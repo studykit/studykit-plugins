@@ -1,0 +1,25 @@
+# DerivedParameter.ModelValueType Property
+
+Parent Object: [DerivedParameter](../DerivedParameter/DerivedParameter.md)
+
+## Description
+
+Gets/(Sets) the setting which is used for determining the method used to compute the model value.
+
+## Syntax
+
+DerivedParameter.**ModelValueType**() As [ModelValueTypeEnum](../ModelValueTypeEnum.md)
+
+## Property Value
+
+This is a read/write property whose value is a [ModelValueTypeEnum](../ModelValueTypeEnum.md).
+
+## Version
+
+Introduced in version 11
+
+---
+
+|  |  |
+| --- | --- |
+| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -1,0 +1,25 @@
+# ComponentOccurrence.PreciseRangeBox Property
+
+Parent Object: [ComponentOccurrence](../ComponentOccurrence/ComponentOccurrence.md)
+
+## Description
+
+Property that returns a Box object which contains the opposing points of a rectangular box that tightly encloses this object.
+
+## Syntax
+
+ComponentOccurrence.**PreciseRangeBox**() As [Box](../Box/Box.md)
+
+## Property Value
+
+This is a read only property whose value is a [Box](../Box/Box.md).
+
+## Version
+
+Introduced in version 2023
+
+---
+
+|  |  |
+| --- | --- |
+| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -1,0 +1,25 @@
+# ChangeDefinition.Type Property
+
+Parent Object: [ChangeDefinition](../ChangeDefinition/ChangeDefinition.md)
+
+## Description
+
+Returns an ObjectTypeEnum indicating this object's type.
+
+## Syntax
+
+ChangeDefinition.**Type**() As [ObjectTypeEnum](../ObjectTypeEnum.md)
+
+## Property Value
+
+This is a read only property whose value is an [ObjectTypeEnum](../ObjectTypeEnum.md).
+
+## Version
+
+Introduced in version 9
+
+---
+
+|  |  |
+| --- | --- |
+| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

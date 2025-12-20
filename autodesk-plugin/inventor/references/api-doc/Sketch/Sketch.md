@@ -1,0 +1,99 @@
+# Sketch Object
+
+## Description
+
+The generic Sketch object. All types of Sketch objects derive from this object. See the article in the overviews section.
+
+## Methods
+
+|  |  |
+| --- | --- |
+| Name | Description |
+| [AddArcSlotByCenterPointArc](../Sketch/Sketch_AddArcSlotByCenterPointArc.md) | Method that creates an arc slot. The sketch entities represent the sketch slot are returned. |
+| [AddArcSlotByThreePointArc](../Sketch/Sketch_AddArcSlotByThreePointArc.md) | Method that creates an arc slot. The sketch entities represent the sketch slot are returned. |
+| [AddByProjectingEntity](../Sketch/Sketch_AddByProjectingEntity.md) | Method that creates a new sketch entity by projecting other entities onto the sketch plane. This method performs the same function as the Project Geometry or Project DWG Geometry command according to the Entity you specified. |
+| [AddStraightSlotByCenterToCenter](../Sketch/Sketch_AddStraightSlotByCenterToCenter.md) | Method that creates a straight slot. The sketch entities represent the sketch slot are returned. |
+| [AddStraightSlotByOverall](../Sketch/Sketch_AddStraightSlotByOverall.md) | Method that creates a straight slot. The sketch entities represent the sketch slot are returned. |
+| [AddStraightSlotBySlotCenter](../Sketch/Sketch_AddStraightSlotBySlotCenter.md) | Method that creates a straight slot. The sketch entities represent the sketch slot are returned. |
+| [CopyContentsTo](../Sketch/Sketch_CopyContentsTo.md) | Method that copies all the contents of the sketch to the \input target sketch. |
+| [CopyEntitiesTo](../Sketch/Sketch_CopyEntitiesTo.md) | Method that copies sketch entities of the sketch to the input target sketch. |
+| [Delete](../Sketch/Sketch_Delete.md) | Method that deletes the sketch. This method is only valid for sketches that are not used by a feature. |
+| [Edit](../Sketch/Sketch_Edit.md) | Method that causes the Sketch environment to be invoked with this sketch available for interactive edit. |
+| [ExitEdit](../Sketch/Sketch_ExitEdit.md) | Causes the Sketch environment to be closed and the user interface to return to the previous environment. This is equivalent to the Return command. This method is only valid in the case where this sketch is open for edit within the user interface. |
+| [GetCustomLineType](../Sketch/Sketch_GetCustomLineType.md) | Method that returns information regarding the custom line type in use. The method returns a failure if the return value of the LineType property is not kCustomLineType. |
+| [GetReferenceKey](../Sketch/Sketch_GetReferenceKey.md) | Method that generates and returns the reference key for this entity. |
+| [MoveSketchObjects](../Sketch/Sketch_MoveSketchObjects.md) | Method that moves a collection of sketch objects by a specified vector. If the Copy argument is set to True, the newly created objects are returned. |
+| [OffsetSketchEntitiesUsingDistance](../Sketch/Sketch_OffsetSketchEntitiesUsingDistance.md) | Method that offsets a sketch entity or a group of connected sketch entities. In both cases, the base sketch entity is first offset by the specified distance and along the specified direction. The base sketch entity is determined as follows: \* If only one sketch entity needs to be offset, it will be treated as the base sketch entity. \* If a group of end-to-end connected entities need to be offset, the first entity in the group will be treated as the base sketch entity. If this method successfully offsets the specified input sketch entities, the newly created sketch entities are returned. |
+| [OffsetSketchEntitiesUsingPoint](../Sketch/Sketch_OffsetSketchEntitiesUsingPoint.md) | Method that offsets a sketch entity or a group of end-to-end connected sketch entities. In both cases, the offset is first applied to the base sketch entity such that the offset of the base sketch entity passes through the specified offset point on the sketch. The shortest distance of this offset point from the original base sketch entity determines the offset distance. |
+| [RotateSketchObjects](../Sketch/Sketch_RotateSketchObjects.md) | Method that rotates a collection of sketch objects by a specified angle. If the Copy argument is set to True, the newly created objects are returned. |
+| [SetCustomLineType](../Sketch/Sketch_SetCustomLineType.md) | Method that sets a custom line type to the curve from the specified .lin file. The method automatically changes the value of LineType property to kCustomLineType. |
+| [Solve](../Sketch/Sketch_Solve.md) | Method that causes the sketch to solve. |
+
+## Properties
+
+|  |  |
+| --- | --- |
+| Name | Description |
+| [Application](../Sketch/Sketch_Application.md) | Returns the top-level parent application object. When used the context of Inventor, an Application object is returned. When used in the context of Apprentice, an ApprenticeServer object is returned. |
+| [AttributeSets](../Sketch/Sketch_AttributeSets.md) | Property that returns the AttributeSets collection object associated with this object. |
+| [CircularPatterns](../Sketch/Sketch_CircularPatterns.md) | Gets the SketchCircularPatterns collection object. |
+| [Color](../Sketch/Sketch_Color.md) | Gets and Sets the color for the sketch. |
+| [ConstraintStatus](../Sketch/Sketch_ConstraintStatus.md) | Property that returns an enum indicating the constraint status of the sketch entity, signifying whether it is fully constrained, over constrained, or under constrained. |
+| [DataIO](../Sketch/Sketch_DataIO.md) | Gets the object through which this sketch's data content can be persisted. |
+| [DeferUpdates](../Sketch/Sketch_DeferUpdates.md) | Gets and Sets whether to defer the solving of the sketch or not. |
+| [DimensionConstraints](../Sketch/Sketch_DimensionConstraints.md) | Gets the collection of all dimension constraints on the sketch. |
+| [DisabledActionTypes](../Sketch/Sketch_DisabledActionTypes.md) | Gets and sets the action types valid for this sketch. |
+| [GeometricConstraints](../Sketch/Sketch_GeometricConstraints.md) | Property that returns the collection of all geometric constraints on the sketch. |
+| [LineType](../Sketch/Sketch_LineType.md) | Gets and Sets the line type override for the sketch. |
+| [LineWeight](../Sketch/Sketch_LineWeight.md) | Gets and Sets the line weight override for the sketch. |
+| [Name](../Sketch/Sketch_Name.md) | Gets and sets name of the sketch. |
+| [Parent](../Sketch/Sketch_Parent.md) | Property that gets the parent object from whom this object can logically be reached. |
+| [RectangularPatterns](../Sketch/Sketch_RectangularPatterns.md) | Gets the SketchRectangularPatterns collection object. |
+| [SketchArcs](../Sketch/Sketch_SketchArcs.md) | Property that returns the SketchArcs collection object. |
+| [SketchCircles](../Sketch/Sketch_SketchCircles.md) | Property that returns the SketchArcs collection object. |
+| [SketchControlPointSplines](../Sketch/Sketch_SketchControlPointSplines.md) | Read-only property that returns the SketchControlPointSplines collection object. This collection provides access to the existing control point splines in the sketch and provides functionality to create new control point splines. |
+| [SketchEllipses](../Sketch/Sketch_SketchEllipses.md) | Property that returns the SketchEllipses collection object. |
+| [SketchEllipticalArcs](../Sketch/Sketch_SketchEllipticalArcs.md) | Property that returns the SketchEllipticalArcs collection object. |
+| [SketchEntities](../Sketch/Sketch_SketchEntities.md) | Property that returns the collection of all entities on the sketch, regardless of their type. |
+| [SketchEquationCurves](../Sketch/Sketch_SketchEquationCurves.md) | Read-only property that returns the SketchEquationCurves collection object. This collection provides access to the existing equation curves in the sketch and provides functionality to create new equation curves. |
+| [SketchFixedSplines](../Sketch/Sketch_SketchFixedSplines.md) | Property that gets the collection object. |
+| [SketchImages](../Sketch/Sketch_SketchImages.md) | Property that returns a collection of all images on the sketch. |
+| [SketchLines](../Sketch/Sketch_SketchLines.md) | Property that returns the SketchLines collection object. This collection provides access to the existing lines in the sketch and provides functionality to create new lines. |
+| [SketchOffsetSplines](../Sketch/Sketch_SketchOffsetSplines.md) | Property that returns the collection object. This collection provides access to the existing offset splines in the sketch. |
+| [SketchPoints](../Sketch/Sketch_SketchPoints.md) | Property that returns the SketchPoints collection object. |
+| [SketchSplines](../Sketch/Sketch_SketchSplines.md) | Property that returns the SketchSplines collection object. |
+| [TextBoxes](../Sketch/Sketch_TextBoxes.md) | Gets the TextBoxes collection associated with this Sketch. |
+| [Type](../Sketch/Sketch_Type.md) | Returns an ObjectTypeEnum indicating this object's type. |
+| [Visible](../Sketch/Sketch_Visible.md) | Gets and sets the visibility of the sketch. |
+
+## Accessed From
+
+[ArcLengthDimConstraint.Parent](../ArcLengthDimConstraint/ArcLengthDimConstraint_Parent.md), [ArcLengthDimConstraintProxy.Parent](../ArcLengthDimConstraintProxy/ArcLengthDimConstraintProxy_Parent.md), [CoincidentConstraint.Parent](../CoincidentConstraint/CoincidentConstraint_Parent.md), [CoincidentConstraintProxy.Parent](../CoincidentConstraintProxy/CoincidentConstraintProxy_Parent.md), [CollinearConstraint.Parent](../CollinearConstraint/CollinearConstraint_Parent.md), [CollinearConstraintProxy.Parent](../CollinearConstraintProxy/CollinearConstraintProxy_Parent.md), [ConcentricConstraint.Parent](../ConcentricConstraint/ConcentricConstraint_Parent.md), [ConcentricConstraintProxy.Parent](../ConcentricConstraintProxy/ConcentricConstraintProxy_Parent.md), [DiameterDimConstraint.Parent](../DiameterDimConstraint/DiameterDimConstraint_Parent.md), [DiameterDimConstraintProxy.Parent](../DiameterDimConstraintProxy/DiameterDimConstraintProxy_Parent.md), [DimensionConstraint.Parent](../DimensionConstraint/DimensionConstraint_Parent.md), [EllipseRadiusDimConstraint.Parent](../EllipseRadiusDimConstraint/EllipseRadiusDimConstraint_Parent.md), [EllipseRadiusDimConstraintProxy.Parent](../EllipseRadiusDimConstraintProxy/EllipseRadiusDimConstraintProxy_Parent.md), [EqualLengthConstraint.Parent](../EqualLengthConstraint/EqualLengthConstraint_Parent.md), [EqualLengthConstraintProxy.Parent](../EqualLengthConstraintProxy/EqualLengthConstraintProxy_Parent.md), [EqualRadiusConstraint.Parent](../EqualRadiusConstraint/EqualRadiusConstraint_Parent.md), [EqualRadiusConstraintProxy.Parent](../EqualRadiusConstraintProxy/EqualRadiusConstraintProxy_Parent.md), [GeometricConstraint.Parent](../GeometricConstraint/GeometricConstraint_Parent.md), [GroundConstraint.Parent](../GroundConstraint/GroundConstraint_Parent.md), [GroundConstraintProxy.Parent](../GroundConstraintProxy/GroundConstraintProxy_Parent.md), [HorizontalAlignConstraint.Parent](../HorizontalAlignConstraint/HorizontalAlignConstraint_Parent.md), [HorizontalAlignConstraintProxy.Parent](../HorizontalAlignConstraintProxy/HorizontalAlignConstraintProxy_Parent.md), [HorizontalConstraint.Parent](../HorizontalConstraint/HorizontalConstraint_Parent.md), [HorizontalConstraintProxy.Parent](../HorizontalConstraintProxy/HorizontalConstraintProxy_Parent.md), [MidpointConstraint.Parent](../MidpointConstraint/MidpointConstraint_Parent.md), [MidpointConstraintProxy.Parent](../MidpointConstraintProxy/MidpointConstraintProxy_Parent.md), [OffsetConstraint.Parent](../OffsetConstraint/OffsetConstraint_Parent.md), [OffsetConstraintProxy.Parent](../OffsetConstraintProxy/OffsetConstraintProxy_Parent.md), [OffsetDimConstraint.Parent](../OffsetDimConstraint/OffsetDimConstraint_Parent.md), [OffsetDimConstraintProxy.Parent](../OffsetDimConstraintProxy/OffsetDimConstraintProxy_Parent.md), [OffsetSplineDimConstraint.Parent](../OffsetSplineDimConstraint/OffsetSplineDimConstraint_Parent.md), [OffsetSplineDimConstraintProxy.Parent](../OffsetSplineDimConstraintProxy/OffsetSplineDimConstraintProxy_Parent.md), [ParallelConstraint.Parent](../ParallelConstraint/ParallelConstraint_Parent.md), [ParallelConstraintProxy.Parent](../ParallelConstraintProxy/ParallelConstraintProxy_Parent.md), [PatternConstraint.Parent](../PatternConstraint/PatternConstraint_Parent.md), [PatternConstraintProxy.Parent](../PatternConstraintProxy/PatternConstraintProxy_Parent.md), [PerpendicularConstraint.Parent](../PerpendicularConstraint/PerpendicularConstraint_Parent.md), [PerpendicularConstraintProxy.Parent](../PerpendicularConstraintProxy/PerpendicularConstraintProxy_Parent.md), [Profile.Parent](../Profile/Profile_Parent.md), [ProfileProxy.Parent](../ProfileProxy/ProfileProxy_Parent.md), [RadiusDimConstraint.Parent](../RadiusDimConstraint/RadiusDimConstraint_Parent.md), [RadiusDimConstraintProxy.Parent](../RadiusDimConstraintProxy/RadiusDimConstraintProxy_Parent.md), [SketchArc.Parent](../SketchArc/SketchArc_Parent.md), [SketchArcProxy.Parent](../SketchArcProxy/SketchArcProxy_Parent.md), [SketchBlock.Parent](../SketchBlock/SketchBlock_Parent.md), [SketchBlockProxy.Parent](../SketchBlockProxy/SketchBlockProxy_Parent.md), [SketchCircle.Parent](../SketchCircle/SketchCircle_Parent.md), [SketchCircleProxy.Parent](../SketchCircleProxy/SketchCircleProxy_Parent.md), [SketchCircularPattern.Parent](../SketchCircularPattern/SketchCircularPattern_Parent.md), [SketchControlPointSpline.Parent](../SketchControlPointSpline/SketchControlPointSpline_Parent.md), [SketchControlPointSplineProxy.Parent](../SketchControlPointSplineProxy/SketchControlPointSplineProxy_Parent.md), [SketchEllipse.Parent](../SketchEllipse/SketchEllipse_Parent.md), [SketchEllipseProxy.Parent](../SketchEllipseProxy/SketchEllipseProxy_Parent.md), [SketchEllipticalArc.Parent](../SketchEllipticalArc/SketchEllipticalArc_Parent.md), [SketchEllipticalArcProxy.Parent](../SketchEllipticalArcProxy/SketchEllipticalArcProxy_Parent.md), [SketchEntity.Parent](../SketchEntity/SketchEntity_Parent.md), [SketchEquationCurve.Parent](../SketchEquationCurve/SketchEquationCurve_Parent.md), [SketchEquationCurveProxy.Parent](../SketchEquationCurveProxy/SketchEquationCurveProxy_Parent.md), [SketchesEnumerator.Item](../SketchesEnumerator/SketchesEnumerator_Item.md), [SketchFillRegion.Parent](../SketchFillRegion/SketchFillRegion_Parent.md), [SketchFixedSpline.Parent](../SketchFixedSpline/SketchFixedSpline_Parent.md), [SketchFixedSplineProxy.Parent](../SketchFixedSplineProxy/SketchFixedSplineProxy_Parent.md), [SketchLine.Parent](../SketchLine/SketchLine_Parent.md), [SketchLineProxy.Parent](../SketchLineProxy/SketchLineProxy_Parent.md), [SketchOffsetSpline.Parent](../SketchOffsetSpline/SketchOffsetSpline_Parent.md), [SketchOffsetSplineProxy.Parent](../SketchOffsetSplineProxy/SketchOffsetSplineProxy_Parent.md), [SketchPoint.Parent](../SketchPoint/SketchPoint_Parent.md), [SketchPointProxy.Parent](../SketchPointProxy/SketchPointProxy_Parent.md), [SketchRectangularPattern.Parent](../SketchRectangularPattern/SketchRectangularPattern_Parent.md), [SketchSpline.Parent](../SketchSpline/SketchSpline_Parent.md), [SketchSplineHandle.Parent](../SketchSplineHandle/SketchSplineHandle_Parent.md), [SketchSplineHandleProxy.Parent](../SketchSplineHandleProxy/SketchSplineHandleProxy_Parent.md), [SketchSplineProxy.Parent](../SketchSplineProxy/SketchSplineProxy_Parent.md), [SmoothConstraint.Parent](../SmoothConstraint/SmoothConstraint_Parent.md), [SmoothConstraintProxy.Parent](../SmoothConstraintProxy/SmoothConstraintProxy_Parent.md), [SplineFitPointConstraint.Parent](../SplineFitPointConstraint/SplineFitPointConstraint_Parent.md), [SplineFitPointConstraintProxy.Parent](../SplineFitPointConstraintProxy/SplineFitPointConstraintProxy_Parent.md), [SymmetryConstraint.Parent](../SymmetryConstraint/SymmetryConstraint_Parent.md), [SymmetryConstraintProxy.Parent](../SymmetryConstraintProxy/SymmetryConstraintProxy_Parent.md), [TangentDistanceDimConstraint.Parent](../TangentDistanceDimConstraint/TangentDistanceDimConstraint_Parent.md), [TangentDistanceDimConstraintProxy.Parent](../TangentDistanceDimConstraintProxy/TangentDistanceDimConstraintProxy_Parent.md), [TangentSketchConstraint.Parent](../TangentSketchConstraint/TangentSketchConstraint_Parent.md), [TangentSketchConstraintProxy.Parent](../TangentSketchConstraintProxy/TangentSketchConstraintProxy_Parent.md), [TextBox.Parent](../TextBox/TextBox_Parent.md), [TextBoxConstraint.Parent](../TextBoxConstraint/TextBoxConstraint_Parent.md), [TextBoxConstraintProxy.Parent](../TextBoxConstraintProxy/TextBoxConstraintProxy_Parent.md), [TextBoxProxy.Parent](../TextBoxProxy/TextBoxProxy_Parent.md), [ThreePointAngleDimConstraint.Parent](../ThreePointAngleDimConstraint/ThreePointAngleDimConstraint_Parent.md), [ThreePointAngleDimConstraintProxy.Parent](../ThreePointAngleDimConstraintProxy/ThreePointAngleDimConstraintProxy_Parent.md), [TwoLineAngleDimConstraint.Parent](../TwoLineAngleDimConstraint/TwoLineAngleDimConstraint_Parent.md), [TwoLineAngleDimConstraintProxy.Parent](../TwoLineAngleDimConstraintProxy/TwoLineAngleDimConstraintProxy_Parent.md), [TwoPointDistanceDimConstraint.Parent](../TwoPointDistanceDimConstraint/TwoPointDistanceDimConstraint_Parent.md), [TwoPointDistanceDimConstraintProxy.Parent](../TwoPointDistanceDimConstraintProxy/TwoPointDistanceDimConstraintProxy_Parent.md), [VerticalAlignConstraint.Parent](../VerticalAlignConstraint/VerticalAlignConstraint_Parent.md), [VerticalAlignConstraintProxy.Parent](../VerticalAlignConstraintProxy/VerticalAlignConstraintProxy_Parent.md), [VerticalConstraint.Parent](../VerticalConstraint/VerticalConstraint_Parent.md), [VerticalConstraintProxy.Parent](../VerticalConstraintProxy/VerticalConstraintProxy_Parent.md)
+
+## Derived Classes
+
+[DrawingSketch](../DrawingSketch/DrawingSketch.md), [PlanarSketch](../PlanarSketch/PlanarSketch.md)
+
+## Samples
+
+|  |  |
+| --- | --- |
+| Name | Description |
+| [Copy a sketch](../../sample-programs/CopySketch_Sample.md) | This sample demonstrates copying the contents of a sketch into another sketch via the API. |
+| [Sketch profile control](../../sample-programs/ProfilePath_AddsMaterial_Sample.md) | This sample demonstrates the usage of the Profiles API to control the shape of the profile. The sample creates three concntric circles and creates an extrusion of the region between the inner circles. |
+| [Copy sketch contents](../../sample-programs/Sketch_CopyContentsTo_Sample.md) | This sample shows how to copy the contents of one sketch to another. |
+| [Defer sketch updates](../../sample-programs/Sketch_DeferUpdates_Sample.md) | This sample demonstrates the sketch defer update functionality. |
+| [Move sketch entities](../../sample-programs/Sketch_MoveSketchObjects_Sample.md) | This sample demonstrates the translation of all the objects on the active sketch by a certain distance. |
+| [Create SketchedSymbol Definition](../../sample-programs/SketchedSymbolDefinition_Sample.md) | This sample illustrates creating a new sketched symbol definition object and inserting it into the active sheet. |
+| [Create slots in sketch.](../../sample-programs/SketchSlots_Sample.md) | This sample demonstrates several new methods to create sketch entities that represent slots. These are the equivalent to new sketch commands that were added in Inventor 2014. |
+| [Sketch Text Add](../../sample-programs/TextBoxes_Sample.md) | This sample illustrates creating text in a sketch. |
+
+## Version
+
+Introduced in version 4
+
+---
+
+|  |  |
+| --- | --- |
+| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

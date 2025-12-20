@@ -1,0 +1,25 @@
+# DrawingViewEvents.Parent Property
+
+Parent Object: [DrawingViewEvents](../DrawingViewEvents/DrawingViewEvents.md)
+
+## Description
+
+Gets the parent object from whom this object can logically be reached.
+
+## Syntax
+
+DrawingViewEvents.**Parent**() As [DrawingView](../DrawingView/DrawingView.md)
+
+## Property Value
+
+This is a read only property whose value is a [DrawingView](../DrawingView/DrawingView.md).
+
+## Version
+
+Introduced in version 9
+
+---
+
+|  |  |
+| --- | --- |
+| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

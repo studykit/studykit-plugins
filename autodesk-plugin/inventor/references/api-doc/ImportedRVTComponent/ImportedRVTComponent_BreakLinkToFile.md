@@ -1,0 +1,21 @@
+# ImportedRVTComponent.BreakLinkToFile Method
+
+Parent Object: [ImportedRVTComponent](../ImportedRVTComponent/ImportedRVTComponent.md)
+
+## Description
+
+Method that breaks the connection of the derived component with the part or assembly from which it was created. When the link is broken the ReferencedFile property will return Nothing.
+
+## Syntax
+
+ImportedRVTComponent.**BreakLinkToFile**()
+
+## Version
+
+Introduced in version 2021
+
+---
+
+|  |  |
+| --- | --- |
+| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

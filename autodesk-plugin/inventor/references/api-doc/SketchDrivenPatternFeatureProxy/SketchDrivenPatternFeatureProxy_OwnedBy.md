@@ -1,0 +1,25 @@
+# SketchDrivenPatternFeatureProxy.OwnedBy Property
+
+Parent Object: [SketchDrivenPatternFeatureProxy](../SketchDrivenPatternFeatureProxy/SketchDrivenPatternFeatureProxy.md)
+
+## Description
+
+Property that returns the owning PartFeature object. This property returns Nothing if the IsOwnedByFeature property returns False.
+
+## Syntax
+
+SketchDrivenPatternFeatureProxy.**OwnedBy**() As [PartFeature](../PartFeature/PartFeature.md)
+
+## Property Value
+
+This is a read only property whose value is a [PartFeature](../PartFeature/PartFeature.md).
+
+## Version
+
+Introduced in version 2017
+
+---
+
+|  |  |
+| --- | --- |
+| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

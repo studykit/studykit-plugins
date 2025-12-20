@@ -1,0 +1,25 @@
+# DrawingOptions.EnableOrdinateDimGeomSelection Property
+
+Parent Object: [DrawingOptions](../DrawingOptions/DrawingOptions.md)
+
+## Description
+
+Gets/Sets the selection of drawing geometry when creating ordinate dimensions.
+
+## Syntax
+
+DrawingOptions.**EnableOrdinateDimGeomSelection**() As Boolean
+
+## Property Value
+
+This is a read/write property whose value is a Boolean.
+
+## Version
+
+Introduced in version 2008
+
+---
+
+|  |  |
+| --- | --- |
+| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

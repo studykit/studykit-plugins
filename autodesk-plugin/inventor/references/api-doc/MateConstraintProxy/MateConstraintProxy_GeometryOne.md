@@ -1,0 +1,25 @@
+# MateConstraintProxy.GeometryOne Property
+
+Parent Object: [MateConstraintProxy](../MateConstraintProxy/MateConstraintProxy.md)
+
+## Description
+
+Property that returns the geometry of the first of the two entities that this constraint is between. The geometry returned is in the space of the assembly and for face or work plane geometries it accounts for the orientation of the face or work plane.
+
+## Syntax
+
+MateConstraintProxy.**GeometryOne**() As Object
+
+## Property Value
+
+This is a read only property whose value is an Object.
+
+## Version
+
+Introduced in version 11
+
+---
+
+|  |  |
+| --- | --- |
+| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

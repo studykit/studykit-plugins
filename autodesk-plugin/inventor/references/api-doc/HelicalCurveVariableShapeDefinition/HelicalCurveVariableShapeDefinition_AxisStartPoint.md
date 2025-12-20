@@ -1,0 +1,25 @@
+# HelicalCurveVariableShapeDefinition.AxisStartPoint Property
+
+Parent Object: [HelicalCurveVariableShapeDefinition](../HelicalCurveVariableShapeDefinition/HelicalCurveVariableShapeDefinition.md)
+
+## Description
+
+Gets and sets the axis start point of the helical curve.
+
+## Syntax
+
+HelicalCurveVariableShapeDefinition.**AxisStartPoint**() As [Point](../Point/Point.md)
+
+## Property Value
+
+This is a read/write property whose value is a [Point](../Point/Point.md).
+
+## Version
+
+Introduced in version 2019
+
+---
+
+|  |  |
+| --- | --- |
+| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

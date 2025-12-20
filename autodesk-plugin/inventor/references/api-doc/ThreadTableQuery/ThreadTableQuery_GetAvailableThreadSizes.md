@@ -1,0 +1,36 @@
+# ThreadTableQuery.GetAvailableThreadSizes Method
+
+Parent Object: [ThreadTableQuery](../ThreadTableQuery/ThreadTableQuery.md)
+
+## Description
+
+Method that returns all the available thread sizes for a given thread type.
+
+## Syntax
+
+ThreadTableQuery.**GetAvailableThreadSizes**( ***Internal*** As Boolean, ***ThreadType*** As String ) As String()
+
+## Parameters
+
+|  |  |  |
+| --- | --- | --- |
+| Name | Type | Description |
+| Internal | Boolean | Input Boolean that indicates if the thread is an internal or external thread. A value of True indicates an Internal thread. |
+| ThreadType | String | Thread type identifier string. |
+
+## Samples
+
+|  |  |
+| --- | --- |
+| Name | Description |
+| [Creating a ThreadInfo object](../../sample-programs/ThreadTableQuery_CreateThreadInfo_Sample.md) | Demonstrates the use of a ThreadInfo object. |
+
+## Version
+
+Introduced in version 11
+
+---
+
+|  |  |
+| --- | --- |
+| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

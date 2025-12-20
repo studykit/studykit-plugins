@@ -1,0 +1,25 @@
+# WorkSurfaces.Count Property
+
+Parent Object: [WorkSurfaces](../WorkSurfaces/WorkSurfaces.md)
+
+## Description
+
+Property that returns the number of items in this collection.
+
+## Syntax
+
+WorkSurfaces.**Count**() As Long
+
+## Property Value
+
+This is a read only property whose value is a Long.
+
+## Version
+
+Introduced in version 6
+
+---
+
+|  |  |
+| --- | --- |
+| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

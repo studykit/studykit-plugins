@@ -1,0 +1,66 @@
+# Matrix Object
+
+## Description
+
+A 4x4 Matrix object. For more information, see the Transient Geometry article in the overviews section.
+
+## Methods
+
+|  |  |
+| --- | --- |
+| Name | Description |
+| [Copy](../Matrix/Matrix_Copy.md) | Creates a copy of this Matrix object. The result is entirely independent and can be edited without affecting the original Matrix object. |
+| [GetCoordinateSystem](../Matrix/Matrix_GetCoordinateSystem.md) | Get the coordinate system that this matrix maps to from the standard coordinate system. |
+| [GetMatrixData](../Matrix/Matrix_GetMatrixData.md) | Get the data defining this matrix. |
+| [Invert](../Matrix/Matrix_Invert.md) | Invert this matrix. |
+| [IsEqualTo](../Matrix/Matrix_IsEqualTo.md) | Compares this matrix for equality with the specified matrix. |
+| [PostMultiplyBy](../Matrix/Matrix_PostMultiplyBy.md) | Method that post-multiplies this matrix by the specified matrix, setting this matrix to the result. |
+| [PreMultiplyBy](../Matrix/Matrix_PreMultiplyBy.md) | Method that post-multiplies this matrix by the specified matrix, setting this matrix to the result. |
+| [PutMatrixData](../Matrix/Matrix_PutMatrixData.md) | Method that sets the data defining this matrix. |
+| [SetCoordinateSystem](../Matrix/Matrix_SetCoordinateSystem.md) | Sets this matrix to be the matrix that maps from the standard coordinate system to the specified coordinate system. |
+| [SetToAlignCoordinateSystems](../Matrix/Matrix_SetToAlignCoordinateSystems.md) | Sets this matrix to be the matrix that maps from the 'from' coordinate system to the 'to' coordinate system. |
+| [SetToIdentity](../Matrix/Matrix_SetToIdentity.md) | Sets this matrix to the identity matrix. |
+| [SetToRotateTo](../Matrix/Matrix_SetToRotateTo.md) | Sets to the matrix of rotation that would align the 'from' vector with the 'to' vector. The optional Axis argument may be used when the two vectors are parallel and in opposite directions to specify a specific solution, but is otherwise ignored. |
+| [SetToRotation](../Matrix/Matrix_SetToRotation.md) | Sets this matrix to the matrix of rotation by the specified angle, through the specified origin, around the specified axis. |
+| [SetTranslation](../Matrix/Matrix_SetTranslation.md) | Sets the translation portion of the matrix. If the optional ResetRotation flag is True, the rotation portion of the matrix is reset to identity. |
+| [TransformBy](../Matrix/Matrix_TransformBy.md) | Method that sets this matrix to the result of this transformation followed by the specified transformation (a pre-multiplication of this matrix by the specified matrix). |
+
+## Properties
+
+|  |  |
+| --- | --- |
+| Name | Description |
+| [Cell](../Matrix/Matrix_Cell.md) | Property that returns the cell defined by row/col. |
+| [Determinant](../Matrix/Matrix_Determinant.md) | Get the determinant of this matrix. |
+| [Translation](../Matrix/Matrix_Translation.md) | Get the translation portion of the matrix. |
+
+## Accessed From
+
+[AnnotationPlaneDefinition.Transformation](../AnnotationPlaneDefinition/AnnotationPlaneDefinition_Transformation.md), [Camera.ModelToViewTransformation](../Camera/Camera_ModelToViewTransformation.md), [ComponentOccurrence.Transformation](../ComponentOccurrence/ComponentOccurrence_Transformation.md), [ComponentOccurrenceProxy.Transformation](../ComponentOccurrenceProxy/ComponentOccurrenceProxy_Transformation.md), [DerivedPartTransformDef.GetTransformation](../DerivedPartTransformDef/DerivedPartTransformDef_GetTransformation.md), [DetailDrawingView.DrawingViewToModelTransform](../DetailDrawingView/DetailDrawingView_DrawingViewToModelTransform.md), [DetailDrawingView.DrawingViewToSheetTransform](../DetailDrawingView/DetailDrawingView_DrawingViewToSheetTransform.md), [DetailDrawingView.ModelToDrawingViewTransform](../DetailDrawingView/DetailDrawingView_ModelToDrawingViewTransform.md), [DetailDrawingView.ModelToSheetTransform](../DetailDrawingView/DetailDrawingView_ModelToSheetTransform.md), [DetailDrawingView.SheetToDrawingViewTransform](../DetailDrawingView/DetailDrawingView_SheetToDrawingViewTransform.md), [DetailDrawingView.SheetToModelTransform](../DetailDrawingView/DetailDrawingView_SheetToModelTransform.md), [DrawingView.DrawingViewToModelTransform](../DrawingView/DrawingView_DrawingViewToModelTransform.md), [DrawingView.DrawingViewToSheetTransform](../DrawingView/DrawingView_DrawingViewToSheetTransform.md), [DrawingView.ModelToDrawingViewTransform](../DrawingView/DrawingView_ModelToDrawingViewTransform.md), [DrawingView.ModelToSheetTransform](../DrawingView/DrawingView_ModelToSheetTransform.md), [DrawingView.SheetToDrawingViewTransform](../DrawingView/DrawingView_SheetToDrawingViewTransform.md), [DrawingView.SheetToModelTransform](../DrawingView/DrawingView_SheetToModelTransform.md), [DWGBlockReference.Transformation](../DWGBlockReference/DWGBlockReference_Transformation.md), [DWGBlockReferenceProxy.Transformation](../DWGBlockReferenceProxy/DWGBlockReferenceProxy_Transformation.md), [FeaturePatternElement.Transform](../FeaturePatternElement/FeaturePatternElement_Transform.md), [FeaturePatternElementProxy.Transform](../FeaturePatternElementProxy/FeaturePatternElementProxy_Transform.md), [FreeMoveDefinition.Transformation](../FreeMoveDefinition/FreeMoveDefinition_Transformation.md), [GraphicsNode.Transformation](../GraphicsNode/GraphicsNode_Transformation.md), [GraphicsNodeProxy.Transformation](../GraphicsNodeProxy/GraphicsNodeProxy_Transformation.md), [ImportedDWGComponentDefinition.Transformation](../ImportedDWGComponentDefinition/ImportedDWGComponentDefinition_Transformation.md), [ManipulatorEvents.Transform](../ManipulatorEvents/ManipulatorEvents_Transform.md), [Matrix.Copy](../Matrix/Matrix_Copy.md), [ModelDatumReferenceFrameDefinition.CoordinateSystem](ModelDatumReferenceFrameDefinition_CoordinateSystem.md), [MoveFeature.Transformation](../MoveFeature/MoveFeature_Transformation.md), [MoveFeatureProxy.Transformation](../MoveFeatureProxy/MoveFeatureProxy_Transformation.md), [OGSRenderItem.TextureTransformation](OGSRenderItem_TextureTransformation.md), [OGSRenderItem.Transformation](OGSRenderItem_Transformation.md), [OGSSceneNode.Transformation](OGSSceneNode_Transformation.md), [PlanarSketch.ModelToSketchTransform](../PlanarSketch/PlanarSketch_ModelToSketchTransform.md), [PlanarSketch.SketchToModelTransform](../PlanarSketch/PlanarSketch_SketchToModelTransform.md), [PlanarSketchProxy.ModelToSketchTransform](../PlanarSketchProxy/PlanarSketchProxy_ModelToSketchTransform.md), [PlanarSketchProxy.SketchToModelTransform](../PlanarSketchProxy/PlanarSketchProxy_SketchToModelTransform.md), [PointCloud.Transform](../PointCloud/PointCloud_Transform.md), [PointCloudProxy.Transform](../PointCloudProxy/PointCloudProxy_Transform.md), [PositionalRepresentation.IsTransformOverridden](../PositionalRepresentation/PositionalRepresentation_IsTransformOverridden.md), [PresentationComponent.Transformation](../PresentationComponent/PresentationComponent_Transformation.md), [PresentationExplodedView.GetTransform](PresentationExplodedView_GetTransform.md), [PublicationComponent.GetTweakTransformationAt](PublicationComponent_GetTweakTransformationAt.md), [PublicationComponent.InitialTransformation](PublicationComponent_InitialTransformation.md), [PublicationComponent.Transformation](PublicationComponent_Transformation.md), [PublicationMarkedView.GetComponentTransformation](PublicationMarkedView_GetComponentTransformation.md), [PublicationTweakDefinition.Transform](PublicationTweakDefinition_Transform.md), [PublicationTweaks.TriadMatrix](PublicationTweaks_TriadMatrix.md), [SectionDrawingView.DrawingViewToModelTransform](../SectionDrawingView/SectionDrawingView_DrawingViewToModelTransform.md), [SectionDrawingView.DrawingViewToSheetTransform](../SectionDrawingView/SectionDrawingView_DrawingViewToSheetTransform.md), [SectionDrawingView.ModelToDrawingViewTransform](../SectionDrawingView/SectionDrawingView_ModelToDrawingViewTransform.md), [SectionDrawingView.ModelToSheetTransform](../SectionDrawingView/SectionDrawingView_ModelToSheetTransform.md), [SectionDrawingView.SheetToDrawingViewTransform](../SectionDrawingView/SectionDrawingView_SheetToDrawingViewTransform.md), [SectionDrawingView.SheetToModelTransform](../SectionDrawingView/SectionDrawingView_SheetToModelTransform.md), [SketchBlockDefinition.ModelToSketchTransform](../SketchBlockDefinition/SketchBlockDefinition_ModelToSketchTransform.md), [SketchBlockDefinition.SketchToModelTransform](../SketchBlockDefinition/SketchBlockDefinition_SketchToModelTransform.md), [SketchBlockDefinitionProxy.ModelToSketchTransform](../SketchBlockDefinitionProxy/SketchBlockDefinitionProxy_ModelToSketchTransform.md), [SketchBlockDefinitionProxy.SketchToModelTransform](../SketchBlockDefinitionProxy/SketchBlockDefinitionProxy_SketchToModelTransform.md), [TextureMap.Transformation](../TextureMap/TextureMap_Transformation.md), [TransientGeometry.CreateMatrix](../TransientGeometry/TransientGeometry_CreateMatrix.md), [TriadEvents.GlobalTransform](../TriadEvents/TriadEvents_GlobalTransform.md), [UserCoordinateSystem.Transformation](../UserCoordinateSystem/UserCoordinateSystem_Transformation.md), [UserCoordinateSystemDefinition.Transformation](../UserCoordinateSystemDefinition/UserCoordinateSystemDefinition_Transformation.md), [UserCoordinateSystemProxy.Transformation](../UserCoordinateSystemProxy/UserCoordinateSystemProxy_Transformation.md)
+
+## Samples
+
+|  |  |
+| --- | --- |
+| Name | Description |
+| [Adding iAssembly occurrences](../../sample-programs/AddiAssemblyMember_Sample.md) | This sample demonstrates adding iAssembly occurrences to an assembly. |
+| [Adding iPart occurrences to an assembly](../../sample-programs/AddiPartMember_Sample.md) | This sample demonstrates adding iPart occurrences to an assembly. |
+| [Assembly Add Occurrence](../../sample-programs/AddOccurrence_Sample.md) | This sample demonstrates placing an assembly occurrence. |
+| [iMate Creation During Occurrence Placement](../../sample-programs/AddUsingiMates_Sample.md) | This sample demonstrates creating multiple iMate results when adding an occurrence into an assembly. This uses the AddUsingiMate method which is the equivalent of using the Place Component command and checking the Use iMate check box on the dialog. |
+| [Demote occurence](../../sample-programs/BrowserPaneObject_Reorder_Demote_Sample.md) | This sample demonstrates how to demote a top level occurrence in an assembly into a new sub-assembly occurrence. |
+| [SurfaceBody Copy](../../sample-programs/CopyBodyFeature_Sample.md) | This sample demonstrates copying a surface body from one part to another. This is equivalent to the Promote command, but the API is much more flexible. In order for the sample to be self-contained, it creates two parts on the fly that will be used to demonstrate copying a body from one part to another. When copying a body into a part, you provide the surface body and a matrix to define its position in the new part. This sample creates a matrix based on the position of these parts within an assembly. |
+| [Derived Parts and Assemblies](../../sample-programs/DerivedAssemblyComponents_Add_Sample.md) | This sample demonstrates the use of the API to create derived parts and assemblies. |
+| [Client Graphics - Line](../../sample-programs/GraphicsNode_AddLineGraphics_Sample.md) | This sample demonstrates the creation of custom graphics using LineGraphics and LineStripGraphics. The same set of coordinate data is used for both types of graphics. Line graphics use two coordinates to define a line, and then the next two coordinates to define the next line, and so on through the defined coordinates. For the data provided, this results in gaps in the drawn curve. Line strips use the first two coordinates to define the first line and then the last point of the first line becomes the first point of the second line and the next coordinate is used as the end point of the second line. This results in the set of points being connected by a continuous set of lines, drawing a continuous curve. This sample also demonstrates two methods of defining the color for client graphics. In one case it uses an existing appearance asset, and in the other, it explicitly defines a color and assigns it. To use the sample you need to have an assembly or part document open. The program has two behaviors: the first time it is run it will draw the graphics. The second time it is run it deletes the previously drawn graphics. |
+| [Create assembly occurrence with representations](../../sample-programs/OccurrenceAddWithOptions_Sample.md) | This sample demonstrates how to create an assembly occurrence by specifying various representations. |
+| [Assembly Move Occurrence](../../sample-programs/TransformOccurrence_Sample.md) | This sample demonstrates moving a component occurrence. This sample performs a translate, but a rotate can also be performed since the transform is defined using a matrix. |
+| [UCS by transformation matrix](../../sample-programs/UserCoordinateSystems_CreateDefinition_Sample.md) | This sample demonstrates the creation of a user coordinate system (UCS) by specifying a transformation matrix. |
+
+## Version
+
+Introduced in version 4
+
+---
+
+|  |  |
+| --- | --- |
+| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

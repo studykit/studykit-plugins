@@ -1,0 +1,31 @@
+# DrawingDocument.PutInternalNameAndRevisionId Method
+
+Parent Object: [DrawingDocument](../DrawingDocument/DrawingDocument.md)
+
+## Description
+
+Constructs and sets the Internal Name and Revision Identifier for this Document from strings supplied. This can only be done on a previously un-saved document (New or SaveCopyAs)
+
+## Syntax
+
+DrawingDocument.**PutInternalNameAndRevisionId**( ***InternalNameToken*** As String, ***RevisionIdToken*** As String, ***InternalName*** As String, ***RevisionId*** As String )
+
+## Parameters
+
+|  |  |  |
+| --- | --- | --- |
+| Name | Type | Description |
+| InternalNameToken | String | Input string value to specify the internal name token. |
+| RevisionIdToken | String | Input string value to specify the revision token. |
+| InternalName | String | Output string(GUID) value that indicates the internal name. |
+| RevisionId | String | Output string(GUID) value that indicates the revision Id. |
+
+## Version
+
+Introduced in version 11
+
+---
+
+|  |  |
+| --- | --- |
+| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

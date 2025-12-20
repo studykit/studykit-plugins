@@ -1,0 +1,29 @@
+# CornerChamferDefinition.SetDistance Method
+
+Parent Object: [CornerChamferDefinition](../CornerChamferDefinition/CornerChamferDefinition.md)
+
+## Description
+
+Method that changes the way this corner chamfer is defined so that it is defined using an equal distance from the corner.
+
+## Syntax
+
+CornerChamferDefinition.**SetDistance**( ***CornerEdges*** As [EdgeCollection](../EdgeCollection/EdgeCollection.md), ***Distance*** As Variant )
+
+## Parameters
+
+|  |  |  |
+| --- | --- | --- |
+| Name | Type | Description |
+| CornerEdges | [EdgeCollection](../EdgeCollection/EdgeCollection.md) | Input EdgeCollection object that contains all of the corners to apply a fillet on. These must be corner edges. |
+| Distance | Variant | Input Variant that defines the distance from the edge. This can be either a numeric value or a string. A parameter for this value will be created and the supplied string or value is assigned to the parameter. If a value is input, the units are centimeters. If a string is input, the units can be specified as part of the string or it will default to the current length units of the document. |
+
+## Version
+
+Introduced in version 2010
+
+---
+
+|  |  |
+| --- | --- |
+| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

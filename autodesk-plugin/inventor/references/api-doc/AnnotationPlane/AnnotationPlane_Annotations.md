@@ -1,0 +1,25 @@
+# AnnotationPlane.Annotations Property
+
+Parent Object: [AnnotationPlane](../AnnotationPlane/AnnotationPlane.md)
+
+## Description
+
+Read-only property that returns the annotations associated with this annotation plane.
+
+## Syntax
+
+AnnotationPlane.**Annotations**() As [ModelAnnotationsEnumerator](../ModelAnnotationsEnumerator/ModelAnnotationsEnumerator.md)
+
+## Property Value
+
+This is a read only property whose value is a [ModelAnnotationsEnumerator](../ModelAnnotationsEnumerator/ModelAnnotationsEnumerator.md).
+
+## Version
+
+Introduced in version 2018
+
+---
+
+|  |  |
+| --- | --- |
+| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

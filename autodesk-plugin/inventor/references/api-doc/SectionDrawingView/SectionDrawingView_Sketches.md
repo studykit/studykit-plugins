@@ -1,0 +1,25 @@
+# SectionDrawingView.Sketches Property
+
+Parent Object: [SectionDrawingView](../SectionDrawingView/SectionDrawingView.md)
+
+## Description
+
+Property that returns the DrawingSketches collection object for the sheet. This object provides access to all of the sketches that have been created on the sheet and provides functionality to create new sketches.
+
+## Syntax
+
+SectionDrawingView.**Sketches**() As [DrawingSketches](../DrawingSketches/DrawingSketches.md)
+
+## Property Value
+
+This is a read only property whose value is a [DrawingSketches](../DrawingSketches/DrawingSketches.md).
+
+## Version
+
+Introduced in version 9
+
+---
+
+|  |  |
+| --- | --- |
+| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

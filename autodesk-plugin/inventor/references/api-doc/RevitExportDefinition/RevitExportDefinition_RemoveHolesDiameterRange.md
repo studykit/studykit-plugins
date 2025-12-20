@@ -1,0 +1,25 @@
+# RevitExportDefinition.RemoveHolesDiameterRange Property
+
+Parent Object: [RevitExportDefinition](../RevitExportDefinition/RevitExportDefinition.md)
+
+## Description
+
+Read-write property that gets and sets the diameter of holes in centimeters to remove for the RevitExport. This is only applicable when the RemoveHolesStyle is set to kRevitExportRemoveByRange.
+
+## Syntax
+
+RevitExportDefinition.**RemoveHolesDiameterRange**() As Double
+
+## Property Value
+
+This is a read/write property whose value is a Double.
+
+## Version
+
+Introduced in version 2022
+
+---
+
+|  |  |
+| --- | --- |
+| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

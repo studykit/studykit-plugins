@@ -1,0 +1,28 @@
+# Point2d.PutPointData Method
+
+Parent Object: [Point2d](../Point2d/Point2d.md)
+
+## Description
+
+Method that sets the data defining this point.
+
+## Syntax
+
+Point2d.**PutPointData**( ***Coords***() As Double )
+
+## Parameters
+
+|  |  |  |
+| --- | --- | --- |
+| Name | Type | Description |
+| Coords | Double | Input/output Double that specifies the entity's coordinates. |
+
+## Version
+
+Introduced in version 4
+
+---
+
+|  |  |
+| --- | --- |
+| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

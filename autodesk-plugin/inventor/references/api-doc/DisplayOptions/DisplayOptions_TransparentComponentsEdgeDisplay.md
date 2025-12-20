@@ -1,0 +1,25 @@
+# DisplayOptions.TransparentComponentsEdgeDisplay Property
+
+Parent Object: [DisplayOptions](../DisplayOptions/DisplayOptions.md)
+
+## Description
+
+Read-write property that specifies whether edges should be displayed for transparent components.
+
+## Syntax
+
+DisplayOptions.**TransparentComponentsEdgeDisplay**() As Boolean
+
+## Property Value
+
+This is a read/write property whose value is a Boolean.
+
+## Version
+
+Introduced in version 2025.2
+
+---
+
+|  |  |
+| --- | --- |
+| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

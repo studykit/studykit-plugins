@@ -1,0 +1,25 @@
+# ProfileEntity.StartSketchPoint Property
+
+Parent Object: [ProfileEntity](../ProfileEntity/ProfileEntity.md)
+
+## Description
+
+Property that gets the that defines the start of the profile entity. This property is not valid in the case where the curve is a periodic curve, i.e. circle, ellipse, etc.
+
+## Syntax
+
+ProfileEntity.**StartSketchPoint**() As [SketchPoint](../SketchPoint/SketchPoint.md)
+
+## Property Value
+
+This is a read only property whose value is a [SketchPoint](../SketchPoint/SketchPoint.md).
+
+## Version
+
+Introduced in version 5
+
+---
+
+|  |  |
+| --- | --- |
+| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

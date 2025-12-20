@@ -1,0 +1,25 @@
+# AssemblySymmetryConstraint.EntityTwoInferredType Property
+
+Parent Object: [AssemblySymmetryConstraint](../AssemblySymmetryConstraint/AssemblySymmetryConstraint.md)
+
+## Description
+
+Read-only property that returns an enum indicating how the geometry of entity two is interpreted.
+
+## Syntax
+
+AssemblySymmetryConstraint.**EntityTwoInferredType**() As [InferredTypeEnum](../InferredTypeEnum.md)
+
+## Property Value
+
+This is a read only property whose value is an [InferredTypeEnum](../InferredTypeEnum.md).
+
+## Version
+
+Introduced in version 2014
+
+---
+
+|  |  |
+| --- | --- |
+| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

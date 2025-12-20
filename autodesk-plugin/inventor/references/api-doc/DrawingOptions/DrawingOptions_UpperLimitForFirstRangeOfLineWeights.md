@@ -1,0 +1,25 @@
+# DrawingOptions.UpperLimitForFirstRangeOfLineWeights Property
+
+Parent Object: [DrawingOptions](../DrawingOptions/DrawingOptions.md)
+
+## Description
+
+Gets/Sets the upper limit for the first range of line weights.
+
+## Syntax
+
+DrawingOptions.**UpperLimitForFirstRangeOfLineWeights**() As Double
+
+## Property Value
+
+This is a read/write property whose value is a Double.
+
+## Version
+
+Introduced in version 2008
+
+---
+
+|  |  |
+| --- | --- |
+| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -1,0 +1,25 @@
+# ObjectDefaultsStyle.ConfigurationTableLayer Property
+
+Parent Object: [ObjectDefaultsStyle](../ObjectDefaultsStyle/ObjectDefaultsStyle.md)
+
+## Description
+
+Gets and sets the default layer for configuration tables.
+
+## Syntax
+
+ObjectDefaultsStyle.**ConfigurationTableLayer**() As [Layer](../Layer/Layer.md)
+
+## Property Value
+
+This is a read/write property whose value is a [Layer](../Layer/Layer.md).
+
+## Version
+
+Introduced in version 2011
+
+---
+
+|  |  |
+| --- | --- |
+| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

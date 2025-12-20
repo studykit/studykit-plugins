@@ -1,0 +1,25 @@
+# SimplifyFeature.AttributeSets Property
+
+Parent Object: [SimplifyFeature](../SimplifyFeature/SimplifyFeature.md)
+
+## Description
+
+Property that returns the AttributeSets collection object associated with this object.
+
+## Syntax
+
+SimplifyFeature.**AttributeSets**() As [AttributeSets](../AttributeSets/AttributeSets.md)
+
+## Property Value
+
+This is a read only property whose value is an [AttributeSets](../AttributeSets/AttributeSets.md).
+
+## Version
+
+Introduced in version 2026
+
+---
+
+|  |  |
+| --- | --- |
+| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

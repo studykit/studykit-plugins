@@ -1,0 +1,86 @@
+# MateConstraint Object
+
+Derived from: [AssemblyConstraint](../AssemblyConstraint/AssemblyConstraint.md) Object
+
+## Description
+
+Object that represents a mate assembly constraint.
+
+## Methods
+
+|  |  |
+| --- | --- |
+| Name | Description |
+| [ConvertToAngleConstraint](../MateConstraint/MateConstraint_ConvertToAngleConstraint.md) | Method that converts the constraint to an angle constraint, and returns the AngleConstraint object. This method can also be used to edit the geometries associated with an angle constraint without changing its type, in which case the same object is returned by the method. |
+| [ConvertToCustomConstraint](../MateConstraint/MateConstraint_ConvertToCustomConstraint.md) | Method that converts the constraint to a custom constraint, and returns the CustomConstraint object. This method can also be used to edit the geometries associated with a custom constraint without changing its type, in which case the same object is returned by the method. |
+| [ConvertToFlushConstraint](../MateConstraint/MateConstraint_ConvertToFlushConstraint.md) | Method that converts the constraint to a flush constraint, and returns the FlushConstraint object. This method can also be used to edit the geometries associated with a flush constraint without changing its type, in which case the same object is returned by the method. |
+| [ConvertToInsertConstraint](../MateConstraint/MateConstraint_ConvertToInsertConstraint.md) | Method that converts the constraint to an insert constraint, and returns the InsertConstraint object. This method can also be used to edit the geometries associated with an insert constraint without changing its type, in which case the same object is returned by the method. |
+| [ConvertToInsertConstraint2](../MateConstraint/MateConstraint_ConvertToInsertConstraint2.md) | Converts the constraint to an insert constraint, and returns the InsertConstraint object. |
+| [ConvertToMateConstraint](../MateConstraint/MateConstraint_ConvertToMateConstraint.md) | Method that converts the constraint to a mate constraint, and returns the MateConstraint object. This method can also be used to edit the geometries associated with a mate constraint without changing its type, in which case the same object is returned by the method. |
+| [ConvertToMateConstraint2](../MateConstraint/MateConstraint_ConvertToMateConstraint2.md) | Converts the constraint to a mate constraint, and returns the MateConstraint object. |
+| [ConvertToRotateRotateConstraint](../MateConstraint/MateConstraint_ConvertToRotateRotateConstraint.md) | Method that converts the constraint to a rotate-rotate constraint, and returns the RotateRotateConstraint object. This method can also be used to edit the geometries associated with a rotate-rotate constraint without changing its type, in which case the same object is returned by the method. |
+| [ConvertToRotateTranslateConstraint](../MateConstraint/MateConstraint_ConvertToRotateTranslateConstraint.md) | Method that converts the constraint to a rotate-translate constraint, and returns the RotateTranslateConstraint object. This method can also be used to edit the geometries associated with a rotate-translate constraint without changing its type, in which case the same object is returned by the method. |
+| [ConvertToSymmetryConstraint](../MateConstraint/MateConstraint_ConvertToSymmetryConstraint.md) | Converts the constraint to a symmetry constraint, and returns the AssemblySymmetryConstraint object. |
+| [ConvertToTangentConstraint](../MateConstraint/MateConstraint_ConvertToTangentConstraint.md) | Method that converts the constraint to a tangent constraint, and returns the TangentConstraint object. This method can also be used to edit the geometries associated with a tangent constraint without changing its type, in which case the same object is returned by the method. |
+| [ConvertToTransitionalConstraint](../MateConstraint/MateConstraint_ConvertToTransitionalConstraint.md) | Method that converts the constraint to a transitional constraint, and returns the TransitionalConstraint object. This method can also be used to edit the geometries associated with a transitional constraint without changing its type, in which case the same object is returned by the method. |
+| [Delete](../MateConstraint/MateConstraint_Delete.md) | Method that deletes the constraint. |
+| [GetReferenceKey](../MateConstraint/MateConstraint_GetReferenceKey.md) | Method that generates and returns the reference key for this entity. |
+
+## Properties
+
+|  |  |
+| --- | --- |
+| Name | Description |
+| [AffectedOccurrenceOne](../MateConstraint/MateConstraint_AffectedOccurrenceOne.md) | Property that returns the first of the two objects affected by this constraint. This is the same as the owning occurrence obtained from the OccurrenceOne property in the case where the owning assembly is not adaptive. Else, this is the first non-adaptive occurrence in the path leading from the owning occurrence to the occurrence that contains the first of the two geometries that this constraint is between. |
+| [AffectedOccurrenceTwo](../MateConstraint/MateConstraint_AffectedOccurrenceTwo.md) | Property that returns the second of the two objects affected by this constraint. This is the same as the owning occurrence obtained from the OccurrenceTwo property in the case where the owning assembly is not adaptive. Else, this is the first non-adaptive occurrence in the path leading from the owning occurrence to the occurrence that contains the second of the two geometries that this constraint is between. |
+| [Application](../MateConstraint/MateConstraint_Application.md) | Returns the top-level parent application object. When used the context of Inventor, an Application object is returned. When used in the context of Apprentice, an ApprenticeServer object is returned. |
+| [AttributeSets](../MateConstraint/MateConstraint_AttributeSets.md) | Property that returns the AttributeSets collection object associated with this object. |
+| [ConstraintLimits](../MateConstraint/MateConstraint_ConstraintLimits.md) | Property that returns the ConstraintLimits object that provides access to various limits related settings for the constraint. |
+| [DriveSettings](../MateConstraint/MateConstraint_DriveSettings.md) | Returns the DriveSettings object for the constraint. |
+| [EntityOne](../MateConstraint/MateConstraint_EntityOne.md) | Property that indicates the first of the geometric entities (Face, Axis, Edge, etc.) being constrained. |
+| [EntityOneInferredType](../MateConstraint/MateConstraint_EntityOneInferredType.md) | Property that returns an enum indicating how the geometry of entity one is interpreted. |
+| [EntityTwo](../MateConstraint/MateConstraint_EntityTwo.md) | Property that indicates the second of the geometric entities (Face, Axis, Edge, etc.) being constrained. |
+| [EntityTwoInferredType](../MateConstraint/MateConstraint_EntityTwoInferredType.md) | Property that returns an enum indicating how the geometry of entity two is interpreted. |
+| [GeometryOne](../MateConstraint/MateConstraint_GeometryOne.md) | Property that returns the geometry of the first of the two entities that this constraint is between. The geometry returned is in the space of the assembly and for face or work plane geometries it accounts for the orientation of the face or work plane. |
+| [GeometryTwo](../MateConstraint/MateConstraint_GeometryTwo.md) | Property that returns the geometry of the second of the two entities that this constraint is between. The geometry returned is in the space of the assembly and for face or work plane geometries it accounts for the orientation of the face or work plane. |
+| [HealthStatus](../MateConstraint/MateConstraint_HealthStatus.md) | Property that returns an enum indicating the current state of the object. |
+| [iMateResult](../MateConstraint/MateConstraint_iMateResult.md) | Property that returns the iMateResult object that resulted in the creation of this constraint. |
+| [IsDefaultName](../MateConstraint/MateConstraint_IsDefaultName.md) | Indicates if the name of this constraint is the original default name or if the user has changed the name. A value of True indicates the name is the original default name. |
+| [LayoutConstraint](../MateConstraint/MateConstraint_LayoutConstraint.md) | Property that returns the layout constraint this constraint is a member of. Returns Nothing in the case where this constraint is not a member of a layout constraint. You can also determine if a constraint is a member of a layout constraint by using the ResultOfLayoutConstraint property. |
+| [Name](../MateConstraint/MateConstraint_Name.md) | Gets/Sets the displayable name of this constraint. |
+| [OccurrenceOne](../MateConstraint/MateConstraint_OccurrenceOne.md) | Property that returns the first of the two objects this constraint is between. |
+| [OccurrenceTwo](../MateConstraint/MateConstraint_OccurrenceTwo.md) | Property that returns the second of the two objects this constraint is between. |
+| [Offset](../MateConstraint/MateConstraint_Offset.md) | Property that returns the Parameter object that controls the offset distance of the constraint. |
+| [Parent](../MateConstraint/MateConstraint_Parent.md) | Property that returns the parent of the object. |
+| [ResultOfiMate](../MateConstraint/MateConstraint_ResultOfiMate.md) | Property that indicates if this iMateResult represents a composite iMate. |
+| [ResultOfLayoutConstraint](../MateConstraint/MateConstraint_ResultOfLayoutConstraint.md) | Property that indicates if this constraint is a member of a layout constraint. If True then it is a member of a layout constraint. The layout constraint can be obtained by using the LayoutConstraint property. |
+| [SolutionType](../MateConstraint/MateConstraint_SolutionType.md) | Read-only property that returns the solution type for the mate constraint. |
+| [Suppressed](../MateConstraint/MateConstraint_Suppressed.md) | Gets/Sets the Boolean flag indicating whether this constraint is suppressed. |
+| [Type](../MateConstraint/MateConstraint_Type.md) | Returns an ObjectTypeEnum indicating this object's type. |
+| [Visible](../MateConstraint/MateConstraint_Visible.md) | Gets/Sets the Visible indicating whether this constraint is visible. |
+
+## Accessed From
+
+[AngleConstraint.ConvertToMateConstraint](../AngleConstraint/AngleConstraint_ConvertToMateConstraint.md), [AngleConstraint.ConvertToMateConstraint2](../AngleConstraint/AngleConstraint_ConvertToMateConstraint2.md), [AngleConstraintProxy.ConvertToMateConstraint](../AngleConstraintProxy/AngleConstraintProxy_ConvertToMateConstraint.md), [AngleConstraintProxy.ConvertToMateConstraint2](../AngleConstraintProxy/AngleConstraintProxy_ConvertToMateConstraint2.md), [AssemblyConstraint.ConvertToMateConstraint](../AssemblyConstraint/AssemblyConstraint_ConvertToMateConstraint.md), [AssemblyConstraint.ConvertToMateConstraint2](../AssemblyConstraint/AssemblyConstraint_ConvertToMateConstraint2.md), [AssemblyConstraints.AddMateConstraint](../AssemblyConstraints/AssemblyConstraints_AddMateConstraint.md), [AssemblyConstraints.AddMateConstraint2](../AssemblyConstraints/AssemblyConstraints_AddMateConstraint2.md), [AssemblySymmetryConstraint.ConvertToMateConstraint](../AssemblySymmetryConstraint/AssemblySymmetryConstraint_ConvertToMateConstraint.md), [AssemblySymmetryConstraint.ConvertToMateConstraint2](../AssemblySymmetryConstraint/AssemblySymmetryConstraint_ConvertToMateConstraint2.md), [AssemblySymmetryConstraintProxy.ConvertToMateConstraint](../AssemblySymmetryConstraintProxy/AssemblySymmetryConstraintProxy_ConvertToMateConstraint.md), [AssemblySymmetryConstraintProxy.ConvertToMateConstraint2](../AssemblySymmetryConstraintProxy/AssemblySymmetryConstraintProxy_ConvertToMateConstraint2.md), [CustomConstraint.ConvertToMateConstraint](CustomConstraint_ConvertToMateConstraint.md), [CustomConstraintProxy.ConvertToMateConstraint](CustomConstraintProxy_ConvertToMateConstraint.md), [FlushConstraint.ConvertToMateConstraint](../FlushConstraint/FlushConstraint_ConvertToMateConstraint.md), [FlushConstraint.ConvertToMateConstraint2](../FlushConstraint/FlushConstraint_ConvertToMateConstraint2.md), [FlushConstraintProxy.ConvertToMateConstraint](../FlushConstraintProxy/FlushConstraintProxy_ConvertToMateConstraint.md), [FlushConstraintProxy.ConvertToMateConstraint2](../FlushConstraintProxy/FlushConstraintProxy_ConvertToMateConstraint2.md), [InsertConstraint.ConvertToMateConstraint](../InsertConstraint/InsertConstraint_ConvertToMateConstraint.md), [InsertConstraint.ConvertToMateConstraint2](../InsertConstraint/InsertConstraint_ConvertToMateConstraint2.md), [InsertConstraintProxy.ConvertToMateConstraint](../InsertConstraintProxy/InsertConstraintProxy_ConvertToMateConstraint.md), [InsertConstraintProxy.ConvertToMateConstraint2](../InsertConstraintProxy/InsertConstraintProxy_ConvertToMateConstraint2.md), [MateConstraint.ConvertToMateConstraint](../MateConstraint/MateConstraint_ConvertToMateConstraint.md), [MateConstraint.ConvertToMateConstraint2](../MateConstraint/MateConstraint_ConvertToMateConstraint2.md), [MateConstraintProxy.ConvertToMateConstraint](../MateConstraintProxy/MateConstraintProxy_ConvertToMateConstraint.md), [MateConstraintProxy.ConvertToMateConstraint2](../MateConstraintProxy/MateConstraintProxy_ConvertToMateConstraint2.md), [MateConstraintProxy.NativeObject](../MateConstraintProxy/MateConstraintProxy_NativeObject.md), [RotateRotateConstraint.ConvertToMateConstraint](../RotateRotateConstraint/RotateRotateConstraint_ConvertToMateConstraint.md), [RotateRotateConstraint.ConvertToMateConstraint2](../RotateRotateConstraint/RotateRotateConstraint_ConvertToMateConstraint2.md), [RotateRotateConstraintProxy.ConvertToMateConstraint](../RotateRotateConstraintProxy/RotateRotateConstraintProxy_ConvertToMateConstraint.md), [RotateRotateConstraintProxy.ConvertToMateConstraint2](../RotateRotateConstraintProxy/RotateRotateConstraintProxy_ConvertToMateConstraint2.md), [RotateTranslateConstraint.ConvertToMateConstraint](../RotateTranslateConstraint/RotateTranslateConstraint_ConvertToMateConstraint.md), [RotateTranslateConstraint.ConvertToMateConstraint2](../RotateTranslateConstraint/RotateTranslateConstraint_ConvertToMateConstraint2.md), [RotateTranslateConstraintProxy.ConvertToMateConstraint](../RotateTranslateConstraintProxy/RotateTranslateConstraintProxy_ConvertToMateConstraint.md), [RotateTranslateConstraintProxy.ConvertToMateConstraint2](../RotateTranslateConstraintProxy/RotateTranslateConstraintProxy_ConvertToMateConstraint2.md), [TangentConstraint.ConvertToMateConstraint](../TangentConstraint/TangentConstraint_ConvertToMateConstraint.md), [TangentConstraint.ConvertToMateConstraint2](../TangentConstraint/TangentConstraint_ConvertToMateConstraint2.md), [TangentConstraintProxy.ConvertToMateConstraint](../TangentConstraintProxy/TangentConstraintProxy_ConvertToMateConstraint.md), [TangentConstraintProxy.ConvertToMateConstraint2](../TangentConstraintProxy/TangentConstraintProxy_ConvertToMateConstraint2.md), [TransitionalConstraint.ConvertToMateConstraint](../TransitionalConstraint/TransitionalConstraint_ConvertToMateConstraint.md), [TransitionalConstraint.ConvertToMateConstraint2](../TransitionalConstraint/TransitionalConstraint_ConvertToMateConstraint2.md), [TransitionalConstraintProxy.ConvertToMateConstraint](../TransitionalConstraintProxy/TransitionalConstraintProxy_ConvertToMateConstraint.md), [TransitionalConstraintProxy.ConvertToMateConstraint2](../TransitionalConstraintProxy/TransitionalConstraintProxy_ConvertToMateConstraint2.md), [TranslateTranslateConstraint.ConvertToMateConstraint](../TranslateTranslateConstraint/TranslateTranslateConstraint_ConvertToMateConstraint.md), [TranslateTranslateConstraint.ConvertToMateConstraint2](../TranslateTranslateConstraint/TranslateTranslateConstraint_ConvertToMateConstraint2.md), [TranslateTranslateConstraintProxy.ConvertToMateConstraint](../TranslateTranslateConstraintProxy/TranslateTranslateConstraintProxy_ConvertToMateConstraint.md), [TranslateTranslateConstraintProxy.ConvertToMateConstraint2](../TranslateTranslateConstraintProxy/TranslateTranslateConstraintProxy_ConvertToMateConstraint2.md)
+
+## Derived Classes
+
+[MateConstraintProxy](../MateConstraintProxy/MateConstraintProxy.md)
+
+## Samples
+
+|  |  |
+| --- | --- |
+| Name | Description |
+| [Add assembly mate constraint](../../sample-programs/AssemblyConstraints_AddMateConstraint_Sample.md) | This sample demonstrates the creation of an assembly mate constraint. |
+| [Add mate constraint with limits](../../sample-programs/AssemblyConstraints_AddMateConstraint3_Sample.md) | This sample demonstrates the creation of an assembly mate constraint with maximum and minimum limits defined. |
+
+## Version
+
+Introduced in version 4
+
+---
+
+|  |  |
+| --- | --- |
+| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

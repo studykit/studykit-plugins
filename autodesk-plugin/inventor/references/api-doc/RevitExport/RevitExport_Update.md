@@ -1,0 +1,21 @@
+# RevitExport.Update Method
+
+Parent Object: [RevitExport](../RevitExport/RevitExport.md)
+
+## Description
+
+Method that updates the Revit model file that relates with this RevitExport object.
+
+## Syntax
+
+RevitExport.**Update**()
+
+## Version
+
+Introduced in version 2022
+
+---
+
+|  |  |
+| --- | --- |
+| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

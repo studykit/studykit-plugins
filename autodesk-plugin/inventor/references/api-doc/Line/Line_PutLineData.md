@@ -1,0 +1,29 @@
+# Line.PutLineData Method
+
+Parent Object: [Line](../Line/Line.md)
+
+## Description
+
+Method that sets the data defining this line.
+
+## Syntax
+
+Line.**PutLineData**( ***RootPoint***() As Double, ***Direction***() As Double )
+
+## Parameters
+
+|  |  |  |
+| --- | --- | --- |
+| Name | Type | Description |
+| RootPoint | Double | Input/output Double that specifies the root point of the line. |
+| Direction | Double | Input/output Double that specifies the direction of the line. |
+
+## Version
+
+Introduced in version 4
+
+---
+
+|  |  |
+| --- | --- |
+| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -1,0 +1,25 @@
+# HoleThreadNote.RightHandedThread Property
+
+Parent Object: [HoleThreadNote](../HoleThreadNote/HoleThreadNote.md)
+
+## Description
+
+Gets and sets whether to show RH for right handed thread.
+
+## Syntax
+
+HoleThreadNote.**RightHandedThread**() As Boolean
+
+## Property Value
+
+This is a read/write property whose value is a Boolean.
+
+## Version
+
+Introduced in version 2025
+
+---
+
+|  |  |
+| --- | --- |
+| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

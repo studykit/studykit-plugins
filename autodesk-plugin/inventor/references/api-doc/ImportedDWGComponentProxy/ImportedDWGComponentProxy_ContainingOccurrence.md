@@ -1,0 +1,25 @@
+# ImportedDWGComponentProxy.ContainingOccurrence Property
+
+Parent Object: [ImportedDWGComponentProxy](../ImportedDWGComponentProxy/ImportedDWGComponentProxy.md)
+
+## Description
+
+Property that returns the ComponentOccurrence that the native object is being referenced through. The returned occurrence is the containing occurrence.
+
+## Syntax
+
+ImportedDWGComponentProxy.**ContainingOccurrence**() As [ComponentOccurrence](../ComponentOccurrence/ComponentOccurrence.md)
+
+## Property Value
+
+This is a read only property whose value is a [ComponentOccurrence](../ComponentOccurrence/ComponentOccurrence.md).
+
+## Version
+
+Introduced in version 2016
+
+---
+
+|  |  |
+| --- | --- |
+| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

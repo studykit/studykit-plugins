@@ -1,0 +1,25 @@
+# InteractionEvents.TriadEvents Property
+
+Parent Object: [InteractionEvents](../InteractionEvents/InteractionEvents.md)
+
+## Description
+
+Gets the TriadEvents object.
+
+## Syntax
+
+InteractionEvents.**TriadEvents**() As [TriadEvents](../TriadEvents/TriadEvents.md)
+
+## Property Value
+
+This is a read only property whose value is a [TriadEvents](../TriadEvents/TriadEvents.md).
+
+## Version
+
+Introduced in version 9
+
+---
+
+|  |  |
+| --- | --- |
+| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

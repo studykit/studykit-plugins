@@ -1,0 +1,32 @@
+# PresentationEdgesEnumerator.Item Property
+
+Parent Object: [PresentationEdgesEnumerator](../PresentationEdgesEnumerator/PresentationEdgesEnumerator.md)
+
+## Description
+
+Allows integer-indexed access to items in the collection.
+
+## Syntax
+
+PresentationEdgesEnumerator.**Item**( ***Index*** As Long ) As [PresentationEdge](../PresentationEdge/PresentationEdge.md)
+
+## Property Value
+
+This is a read only property whose value is a [PresentationEdge](../PresentationEdge/PresentationEdge.md).
+
+## Parameters
+
+|  |  |  |
+| --- | --- | --- |
+| Name | Type | Description |
+| Index | Long | Input Long to specify the index of the object to return. If an out of range index is provided, an error will occur. |
+
+## Version
+
+Introduced in version 2018
+
+---
+
+|  |  |
+| --- | --- |
+| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

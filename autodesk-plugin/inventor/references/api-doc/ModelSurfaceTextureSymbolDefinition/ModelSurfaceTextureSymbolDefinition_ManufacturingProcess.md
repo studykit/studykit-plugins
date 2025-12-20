@@ -1,0 +1,25 @@
+# ModelSurfaceTextureSymbolDefinition.ManufacturingProcess Property
+
+Parent Object: [ModelSurfaceTextureSymbolDefinition](../ModelSurfaceTextureSymbolDefinition/ModelSurfaceTextureSymbolDefinition.md)
+
+## Description
+
+Gets and sets the manufacturing process.
+
+## Syntax
+
+ModelSurfaceTextureSymbolDefinition.**ManufacturingProcess**() As String
+
+## Property Value
+
+This is a read/write property whose value is a String.
+
+## Version
+
+Introduced in version 2025
+
+---
+
+|  |  |
+| --- | --- |
+| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -1,0 +1,84 @@
+# InsertConstraint Object
+
+Derived from: [AssemblyConstraint](../AssemblyConstraint/AssemblyConstraint.md) Object
+
+## Description
+
+Object that represents an insert assembly constraint.
+
+## Methods
+
+|  |  |
+| --- | --- |
+| Name | Description |
+| [ConvertToAngleConstraint](../InsertConstraint/InsertConstraint_ConvertToAngleConstraint.md) | Method that converts the constraint to an angle constraint, and returns the AngleConstraint object. This method can also be used to edit the geometries associated with an angle constraint without changing its type, in which case the same object is returned by the method. |
+| [ConvertToCustomConstraint](../InsertConstraint/InsertConstraint_ConvertToCustomConstraint.md) | Method that converts the constraint to a custom constraint, and returns the CustomConstraint object. This method can also be used to edit the geometries associated with a custom constraint without changing its type, in which case the same object is returned by the method. |
+| [ConvertToFlushConstraint](../InsertConstraint/InsertConstraint_ConvertToFlushConstraint.md) | Method that converts the constraint to a flush constraint, and returns the FlushConstraint object. This method can also be used to edit the geometries associated with a flush constraint without changing its type, in which case the same object is returned by the method. |
+| [ConvertToInsertConstraint](../InsertConstraint/InsertConstraint_ConvertToInsertConstraint.md) | Method that converts the constraint to an insert constraint, and returns the InsertConstraint object. This method can also be used to edit the geometries associated with an insert constraint without changing its type, in which case the same object is returned by the method. |
+| [ConvertToInsertConstraint2](../InsertConstraint/InsertConstraint_ConvertToInsertConstraint2.md) | Converts the constraint to an insert constraint, and returns the InsertConstraint object. |
+| [ConvertToMateConstraint](../InsertConstraint/InsertConstraint_ConvertToMateConstraint.md) | Method that converts the constraint to a mate constraint, and returns the MateConstraint object. This method can also be used to edit the geometries associated with a mate constraint without changing its type, in which case the same object is returned by the method. |
+| [ConvertToMateConstraint2](../InsertConstraint/InsertConstraint_ConvertToMateConstraint2.md) | Converts the constraint to a mate constraint, and returns the MateConstraint object. |
+| [ConvertToRotateRotateConstraint](../InsertConstraint/InsertConstraint_ConvertToRotateRotateConstraint.md) | Method that converts the constraint to a rotate-rotate constraint, and returns the RotateRotateConstraint object. This method can also be used to edit the geometries associated with a rotate-rotate constraint without changing its type, in which case the same object is returned by the method. |
+| [ConvertToRotateTranslateConstraint](../InsertConstraint/InsertConstraint_ConvertToRotateTranslateConstraint.md) | Method that converts the constraint to a rotate-translate constraint, and returns the RotateTranslateConstraint object. This method can also be used to edit the geometries associated with a rotate-translate constraint without changing its type, in which case the same object is returned by the method. |
+| [ConvertToSymmetryConstraint](../InsertConstraint/InsertConstraint_ConvertToSymmetryConstraint.md) | Converts the constraint to a symmetry constraint, and returns the AssemblySymmetryConstraint object. |
+| [ConvertToTangentConstraint](../InsertConstraint/InsertConstraint_ConvertToTangentConstraint.md) | Method that converts the constraint to a tangent constraint, and returns the TangentConstraint object. This method can also be used to edit the geometries associated with a tangent constraint without changing its type, in which case the same object is returned by the method. |
+| [ConvertToTransitionalConstraint](../InsertConstraint/InsertConstraint_ConvertToTransitionalConstraint.md) | Method that converts the constraint to a transitional constraint, and returns the TransitionalConstraint object. This method can also be used to edit the geometries associated with a transitional constraint without changing its type, in which case the same object is returned by the method. |
+| [Delete](../InsertConstraint/InsertConstraint_Delete.md) | Method that deletes the constraint. |
+| [GetReferenceKey](../InsertConstraint/InsertConstraint_GetReferenceKey.md) | Method that generates and returns the reference key for this entity. |
+
+## Properties
+
+|  |  |
+| --- | --- |
+| Name | Description |
+| [AffectedOccurrenceOne](../InsertConstraint/InsertConstraint_AffectedOccurrenceOne.md) | Property that returns the first of the two objects affected by this constraint. This is the same as the owning occurrence obtained from the OccurrenceOne property in the case where the owning assembly is not adaptive. Else, this is the first non-adaptive occurrence in the path leading from the owning occurrence to the occurrence that contains the first of the two geometries that this constraint is between. |
+| [AffectedOccurrenceTwo](../InsertConstraint/InsertConstraint_AffectedOccurrenceTwo.md) | Property that returns the second of the two objects affected by this constraint. This is the same as the owning occurrence obtained from the OccurrenceTwo property in the case where the owning assembly is not adaptive. Else, this is the first non-adaptive occurrence in the path leading from the owning occurrence to the occurrence that contains the second of the two geometries that this constraint is between. |
+| [Application](../InsertConstraint/InsertConstraint_Application.md) | Returns the top-level parent application object. When used the context of Inventor, an Application object is returned. When used in the context of Apprentice, an ApprenticeServer object is returned. |
+| [AttributeSets](../InsertConstraint/InsertConstraint_AttributeSets.md) | Property that returns the AttributeSets collection object associated with this object. |
+| [AxesOpposed](../InsertConstraint/InsertConstraint_AxesOpposed.md) | Property that gets whether the direction of the two axes is opposed. |
+| [ConstraintLimits](../InsertConstraint/InsertConstraint_ConstraintLimits.md) | Property that returns the ConstraintLimits object that provides access to various limits related settings for the constraint. |
+| [Distance](../InsertConstraint/InsertConstraint_Distance.md) | Property that returns the Parameter object that controls the offset distance of the constraint. |
+| [DriveSettings](../InsertConstraint/InsertConstraint_DriveSettings.md) | Returns the DriveSettings object for the constraint. |
+| [EntityOne](../InsertConstraint/InsertConstraint_EntityOne.md) | Property that indicates the first of the geometric entities (Face, Axis, Edge, etc.) being constrained. |
+| [EntityTwo](../InsertConstraint/InsertConstraint_EntityTwo.md) | Property that indicates the second of the geometric entities (Face, Axis, Edge, etc.) being constrained. |
+| [GeometryOne](../InsertConstraint/InsertConstraint_GeometryOne.md) | Property that returns the geometry of the first of the two entities that this constraint is between. The geometry returned is in the space of the assembly and for face or work plane geometries it accounts for the orientation of the face or work plane. |
+| [GeometryTwo](../InsertConstraint/InsertConstraint_GeometryTwo.md) | Property that returns the geometry of the second of the two entities that this constraint is between. The geometry returned is in the space of the assembly and for face or work plane geometries it accounts for the orientation of the face or work plane. |
+| [HealthStatus](../InsertConstraint/InsertConstraint_HealthStatus.md) | Property that returns an enum indicating the current state of the object. |
+| [iMateResult](../InsertConstraint/InsertConstraint_iMateResult.md) | Property that returns the iMateResult object that resulted in the creation of this constraint. |
+| [IsDefaultName](../InsertConstraint/InsertConstraint_IsDefaultName.md) | Indicates if the name of this constraint is the original default name or if the user has changed the name. A value of True indicates the name is the original default name. |
+| [LayoutConstraint](../InsertConstraint/InsertConstraint_LayoutConstraint.md) | Property that returns the layout constraint this constraint is a member of. Returns Nothing in the case where this constraint is not a member of a layout constraint. You can also determine if a constraint is a member of a layout constraint by using the ResultOfLayoutConstraint property. |
+| [LockRotation](../InsertConstraint/InsertConstraint_LockRotation.md) | Property that gets/sets whether to lock the rotation freedom or not. |
+| [Name](../InsertConstraint/InsertConstraint_Name.md) | Gets/Sets the displayable name of this constraint. |
+| [OccurrenceOne](../InsertConstraint/InsertConstraint_OccurrenceOne.md) | Property that returns the first of the two objects this constraint is between. |
+| [OccurrenceTwo](../InsertConstraint/InsertConstraint_OccurrenceTwo.md) | Property that returns the second of the two objects this constraint is between. |
+| [Parent](../InsertConstraint/InsertConstraint_Parent.md) | Property that returns the parent of the object. |
+| [ResultOfiMate](../InsertConstraint/InsertConstraint_ResultOfiMate.md) | Property that indicates if this iMateResult represents a composite iMate. |
+| [ResultOfLayoutConstraint](../InsertConstraint/InsertConstraint_ResultOfLayoutConstraint.md) | Property that indicates if this constraint is a member of a layout constraint. If True then it is a member of a layout constraint. The layout constraint can be obtained by using the LayoutConstraint property. |
+| [Suppressed](../InsertConstraint/InsertConstraint_Suppressed.md) | Gets/Sets the Boolean flag indicating whether this constraint is suppressed. |
+| [Type](../InsertConstraint/InsertConstraint_Type.md) | Returns an ObjectTypeEnum indicating this object's type. |
+| [Visible](../InsertConstraint/InsertConstraint_Visible.md) | Gets/Sets the Visible indicating whether this constraint is visible. |
+
+## Accessed From
+
+[AngleConstraint.ConvertToInsertConstraint](../AngleConstraint/AngleConstraint_ConvertToInsertConstraint.md), [AngleConstraint.ConvertToInsertConstraint2](../AngleConstraint/AngleConstraint_ConvertToInsertConstraint2.md), [AngleConstraintProxy.ConvertToInsertConstraint](../AngleConstraintProxy/AngleConstraintProxy_ConvertToInsertConstraint.md), [AngleConstraintProxy.ConvertToInsertConstraint2](../AngleConstraintProxy/AngleConstraintProxy_ConvertToInsertConstraint2.md), [AssemblyConstraint.ConvertToInsertConstraint](../AssemblyConstraint/AssemblyConstraint_ConvertToInsertConstraint.md), [AssemblyConstraint.ConvertToInsertConstraint2](../AssemblyConstraint/AssemblyConstraint_ConvertToInsertConstraint2.md), [AssemblyConstraints.AddInsertConstraint](../AssemblyConstraints/AssemblyConstraints_AddInsertConstraint.md), [AssemblyConstraints.AddInsertConstraint2](../AssemblyConstraints/AssemblyConstraints_AddInsertConstraint2.md), [AssemblySymmetryConstraint.ConvertToInsertConstraint](../AssemblySymmetryConstraint/AssemblySymmetryConstraint_ConvertToInsertConstraint.md), [AssemblySymmetryConstraint.ConvertToInsertConstraint2](../AssemblySymmetryConstraint/AssemblySymmetryConstraint_ConvertToInsertConstraint2.md), [AssemblySymmetryConstraintProxy.ConvertToInsertConstraint](../AssemblySymmetryConstraintProxy/AssemblySymmetryConstraintProxy_ConvertToInsertConstraint.md), [AssemblySymmetryConstraintProxy.ConvertToInsertConstraint2](../AssemblySymmetryConstraintProxy/AssemblySymmetryConstraintProxy_ConvertToInsertConstraint2.md), [CustomConstraint.ConvertToInsertConstraint](CustomConstraint_ConvertToInsertConstraint.md), [CustomConstraintProxy.ConvertToInsertConstraint](CustomConstraintProxy_ConvertToInsertConstraint.md), [FlushConstraint.ConvertToInsertConstraint](../FlushConstraint/FlushConstraint_ConvertToInsertConstraint.md), [FlushConstraint.ConvertToInsertConstraint2](../FlushConstraint/FlushConstraint_ConvertToInsertConstraint2.md), [FlushConstraintProxy.ConvertToInsertConstraint](../FlushConstraintProxy/FlushConstraintProxy_ConvertToInsertConstraint.md), [FlushConstraintProxy.ConvertToInsertConstraint2](../FlushConstraintProxy/FlushConstraintProxy_ConvertToInsertConstraint2.md), [InsertConstraint.ConvertToInsertConstraint](../InsertConstraint/InsertConstraint_ConvertToInsertConstraint.md), [InsertConstraint.ConvertToInsertConstraint2](../InsertConstraint/InsertConstraint_ConvertToInsertConstraint2.md), [InsertConstraintProxy.ConvertToInsertConstraint](../InsertConstraintProxy/InsertConstraintProxy_ConvertToInsertConstraint.md), [InsertConstraintProxy.ConvertToInsertConstraint2](../InsertConstraintProxy/InsertConstraintProxy_ConvertToInsertConstraint2.md), [InsertConstraintProxy.NativeObject](../InsertConstraintProxy/InsertConstraintProxy_NativeObject.md), [MateConstraint.ConvertToInsertConstraint](../MateConstraint/MateConstraint_ConvertToInsertConstraint.md), [MateConstraint.ConvertToInsertConstraint2](../MateConstraint/MateConstraint_ConvertToInsertConstraint2.md), [MateConstraintProxy.ConvertToInsertConstraint](../MateConstraintProxy/MateConstraintProxy_ConvertToInsertConstraint.md), [MateConstraintProxy.ConvertToInsertConstraint2](../MateConstraintProxy/MateConstraintProxy_ConvertToInsertConstraint2.md), [RotateRotateConstraint.ConvertToInsertConstraint](../RotateRotateConstraint/RotateRotateConstraint_ConvertToInsertConstraint.md), [RotateRotateConstraint.ConvertToInsertConstraint2](../RotateRotateConstraint/RotateRotateConstraint_ConvertToInsertConstraint2.md), [RotateRotateConstraintProxy.ConvertToInsertConstraint](../RotateRotateConstraintProxy/RotateRotateConstraintProxy_ConvertToInsertConstraint.md), [RotateRotateConstraintProxy.ConvertToInsertConstraint2](../RotateRotateConstraintProxy/RotateRotateConstraintProxy_ConvertToInsertConstraint2.md), [RotateTranslateConstraint.ConvertToInsertConstraint](../RotateTranslateConstraint/RotateTranslateConstraint_ConvertToInsertConstraint.md), [RotateTranslateConstraint.ConvertToInsertConstraint2](../RotateTranslateConstraint/RotateTranslateConstraint_ConvertToInsertConstraint2.md), [RotateTranslateConstraintProxy.ConvertToInsertConstraint](../RotateTranslateConstraintProxy/RotateTranslateConstraintProxy_ConvertToInsertConstraint.md), [RotateTranslateConstraintProxy.ConvertToInsertConstraint2](../RotateTranslateConstraintProxy/RotateTranslateConstraintProxy_ConvertToInsertConstraint2.md), [TangentConstraint.ConvertToInsertConstraint](../TangentConstraint/TangentConstraint_ConvertToInsertConstraint.md), [TangentConstraint.ConvertToInsertConstraint2](../TangentConstraint/TangentConstraint_ConvertToInsertConstraint2.md), [TangentConstraintProxy.ConvertToInsertConstraint](../TangentConstraintProxy/TangentConstraintProxy_ConvertToInsertConstraint.md), [TangentConstraintProxy.ConvertToInsertConstraint2](../TangentConstraintProxy/TangentConstraintProxy_ConvertToInsertConstraint2.md), [TransitionalConstraint.ConvertToInsertConstraint](../TransitionalConstraint/TransitionalConstraint_ConvertToInsertConstraint.md), [TransitionalConstraint.ConvertToInsertConstraint2](../TransitionalConstraint/TransitionalConstraint_ConvertToInsertConstraint2.md), [TransitionalConstraintProxy.ConvertToInsertConstraint](../TransitionalConstraintProxy/TransitionalConstraintProxy_ConvertToInsertConstraint.md), [TransitionalConstraintProxy.ConvertToInsertConstraint2](../TransitionalConstraintProxy/TransitionalConstraintProxy_ConvertToInsertConstraint2.md), [TranslateTranslateConstraint.ConvertToInsertConstraint](../TranslateTranslateConstraint/TranslateTranslateConstraint_ConvertToInsertConstraint.md), [TranslateTranslateConstraint.ConvertToInsertConstraint2](../TranslateTranslateConstraint/TranslateTranslateConstraint_ConvertToInsertConstraint2.md), [TranslateTranslateConstraintProxy.ConvertToInsertConstraint](../TranslateTranslateConstraintProxy/TranslateTranslateConstraintProxy_ConvertToInsertConstraint.md), [TranslateTranslateConstraintProxy.ConvertToInsertConstraint2](../TranslateTranslateConstraintProxy/TranslateTranslateConstraintProxy_ConvertToInsertConstraint2.md)
+
+## Derived Classes
+
+[InsertConstraintProxy](../InsertConstraintProxy/InsertConstraintProxy.md)
+
+## Samples
+
+|  |  |
+| --- | --- |
+| Name | Description |
+| [Add assembly insert constraint](../../sample-programs/AssemblyConstraints_AddInsertConstraint_Sample.md) | This sample demonstrates the creation of an assembly insert constraint. |
+
+## Version
+
+Introduced in version 4
+
+---
+
+|  |  |
+| --- | --- |
+| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

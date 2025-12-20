@@ -1,0 +1,25 @@
+# SilhouetteCurves.Count Property
+
+Parent Object: [SilhouetteCurves](../SilhouetteCurves/SilhouetteCurves.md)
+
+## Description
+
+Gets the number of items in this collection.
+
+## Syntax
+
+SilhouetteCurves.**Count**() As Long
+
+## Property Value
+
+This is a read only property whose value is a Long.
+
+## Version
+
+Introduced in version 2012
+
+---
+
+|  |  |
+| --- | --- |
+| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

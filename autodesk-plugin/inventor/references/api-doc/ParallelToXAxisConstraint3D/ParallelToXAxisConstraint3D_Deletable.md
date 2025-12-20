@@ -1,0 +1,25 @@
+# ParallelToXAxisConstraint3D.Deletable Property
+
+Parent Object: [ParallelToXAxisConstraint3D](../ParallelToXAxisConstraint3D/ParallelToXAxisConstraint3D.md)
+
+## Description
+
+Indicates whether this object can be deleted.
+
+## Syntax
+
+ParallelToXAxisConstraint3D.**Deletable**() As Boolean
+
+## Property Value
+
+This is a read only property whose value is a Boolean.
+
+## Version
+
+Introduced in version 2017
+
+---
+
+|  |  |
+| --- | --- |
+| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

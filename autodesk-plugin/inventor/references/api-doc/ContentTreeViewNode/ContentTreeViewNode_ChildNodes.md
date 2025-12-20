@@ -1,0 +1,33 @@
+# ContentTreeViewNode.ChildNodes Property
+
+Parent Object: [ContentTreeViewNode](../ContentTreeViewNode/ContentTreeViewNode.md)
+
+## Description
+
+Property that returns a collection containing the child ContentTreeViewNode objects of this node.
+
+## Syntax
+
+ContentTreeViewNode.**ChildNodes**() As [ContentTreeViewNodesEnumerator](../ContentTreeViewNodesEnumerator/ContentTreeViewNodesEnumerator.md)
+
+## Property Value
+
+This is a read only property whose value is a [ContentTreeViewNodesEnumerator](../ContentTreeViewNodesEnumerator/ContentTreeViewNodesEnumerator.md).
+
+## Samples
+
+|  |  |
+| --- | --- |
+| Name | Description |
+| [Replace content center part](../../sample-programs/ContentCenterPartReplace_Sample.md) | This sample demonstrates how to replace the content part referenced by an assembly occurrence. |
+| [Place Content Center Parts](../../sample-programs/PlaceContentCenterPart_Sample.md) | Places all of the items in a specified family within an assembly. The specific family is identified by the strings where it's setting the HexHeadNode variable. |
+
+## Version
+
+Introduced in version 2010
+
+---
+
+|  |  |
+| --- | --- |
+| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

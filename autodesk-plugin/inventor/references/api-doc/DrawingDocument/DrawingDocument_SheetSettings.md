@@ -1,0 +1,25 @@
+# DrawingDocument.SheetSettings Property
+
+Parent Object: [DrawingDocument](../DrawingDocument/DrawingDocument.md)
+
+## Description
+
+Property that returns the SheetSettings object. The SheetSettings object provides access to various sheet related document options. This is somewhat equivalent to the Sheet tab of the Document Settings dialog.
+
+## Syntax
+
+DrawingDocument.**SheetSettings**() As [SheetSettings](../SheetSettings/SheetSettings.md)
+
+## Property Value
+
+This is a read only property whose value is a [SheetSettings](../SheetSettings/SheetSettings.md).
+
+## Version
+
+Introduced in version 11
+
+---
+
+|  |  |
+| --- | --- |
+| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -1,0 +1,31 @@
+# LoftSectionDimensions.AddDrivingSection Method
+
+Parent Object: [LoftSectionDimensions](../LoftSectionDimensions/LoftSectionDimensions.md)
+
+## Description
+
+Method that creates a new LoftSectionDimension that represents a driving placed section for an area-graph type loft feature.
+
+## Syntax
+
+LoftSectionDimensions.**AddDrivingSection**( ***Position*** As Double, ***Size*** As Double, [***PositionAsAbsoluteDistance***] As Boolean, [***SizeAsScaleFactor***] As Boolean ) As [LoftSectionDimension](../LoftSectionDimension/LoftSectionDimension.md)
+
+## Parameters
+
+|  |  |  |
+| --- | --- | --- |
+| Name | Type | Description |
+| Position | Double | Specifies the positional distance (from the starting section) of the placed section for an area-graph type loft feature. The valid range of values for this argument depends on the value of the PositionAsAbsoluteDistance argument. If the PositionAsAbsoluteDistance argument is True, then the value specified by this argument represents an absolute distance value (measured along the centerline of the loft from the starting section) and any Double value that represents this absolute distance can be specified. If the PositionAsAbsoluteDistance argument is False, then the value specified by this argument represents a proportional distance value (relative to the starting section). The valid range of values for the proportional distance is 0.0 to 1.0 (including 0.0 and 1.0). This proportional distance is defined as the absolute distance of the placed section from the starting section divided by the absolute distance of the ending section from the starting section where both the distances are measured along the centerline of the loft. For example, for a placed section that coincides with the starting section the value of the proportional distance will be 0.0 and for a placed section that coincides with the ending section the value of the proportional distance will be 1.0. For intermediate placed sections, the value of the proportional distance will be between 0.0 and 1.0. |
+| Size | Double | Specifies the size of the placed section for an area-graph type loft feature. The specified value will either represent an absolute area value or a scale factor value depending on the value of the SizeAsScaleFactor argument. If the SizeAsScaleFactor argument is True, then the value specified by this argument represents a scale factor for the size of the placed section (i.e. by what scale factor should the placed section be re-sized from its default size). For example, for a placed section whose area needs to be the same as its default size, the value of the scale factor will be 1.0 and for a placed section whose area needs to be half the default size, the value of the scale factor will be 0.5. If the SizeAsScaleFactor argument is False, then the value specified by this argument represents the absolute area of the placed section. |
+| PositionAsAbsoluteDistance | Boolean | Indicates whether the positional distance of the placed section for an area-graph type loft feature is specified as an absolute distance value. A value of True indicates that the positional distance (specified by the Position argument) of the placed section is specified as an absolute distance value (measured along the centerline of the loft from the starting section). A value of False indicates that the positional distance (specified by the Position argument) of the placed section is specified as a proportional distance value (relative to the starting section). This proportional distance is defined as the absolute distance of the placed section from the starting section divided by the absolute distance of the ending section from the starting section where both the distances are measured along the centerline of the loft. For example, for a placed section that coincides with the starting section the value of the proportional distance will be 0.0 and for a placed section that coincides with the ending section the value of the proportional distance will be 1.0. For intermediate placed sections, the value of the proportional distance will be between 0.0 and 1.0. If no value is explicitly specified, a default value of False will be assumed to indicate that positional distance is specified as a proportional distance value. |
+| SizeAsScaleFactor | Boolean | Indicates whether the size of the placed section for an area-graph type loft feature is specified as a scale factor with respect to its default size. A value of True indicates that the size (specified by the Size argument) of the placed section is specified in terms of a scale factor with respect to its default size. For example, for a placed section whose area needs to be the same as its default size, the value of the scale factor will be 1.0 and for a placed section whose area needs to be half the default size, the value of the scale factor will be 0.5. A value of False indicates that the size (specified by the Size argument) of the placed section is specified as an absolute area value. If no value is explicitly specified, a default value of False will be assumed to indicate that that the size of the placed section is specified as an absolute area value.   This is an optional argument whose default value is False. |
+
+## Version
+
+Introduced in version 2008
+
+---
+
+|  |  |
+| --- | --- |
+| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

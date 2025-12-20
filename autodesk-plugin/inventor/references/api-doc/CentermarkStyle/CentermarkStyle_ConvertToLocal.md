@@ -1,0 +1,21 @@
+# CentermarkStyle.ConvertToLocal Method
+
+Parent Object: [CentermarkStyle](../CentermarkStyle/CentermarkStyle.md)
+
+## Description
+
+Method that creates a local cached copy of a global style and returns the local style.
+
+## Syntax
+
+CentermarkStyle.**ConvertToLocal**() As [Style](../Style/Style.md)
+
+## Version
+
+Introduced in version 2010
+
+---
+
+|  |  |
+| --- | --- |
+| © Copyright 2025 Autodesk, Inc. | Comment on this page. |
