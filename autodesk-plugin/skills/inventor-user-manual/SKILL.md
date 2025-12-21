@@ -135,19 +135,6 @@ To answer questions about Inventor API concepts:
 
 ## Code Example Patterns
 
-### Connecting to Inventor (Python)
-
-```python
-import win32com.client
-
-# Connect to running Inventor or start new instance
-inventor = win32com.client.Dispatch("Inventor.Application")
-inventor.Visible = True
-
-# Access active document
-doc = inventor.ActiveDocument
-```
-
 ### Connecting to Inventor (C#)
 
 ```csharp
