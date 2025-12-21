@@ -28,9 +28,3 @@ The KnitFeatures object represents a collection of knit features ( objects) on a
 ## Version
 
 Introduced in version 6
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

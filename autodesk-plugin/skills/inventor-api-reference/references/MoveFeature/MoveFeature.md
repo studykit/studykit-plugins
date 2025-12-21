@@ -59,9 +59,3 @@ Use a MoveFeature object to move and rotate solid(SurfaceBody) and surface(WorkS
 ## Version
 
 Introduced in version 2010
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

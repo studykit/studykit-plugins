@@ -55,9 +55,3 @@ The DrawingCurve object represents a curve within a drawing view that resulted f
 ## Version
 
 Introduced in version 11
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

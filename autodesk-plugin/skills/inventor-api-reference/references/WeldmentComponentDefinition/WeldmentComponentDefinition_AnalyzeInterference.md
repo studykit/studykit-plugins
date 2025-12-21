@@ -21,9 +21,3 @@ WeldmentComponentDefinition.**AnalyzeInterference**( ***Set1*** As [ObjectCollec
 ## Version
 
 Introduced in version 8
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -21,9 +21,3 @@ The PitchAndRevolutionExtent object provides access to the information that defi
 ## Version
 
 Introduced in version 5.3
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

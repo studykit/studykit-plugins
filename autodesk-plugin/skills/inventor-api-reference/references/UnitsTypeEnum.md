@@ -103,9 +103,3 @@ Units Types. Each signifies a specific unit in a particular dimension or categor
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

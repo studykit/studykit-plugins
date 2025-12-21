@@ -25,9 +25,3 @@ Constants identifying the type of derived property specified in formatted text o
 ## Version
 
 Introduced in version 5.3
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

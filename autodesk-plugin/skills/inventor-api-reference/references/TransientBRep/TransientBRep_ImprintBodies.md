@@ -45,9 +45,3 @@ TransientBRep.**ImprintBodies**( ***InputBodyOne*** As [SurfaceBody](../SurfaceB
 ## Version
 
 Introduced in version 2014
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -20,9 +20,3 @@ The SketchConstraints3DEnumerator object provides access to a list of SketchCons
 ## Version
 
 Introduced in version 6
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

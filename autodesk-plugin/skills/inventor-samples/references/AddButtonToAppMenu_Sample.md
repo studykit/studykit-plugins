@@ -8,10 +8,6 @@ Demonstrates adding command to the application menu.
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Sub AddCommandsToFileBrowser()
     ' Get the application menu controls collection
@@ -31,9 +27,3 @@ Sub AddCommandsToFileBrowser()
     Call oFileBrowserControls.AddSeparator("Manage", True)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

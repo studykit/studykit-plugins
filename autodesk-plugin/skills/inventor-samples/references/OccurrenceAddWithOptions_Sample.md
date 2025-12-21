@@ -10,10 +10,6 @@ This sample demonstrates how to create an assembly occurrence by specifying vari
 
 Before running this sample, make sure that the file C:\Temp\Reps.iam exists (or change the path in the sample). The file must contain a model state named MyModelState, a positional representation named MyPositionalRep and a design view representation named MyDesignViewRep.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub AddOccurrenceWithRepresentations()
     ' Set a reference to the assembly component definintion.
@@ -44,9 +40,3 @@ Public Sub AddOccurrenceWithRepresentations()
     Set oOcc = oAsmCompDef.Occurrences.AddWithOptions("C:\Temp\Reps.iam", oMatrix, oOptions)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -23,9 +23,3 @@ SweepFeatures.**CreateSweepDefinition**( ***SweepType*** As [SweepTypeEnum](../S
 ## Version
 
 Introduced in version 2015
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

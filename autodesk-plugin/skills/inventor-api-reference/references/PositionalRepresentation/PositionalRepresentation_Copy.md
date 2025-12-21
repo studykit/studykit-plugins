@@ -20,9 +20,3 @@ PositionalRepresentation.**Copy**( [***NewName***] As String ) As [PositionalRep
 ## Version
 
 Introduced in version 11
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

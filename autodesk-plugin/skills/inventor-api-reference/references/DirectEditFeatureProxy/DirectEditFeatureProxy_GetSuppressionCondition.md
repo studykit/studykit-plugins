@@ -22,9 +22,3 @@ DirectEditFeatureProxy.**GetSuppressionCondition**( ***Parameter*** As [Paramete
 ## Version
 
 Introduced in version 2015
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -13,9 +13,3 @@ CornerOptions.**Copy**() As [CornerOptions](../CornerOptions/CornerOptions.md)
 ## Version
 
 Introduced in version 2010
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

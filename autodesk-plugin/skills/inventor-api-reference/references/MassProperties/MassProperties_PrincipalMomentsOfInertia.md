@@ -30,9 +30,3 @@ MassProperties.**PrincipalMomentsOfInertia**( ***I1*** As Double, ***I2*** As Do
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

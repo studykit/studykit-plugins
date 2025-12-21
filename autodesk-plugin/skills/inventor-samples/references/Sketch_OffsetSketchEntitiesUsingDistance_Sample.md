@@ -8,10 +8,6 @@ This sample demonstrates the creation of offsets in 2d sketches. Two ways of cre
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub Offset()
     ' Check to make sure a sketch is open.
@@ -82,9 +78,3 @@ Public Sub Offset()
     Call oSketch.OffsetSketchEntitiesUsingDistance(oCollection, 6, bNaturalOffsetDir, True)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

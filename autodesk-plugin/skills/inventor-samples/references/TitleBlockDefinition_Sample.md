@@ -10,10 +10,6 @@ This sample illustrates creating a new title block definition object and inserti
 
 To run the sample have a drawing document open and run the CreateTitleBlockDefinition Sub. After this you can run the InsertTitleBlockOnSheet to insert the title block into the active sheet.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub CreateTitleBlockDefinition()
     ' Set a reference to the drawing document.
@@ -111,9 +107,3 @@ Public Sub InsertTitleBlockOnSheet()
     Set oTitleBlock = oSheet.AddTitleBlock(oTitleBlockDef, , sPromptStrings)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -117,9 +117,3 @@ This object represents an individual occurrence within an assembly. An occurrenc
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

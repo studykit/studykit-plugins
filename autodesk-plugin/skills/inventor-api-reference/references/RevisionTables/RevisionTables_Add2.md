@@ -26,9 +26,3 @@ RevisionTables.**Add2**( ***PlacementPoint*** As [Point2d](../Point2d/Point2d.md
 ## Version
 
 Introduced in version 2012
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

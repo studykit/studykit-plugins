@@ -10,10 +10,6 @@ This sample demonstrates grounding an assembly occurrence.
 
 Before running the sample, you need to open an assembly and create a part file called C:\TempPart1.ipt, or edit the sample code to point to another part file if desired.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub FixAllOccurrences()
     ' Set a reference to the assembly component definintion.
@@ -46,9 +42,3 @@ Public Sub FixAllOccurrences()
     Next
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -21,9 +21,3 @@ The DraftingStandard object represent the currently applied drafting standard, a
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

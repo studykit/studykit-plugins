@@ -38,9 +38,3 @@ The CollinearConstraint3D object represents a collinear constraint within a 3D s
 ## Version
 
 Introduced in version 10
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

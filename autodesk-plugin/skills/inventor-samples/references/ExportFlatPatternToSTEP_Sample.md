@@ -10,10 +10,6 @@ This sample demonstrates how to save a FlatPattern file using the STEP translato
 
 This sample demonstrates how to save a FlatPattern file using the STEP translator add-in.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Sub ExportFlatPatternToSTEP()
     'Set a reference to the active document (the document to be published).
@@ -59,9 +55,3 @@ Sub ExportFlatPatternToSTEP()
     End If
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

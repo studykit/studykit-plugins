@@ -37,9 +37,3 @@ The AssetLibraries collection object provides access to the various asset librar
 ## Version
 
 Introduced in version 2014
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

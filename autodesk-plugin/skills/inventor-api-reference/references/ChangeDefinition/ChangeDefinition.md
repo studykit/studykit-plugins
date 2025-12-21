@@ -39,9 +39,3 @@ The ChangeDefinition object is obtained from the ChangeManager object. It's purp
 ## Version
 
 Introduced in version 9
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

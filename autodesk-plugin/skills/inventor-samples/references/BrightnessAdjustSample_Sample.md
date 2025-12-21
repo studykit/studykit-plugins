@@ -8,10 +8,6 @@ This sample demonstrates how to adjust lighting brightness with mini-toolbar sli
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Sub BrightnessAdjustSample()
     ' Open a part/assembly document before running below code
@@ -110,9 +106,3 @@ Private Sub m_MiniToolbar_OnOK()
     End If
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

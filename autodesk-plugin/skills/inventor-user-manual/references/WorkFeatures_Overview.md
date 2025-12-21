@@ -36,9 +36,18 @@ As indicated by the preceding object diagram, the work feature collection object
 
 The following example shows one way of creating a fixed WorkPoint object using the AddFixed method. Note the use of transient geometry to create a 3D point and then assign the X Y Z coordinates 2, 3, 4 to that point, before adding the WorkPoint to the WorkPoints collection.
 
-|  |
-| --- |
-| ```  Dim oPartDoc As PartDocument Set oPartDoc = ThisApplication.ActiveDocument  Dim oPartCompDef As PartComponentDefinition Set oPartCompDef = oPartDoc.ComponentDefinition  Dim oTrans As TransientGeometry Set oTrans = ThisApplication.TransientGeometry  Dim oPnt As Point Set oPnt = oTrans.CreatePoint(2, 3, 4)  Dim oWorkPoint1 As WorkPoint Set oWorkPoint1 = oPartCompDef.WorkPoints.AddFixed(oPnt, False) ``` |
+```vb
+Dim oPartDoc As PartDocument
+Set oPartDoc = ThisApplication.ActiveDocument
+Dim oPartCompDef As PartComponentDefinition
+Set oPartCompDef = oPartDoc.ComponentDefinition
+Dim oTrans As TransientGeometry
+Set oTrans = ThisApplication.TransientGeometry
+Dim oPnt As Point
+Set oPnt = oTrans.CreatePoint(2, 3, 4)
+Dim oWorkPoint1 As WorkPoint
+Set oWorkPoint1 = oPartCompDef.WorkPoints.AddFixed(oPnt, False)
+```
 
 This sample and the following code omit error checking for the sake of clarity and brevity. Always check that return values are of the expected type.
 
@@ -54,9 +63,13 @@ The False argument to the AddFixed method indicates that the WorkPoint is not to
 
 The following code creates a WorkAxis and adds it to the WorkAxes collection. The AddByTwoPoints method is used, so another WorkPoint is defined with X Y Z values of 0, 0, 0. So the WorkAxis will be defined by two points; the previously created WorkPoint at 2, 3, 4, and a new one at 0, 0, 0.
 
-|  |
-| --- |
-| ```  Dim oWorkPoint2 As WorkPoint Set oPnt = oTrans.CreatePoint(0, 0, 0) Set oWorkPoint2 = oPartCompDef.WorkPoints.AddFixed(oPnt, False)  Dim oWorkAxis As WorkAxis Set oWorkAxis = oPartCompDef.WorkAxes.AddByTwoPoints(oWorkPoint1, oWorkPoint2, False) ``` |
+```vb
+Dim oWorkPoint2 As WorkPoint
+Set oPnt = oTrans.CreatePoint(0, 0, 0)
+Set oWorkPoint2 = oPartCompDef.WorkPoints.AddFixed(oPnt, False)
+Dim oWorkAxis As WorkAxis
+Set oWorkAxis = oPartCompDef.WorkAxes.AddByTwoPoints(oWorkPoint1, oWorkPoint2, False)
+```
 
 The AddByTwoPoints method creates the WorkAxis and adds it to the WorkAxes collection. Note the third argument again indicates that the newly created work feature should not be considered application-specific construction geometry. It is displayed on screen, appearing something like this:
 
@@ -70,9 +83,12 @@ With just two points, there is insufficient information to create a plane. There
 | --- |
 | **Note:** This code also demonstrates the ability to name work features. When dealing with a large number of objects, it is easier to reference them by name than by numerical index. The same applies to the base work feature objects. The name of the Y-Z plane, the first one in the WorkPlanes collection, is YZ Plane. This could be referenced as Item(1), but it is easier to read as Item("YZ Plane"). |
 
-|  |
-| --- |
-| ```  Dim oWorkPlane As WorkPlane Set oWorkPlane = oPartCompDef.WorkPlanes.AddByLinePlaneAndAngle _    (oWorkAxis, oPartCompDef.WorkPlanes.Item("YZ Plane"), 45, False)  oWorkPlane.Name = "MyFirstWorkPlane" ``` |
+```vb
+Dim oWorkPlane As WorkPlane
+Set oWorkPlane = oPartCompDef.WorkPlanes.AddByLinePlaneAndAngle _
+(oWorkAxis, oPartCompDef.WorkPlanes.Item("YZ Plane"), 45, False)
+oWorkPlane.Name = "MyFirstWorkPlane"
+```
 
 The last line of code names the newly created WorkPlane object MyFirstWorkPlane. Other code can use this name to reference this work feature. The new name is also displayed in the Autodesk Inventor browser, provided the work feature is not application-specific construction geometry. It is displayed as follows:
 

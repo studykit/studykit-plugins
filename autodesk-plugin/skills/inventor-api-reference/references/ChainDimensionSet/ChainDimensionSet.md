@@ -38,9 +38,3 @@ The ChainDimensionSet object represents a chain dimension set placed on a sheet.
 ## Version
 
 Introduced in version 2011
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

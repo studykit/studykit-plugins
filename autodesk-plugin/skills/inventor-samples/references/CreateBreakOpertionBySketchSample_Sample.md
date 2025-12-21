@@ -11,10 +11,6 @@ This sample demonstrates how to create a break operation using a sketch.
 
 This sample demonstrates how to create a break operation using a sketch. You need to open a drawing document with a drawing view on the active sheet before running this sample.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Sub CreateBreakOpertionBySketchSample()
     ' Open a drawing document and place a drawing view on the active sheet before running this sample.
@@ -48,10 +44,6 @@ End Sub
 
 This sample demonstrates how to create a break operation using a sketch. You need to open a drawing document with a drawing view on the active sheet before running this sample.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Sub CreateBreakOpertionBySketchSample()
     ' Open a drawing document and place a drawing view on the active sheet before running this sample.
@@ -82,9 +74,3 @@ Sub CreateBreakOpertionBySketchSample()
     Set oBreak = oView.BreakOperations.AddBySketch(oSk, kRectangularBreakStyle)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

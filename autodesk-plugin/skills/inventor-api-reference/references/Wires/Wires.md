@@ -27,9 +27,3 @@ The Wires collection object provides access to a set of Wire objects.
 ## Version
 
 Introduced in version 2009
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

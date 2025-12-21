@@ -8,10 +8,6 @@ This sample demonstrates how to save a IGES file using the IGES translator add-i
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub ExportToIGES()
     ' Get the IGES translator Add-In.
@@ -49,9 +45,3 @@ Public Sub ExportToIGES()
     End If
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

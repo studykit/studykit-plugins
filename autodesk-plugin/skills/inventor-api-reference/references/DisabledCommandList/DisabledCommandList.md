@@ -29,9 +29,3 @@ This object represents a list of commands that are disabled in the given context
 ## Version
 
 Introduced in version 10
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

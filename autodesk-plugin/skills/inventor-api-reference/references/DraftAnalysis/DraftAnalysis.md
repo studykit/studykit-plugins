@@ -46,9 +46,3 @@ The DraftAnalysis object represents an existing draft analysis feature in a part
 ## Version
 
 Introduced in version 2009
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

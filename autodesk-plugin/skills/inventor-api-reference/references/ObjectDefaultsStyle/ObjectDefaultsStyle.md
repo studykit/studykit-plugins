@@ -144,9 +144,3 @@ The Object Defaults style is a sub-style of the active standard style. In a draw
 ## Version
 
 Introduced in version 9
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

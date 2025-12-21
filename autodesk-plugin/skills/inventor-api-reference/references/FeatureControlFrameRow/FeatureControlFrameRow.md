@@ -42,9 +42,3 @@ The FeatureControlFrameRow object represents a row within a feature control fram
 ## Version
 
 Introduced in version 2009
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

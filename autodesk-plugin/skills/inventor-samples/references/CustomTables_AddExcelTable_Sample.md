@@ -10,10 +10,6 @@ This sample demonstrates the creation of a table based on an Excel file in a dra
 
 Change the location of the source Excel file in the code below before running the sample.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub CreateDrawingExcelTable()
     ' Set a reference to the active drawing document
@@ -35,9 +31,3 @@ Public Sub CreateDrawingExcelTable()
     Set oExcelTable = oActiveSheet.CustomTables.AddExcelTable("C:\Temp\test.xls", oPoint, "Excel Table")
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -22,9 +22,3 @@ PartDocument.**SetMissingAddInBehavior**( ***ClientId*** As String, ***DisabledC
 ## Version
 
 Introduced in version 11
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

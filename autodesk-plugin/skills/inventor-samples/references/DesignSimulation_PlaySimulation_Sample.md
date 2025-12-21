@@ -10,10 +10,6 @@ This sample plays back an existing dynamic simulation.
 
 To run this sample you must have an active document that has a valid simulation defined.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Sub PlaySimulation()
     ' Get the active document.  This assumes it is an assembly.
@@ -51,9 +47,3 @@ Sub PlaySimulation()
     End If
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -8,10 +8,6 @@ Dumps out information to the Immediate window about tolerance information associ
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub DumpParamInfo()
     ' Get the active document assuming it is a part.
@@ -84,9 +80,3 @@ Private Sub DisplayToleranceInfo(Param As Parameter)
     Debug.Print "  Shaft: " & tol.ShaftTolerance
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -21,9 +21,3 @@ TransientGeometry.**CreateLine2d**( ***RootPoint*** As [Point2d](../Point2d/Poin
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

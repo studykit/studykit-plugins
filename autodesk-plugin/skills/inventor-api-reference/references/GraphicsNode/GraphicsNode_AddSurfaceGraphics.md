@@ -34,9 +34,3 @@ The input body (or the body associated with the input faces) is copied and the c
 ## Version
 
 Introduced in version 2009
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

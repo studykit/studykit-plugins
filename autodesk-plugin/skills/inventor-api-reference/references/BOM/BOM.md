@@ -53,9 +53,3 @@ The BOM object represents the Bill Of Materials (BOM) data of a document.
 ## Version
 
 Introduced in version 10
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

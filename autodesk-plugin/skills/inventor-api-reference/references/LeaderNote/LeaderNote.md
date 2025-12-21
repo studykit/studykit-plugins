@@ -63,9 +63,3 @@ The LeaderNote object represents a note with an attached leader on a sheet and d
 ## Version
 
 Introduced in version 10
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

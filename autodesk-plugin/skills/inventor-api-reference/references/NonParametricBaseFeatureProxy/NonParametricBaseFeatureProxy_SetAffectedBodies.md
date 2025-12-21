@@ -20,9 +20,3 @@ NonParametricBaseFeatureProxy.**SetAffectedBodies**( ***Bodies*** As [ObjectColl
 ## Version
 
 Introduced in version 2010
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

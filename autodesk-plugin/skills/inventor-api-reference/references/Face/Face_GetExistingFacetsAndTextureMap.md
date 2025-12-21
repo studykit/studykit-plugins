@@ -26,9 +26,3 @@ Face.**GetExistingFacetsAndTextureMap**( ***ToleranceIndex*** As Double, ***Vert
 ## Version
 
 Introduced in version 9
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

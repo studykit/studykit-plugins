@@ -22,9 +22,3 @@ This is a read only property whose value is a [SketchFillRegions](../SketchFillR
 ## Version
 
 Introduced in version 10
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

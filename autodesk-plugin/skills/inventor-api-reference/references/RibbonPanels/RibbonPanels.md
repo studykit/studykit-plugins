@@ -37,9 +37,3 @@ The RibbonPanels collection object provides access to all existing panels within
 ## Version
 
 Introduced in version 2010
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

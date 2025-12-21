@@ -22,9 +22,3 @@ The DSResults collection object provides access to the results associated with a
 ## Version
 
 Introduced in version 2013
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

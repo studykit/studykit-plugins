@@ -21,9 +21,3 @@ The ContourRollFeatures collection object provides access to the ContourRollFeat
 ## Version
 
 Introduced in version 2010
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

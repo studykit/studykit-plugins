@@ -8,10 +8,6 @@ Demonstrates creating a highlight set.
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Sub Main()
   ' Check to make sure the active document is a part.
@@ -49,9 +45,3 @@ Sub Main()
   Call oSet2.AddItem(oFace2)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

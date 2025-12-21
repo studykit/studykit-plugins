@@ -27,9 +27,3 @@ ApplicationEvents.**OnDeactivateView**( ***ViewObject*** As [View](../View/View.
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

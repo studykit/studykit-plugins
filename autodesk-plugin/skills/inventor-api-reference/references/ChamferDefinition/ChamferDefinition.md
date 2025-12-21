@@ -45,9 +45,3 @@ The ChamferDefinition object is the base class that defines the variables for ch
 ## Version
 
 Introduced in version 5.3
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

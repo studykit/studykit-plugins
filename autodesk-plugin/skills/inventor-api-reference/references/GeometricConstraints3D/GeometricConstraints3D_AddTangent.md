@@ -22,9 +22,3 @@ GeometricConstraints3D.**AddTangent**( ***EntityOne*** As [SketchEntity3D](../Sk
 ## Version
 
 Introduced in version 8
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

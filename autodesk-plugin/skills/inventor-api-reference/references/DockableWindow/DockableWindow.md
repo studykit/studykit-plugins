@@ -55,9 +55,3 @@ A DockableWindow object represents a window that can be docked on to the Invento
 ## Version
 
 Introduced in version 2011
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

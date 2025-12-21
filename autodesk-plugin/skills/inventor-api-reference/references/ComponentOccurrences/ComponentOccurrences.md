@@ -51,9 +51,3 @@ Provides access to the objects within an assembly and supports methods to create
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

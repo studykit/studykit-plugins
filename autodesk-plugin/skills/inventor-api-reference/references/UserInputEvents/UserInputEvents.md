@@ -45,9 +45,3 @@ The UserInputEvents object provides input event notification. For example, use o
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

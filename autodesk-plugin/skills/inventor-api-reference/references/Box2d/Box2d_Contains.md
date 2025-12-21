@@ -20,9 +20,3 @@ Box2d.**Contains**( ***Point*** As [Point2d](../Point2d/Point2d.md) ) As Boolean
 ## Version
 
 Introduced in version 2008
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

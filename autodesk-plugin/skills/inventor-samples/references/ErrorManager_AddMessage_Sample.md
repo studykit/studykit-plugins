@@ -8,10 +8,6 @@ Demonstrates displaying custom error messages.
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Sub DisplayErrorsInInventorDialog()
     ' Set a reference to the ErrorManager object
@@ -39,9 +35,3 @@ Sub DisplayErrorsInInventorDialog()
     Call oErrorMgr.Show("My errors", False, False)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -22,9 +22,3 @@ SketchSpline3D.**InsertFitPoint**( ***FitPoint*** As Object, [***TargetIndex***]
 ## Version
 
 Introduced in version 8
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

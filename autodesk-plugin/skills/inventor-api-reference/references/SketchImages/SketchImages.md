@@ -35,9 +35,3 @@ The SketchImages collection object provides access to all the images in a sketch
 ## Version
 
 Introduced in version 11
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

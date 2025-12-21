@@ -45,9 +45,3 @@ The Border object represents the instance of a border on a sheet.
 ## Version
 
 Introduced in version 5.3
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

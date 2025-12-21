@@ -8,10 +8,6 @@ Displays information about all of the extrude features in the active document. A
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub GetFeatureInfo()
     ' Get the active document assuming it is a part.
@@ -65,9 +61,3 @@ Public Sub GetFeatureInfo()
     Next
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

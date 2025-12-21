@@ -28,9 +28,3 @@ iFeatures.**CreateiFeatureDefinition**( ***FullFileName*** As String ) As [iFeat
 ## Version
 
 Introduced in version 2009
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -45,9 +45,3 @@ The BrowserFolder object represents a folder in the browser.
 ## Version
 
 Introduced in version 2010
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

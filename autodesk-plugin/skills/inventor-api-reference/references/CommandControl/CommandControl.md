@@ -44,9 +44,3 @@ A CommandControl object represents a user interface control (button, combobox, s
 ## Version
 
 Introduced in version 2010
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

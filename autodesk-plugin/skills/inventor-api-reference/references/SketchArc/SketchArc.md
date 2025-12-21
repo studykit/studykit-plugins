@@ -73,9 +73,3 @@ The SketchArc object represents an arc within a sketch. See the article in the o
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

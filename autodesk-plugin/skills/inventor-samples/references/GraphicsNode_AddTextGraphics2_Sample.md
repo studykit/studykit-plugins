@@ -10,10 +10,6 @@ This sample demonstrates creating text using client graphics. It illustrates the
 
 To run the sample have a part or assembly document open.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub ClientGraphicsTextMultipleFonts()
     ' Set a reference to the document.  This will work with
@@ -117,9 +113,3 @@ Public Sub ClientGraphicsTextMultipleFonts()
     ThisApplication.ActiveView.Update
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

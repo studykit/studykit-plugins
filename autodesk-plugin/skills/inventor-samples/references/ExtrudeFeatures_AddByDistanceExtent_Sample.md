@@ -8,10 +8,6 @@ This sample demonstrates the creation of an extrude feature from sketch text.
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub ExtrudeSketchText()
     ' Create a new part document, using the default part template.
@@ -55,9 +51,3 @@ Public Sub ExtrudeSketchText()
     Set oExtrude = oCompDef.Features.ExtrudeFeatures.Add(oExtrudeDef)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

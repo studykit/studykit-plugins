@@ -17,9 +17,3 @@ This is a read only property whose value is a [SketchEntities3DEnumerator](../Sk
 ## Version
 
 Introduced in version 2021
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

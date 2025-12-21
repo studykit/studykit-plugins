@@ -23,9 +23,3 @@ ProjectToSurfaceCurves.**Add**( ***Faces*** As [ObjectCollection](../ObjectColle
 ## Version
 
 Introduced in version 2021
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

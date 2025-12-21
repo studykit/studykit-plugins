@@ -52,9 +52,3 @@ The StandardThreadInfo object defines the thread information that is used by the
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

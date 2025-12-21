@@ -21,9 +21,3 @@ PlaneAndPointWorkPlaneDef.**GetData**( ***Plane*** As Object, ***Point*** As Obj
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

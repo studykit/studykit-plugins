@@ -8,10 +8,6 @@ The following sample demonstrates the activation of an Inventor project.
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub SetActiveProject()
     ' Check to make sure a document isn't open.
@@ -39,9 +35,3 @@ Public Sub SetActiveProject()
     Debug.Print "New active project: " & oDesignProjectMgr.ActiveDesignProject.FullFileName
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

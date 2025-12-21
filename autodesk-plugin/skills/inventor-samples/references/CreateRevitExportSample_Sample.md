@@ -10,10 +10,6 @@ This sample demonstrates how to create a RevitExport object.
 
 This sample demonstrates how to create a RevitExport object. Open an assembly firstly before running this sample.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Sub CreateRevitExportSample()
     Dim oDoc As AssemblyDocument
@@ -38,9 +34,3 @@ Sub CreateRevitExportSample()
     Set oRevitExport = oDoc.ComponentDefinition.RevitExports.Add(oRevitExportDef)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

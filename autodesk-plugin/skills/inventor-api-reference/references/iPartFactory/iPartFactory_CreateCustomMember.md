@@ -22,9 +22,3 @@ iPartFactory.**CreateCustomMember**( ***FullFileName*** As String, [***Row***] A
 ## Version
 
 Introduced in version 6
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

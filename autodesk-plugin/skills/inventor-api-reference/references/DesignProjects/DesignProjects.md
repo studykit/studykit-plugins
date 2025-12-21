@@ -30,9 +30,3 @@ The DesignProjects collection object provides access to all the existing project
 ## Version
 
 Introduced in version 2011
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

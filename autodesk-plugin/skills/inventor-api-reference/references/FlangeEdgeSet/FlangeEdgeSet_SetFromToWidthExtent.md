@@ -21,9 +21,3 @@ FlangeEdgeSet.**SetFromToWidthExtent**( ***FromEntity*** As Object, ***ToEntity*
 ## Version
 
 Introduced in version 2025
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

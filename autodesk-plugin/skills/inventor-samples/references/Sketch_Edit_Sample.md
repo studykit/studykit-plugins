@@ -10,10 +10,6 @@ This sample demonstrates opening a sketch for edit.
 
 To use this sample, have a part document open that contains a sketch named Sketch1.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub StartSketchEdit()
     ' Set a reference to the Sketches collection. This assumes
@@ -35,9 +31,3 @@ Public Sub StartSketchEdit()
     oSketch.Edit
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -44,9 +44,3 @@ The GeometricConstraints3D object provides access to all the geometric sketch co
 ## Version
 
 Introduced in version 6
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

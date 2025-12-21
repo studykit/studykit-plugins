@@ -27,9 +27,3 @@ SketchPoint.**MoveTo**( ***Point*** As [Point2d](../Point2d/Point2d.md) )
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

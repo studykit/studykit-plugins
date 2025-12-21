@@ -10,10 +10,6 @@ This sample demonstrates creating an iMate result using two existin iMate defini
 
 To use this sample create a new part by extruding a rectangle to create a cube. Create a mate iMate on one of the faces. This sample assumes the iMate is named the default name used in the English version of Inventor, which is iMate:1. If the iMate definition is created with another name you can either edit the name of the iMate definition in the part file, or edit the sample code below to use the different name. Save the part to C:\Temp\iMatePart.ipt. Finally, have an assembly open and run the sample code.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub iMateResultCreationSample()
     ' Get the component definition of the currently open assembly.
@@ -75,9 +71,3 @@ Public Sub iMateResultCreationSample()
 
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

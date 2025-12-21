@@ -20,9 +20,3 @@ UserInterfaceEvents.**OnResetShortcuts**( ***Context*** As [NameValueMap](../Nam
 ## Version
 
 Introduced in version 2008
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

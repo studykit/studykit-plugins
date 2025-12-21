@@ -10,10 +10,6 @@ This sample demonstrates the translation of all the objects on the active sketch
 
 Have a sketch active that contains several entities (this could include text boxes and images) and run the sample.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub MoveSketchObjects()
     ' Check to make sure a sketch is open.
@@ -47,9 +43,3 @@ Public Sub MoveSketchObjects()
     Call oSketch.MoveSketchObjects(oSketchObjects, oVec)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

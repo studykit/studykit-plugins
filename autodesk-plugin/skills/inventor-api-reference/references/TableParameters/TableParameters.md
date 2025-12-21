@@ -27,9 +27,3 @@ Provides access to the objects associated with the ParameterTable object the col
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

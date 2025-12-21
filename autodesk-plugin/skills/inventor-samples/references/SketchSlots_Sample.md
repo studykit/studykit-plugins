@@ -8,10 +8,6 @@ This sample demonstrates several new methods to create sketch entities that repr
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub CreateSlots()
     ' Create a new part.
@@ -44,9 +40,3 @@ Public Sub CreateSlots()
     ThisApplication.ActiveView.Fit
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

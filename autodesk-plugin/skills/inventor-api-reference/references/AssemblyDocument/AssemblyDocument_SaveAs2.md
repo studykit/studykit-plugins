@@ -22,9 +22,3 @@ AssemblyDocument.**SaveAs2**( ***FullFileName*** As String, ***SaveCopyAs*** As 
 ## Version
 
 Introduced in version 2024
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

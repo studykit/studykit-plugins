@@ -17,9 +17,3 @@ This is a read only property whose value is a [UnitVector2d](../UnitVector2d/Uni
 ## Version
 
 Introduced in version 2009
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

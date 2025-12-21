@@ -17,9 +17,3 @@ This is a read/write property whose value is a [UnitVector2d](../UnitVector2d/Un
 ## Version
 
 Introduced in version 2008
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

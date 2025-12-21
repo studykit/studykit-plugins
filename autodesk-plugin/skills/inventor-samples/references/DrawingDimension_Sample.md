@@ -10,10 +10,6 @@ This sample demonstrates the editing of sheet dimensions and the associated dime
 
 To run this sample, open a drawing document that has one or more drawing views on the active sheet and add various sheet dimensions to it.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub EditDrawingDimensions()
     ' Set a reference to the drawing document.
@@ -53,9 +49,3 @@ Public Sub EditDrawingDimensions()
     oDimStyle.Tolerance.SetToSymmetric (0.02)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

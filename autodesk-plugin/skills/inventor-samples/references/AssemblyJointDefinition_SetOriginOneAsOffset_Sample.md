@@ -10,10 +10,6 @@ This sample demonstrates how to create a planar AssemblyJoint with offset to the
 
 Create a part with some solid and make sure there are linear edges in it, save it as C:\Temp\Part1.ipt or you need to edit the VBA code to change the paths to make it work.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Sub CreateAssemblyJointWithOffsetSample()
     Dim oDoc As AssemblyDocument
@@ -63,9 +59,3 @@ Sub CreateAssemblyJointWithOffsetSample()
     Set oJoint = oCompDef.Joints.Add(oJointDef)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

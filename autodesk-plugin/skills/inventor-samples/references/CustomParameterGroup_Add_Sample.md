@@ -8,10 +8,6 @@ This sample demonstrates the creation of model, reference and user parameters an
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub CreateParametersAndGroup()
     ' Create a new Part document.
@@ -47,9 +43,3 @@ Public Sub CreateParametersAndGroup()
     Call oCustomParamGroup.Add(oUserParam)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

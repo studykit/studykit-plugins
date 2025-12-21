@@ -22,9 +22,3 @@ The iFeatureWorkPlaneInput object represents the work plane input information of
 ## Version
 
 Introduced in version 6
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

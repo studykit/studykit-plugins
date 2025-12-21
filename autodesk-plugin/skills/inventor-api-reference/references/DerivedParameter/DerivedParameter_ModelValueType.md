@@ -17,9 +17,3 @@ This is a read/write property whose value is a [ModelValueTypeEnum](../ModelValu
 ## Version
 
 Introduced in version 11
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

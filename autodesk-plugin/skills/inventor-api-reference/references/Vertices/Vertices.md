@@ -20,9 +20,3 @@ The Vertices object represents a collection of  objects.
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

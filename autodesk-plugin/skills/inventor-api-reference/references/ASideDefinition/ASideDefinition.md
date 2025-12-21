@@ -30,9 +30,3 @@ The ASideFaceDefinition object provides the properties and methods for this obje
 ## Version
 
 Introduced in version 2016
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

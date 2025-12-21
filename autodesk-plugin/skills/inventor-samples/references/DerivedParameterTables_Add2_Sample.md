@@ -10,10 +10,6 @@ This sample demonstrates the selective linking of parameters from another Invent
 
 Before running this sample, make sure that the file C:\temp\block.ipt exists (or change the path in the sample). The sample assumes that the file contains parameters named d0, d1 and d2.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Sub SelectivelyLinkParams()
     ' Open the source document invisible.
@@ -55,9 +51,3 @@ Sub SelectivelyLinkParams()
     oDerivedParamTable.LinkedParameters = oParamsToLink
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

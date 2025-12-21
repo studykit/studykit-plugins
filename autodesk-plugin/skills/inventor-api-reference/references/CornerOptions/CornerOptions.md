@@ -30,9 +30,3 @@ The CornerOptions object defines the settings that influence the creation of a c
 ## Version
 
 Introduced in version 2009
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

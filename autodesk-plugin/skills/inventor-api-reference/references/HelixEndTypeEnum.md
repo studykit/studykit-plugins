@@ -15,9 +15,3 @@ Constants identifying the end type of a helix curve.
 ## Version
 
 Introduced in version 2019
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

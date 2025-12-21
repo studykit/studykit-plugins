@@ -30,9 +30,3 @@ The Ribbons collection object provides access to all existing ribbons in Invento
 ## Version
 
 Introduced in version 2010
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

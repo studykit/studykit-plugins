@@ -8,10 +8,6 @@ This sample demonstrates how to save a DXF file using the DXF translator add-in.
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub PublishDXF()
     ' Get the DXF translator Add-In.
@@ -50,9 +46,3 @@ Public Sub PublishDXF()
     Call DXFAddIn.SaveCopyAs(oDocument, oContext, oOptions, oDataMedium)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

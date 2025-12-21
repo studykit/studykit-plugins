@@ -64,9 +64,3 @@ The ControlDefinition object is the base class for all other command definition 
 ## Version
 
 Introduced in version 6
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

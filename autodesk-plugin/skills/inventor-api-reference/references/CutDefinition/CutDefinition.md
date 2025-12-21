@@ -44,9 +44,3 @@ The CutDefinition object represents all of the information that defines a cut fe
 ## Version
 
 Introduced in version 2009
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

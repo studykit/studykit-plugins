@@ -8,10 +8,6 @@ This sample demonstrates how to create a custom table.
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub CreateCustomTable()
     ' Set a reference to the drawing document.
@@ -69,9 +65,3 @@ Public Sub CreateCustomTable()
     oCustomTable.OverrideFormat = oFormat
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

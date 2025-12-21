@@ -20,9 +20,3 @@ DrawingSketch.**SketchToSheetSpace**( ***SketchCoordinate*** As [Point2d](../Poi
 ## Version
 
 Introduced in version 5.3
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -21,9 +21,3 @@ DrawingView.**SetVisibility**( ***Object*** As Object, ***Visible*** As Boolean 
 ## Version
 
 Introduced in version 10
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

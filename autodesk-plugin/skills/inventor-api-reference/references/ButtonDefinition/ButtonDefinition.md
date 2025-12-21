@@ -68,9 +68,3 @@ The ButtonDefinition object represents any command whose user interface is a but
 ## Version
 
 Introduced in version 6
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

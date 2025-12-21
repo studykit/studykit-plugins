@@ -8,10 +8,6 @@ Sets the value of an existing parameter. A part must be open that contains a par
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub SetParameter()
     ' Get the Parameters object. Assumes a part or assembly document is active.
@@ -29,9 +25,3 @@ Public Sub SetParameter()
     ThisApplication.ActiveDocument.Update
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

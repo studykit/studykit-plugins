@@ -62,9 +62,3 @@ The iFeature object represents the instance of a placed iFeature.
 ## Version
 
 Introduced in version 2009
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

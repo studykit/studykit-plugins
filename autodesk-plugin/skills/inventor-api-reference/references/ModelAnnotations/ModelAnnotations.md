@@ -39,9 +39,3 @@ The ModelAnnotations collection object provides access to all of the annotations
 ## Version
 
 Introduced in version 2018
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -26,9 +26,3 @@ This is a read only property whose value is a [DrawingViews](../DrawingViews/Dra
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

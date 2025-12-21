@@ -10,10 +10,6 @@ A document must be open when this sample is run.
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub GetPropertySample()
     ' Get the active document.
@@ -31,9 +27,3 @@ Public Sub GetPropertySample()
     MsgBox "Part Number: " & invPartNumberProperty.value
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

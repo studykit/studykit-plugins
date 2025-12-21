@@ -24,9 +24,3 @@ This is a read/write property whose value is an [AngularPrecisionEnum](../Angula
 ## Version
 
 Introduced in version 9
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

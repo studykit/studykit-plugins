@@ -477,9 +477,3 @@
 | [Cancel a double click](UserInputEventsSink_OnDoubleClick_Sample.md) |
 | [OnDrag Event - dragging a WorkPoint](UserInputEventsSink_OnDrag_Sample.md) |
 | [Move view tab between different view frames](ViewTabMoveSample_Sample.md) |
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright Autodesk, Inc. |  |

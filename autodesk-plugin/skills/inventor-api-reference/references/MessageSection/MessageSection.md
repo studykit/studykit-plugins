@@ -39,9 +39,3 @@ A MessageSection object can be used to clear, adopt or retain error/warning mess
 ## Version
 
 Introduced in version 2010
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -20,9 +20,3 @@ SketchPoint.**Merge**( ***SketchPoint*** As [SketchPoint](../SketchPoint/SketchP
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

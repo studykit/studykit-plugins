@@ -120,9 +120,3 @@ The Document object represents an in-memory Inventor document.
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

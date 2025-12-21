@@ -21,9 +21,3 @@ ContentCenterOptions.**GetAccessOption**( ***AccessOption*** As [ContentCenterAc
 ## Version
 
 Introduced in version 2010
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -42,9 +42,3 @@ The ChoiceAssetValue object represents an asset value that consists of several p
 ## Version
 
 Introduced in version 2014
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

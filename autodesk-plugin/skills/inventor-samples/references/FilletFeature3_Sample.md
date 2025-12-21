@@ -8,10 +8,6 @@ This sample demonstrates using the AddSimple method of the FilletFeatures collec
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub CreateSimpleFillet()
     ' Create a new Part document.
@@ -60,9 +56,3 @@ Public Sub CreateSimpleFillet()
     Set oFillet = oCompDef.Features.FilletFeatures.AddSimple(oEdges, 1)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

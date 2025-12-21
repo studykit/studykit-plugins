@@ -16,9 +16,3 @@ Enum indicating the sheet metal properties that are associated with a model will
 ## Version
 
 Introduced in version 2009
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

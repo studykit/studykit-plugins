@@ -34,9 +34,3 @@ The OriginIndicator object represents an origin indicator for ordinate dimension
 ## Version
 
 Introduced in version 2009
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -26,9 +26,3 @@ ThickenFeatures.**Add**( ***Faces*** As Object, ***Distance*** As Variant, ***Ex
 ## Version
 
 Introduced in version 9
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

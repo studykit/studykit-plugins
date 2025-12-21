@@ -60,9 +60,3 @@ The DerivedAssemblyDefinition object is used to describe which parts in an assem
 ## Version
 
 Introduced in version 5.3
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -17,9 +17,3 @@ Constants indicating the source of the color in some objects.
 ## Version
 
 Introduced in version 2015
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

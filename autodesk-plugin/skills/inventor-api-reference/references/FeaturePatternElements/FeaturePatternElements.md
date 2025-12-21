@@ -21,9 +21,3 @@ Provides access to the instances ( objects) that result from the creation of a f
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

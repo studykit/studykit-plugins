@@ -33,9 +33,3 @@ The CosmeticWeld object represents a cosmetic weld within an assembly. The Cosme
 ## Version
 
 Introduced in version 8
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

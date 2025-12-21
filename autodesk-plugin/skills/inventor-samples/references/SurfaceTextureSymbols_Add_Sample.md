@@ -10,10 +10,6 @@ This sample demonstrates the creation of a surface texture symbol attached to th
 
 Select a linear general dimension in a drawing and run the sample.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub AddSurfaceTextureSymbol()
     ' Set a reference to the drawing document.
@@ -70,9 +66,3 @@ Public Sub AddSurfaceTextureSymbol()
             kParticulateNondirectional)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

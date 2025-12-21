@@ -20,9 +20,3 @@ RuledSurfaceFeatures.**Add**( ***Definition*** As [RuledSurfaceDefinition](../Ru
 ## Version
 
 Introduced in version 2016
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

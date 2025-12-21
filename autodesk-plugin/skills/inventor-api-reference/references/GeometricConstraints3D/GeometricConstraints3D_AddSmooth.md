@@ -22,9 +22,3 @@ GeometricConstraints3D.**AddSmooth**( ***EntityOne*** As [SketchEntity3D](../Ske
 ## Version
 
 Introduced in version 11
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

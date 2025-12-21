@@ -10,10 +10,6 @@ Demonstrates the creation of a break operation.
 
 Before running this sample, select a drawing view in the active drawing.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub CreateBreakoperationInDrawingView()
     ' Set a reference to the drawing document.
@@ -52,9 +48,3 @@ Public Sub CreateBreakoperationInDrawingView()
     Set oBreakOperation = oDrawingView.BreakOperations.Add(kHorizontalBreakOrientation, oStartPoint, oEndPoint, kRectangularBreakStyle, 5)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

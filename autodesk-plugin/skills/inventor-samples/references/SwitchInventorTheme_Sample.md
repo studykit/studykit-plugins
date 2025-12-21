@@ -11,10 +11,6 @@ This sample demonstrates how to change the Inventor theme.
 
 This sample demonstrates how to change the Inventor theme.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Sub SwitchThemeSample()
     Dim oThemeManager As ThemeManager
@@ -41,10 +37,6 @@ End Sub
 
 This sample demonstrates how to change the Inventor theme.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Sub SwitchThemeSample()
     Dim oThemeManager As ThemeManager
@@ -68,9 +60,3 @@ Sub SwitchThemeSample()
 
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -21,9 +21,3 @@ The iAssemblyTableColumns collection object provides access to all existing iAss
 ## Version
 
 Introduced in version 11
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

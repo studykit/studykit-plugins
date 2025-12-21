@@ -41,9 +41,3 @@ The GraphicsColorMapper object maps scalar values to colors. Use methods provide
 ## Version
 
 Introduced in version 2010
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

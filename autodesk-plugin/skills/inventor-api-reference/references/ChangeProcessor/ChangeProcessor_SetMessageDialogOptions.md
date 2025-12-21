@@ -21,9 +21,3 @@ ChangeProcessor.**SetMessageDialogOptions**( ***AllowAccept*** As Boolean, ***Al
 ## Version
 
 Introduced in version 2010
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

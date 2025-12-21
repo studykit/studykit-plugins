@@ -66,9 +66,3 @@ The CutFeature object represents a sheet metal cut feature.
 ## Version
 
 Introduced in version 5.3
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

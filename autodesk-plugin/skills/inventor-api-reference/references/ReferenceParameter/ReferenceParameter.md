@@ -54,9 +54,3 @@ Object that represents a parameter that was created automatically by Autodesk In
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

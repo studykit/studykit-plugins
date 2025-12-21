@@ -8,10 +8,6 @@ This sample prints out all of the elements of the ribbons. This output is very u
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub PrintRibbon()
     Open "C:\temp\RibbonNames.txt" For Output As #1
@@ -72,9 +68,3 @@ Private Sub PrintControls(Controls As CommandControls, LeadingSpace As String, L
     Next
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

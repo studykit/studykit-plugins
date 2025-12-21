@@ -32,9 +32,3 @@ The Row object represents a single row in this custom table. See the Custom Tabl
 ## Version
 
 Introduced in version 9
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

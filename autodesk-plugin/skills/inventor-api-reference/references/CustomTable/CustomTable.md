@@ -72,9 +72,3 @@ The CustomTable object allows the creation of user-defined tables with the speci
 ## Version
 
 Introduced in version 9
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

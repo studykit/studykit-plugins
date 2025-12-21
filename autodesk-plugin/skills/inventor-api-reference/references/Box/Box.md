@@ -43,9 +43,3 @@ The Box object is a mathematical utility object that represents a rectangular bo
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -8,10 +8,6 @@ This sample demonstrates how to opening a Rhino file using the Rhino translator 
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Sub ImportRhino()
    ' Set Rhino translator’s CLSID and the Rhino file name.
@@ -72,9 +68,3 @@ Sub ImportRhino()
    oPeTransAddIn.Open file, context, options, sourceObj
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

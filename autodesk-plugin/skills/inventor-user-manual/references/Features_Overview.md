@@ -49,33 +49,47 @@ This sample code steps through the process of creating a solid from an extruded 
 
 The code omits error checking for the sake of clarity and brevity. Always check that return values are of the expected type. First, add a new part document to the documents collection:
 
-|  |
-| --- |
-| ```  Dim oApp As Inventor.Application Set oApp = ThisApplication      Dim oPartDoc As PartDocument Set oPartDoc = oApp.Documents.Add(kPartDocumentObject, oApp.GetTemplateFile(kPartDocumentObject)) ``` |
+```vb
+Dim oApp As Inventor.Application
+Set oApp = ThisApplication
+Dim oPartDoc As PartDocument
+Set oPartDoc = oApp.Documents.Add(kPartDocumentObject, oApp.GetTemplateFile(kPartDocumentObject))
+```
 
 Now add a new sketch to the sketches collection of this document's component definition. Here, the third item in the WorkPlanes collection indicates the XY plane, so that is the plane for the new sketch. For more information on WorkPlanes and other work features, refer to the [Work Features](WorkFeatures_Overview.md) overview.
 
-|  |
-| --- |
-| ```  Dim oSketch As PlanarSketch Set oSketch = oPartDoc.ComponentDefinition.Sketches.Add(oPartDoc.ComponentDefinition.WorkPlanes.Item(3)) ``` |
+```vb
+Dim oSketch As PlanarSketch
+Set oSketch = oPartDoc.ComponentDefinition.Sketches.Add(oPartDoc.ComponentDefinition.WorkPlanes.Item(3))
+```
 
 Some transient point objects are required when creating sketch lines, so obtain the TransientGeometry object.
 
-|  |
-| --- |
-| ```  Dim oTG As TransientGeometry Set oTG = oApp.TransientGeometry ``` |
+```vb
+Dim oTG As TransientGeometry
+Set oTG = oApp.TransientGeometry
+```
 
 Add three points to the SketchPoints collection of the new sketch. These become the endpoints of three sketch lines forming a triangle. The false argument indicates that these points are not intended as hole feature center points.
 
-|  |
-| --- |
-| ```  Dim oSkPnts As SketchPoints Set oSkPnts = oSketch.SketchPoints Call oSkPnts.Add(oTG.CreatePoint2d(0, 0), False) Call oSkPnts.Add(oTG.CreatePoint2d(1, 0), False) Call oSkPnts.Add(oTG.CreatePoint2d(1, 1), False) ``` |
+```vb
+Dim oSkPnts As SketchPoints
+Set oSkPnts = oSketch.SketchPoints
+Call oSkPnts.Add(oTG.CreatePoint2d(0, 0), False)
+Call oSkPnts.Add(oTG.CreatePoint2d(1, 0), False)
+Call oSkPnts.Add(oTG.CreatePoint2d(1, 1), False)
+```
 
 When the user draws sketch lines through the Autodesk Inventor user interface, sketch points are not required as they are inferred automatically. This is not the case with the API. Sketch points are required to add sketch lines. Use the preceding sketch points to add three sketch lines to the sketch.
 
-|  |
-| --- |
-| ```  Dim oLines As SketchLines Set oLines = oSketch.SketchLines Dim oLine(1 To 3) As SketchLine Set oLine(1) = oLines.AddByTwoPoints(oSkPnts(1), oSkPnts(2)) Set oLine(2) = oLines.AddByTwoPoints(oSkPnts(2), oSkPnts(3)) Set oLine(3) = oLines.AddByTwoPoints(oSkPnts(3), oSkPnts(1)) ``` |
+```vb
+Dim oLines As SketchLines
+Set oLines = oSketch.SketchLines
+Dim oLine(1 To 3) As SketchLine
+Set oLine(1) = oLines.AddByTwoPoints(oSkPnts(1), oSkPnts(2))
+Set oLine(2) = oLines.AddByTwoPoints(oSkPnts(2), oSkPnts(3))
+Set oLine(3) = oLines.AddByTwoPoints(oSkPnts(3), oSkPnts(1))
+```
 
 The code thus far creates a new part document containing the following sketch:
 
@@ -83,15 +97,19 @@ The code thus far creates a new part document containing the following sketch:
 
 Extrude features require a profile object, so create a profile from this sketch. The AddForSolid method has optional arguments (not used here) that can be used to further manipulate the ProfilePaths within the Profile.
 
-|  |
-| --- |
-| ```  Dim oProfile As Profile Set oProfile = oSketch.Profiles.AddForSolid ``` |
+```vb
+Dim oProfile As Profile
+Set oProfile = oSketch.Profiles.AddForSolid
+```
 
 Now, add an ExtrudeFeature to the Features collection of the document's component definition. Here the AddByDistanceExtent method is used, which requires a distance for the extrude - in this case, 1.0. The other arguments are also similar to the user interface, indicating the extrude should occur in both positive and negative directions, and that a join Boolean operation should be performed.
 
-|  |
-| --- |
-| ```  Dim oExtFeature As ExtrudeFeature Set oExtFeature = oPartDoc.ComponentDefinition.Features.ExtrudeFeatures.AddByDistanceExtent _     (oProfile, 1.0, kSymmetricExtentDirection, kJoinOperation) oApp.ActiveView.Fit ``` |
+```vb
+Dim oExtFeature As ExtrudeFeature
+Set oExtFeature = oPartDoc.ComponentDefinition.Features.ExtrudeFeatures.AddByDistanceExtent _
+(oProfile, 1.0, kSymmetricExtentDirection, kJoinOperation)
+oApp.ActiveView.Fit
+```
 
 The code results in a 3D solid appearing as follows:
 
@@ -99,15 +117,34 @@ The code results in a 3D solid appearing as follows:
 
 This sample demonstrated a simple extrude of a sketch to form a 3D solid. The following sample demonstrates creation of a 3D solid by revolving a sketch around an axis. Again, start a new part document and create some sketch points:
 
-|  |
-| --- |
-| ```  Dim oApp As Inventor.Application Set oApp = ThisApplication      Dim oPartDoc As PartDocument Set oPartDoc = oApp.Documents.Add(kPartDocumentObject, oApp.GetTemplateFile(kPartDocumentObject))  Dim oSketch As PlanarSketch Set oSketch = oPartDoc.ComponentDefinition.Sketches.Add(oPartDoc.ComponentDefinition.WorkPlanes.Item(3))      Dim oTG As TransientGeometry Set oTG = oApp.TransientGeometry                Dim oSkPnts As SketchPoints Set oSkPnts = oSketch.SketchPoints          Call oSkPnts.Add(oTG.CreatePoint2d(0, 0), False) Call oSkPnts.Add(oTG.CreatePoint2d(1, 1), False) Call oSkPnts.Add(oTG.CreatePoint2d(1, 0), False) ``` |
+```vb
+Dim oApp As Inventor.Application
+Set oApp = ThisApplication
+Dim oPartDoc As PartDocument
+Set oPartDoc = oApp.Documents.Add(kPartDocumentObject, oApp.GetTemplateFile(kPartDocumentObject))
+Dim oSketch As PlanarSketch
+Set oSketch = oPartDoc.ComponentDefinition.Sketches.Add(oPartDoc.ComponentDefinition.WorkPlanes.Item(3))
+Dim oTG As TransientGeometry
+Set oTG = oApp.TransientGeometry
+Dim oSkPnts As SketchPoints
+Set oSkPnts = oSketch.SketchPoints
+Call oSkPnts.Add(oTG.CreatePoint2d(0, 0), False)
+Call oSkPnts.Add(oTG.CreatePoint2d(1, 1), False)
+Call oSkPnts.Add(oTG.CreatePoint2d(1, 0), False)
+```
 
 Three sketch points have been created. Use two of them to create a sketch line, and the third to locate a sketch circle with a radius of 0.5:
 
-|  |
-| --- |
-| ```  Dim oLines As SketchLines Set oLines = oSketch.SketchLines  Dim oLine As SketchLine Set oLine = oLines.AddByTwoPoints(oSkPnts(1), oSkPnts(2))  Dim oCircs As SketchCircles Set oCircs = oSketch.SketchCircles  Dim oCirc As SketchCircle Set oCirc = oCircs.AddByCenterRadius(oSkPnts(3), 0.5) ``` |
+```vb
+Dim oLines As SketchLines
+Set oLines = oSketch.SketchLines
+Dim oLine As SketchLine
+Set oLine = oLines.AddByTwoPoints(oSkPnts(1), oSkPnts(2))
+Dim oCircs As SketchCircles
+Set oCircs = oSketch.SketchCircles
+Dim oCirc As SketchCircle
+Set oCirc = oCircs.AddByCenterRadius(oSkPnts(3), 0.5)
+```
 
 The new sketch appears as follows:
 
@@ -115,15 +152,19 @@ The new sketch appears as follows:
 
 The intention here is to rotate, or revolve, the circle around the axis formed by the sketch line, thus forming a doughnut shape. The next step is to form a profile from the circle sketch. Note that the AddForSolid method is used again. The only contiguous closed loop in the sketch is the circle, which is the only object that will be used in the resultant profile.
 
-|  |
-| --- |
-| ```  Dim oProfile As Profile Set oProfile = oSketch.Profiles.AddForSolid ``` |
+```vb
+Dim oProfile As Profile
+Set oProfile = oSketch.Profiles.AddForSolid
+```
 
 The only remaining step is to add the RevolveFeature to the RevolveFeatures collection. Here the AddFull method is used, indicating that the revolve should rotate through a full 360 degrees. The alternative is the AddByAngle method. The sketch line is used as the rotation axis.
 
-|  |
-| --- |
-| ```  Dim oRevFeature As RevolveFeature Set oRevFeature = oPartDoc.ComponentDefinition.Features.RevolveFeatures.AddFull _     (oProfile, oLine, kJoinOperation) oApp.ActiveView.Fit ``` |
+```vb
+Dim oRevFeature As RevolveFeature
+Set oRevFeature = oPartDoc.ComponentDefinition.Features.RevolveFeatures.AddFull _
+(oProfile, oLine, kJoinOperation)
+oApp.ActiveView.Fit
+```
 
 This RevolveFeature sample code results in a 3D solid appearing as follows:
 
@@ -144,15 +185,18 @@ The following code extract shows how an iFeature, named MyiFeature.ide, might be
 
 As this sample assumes an assembly context, the face is also in the assembly context, so it gets the part component definition of the face in its part context using the Parent property of the native object. In other words, the face in its part context, not in its assembly context. For more information, see the [Proxies](Proxies_Overview.md) overview.
 
-|  |
-| --- |
-| ```  Dim oPartCompDef As PartComponentDefinition Set oPartCompDef = oFace.NativeObject.Parent.Parent ``` |
+```vb
+Dim oPartCompDef As PartComponentDefinition
+Set oPartCompDef = oFace.NativeObject.Parent.Parent
+```
 
 Using the part component definition, add a new iFeature component definition to its ReferenceComponents collection. In this case, the code references an iFeature file named MyiFeature.ide.
 
-|  |
-| --- |
-| ```  Dim iFeatDef As iFeatureDefinition Set iFeatDef = oPartCompDef.ReferenceComponents. _     iFeatureComponents.CreateDefinition("c:\MyiFeature.ide") ``` |
+```vb
+Dim iFeatDef As iFeatureDefinition
+Set iFeatDef = oPartCompDef.ReferenceComponents. _
+iFeatureComponents.CreateDefinition("c:\MyiFeature.ide")
+```
 
 The previously prepared iFeature is added to specified face of the part in the assembly. Use the iFeatureSketchPlaneInput object if additional control is required; for example, over the orientation of the iFeature.
 

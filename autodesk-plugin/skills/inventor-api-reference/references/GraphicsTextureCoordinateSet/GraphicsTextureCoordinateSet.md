@@ -42,9 +42,3 @@ The GraphicsTextureCoordinateSet object contains a list of coordinate values
 ## Version
 
 Introduced in version 2010
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

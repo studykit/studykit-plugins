@@ -28,9 +28,3 @@ The SurfaceBodies object represents a collection of SurfaceBody objects. See the
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

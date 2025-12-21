@@ -37,9 +37,3 @@ The FaceFeatures collection object provides access to all of the objects in a sh
 ## Version
 
 Introduced in version 5.3
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

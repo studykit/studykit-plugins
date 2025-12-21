@@ -40,9 +40,3 @@ The DrawingCurveSegment object represents a single segment of a drawing curve.
 ## Version
 
 Introduced in version 11
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

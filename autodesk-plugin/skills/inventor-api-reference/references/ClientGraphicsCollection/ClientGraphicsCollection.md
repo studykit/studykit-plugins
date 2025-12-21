@@ -39,9 +39,3 @@ The ClientGraphicsCollection object provides access to all of the existing objec
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

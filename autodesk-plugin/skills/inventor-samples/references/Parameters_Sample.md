@@ -10,10 +10,6 @@ This sample demonstrates the methods and properties supported by the Parameters 
 
 To run the sample you must have an part document open that contains at least one parameter, one of which is named d0.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub ModelParameters()
     ' Obtain the active document, this assumes
@@ -94,9 +90,3 @@ Public Sub ModelParameters()
     oPartDoc.Update
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

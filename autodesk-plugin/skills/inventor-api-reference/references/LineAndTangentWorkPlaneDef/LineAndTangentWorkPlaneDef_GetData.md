@@ -22,9 +22,3 @@ LineAndTangentWorkPlaneDef.**GetData**( ***Line*** As Object, ***Face*** As [Fac
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

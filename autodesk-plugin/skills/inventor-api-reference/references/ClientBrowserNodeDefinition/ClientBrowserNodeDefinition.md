@@ -41,9 +41,3 @@ The ClientBrowserNodeDefinition object derives from the BrowserNodeDefinition an
 ## Version
 
 Introduced in version 8
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

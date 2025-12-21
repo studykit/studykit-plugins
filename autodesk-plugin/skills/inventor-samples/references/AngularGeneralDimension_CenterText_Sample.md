@@ -10,10 +10,6 @@ This sample demonstrates how to center the text of all dimensions on the active 
 
 Only linear and angular general dimensions are supported. Open a drawing document that contains several dimensions and run the sample.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub CenterAllDimensions()
     ' Set a reference to the active drawing document
@@ -37,9 +33,3 @@ Public Sub CenterAllDimensions()
     Next
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

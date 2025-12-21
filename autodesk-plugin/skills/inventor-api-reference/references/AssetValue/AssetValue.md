@@ -40,9 +40,3 @@ The AssetValue object represents a specific value within an asset. The AssetValu
 ## Version
 
 Introduced in version 2014
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

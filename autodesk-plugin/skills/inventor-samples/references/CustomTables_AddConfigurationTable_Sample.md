@@ -10,10 +10,6 @@ This sample demonstrates the creation of a configuration (iPart/iAssembly) table
 
 Change the location of the source part in the code below before running the sample.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub CreateConfigurationTable()
     ' Set a reference to the active drawing document
@@ -52,9 +48,3 @@ Public Sub CreateConfigurationTable()
     Set oConfigTable = oActiveSheet.CustomTables.AddConfigurationTable("C:\Temp\iPartFactory.ipt", oPoint, "Configuration Table", strColumns)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

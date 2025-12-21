@@ -14,9 +14,3 @@ User Defined Properties, InternalName: {D5CDD505-2E9C-101B-9397-08002B2CF9AE}, N
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

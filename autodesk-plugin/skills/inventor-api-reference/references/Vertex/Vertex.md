@@ -47,9 +47,3 @@ The Vertex object represents a transient point in boundary representation data.
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

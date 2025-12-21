@@ -84,9 +84,3 @@ See the [Translator Options](TranslatorSettings.md) page for details about the s
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

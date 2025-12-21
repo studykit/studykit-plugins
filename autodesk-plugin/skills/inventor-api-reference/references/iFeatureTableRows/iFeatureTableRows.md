@@ -21,9 +21,3 @@ The iFeatureTableRows collection object provides access to the rows of an iFeatu
 ## Version
 
 Introduced in version 2009
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

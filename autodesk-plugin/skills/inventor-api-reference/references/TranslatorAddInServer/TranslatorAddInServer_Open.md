@@ -23,9 +23,3 @@ TranslatorAddInServer.**Open**( ***SourceData*** As [DataMedium](../DataMedium/D
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

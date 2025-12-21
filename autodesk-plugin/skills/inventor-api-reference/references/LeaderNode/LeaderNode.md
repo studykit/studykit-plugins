@@ -41,9 +41,3 @@ The LeaderNode object represents a node in a leader.
 ## Version
 
 Introduced in version 11
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

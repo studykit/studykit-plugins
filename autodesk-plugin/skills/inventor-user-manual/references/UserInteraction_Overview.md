@@ -16,9 +16,33 @@ Use of the Select command by the user is entirely independent of the API. As a p
 
 Use of the select set from the programmer's point of view is extremely easy since you're not involved in the selection process itself. During the selection process it's left up to the user to understand what needs to be selected before running your command or program. Your program just looks at the results, checks to see if any valid entities have been selected, and uses them if they are valid. The SelectSet object is available from all documents via the SelectSet property. The sample below illustrates a program that checks to see if a single face has been selected and displays its surface area.
 
-|  |
-| --- |
-| ```  Public Sub ShowSurfaceArea()     ' Set a reference to the select set of the active document.     Dim oSelectSet As SelectSet     Set oSelectSet = ThisApplication.ActiveDocument.SelectSet          ' Check to make sure a single item was selected.     If oSelectSet.Count = 1 Then         ' Check to make sure a face was selected.         If TypeOf oSelectSet.Item(1) Is Face Then             ' Set a reference to the selected face.             Dim oFace As Face             Set oFace = oSelectSet.Item(1)                          ' Display the area of the selected face.             MsgBox "Surface area: " & oFace.Evaluator.Area & " cm^2"             Exit Sub         Else             MsgBox "You must select a single face."             Exit Sub         End If     Else         MsgBox "You must select a single face."         Exit Sub     End If End Sub ``` |
+```vb
+Public Sub ShowSurfaceArea()
+    '
+    Set a reference to the select set of the active document.
+    Dim oSelectSet As SelectSet
+    Set oSelectSet = ThisApplication.ActiveDocument.SelectSet
+    ' Check to make sure a single item was selected.
+    If oSelectSet.Count = 1 Then
+        ' Check to make sure a face was selected.
+        If TypeOf oSelectSet.Item(1) Is Face Then
+            '
+            Set a reference to the selected face.
+            Dim oFace As Face
+            Set oFace = oSelectSet.Item(1)
+            ' Display the area of the selected face.
+            MsgBox "Surface area: " & oFace.Evaluator.Area & " cm^2"
+            Exit Sub
+        Else
+            MsgBox "You must select a single face."
+            Exit Sub
+        End If
+    Else
+        MsgBox "You must select a single face."
+        Exit Sub
+    End If
+End Sub
+```
 
 In addition to providing access to the objects the user has selected, the SelectSet object also supports methods that allow you to add and remove objects from the select set.
 
@@ -52,9 +76,25 @@ For this example, we'll assume you're using VBA, although the implementation in 
 
 The form consists of five controls: two text boxes, two labels, and a command control. The form is named frmSelection. The text box for the length is named txtLength, the text box for the edge count is named txtEdgeCount, and the command control is named cmdCancel. The names of the label controls don't matter. The following are the global declarations within the form module and the code from the Initialize event of the form that obtains the necessary objects and sets them up for the selection process.
 
-|  |
-| --- |
-| ```  Private WithEvents oInteraction As InteractionEvents Private WithEvents oSelect As SelectEvents  Private Sub UserForm_Initialize()     ' Create a new InteractionEvents object.     Set oInteraction = ThisApplication.CommandManager.CreateInteractionEvents          ' Set the prompt.     oInteraction.StatusBarText = "Select an edge."          ' Connect to the associated select events.     Set oSelect = oInteraction.SelectEvents          ' Define that all part edges should be selectable.     oSelect.AddSelectionFilter kPartEdgeFilter      ' Enable single selection.     oSelect.SingleSelectEnabled = True      ' Start the selection process.     oInteraction.Start End Sub ``` |
+```vb
+Private WithEvents oInteraction As InteractionEvents
+Private WithEvents oSelect As SelectEvents
+Private Sub UserForm_Initialize()
+    ' Create a new InteractionEvents object.
+    Set oInteraction = ThisApplication.CommandManager.CreateInteractionEvents
+    '
+    Set the prompt.
+    oInteraction.StatusBarText = "Select an edge."
+    ' Connect to the associated select events.
+    Set oSelect = oInteraction.SelectEvents
+    ' Define that all part edges should be selectable.
+    oSelect.AddSelectionFilter kPartEdgeFilter
+    ' Enable single selection.
+    oSelect.SingleSelectEnabled = True
+    ' Start the selection process.
+    oInteraction.Start
+End Sub
+```
 
 Notice that the global variables for the InteractionEvents and SelectEvents objects use the WithEvents keyword. This allows us to set up event handlers that will receive the events associated with these objects. Variables that are declared using the WithEvents keyword now show up in the Object List (the pull-down at the top-left of the code window). When you select one of the objects in this list, the associated events are listed in the Events List (the pull-down at the top-right of the code window).
 
@@ -62,15 +102,42 @@ In this sample, the Initialize event of the form is used to trigger the setup an
 
 To use this code, we need the form to be displayed in a modeless manner, so you can leave the form displayed and still interact with Autodesk Inventor to do the selection. The following function should be added to a standard code module to display the form. It's this function that you'll run to start this sample program.
 
-|  |
-| --- |
-| ```  Public Sub SelectionSample()     frmSelection.Show vbModeless End Sub ``` |
+```vb
+Public Sub SelectionSample()
+    frmSelection.Show vbModeless
+End Sub
+```
 
 You can run the program now by executing the SelectionSample sub. First, make sure you have a part document open that contains a model. When you run the SelectionSample sub, the current Autodesk Inventor command will be aborted and you will be able to select edges of the model. Any other entities, such as faces, work geometry, sketches, etc., are not selectable. Because of the SingleSelectEnabled property, as you continue to select edges the previously selected edge is unselected. This demonstrates that you can control the filtering and initiate the selection process, but it isn't very useful because we're not getting or doing anything with the selected entities. We'll add code now to get the entities just selected and display their length. To do this we need to implement OnSelect event of the SelectEvents object, as shown below.
 
-|  |
-| --- |
-| ```  Private Sub oSelect_OnSelect(ByVal JustSelectedEntities As ObjectsEnumerator, _                             ByVal SelectionDevice As SelectionDeviceEnum, _                             ByVal ModelPosition As Point, _                             ByVal ViewPosition As Point2d, _                             ByVal View As View)     ' Calculate the length of the edge(s) selected.     Dim i As Long     Dim dLength As Double     For i = 1 To JustSelectedEntities.Count         ' Since we set the filter to only select edges it's safe to assign         ' the returned entities to an Edge object.         Dim oEdge As Edge         Set oEdge = JustSelectedEntities.Item(i)                  ' Determine the length of the current edge.         Dim dMin As Double         Dim dMax As Double         Call oEdge.Evaluator.GetParamExtents(dMin, dMax)                  Dim dSingleLength As Double         Call oEdge.Evaluator.GetLengthAtParam(dMin, dMax, dSingleLength)                  ' Add up the length of all the edges in this set.         dLength = dLength + dSingleLength     Next          ' Display the length and number of the edges.     txtLength.Text = Format(dLength, "0.0000 cm")     txtEdgeCount.Text = JustSelectedEntities.Count End Sub ``` |
+```vb
+Private Sub oSelect_OnSelect(ByVal JustSelectedEntities As ObjectsEnumerator, _
+    ByVal SelectionDevice As SelectionDeviceEnum, _
+    ByVal ModelPosition As Point, _
+    ByVal ViewPosition As Point2d, _
+    ByVal View As View)
+    ' Calculate the length of the edge(s) selected.
+    Dim i As Long
+    Dim dLength As Double
+    For i = 1 To JustSelectedEntities.Count
+        ' Since we set the filter to only select edges it's safe to assign
+        ' the returned entities to an Edge object.
+        Dim oEdge As Edge
+        Set oEdge = JustSelectedEntities.Item(i)
+        ' Determine the length of the current edge.
+        Dim dMin As Double
+        Dim dMax As Double
+        Call oEdge.Evaluator.GetParamExtents(dMin, dMax)
+        Dim dSingleLength As Double
+        Call oEdge.Evaluator.GetLengthAtParam(dMin, dMax, dSingleLength)
+        ' Add up the length of all the edges in this set.
+        dLength = dLength + dSingleLength
+    Next
+    ' Display the length and number of the edges.
+    txtLength.Text = Format(dLength, "0.0000 cm")
+    txtEdgeCount.Text = JustSelectedEntities.Count
+End Sub
+```
 
 Autodesk Inventor fires the OnSelect whenever the user selects an entity. The entity selected is provided in the JustSelectedEntities argument. This argument is an ObjectEnumerator but in our sample the returned ObjectsEnumerator object will always contain a single entity. We'll see in a minute a case when this contains multiple entities. The other arguments provide additional information about the selection. If you run the program now you should see the length displayed for the single selected edge.
 
@@ -80,23 +147,64 @@ When selecting entities in Autodesk Inventor, entities that are valid for select
 
 The following code takes the input edge and checks to see if there are any tangentially connected edges. If so, it adds these edges to the set to be highlighted. When you run the sample after adding this code, any tangentially connected edges will highlight and select together. In this case, the ObjectCollection passed in through the JustSelectedEntities argument of the OnSelect event will contain all of the edges selected.
 
-|  |
-| --- |
-| ```  Private Sub oSelect_OnPreSelect(PreSelectEntity As Object, _                                 DoHighlight As Boolean, _                                 MorePreSelectEntities As ObjectCollection, _                                 ByVal SelectionDevice As SelectionDeviceEnum, _                                 ByVal ModelPosition As Point, _                                 ByVal ViewPosition As Point2d, _                                 ByVal View As View)     ' Set a reference to the object the mouse is currently over.     ' We know it's an edge because of the filtering previously defined.     Dim oEdge As Edge     Set oEdge = PreSelectEntity          ' Determine if there are any tangentially connected edges.     Dim oEdges As EdgeCollection     Set oEdges = oEdge.TangentiallyConnectedEdges     If oEdges.Count > 1 Then         ' Build up the object collection containing the additional edges.         Set MorePreSelectEntities = _                         ThisApplication.TransientObjects.CreateObjectCollection         Dim i As Long         For i = 1 To oEdges.Count             If Not oEdges.Item(i) Is PreSelectEntity Then                 MorePreSelectEntities.Add oEdges.Item(i)             End If         Next     End If End Sub ``` |
+```vb
+Private Sub oSelect_OnPreSelect(PreSelectEntity As Object, _
+    DoHighlight As Boolean, _
+        MorePreSelectEntities As ObjectCollection, _
+        ByVal SelectionDevice As SelectionDeviceEnum, _
+        ByVal ModelPosition As Point, _
+        ByVal ViewPosition As Point2d, _
+        ByVal View As View)
+        '
+        Set a reference to the object the mouse is currently over.
+        ' We know it's an edge because of the filtering previously defined.
+        Dim oEdge As Edge
+        Set oEdge = PreSelectEntity
+        ' Determine if there are any tangentially connected edges.
+        Dim oEdges As EdgeCollection
+        Set oEdges = oEdge.TangentiallyConnectedEdges
+        If oEdges.Count > 1 Then
+            ' Build up the object collection containing the additional edges.
+            Set MorePreSelectEntities = _
+            ThisApplication.TransientObjects.CreateObjectCollection
+            Dim i As Long
+            For i = 1 To oEdges.Count
+                If Not oEdges.Item(i) Is PreSelectEntity Then
+                    MorePreSelectEntities.Add oEdges.Item(i)
+                End If
+            Next
+        End If
+    End Sub
+```
 
 The basic behavior of the SelectEvents object is to remain in selection mode, allowing the user to continue selecting entities until it is explicitly stopped. It can be stopped by your program telling it to stop, or by the user aborting it by pressing the escape key or running another Autodesk Inventor command. For example, if you have a command that requires the user to select faces and then performs some operation with all of the selected faces, you might start your command with the select enabled and filtered to select only faces. Your dialog can contain some method for users to specify when they're finished selecting faces so you can perform the desired operation.
 
 In our example, the Cancel button is the signal to stop selection. In this sample, in addition to stopping the selection it also terminates the command and dismisses the dialog. Another action that can cause our command to stop is when the user runs another command or presses the escape key. In this case Autodesk Inventor fires the OnTerminate event to notify you that your interaction event is being terminated. Both of these are handled in the code below.
 
-|  |
-| --- |
-| ```  Private Sub cmdCancel_Click()     ' Stop the selection and release any global references.     oInteraction.Stop     Set oSelect = Nothing     Set oInteraction = Nothing          ' Unload the form.     Unload Me End Sub  Private Sub oInteraction_OnTerminate()     ' Release any global references.     Set oSelect = Nothing     Set oInteraction = Nothing          ' Unload the form.     Unload Me End Sub ``` |
+```vb
+Private Sub cmdCancel_Click()
+    ' Stop the selection and release any global references.
+    oInteraction.Stop
+    Set oSelect = Nothing
+    Set oInteraction = Nothing
+    ' Unload the form.
+    Unload Me
+End Sub
+Private Sub oInteraction_OnTerminate()
+    ' Release any global references.
+    Set oSelect = Nothing
+    Set oInteraction = Nothing
+    ' Unload the form.
+    Unload Me
+End Sub
+```
 
 In the previous discussion we've seen how the SelectEvents object supports the selection of a single entity at a time when the SingleSelectEnabled property is set to True. There are also many cases when you want the user to select multiple entities. Setting the SingleSelectEnabled to False will allow this. There are two things to be aware of in this case. First, you may want to implement the OnUnselect event to handle the case where the user unselects a previously selected entity. Second, the JustSelectedEntities argument of the OnSelect event will only contain the entity(s) just selected. To obtain all of the entities currently selected you can use the SelectedEntities property of the SelectEvents object.
 
-|  |
-| --- |
-| ```      ' Clear the current selection.     oSelect.ResetSelections ``` |
+```vb
+' Clear the current selection.
+oSelect.ResetSelections
+```
 
 There are also several other events supported by the SelectEvents object that weren't used in this sample. The OnPreSelectMouseMove fires events as the user moves the mouse over an entity that is valid for selection. The primary use of this event is to capture the current position of the mouse relative to the selected entity as the mouse moves across it. For example, a Finite Element Modeling system might have a command that allows the user to position a load on a face. Using this event you can track the mouse and dynamically show the load on the face as it follows the mouse.
 
@@ -110,15 +218,82 @@ So far we've seen the power of the SelectEvents, but we've also seen that it's n
 
 Below is the primary code. This can exist within a standard code module, a form, or another class. The only selection-related code here is the declaration and creation of an object of the clsSelect class and the call of this object's Pick method. The Pick method takes a single argument that defines the filter and returns the selected face. For the user this is easier to use than the previous select set sample because it enforces that only faces are selected.
 
-|  |
-| --- |
-| ```  Public Sub ShowSurfaceArea2()     ' Declare a variable and create a new instance of the select class.     Dim oSelect As New clsSelect      ' Call the Pick method of the clsSelect object and set     ' the filter to pick any face.     Dim oFace As Face     Set oFace = oSelect.Pick(kPartFaceFilter)          ' Check to make sure a face was selected.     If Not oFace Is Nothing Then         ' Display the area of the selected face.         MsgBox "Surface area: " & oFace.Evaluator.Area & " cm^2"     End If End Sub ``` |
+```vb
+Public Sub ShowSurfaceArea2()
+    ' Declare a variable and create a new instance of the select class.
+    Dim oSelect As New clsSelect
+    '
+    Call the Pick method of the clsSelect object and set
+    ' the filter to pick any face.
+    Dim oFace As Face
+    Set oFace = oSelect.Pick(kPartFaceFilter)
+    ' Check to make sure a face was selected.
+    If Not oFace Is Nothing Then
+        ' Display the area of the selected face.
+        MsgBox "Surface area: " & oFace.Evaluator.Area & " cm^2"
+    End If
+End Sub
+```
 
 The code below does all of the work. To use this create a Class module named clsSelect and add the code to it.
 
-|  |
-| --- |
-| ```  ' Declare the event objects Private WithEvents oInteraction As InteractionEvents Private WithEvents oSelect As SelectEvents  ' Declare a flag that's used to determine when selection stops. Private bStillSelecting As Boolean  Public Function Pick(filter As SelectionFilterEnum) As Object     ' Initialize flag.     bStillSelecting = True          ' Create an InteractionEvents object.     Set oInteraction = ThisApplication.CommandManager.CreateInteractionEvents          ' Define that we want select events rather than mouse events.     oInteraction.SelectionActive = True      ' Set a reference to the select events.     Set oSelect = oInteraction.SelectEvents          ' Set the filter using the value passed in.     oSelect.AddSelectionFilter filter          ' The InteractionEvents object.     oInteraction.Start          ' Loop until a selection is made.     Do While bStillSelecting         DoEvents     Loop          ' Get the selected item.  If more than one thing was selected,     ' just get the first item and ignore the rest.     Dim oSelectedEnts As ObjectsEnumerator     Set oSelectedEnts = oSelect.SelectedEntities     If oSelectedEnts.Count > 0 Then         Set Pick = oSelectedEnts.Item(1)     Else         Set Pick = Nothing     End If          ' Stop the InteractionEvents object.     oInteraction.Stop          ' Clean up.     Set oSelect = Nothing     Set oInteraction = Nothing End Function   Private Sub oInteraction_OnTerminate()     ' Set the flag to indicate we're done.     bStillSelecting = False End Sub   Private Sub oSelect_OnSelect(ByVal JustSelectedEntities As ObjectsEnumerator, _                                 ByVal SelectionDevice As SelectionDeviceEnum, _                                 ByVal ModelPosition As Point, _                                 ByVal ViewPosition As Point2d, _                                 ByVal View As View)     ' Set the flag to indicate we're done.     bStillSelecting = False End Sub ``` |
+```vb
+' Declare the event objects
+Private WithEvents oInteraction As InteractionEvents
+Private WithEvents oSelect As SelectEvents
+' Declare a flag that's used to determine when selection stops.
+Private bStillSelecting As Boolean
+Public Function Pick(filter As SelectionFilterEnum) As Object
+    ' Initialize flag.
+    bStillSelecting = True
+    ' Create an InteractionEvents object.
+    Set oInteraction = ThisApplication.CommandManager.CreateInteractionEvents
+    ' Define that we want select events rather than mouse events.
+    oInteraction.SelectionActive = True
+    '
+    Set a reference to the select events.
+    Set oSelect = oInteraction.SelectEvents
+    '
+    Set the filter using the value passed in.
+    oSelect.AddSelectionFilter filter
+    ' The InteractionEvents object.
+    oInteraction.Start
+    '
+Loop until a selection is made.
+Do While bStillSelecting
+    DoEvents
+    Loop
+    ' Get the selected item.
+    If more than one thing was selected,
+    ' just get the first item and ignore the rest.
+    Dim oSelectedEnts As ObjectsEnumerator
+    Set oSelectedEnts = oSelect.SelectedEntities
+    If oSelectedEnts.Count > 0 Then
+        Set Pick = oSelectedEnts.Item(1)
+    Else
+        Set Pick = Nothing
+    End If
+    ' Stop the InteractionEvents object.
+    oInteraction.Stop
+    ' Clean up.
+    Set oSelect = Nothing
+    Set oInteraction = Nothing
+End Function
+Private Sub oInteraction_OnTerminate()
+    '
+    Set the flag to indicate we're done.
+    bStillSelecting = False
+End Sub
+Private Sub oSelect_OnSelect(ByVal JustSelectedEntities As ObjectsEnumerator, _
+    ByVal SelectionDevice As SelectionDeviceEnum, _
+    ByVal ModelPosition As Point, _
+    ByVal ViewPosition As Point2d, _
+    ByVal View As View)
+    '
+    Set the flag to indicate we're done.
+    bStillSelecting = False
+End Sub
+```
 
 ## Mouse and Keyboard Events
 

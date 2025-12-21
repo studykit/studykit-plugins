@@ -25,9 +25,3 @@ The SurfaceGraphicsFace represents an individual face displayed by the SurfaceGr
 ## Version
 
 Introduced in version 2009
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

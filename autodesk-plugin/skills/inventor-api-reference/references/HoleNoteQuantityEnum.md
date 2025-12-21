@@ -15,9 +15,3 @@ Constants identifying how the quantity value is set for the note.
 ## Version
 
 Introduced in version 2010
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

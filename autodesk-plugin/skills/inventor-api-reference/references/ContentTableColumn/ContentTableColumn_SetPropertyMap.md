@@ -25,9 +25,3 @@ ContentTableColumn.**SetPropertyMap**( ***PropertySetId*** As String, ***Propert
 ## Version
 
 Introduced in version 2010
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

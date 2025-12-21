@@ -15,9 +15,3 @@ Constants indicating the preferred constraint type for automatic placement of co
 ## Version
 
 Introduced in version 2015
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -38,9 +38,3 @@ The CustomConstraint3D object represents a custom constraint for a 3D sketch ent
 ## Version
 
 Introduced in version 11
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

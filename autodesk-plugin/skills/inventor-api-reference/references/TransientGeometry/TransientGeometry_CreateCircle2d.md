@@ -28,9 +28,3 @@ TransientGeometry.**CreateCircle2d**( ***Center*** As [Point2d](../Point2d/Point
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

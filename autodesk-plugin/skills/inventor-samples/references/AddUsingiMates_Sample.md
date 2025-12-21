@@ -10,10 +10,6 @@ This sample demonstrates creating multiple iMate results when adding an occurren
 
 To use this sample create a new part by extruding a rectangle to create a cube. Create a mate iMate on one of the faces. Next, create a flush iMate on any of the faces connecting to the first face. Save this part to C:\TempiMatePart.ipt. Finally, have an assembly open and run the sample code.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub iMateDuringOccurrencePlacementSample()
     ' Get the component definition of the currently open assembly.
@@ -40,9 +36,3 @@ Public Sub iMateDuringOccurrencePlacementSample()
     Set oOcc1 = oOccEnumerator.Item(1)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

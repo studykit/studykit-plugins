@@ -71,9 +71,3 @@ The FeatureControlFrameStyle object represents a feature control frame style in 
 ## Version
 
 Introduced in version 2009
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

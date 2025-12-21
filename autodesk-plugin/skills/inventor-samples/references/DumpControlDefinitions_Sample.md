@@ -10,10 +10,6 @@ This sample prints the internal names and descriptions of all commands (aka Cont
 
 The sample prints the names and descriptions to a text file (CommandNames.txt) created in C:\Temp directory. You should either have the C:\Temp directory or change the path in the sample.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Sub PrintCommandNames()
     Dim oControlDefs As ControlDefinitions
@@ -33,9 +29,3 @@ Sub PrintCommandNames()
     Close #1
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

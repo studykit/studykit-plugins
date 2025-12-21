@@ -8,10 +8,6 @@ This sample demonstrates using client graphics and some other functions that hel
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub ZHeightColors()
     ' Get the surface body from the active document.
@@ -145,9 +141,3 @@ Public Sub ZHeightColors()
     ThisApplication.ActiveView.Update
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

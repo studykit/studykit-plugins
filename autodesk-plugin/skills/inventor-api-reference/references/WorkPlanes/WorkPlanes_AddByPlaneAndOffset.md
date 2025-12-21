@@ -31,9 +31,3 @@ WorkPlanes.**AddByPlaneAndOffset**( ***Plane*** As Object, ***Offset*** As Varia
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

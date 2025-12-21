@@ -16,9 +16,3 @@ Constants info for hole clearance.
 ## Version
 
 Introduced in version 2018
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

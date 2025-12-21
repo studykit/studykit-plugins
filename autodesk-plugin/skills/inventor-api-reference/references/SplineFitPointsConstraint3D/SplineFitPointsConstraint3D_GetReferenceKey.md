@@ -21,9 +21,3 @@ SplineFitPointsConstraint3D.**GetReferenceKey**( ***ReferenceKey***() As Byte, [
 ## Version
 
 Introduced in version 8
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

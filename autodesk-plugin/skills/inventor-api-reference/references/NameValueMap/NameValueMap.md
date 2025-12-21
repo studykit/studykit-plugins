@@ -58,9 +58,3 @@ The NameValueMap object. This object provides context-specific information, usua
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

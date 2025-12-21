@@ -18,9 +18,3 @@ Defines the constants used to specify how the height of a distance extent flange
 ## Version
 
 Introduced in version 2009
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

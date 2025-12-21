@@ -20,9 +20,3 @@ The SketchBlocksEnumerator allows iteration of available SketchBlock objects.
 ## Version
 
 Introduced in version 2010
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

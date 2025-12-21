@@ -28,9 +28,3 @@ The AuxiliaryFeatureIndicators object allows to access the auxiliary feature ind
 ## Version
 
 Introduced in version 2023
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -10,10 +10,6 @@ This sample demonstrates how to find the component that a balloon references.
 
 Select a balloon in a drawing and run the following sample.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub GetComponentReferencedByBalloon()
     ' Set a reference to the active drawing document
@@ -74,9 +70,3 @@ Public Sub GetComponentReferencedByBalloon()
     Next
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

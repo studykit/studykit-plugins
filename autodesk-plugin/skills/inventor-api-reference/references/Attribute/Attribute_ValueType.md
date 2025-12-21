@@ -17,9 +17,3 @@ This is a read only property whose value is a [ValueTypeEnum](../ValueTypeEnum.m
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

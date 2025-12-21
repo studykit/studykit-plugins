@@ -8,10 +8,6 @@ This sample demonstrates the creation of through holes, both regular and tapped.
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub HoleSample()
     ' Create a new part document, using the default part template.
@@ -84,9 +80,3 @@ Public Sub HoleSample()
                             oHoleCenters, oHoleTapInfo, kPositiveExtentDirection)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

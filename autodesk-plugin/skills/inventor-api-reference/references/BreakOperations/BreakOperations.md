@@ -37,9 +37,3 @@ The BreakOperations collection object contains information about all the break o
 ## Version
 
 Introduced in version 2010
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

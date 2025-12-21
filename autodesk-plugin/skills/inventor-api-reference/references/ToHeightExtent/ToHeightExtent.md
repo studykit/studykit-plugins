@@ -20,9 +20,3 @@ The ToHeightExtent is used by the FlangeFeature object when the height extent ty
 ## Version
 
 Introduced in version 2009
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

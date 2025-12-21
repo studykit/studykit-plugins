@@ -20,9 +20,3 @@ TextureMap.**GenerateImage**( ***FileName*** As String )
 ## Version
 
 Introduced in version 2018
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

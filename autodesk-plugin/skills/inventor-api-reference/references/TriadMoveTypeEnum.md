@@ -14,9 +14,3 @@ Enum indicating various actions that cause a triad move.
 ## Version
 
 Introduced in version 9
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

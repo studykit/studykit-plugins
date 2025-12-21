@@ -42,9 +42,3 @@ The TwoPointDistanceDimConstraint3D object represents a constraint that controls
 ## Version
 
 Introduced in version 11
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

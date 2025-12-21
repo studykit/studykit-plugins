@@ -16,9 +16,3 @@ This object represents the End of Part marker in the browser. When traversing th
 ## Version
 
 Introduced in version 10
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -20,9 +20,3 @@ UnitVector2d.**AngleTo**( ***Vector*** As [UnitVector2d](../UnitVector2d/UnitVec
 ## Version
 
 Introduced in version 11
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

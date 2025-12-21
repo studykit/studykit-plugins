@@ -30,9 +30,3 @@ UserParameters.**AddByValue**( ***Name*** As String, ***Value*** As Variant, ***
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

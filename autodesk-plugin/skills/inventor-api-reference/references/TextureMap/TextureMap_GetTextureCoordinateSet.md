@@ -20,9 +20,3 @@ TextureMap.**GetTextureCoordinateSet**( ***Tolerance*** As Double ) As [TextureC
 ## Version
 
 Introduced in version 11
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

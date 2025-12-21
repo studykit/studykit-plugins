@@ -35,9 +35,3 @@ This is an assembly-context proxy object derived from its native definition-cont
 ## Version
 
 Introduced in version 11
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

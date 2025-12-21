@@ -43,9 +43,3 @@ The Path object represents a single set of connected curves. The order of the ob
 ## Version
 
 Introduced in version 6
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

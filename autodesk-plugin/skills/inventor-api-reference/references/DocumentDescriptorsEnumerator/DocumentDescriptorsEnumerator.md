@@ -21,9 +21,3 @@ The DocumentDescriptorsEnumerator object provides information about native docum
 ## Version
 
 Introduced in version 11
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

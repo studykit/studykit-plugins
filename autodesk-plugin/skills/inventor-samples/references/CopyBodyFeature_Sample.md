@@ -8,10 +8,6 @@ This sample demonstrates copying a surface body from one part to another. This i
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub CopyBodyFromPartToPart()
     ' The first portion of this program creates an assembly so that the
@@ -132,9 +128,3 @@ Public Sub CopyBodyFromPartToPart()
     Call oPartDoc2.ComponentDefinition.Features.NonParametricBaseFeatures.Add(oBody, oMatrix)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

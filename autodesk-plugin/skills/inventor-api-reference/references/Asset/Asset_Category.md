@@ -25,9 +25,3 @@ This is a read/write property whose value is an [AssetCategory](../AssetCategory
 ## Version
 
 Introduced in version 2014
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

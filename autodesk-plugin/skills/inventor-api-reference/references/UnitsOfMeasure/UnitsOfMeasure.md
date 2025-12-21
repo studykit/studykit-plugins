@@ -51,9 +51,3 @@ The UnitsOfMeasure object supports various functions to allow you to interact wi
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

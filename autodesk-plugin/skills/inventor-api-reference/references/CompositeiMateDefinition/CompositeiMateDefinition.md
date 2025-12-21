@@ -46,9 +46,3 @@ The CompositeiMateDefinition object represents a composite iMate definition. It 
 ## Version
 
 Introduced in version 6
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

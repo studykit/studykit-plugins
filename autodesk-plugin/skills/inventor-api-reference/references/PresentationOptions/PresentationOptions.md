@@ -20,9 +20,3 @@ The PresentationOptions object provides access to properties that provide read a
 ## Version
 
 Introduced in version 2011
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

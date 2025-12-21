@@ -20,9 +20,3 @@ CornerRoundFeatures.**GetEdgesFromFeature**( ***Feature*** As [PartFeature](../P
 ## Version
 
 Introduced in version 2025
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

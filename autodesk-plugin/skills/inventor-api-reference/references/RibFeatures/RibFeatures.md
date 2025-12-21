@@ -29,9 +29,3 @@ The Part RibFeatures collection object. A is a closed, thin-walled support shape
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

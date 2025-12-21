@@ -25,9 +25,3 @@ WorkPlane.**SetByPlaneAndOffset**( ***Plane*** As Object, ***Offset*** As Varian
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

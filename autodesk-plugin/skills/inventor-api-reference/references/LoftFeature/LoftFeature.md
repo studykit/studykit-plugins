@@ -61,9 +61,3 @@ The LoftFeature object represents an existing loft in an Autodesk Inventor part 
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

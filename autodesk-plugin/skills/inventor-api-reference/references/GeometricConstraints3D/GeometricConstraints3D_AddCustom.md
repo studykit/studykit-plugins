@@ -21,9 +21,3 @@ GeometricConstraints3D.**AddCustom**( ***Entity*** As [SketchEntity3D](../Sketch
 ## Version
 
 Introduced in version 11
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -20,9 +20,3 @@ Vector2d.**DotProduct**( ***Vector*** As [Vector2d](../Vector2d/Vector2d.md) ) A
 ## Version
 
 Introduced in version 11
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

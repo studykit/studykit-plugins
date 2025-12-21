@@ -36,9 +36,3 @@ The ProjectPath object represents a folder path for a library, workspace or a wo
 ## Version
 
 Introduced in version 2011
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -28,9 +28,3 @@ ApplicationEvents.**OnDocumentChange**( ***DocumentObject*** As [Document](../Do
 ## Version
 
 Introduced in version 8
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

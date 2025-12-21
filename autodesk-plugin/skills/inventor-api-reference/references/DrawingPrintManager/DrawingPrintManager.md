@@ -53,9 +53,3 @@ The DrawingPrintManager object supports properties and methods that allow you to
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

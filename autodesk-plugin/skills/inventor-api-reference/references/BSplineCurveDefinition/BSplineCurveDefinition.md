@@ -28,9 +28,3 @@ The BSplineCurveDefinition object is a transient object. It is a convenient way 
 ## Version
 
 Introduced in version 9
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

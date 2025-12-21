@@ -36,9 +36,3 @@ The iAssemblyTableColumn object represents a column in the iAssembly factory tab
 ## Version
 
 Introduced in version 11
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

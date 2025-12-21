@@ -36,9 +36,3 @@ The SurfaceTextureSymbols collection object provides access to all the surface t
 ## Version
 
 Introduced in version 2009
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

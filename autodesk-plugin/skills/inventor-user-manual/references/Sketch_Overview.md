@@ -42,9 +42,9 @@ Let's look at creating the original example using the API to see the differences
 
 If you look at the online help for the AddByTwoPoints method of the SketchLines object you'll see the method takes two points to define the line.
 
-|  |
-| --- |
-| ```  AddByTwoPoints(StartPoint As Object, EndPoint As Object) As SketchLine ``` |
+```vb
+AddByTwoPoints(StartPoint As Object, EndPoint As Object) As SketchLine
+```
 
 Notice that the type of object expected as input for the points is defined as "Object." This allows you to input either a Point2d object or an existing SketchPoint object. A Point2d object describes a location on the sketch. When you provide a Point2d object as input a SketchPoint is created at that location and the line is attached to the sketch point with a coincident constraint. In the case where a SketchPoint is input, the line is attached directly to the input sketch point using a coincident constraint.
 
@@ -52,51 +52,71 @@ Because sketch entities are always dependent on sketch points, the API provides 
 
 When you define the location of sketch entities using coordinates on the sketch, they are defined using Point2d objects. These objects don't define a graphical point but only a coordinate in 2D space. These lines set a reference to the TransientGeometry object to facilitate its use later in the program.
 
-|  |
-| --- |
-| ```  Dim oTransGeom As TransientGeometry Set oTransGeom = ThisApplication.TransientGeometry ``` |
+```vb
+Dim oTransGeom As TransientGeometry
+Set oTransGeom = ThisApplication.TransientGeometry
+```
 
 This defines two Point2d objects that will be used to define the ends of the line.
 
-|  |
-| --- |
-| ```  Dim oCoord1 As Point2d Set oCoord1 = oTransGeom.CreatePoint2d(0, 0) Dim oCoord2 As Point2d Set oCoord2 = oTransGeom.CreatePoint2d(5, 0) ``` |
+```vb
+Dim oCoord1 As Point2d
+Set oCoord1 = oTransGeom.CreatePoint2d(0, 0)
+Dim oCoord2 As Point2d
+Set oCoord2 = oTransGeom.CreatePoint2d(5, 0)
+```
 
 This creates the actual SketchLine object. The two inputs are the two Point2d objects. Automatically, two sketch points are created at those locations and the line is attached to them with coincident constraints.
 
-|  |
-| --- |
-| ```  Dim oLines(1 To 4) As SketchLine Set oLines(1) = oSketch.SketchLines.AddByTwoPoints(oCoord1, oCoord2) ``` |
+```vb
+Dim oLines(1 To 4) As SketchLine
+Set oLines(1) = oSketch.SketchLines.AddByTwoPoints(oCoord1, oCoord2)
+```
 
 This creates the second sketch line. In this case a SketchPoint and a Point2d object are input as the start and end points of the line. The SketchPoint is obtained by asking the first line for its end sketch point.
 
-|  |
-| --- |
-| ```  Set oCoord1 = oTransGeom.CreatePoint2d(5, 3) Set oLines(2) = oSketch.SketchLines.AddByTwoPoints(oLines(1).EndSketchPoint, _                                                    oCoord1) ``` |
+```vb
+Set oCoord1 = oTransGeom.CreatePoint2d(5, 3)
+Set oLines(2) = oSketch.SketchLines.AddByTwoPoints(oLines(1).EndSketchPoint, _
+oCoord1)
+```
 
 This creates the arc. The center and end point are defined using Point2d objects and the start point is defined using the end sketch point from the previous line.
 
-|  |
-| --- |
-| ```  Set oCoord1 = oTransGeom.CreatePoint2d(4, 3) Set oCoord2 = oTransGeom.CreatePoint2d(4, 4) Dim oArc As SketchArc Set oArc = oSketch.SketchArcs.AddByCenterStartEndPoint(oCoord1, _                                             oLines(2).EndSketchPoint, oCoord2) 											 ``` |
+```vb
+Set oCoord1 = oTransGeom.CreatePoint2d(4, 3)
+Set oCoord2 = oTransGeom.CreatePoint2d(4, 4)
+Dim oArc As SketchArc
+Set oArc = oSketch.SketchArcs.AddByCenterStartEndPoint(oCoord1, _
+oLines(2).EndSketchPoint, oCoord2)
+```
 
 This creates the third line and connects it to the arc by inputting the arcs end sketch point.
 
-|  |
-| --- |
-| ```  Set oCoord1 = oTransGeom.CreatePoint2d(0, 4) Set oLines(3) = oSketch.SketchLines.AddByTwoPoints(oArc.EndSketchPoint, _                                                    oCoord1) ``` |
+```vb
+Set oCoord1 = oTransGeom.CreatePoint2d(0, 4)
+Set oLines(3) = oSketch.SketchLines.AddByTwoPoints(oArc.EndSketchPoint, _
+oCoord1)
+```
 
 This creates the final line using sketch points from the first and last line as inputs.
 
-|  |
-| --- |
-| ```  Set oLines(4) = oSketch.SketchLines.AddByTwoPoints( _                                            oLines(1).StartSketchPoint, _                                            oLines(3).EndSketchPoint) ``` |
+```vb
+Set oLines(4) = oSketch.SketchLines.AddByTwoPoints( _
+oLines(1).StartSketchPoint, _
+oLines(3).EndSketchPoint)
+```
 
 At this point you will have a sketch that looks similar to that shown in the previous figure, but if you attempt to manipulate the sketch at all you will notice that the only constraints are the coincident constraints tying everything together. Because of this, the lines will not stay horizontal and vertical, and the lines will not remain tangent to the arc. The following code will add the same constraints that were placed automatically when interactively creating the sketch.
 
-|  |
-| --- |
-| ```  Call oSketch.GeometricConstraints.AddHorizontal(oLines(1)) Call oSketch.GeometricConstraints.AddPerpendicular(oLines(1), oLines(2)) Call oSketch.GeometricConstraints.AddTangent(oLines(2), oArc) Call oSketch.GeometricConstraints.AddTangent(oLines(3), oArc) Call oSketch.GeometricConstraints.AddParallel(oLines(1), oLines(3)) Call oSketch.GeometricConstraints.AddParallel(oLines(4), oLines(2)) ``` |
+```vb
+Call oSketch.GeometricConstraints.AddHorizontal(oLines(1))
+Call oSketch.GeometricConstraints.AddPerpendicular(oLines(1), oLines(2))
+Call oSketch.GeometricConstraints.AddTangent(oLines(2), oArc)
+Call oSketch.GeometricConstraints.AddTangent(oLines(3), oArc)
+Call oSketch.GeometricConstraints.AddParallel(oLines(1), oLines(3))
+Call oSketch.GeometricConstraints.AddParallel(oLines(4), oLines(2))
+```
 
 If you edit the sketch now it will have the behavior you expect.
 
@@ -151,21 +171,42 @@ Sketches can contain several different kinds of entities, depending on the type 
 
 Many programs that deal exclusively with sketches will not want to create a sketch but instead will want to access the currently active sketch. In the case where a sketch is not active you will need to know this so you can handle it gracefully. Determining if a sketch is active can be accomplished using the ActiveEditObject property of the Application. This property returns the object that is currently active for edit. Currently this can be any of the various document types or a sketch. The sample code below illustrates checking to see if a sketch is active and if one is active, setting a reference to it. If a sketch isn't active, it displays a message telling the user a sketch must be active.
 
-|  |
-| --- |
-| ```  ' Determine if a sketch is active. If Not TypeOf ThisApplication.ActiveEditObject Is Sketch Then     MsgBox "A sketch must be active."     Exit Sub End If  ' Set a reference to the active sketch. Dim oSketch As Sketch Set oSketch = ThisApplication.ActiveEditObject ``` |
+```vb
+' Determine if a sketch is active.
+If Not TypeOf ThisApplication.ActiveEditObject Is Sketch Then
+    MsgBox "A sketch must be active."
+    Exit Sub
+End If
+'
+Set a reference to the active sketch.
+Dim oSketch As Sketch
+Set oSketch = ThisApplication.ActiveEditObject
+```
 
 The Sketches collection object also provides access to all of the existing sketches in a document. Through this you can obtain any existing sketch, and if you know its name you can access it directly using the Item method of the Sketches collection object. The code below iterates through all of the sketches in the document and prints their names.
 
-|  |
-| --- |
-| ```  Dim oSketch As Sketch For Each oSketch in oPartDoc.ComponentDefinition.Sketches     Debug.Print "Sketch: " & oSketch.Name Next ``` |
+```vb
+Dim oSketch As Sketch
+For Each oSketch in oPartDoc.ComponentDefinition.Sketches
+    Debug.Print "Sketch: " & oSketch.Name
+Next
+```
 
 This code sets a reference to the sketch named "Sketch2." If a sketch named "Sketch2" does not exist in the part the call of the Item property will fail. The On Error statement allows you to check for and handle this error.
 
-|  |
-| --- |
-| ```  ' Enable error trapping On Error Resume Next  Dim oSketch As Sketch Set oSketch in oPartDoc.ComponentDefinition.Sketches.Item("Sketch2") If Err Then     Err.Clear     MsgBox "A sketch named ""Sketch2"" does not exist." End If  ' Turn off error trapping On Error Goto 0 ``` |
+```vb
+' Enable error trapping
+On Error
+Resume Next
+Dim oSketch As Sketch
+Set oSketch in oPartDoc.ComponentDefinition.Sketches.Item("Sketch2")
+If Err Then
+    Err.Clear
+    MsgBox "A sketch named ""Sketch2"" does not exist."
+End If
+' Turn off error trapping
+On Error Goto 0
+```
 
 When creating models you'll usually need to create sketches. The Sketches collection supports two methods for creating a sketch. The Add method works identically as the 2D Sketch command. That is, you provide a planar entity, (a work plane or planar face) as input and the sketch is created. It uses built-in logic to determine the orientation of the sketch on the selected entity. Sometimes this is acceptable, but unlike the end-user who is working visually with the system and can easily see and react to the default orientation, you usually need explicit control of the orientation of the sketch. The AddWithOrientation method provides this control.
 
@@ -177,9 +218,28 @@ The part consists of two extrusion features: one to create the base block and an
 
 The code below creates the first extrusion. (The profile creation step is discussed in detail in a subsequent section.)
 
-|  |
-| --- |
-| ```  ' Set a reference to the component definition. Dim oPartCompDef As PartComponentDefinition Set oPartCompDef = ThisApplication.ActiveDocument.ComponentDefinition  ' Create a new sketch. Dim oSketch As Sketch Set oSketch = oPartCompDef.Sketches.Add(oPartCompDef.WorkPlanes.Item(3))  ' Draw a rectangle. With ThisApplication.TransientGeometry     Call oSketch.SketchLines.AddAsTwoPointRectangle( _                                         .CreatePoint2d(0, 0), _                                         .CreatePoint2d(5, 3)) End With  ' Create a profile. Dim oProfile As Profile Set oProfile = oSketch.Profiles.AddForSolid  ' Create the extrusion feature. Dim oExtrude As ExtrudeFeature Set oExtrude = oPartCompDef.Features.ExtrudeFeatures.AddByDistanceExtent( _                     oProfile, 2, kPositiveExtentDirection, kJoinOperation) ``` |
+```vb
+'
+Set a reference to the component definition.
+Dim oPartCompDef As PartComponentDefinition
+Set oPartCompDef = ThisApplication.ActiveDocument.ComponentDefinition
+' Create a new sketch.
+Dim oSketch As Sketch
+Set oSketch = oPartCompDef.Sketches.Add(oPartCompDef.WorkPlanes.Item(3))
+' Draw a rectangle.
+With ThisApplication.TransientGeometry
+    Call oSketch.SketchLines.AddAsTwoPointRectangle( _
+    .CreatePoint2d(0, 0), _
+    .CreatePoint2d(5, 3))
+End With
+' Create a profile.
+Dim oProfile As Profile
+Set oProfile = oSketch.Profiles.AddForSolid
+' Create the extrusion feature.
+Dim oExtrude As ExtrudeFeature
+Set oExtrude = oPartCompDef.Features.ExtrudeFeatures.AddByDistanceExtent( _
+oProfile, 2, kPositiveExtentDirection, kJoinOperation)
+```
 
 To create the sketch for this feature, the Sketches.Add method is used. This is the method that doesn't provide control over the orientation. You'll notice that the input plane provided is an existing work plane. The first three work planes in the WorkPlanes collection are the three that exist in every part. The first represents the YZ plane, the second the XZ plane, and the third the XY plane. (This is the same order as they appear in the Browser.) When a sketch is created with the Add method and a work plane is used as input, the sketch inherits the orientation and origin from the work plane. In this case, since it's the XY base work plane the origin will be at (0,0,0) and the X and Y directions of the sketch will be in the same directions as the X and Y axes of the model. The result after the creation of this feature is shown below, and the sketch used is highlighted.
 
@@ -191,9 +251,24 @@ The creation of the next sketch becomes more interesting. It's important to cont
 
 The following code creates a sketch in the desired position and uses the sketch to create the extrusion for the pocket.
 
-|  |
-| --- |
-| ```  ' Create a sketch on the end face using an existing work axis  ' and the origin work point. Set oSketch = oPartCompDef.Sketches.AddWithOrientation( _                           oExtrude.EndFaces.Item(1), _                           oPartCompDef.WorkAxes.Item(1), True, True, _                           oPartCompDef.WorkPoints.Item(1), False)  ' Draw a rectangle. With ThisApplication.TransientGeometry     Call oSketch.SketchLines.AddAsTwoPointRectangle( .CreatePoint2d(1, 1),                                                     .CreatePoint2d(4, 2)) End With  ' Create a profile. Set oProfile = oSketch.Profiles.AddForSolid  ' Create the extrusion feature. Set oExtrude = oPartCompDef.Features.ExtrudeFeatures.AddByDistanceExtent( _                    oProfile, 0.75, kNegativeExtentDirection, kCutOperation) ``` |
+```vb
+' Create a sketch on the end face using an existing work axis
+' and the origin work point.
+Set oSketch = oPartCompDef.Sketches.AddWithOrientation( _
+oExtrude.EndFaces.Item(1), _
+oPartCompDef.WorkAxes.Item(1), True, True, _
+oPartCompDef.WorkPoints.Item(1), False)
+' Draw a rectangle.
+With ThisApplication.TransientGeometry
+    Call oSketch.SketchLines.AddAsTwoPointRectangle( .CreatePoint2d(1, 1),
+    .CreatePoint2d(4, 2))
+End With
+' Create a profile.
+Set oProfile = oSketch.Profiles.AddForSolid
+' Create the extrusion feature.
+Set oExtrude = oPartCompDef.Features.ExtrudeFeatures.AddByDistanceExtent( _
+oProfile, 0.75, kNegativeExtentDirection, kCutOperation)
+```
 
 The interesting portion of this code sample is the AddWithOrientation method call. This allows you to create a sketch and fully define its orientation. The first argument is the face, which is obtained directly from the previous feature. The second argument is used to the define the X axis. In this case the system X work axis is provided as input. The third argument specifies if the direction of the sketch X axis should be in the same direction as the entity provided as the second argument. The fourth argument specifies if the axis being defined is the X or Y axis. The fifth argument defines the origin of the sketch. In this sample the system origin work point is input. The final argument defines whether the edges of the input face should be copied onto the sketch, (as is done when creating a sketch interactively).
 
@@ -273,15 +348,48 @@ An important difference between sketches in drawing documents versus those in pa
 
 For sheet overlay and drawing view sketches, this is done by calling the Edit method on the DrawingSketch object. To leave edit mode, call the ExitEdit method. The code below places the first sheet overlay sketch on the active sheet in edit mode.
 
-|  |
-| --- |
-| ```  ' Determine if there are any sheet overlay sketches. Dim oSketches As DrawingSketches Set oSketches = ThisDocument.ActiveSheet.Sketches If oSketches.Count = 0 Then     MsgBox "Active sheet does not contain any overlay sketches."     Exit Sub End If  ' Set a reference to the first sketch. Dim oSketch As DrawingSketch Set oSketch = oSketches.Item(1)  ' Place the sketch in edit mode. oSketch.Edit  ' Make changes to the sketch contents here.  ' Return from edit mode. oSketch.ExitEdit ``` |
+```vb
+' Determine if there are any sheet overlay sketches.
+Dim oSketches As DrawingSketches
+Set oSketches = ThisDocument.ActiveSheet.Sketches
+If oSketches.Count = 0 Then
+    MsgBox "Active sheet does not contain any overlay sketches."
+    Exit Sub
+End If
+'
+Set a reference to the first sketch.
+Dim oSketch As DrawingSketch
+Set oSketch = oSketches.Item(1)
+' Place the sketch in edit mode.
+oSketch.Edit
+' Make changes to the sketch contents here.
+'
+Return from edit mode.
+oSketch.ExitEdit
+```
 
 To edit the sketch of a drawing aid definition, the definition object must be placed into edit mode which is done by calling the Edit method on the definition object (BorderDefinition, TitleBlockDefinition, or SketchedSymbolDefinition), not the DrawingSketch. Calling the Edit or ExitEdit method on the DrawingSketch owned by a drawing aid definition (obtained from the Sketch property on, for example, the BorderDefinition object) will always fail. The Edit method and drawing aid definitions has a single out argument which is the DrawingSketch that is in edit mode. Note that this is not a reference to the same sketch obtained from the drawing aid's Sketch property, but is a temporary copy of the definition's sketch on a temporary sheet that is activated for the edit operation. The code below places a border in edit mode.
 
-|  |
-| --- |
-| ```  ' Get the desired border. Dim oBorder As BorderDefinition On Error Resume Next Set oBorder = ThisDocument.BorderDefinitions.Item("MyBorder") If Err Then     Err.Clear     MsgBox "A border named ""MyBorder"" does not exist."     Exit Sub End If On Error GoTo 0  ' Place the border in edit mode. Dim oSketch As DrawingSketch oBorder.Edit oSketch  ' Make changes to the sketch contents here.  ' Return from edit mode. oBorder.ExitEdit ``` |
+```vb
+' Get the desired border.
+Dim oBorder As BorderDefinition
+On Error
+Resume Next
+Set oBorder = ThisDocument.BorderDefinitions.Item("MyBorder")
+If Err Then
+    Err.Clear
+    MsgBox "A border named ""MyBorder"" does not exist."
+    Exit Sub
+End If
+On Error GoTo 0
+' Place the border in edit mode.
+Dim oSketch As DrawingSketch
+oBorder.Edit oSketch
+' Make changes to the sketch contents here.
+'
+Return from edit mode.
+oBorder.ExitEdit
+```
 
 Because only one drawing sketch can be actively editing at a time, calling the Edit method on an overlay sketch or a drawing aid definition will fail if there already is a drawing sketch in edit mode. To determine if a sketch is in edit mode, or to obtain the currently editing sketch, use the ActiveEditObject property on the Application object, or the ActivatedObject property on the DrawingDocument object. Note that if you attempt to transparently change the actively editing sketch when the active editing sketch is for a drawing aid definition, the changes must be aborted, saved, or saved to a new definition. In order to exit sketch mode for a drawing aid, you have to decide whether to abort, save or save changes to a new definition, which makes it impossible to return the user to the previous state.
 

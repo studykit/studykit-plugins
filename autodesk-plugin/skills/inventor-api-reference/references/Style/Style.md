@@ -43,9 +43,3 @@ The Style object is the base class for all the drawing styles and contains metho
 ## Version
 
 Introduced in version 2008
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

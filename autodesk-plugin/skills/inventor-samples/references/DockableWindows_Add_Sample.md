@@ -10,10 +10,6 @@ This sample demonstrates creating a dockable window and adding a dialog into it.
 
 You need to create the (modeless) dialog and set the hwnd of the dialog in the code below.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Sub DockableWindow()
     Dim oUserInterfaceMgr As UserInterfaceManager
@@ -38,9 +34,3 @@ Sub DockableWindow()
     oWindow.Visible = True
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

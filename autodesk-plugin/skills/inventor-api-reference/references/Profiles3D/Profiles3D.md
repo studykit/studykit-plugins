@@ -29,9 +29,3 @@ Provides access to all of the 3d profiles owned by a particular 3d sketch and su
 ## Version
 
 Introduced in version 6
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

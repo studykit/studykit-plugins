@@ -58,9 +58,3 @@ The FaceDraftFeature object represents a face draft on a part..
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

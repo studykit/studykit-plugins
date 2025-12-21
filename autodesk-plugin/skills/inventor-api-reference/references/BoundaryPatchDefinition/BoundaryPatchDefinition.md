@@ -28,9 +28,3 @@ The BoundaryPatchDefinition object is used to define the input required for crea
 ## Version
 
 Introduced in version 2008
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

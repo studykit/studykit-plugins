@@ -8,10 +8,6 @@ This sample demonstrates how open an NX file using the NX translator add-in.
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Sub ImportNXFile()
     ' Set NX translator's CLSID and the NX file name.
@@ -86,9 +82,3 @@ Sub ImportNXFile()
     oTransAddIn.Open file, context, options, sourceObj
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

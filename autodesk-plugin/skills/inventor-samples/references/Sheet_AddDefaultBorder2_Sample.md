@@ -8,10 +8,6 @@ This sample illustrates inserting a default border using the default values.
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub InsertDefaultBorderUsingDefaults()
     ' Set a reference to the drawing document.
@@ -32,9 +28,3 @@ Public Sub InsertDefaultBorderUsingDefaults()
     Set oBorder = oSheet.AddDefaultBorder()
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

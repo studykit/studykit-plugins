@@ -15,9 +15,3 @@ Generic object. Weakly-typed (IDispatch).
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

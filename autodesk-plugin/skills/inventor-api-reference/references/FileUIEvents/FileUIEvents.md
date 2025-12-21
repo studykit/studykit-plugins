@@ -41,9 +41,3 @@ The FileUIEvents object supports a set of events that are fired when the user is
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

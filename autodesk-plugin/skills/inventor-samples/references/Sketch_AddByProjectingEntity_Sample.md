@@ -8,10 +8,6 @@ This sample demonstrates projecting a sketch entity across parts in an assembly.
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub ProjectingAcrossParts()
     ' Set a reference to the assembly component definition.
@@ -59,9 +55,3 @@ Public Sub ProjectingAcrossParts()
     Set oSketchLine2Proxy = oSketch2Proxy.AddByProjectingEntity(oSketchLine1Proxy)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -28,9 +28,3 @@ The LoftRails object is used to define the rails and their conditions in a loft 
 ## Version
 
 Introduced in version 11
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -38,9 +38,3 @@ OnFaceConstraint3D Object.
 ## Version
 
 Introduced in version 2017
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -49,9 +49,3 @@ The MassProperties object provides access to properties that provide read and wr
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

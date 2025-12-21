@@ -145,9 +145,3 @@ The DrawingDocument object provides methods and properties to create, activate, 
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

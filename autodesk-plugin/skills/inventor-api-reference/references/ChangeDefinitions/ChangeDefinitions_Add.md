@@ -21,9 +21,3 @@ ChangeDefinitions.**Add**( ***InternalName*** As String, ***CommandName*** As St
 ## Version
 
 Introduced in version 9
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

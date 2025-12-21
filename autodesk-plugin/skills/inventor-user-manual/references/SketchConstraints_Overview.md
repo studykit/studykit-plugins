@@ -26,33 +26,61 @@ The following code creates a sketch in a new part document. It defines a number 
 
 First, create the new part document, and then add a new sketch:
 
-|  |
-| --- |
-| ```  Dim oApp As Inventor.Application Set oApp = ThisApplication Dim oPartDoc As PartDocument Set oPartDoc = oApp.Documents.Add(kPartDocumentObject, _     oApp.GetTemplateFile(kPartDocumentObject)) Dim oSketch As PlanarSketch Set oSketch = oPartDoc.ComponentDefinition.Sketches.Add _    (oPartDoc.ComponentDefinition.WorkPlanes.Item(3)) ``` |
+```vb
+Dim oApp As Inventor.Application
+Set oApp = ThisApplication
+Dim oPartDoc As PartDocument
+Set oPartDoc = oApp.Documents.Add(kPartDocumentObject, _
+oApp.GetTemplateFile(kPartDocumentObject))
+Dim oSketch As PlanarSketch
+Set oSketch = oPartDoc.ComponentDefinition.Sketches.Add _
+(oPartDoc.ComponentDefinition.WorkPlanes.Item(3))
+```
 
 The code creates a number of arbitrary 2D points, using transient geometry to create the points, so create the transient geometry object.
 
-|  |
-| --- |
-| ```  Dim oTG As TransientGeometry Set oTG = oApp.TransientGeometry ``` |
+```vb
+Dim oTG As TransientGeometry
+Set oTG = oApp.TransientGeometry
+```
 
 Now get the SketchPoints collection for the new sketch, and add some points.
 
-|  |
-| --- |
-| ```  Dim oSkPnts As SketchPoints Set oSkPnts = oSketch.SketchPoints Call oSkPnts.Add(oTG.CreatePoint2d(0, 0), False) Call oSkPnts.Add(oTG.CreatePoint2d(1.0, 0), False) Call oSkPnts.Add(oTG.CreatePoint2d(1.0, 0.5), False) Call oSkPnts.Add(oTG.CreatePoint2d(2.2, 0.5), False) Call oSkPnts.Add(oTG.CreatePoint2d(0.5, 1.5), False) Call oSkPnts.Add(oTG.CreatePoint2d(0, 1.0), False) Call oSkPnts.Add(oTG.CreatePoint2d(2.7, 1.5), False) Call oSkPnts.Add(oTG.CreatePoint2d(0.5, 1.0), False) ``` |
+```vb
+Dim oSkPnts As SketchPoints
+Set oSkPnts = oSketch.SketchPoints
+Call oSkPnts.Add(oTG.CreatePoint2d(0, 0), False)
+Call oSkPnts.Add(oTG.CreatePoint2d(1.0, 0), False)
+Call oSkPnts.Add(oTG.CreatePoint2d(1.0, 0.5), False)
+Call oSkPnts.Add(oTG.CreatePoint2d(2.2, 0.5), False)
+Call oSkPnts.Add(oTG.CreatePoint2d(0.5, 1.5), False)
+Call oSkPnts.Add(oTG.CreatePoint2d(0, 1.0), False)
+Call oSkPnts.Add(oTG.CreatePoint2d(2.7, 1.5), False)
+Call oSkPnts.Add(oTG.CreatePoint2d(0.5, 1.0), False)
+```
 
 Using the previously defined sketch points, add some lines to the SketchLines collection. Here the SketchLine objects are added to an array for easy reference later.
 
-|  |
-| --- |
-| ```  Dim oLines As SketchLines Set oLines = oSketch.SketchLines Dim oLine(1 To 6) As SketchLine Set oLine(1) = oLines.AddByTwoPoints(oSkPnts(1), oSkPnts(2)) Set oLine(2) = oLines.AddByTwoPoints(oSkPnts(2), oSkPnts(3)) Set oLine(3) = oLines.AddByTwoPoints(oSkPnts(3), oSkPnts(4)) Set oLine(4) = oLines.AddByTwoPoints(oSkPnts(4), oSkPnts(7)) Set oLine(5) = oLines.AddByTwoPoints(oSkPnts(7), oSkPnts(5)) Set oLine(6) = oLines.AddByTwoPoints(oSkPnts(6), oSkPnts(1)) ``` |
+```vb
+Dim oLines As SketchLines
+Set oLines = oSketch.SketchLines
+Dim oLine(1 To 6) As SketchLine
+Set oLine(1) = oLines.AddByTwoPoints(oSkPnts(1), oSkPnts(2))
+Set oLine(2) = oLines.AddByTwoPoints(oSkPnts(2), oSkPnts(3))
+Set oLine(3) = oLines.AddByTwoPoints(oSkPnts(3), oSkPnts(4))
+Set oLine(4) = oLines.AddByTwoPoints(oSkPnts(4), oSkPnts(7))
+Set oLine(5) = oLines.AddByTwoPoints(oSkPnts(7), oSkPnts(5))
+Set oLine(6) = oLines.AddByTwoPoints(oSkPnts(6), oSkPnts(1))
+```
 
 Add an arc to the SketchArcs collection.
 
-|  |
-| --- |
-| ```  Dim oArc As SketchArc Dim oArcs As SketchArcs Set oArcs = oSketch.SketchArcs Set oArc = oArcs.AddByCenterStartEndPoint(oSkPnts(8), oSkPnts(5), oSkPnts(6)) ``` |
+```vb
+Dim oArc As SketchArc
+Dim oArcs As SketchArcs
+Set oArcs = oSketch.SketchArcs
+Set oArc = oArcs.AddByCenterStartEndPoint(oSkPnts(8), oSkPnts(5), oSkPnts(6))
+```
 
 The code to this point creates a sketch with no constraints, appearing as follows:
 
@@ -60,9 +88,10 @@ The code to this point creates a sketch with no constraints, appearing as follow
 
 Now add some constraints. First, add a perpendicular constraint between two lines.
 
-|  |
-| --- |
-| ```  Call oSketch.GeometricConstraints.AddPerpendicular(oLine(4), oLine(5)) oApp.ActiveView.Update ``` |
+```vb
+Call oSketch.GeometricConstraints.AddPerpendicular(oLine(4), oLine(5))
+oApp.ActiveView.Update
+```
 
 The preceding code modifies the appearance of the sketch as follows:
 
@@ -70,15 +99,18 @@ The preceding code modifies the appearance of the sketch as follows:
 
 Add tangent constraints to the two lines that join to both ends of the arc.
 
-|  |
-| --- |
-| ```  Call oSketch.GeometricConstraints.AddTangent(oLine(5), oArc) Call oSketch.GeometricConstraints.AddTangent(oLine(6), oArc) oApp.ActiveView.Update ``` |
+```vb
+Call oSketch.GeometricConstraints.AddTangent(oLine(5), oArc)
+Call oSketch.GeometricConstraints.AddTangent(oLine(6), oArc)
+oApp.ActiveView.Update
+```
 
 This has no apparent effect - yet - since the lines and arc are already tangential. To see the effect of the tangent constraints, add a parallel constraint between two lines:
 
-|  |
-| --- |
-| ```  Call oSketch.GeometricConstraints.AddParallel(oLine(3), oLine(5)) oApp.ActiveView.Update ``` |
+```vb
+Call oSketch.GeometricConstraints.AddParallel(oLine(3), oLine(5))
+oApp.ActiveView.Update
+```
 
 The cumulative effect of these tangential and parallel constraints is as follows:
 
@@ -86,9 +118,10 @@ The cumulative effect of these tangential and parallel constraints is as follows
 
 Now constrain the lower angled line to always be horizontal.
 
-|  |
-| --- |
-| ```  Call oSketch.GeometricConstraints.AddHorizontal(oLine(5)) oApp.ActiveView.Update ``` |
+```vb
+Call oSketch.GeometricConstraints.AddHorizontal(oLine(5))
+oApp.ActiveView.Update
+```
 
 The horizontal constraint results in the following change to the sketch:
 

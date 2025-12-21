@@ -10,10 +10,6 @@ This sample illustrates creating text (general note) in a sheet.
 
 Before running this sample, open a drawing document.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub SheetTextAdd()
     ' Set a reference to the drawing document.
@@ -82,9 +78,3 @@ Public Sub SheetTextAdd()
     Set oGeneralNote = oGeneralNotes.AddFitted(oTG.CreatePoint2d(4, dYCoord), sText)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

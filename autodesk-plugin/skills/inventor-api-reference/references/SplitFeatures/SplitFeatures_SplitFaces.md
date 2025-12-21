@@ -22,9 +22,3 @@ SplitFeatures.**SplitFaces**( ***SplitTool*** As Object, [***SplitAll***] As Boo
 ## Version
 
 Introduced in version 6
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

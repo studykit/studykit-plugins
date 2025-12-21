@@ -20,9 +20,3 @@ SurfaceBodyProxy.**GetFaceColors**( [***Faces***] As Variant ) As [ObjectCollect
 ## Version
 
 Introduced in version 2018
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

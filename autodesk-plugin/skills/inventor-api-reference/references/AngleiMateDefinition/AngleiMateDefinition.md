@@ -46,9 +46,3 @@ The AngleiMateDefinition object represents an angle iMate definition. It is deri
 ## Version
 
 Introduced in version 6
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

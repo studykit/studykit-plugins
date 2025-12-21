@@ -40,9 +40,3 @@ The CollinearConstraint object represents a collinear constraint within a sketch
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

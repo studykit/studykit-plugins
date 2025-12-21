@@ -16,9 +16,3 @@ Constants identifying the driven dimension type of a partial chamfer.
 ## Version
 
 Introduced in version 2018
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

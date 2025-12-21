@@ -65,9 +65,3 @@ The CornerSeamFeature object represents a sheet metal corner seam feature.
 ## Version
 
 Introduced in version 5.3
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

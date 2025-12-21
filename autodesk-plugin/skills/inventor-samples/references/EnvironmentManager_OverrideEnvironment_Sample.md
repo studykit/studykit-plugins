@@ -10,10 +10,6 @@ A new ribbon tab is created and associated with the override environment.
 
 Open a part document and run the sample.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Sub AddOverrideEnvironment()
     ' Make sure a part document is active
@@ -64,9 +60,3 @@ Sub AddOverrideEnvironment()
 
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

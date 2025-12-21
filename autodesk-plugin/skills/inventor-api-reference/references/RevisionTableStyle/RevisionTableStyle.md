@@ -62,9 +62,3 @@ The RevisionTableStyle object represents a revision table style in a drawing. Th
 ## Version
 
 Introduced in version 2011
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

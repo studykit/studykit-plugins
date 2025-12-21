@@ -10,10 +10,6 @@ The sample demonstrate how to set the online help for a file dialog.
 
 The VBA sample demonstrates how to set the online help page for a file dialog.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub ShowOnlineHelpForFileDialog()
     Dim helpWebsite As String
@@ -28,9 +24,3 @@ Public Sub ShowOnlineHelpForFileDialog()
     oFileDialog.ShowOpen
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

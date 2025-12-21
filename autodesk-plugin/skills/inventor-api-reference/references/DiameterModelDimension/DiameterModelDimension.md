@@ -48,9 +48,3 @@ The DiameterModelDimension object represents a diameter model dimension in a par
 ## Version
 
 Introduced in version 2018
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

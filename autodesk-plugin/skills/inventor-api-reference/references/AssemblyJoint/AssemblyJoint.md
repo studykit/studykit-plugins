@@ -52,9 +52,3 @@ An AssemblyJoint object represents an assembly relationship between two componen
 ## Version
 
 Introduced in version 2014
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -10,10 +10,6 @@ This sample demonstrates creating an elliptical arc in a sketch and dimensioning
 
 To run this sample you must have a sketch active.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Sub DrawSketchEllipticalArc()
     ' Check to make sure a sketch is open.
@@ -53,9 +49,3 @@ Sub DrawSketchEllipticalArc()
     Set oEllipseRadiusDim = oSketch.DimensionConstraints.AddEllipseRadius(oEllipticalArc, False, oTextPt)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -21,9 +21,3 @@ The ModelAnnotationsEnumerator collection object provides access to a set of ann
 ## Version
 
 Introduced in version 2018
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

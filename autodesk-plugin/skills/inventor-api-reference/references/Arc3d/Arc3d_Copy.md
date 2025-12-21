@@ -13,9 +13,3 @@ Arc3d.**Copy**() As [Arc3d](../Arc3d/Arc3d.md)
 ## Version
 
 Introduced in version 2013
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

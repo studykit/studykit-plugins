@@ -56,9 +56,3 @@ The GeneralNote object represents a general note on a sheet and derives from the
 ## Version
 
 Introduced in version 10
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

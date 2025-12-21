@@ -36,9 +36,3 @@ The iFeatureSketchPlaneInput object represents the sketch plane input informatio
 ## Version
 
 Introduced in version 6
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

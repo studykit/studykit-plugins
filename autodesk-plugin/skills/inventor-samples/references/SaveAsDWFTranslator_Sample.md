@@ -8,10 +8,6 @@ This sample demonstrates how to save a DWF file using the DWF translator add-in.
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub PublishDWF()
     ' Get the DWF translator Add-In.
@@ -85,9 +81,3 @@ Public Sub PublishDWF()
     Call DWFAddIn.SaveCopyAs(oDocument, oContext, oOptions, oDataMedium)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

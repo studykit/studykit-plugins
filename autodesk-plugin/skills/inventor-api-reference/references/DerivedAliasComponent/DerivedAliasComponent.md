@@ -44,9 +44,3 @@ The DerivedAliasComponent object represents a specific derived Alias instance.
 ## Version
 
 Introduced in version 2010
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -22,9 +22,3 @@ WorkAxes.**AddFixed**( ***Point*** As [Point](../Point/Point.md), ***Axis*** As 
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -20,9 +20,3 @@ The Sketches3DEnumerator allows iteration of available Sketch3D objects.
 ## Version
 
 Introduced in version 2009
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

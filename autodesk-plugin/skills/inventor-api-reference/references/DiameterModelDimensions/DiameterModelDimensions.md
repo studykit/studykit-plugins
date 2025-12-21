@@ -29,9 +29,3 @@ The DiameterModelDimensions collection object provides access to all of the diam
 ## Version
 
 Introduced in version 2018
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -21,9 +21,3 @@ GeometricConstraints.**AddMidpoint**( ***Point*** As [SketchPoint](../SketchPoin
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

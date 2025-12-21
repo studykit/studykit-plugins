@@ -20,9 +20,3 @@ The FaceShells object represents a collection of objects. See the article in the
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

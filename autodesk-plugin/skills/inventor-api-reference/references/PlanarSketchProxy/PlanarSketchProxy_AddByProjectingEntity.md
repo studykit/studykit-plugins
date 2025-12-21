@@ -20,9 +20,3 @@ PlanarSketchProxy.**AddByProjectingEntity**( ***Entity*** As Object ) As [Sketch
 ## Version
 
 Introduced in version 6
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

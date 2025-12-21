@@ -33,9 +33,3 @@ TextBoxes.**AddFitted**( ***Position*** As [Point2d](../Point2d/Point2d.md), ***
 ## Version
 
 Introduced in version 5.3
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -29,9 +29,3 @@ The BSplineSurface object represent a surface curved according to BSpline poles,
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -10,10 +10,6 @@ This sample demonstrates how to access the Parameters object, and from it in tur
 
 To run the sample, you need to have a part document open, and the spreadsheet C:\Temp\params.xls must exist. You can also edit the sample to reference another spreadsheet if you prefer. The spreadsheet should contain valid definitions for parameters. For the section of the code that demonstrates changing the reference you also need to create a spreadsheet C:\Temp\newparams.xls, or edit the sample to reference another spreadsheet.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub TableParameters()
     Dim oPartDoc As Inventor.PartDocument
@@ -60,9 +56,3 @@ Public Sub TableParameters()
     Next
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

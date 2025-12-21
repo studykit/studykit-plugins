@@ -8,10 +8,6 @@ This sample demonstrates creating user parameters using an expression and a valu
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub CreateParameters()
     ' Get the active document.  Assumes a part document is active.
@@ -35,9 +31,3 @@ Public Sub CreateParameters()
     Set param = userParams.AddByValue("NewParam2", 3 * 2.54, kDefaultDisplayLengthUnits)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

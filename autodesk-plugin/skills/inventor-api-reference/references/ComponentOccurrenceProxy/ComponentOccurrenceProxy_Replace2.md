@@ -23,9 +23,3 @@ ComponentOccurrenceProxy.**Replace2**( ***FileName*** As String, ***ReplaceAll**
 ## Version
 
 Introduced in version 2021
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

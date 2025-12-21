@@ -50,9 +50,3 @@ The Vector object. For more information, see the [Transient Geometry](TransientG
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

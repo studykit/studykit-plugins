@@ -40,33 +40,46 @@ The following code prints the X and Y coordinates of one corner of the range box
 
 First, obtain the component occurrence from the assembly document. In this case it's simplified as we know the document contains only one.
 
-|  |
-| --- |
-| ```  Dim oDoc As AssemblyDocument Set oDoc = ThisApplication.ActiveDocument  Dim oCompOcc As ComponentOccurrence Set oCompOcc = oDoc.ComponentDefinition.Occurrences.Item(1) ``` |
+```vb
+Dim oDoc As AssemblyDocument
+Set oDoc = ThisApplication.ActiveDocument
+Dim oCompOcc As ComponentOccurrence
+Set oCompOcc = oDoc.ComponentDefinition.Occurrences.Item(1)
+```
 
 Then obtain the part component definition to gain access to the part features.
 
-|  |
-| --- |
-| ```  Dim oPartCompDef As PartComponentDefinition Set oPartCompDef = oCompOcc.Definition  Dim oExtrudeFeature As ExtrudeFeature Set oExtrudeFeature = oPartCompDef.Features.ExtrudeFeatures.Item(1) ``` |
+```vb
+Dim oPartCompDef As PartComponentDefinition
+Set oPartCompDef = oCompOcc.Definition
+Dim oExtrudeFeature As ExtrudeFeature
+Set oExtrudeFeature = oPartCompDef.Features.ExtrudeFeatures.Item(1)
+```
 
 To get the proxy for the feature, use the CreateGeometryProxy method of the component occurrence, with the required feature as an argument.
 
-|  |
-| --- |
-| ```  Dim oExtrudeFeatureProxy As ExtrudeFeatureProxy oCompOcc.CreateGeometryProxy oExtrudeFeature, oExtrudeFeatureProxy ``` |
+```vb
+Dim oExtrudeFeatureProxy As ExtrudeFeatureProxy
+oCompOcc.CreateGeometryProxy oExtrudeFeature, oExtrudeFeatureProxy
+```
 
 Print some coordinate data, in this case the X Y values of one corner of the feature rangebox. These figures will differ, indicating that the first set come from the native object, while the second set come from the proxy object - in other words, the second set of values are in the assembly context.
 
-|  |
-| --- |
-| ```  Debug.Print oExtrudeFeature.RangeBox.MaxPoint.X Debug.Print oExtrudeFeature.RangeBox.MaxPoint.Y  Debug.Print oExtrudeFeatureProxy.RangeBox.MaxPoint.X Debug.Print oExtrudeFeatureProxy.RangeBox.MaxPoint.Y ``` |
+```vb
+Debug.Print oExtrudeFeature.RangeBox.MaxPoint.X
+Debug.Print oExtrudeFeature.RangeBox.MaxPoint.Y
+Debug.Print oExtrudeFeatureProxy.RangeBox.MaxPoint.X
+Debug.Print oExtrudeFeatureProxy.RangeBox.MaxPoint.Y
+```
 
 The preceding code demonstrated that coordinates for a known point differed according to the context of the feature. Example output might look as follows.
 
-|  |
-| --- |
-| ```   0.232857970569028   0.96726442148297   0.177086160521056   0.988809173640979 ``` |
+```vb
+0.232857970569028
+0.96726442148297
+0.177086160521056
+0.988809173640979
+```
 
 In the assembly context, the part was moved; therefore the coordinates returned by the proxy reflect this move (the first and second lines in the output). These coordinates are different from those returned by the native object, the object definition, with no containing context (the third and fourth lines in the output).
 

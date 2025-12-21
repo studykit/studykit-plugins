@@ -20,9 +20,3 @@ SectionDrawingView.**MoveTo**( ***TargetSheet*** As [Sheet](../Sheet/Sheet.md) )
 ## Version
 
 Introduced in version 9
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

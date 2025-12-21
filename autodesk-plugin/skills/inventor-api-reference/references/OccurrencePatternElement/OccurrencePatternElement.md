@@ -30,9 +30,3 @@ The OccurrencePatternElement object represents a single instance within an occur
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

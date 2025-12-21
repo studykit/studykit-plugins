@@ -22,9 +22,3 @@ BSplineCurve2d.**GetBSplineData**( ***Poles***() As Double, ***Knots***() As Dou
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

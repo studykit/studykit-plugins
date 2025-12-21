@@ -21,9 +21,3 @@ PropertySets.**Add**( ***Name*** As String, [***InternalName***] As Variant ) As
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -21,9 +21,3 @@ SketchLines.**AddByMidEndPoints**( ***MidPoint*** As Object, ***EndPoint*** As O
 ## Version
 
 Introduced in version 2025.2
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -20,9 +20,3 @@ The SketchEntities3DEnumerator object provides access to a set of 3D sketch enti
 ## Version
 
 Introduced in version 6
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -48,9 +48,3 @@ The MaterialAsset object is derived from the Asset object and represents a mater
 ## Version
 
 Introduced in version 2014
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

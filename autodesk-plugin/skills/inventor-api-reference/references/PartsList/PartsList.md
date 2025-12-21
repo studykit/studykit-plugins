@@ -70,9 +70,3 @@ The PartsList object represents a parts list in a drawing sheet.
 ## Version
 
 Introduced in version 5.3
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

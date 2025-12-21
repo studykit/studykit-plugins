@@ -17,9 +17,3 @@ This is a read only property whose value is a [SketchArcs3D](../SketchArcs3D/Ske
 ## Version
 
 Introduced in version 6
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

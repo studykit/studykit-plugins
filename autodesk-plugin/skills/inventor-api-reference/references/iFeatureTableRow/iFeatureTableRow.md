@@ -32,9 +32,3 @@ The iFeatureTableRow object represents a single row of a table associated with a
 ## Version
 
 Introduced in version 2009
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

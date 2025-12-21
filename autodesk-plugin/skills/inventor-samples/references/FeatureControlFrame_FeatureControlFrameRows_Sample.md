@@ -8,10 +8,6 @@ These samples demonstrate editing an existing feature control frame symbol. The 
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub EditFeatureControlFrame()
     ' Set a reference to the drawing document.
@@ -53,9 +49,3 @@ Public Sub BatchUpdateFeatureControlFrameRows()
     oFCF.FeatureControlFrameRows = oRows
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -27,9 +27,3 @@ DocumentEvents.**OnDelete**( ***Entity*** As Object, ***BeforeOrAfter*** As [Eve
 ## Version
 
 Introduced in version 8
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

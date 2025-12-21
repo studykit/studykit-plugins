@@ -42,9 +42,3 @@ The ProgressBar object represents an Inventor dialog to show the progress of a c
 ## Version
 
 Introduced in version 2010
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -23,9 +23,3 @@ ViewFrame.**Move**( ***Top*** As Long, ***Left*** As Long, ***Height*** As Long,
 ## Version
 
 Introduced in version 2021
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -28,9 +28,3 @@ The DraftAnalyses collection object provides access to existing draft analyses a
 ## Version
 
 Introduced in version 2009
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

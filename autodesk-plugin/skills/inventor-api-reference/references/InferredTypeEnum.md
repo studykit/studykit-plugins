@@ -16,9 +16,3 @@ Constants that define the types of geometry that can be inferred from different 
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

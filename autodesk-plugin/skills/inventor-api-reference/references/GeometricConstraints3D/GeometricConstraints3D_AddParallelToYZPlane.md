@@ -20,9 +20,3 @@ GeometricConstraints3D.**AddParallelToYZPlane**( ***Entity*** As [SketchEntity3D
 ## Version
 
 Introduced in version 2017
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

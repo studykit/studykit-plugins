@@ -21,9 +21,3 @@ FileSaveAs.**AddFileToSave**( ***Document*** As Unknown, ***TargetFileName*** As
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

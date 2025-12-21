@@ -20,9 +20,3 @@ BrowserNodesEnumerator.**ItemById**( ***Id*** As Long ) As [BrowserNode](../Brow
 ## Version
 
 Introduced in version 8
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

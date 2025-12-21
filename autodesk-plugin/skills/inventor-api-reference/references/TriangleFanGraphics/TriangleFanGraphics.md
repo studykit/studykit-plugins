@@ -60,9 +60,3 @@ The TriangleFanGraphics object defines a set of connected triangles. The first t
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

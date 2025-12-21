@@ -25,9 +25,3 @@ The PointCloudScan object represents a scan within a point cloud.
 ## Version
 
 Introduced in version 2016
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

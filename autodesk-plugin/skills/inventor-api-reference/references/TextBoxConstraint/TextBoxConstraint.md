@@ -37,9 +37,3 @@ The TextBoxConstraint is automatically created when a text box is created. This 
 ## Version
 
 Introduced in version 11
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

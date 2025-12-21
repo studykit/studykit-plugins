@@ -20,9 +20,3 @@ HoleTableRows.**Add**( ***Hole*** As Object ) As [HoleTableRow](../HoleTableRow/
 ## Version
 
 Introduced in version 2009
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

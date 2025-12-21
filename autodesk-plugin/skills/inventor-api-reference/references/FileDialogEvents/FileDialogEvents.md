@@ -28,9 +28,3 @@ The FileDialogEvents object hosts events related to the FileDialog.
 ## Version
 
 Introduced in version 2008
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

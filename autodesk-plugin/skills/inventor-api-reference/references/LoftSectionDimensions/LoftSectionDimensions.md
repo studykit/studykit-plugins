@@ -29,9 +29,3 @@ The LoftSectionDimensions object is used to define the placed section dimensions
 ## Version
 
 Introduced in version 2008
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

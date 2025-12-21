@@ -10,10 +10,6 @@ The following sample demonstrates how to display client graphics based on bodies
 
 Make sure you have "C:\temp\block.sat" or change the path in the code below.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub ClientGraphicsFromSATFileBody()
     ' Set a reference to the TransientBRep object
@@ -48,9 +44,3 @@ Public Sub ClientGraphicsFromSATFileBody()
     ThisApplication.ActiveView.Update
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

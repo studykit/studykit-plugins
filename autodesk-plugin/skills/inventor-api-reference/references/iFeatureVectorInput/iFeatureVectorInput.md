@@ -22,9 +22,3 @@ The iFeatureVectorInput object represents the vector input information of an iFe
 ## Version
 
 Introduced in version 6
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

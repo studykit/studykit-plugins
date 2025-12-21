@@ -32,9 +32,3 @@ ComponentOccurrence.**Replace**( ***FileName*** As String, ***ReplaceAll*** As B
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

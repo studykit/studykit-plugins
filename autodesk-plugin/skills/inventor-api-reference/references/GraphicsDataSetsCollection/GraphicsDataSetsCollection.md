@@ -40,9 +40,3 @@ The ClientGraphicsCollection object allows you to create new objects and support
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

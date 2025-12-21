@@ -46,10 +46,6 @@ The sample code below writes a sheet metal file out as DXF. DWG is also supporte
 
 The following sample demonstrates creating an R12 DXF file that will have a layer called Outer where the the curves for the outer shape will be created.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub WriteSheetMetalDXF()
     ' Get the active document.  This assumes it is a part document.
@@ -68,9 +64,3 @@ Public Sub WriteSheetMetalDXF()
     oDataIO.WriteDataToFile sOut, "C:\temp\flat2.dxf"
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

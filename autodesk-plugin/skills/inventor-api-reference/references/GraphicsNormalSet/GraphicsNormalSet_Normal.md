@@ -24,9 +24,3 @@ This is a read/write property whose value is a [UnitVector](../UnitVector/UnitVe
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

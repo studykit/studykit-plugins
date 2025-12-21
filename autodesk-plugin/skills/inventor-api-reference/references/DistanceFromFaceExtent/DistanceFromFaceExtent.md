@@ -26,9 +26,3 @@ The DistanceFromFaceExtent object provides access to the information that define
 ## Version
 
 Introduced in version 2018
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

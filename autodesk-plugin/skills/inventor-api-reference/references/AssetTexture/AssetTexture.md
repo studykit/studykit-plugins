@@ -37,9 +37,3 @@ The AssetTexture object represents a texture that’s associated with an asset v
 ## Version
 
 Introduced in version 2014
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

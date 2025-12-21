@@ -31,9 +31,3 @@ This object provides methods and properties allowing the BOM row unit quantity t
 ## Version
 
 Introduced in version 10
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -10,10 +10,6 @@ This sample demonstrates the creation of a new layer and moving sketch entities 
 
 To run the sample, have a drawing document open. After running the sample, select the 'Edit Layers' command in the toolbar and turn on the layer named Custom Sketch Circles.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub Layer()
     ' Set a reference to the drawing document.
@@ -65,9 +61,3 @@ Public Sub Layer()
     oSketch.ExitEdit
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

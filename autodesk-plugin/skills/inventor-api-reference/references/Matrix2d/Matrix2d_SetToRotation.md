@@ -21,9 +21,3 @@ Matrix2d.**SetToRotation**( ***Angle*** As Double, ***Center*** As [Point2d](../
 ## Version
 
 Introduced in version 11
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

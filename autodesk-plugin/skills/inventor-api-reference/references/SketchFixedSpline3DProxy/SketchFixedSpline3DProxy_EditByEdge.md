@@ -20,9 +20,3 @@ SketchFixedSpline3DProxy.**EditByEdge**( ***TransientEdge*** As [Edge](../Edge/E
 ## Version
 
 Introduced in version 2010
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

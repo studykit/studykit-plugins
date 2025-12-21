@@ -8,10 +8,6 @@ This sample demonstrates editing the profile of an extrude feature.
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub EditFeatureProfile()
     ' Create a new part document, using the default part template.
@@ -72,9 +68,3 @@ Public Sub EditFeatureProfile()
     oExtrude.Definition.Profile = oProfile
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -17,9 +17,3 @@ Constants identifying kind of application of the colors in the associated color-
 ## Version
 
 Introduced in version 2015
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

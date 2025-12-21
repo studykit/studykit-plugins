@@ -48,9 +48,3 @@ The FeatureControlFrame object represents a feature control frame symbol on a sh
 ## Version
 
 Introduced in version 2009
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

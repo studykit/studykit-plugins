@@ -12,10 +12,6 @@ The 3D PDF converter is to translate Inventor model to 3D PDF format, but not li
 
 Open a part document, and new a design view named "View1", and run below VBA code:
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub PublishTo3DPDF()
     ' Get the 3D PDF Add-In.
@@ -72,10 +68,6 @@ End Sub
 
 Open a part document, and new a design view named "View1", and copy below C# code to a project to run it.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 public void Export3DPdf()
         {
@@ -118,10 +110,6 @@ public void Export3DPdf()
 ```
 
 Copy the C++ code to your project, and change the hardcoded file names for the sFileName in ExportToPDF3D to set the document path in your machine, and update the sTemplatePath to specify a proper template according to the doucment type. Then call the ExportToPDF3D to export the document to 3D PDF.
-
-|  |
-| --- |
-| Copy Code |
 
 ```
 static HRESULT ExportToPDF3D();
@@ -435,9 +423,3 @@ HRESULT CreateStepFileOption(NameValueMap *pOptionsStep)
 	return hr;
 }
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

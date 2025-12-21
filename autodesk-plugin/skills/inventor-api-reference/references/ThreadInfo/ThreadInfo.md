@@ -40,9 +40,3 @@ This is a common base object from which the rest of the concrete objects that ho
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

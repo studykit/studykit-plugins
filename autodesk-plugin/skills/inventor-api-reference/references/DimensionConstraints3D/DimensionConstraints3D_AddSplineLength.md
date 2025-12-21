@@ -22,9 +22,3 @@ DimensionConstraints3D.**AddSplineLength**( ***SketchSpline*** As [SketchEntity3
 ## Version
 
 Introduced in version 2019
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

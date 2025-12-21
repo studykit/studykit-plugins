@@ -8,10 +8,6 @@ This sample demonstrates how to print a drawing, setting specifics such as sheet
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub PrintDrawing()
     ' Set a reference to the print manager object of the active document.
@@ -76,9 +72,3 @@ Public Sub PrintDrawing()
     oPrintMgr.SubmitPrint
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

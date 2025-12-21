@@ -27,9 +27,3 @@ DocumentEvents.**OnChange**( ***ReasonsForChange*** As [CommandTypesEnum](../Com
 ## Version
 
 Introduced in version 8
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

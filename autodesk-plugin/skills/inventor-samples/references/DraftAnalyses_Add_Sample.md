@@ -10,10 +10,6 @@ This sample demonstrates the creation of a draft analysis in a part.
 
 Open a part document and run the following sample.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub CreateDraftAnalysis()
     ' Set a reference to the active part document
@@ -42,9 +38,3 @@ Public Sub CreateDraftAnalysis()
     Set oDraftAnalysis = oAnalysisMgr.DraftAnalyses.Add(-0.05236, 0.05236, oYAxis, True, , , 5)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

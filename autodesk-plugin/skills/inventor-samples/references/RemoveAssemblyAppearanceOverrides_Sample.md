@@ -8,10 +8,6 @@ Removes all appearance overrides that have been assigned in the active assembly.
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub RemoveAssemblyOverrides()
     ' Get the active assembly document.
@@ -26,9 +22,3 @@ Public Sub RemoveAssemblyOverrides()
     Next
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

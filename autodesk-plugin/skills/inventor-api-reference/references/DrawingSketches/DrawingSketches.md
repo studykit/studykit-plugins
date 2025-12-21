@@ -28,9 +28,3 @@ The DrawingSketches collection object provides access to the objects associated 
 ## Version
 
 Introduced in version 5.3
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

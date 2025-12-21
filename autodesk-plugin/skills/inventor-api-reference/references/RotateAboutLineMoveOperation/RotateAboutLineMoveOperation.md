@@ -32,9 +32,3 @@ The RotateAboutLineMoveOperation object represents the definition of a rotation 
 ## Version
 
 Introduced in version 2013
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

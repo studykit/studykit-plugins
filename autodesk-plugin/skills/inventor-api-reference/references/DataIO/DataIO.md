@@ -30,9 +30,3 @@ Generic object that handles input and output of formatted data. IDataObject-styl
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

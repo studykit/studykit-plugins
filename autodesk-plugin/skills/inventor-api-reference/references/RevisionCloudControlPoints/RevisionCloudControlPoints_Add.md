@@ -22,9 +22,3 @@ RevisionCloudControlPoints.**Add**( ***Position*** As [Point2d](../Point2d/Point
 ## Version
 
 Introduced in version 2024
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

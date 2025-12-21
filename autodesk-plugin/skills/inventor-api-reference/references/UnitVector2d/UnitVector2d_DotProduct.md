@@ -20,9 +20,3 @@ UnitVector2d.**DotProduct**( ***Vector*** As [UnitVector2d](../UnitVector2d/Unit
 ## Version
 
 Introduced in version 11
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -10,10 +10,6 @@ The sample uses and existing part that must be set up to allow it to work correc
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub AssemblyJointSample()
     ' Create a new assembly document.
@@ -111,9 +107,3 @@ Private Function GetNamedEntity(Occurrence As ComponentOccurrence, Name As Strin
     Set GetNamedEntity = resultEntity
 End Function
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

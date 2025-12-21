@@ -46,9 +46,3 @@ The DerivedFuturePartComponent object represents a specific derived future part 
 ## Version
 
 Introduced in version 2018
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

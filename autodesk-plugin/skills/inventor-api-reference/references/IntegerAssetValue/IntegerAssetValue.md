@@ -45,9 +45,3 @@ The IntegerAssetValue object represents an integer value. The value is returned 
 ## Version
 
 Introduced in version 2014
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

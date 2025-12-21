@@ -16,9 +16,3 @@ The ApplicationAddInSite object is an object that is only available through the 
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

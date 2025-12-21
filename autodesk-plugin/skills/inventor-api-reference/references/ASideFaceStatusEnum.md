@@ -16,9 +16,3 @@ Enum to describe the status for the sheetmetal ASide definition.
 ## Version
 
 Introduced in version 2015
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

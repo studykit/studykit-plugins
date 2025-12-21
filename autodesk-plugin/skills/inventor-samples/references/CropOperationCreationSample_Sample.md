@@ -10,10 +10,6 @@ This sample demonstrates how to create a crop operation for a drawing view bases
 
 This sample demonstrates how to create a crop operation for a drawing view bases on a sketch under the drawing view. You need to open a drawing document with a drawing view in the active sheet before running this sample.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Sub CropOperationSample()
     Dim oDoc As DrawingDocument
@@ -45,9 +41,3 @@ Sub CropOperationSample()
     Set oCrop = oView.CropOperations.AddBySketch(oSk, True)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

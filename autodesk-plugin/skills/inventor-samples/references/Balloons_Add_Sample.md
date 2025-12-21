@@ -10,10 +10,6 @@ This sample demonstrates the creation of a balloon.
 
 Select a linear drawing curve and run the sample.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub CreateBalloon()
     ' Set a reference to the drawing document.
@@ -114,9 +110,3 @@ Public Sub CreateBalloon()
     End If
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

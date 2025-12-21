@@ -20,9 +20,3 @@ The AngleExtent object provides access to the information that defines the exten
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

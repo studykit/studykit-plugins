@@ -9,10 +9,6 @@ This sample demonstrates the use of the FileDialog object. The only requirement 
 * [VBA](#VBA)
 * [C#](#C#)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub TestFileDialog()
     ' Create a new FileDialog object.
@@ -51,10 +47,6 @@ End Sub
 
 The first line sets the oApp variable to ThisApplication - this should be appropriately changed.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 public void TestFileDialog()
 {
@@ -87,9 +79,3 @@ public void TestFileDialog()
     System.Windows.Forms.MessageBox.Show("File " + oFileDlg.FileName + " was selected.", "Selected file");
 }
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

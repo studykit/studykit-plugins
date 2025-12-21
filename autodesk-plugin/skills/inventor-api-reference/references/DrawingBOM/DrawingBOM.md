@@ -24,9 +24,3 @@ The DrawingBOM object represents a locally stored BOM. This is the equivalent of
 ## Version
 
 Introduced in version 2009
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

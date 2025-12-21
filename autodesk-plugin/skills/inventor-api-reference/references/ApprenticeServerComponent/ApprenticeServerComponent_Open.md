@@ -27,9 +27,3 @@ ApprenticeServerComponent.**Open**( ***FullDocumentName*** As String ) As [Appre
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

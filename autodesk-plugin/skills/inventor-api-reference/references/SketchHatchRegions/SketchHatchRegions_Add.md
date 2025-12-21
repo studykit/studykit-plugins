@@ -34,9 +34,3 @@ SketchHatchRegions.**Add**( ***Profile*** As [Profile](../Profile/Profile.md), [
 ## Version
 
 Introduced in version 2021
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

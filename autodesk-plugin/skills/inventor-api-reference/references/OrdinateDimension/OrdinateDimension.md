@@ -52,9 +52,3 @@ The OrdinateDimension object represents an ordinate dimension placed on a sheet.
 ## Version
 
 Introduced in version 2009
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

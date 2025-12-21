@@ -8,10 +8,6 @@ This sample demonstrates how to create a web-based browser dialog, you can use t
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Sub WebBrowserDialogSample()
     ' Create a WebBrowserDialog
@@ -29,9 +25,3 @@ Sub WebBrowserDialogSample()
     oWebBrowserDialog.Delete
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

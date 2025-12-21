@@ -37,9 +37,3 @@ The GraphicsPrimitive object is the base class for all the various primitive typ
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -21,9 +21,3 @@ RevisionTableColumn.**GetFilePropertyId**( ***PropertySetId*** As String, ***Pro
 ## Version
 
 Introduced in version 2012
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

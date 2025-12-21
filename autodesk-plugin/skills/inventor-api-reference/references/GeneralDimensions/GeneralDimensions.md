@@ -35,9 +35,3 @@ The GeneralDimensions collection object provides access to all of the general di
 ## Version
 
 Introduced in version 9
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

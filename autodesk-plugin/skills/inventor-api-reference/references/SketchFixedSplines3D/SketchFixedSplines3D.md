@@ -29,9 +29,3 @@ The SketchFixedSplines3D object provides access to all the objects in a 3D sketc
 ## Version
 
 Introduced in version 9
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

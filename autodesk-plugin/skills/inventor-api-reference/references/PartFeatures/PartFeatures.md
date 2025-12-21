@@ -92,9 +92,3 @@ The PartFeatures collection object. Presents the current view of objects and all
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

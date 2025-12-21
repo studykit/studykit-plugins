@@ -42,9 +42,3 @@ The object represented the base solid that was created when a file was imported 
 ## Version
 
 Introduced in version 6
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

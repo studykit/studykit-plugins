@@ -8,10 +8,6 @@ This sample demonstrates getting mass properties from a part. This sample is spe
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub GetPartMassProps()
     ' Set a reference to the part document.
@@ -71,9 +67,3 @@ Public Sub GetPartMassProps()
     Debug.Print "   Ixz: " & Ixz
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

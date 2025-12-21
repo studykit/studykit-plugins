@@ -21,9 +21,3 @@ Curve2dEvaluator.**GetFirstDerivatives**( ***Params***() As Double, ***FirstDeri
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -10,10 +10,6 @@ This sample illustrates querying the contents of the parts list.
 
 To run this sample have a sheet active that contains a parts list.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub PartListQuery()
     ' Set a reference to the drawing document.
@@ -46,9 +42,3 @@ Public Sub PartListQuery()
     Next
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

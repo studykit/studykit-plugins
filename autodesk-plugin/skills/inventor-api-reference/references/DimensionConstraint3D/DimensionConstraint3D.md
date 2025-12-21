@@ -38,9 +38,3 @@ The DimensionConstraint3D object represents the base class of all 3D sketch dime
 ## Version
 
 Introduced in version 11
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

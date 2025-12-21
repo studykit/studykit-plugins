@@ -34,9 +34,3 @@ Reference key manager object. This object provides methods to create and save re
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

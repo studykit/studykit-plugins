@@ -20,9 +20,3 @@ RuledSurfaceFeature.**SetAffectedBodies**( ***Bodies*** As [ObjectCollection](..
 ## Version
 
 Introduced in version 2016
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

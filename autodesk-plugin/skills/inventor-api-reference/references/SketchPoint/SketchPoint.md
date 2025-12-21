@@ -67,9 +67,3 @@ The SketchPoint object represents a point within a sketch. See the article in th
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -10,10 +10,6 @@ This sample demonstrates the creation of a feature control frame symbol.
 
 Select a linear drawing curve and run the sample.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub AddFeatureControlFrame()
     ' Set a reference to the drawing document.
@@ -69,9 +65,3 @@ Public Sub AddFeatureControlFrame()
     Set oSymbol = oActiveSheet.FeatureControlFrames.Add(oLeaderPoints, oRows)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

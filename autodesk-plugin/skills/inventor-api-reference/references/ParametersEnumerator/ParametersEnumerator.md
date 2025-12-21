@@ -20,9 +20,3 @@ The ParametersEnumerator object allows enumeration through available parameters.
 ## Version
 
 Introduced in version 5.3
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

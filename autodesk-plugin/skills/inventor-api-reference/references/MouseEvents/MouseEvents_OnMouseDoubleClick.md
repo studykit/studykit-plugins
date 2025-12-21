@@ -24,9 +24,3 @@ MouseEvents.**OnMouseDoubleClick**( ***Button*** As [MouseButtonEnum](../MouseBu
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

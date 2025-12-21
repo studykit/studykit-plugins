@@ -27,9 +27,3 @@ Profiles.**AddForSurface**( [***Curve***] As Variant ) As [Profile](../Profile/P
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

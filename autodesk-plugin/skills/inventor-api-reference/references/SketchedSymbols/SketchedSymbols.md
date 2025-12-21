@@ -37,9 +37,3 @@ The SketchedSymbols collection object provides access to the objects on a specif
 ## Version
 
 Introduced in version 5.3
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

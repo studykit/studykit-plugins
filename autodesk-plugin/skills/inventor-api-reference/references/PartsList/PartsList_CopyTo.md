@@ -20,9 +20,3 @@ PartsList.**CopyTo**( ***TargetSheet*** As [Sheet](../Sheet/Sheet.md) ) As [Part
 ## Version
 
 Introduced in version 2009
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

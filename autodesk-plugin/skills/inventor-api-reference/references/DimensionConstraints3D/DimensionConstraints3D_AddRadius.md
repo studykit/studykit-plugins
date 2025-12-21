@@ -28,9 +28,3 @@ DimensionConstraints3D.**AddRadius**( ***Entity*** As [SketchEntity3D](../Sketch
 ## Version
 
 Introduced in version 2010
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

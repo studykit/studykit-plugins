@@ -8,10 +8,6 @@ This sample demonstrates creating a complex fillet. The result in this case has 
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub CreateFilletComplex()
     ' Create a new Part document.
@@ -111,9 +107,3 @@ Public Sub CreateFilletComplex()
     Set oFillet = oCompDef.Features.FilletFeatures.Add(oFilletDef, False)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -41,9 +41,3 @@ The HighlightSet object defines a set of objects and an associated color to disp
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

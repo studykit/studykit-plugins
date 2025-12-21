@@ -21,9 +21,3 @@ DrawingView.**RotateByAngle**( ***Angle*** As Double, [***Clockwise***] As Boole
 ## Version
 
 Introduced in version 11
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

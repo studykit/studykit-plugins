@@ -8,10 +8,6 @@ This sample illustrates editing the thickness of a sheet metal part.
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub SetSheetMetalThickness()
     ' Set a reference to the sheet metal document.
@@ -39,9 +35,3 @@ Public Sub SetSheetMetalThickness()
     ThisApplication.ActiveDocument.Update
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

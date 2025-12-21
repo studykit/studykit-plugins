@@ -21,9 +21,3 @@ The BOMViews collection object provides access to the existing BOMView objects.
 ## Version
 
 Introduced in version 10
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

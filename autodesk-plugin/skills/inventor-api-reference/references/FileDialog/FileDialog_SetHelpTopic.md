@@ -21,9 +21,3 @@ FileDialog.**SetHelpTopic**( ***FileName*** As String, ***TopicName*** As String
 ## Version
 
 Introduced in version 11
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -11,10 +11,6 @@ The following sample demonstrates the use of parallel environments and contextua
 
 Run the following macro. Open an assembly document. Go the the "Environments" tab and click on the "Some Analysis" button.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Sub AddParallelEnvironment()
     ' Get the Environments collection
@@ -92,10 +88,6 @@ End Sub
 
 Run the following macro. Open an assembly document. Go the the "Environments" tab and click on the "Some Analysis" button. The first line of this sample sets the oApp variable to ThisApplication - this should be appropriately changed.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 public void AddParallelEnvironment()
 {
@@ -161,9 +153,3 @@ public void AddParallelEnvironment()
     }
 }
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

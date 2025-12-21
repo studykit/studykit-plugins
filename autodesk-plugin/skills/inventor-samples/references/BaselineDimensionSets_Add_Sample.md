@@ -10,10 +10,6 @@ This sample demonstrates the creation of a baseline set dimension in a drawing.
 
 Create a drawing view and select multiple edges in the view before running the sample.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub CreateBaselineDimensionSet()
     ' Set a reference to the drawing document.
@@ -59,9 +55,3 @@ Public Sub CreateBaselineDimensionSet()
     Set oBaselineSet = oBaselineSets.Add(oIntentCollection, oPlacementPoint, kVerticalDimensionType)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

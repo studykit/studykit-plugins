@@ -19,9 +19,3 @@ The DirectionAndDistanceMoveDefinition object defines all of the inputs that are
 ## Version
 
 Introduced in version 2011
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -27,9 +27,3 @@ DerivedParameterTables.**Add**( ***FullFileName*** As String ) As [DerivedParame
 ## Version
 
 Introduced in version 11
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

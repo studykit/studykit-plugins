@@ -20,9 +20,3 @@ DrawingDocument.**HasPrivateStream**( ***StreamName*** As String ) As Boolean
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

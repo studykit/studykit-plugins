@@ -36,9 +36,3 @@ The AutoCADBlockDefinitions collection object provides access to all the existin
 ## Version
 
 Introduced in version 2011
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

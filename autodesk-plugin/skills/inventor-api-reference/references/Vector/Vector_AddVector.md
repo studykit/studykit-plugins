@@ -27,9 +27,3 @@ Vector.**AddVector**( ***Argument*** As [Vector](../Vector/Vector.md) )
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

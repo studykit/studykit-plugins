@@ -10,10 +10,6 @@ This sample demonstrates the functions used to calculate interference analysis i
 
 To use this sample have an assembly open that contains mutiple parts. Depending on preselected parts when running the sample, you'll get different results. If one part is selected, that one part will be checked against the rest of the assembly. If more than one part is selected you have the choice of checking for interference among the selected parts or checking the selected parts against the rest of the assembly. If no parts are selected it will check every part against every other part.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub Interference()
     Dim oDoc As AssemblyDocument
@@ -113,9 +109,3 @@ Public Sub Interference()
     End If
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

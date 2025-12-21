@@ -31,9 +31,3 @@ The iAssemblyMember object provides access to a member of an iAssembly.
 ## Version
 
 Introduced in version 11
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

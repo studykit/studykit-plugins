@@ -49,9 +49,3 @@ The DerivedPartDefinition object is used to describe which entities within a par
 ## Version
 
 Introduced in version 5.3
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

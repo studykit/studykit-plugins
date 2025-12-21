@@ -31,9 +31,3 @@ The EllipseFull object. The object created is a transient mathematical object an
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

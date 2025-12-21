@@ -21,9 +21,3 @@ Enumeration of the 'shift' key (SHIFT, CTRL and ALT) combination.
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

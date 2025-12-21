@@ -51,9 +51,3 @@ The SketchEquationCurve3D object represents an equation curve within a 3D sketch
 ## Version
 
 Introduced in version 2014
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

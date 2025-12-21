@@ -19,9 +19,3 @@ The DSDegreeOfFreedom object represents a degree of freedom associated with a jo
 ## Version
 
 Introduced in version 2013
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

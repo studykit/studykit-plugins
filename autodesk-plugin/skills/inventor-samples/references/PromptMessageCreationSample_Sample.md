@@ -10,10 +10,6 @@ This sample demonstrates how to creat a custom prompt message.
 
 This sample demonstrates how to creat a custom prompt message.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Sub PromptMessageSample()
     Dim oPO As PromptsOptions
@@ -36,9 +32,3 @@ Sub PromptMessageSample()
     oPM.Display
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

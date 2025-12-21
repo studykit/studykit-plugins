@@ -10,10 +10,6 @@ This sample demonstrates the sketch defer update functionality.
 
 To run this sample, have a 2d sketch active. Choosing 'Yes' in the dialog popped up by this sample defers the sketch update and creates the circle (approximated by 500 lines) much faster.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub DeferSketchUpdate()
    ' Check to make sure a sketch is open.
@@ -65,9 +61,3 @@ Public Sub DeferSketchUpdate()
    End If
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

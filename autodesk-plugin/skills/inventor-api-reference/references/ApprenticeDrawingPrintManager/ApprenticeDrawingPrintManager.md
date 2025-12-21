@@ -43,9 +43,3 @@ The ApprenticeDrawingPrintManager object supports properties and methods that al
 ## Version
 
 Introduced in version 9
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

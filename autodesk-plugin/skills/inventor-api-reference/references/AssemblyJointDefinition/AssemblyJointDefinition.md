@@ -70,9 +70,3 @@ The AssemblyJointDefinition is not an assembly joint but is an object that conta
 ## Version
 
 Introduced in version 2014
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

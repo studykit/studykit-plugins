@@ -31,9 +31,3 @@ TransientBRep.**CreateSolidBlock**( ***Box*** As [Box](../Box/Box.md) ) As [Surf
 ## Version
 
 Introduced in version 2009
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -10,10 +10,6 @@ This sample demonstrates getting mass properties from a part without dirtying th
 
 To run the sample you must have a part document open that contains a solid.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub GetPartMassPropsWithoutDirtying()
     ' Set a reference to the part document.
@@ -85,9 +81,3 @@ Public Sub GetPartMassPropsWithoutDirtying()
     Debug.Print " Ixz: " & Ixz
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

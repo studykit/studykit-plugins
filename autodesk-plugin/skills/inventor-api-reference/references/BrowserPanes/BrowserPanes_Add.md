@@ -21,9 +21,3 @@ BrowserPanes.**Add**( ***Name*** As String, ***InternalName*** As String ) As [B
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

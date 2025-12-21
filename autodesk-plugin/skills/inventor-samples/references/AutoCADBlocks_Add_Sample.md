@@ -10,10 +10,6 @@ Demonstrates inserting an AutoCAD block.
 
 Open an Inventor dwg file and run the following macro.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub InsertAutoCADBlockOnSheet()
     ' Set a reference to the drawing document.
@@ -43,9 +39,3 @@ Public Sub InsertAutoCADBlockOnSheet()
     Set oAutoCADBlock = oSheet.AutoCADBlocks.Add(oBlockDef, oTG.CreatePoint2d(10, 10), (3.14159 / 4), 0.75)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -27,9 +27,3 @@ PartFeatures.**CreatePath**( ***SketchCurve*** As Object ) As [Path](../Path/Pat
 ## Version
 
 Introduced in version 8
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

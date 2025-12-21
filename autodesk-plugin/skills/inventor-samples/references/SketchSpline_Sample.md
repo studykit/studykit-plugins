@@ -10,10 +10,6 @@ This sample demonstrates creating and manipulating a sketch spline.
 
 To use this sample a sketch must be active.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub DrawSketchSpline()
     ' Check to make sure a sketch is open.
@@ -76,9 +72,3 @@ Public Sub DrawSketchSpline()
     oSpline.FitPoint(2).Delete
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

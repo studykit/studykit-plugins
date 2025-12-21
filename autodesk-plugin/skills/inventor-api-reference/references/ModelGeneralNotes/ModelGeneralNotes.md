@@ -31,9 +31,3 @@ The ModelGeneralNotes collection object provides access to all of the general no
 ## Version
 
 Introduced in version 2018
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

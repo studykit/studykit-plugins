@@ -21,9 +21,3 @@ MeasureTools.**SetAnglePrecision**( ***Document*** As [Document](../Document/Doc
 ## Version
 
 Introduced in version 2021
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

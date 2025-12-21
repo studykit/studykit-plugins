@@ -8,10 +8,6 @@ This sample demonstrates the creation of a rip sheet metal feature.
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub RipFeatureCreation()
     ' Create a new sheet metal document, using the default sheet metal template.
@@ -113,9 +109,3 @@ Public Sub RipFeatureCreation()
     ThisApplication.ActiveView.GoHome
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

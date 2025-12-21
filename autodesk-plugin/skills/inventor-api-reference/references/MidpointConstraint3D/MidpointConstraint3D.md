@@ -38,9 +38,3 @@ The MidpointConstraint3D object represents a constraint that connects a sketch p
 ## Version
 
 Introduced in version 2009
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

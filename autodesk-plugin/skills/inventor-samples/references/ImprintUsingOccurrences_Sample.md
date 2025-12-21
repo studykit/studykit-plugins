@@ -8,10 +8,6 @@ This sample demonstrates creating imprinted bodies from two selected occurrences
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub CreateImprintFromAssembly()
     ' Get the active assembly document and its definition.
@@ -70,9 +66,3 @@ Public Sub CreateImprintFromAssembly()
     Set newBody2 = non2.SurfaceBodies.Item(1)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

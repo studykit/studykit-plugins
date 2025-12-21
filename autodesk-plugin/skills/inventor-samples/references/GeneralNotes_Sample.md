@@ -8,10 +8,6 @@ This sample demonstrates the creation of stacked text and text with superscript 
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub StackedText()
     ' Set a reference to the active drawing document
@@ -49,9 +45,3 @@ Public Sub StackedText()
     Set oGeneralNote = oActiveSheet.DrawingNotes.GeneralNotes.AddFitted(oPoint, strText)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

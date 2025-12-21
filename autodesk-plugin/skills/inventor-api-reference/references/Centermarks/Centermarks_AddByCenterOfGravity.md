@@ -22,9 +22,3 @@ Centermarks.**AddByCenterOfGravity**( ***DrawingView*** As [DrawingView](../Draw
 ## Version
 
 Introduced in version 2010
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

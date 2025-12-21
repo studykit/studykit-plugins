@@ -55,9 +55,3 @@ The SelectSet object acts as a container for all of the objects that are current
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -16,9 +16,3 @@ Document Summary Information, InternalName: {D5CDD502-2E9C-101B-9397-08002B2CF9A
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -29,9 +29,3 @@ The iPartTableCell object represents an individual cell in the iPart factory tab
 ## Version
 
 Introduced in version 6
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

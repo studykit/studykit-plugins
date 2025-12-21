@@ -8,10 +8,6 @@ This sample demonstrates rounding all of the edges of a part.
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub CreateAllRoundsFillet()
     ' Create a new Part document.
@@ -52,9 +48,3 @@ Public Sub CreateAllRoundsFillet()
     Set oFillet = oCompDef.Features.FilletFeatures.AddSimple(oEdges, 1, , True)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

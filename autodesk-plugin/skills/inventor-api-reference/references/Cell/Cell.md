@@ -34,9 +34,3 @@ The Cell object represents an individual cell in the table. A cell is the inters
 ## Version
 
 Introduced in version 9
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

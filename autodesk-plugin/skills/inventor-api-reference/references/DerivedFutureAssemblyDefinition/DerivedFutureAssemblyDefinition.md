@@ -24,9 +24,3 @@ The DerivedFutureAssemblyDefinition object is used to describe which parts in an
 ## Version
 
 Introduced in version 2018
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

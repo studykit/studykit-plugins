@@ -21,9 +21,3 @@ WorkAxisProxy.**GetSize**( ***Point1*** As [Point](../Point/Point.md), ***Point2
 ## Version
 
 Introduced in version 2008
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

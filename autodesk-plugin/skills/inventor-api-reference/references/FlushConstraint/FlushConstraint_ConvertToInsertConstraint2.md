@@ -26,9 +26,3 @@ FlushConstraint.**ConvertToInsertConstraint2**( ***EntityOne*** As Object, ***En
 ## Version
 
 Introduced in version 2019
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

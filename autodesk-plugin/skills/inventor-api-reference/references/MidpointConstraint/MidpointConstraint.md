@@ -39,9 +39,3 @@ The MidpointConstraint object represents a constraint that connects a sketch poi
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

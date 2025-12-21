@@ -8,10 +8,6 @@ This sample demonstrates the creation of a hole feature using the linear placeme
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub HoleFeatureLinearPlacement()
     ' Create a new part document, using the default part template.
@@ -72,9 +68,3 @@ Public Sub HoleFeatureLinearPlacement()
                             oLinearPlacementDef, "1 cm", kPositiveExtentDirection)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -26,9 +26,3 @@ Constants enumerating the restrictions for the PromptMessage method.
 ## Version
 
 Introduced in version 10
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

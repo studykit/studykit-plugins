@@ -10,10 +10,6 @@ This sample demonstrates the creation of a 3d sketch line and a dimension betwee
 
 To run this sample you must have a 3D sketch active.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub Create3DSketchDimension()
     ' Check to make sure a 3d sketch is open.
@@ -80,9 +76,3 @@ Public Sub Create3DSketchDimension()
     End If
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

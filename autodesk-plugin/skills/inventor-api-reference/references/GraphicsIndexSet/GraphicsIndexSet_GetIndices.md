@@ -20,9 +20,3 @@ GraphicsIndexSet.**GetIndices**( ***IndexValues***() As Long )
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

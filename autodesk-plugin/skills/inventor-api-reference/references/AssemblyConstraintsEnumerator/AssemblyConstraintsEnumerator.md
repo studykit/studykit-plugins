@@ -20,9 +20,3 @@ Provides access to the constraints acting directly on a particular occurrence.
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -20,9 +20,3 @@ CornerChamferFeatureProxy.**RemoveParticipant**( ***Occurrence*** As [ComponentO
 ## Version
 
 Introduced in version 10
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

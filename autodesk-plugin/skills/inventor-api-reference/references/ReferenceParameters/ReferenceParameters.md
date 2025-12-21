@@ -28,9 +28,3 @@ Provides access to the objects of the component definition the collection was ob
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

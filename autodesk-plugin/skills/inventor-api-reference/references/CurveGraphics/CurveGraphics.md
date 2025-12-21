@@ -56,9 +56,3 @@ The CurveGraphics object defines a graphics object created using a transient cur
 ## Version
 
 Introduced in version 2008
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

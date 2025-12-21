@@ -17,9 +17,3 @@ This is a read/write property whose value is a [Vector2d](../Vector2d/Vector2d.m
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

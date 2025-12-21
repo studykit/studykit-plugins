@@ -10,10 +10,6 @@ Creates a new sketch containing rectangles created using the two new center poin
 
 To use this sample a part must be active.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub SketchCreation()
     ' Get the active part document.
@@ -36,9 +32,3 @@ Public Sub SketchCreation()
     ThisApplication.ActiveView.Fit
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

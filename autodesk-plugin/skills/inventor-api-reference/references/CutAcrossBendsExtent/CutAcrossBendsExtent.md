@@ -19,9 +19,3 @@ The CutAcrossBendsExtent object represents the extent definition for a sheet met
 ## Version
 
 Introduced in version 2009
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

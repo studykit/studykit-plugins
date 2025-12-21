@@ -17,9 +17,3 @@ Constants identifying the type of treatment given to the start of the hole.
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

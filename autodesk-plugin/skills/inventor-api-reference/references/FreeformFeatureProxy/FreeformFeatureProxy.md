@@ -51,9 +51,3 @@ Part Freeform Feature Proxy Object.
 ## Version
 
 Introduced in version 2015
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

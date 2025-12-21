@@ -16,9 +16,3 @@ Enum indicating the type of the Hole Table.
 ## Version
 
 Introduced in version 2009
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

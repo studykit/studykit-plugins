@@ -20,9 +20,3 @@ EdgeCollection.**RemoveByObject**( ***Object*** As Object )
 ## Version
 
 Introduced in version 7
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

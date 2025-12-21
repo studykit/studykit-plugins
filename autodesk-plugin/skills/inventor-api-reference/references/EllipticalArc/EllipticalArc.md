@@ -36,9 +36,3 @@ The EllipticalArc object. The object created is a transient mathematical object 
 ## Version
 
 Introduced in version 6
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

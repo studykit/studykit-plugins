@@ -22,9 +22,3 @@ Tolerance.**SetToLimits**( ***LimitsToleranceType*** As [ToleranceTypeEnum](../T
 ## Version
 
 Introduced in version 6
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

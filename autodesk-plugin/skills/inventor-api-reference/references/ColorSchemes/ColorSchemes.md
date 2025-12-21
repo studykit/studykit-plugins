@@ -26,9 +26,3 @@ The ColorSchemes object provides access to all of the existing objects. This is 
 ## Version
 
 Introduced in version 9
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

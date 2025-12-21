@@ -8,10 +8,6 @@ This sample demonstrates the creation of sheet metal face and flange features.
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub FaceAndFlangeFeatureCreation()
     ' Create a new sheet metal document, using the default sheet metal template.
@@ -77,9 +73,3 @@ Public Sub FaceAndFlangeFeatureCreation()
 
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

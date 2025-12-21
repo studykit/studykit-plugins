@@ -72,9 +72,3 @@ The ApprenticeServerDrawingDocument object represents the drawing document withi
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

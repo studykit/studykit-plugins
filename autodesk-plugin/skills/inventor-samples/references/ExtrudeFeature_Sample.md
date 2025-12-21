@@ -8,10 +8,6 @@ This sample demonstrates creating a simple solid consisting a block with a pocke
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub DrawBlockWithPocket()
     ' Create a new part document, using the default part template.
@@ -77,9 +73,3 @@ Public Sub DrawBlockWithPocket()
     Set oExtrude = oCompDef.Features.ExtrudeFeatures.Add(oExtrudeDef)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

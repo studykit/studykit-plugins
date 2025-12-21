@@ -8,10 +8,6 @@ This sample illustrates inserting a default border.
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub InsertDefaultBorder()
     ' Set a reference to the drawing document.
@@ -81,9 +77,3 @@ Public Sub InsertDefaultBorder()
                                           TextLabelHeight, Font)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

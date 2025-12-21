@@ -54,9 +54,3 @@ The DerivedPartComponent object represents a specific derived part instance.
 ## Version
 
 Introduced in version 5.3
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -15,9 +15,3 @@ Constants indicating the preferred behavior when placing dimensions on overconst
 ## Version
 
 Introduced in version 9
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

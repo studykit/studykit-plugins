@@ -10,10 +10,6 @@ This sample demonstrates how to create a base view by specifying various represe
 
 Before running this sample, make sure that the file C:\TempReps.iam exists (or change the path in the sample). The file must contain a level of detail representation named MyLODRep, a positional representation named MyPositionalRep and a design view representation named MyDesignViewRep.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub AddBaseViewWithRepresentations()
   ' Set a reference to the drawing document.
@@ -52,9 +48,3 @@ Public Sub AddBaseViewWithRepresentations()
       , , oBaseViewOptions)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

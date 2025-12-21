@@ -10,10 +10,6 @@ This sample demonstrates how to export a part or assembly document to USDz forma
 
 This sample demonstrates how to export a part or assembly document to USDz format.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Sub SaveToUSDz()
   Dim oAddin As TranslatorAddIn
@@ -40,9 +36,3 @@ Sub SaveToUSDz()
   End If
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

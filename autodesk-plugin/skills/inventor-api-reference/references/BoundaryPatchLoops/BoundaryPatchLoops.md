@@ -28,9 +28,3 @@ The BoundaryPatchLoops object is used to define the boundary loops for a boundar
 ## Version
 
 Introduced in version 2008
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

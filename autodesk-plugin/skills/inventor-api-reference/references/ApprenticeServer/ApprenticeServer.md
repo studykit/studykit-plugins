@@ -41,9 +41,3 @@ Standalone mini component allowing limited access to an Inventor File. Refer to 
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

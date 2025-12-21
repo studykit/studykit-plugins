@@ -10,10 +10,6 @@ This sample is to demonstrate how to create a revision cloud in drawing document
 
 This sample is to demonstrate how to create a revision cloud in drawing document.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub CreateRevisionCloud()
 
@@ -55,9 +51,3 @@ Public Sub CreateRevisionCloud()
 
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

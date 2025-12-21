@@ -36,9 +36,3 @@ The CommandCategory object represents the list of commands that are displayed in
 ## Version
 
 Introduced in version 9
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

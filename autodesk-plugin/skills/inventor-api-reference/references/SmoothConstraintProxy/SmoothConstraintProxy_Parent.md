@@ -17,9 +17,3 @@ This is a read only property whose value is a [Sketch](../Sketch/Sketch.md).
 ## Version
 
 Introduced in version 11
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

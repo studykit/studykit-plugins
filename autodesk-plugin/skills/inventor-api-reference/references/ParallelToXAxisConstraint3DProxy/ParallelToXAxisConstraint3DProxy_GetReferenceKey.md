@@ -21,9 +21,3 @@ ParallelToXAxisConstraint3DProxy.**GetReferenceKey**( ***ReferenceKey***() As By
 ## Version
 
 Introduced in version 2017
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

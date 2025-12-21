@@ -49,9 +49,3 @@ The ColorScheme object represents a single color scheme. It provides access to t
 ## Version
 
 Introduced in version 9
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

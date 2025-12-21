@@ -32,9 +32,3 @@ Dynamic attributes provide the ability for a programmer to add any arbitrary dat
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -10,10 +10,6 @@ This sample demonstrates the creation of an assembly mate constraint.
 
 Before running the sample, you need to open an assembly that contains at least two parts. Select planar faces on the two parts that will be used for the constraint and run the sample code. (Set the priority of the Select command and use the Shift-Select to select multiple faces.)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub MateConstraint()
     ' Set a reference to the assembly component definintion.
@@ -41,9 +37,3 @@ Public Sub MateConstraint()
     Set oMate = oAsmCompDef.Constraints.AddMateConstraint(oBrepEnt1, oBrepEnt2, 0)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

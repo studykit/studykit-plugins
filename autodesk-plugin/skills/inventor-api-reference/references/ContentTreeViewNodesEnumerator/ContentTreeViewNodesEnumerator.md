@@ -28,9 +28,3 @@ The ContentFamiliesEnumerator is a collection object that provides access to a g
 ## Version
 
 Introduced in version 2010
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

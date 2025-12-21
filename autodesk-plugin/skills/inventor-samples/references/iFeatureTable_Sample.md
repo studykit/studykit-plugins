@@ -10,10 +10,6 @@ This program demonstrates the placement of a table driven iFeature in a part.
 
 A part must be open and a planar face on that part selected. There aren't any table driven .ide files delivered with Inventor so one must be constructed to be used as input. The primary assumption this sample makes about the .ide file is that a custom row has been created named 'Size' and one of the rows in this column has the value '4.5.'
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub PlaceTableDriveniFeature()
     ' Get the part document and component definition of the active document.
@@ -120,9 +116,3 @@ Public Sub PlaceTableDriveniFeature()
     Set oiFeature = oFeatures.iFeatures.Add(oiFeatureDef)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

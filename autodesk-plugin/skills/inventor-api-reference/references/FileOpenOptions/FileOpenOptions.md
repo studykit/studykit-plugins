@@ -26,9 +26,3 @@ The FileOpenOptions object provides access to options affecting the opening of f
 ## Version
 
 Introduced in version 2011
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -8,10 +8,6 @@ This sample demonstrates the creation of sheet metal face and fold features.
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub FaceAndFoldFeatureCreation()
     ' Create a new sheet metal document, using the default sheet metal template.
@@ -89,9 +85,3 @@ Public Sub FaceAndFoldFeatureCreation()
 
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

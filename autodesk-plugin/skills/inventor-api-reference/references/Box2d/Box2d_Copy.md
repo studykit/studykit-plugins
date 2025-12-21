@@ -13,9 +13,3 @@ Box2d.**Copy**() As [Box2d](../Box2d/Box2d.md)
 ## Version
 
 Introduced in version 2013
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

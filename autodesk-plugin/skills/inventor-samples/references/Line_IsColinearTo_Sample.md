@@ -10,10 +10,6 @@ This sample shows how to determine whether the selected cylindircal face is an e
 
 Before running the sample, select a cylindrical face.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub IsCylindricalFaceInterior()
     Dim oDoc As Document
@@ -85,9 +81,3 @@ Public Sub IsCylindricalFaceInterior()
     End If
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

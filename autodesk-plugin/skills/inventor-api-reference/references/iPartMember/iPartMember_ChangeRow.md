@@ -21,9 +21,3 @@ iPartMember.**ChangeRow**( ***NewRow*** As Variant, [***CustomInput***] As Varia
 ## Version
 
 Introduced in version 6
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

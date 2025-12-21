@@ -54,9 +54,13 @@ sample performs a count of the number of balloons and value sets,
 overriding the balloon values with these counts, so the balloon count
 is first initialized.
 
-|  |
-| --- |
-| ``` Dim oDrawDoc As DrawingDocument Set oDrawDoc = ThisApplication.ActiveDocument      Dim oSheet As Sheet Set oSheet = oDrawDoc.ActiveSheet      Dim BalloonCount As Long BalloonCount = 1 ``` |
+```vb
+Dim oDrawDoc As DrawingDocument
+Set oDrawDoc = ThisApplication.ActiveDocument
+Dim oSheet As Sheet
+Set oSheet = oDrawDoc.ActiveSheet
+Dim BalloonCount As Long BalloonCount = 1
+```
 
 The intention is to change values in all balloons on the sheet, not
 just in a view. The following code iterates through the balloons
@@ -64,18 +68,22 @@ collection, obtaining each balloon object in turn. The balloon type is
 changed to hexagonal, and the balloon placement direction is changed to
 kBottomDirection.
 
-|  |
-| --- |
-| ``` Dim oBalloon As Balloon      For Each oBalloon In oSheet.Balloons     oBalloon.SetBalloonType (kHexagonBalloonType)     oBalloon.PlacementDirection = kBottomDirection ``` |
+```vb
+Dim oBalloon As Balloon
+For Each oBalloon In oSheet.Balloons     oBalloon.SetBalloonType (kHexagonBalloonType)     oBalloon.PlacementDirection = kBottomDirection
+```
 
 Typically, a balloon has a single ValueSet object associated with
 it, but it's safe to iterate through the BalloonValueSets collection
 object. The code overrides each balloons value set or sets with a
 string, comprised of the balloon count and value set count values.
 
-|  |
-| --- |
-| ```     Dim ValueSetCount As Long     ValueSetCount = 1              For Each oBalloonValueSet In oBalloon.BalloonValueSets         oBalloonValueSet.OverrideValue = "Balloon" & _            BalloonCount & ": ValueSet" & ValueSetCount         ValueSetCount = ValueSetCount + 1     Next     BalloonCount = BalloonCount + 1 Next ``` |
+```vb
+Dim ValueSetCount As Long     ValueSetCount = 1
+For Each oBalloonValueSet In oBalloon.BalloonValueSets         oBalloonValueSet.OverrideValue = "Balloon" & _            BalloonCount & ": ValueSet" & ValueSetCount         ValueSetCount = ValueSetCount + 1
+Next     BalloonCount = BalloonCount + 1
+Next
+```
 
 In the following figure, the balloon on the right demonstrates the
 changes the preceding code applied to the balloon on the left.

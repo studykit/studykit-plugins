@@ -10,10 +10,6 @@ This sample demonstrates the modification of sketch entity line type and color i
 
 Open a drawing document and run the following sample.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub ModifyDrawingSketchEntityProperties()
     ' Set a reference to the active document.  This assumes it
@@ -57,9 +53,3 @@ Public Sub ModifyDrawingSketchEntityProperties()
     oSketch.ExitEdit
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

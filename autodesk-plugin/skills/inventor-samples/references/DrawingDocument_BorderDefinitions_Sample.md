@@ -10,10 +10,6 @@ This sample illustrates creating a new border definition object and using it for
 
 This sample consists of two sub procedures. The first creates the border definition. The second inserts it into the active sheet. To run the sample have a drawing document open and run the CreateBorderDefinition sub first. After that you can run the InsertBorderOnSheet sub.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub CreateBorderDefinition()
     ' Set a reference to the drawing document.
@@ -81,9 +77,3 @@ Public Sub InsertCustomBorderOnSheet()
     Set oBorder = oSheet.AddBorder(oBorderDef, sPromptStrings)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

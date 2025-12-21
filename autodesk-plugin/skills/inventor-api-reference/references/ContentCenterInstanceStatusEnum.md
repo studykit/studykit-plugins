@@ -17,9 +17,3 @@ Enum indicating status of instance (.ipt) of corresponding member in content cen
 ## Version
 
 Introduced in version 2010
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

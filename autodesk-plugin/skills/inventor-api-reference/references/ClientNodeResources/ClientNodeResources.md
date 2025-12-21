@@ -29,9 +29,3 @@ This object is accessible through the . But it is in fact, just the one associat
 ## Version
 
 Introduced in version 8
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -20,9 +20,3 @@ The AttributesEnumerator object provides access to a list of Attribute objects. 
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

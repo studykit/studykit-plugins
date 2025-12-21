@@ -10,10 +10,6 @@ This sample demonstrates the creation of curve primitives (lines, arcs, circles,
 
 To use the sample you need to have an assembly or part document open. The program has two behaviors: the first time it is run it will draw the graphics. The second time it is run it deletes the previously drawn graphics.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub ClientGraphicsPrimitives()
     Dim odoc As Document
@@ -106,9 +102,3 @@ Public Sub ClientGraphicsPrimitives()
     End If
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

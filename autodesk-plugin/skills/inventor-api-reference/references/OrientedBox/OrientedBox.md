@@ -32,9 +32,3 @@ The OrientedBox object is a mathematical utility object that represents a rectan
 ## Version
 
 Introduced in version 2016
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

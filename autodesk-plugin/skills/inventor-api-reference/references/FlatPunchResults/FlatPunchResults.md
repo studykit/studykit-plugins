@@ -21,9 +21,3 @@ The FlatPunchResults collection object contains information about all the result
 ## Version
 
 Introduced in version 2008
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

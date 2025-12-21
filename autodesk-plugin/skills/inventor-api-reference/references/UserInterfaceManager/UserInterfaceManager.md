@@ -67,9 +67,3 @@ The UserInterfaceManager object, through which all UI customization objects can 
 ## Version
 
 Introduced in version 9
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

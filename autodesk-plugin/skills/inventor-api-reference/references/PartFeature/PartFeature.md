@@ -64,9 +64,3 @@ The PartFeature object is the base class for all part modeling features.
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -35,9 +35,3 @@ The DecalFeatures collection object provides access to all of the DecalFeature o
 ## Version
 
 Introduced in version 6
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

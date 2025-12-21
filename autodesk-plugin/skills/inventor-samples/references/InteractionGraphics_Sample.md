@@ -10,10 +10,6 @@ The sample creates overlay graphics.
 
 Follow these steps: 1. Have a drawing document open. 2. Cut and paste in a VBA module. 3. Run the sample. Overlay graphics is created. 4. Hit the escape key to end interaction events and bring down the graphics.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Dim oIE As InteractionEvents
 
@@ -112,9 +108,3 @@ Public Sub DrawOverlayGraphics()
     'oIE.Stop
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

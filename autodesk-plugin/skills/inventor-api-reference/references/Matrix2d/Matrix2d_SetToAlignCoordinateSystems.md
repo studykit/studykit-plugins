@@ -25,9 +25,3 @@ Matrix2d.**SetToAlignCoordinateSystems**( ***FromOrigin*** As [Point2d](../Point
 ## Version
 
 Introduced in version 11
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

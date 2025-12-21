@@ -30,9 +30,3 @@ TransientBRep.**CreateRuledSurface**( ***SectionOne*** As [Wire](../Wire/Wire.md
 ## Version
 
 Introduced in version 2013
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

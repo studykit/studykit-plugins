@@ -24,9 +24,3 @@ This is a read only property whose value is a [SketchLine3D](../SketchLine3D/Ske
 ## Version
 
 Introduced in version 2014
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

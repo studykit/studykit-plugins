@@ -8,10 +8,6 @@ This sample demonstrates how to open an assembly document in its last active mod
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub OpenDocumentInLastActiveModelState()
     Dim strFullFileName As String
@@ -34,9 +30,3 @@ Public Sub OpenDocumentInLastActiveModelState()
     Set oDoc = ThisApplication.Documents.Open(strFullDocumentName)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

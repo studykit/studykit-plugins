@@ -34,9 +34,3 @@ The DimensionConstraints3D object provides access to all the dimension sketch co
 ## Version
 
 Introduced in version 11
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

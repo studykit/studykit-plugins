@@ -10,10 +10,6 @@ Updates some iProperty values using Apprentice. The document specified in the co
 
 Create a new VB.Net project and add a reference to the Inventor interop. Copy the code below into the project and call the function. For a Forms application you can call this when a button is clicked, or from a console application you can call it from the Main function. Please note that the sample works with Inventor version since Inventor 2022.2 or later versions which have the ApprenticeServerDocument.FilePropertySets, to work with Inventor 2022.1 or previous version you should change the ApprenticeServerDocument.FilePropertySets to ApprenticeServerDocument.PropertySets.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub ApprenticeUpdate()
     ' Declare a variable for Apprentice.
@@ -40,9 +36,3 @@ Public Sub ApprenticeUpdate()
     invApprentice = Nothing
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -129,9 +129,3 @@ Object through which all transient geometry objects are constructed. For more in
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -27,9 +27,3 @@ The CameraEvents object supports a set of properties and events used to work wit
 ## Version
 
 Introduced in version 2011
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

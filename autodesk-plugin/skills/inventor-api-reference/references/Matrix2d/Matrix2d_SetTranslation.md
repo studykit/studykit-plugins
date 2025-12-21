@@ -21,9 +21,3 @@ Matrix2d.**SetTranslation**( ***Translation*** As [Vector2d](../Vector2d/Vector2
 ## Version
 
 Introduced in version 11
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -10,10 +10,6 @@ This sample demonstrates the creation of ordinate dimensions in a drawing docume
 
 Before running this sample, select a linear drawing curve on the active drawing document.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub CreateOrdinateDimensions()
   ' Set a reference to the drawing document.
@@ -98,9 +94,3 @@ Public Sub CreateOrdinateDimensions()
   Set oOrdinateDimension2 = oOrdinateDimensions.Add(oDimIntent2, oTextOrigin2, DimType)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

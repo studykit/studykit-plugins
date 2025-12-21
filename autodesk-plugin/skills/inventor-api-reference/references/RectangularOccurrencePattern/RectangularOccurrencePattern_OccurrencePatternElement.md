@@ -25,9 +25,3 @@ This is a read only property whose value is an [OccurrencePatternElement](../Occ
 ## Version
 
 Introduced in version 6
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

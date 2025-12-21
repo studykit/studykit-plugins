@@ -23,9 +23,3 @@ The FilletFullRoundSet object provides access to the inputs used to create a ful
 ## Version
 
 Introduced in version 11
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

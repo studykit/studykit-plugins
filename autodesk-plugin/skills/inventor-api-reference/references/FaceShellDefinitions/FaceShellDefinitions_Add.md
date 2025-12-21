@@ -23,9 +23,3 @@ FaceShellDefinitions.**Add**() As [FaceShellDefinition](../FaceShellDefinition/F
 ## Version
 
 Introduced in version 2011
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -10,10 +10,6 @@ The sample demonstrate how to set the help context/topic. Before running the sam
 
 The VBA sample demonstrate how to set the help context/topic to display help from a local chm file. Before running the sample you have to change the helpFile to specify it a with correct Inventor API documentation path.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub ShowHelpSampleWithLocalHelp()
     Dim helpFile As String
@@ -22,9 +18,3 @@ Public Sub ShowHelpSampleWithLocalHelp()
     Call ThisApplication.HelpManager.DisplayHelpContext(helpFile, 83886873)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

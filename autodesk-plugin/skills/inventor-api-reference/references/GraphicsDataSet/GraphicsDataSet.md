@@ -32,9 +32,3 @@ The GraphicsDataSet object is the base class for the various utility objects use
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -22,9 +22,3 @@ SurfaceGraphics.**SetViewSpaceAnchor**( ***Origin*** As [Point](../Point/Point.m
 ## Version
 
 Introduced in version 2009
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

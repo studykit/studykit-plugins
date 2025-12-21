@@ -22,9 +22,3 @@ SketchBlockDefinitionProxy.**AddStraightSlotByOverall**( ***StartPoint*** As Obj
 ## Version
 
 Introduced in version 2014
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

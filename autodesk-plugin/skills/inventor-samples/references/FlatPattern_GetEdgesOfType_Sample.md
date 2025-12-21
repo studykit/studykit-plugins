@@ -10,10 +10,6 @@ This sample demonstrates how to retrieve the bend extent edges (a.k.a. tangent e
 
 Before running the sample, activate a flat pattern and select a bend edge.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Sub BendExtentEdges()
     ' Check to make sure a flat pattern is open.
@@ -208,9 +204,3 @@ Private Function IsBendEdge(oEdge As Edge, oFlatPattern As FlatPattern) As Boole
     IsBendEdge = False
 End Function
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

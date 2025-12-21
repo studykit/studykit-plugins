@@ -22,9 +22,3 @@ RevisionTable.**Export**( ***FileName*** As String, ***FileFormat*** As [FileFor
 ## Version
 
 Introduced in version 2012
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -28,9 +28,3 @@ Object allowing iteration of the collection of UnfoldFeature objects, and allows
 ## Version
 
 Introduced in version 2010
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

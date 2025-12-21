@@ -28,9 +28,3 @@ CurveEvaluator.**GetParamExtents**( ***MinParam*** As Double, ***MaxParam*** As 
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

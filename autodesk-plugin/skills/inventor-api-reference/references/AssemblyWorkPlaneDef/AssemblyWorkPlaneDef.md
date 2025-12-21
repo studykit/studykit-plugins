@@ -28,9 +28,3 @@ The AssemblyWorkPlaneDef object allows you to access the information specific to
 ## Version
 
 Introduced in version 6
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -28,9 +28,3 @@ The IntersectionCurves object provides access to all the intersection curve resu
 ## Version
 
 Introduced in version 2014
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

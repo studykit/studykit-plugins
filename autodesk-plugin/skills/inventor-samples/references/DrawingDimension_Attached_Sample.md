@@ -10,10 +10,6 @@ This sample finds and deletes all unattached drawing dimensions on the active sh
 
 Before you run the sample, have a drawing document open that contains several drawing dimensions including unattached (sick) ones.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub DeleteUnattachedDimensions()
     ' Set a reference to the active drawing document
@@ -36,9 +32,3 @@ Public Sub DeleteUnattachedDimensions()
     Next
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -21,9 +21,3 @@ Vector2d.**IsPerpendicularTo**( ***Vector*** As [Vector2d](../Vector2d/Vector2d.
 ## Version
 
 Introduced in version 11
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -41,9 +41,3 @@ The FaceCollection object is a transient object created by the CreateFaceCollect
 ## Version
 
 Introduced in version 9
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -21,9 +21,3 @@ The PointInference object provides access to information that defines how the cu
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

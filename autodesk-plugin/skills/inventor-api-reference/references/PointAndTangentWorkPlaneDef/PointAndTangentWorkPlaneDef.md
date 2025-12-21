@@ -25,9 +25,3 @@ Object that allows you to get and set the information that specifies a work plan
 ## Version
 
 Introduced in version 10
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

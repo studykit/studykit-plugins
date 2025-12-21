@@ -25,9 +25,3 @@ Sheet.**GetReferenceKey**( ***ReferenceKey***() As Byte, [***KeyContext***] As L
 ## Version
 
 Introduced in version 9
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

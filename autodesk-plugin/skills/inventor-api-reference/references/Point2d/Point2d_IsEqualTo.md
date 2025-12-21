@@ -21,9 +21,3 @@ Point2d.**IsEqualTo**( ***Point*** As [Point2d](../Point2d/Point2d.md), [***Tole
 ## Version
 
 Introduced in version 2008
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

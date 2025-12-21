@@ -37,9 +37,3 @@ The Cylinder object. The object created is a transient mathematical object and i
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

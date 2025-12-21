@@ -34,9 +34,3 @@ The DerivedFuturePartDefinition object is used to describe which entities within
 ## Version
 
 Introduced in version 2018
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

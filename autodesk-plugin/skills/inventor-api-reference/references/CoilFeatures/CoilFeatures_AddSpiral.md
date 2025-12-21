@@ -26,9 +26,3 @@ CoilFeatures.**AddSpiral**( ***Profile*** As [Profile](../Profile/Profile.md), *
 ## Version
 
 Introduced in version 5.3
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

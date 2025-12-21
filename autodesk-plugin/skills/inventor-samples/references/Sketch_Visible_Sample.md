@@ -10,10 +10,6 @@ This sample demonstrates setting the visibility of a sketch.
 
 To use this sample have a part document open that contains at least one sketch.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub ToggleSketchVisibility()
     ' Set a reference to the Sketches collection.  This assumes
@@ -40,9 +36,3 @@ Public Sub ToggleSketchVisibility()
     Next
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

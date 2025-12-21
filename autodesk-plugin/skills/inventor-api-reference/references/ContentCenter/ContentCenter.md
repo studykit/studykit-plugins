@@ -35,9 +35,3 @@ The ContentCenter object provides the API interface to the Content Center functi
 ## Version
 
 Introduced in version 2010
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

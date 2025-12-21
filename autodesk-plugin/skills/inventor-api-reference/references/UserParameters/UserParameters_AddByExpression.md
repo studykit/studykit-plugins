@@ -29,9 +29,3 @@ UserParameters.**AddByExpression**( ***Name*** As String, ***Expression*** As St
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

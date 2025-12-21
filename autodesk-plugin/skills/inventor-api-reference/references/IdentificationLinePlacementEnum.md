@@ -16,9 +16,3 @@ Constants that define the identification line placement types.
 ## Version
 
 Introduced in version 2024
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

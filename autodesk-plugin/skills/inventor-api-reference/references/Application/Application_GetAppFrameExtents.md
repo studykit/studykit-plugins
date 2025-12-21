@@ -23,9 +23,3 @@ Application.**GetAppFrameExtents**( ***Top*** As Long, ***Left*** As Long, ***He
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

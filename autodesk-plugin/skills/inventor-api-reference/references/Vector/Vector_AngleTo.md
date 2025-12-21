@@ -24,9 +24,3 @@ Vector.**AngleTo**( ***Argument*** As [Vector](../Vector/Vector.md) ) As Double
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

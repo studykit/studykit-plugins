@@ -17,9 +17,3 @@ Constants identifying the kind of split tool.
 ## Version
 
 Introduced in version 6
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

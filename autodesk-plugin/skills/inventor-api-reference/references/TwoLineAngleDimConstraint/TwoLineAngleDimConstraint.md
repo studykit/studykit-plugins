@@ -42,9 +42,3 @@ The TwoLineAngleDimConstraint object represents a constraint that controls the a
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -30,9 +30,3 @@ The HoleTag object represents a hole tag associated with a hole table row.
 ## Version
 
 Introduced in version 10
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

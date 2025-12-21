@@ -44,9 +44,3 @@ The WorkAxes collection object provides access to all of the  objects in the par
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

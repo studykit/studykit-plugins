@@ -41,9 +41,3 @@ SketchCircles.**AddByCenterRadius**( ***CenterPoint*** As Object, ***Radius*** A
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

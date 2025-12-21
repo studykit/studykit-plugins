@@ -28,9 +28,3 @@ The SketchPoints3D object provides access to all the objects in a sketch. See th
 ## Version
 
 Introduced in version 6
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

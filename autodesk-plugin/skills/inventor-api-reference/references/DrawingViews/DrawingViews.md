@@ -43,9 +43,3 @@ The DrawingViews collection object provides access to the objects associated wit
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

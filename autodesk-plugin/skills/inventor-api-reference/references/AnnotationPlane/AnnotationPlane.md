@@ -34,9 +34,3 @@ The AnnotationPlane object represents an existing annotation plane in a document
 ## Version
 
 Introduced in version 2018
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -35,9 +35,3 @@ The FileAccessEvents object supports a set of properties and events used to get 
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

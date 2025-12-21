@@ -42,9 +42,3 @@ The EdgeCollection object provides access to all of the and EdgeCollection objec
 ## Version
 
 Introduced in version 5.3
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -16,9 +16,3 @@ Enum indicating the model tolerance feature constrained status.
 ## Version
 
 Introduced in version 2019
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

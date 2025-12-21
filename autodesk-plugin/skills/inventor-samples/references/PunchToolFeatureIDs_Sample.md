@@ -8,10 +8,6 @@ This program demonstrates accessing punch features and creates a report of the p
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub PunchFeatureReport()
 
@@ -70,9 +66,3 @@ Public Sub PunchFeatureReport()
     MsgBox strMessage
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

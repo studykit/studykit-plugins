@@ -36,9 +36,3 @@ The Sheets collection object provides access to all the existing objects in a dr
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

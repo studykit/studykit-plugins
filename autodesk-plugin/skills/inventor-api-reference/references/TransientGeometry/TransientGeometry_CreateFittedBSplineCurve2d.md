@@ -20,9 +20,3 @@ TransientGeometry.**CreateFittedBSplineCurve2d**( ***Definition*** As [BSplineCu
 ## Version
 
 Introduced in version 9
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

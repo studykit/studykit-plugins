@@ -40,9 +40,3 @@ The FileDescriptor object represents a reference to an Autodesk Inventor file or
 ## Version
 
 Introduced in version 11
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

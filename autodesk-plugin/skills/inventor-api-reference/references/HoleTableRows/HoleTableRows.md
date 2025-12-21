@@ -28,9 +28,3 @@ The HoleTableRows collection object provides access to the existing collection o
 ## Version
 
 Introduced in version 10
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

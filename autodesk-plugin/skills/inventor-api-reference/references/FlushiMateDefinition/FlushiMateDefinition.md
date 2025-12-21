@@ -46,9 +46,3 @@ The FlushiMateDefinition object represents a flush iMate definition. It is deriv
 ## Version
 
 Introduced in version 6
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

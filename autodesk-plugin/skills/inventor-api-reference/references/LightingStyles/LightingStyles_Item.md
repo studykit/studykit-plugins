@@ -24,9 +24,3 @@ This is a read only property whose value is a [LightingStyle](../LightingStyle/L
 ## Version
 
 Introduced in version 10
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

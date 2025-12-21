@@ -16,9 +16,3 @@ Defines the constants used to specify the seam type used in a corner feature.
 ## Version
 
 Introduced in version 2009
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -20,9 +20,3 @@ ModelLeaderNode.**AddLeader**( ***Points*** As [ObjectCollection](../ObjectColle
 ## Version
 
 Introduced in version 2018
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

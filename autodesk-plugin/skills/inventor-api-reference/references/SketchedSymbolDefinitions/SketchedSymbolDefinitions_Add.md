@@ -27,9 +27,3 @@ SketchedSymbolDefinitions.**Add**( ***Name*** As String ) As [SketchedSymbolDefi
 ## Version
 
 Introduced in version 5.3
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

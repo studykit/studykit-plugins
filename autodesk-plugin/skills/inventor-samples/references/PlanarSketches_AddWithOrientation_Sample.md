@@ -10,10 +10,6 @@ This sample demonstrates the creation of a sketch using the Sketches.AddWithOrie
 
 To use this sample, open a part document that contains a box before running the sample code.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub AddOrientedSketch()
     ' Set a reference to the part component definition.
@@ -74,9 +70,3 @@ Public Sub AddOrientedSketch()
                 ThisApplication.TransientGeometry.CreatePoint2d(1, 0))
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

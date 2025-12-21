@@ -10,10 +10,6 @@ This sample demonstrates the creation of client graphics that is fully anchored 
 
 This sample anchors some text graphics relative to the top-left corner of the view. Open a part or an assembly document and run the following sample.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub AnchoredClientGraphics()
   ' Set a reference to the document.
@@ -68,9 +64,3 @@ Public Sub AnchoredClientGraphics()
   ThisApplication.ActiveView.Update
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

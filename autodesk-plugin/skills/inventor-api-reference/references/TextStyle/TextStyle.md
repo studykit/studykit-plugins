@@ -60,9 +60,3 @@ The TextStyle object represents a text style in a drawing.
 ## Version
 
 Introduced in version 5.3
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -17,9 +17,3 @@ Constants specifying the graphics card optimization setting.
 ## Version
 
 Introduced in version 2011
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

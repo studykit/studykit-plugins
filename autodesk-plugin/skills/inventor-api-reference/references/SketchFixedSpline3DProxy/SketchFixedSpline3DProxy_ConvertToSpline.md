@@ -13,9 +13,3 @@ SketchFixedSpline3DProxy.**ConvertToSpline**() As [SketchSpline3D](../SketchSpli
 ## Version
 
 Introduced in version 10
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

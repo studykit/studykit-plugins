@@ -21,9 +21,3 @@ ComponentOccurrences.**AddVirtual**( ***Name*** As String, ***Position*** As [Ma
 ## Version
 
 Introduced in version 10
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -22,9 +22,3 @@ WorkPoints.**AddByTwoLines**( ***Line1*** As Object, ***Line2*** As Object, [***
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -24,15 +24,29 @@ The Point object is a list of three coordinates, representing the X Y and Z of a
 
 Point2d objects are frequently used when working with 2D sketches. To create a SketchPoint object on a sketch, use the Add method of that sketches SketchPoints collection. You might expect code similar to the following.
 
-|  |
-| --- |
-| ```  Dim oSkPnts As SketchPoints Call oSkPnts.Add(10, 20)  ' This is wrong ``` |
+```vb
+Dim oSkPnts As SketchPoints
+Call oSkPnts.Add(10, 20)
+' This is wrong
+```
 
 The Add method needs to know the location to create the SketchPoint object, but this point may be the result of any number of transformations or translations, or it may be provided by another object. Therefore the Add method expects a Point2D object. The correct code is as follows. The code omits error checking for the sake of clarity and brevity. Always check that return values are of the expected type.
 
-|  |
-| --- |
-| ```  Dim oApp As Inventor.Application Set oApp = ThisApplication  Dim oPartDoc As PartDocument Set oPartDoc = oApp.Documents.Add(kPartDocumentObject, _    oApp.GetTemplateFile(kPartDocumentObject))  Dim oSketch As PlanarSketch Set oSketch = oPartDoc.ComponentDefinition.Sketches.Add _   (oPartDoc.ComponentDefinition.WorkPlanes.Item(3))   Dim oTG As TransientGeometry Set oTG = oApp.TransientGeometry  Dim oSkPnts As SketchPoints Set oSkPnts = oSketch.SketchPoints Call oSkPnts.Add(oTG.CreatePoint2d(10, 20), False) ``` |
+```vb
+Dim oApp As Inventor.Application
+Set oApp = ThisApplication
+Dim oPartDoc As PartDocument
+Set oPartDoc = oApp.Documents.Add(kPartDocumentObject, _
+oApp.GetTemplateFile(kPartDocumentObject))
+Dim oSketch As PlanarSketch
+Set oSketch = oPartDoc.ComponentDefinition.Sketches.Add _
+(oPartDoc.ComponentDefinition.WorkPlanes.Item(3))
+Dim oTG As TransientGeometry
+Set oTG = oApp.TransientGeometry
+Dim oSkPnts As SketchPoints
+Set oSkPnts = oSketch.SketchPoints
+Call oSkPnts.Add(oTG.CreatePoint2d(10, 20), False)
+```
 
 The preceding code will create a sketch with a single sketchpoint at X=10, Y=20. The last argument of the Add method is a boolean value, indicating whether the SketchPoint will form the center point of a hole feature. The main difference is that the graphical representation of the resulting SketchPoint will differ slightly.
 
@@ -56,9 +70,26 @@ Imagine a vector pointing along the required X axis. Remember we now want this t
 
 Using the previously noted SetCoordinateSystem method, the following code calculates and sets a matrix object to the above values. Autodesk Inventor internal units are centimeters and radians.
 
-|  |
-| --- |
-| ```  Dim oTG As TransientGeometry Set oTG = ThisApplication.TransientGeometry Dim dPi As Double dPi = Atn(1) * 4      ' Define the origin point. Dim oOrigin As Point Set oOrigin = oTG.CreatePoint(10, 5, 0)      ' Define the axis vectors.  Pi/4 is 45 degrees in radians. Dim oXAxis As UnitVector Dim oYAxis As UnitVector Dim oZAxis As UnitVector Set oXAxis = oTG.CreateUnitVector(Cos(dPi / 4), Sin(dPi / 4), 0) Set oYAxis = oTG.CreateUnitVector(-Cos(dPi / 4), Sin(dPi / 4), 0) Set oZAxis = oTG.CreateUnitVector(0, 0, 1)      ' Create the matrix and define the desired coordinate system. Dim oMatrix As Matrix Set oMatrix = oTG.CreateMatrix Call oMatrix.SetCoordinateSystem(oOrigin, oXAxis.AsVector, oYAxis.AsVector, oZAxis.AsVector) ``` |
+```vb
+Dim oTG As TransientGeometry
+Set oTG = ThisApplication.TransientGeometry
+Dim dPi As Double
+dPi = Atn(1) * 4
+' Define the origin point.
+Dim oOrigin As Point
+Set oOrigin = oTG.CreatePoint(10, 5, 0)
+' Define the axis vectors.  Pi/4 is 45 degrees in radians.
+Dim oXAxis As UnitVector
+Dim oYAxis As UnitVector
+Dim oZAxis As UnitVector
+Set oXAxis = oTG.CreateUnitVector(Cos(dPi / 4), Sin(dPi / 4), 0)
+Set oYAxis = oTG.CreateUnitVector(-Cos(dPi / 4), Sin(dPi / 4), 0)
+Set oZAxis = oTG.CreateUnitVector(0, 0, 1)
+' Create the matrix and define the desired coordinate system.
+Dim oMatrix As Matrix
+Set oMatrix = oTG.CreateMatrix
+Call oMatrix.SetCoordinateSystem(oOrigin, oXAxis.AsVector, oYAxis.AsVector, oZAxis.AsVector)
+```
 
 A typical use for such a matrix definition would be placement of parts within an assembly. You can construct a matrix that, when referenced by the Transformation property of a part occurrence, determines exactly where the part should be placed.
 
@@ -74,9 +105,9 @@ The matrix defined in the preceding code, when referenced by the TransformBy met
 
 In this case, the delta is a 45 degree rotation about the Z axis. All we need to do is change the call to SetCoordinateSystem, as we no longer wish to change the origin, as follows.
 
-|  |
-| --- |
-| ```  Call oMatrix.SetCoordinateSystem(oTG.CreatePoint, oXAxis.AsVector, oYAxis.AsVector, oZAxis.AsVector) ``` |
+```vb
+Call oMatrix.SetCoordinateSystem(oTG.CreatePoint, oXAxis.AsVector, oYAxis.AsVector, oZAxis.AsVector)
+```
 
 Thereafter, to rotatee an object such as a part occurrence about its Z axis, obtain its location matrix through its Transformation property, then modify the matrix by calling its TransformBy method, referencing the delta matrix. Then reapply the updated location matrix to the occurrence, again through its Transformation property. The occurrence will move to its new location.
 

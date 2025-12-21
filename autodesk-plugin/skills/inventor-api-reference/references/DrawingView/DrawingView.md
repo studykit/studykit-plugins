@@ -153,9 +153,3 @@ The DrawingView object represents a drawing view on a sheet. It allows access to
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

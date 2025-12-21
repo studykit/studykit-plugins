@@ -10,10 +10,6 @@ Demonstrates the ability to extract partial curves from a transient geometry cur
 
 To use this sample a part must be active.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub ExtractPartialCurves2D()
     Dim partDoc As PartDocument
@@ -49,9 +45,3 @@ Public Sub ExtractPartialCurves2D()
     spline.Delete
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

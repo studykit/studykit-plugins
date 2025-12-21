@@ -40,9 +40,3 @@ The Column object represents a single column in this custom table.See the Custom
 ## Version
 
 Introduced in version 9
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

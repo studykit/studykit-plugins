@@ -22,9 +22,3 @@ ParameterTable.**Export**( ***FileName*** As String, ***FileFormat*** As [FileFo
 ## Version
 
 Introduced in version 2021
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

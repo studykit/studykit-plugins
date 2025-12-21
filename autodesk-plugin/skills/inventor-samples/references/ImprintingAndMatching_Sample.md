@@ -10,10 +10,6 @@ This sample is intended to demonstrate a technique of finding the matching surfa
 
 To use this sample you need to have a part with multiple bodies. Two of the bodies should be coincident and those two bodies can be selected when running the sample.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub SampleImprintMatching2()
     ' Get the active assembly document and its definition.
@@ -194,9 +190,3 @@ Public Sub SampleImprintMatching2()
     Next
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

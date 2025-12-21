@@ -135,9 +135,3 @@ Returns the top-level parent application object. When used the context of Invent
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

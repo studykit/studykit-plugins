@@ -41,9 +41,3 @@ A 3x3 Matrix2d object. For more information, see the Transient Geometry article 
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

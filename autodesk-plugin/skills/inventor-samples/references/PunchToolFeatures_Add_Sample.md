@@ -8,10 +8,6 @@ This program demonstrates the creation of a punch tool feature. It uses one of t
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub PlacePunchFeature()
     ' Get the active sheet metal document and component
@@ -98,9 +94,3 @@ Public Sub PlacePunchFeature()
     Set oPunchTool = oSMFeatures.PunchToolFeatures.Add(oPoints, oiFeatureDef, 3.14159265358979 / 4)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

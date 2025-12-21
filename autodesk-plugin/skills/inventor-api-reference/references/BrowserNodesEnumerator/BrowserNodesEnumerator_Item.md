@@ -24,9 +24,3 @@ This is a read only property whose value is a [BrowserNode](../BrowserNode/Brows
 ## Version
 
 Introduced in version 8
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

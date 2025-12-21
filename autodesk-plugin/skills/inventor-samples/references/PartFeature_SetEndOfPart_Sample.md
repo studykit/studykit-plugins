@@ -8,10 +8,6 @@ This sample demonstrates how to edit an extrude feature. It shows how to create 
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub EditExtrudeFeature()
     ' Create a new part document, using the default part template.
@@ -93,9 +89,3 @@ Public Sub EditExtrudeFeature()
     Call oExtrude2.Definition.SetDistanceExtent(0.25, kNegativeExtentDirection)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

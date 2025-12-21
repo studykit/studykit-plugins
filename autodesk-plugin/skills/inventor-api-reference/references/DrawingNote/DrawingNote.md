@@ -45,9 +45,3 @@ The DrawingNote object is the base class for all the drawing notes on a sheet.
 ## Version
 
 Introduced in version 10
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

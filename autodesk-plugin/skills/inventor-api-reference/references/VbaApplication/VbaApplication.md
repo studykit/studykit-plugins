@@ -15,9 +15,3 @@ The VBAApplication object represents the currently available VBA application.
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

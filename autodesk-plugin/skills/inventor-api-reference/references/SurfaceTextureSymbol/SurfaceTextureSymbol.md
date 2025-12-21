@@ -41,9 +41,3 @@ The SurfaceTextureSymbol object represents a surface texture symbol on a sheet.
 ## Version
 
 Introduced in version 2009
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

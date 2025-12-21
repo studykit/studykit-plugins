@@ -17,9 +17,3 @@ Constants indicating the viewing plane to use as front view.
 ## Version
 
 Introduced in version 2010
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

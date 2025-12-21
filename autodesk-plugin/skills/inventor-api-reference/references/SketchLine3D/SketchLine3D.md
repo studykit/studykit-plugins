@@ -56,9 +56,3 @@ The SketchLine3D object represents a line within a 3D sketch. See the article in
 ## Version
 
 Introduced in version 6
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

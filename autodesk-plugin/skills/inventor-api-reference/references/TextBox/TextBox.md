@@ -71,9 +71,3 @@ The TextBox object represents text on a sheet or sketch.
 ## Version
 
 Introduced in version 5.3
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

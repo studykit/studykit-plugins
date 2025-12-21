@@ -10,10 +10,6 @@ This sample demonstrates using the selection events to select a face. Selection 
 
 To use the sample copy the TestSelection sub into a code module. Create a new class module called clsSelect and copy all of the rest of the code into it. To run the sample, have a part document open that contains some geometry and run the TestSelection sub. Select a face and it will display its area.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub TestSelection()
     ' Create a new clsSelect object.
@@ -96,9 +92,3 @@ Private Sub oSelectEvents_OnSelect(ByVal JustSelectedEntities As ObjectsEnumerat
     bStillSelecting = False
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

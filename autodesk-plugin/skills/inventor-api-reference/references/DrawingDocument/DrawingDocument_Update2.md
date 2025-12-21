@@ -20,9 +20,3 @@ DrawingDocument.**Update2**( [***AcceptErrorsAndContinue***] As Boolean ) As Boo
 ## Version
 
 Introduced in version 10
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

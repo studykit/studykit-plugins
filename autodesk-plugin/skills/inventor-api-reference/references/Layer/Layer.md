@@ -57,9 +57,3 @@ The Layer object represents a layer in a drawing document.
 ## Version
 
 Introduced in version 10
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

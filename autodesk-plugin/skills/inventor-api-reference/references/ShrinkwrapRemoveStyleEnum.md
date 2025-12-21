@@ -16,9 +16,3 @@ Constants identifying how holes/chamfers/fillets/pockets are removed.
 ## Version
 
 Introduced in version 2018
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

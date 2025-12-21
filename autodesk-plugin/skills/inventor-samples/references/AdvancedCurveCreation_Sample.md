@@ -8,10 +8,6 @@ This sample demonstrates several new curve creation techniques introduced in Inv
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub SketchCurves()
     ' Create a new part.
@@ -96,9 +92,3 @@ Public Sub SketchCurves()
     Call interSketch.IntersectionCurves.Add(extrude1.SurfaceBodies.Item(1), extrude2.SurfaceBodies.Item(1))
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

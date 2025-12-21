@@ -38,9 +38,3 @@ The HorizontalAlignConstraint object represents a constraint that makes two sket
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

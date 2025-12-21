@@ -62,9 +62,3 @@ The TriangleGraphics object defines a set of disconnected triangles. Each set of
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

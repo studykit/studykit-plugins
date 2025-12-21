@@ -38,9 +38,3 @@ The EqualRadiusConstraint object represents a constraint that makes the radius o
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

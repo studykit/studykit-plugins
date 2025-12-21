@@ -39,9 +39,3 @@ Provides access to the collection in the top level of the assembly.
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

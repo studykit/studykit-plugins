@@ -10,10 +10,6 @@ This sample demonstrates how to save a FlatPattern file using the DXF translator
 
 This sample demonstrates how to save a FlatPattern file using the DXF translator add-in.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub PublishFlatPatternToDXF()
     ' Get the DXF translator Add-In.
@@ -63,9 +59,3 @@ Public Sub PublishFlatPatternToDXF()
     Call DXFAddIn.SaveCopyAs(oFlatPattern, oContext, oOptions, oDataMedium)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

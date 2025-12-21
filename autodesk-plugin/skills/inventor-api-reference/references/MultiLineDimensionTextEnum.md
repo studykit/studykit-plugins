@@ -18,9 +18,3 @@ Constants indicating the various types of multiline dimension text.
 ## Version
 
 Introduced in version 2015
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

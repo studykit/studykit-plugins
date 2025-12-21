@@ -10,10 +10,6 @@ This sample demonstrates the use of the API to create derived parts and assembli
 
 This example used is a simple case of a part subtracted from a mold. To simplify setup, the program creates the parts representing the part and the mold. It then uses derived parts and assemblies to scale the part and subtract it from the mold.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub MoldBaseSample()
     ' Initialize the string that defines the directory where the
@@ -167,9 +163,3 @@ Private Sub CreateMoldBase(Filename As String)
     oPartDoc.Close
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

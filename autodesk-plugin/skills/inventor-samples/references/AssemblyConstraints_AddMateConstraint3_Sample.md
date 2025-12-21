@@ -8,10 +8,6 @@ This sample demonstrates the creation of an assembly mate constraint with maximu
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub MateConstraintWithLimits()
     ' Set a reference to the assembly component definintion.
@@ -47,9 +43,3 @@ Public Sub MateConstraintWithLimits()
     oMate.ConstraintLimits.Minimum.Expression = "-2 in"
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

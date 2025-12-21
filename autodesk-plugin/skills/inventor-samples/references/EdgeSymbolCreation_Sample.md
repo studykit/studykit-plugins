@@ -10,10 +10,6 @@ This sample is to demonstrate how to create a EdgeSymbol in drawing document.
 
 This sample is to demonstrate how to create a EdgeSymbol in drawing document.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub CreateEdgeSymbol()
 
@@ -51,9 +47,3 @@ Public Sub CreateEdgeSymbol()
     Set oEdgeSymbol = oActiveSheet.EdgeSymbols.Add(oLeaderPoints, oEdgeSymbolDef)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

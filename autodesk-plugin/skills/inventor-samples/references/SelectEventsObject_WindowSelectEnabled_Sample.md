@@ -10,10 +10,6 @@ This sample demonstrates using the selection events to window-select multiple ed
 
 To use the sample copy the TestWindowSelection sub into a code module. Create a new class module called clsSelect and copy all of the rest of the code into it. To run the sample, have a part document open that contains some geometry and run the TestWindowSelection sub.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Private oSelect As clsSelect
 
@@ -87,9 +83,3 @@ Private Sub oSelectEvents_OnSelect(ByVal JustSelectedEntities As ObjectsEnumerat
     MsgBox "Picked " & JustSelectedEntities.Count & " circular edges."
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

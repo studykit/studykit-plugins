@@ -38,9 +38,3 @@ The AttributeSet object provides the ability to create new attributes and access
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

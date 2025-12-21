@@ -55,9 +55,3 @@ The SimplifyDefinition object represents all of the information that defines a p
 ## Version
 
 Introduced in version 2026
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

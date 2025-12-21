@@ -8,10 +8,6 @@ Demonstrates the use of a ThreadInfo object.
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Sub test_threadinfo()
     Dim oApp As Application
@@ -36,9 +32,3 @@ Sub test_threadinfo()
     Set oThreadInfo = oThreadTable.CreateThreadInfo(False, True, "NPT", oDesignations(0))
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -17,9 +17,3 @@ This is a read only property whose value is a [Box2d](../Box2d/Box2d.md).
 ## Version
 
 Introduced in version 2024
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

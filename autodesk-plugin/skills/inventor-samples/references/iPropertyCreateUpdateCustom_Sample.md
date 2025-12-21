@@ -8,10 +8,6 @@ This example creates a custom iProperty if it doesn't exist and updates the valu
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub UpdateVolume()
     ' Get the active part document.
@@ -49,9 +45,3 @@ Public Sub UpdateVolume()
     End If
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -16,9 +16,3 @@ Constants enumerating the methods of specifyng the range of sheets to be printed
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

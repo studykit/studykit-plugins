@@ -50,9 +50,3 @@ A BreakOperation object represents a break applied to a drawing view. Editing or
 ## Version
 
 Introduced in version 2010
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

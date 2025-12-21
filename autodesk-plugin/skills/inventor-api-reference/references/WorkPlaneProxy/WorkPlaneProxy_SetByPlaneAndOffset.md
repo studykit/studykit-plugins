@@ -21,9 +21,3 @@ WorkPlaneProxy.**SetByPlaneAndOffset**( ***Plane*** As Object, ***Offset*** As V
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

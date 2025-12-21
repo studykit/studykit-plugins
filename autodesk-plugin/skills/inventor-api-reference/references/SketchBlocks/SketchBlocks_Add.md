@@ -22,9 +22,3 @@ SketchBlocks.**Add**( ***SketchObjects*** As [ObjectCollection](../ObjectCollect
 ## Version
 
 Introduced in version 2010
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

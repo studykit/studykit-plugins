@@ -8,10 +8,6 @@ This sample demonstrates how to create bullets and numbering list in a drawing n
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Sub DrawingNoteBulletAndNumberingListSample()
     Dim oDoc As DrawingDocument
@@ -30,9 +26,3 @@ Sub DrawingNoteBulletAndNumberingListSample()
     Debug.Print oNote.FormattedText
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

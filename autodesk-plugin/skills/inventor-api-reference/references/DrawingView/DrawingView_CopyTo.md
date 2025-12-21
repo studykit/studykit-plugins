@@ -20,9 +20,3 @@ DrawingView.**CopyTo**( ***TargetSheet*** As [Sheet](../Sheet/Sheet.md) ) As [Dr
 ## Version
 
 Introduced in version 9
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

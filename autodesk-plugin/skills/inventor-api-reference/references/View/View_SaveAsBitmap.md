@@ -22,9 +22,3 @@ View.**SaveAsBitmap**( ***FullFileName*** As String, ***Width*** As Long, ***Hei
 ## Version
 
 Introduced in version 6
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

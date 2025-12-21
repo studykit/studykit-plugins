@@ -28,9 +28,3 @@ ApplicationEvents.**OnCloseDocument**( ***DocumentObject*** As [Document](../Doc
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

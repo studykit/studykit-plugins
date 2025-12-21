@@ -34,9 +34,3 @@ DimensionConstraints.**AddThreePointAngle**( ***PointOne*** As [SketchPoint](../
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

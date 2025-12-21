@@ -21,9 +21,3 @@ EdgeUseProxy.**GetReferenceKey**( ***ReferenceKey***() As Byte, [***KeyContext**
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -67,9 +67,3 @@ The KnitFeature object represents a knit feature on a part. Knit features connec
 ## Version
 
 Introduced in version 6
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -40,9 +40,3 @@ Documents.**Open**( ***FullDocumentName*** As String, [***OpenVisible***] As Boo
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

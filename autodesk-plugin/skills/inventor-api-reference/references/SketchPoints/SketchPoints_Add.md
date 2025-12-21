@@ -29,9 +29,3 @@ SketchPoints.**Add**( ***Point*** As [Point2d](../Point2d/Point2d.md), [***HoleC
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

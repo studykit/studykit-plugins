@@ -32,9 +32,3 @@ RegionProperties.**MomentsOfInertia**( ***Ixx*** As Double, ***Iyy*** As Double,
 ## Version
 
 Introduced in version 2008
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

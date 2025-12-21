@@ -36,9 +36,3 @@ The PatternConstraint object represents a constraint placed between elements of 
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

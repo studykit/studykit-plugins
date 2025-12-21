@@ -83,9 +83,3 @@ The Sketch3D object provides access to the current contents of a specific 3D ske
 ## Version
 
 Introduced in version 6
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

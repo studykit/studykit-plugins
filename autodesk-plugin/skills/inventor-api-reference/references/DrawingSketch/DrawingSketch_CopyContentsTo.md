@@ -20,9 +20,3 @@ DrawingSketch.**CopyContentsTo**( ***TargetSketch*** As [Sketch](../Sketch/Sketc
 ## Version
 
 Introduced in version 2011
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

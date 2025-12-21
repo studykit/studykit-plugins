@@ -31,9 +31,3 @@ The ChangeManager object manages the processes involved in making changes to dat
 ## Version
 
 Introduced in version 9
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

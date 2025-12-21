@@ -20,9 +20,3 @@ The PartFeaturesEnumerator object. Presents a snapshot of the set of objects.
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

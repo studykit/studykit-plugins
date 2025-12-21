@@ -8,10 +8,6 @@ This sample illustrates creating a new sheet metal style. It uses a bend table a
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub CreateSheetMetalStyle()
     ' Set a reference to the sheet metal document.
@@ -91,9 +87,3 @@ Public Sub CreateSheetMetalStyle()
     End If
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

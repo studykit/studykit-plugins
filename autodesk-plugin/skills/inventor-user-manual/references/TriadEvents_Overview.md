@@ -43,45 +43,68 @@ This example provides skeletal code demonstrating how to set up triad interactio
 
 Start a new VBA project and add a blank form (here named UserForm1). Add the following code to the form, starting with declarations of the interaction and triad event objects:
 
-|  |
-| --- |
-| ```  Private WithEvents oInteraction As InteractionEvents Private WithEvents oTriadEvents As TriadEvents ``` |
+```vb
+Private WithEvents oInteraction As InteractionEvents
+Private WithEvents oTriadEvents As TriadEvents
+```
 
 Add a subroutine to be called when the form is initialized. Obtain the InteractionEvents object from the CommandManager object, and turn of selection and interaction. This means that the triad can still be manipulated by the user.
 
-|  |
-| --- |
-| ```  Sub UserForm_Initialize()   Set oInteraction = ThisApplication.CommandManager.CreateInteractionEvents   oInteraction.SelectionActive = False   oInteraction.InteractionDisabled = True ``` |
+```vb
+Sub UserForm_Initialize()
+    Set oInteraction = ThisApplication.CommandManager.CreateInteractionEvents
+    oInteraction.SelectionActive = False
+    oInteraction.InteractionDisabled = True
+```
 
 Obtain the TriadEvents object from the InteractionEvents object, and then set its Repeat and Enabled properties to True. The Repeat property indicates that triad events should continue after a move sequence completes.
 
-|  |
-| --- |
-| ```  Set oTriadEvents = oInteraction.TriadEvents   oTriadEvents.Repeat = True   oTriadEvents.Enabled = True ``` |
+```vb
+Set oTriadEvents = oInteraction.TriadEvents
+oTriadEvents.Repeat = True
+oTriadEvents.Enabled = True
+```
 
 Now start interaction events, and call DoEvents so the process can be terminated when required.
 
-|  |
-| --- |
-| ```    oInteraction.Start    While UserForm1.Enabled = True     DoEvents   Wend End Sub ``` |
+```vb
+oInteraction.Start
+While UserForm1.Enabled = True
+    DoEvents
+    Wend
+End Sub
+```
 
 Add another subroutine, this time the OnMove event of the TriadEvents object. When the user moves the triad through the user interface, this code is called. This code prints a message, but other more significant actions can take place depending on context.
 
-|  |
-| --- |
-| ```  Private Sub oTriadEvents_OnMove(ByVal SelectedTriadSegment _             As TriadSegmentEnum, _             ByVal ShiftKeys As ShiftStateEnum, _             ByVal CoordinateSystem As Matrix, _             ByVal Context As NameValueMap, _             HandlingCode As HandlingCodeEnum)    Debug.Print "3D move / rotate tool has been moved." End Sub ``` |
+```vb
+Private Sub oTriadEvents_OnMove(ByVal SelectedTriadSegment _
+    As TriadSegmentEnum, _
+    ByVal ShiftKeys As ShiftStateEnum, _
+    ByVal CoordinateSystem As Matrix, _
+    ByVal Context As NameValueMap, _
+    HandlingCode As HandlingCodeEnum)
+    Debug.Print "3D move / rotate tool has been moved."
+End Sub
+```
 
 The last subroutine to add to the form cleans up once the form is closed, and it stops the InteractionEvents object.
 
-|  |
-| --- |
-| ```  Private Sub UserForm1_Terminate()   oInteraction.Stop   Set oTriadEvents = Nothing   Set oInteraction = Nothing End Sub ``` |
+```vb
+Private Sub UserForm1_Terminate()
+    oInteraction.Stop
+    Set oTriadEvents = Nothing
+    Set oInteraction = Nothing
+End Sub
+```
 
 Finally, add the following code to a code module (not the form). To run the sample code, run this TriadEventsTest subroutine.
 
-|  |
-| --- |
-| ```  Public Sub TriadEventsTest()     UserForm1.Show vbModeless End Sub ``` |
+```vb
+Public Sub TriadEventsTest()
+    UserForm1.Show vbModeless
+End Sub
+```
 
 When this sample is run in an open part document, the 3D Move/Rotate triad tool and dialog is displayed as follows:
 

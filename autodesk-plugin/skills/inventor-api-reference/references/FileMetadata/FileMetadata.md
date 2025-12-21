@@ -27,9 +27,3 @@ A container object for defining the name and file properties for an Inventor fil
 ## Version
 
 Introduced in version 2009
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

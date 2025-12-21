@@ -24,9 +24,3 @@ This is a read only property whose value is a [DrawingViewAnnotation](../Drawing
 ## Version
 
 Introduced in version 2026
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

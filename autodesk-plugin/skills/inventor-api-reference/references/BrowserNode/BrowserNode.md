@@ -50,9 +50,3 @@ The BrowserNode object represents a node in the browser.
 ## Version
 
 Introduced in version 8
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

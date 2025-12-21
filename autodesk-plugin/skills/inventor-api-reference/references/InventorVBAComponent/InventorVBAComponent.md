@@ -22,9 +22,3 @@ The InventorVBAComponent object represents a code, class or form module.
 ## Version
 
 Introduced in version 6
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

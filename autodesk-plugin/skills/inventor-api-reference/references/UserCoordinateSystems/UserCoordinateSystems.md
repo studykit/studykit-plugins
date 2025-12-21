@@ -37,9 +37,3 @@ The UserCoordinateSystems collection object contains all user coordinate systems
 ## Version
 
 Introduced in version 2010
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

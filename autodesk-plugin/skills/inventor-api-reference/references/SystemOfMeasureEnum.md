@@ -16,9 +16,3 @@ Type of the Measurement System (Metric, English, etc.).
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

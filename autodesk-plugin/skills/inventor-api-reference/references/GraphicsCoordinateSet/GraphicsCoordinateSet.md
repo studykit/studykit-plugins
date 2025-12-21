@@ -47,9 +47,3 @@ The GraphicsCoordinateSet object contains a list of coordinate values. This obje
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

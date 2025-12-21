@@ -22,9 +22,3 @@ Summary Information, InternalName: {F29F85E0-4FF9-1068-AB91-08002B27B3D9}, Name:
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

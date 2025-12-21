@@ -47,9 +47,3 @@ The TangentiMateDefinition object represents a tangent iMate definition. It is d
 ## Version
 
 Introduced in version 6
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

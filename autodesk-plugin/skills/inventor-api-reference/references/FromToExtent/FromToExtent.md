@@ -31,9 +31,3 @@ The FromToExtent object provides access to the information that defines the exte
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -16,9 +16,3 @@ Constants identifying the fit type of a spline.
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

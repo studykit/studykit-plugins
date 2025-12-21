@@ -29,9 +29,3 @@ The HemFeatures collection object provides access to all of the objects in a she
 ## Version
 
 Introduced in version 5.3
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

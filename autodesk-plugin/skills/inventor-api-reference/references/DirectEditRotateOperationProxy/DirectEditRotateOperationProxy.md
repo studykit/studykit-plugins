@@ -30,9 +30,3 @@ Part DirectEdit Rotate Operation Proxy Object.
 ## Version
 
 Introduced in version 2015
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

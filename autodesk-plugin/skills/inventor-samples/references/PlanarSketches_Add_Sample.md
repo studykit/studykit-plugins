@@ -10,10 +10,6 @@ This sample demonstrates the creation of a sketch using the Sketches.Add method.
 
 Before using this sample, open a part document that contains a box.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub AddSketch()
     ' Set a reference to the part component definition.
@@ -36,9 +32,3 @@ Public Sub AddSketch()
     oSketch.Name = "My New Sketch"
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

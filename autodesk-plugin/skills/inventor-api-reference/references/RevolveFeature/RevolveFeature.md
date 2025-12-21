@@ -74,9 +74,3 @@ The RevolveFeature object represents revolved modeling features. The properties 
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -35,9 +35,3 @@ The ProfilePath3D object represents a single set of connected 3D curves. The ord
 ## Version
 
 Introduced in version 6
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

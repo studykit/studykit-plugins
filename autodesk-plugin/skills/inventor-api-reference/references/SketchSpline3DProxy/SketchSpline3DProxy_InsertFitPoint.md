@@ -22,9 +22,3 @@ SketchSpline3DProxy.**InsertFitPoint**( ***FitPoint*** As Object, [***TargetInde
 ## Version
 
 Introduced in version 8
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

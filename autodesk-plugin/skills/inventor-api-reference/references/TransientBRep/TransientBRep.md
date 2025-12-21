@@ -46,9 +46,3 @@ The TransientBRep object is used to create and manipulate B-Rep objects within a
 ## Version
 
 Introduced in version 2009
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

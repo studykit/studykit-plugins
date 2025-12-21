@@ -49,9 +49,3 @@ The iPartFactory object provides access to the iPart table and provides methods 
 ## Version
 
 Introduced in version 6
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -36,9 +36,3 @@ The EnvironmentList object defines a list of environments that are displayed to 
 ## Version
 
 Introduced in version 10
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

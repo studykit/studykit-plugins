@@ -10,10 +10,6 @@ This sample illustrates creating text in a sketch.
 
 Before running this sample, open a drawing document.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub SketchTextAdd()
     ' Set a reference to the drawing document.
@@ -139,9 +135,3 @@ Private Sub GetCorner(TextBox As TextBox, Left As Double, Top As Double)
     End Select
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

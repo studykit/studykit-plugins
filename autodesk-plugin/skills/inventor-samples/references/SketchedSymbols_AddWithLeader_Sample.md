@@ -10,10 +10,6 @@ This sample illustrates creating sketched symbol with a leader.
 
 Before running this sample, open a drawing document, create a sketched symbol definition and select a linear drawing edge. The sample uses the first sketched symbol definition in the document to create the symbol.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub AddSymbolWithLeader()
     ' Set a reference to the drawing document.
@@ -66,9 +62,3 @@ Public Sub AddSymbolWithLeader()
     Set oSketchedSymbol = oActiveSheet.SketchedSymbols.AddWithLeader(oSketchSymDef, oLeaderPoints)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

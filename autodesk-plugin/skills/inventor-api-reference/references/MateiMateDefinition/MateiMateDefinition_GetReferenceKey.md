@@ -21,9 +21,3 @@ MateiMateDefinition.**GetReferenceKey**( ***ReferenceKey***() As Byte, [***KeyCo
 ## Version
 
 Introduced in version 7
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

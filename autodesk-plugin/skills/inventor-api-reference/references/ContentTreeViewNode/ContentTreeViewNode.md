@@ -34,9 +34,3 @@ The ContentTreeViewNode object represents nodes within the Content Center tree s
 ## Version
 
 Introduced in version 2010
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

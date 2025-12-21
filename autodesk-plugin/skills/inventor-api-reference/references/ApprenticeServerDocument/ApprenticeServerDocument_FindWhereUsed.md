@@ -20,9 +20,3 @@ ApprenticeServerDocument.**FindWhereUsed**( ***FullFileName*** As String ) As [A
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

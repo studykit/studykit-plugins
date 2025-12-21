@@ -68,9 +68,3 @@ The Edge object. See the Boundary Representation article in the overviews sectio
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

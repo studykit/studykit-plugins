@@ -47,9 +47,3 @@ The ChangeProcessor object is at the heart of Inventor's transaction and transcr
 ## Version
 
 Introduced in version 9
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

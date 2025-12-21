@@ -21,9 +21,3 @@ FileDialog.**SetHelpContext**( ***FileName*** As String, ***Context*** As Long )
 ## Version
 
 Introduced in version 11
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -22,9 +22,3 @@ Cylinder.**GetCylinderData**( ***BasePoint***() As Double, ***AxisVector***() As
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

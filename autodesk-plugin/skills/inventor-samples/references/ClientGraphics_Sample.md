@@ -10,10 +10,6 @@ This sample demonstrates the use of client graphics to draw the range box of sel
 
 To run this sample open an assembly or part document and select the item(s) to draw a range box around. Then run the program. If you run it without any graphics selected, it will delete any existing range boxes.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub DrawRangeBox()
     Dim oDoc As Document
@@ -225,9 +221,3 @@ Public Sub DrawRangeBox()
     ThisApplication.ActiveView.Update
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

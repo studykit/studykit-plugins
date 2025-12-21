@@ -17,9 +17,3 @@ Constants identifying the position of the title block on the sheet.
 ## Version
 
 Introduced in version 5.3
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

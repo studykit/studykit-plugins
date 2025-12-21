@@ -8,10 +8,6 @@ The following sample demonstrates the creation of a sheet metal lofted flange fe
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub LoftedFeatureCreation()
     ' Create a new sheet metal document, using the default sheet metal template.
@@ -75,9 +71,3 @@ Public Sub LoftedFeatureCreation()
     ThisApplication.ActiveView.GoHome
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

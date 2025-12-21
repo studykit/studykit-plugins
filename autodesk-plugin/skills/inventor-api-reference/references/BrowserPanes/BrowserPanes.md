@@ -46,9 +46,3 @@ The BrowserPanes object provides access to the existing objects of the browser a
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

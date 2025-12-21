@@ -28,9 +28,3 @@ DocumentInterests.**Add**( ***ClientId*** As String, ***Name*** As String, ***In
 ## Version
 
 Introduced in version 2008
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

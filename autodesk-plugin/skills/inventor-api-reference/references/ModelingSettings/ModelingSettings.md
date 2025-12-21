@@ -38,9 +38,3 @@ The ModelingSettings object provides access to properties that provide read and 
 ## Version
 
 Introduced in version 8
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -43,9 +43,3 @@ The GraphicsIndexSet object contains a list of indices. This object can be refer
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

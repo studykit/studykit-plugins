@@ -35,9 +35,3 @@ This is a read only property whose value is a [SurfaceBody](../SurfaceBody/Surfa
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

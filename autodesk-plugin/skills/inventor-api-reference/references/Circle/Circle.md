@@ -37,9 +37,3 @@ The mathematical Circle object, one of the transient geometry objects.
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -30,9 +30,3 @@ HoleFeatures.**AddDrilledByThroughAllExtent**( ***PlacementDefinition*** As Obje
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

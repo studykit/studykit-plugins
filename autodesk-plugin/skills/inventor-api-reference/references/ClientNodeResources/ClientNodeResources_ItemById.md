@@ -21,9 +21,3 @@ ClientNodeResources.**ItemById**( ***ClientId*** As String, ***Id*** As Long ) A
 ## Version
 
 Introduced in version 8
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

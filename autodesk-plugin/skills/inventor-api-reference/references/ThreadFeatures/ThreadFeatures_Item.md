@@ -31,9 +31,3 @@ This is a read only property whose value is a [ThreadFeature](../ThreadFeature/T
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -21,9 +21,3 @@ The Styles collection object provides access to all the Style objects.
 ## Version
 
 Introduced in version 2008
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

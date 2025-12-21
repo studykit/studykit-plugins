@@ -21,9 +21,3 @@ CustomConstraint3DProxy.**GetReferenceKey**( ***ReferenceKey***() As Byte, [***K
 ## Version
 
 Introduced in version 11
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -16,9 +16,3 @@ Constants indicating the type of the membe edit scope.
 ## Version
 
 Introduced in version 11
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

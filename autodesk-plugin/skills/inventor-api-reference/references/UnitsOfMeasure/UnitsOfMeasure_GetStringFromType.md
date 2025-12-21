@@ -31,9 +31,3 @@ UnitsOfMeasure.**GetStringFromType**( ***UnitsType*** As [UnitsTypeEnum](../Unit
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -10,10 +10,6 @@ This sample demonstrates the Bill of Materials API functionality in assemblies.
 
 Have an assembly document open and run the following sample.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub BOMQuery()
     ' Set a reference to the assembly document.
@@ -106,9 +102,3 @@ Private Sub QueryBOMRowProperties(oBOMRows As BOMRowsEnumerator, ItemTab As Long
     ItemTab = ItemTab - 3
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

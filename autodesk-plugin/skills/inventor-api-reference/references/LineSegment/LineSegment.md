@@ -43,9 +43,3 @@ The LineSegment object represents a line segment. The object created is a transi
 ## Version
 
 Introduced in version 6
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

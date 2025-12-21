@@ -65,9 +65,3 @@ Part Simplify Feature Object.
 ## Version
 
 Introduced in version 2026
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

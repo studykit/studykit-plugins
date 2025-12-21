@@ -8,10 +8,6 @@ Demonstrates creating a new ribbon panel within an existing ribbon tab.
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Sub AddPanelToToolsTab()
     ' Get the ribbon associated with the part document
@@ -50,9 +46,3 @@ Sub AddPanelToToolsTab()
     Call oPanel.CommandControls.AddButton(oDef3, True)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

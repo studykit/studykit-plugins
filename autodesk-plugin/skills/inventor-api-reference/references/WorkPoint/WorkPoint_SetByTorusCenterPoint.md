@@ -24,9 +24,3 @@ WorkPoint.**SetByTorusCenterPoint**( ***Face*** As [Face](../Face/Face.md) )
 ## Version
 
 Introduced in version 2008
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -20,9 +20,3 @@ Generic enumerator for a group of objects. This enumerator will also support the
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -30,9 +30,3 @@ The SurfaceGraphicsEdgeList object contains a list of edges currently displayed 
 ## Version
 
 Introduced in version 2009
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -10,10 +10,6 @@ The samples demonstrate how to import Revit data(.rvt) into Inventor part and as
 
 The VBA samples demonstrate how to import Revit data(.rvt) into Inventor part and assembly documents. You should prepare a Revit data before running the samples.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Sub ImportRVTToAssembly()
     Dim oDoc As AssemblyDocument
@@ -48,9 +44,3 @@ Sub ImportRVTToPart()
     Set oComp = oDoc.ComponentDefinition.ReferenceComponents.ImportedComponents.Add(oImportedRVTDef)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -43,9 +43,3 @@ The ErrorManager object contains methods and properties to get errors and warnin
 ## Version
 
 Introduced in version 2010
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

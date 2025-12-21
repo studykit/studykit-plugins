@@ -32,9 +32,3 @@ BreakOperations.**AddBySketch**( ***Sketch*** As [DrawingSketch](../DrawingSketc
 ## Version
 
 Introduced in version 2026
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

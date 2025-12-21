@@ -21,9 +21,3 @@ The DistanceHeightExtent is used by the FlangeFeature object when the height ext
 ## Version
 
 Introduced in version 2009
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

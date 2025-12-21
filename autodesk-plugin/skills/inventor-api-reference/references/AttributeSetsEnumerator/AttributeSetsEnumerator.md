@@ -20,9 +20,3 @@ The AttributeSetsEnumerator object provides access to a list of objects. See the
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

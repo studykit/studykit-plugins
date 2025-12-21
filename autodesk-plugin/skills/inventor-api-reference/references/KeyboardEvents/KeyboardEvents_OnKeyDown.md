@@ -21,9 +21,3 @@ KeyboardEvents.**OnKeyDown**( ***Key*** As Long, ***ShiftKeys*** As [ShiftStateE
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

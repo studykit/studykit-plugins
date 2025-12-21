@@ -21,9 +21,3 @@ The TextureMaps collection returns all the texture maps applied to a face. There
 ## Version
 
 Introduced in version 10
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

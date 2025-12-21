@@ -56,33 +56,66 @@ This code omits error checking for the sake of clarity and brevity. Always check
 
 First, define a subroutine, and then obtain the active part document and its component definition object.
 
-|  |
-| --- |
-| ```  Sub query_dataIO()  Dim oDoc As PartDocument Set oDoc = ThisApplication.ActiveDocument  Dim oCompDef As ComponentDefinition Set oCompDef = oDoc.ComponentDefinition ``` |
+```vb
+Sub query_dataIO()
+    Dim oDoc As PartDocument
+    Set oDoc = ThisApplication.ActiveDocument
+    Dim oCompDef As ComponentDefinition
+    Set oCompDef = oDoc.ComponentDefinition
+```
 
 Declare the variables for the Format and StorageType arrays, and then get the DataIO object from the component definition.
 
-|  |
-| --- |
-| ```  Dim sFormats() As String Dim sStorageTypes() As StorageTypeEnum Dim oDataIO As DataIO Set oDataIO = oCompDef.DataIO ``` |
+```vb
+Dim sFormats() As String
+Dim sStorageTypes() As StorageTypeEnum
+Dim oDataIO As DataIO
+Set oDataIO = oCompDef.DataIO
+```
 
 Get the supported input (read) formats and display the results in a message box. However, first compose the message string - done by the ioPrint function, defined after this sub.
 
-|  |
-| --- |
-| ```  oDataIO.GetInputFormats sFormats, sStorageTypes MsgBox ("CompDef Input: " & ioPrint(sFormats, sStorageTypes)) ``` |
+```vb
+oDataIO.GetInputFormats sFormats, sStorageTypes
+MsgBox ("CompDef Input: " & ioPrint(sFormats, sStorageTypes))
+```
 
 Get the supported output (write) formats and display the results in a message box, but first compose the message string - done by the ioPrint function, defined after this sub.
 
-|  |
-| --- |
-| ```  oDataIO.GetOutputFormats sFormats, sStorageTypes MsgBox ("CompDef Output: " & ioPrint(sFormats, sStorageTypes))  End Sub ``` |
+```vb
+oDataIO.GetOutputFormats sFormats, sStorageTypes
+MsgBox ("CompDef Output: " & ioPrint(sFormats, sStorageTypes))
+End Sub
+```
 
 That completes the query\_dataIO subroutine. Now, define the ioPrint function. This is a utility function that takes the two arrays and pairs each format and storage type, returning a human-readable string. This function demonstrates that the format and storage type arrays always have identical dimensions. The *nth* item in the format array relates to the *nth* item in the storage type array.
 
-|  |
-| --- |
-| ```  Function ioPrint(sFormats As Variant, sStorageTypes As Variant) _    As String Dim msgString As String Dim lindex As Long For lindex = 0 To UBound(sFormats)   msgString = msgString & sFormats(lindex)   Dim lType As StorageTypeEnum   lType = sStorageTypes(lindex)   Dim sType As String   Select Case lType     Case kFileOrStreamStorage       msgString = msgString & "(File or Stream) "     Case kFileStorage       msgString = msgString & "(File) "     Case kStorageStorage       msgString = msgString & "(Storage) "     Case kStreamStorage       msgString = msgString & "(Stream) "     Case kUnknownStorage       msgString = msgString & "(Unknown) "   End Select Next ioPrint = msgString End Function ``` |
+```vb
+Function ioPrint(sFormats As Variant, sStorageTypes As Variant) _
+    As String
+    Dim msgString As String
+    Dim lindex As Long
+    For lindex = 0 To UBound(sFormats)
+        msgString = msgString & sFormats(lindex)
+        Dim lType As StorageTypeEnum
+        lType = sStorageTypes(lindex)
+        Dim sType As String
+        Select Case lType
+        Case kFileOrStreamStorage
+            msgString = msgString & "(File or Stream) "
+        Case kFileStorage
+            msgString = msgString & "(File) "
+        Case kStorageStorage
+            msgString = msgString & "(Storage) "
+        Case kStreamStorage
+            msgString = msgString & "(Stream) "
+        Case kUnknownStorage
+            msgString = msgString & "(Unknown) "
+        End Select
+    Next
+    ioPrint = msgString
+End Function
+```
 
 Running the query\_dataIO sub generates two message dialog boxes, containing something like the following examples.
 
@@ -95,9 +128,9 @@ ACIS SAT with TransientKeys (File) ACIS SAB with TransientKeys (File or Stream)
 
 This component definition supports writing to a SAT file. So it is valid to call *WriteDataToFile*, using the string "ACIS SAT" as the format, supplying a file name for storage, as in the following example.
 
-|  |
-| --- |
-| ```  oDataIO.WriteDataToFile "ACIS SAT", "c:\MyNewSATfile.SAT" ``` |
+```vb
+oDataIO.WriteDataToFile "ACIS SAT", "c:\MyNewSATfile.SAT"
+```
 
 |  |
 | --- |

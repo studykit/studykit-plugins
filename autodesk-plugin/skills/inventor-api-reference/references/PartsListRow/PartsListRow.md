@@ -38,9 +38,3 @@ The PartsListRow object represents a row in a parts list table.
 ## Version
 
 Introduced in version 5.3
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

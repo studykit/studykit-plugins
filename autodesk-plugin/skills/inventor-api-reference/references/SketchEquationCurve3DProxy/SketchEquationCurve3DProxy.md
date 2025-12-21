@@ -45,9 +45,3 @@ Represents a part SketchEquationCurve3D in an assembly.
 ## Version
 
 Introduced in version 2014
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -21,9 +21,3 @@ Centerline.**GetBisectorEntities**( ***EntityOne*** As [GeometryIntent](../Geome
 ## Version
 
 Introduced in version 2010
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

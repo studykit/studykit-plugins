@@ -43,9 +43,3 @@ The GraphicsNormalSet object contains a list of normals. This object can be refe
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

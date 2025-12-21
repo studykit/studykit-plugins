@@ -10,10 +10,6 @@ Draws a polyline that is an approximation of the selected curve. To use this hav
 
 To use this sample a part must be active.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub Approximate3DSketchGeometry()
     Dim partDoc As PartDocument
@@ -96,9 +92,3 @@ Public Sub Approximate3DSketchGeometry()
     ThisApplication.ActiveView.Update
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

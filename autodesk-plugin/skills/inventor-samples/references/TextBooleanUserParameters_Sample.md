@@ -8,10 +8,6 @@ This sample demonstrates how to create Text and Boolean user parameter.
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub CreateTextBooleanUserParameter()
     Dim oDoc As PartDocument
@@ -27,9 +23,3 @@ Public Sub CreateTextBooleanUserParameter()
     Set oBooleanParam = oUserParameters.AddByValue("Auto_Print", True, kBooleanUnits)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

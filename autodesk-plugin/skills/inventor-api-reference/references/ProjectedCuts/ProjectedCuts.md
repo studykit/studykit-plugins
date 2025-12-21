@@ -28,9 +28,3 @@ The ProjectedCuts object provides access to all of the projected cut edges on th
 ## Version
 
 Introduced in version 2010
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

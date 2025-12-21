@@ -20,9 +20,3 @@ SketchBlockDefinition.**AddByProjectingEntity**( ***Entity*** As Object ) As [Sk
 ## Version
 
 Introduced in version 2010
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

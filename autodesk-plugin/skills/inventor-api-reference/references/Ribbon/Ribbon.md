@@ -34,9 +34,3 @@ The Ribbon object represents the user interface containing a collection of tabs.
 ## Version
 
 Introduced in version 2010
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

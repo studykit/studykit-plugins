@@ -52,9 +52,3 @@ Represents the collection of features in the assembly context. The API does not 
 ## Version
 
 Introduced in version 10
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

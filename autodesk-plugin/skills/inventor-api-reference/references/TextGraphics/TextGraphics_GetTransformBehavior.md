@@ -22,9 +22,3 @@ TextGraphics.**GetTransformBehavior**( ***TextAnchor*** As [Point](../Point/Poin
 ## Version
 
 Introduced in version 6
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

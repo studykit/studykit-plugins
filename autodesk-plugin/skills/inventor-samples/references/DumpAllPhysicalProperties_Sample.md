@@ -8,10 +8,6 @@ This sample writes out information about all of the physical properties in all l
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub DumpAllPhysicalPropertiesInAllLibraries()
     ' Open a file to write the results.
@@ -181,9 +177,3 @@ Private Function ColorString(InColor As color) As String
     ColorString = InColor.Red & "," & InColor.Green & "," & InColor.Blue & "," & InColor.Opacity
 End Function
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

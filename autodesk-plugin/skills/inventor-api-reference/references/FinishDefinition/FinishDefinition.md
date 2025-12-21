@@ -47,9 +47,3 @@ The FinishDefinition object represents all of the information that defines a fin
 ## Version
 
 Introduced in version 2024
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

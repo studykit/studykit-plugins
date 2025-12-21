@@ -26,9 +26,3 @@ A ProgressiveToolTip object provides access to enhanced tooltip display for cont
 ## Version
 
 Introduced in version 2011
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

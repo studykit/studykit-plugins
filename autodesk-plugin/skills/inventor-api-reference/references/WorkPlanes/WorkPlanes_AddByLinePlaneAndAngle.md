@@ -23,9 +23,3 @@ WorkPlanes.**AddByLinePlaneAndAngle**( ***Line*** As Object, ***Plane*** As Obje
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

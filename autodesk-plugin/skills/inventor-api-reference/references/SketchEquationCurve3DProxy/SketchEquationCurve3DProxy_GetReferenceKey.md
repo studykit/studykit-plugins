@@ -21,9 +21,3 @@ SketchEquationCurve3DProxy.**GetReferenceKey**( ***ReferenceKey***() As Byte, [*
 ## Version
 
 Introduced in version 2014
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -10,10 +10,6 @@ This sample demonstrates exporting the Assembly BOM to an external file.
 
 This sample exports the structured and parts only views of the active assembly document to an Excel file. Other file formats are also supported.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub BOMExport()
     ' Set a reference to the assembly document.
@@ -60,9 +56,3 @@ Public Sub BOMExport()
     oPartsOnlyBOMView.Export "C:\temp\BOM-PartsOnly.xls", kMicrosoftExcelFormat, oOptions
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

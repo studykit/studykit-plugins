@@ -31,9 +31,3 @@ A scenario that users need to be aware of is when you use this event to monitor 
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -45,9 +45,3 @@ The MeasureEvents object provides the ability to invoke the measure and show dim
 ## Version
 
 Introduced in version 2009
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

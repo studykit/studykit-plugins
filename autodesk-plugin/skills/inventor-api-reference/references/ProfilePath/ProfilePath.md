@@ -46,9 +46,3 @@ The ProfilePath object represents a single set of connected curves or a text box
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

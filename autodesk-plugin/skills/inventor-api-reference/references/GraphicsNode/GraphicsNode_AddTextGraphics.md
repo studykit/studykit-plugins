@@ -22,9 +22,3 @@ GraphicsNode.**AddTextGraphics**() As [TextGraphics](../TextGraphics/TextGraphic
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

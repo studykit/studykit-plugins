@@ -21,9 +21,3 @@ TransientGeometry.**GetFarmostPoint**( ***Entity*** As Object, ***Direction*** A
 ## Version
 
 Introduced in version 2015
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -20,9 +20,3 @@ Box.**IsDisjoint**( ***Box*** As [Box](../Box/Box.md) ) As Boolean
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

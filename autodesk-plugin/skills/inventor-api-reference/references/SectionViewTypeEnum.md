@@ -17,9 +17,3 @@ Defines the types of the section views in part or assembly.
 ## Version
 
 Introduced in version 2017
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

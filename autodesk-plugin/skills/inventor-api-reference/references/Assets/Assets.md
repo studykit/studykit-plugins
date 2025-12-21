@@ -36,9 +36,3 @@ The Assets collection object provides access to assets within a library and supp
 ## Version
 
 Introduced in version 2014
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

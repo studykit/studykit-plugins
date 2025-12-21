@@ -25,9 +25,3 @@ The ExpressionLimits object provides access to the various range values that can
 ## Version
 
 Introduced in version 2010
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

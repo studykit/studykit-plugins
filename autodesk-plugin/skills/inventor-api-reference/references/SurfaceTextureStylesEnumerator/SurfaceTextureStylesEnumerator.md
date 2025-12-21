@@ -21,9 +21,3 @@ The SurfaceTextureStylesEnumerator object provides access to the existing Surfac
 ## Version
 
 Introduced in version 2009
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

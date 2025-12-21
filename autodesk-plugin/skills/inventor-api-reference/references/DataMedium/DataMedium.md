@@ -43,9 +43,3 @@ The DataMedium object is used when exporting/importing to various formats using 
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

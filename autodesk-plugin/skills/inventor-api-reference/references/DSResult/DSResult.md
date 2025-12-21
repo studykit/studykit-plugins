@@ -30,9 +30,3 @@ The DSResult object represents a specific result from a degree of freedom.
 ## Version
 
 Introduced in version 2013
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

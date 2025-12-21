@@ -66,9 +66,3 @@ The SketchSplineHandle object represents a spline handle within a sketch at a sp
 ## Version
 
 Introduced in version 2008
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

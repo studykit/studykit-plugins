@@ -23,9 +23,3 @@ ModelGeneralNotes.**CreateDefinition**( ***FormattedText*** As String, ***OnScre
 ## Version
 
 Introduced in version 2018
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

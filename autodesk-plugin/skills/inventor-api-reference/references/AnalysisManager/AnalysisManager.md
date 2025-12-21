@@ -24,9 +24,3 @@ The AnalysisManager object provides access to all types of surface analysis in a
 ## Version
 
 Introduced in version 2009
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

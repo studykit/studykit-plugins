@@ -25,9 +25,3 @@ The ConstraintLimits object provides access to various limits related settings f
 ## Version
 
 Introduced in version 2011
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

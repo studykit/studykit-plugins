@@ -22,9 +22,3 @@ The WidthOffsetWidthExtent is used by sheet metal features when the position of 
 ## Version
 
 Introduced in version 2009
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

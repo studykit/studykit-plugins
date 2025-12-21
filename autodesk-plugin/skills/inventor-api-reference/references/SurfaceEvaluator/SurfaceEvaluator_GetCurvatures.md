@@ -23,9 +23,3 @@ SurfaceEvaluator.**GetCurvatures**( ***Params***() As Double, ***MaxTangents***(
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

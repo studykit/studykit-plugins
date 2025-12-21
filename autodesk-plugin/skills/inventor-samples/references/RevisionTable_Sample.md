@@ -10,10 +10,6 @@ This sample illustrates querying the contents of the revision table.
 
 To run this sample have a sheet active that contains a revision table.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub RevisionTableQuery()
     ' Set a reference to the drawing document.
@@ -46,9 +42,3 @@ Public Sub RevisionTableQuery()
     Next
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

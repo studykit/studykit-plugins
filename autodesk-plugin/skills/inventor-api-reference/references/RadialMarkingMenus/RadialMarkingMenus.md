@@ -28,9 +28,3 @@ The RadialMarkingMenus object provides access to the existing radial marking men
 ## Version
 
 Introduced in version 2013
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

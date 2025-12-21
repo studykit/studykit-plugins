@@ -39,9 +39,3 @@ The DimensionText object represents text in a dimension placed on a sheet.
 ## Version
 
 Introduced in version 9
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

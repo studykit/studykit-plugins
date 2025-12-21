@@ -11,10 +11,6 @@ This sample demonstrates placing an assembly occurrence.
 
 Before running the sample, you need to open an assembly and create a part file called C:\Temp\Part1.ipt, or edit the sample code to point to another part file if desired.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub AddOccurrence()
     ' Set a reference to the assembly component definintion.
@@ -45,10 +41,6 @@ End Sub
 ```
 
 Before running the sample, you need to open an assembly and create a part file called C:/Temp/Part1.ipt, or edit the sample code to point to another part file if desired. The first line of the C# sample sets the oApp variable to ThisApplication - this should be appropriately changed.
-
-|  |
-| --- |
-| Copy Code |
 
 ```
 public void AddOccurrence()
@@ -81,9 +73,3 @@ public void AddOccurrence()
 
 }
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

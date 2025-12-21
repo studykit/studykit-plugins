@@ -28,9 +28,3 @@ PlanarSketch.**AddBySilhouette**( ***Face*** As [Face](../Face/Face.md), ***Prox
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

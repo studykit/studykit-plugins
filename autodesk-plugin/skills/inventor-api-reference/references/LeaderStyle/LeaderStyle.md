@@ -53,9 +53,3 @@ The LeaderStyle object represents a leader style in a drawing. The properties an
 ## Version
 
 Introduced in version 2009
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

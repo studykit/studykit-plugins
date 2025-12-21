@@ -10,10 +10,6 @@ This sample demonstrates the creation of a bend note on the drawing view of a fl
 
 Select a bend edge on a flat pattern drawing view and run the sample.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Sub AddBendNote()
     ' Assumes that a drawing document is active
@@ -44,9 +40,3 @@ Sub AddBendNote()
     Set oBendNote = oDoc.ActiveSheet.DrawingNotes.BendNotes.Add(oBendEdge)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

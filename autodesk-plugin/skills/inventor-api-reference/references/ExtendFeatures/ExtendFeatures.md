@@ -21,9 +21,3 @@ For information on this object, please refer to PartFeatures, which provides ide
 ## Version
 
 Introduced in version 11
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

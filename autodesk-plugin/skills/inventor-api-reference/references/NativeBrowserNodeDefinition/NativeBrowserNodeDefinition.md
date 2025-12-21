@@ -40,9 +40,3 @@ The BrowserNodeDefinition object contains the definition of a node in the browse
 ## Version
 
 Introduced in version 8
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

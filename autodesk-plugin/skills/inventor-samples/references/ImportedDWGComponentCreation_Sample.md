@@ -8,10 +8,6 @@ This sample demonstrates how to create an imported DWG component into Inventor p
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Sub CreateImportedDWGComponentSample()
     Dim oDoc As PartDocument
@@ -66,9 +62,3 @@ Sub CreateImportedDWGComponentSample()
     End If
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

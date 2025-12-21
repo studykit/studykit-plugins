@@ -25,9 +25,3 @@ SurfaceEvaluator.**GetIsoCurve**( ***Parameter*** As Double, ***UDirection*** As
 ## Version
 
 Introduced in version 2013
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -62,9 +62,3 @@ The UnfoldFeature object (together with it's complementary RefoldFeature object)
 ## Version
 
 Introduced in version 2010
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

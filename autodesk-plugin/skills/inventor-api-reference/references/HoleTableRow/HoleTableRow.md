@@ -32,9 +32,3 @@ The HoleTableRow object defines a row within the hole table, including the row h
 ## Version
 
 Introduced in version 10
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

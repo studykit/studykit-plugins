@@ -8,10 +8,6 @@ This sample shows how to copy the contents of one sketch to another.
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub CopySketch()
     Dim oCmdMgr As CommandManager
@@ -26,9 +22,3 @@ Public Sub CopySketch()
     Call oSourceSketch.CopyContentsTo(oTargetSketch)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

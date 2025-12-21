@@ -23,9 +23,3 @@ In an assembly, two or more components cannot occupy the same space at the same 
 ## Version
 
 Introduced in version 6
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

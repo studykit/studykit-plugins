@@ -64,9 +64,3 @@ Design Tracking Properties, InternalName: {32853F0F-3444-11d1-9E93-0060B03C1CA6}
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

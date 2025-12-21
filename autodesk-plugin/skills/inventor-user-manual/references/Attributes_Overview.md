@@ -34,9 +34,17 @@ To take full advantage of attributes, it is necessary to add, modify and erase A
 
 The first step in appending data to an Autodesk Inventor object is to create and add a new AttributeSet object to the AttributeSets collection. This is obtained through the AttributeSets property of the object to which the attributes are to be attached. Initially, this AttributeSet can be empty of Attributes. So, assuming an assembly document contains a single part occurrence oMyPartOccurrence:
 
-|  |
-| --- |
-| ```  Dim oAttribSets As AttributeSets Set oAttribSets = oMyPartOccurrence.AttributeSets  Dim oAttribSet As AttributeSet      On Error Resume Next Set oAttribSet = oAttribSets.Add("MyAttribSet") If Err Then   Set oAttribSet = oAttribSets.Item("MyAttribSet") End If ``` |
+```vb
+Dim oAttribSets As AttributeSets
+Set oAttribSets = oMyPartOccurrence.AttributeSets
+Dim oAttribSet As AttributeSet
+On Error
+Resume Next
+Set oAttribSet = oAttribSets.Add("MyAttribSet")
+If Err Then
+    Set oAttribSet = oAttribSets.Item("MyAttribSet")
+End If
+```
 
 The preceding sample code obtains the AttributeSets collection object from the part occurrence, and then adds
 a new AttributeSet object named "MyAttribSet" to the collection, if one doesn't already exist.
@@ -45,9 +53,12 @@ a new AttributeSet object named "MyAttribSet" to the collection, if one doesn't 
 
 Next, declare and add an Attribute to the AttributeSet object using the add method of the AttributeSet object.
 
-|  |
-| --- |
-| ```  Dim oAttrib As Inventor.Attribute If oAttribSet.Count = 0 Then   Set oAttrib = oAttribSet.Add("MyAttrib", kStringType, "Some Text") End If ``` |
+```vb
+Dim oAttrib As Inventor.Attribute
+If oAttribSet.Count = 0 Then
+    Set oAttrib = oAttribSet.Add("MyAttrib", kStringType, "Some Text")
+End If
+```
 
 This code adds a single attribute of type String, containing the text "Some Text", after first
 checking that the AttributeSet doesn't already contain attributes. An alternative is to check
@@ -61,9 +72,13 @@ both AttributeSets allow the use of a name string to identify the required objec
 Item method accepts a numeric index value, allowing iteration of all available AttributeSets. In this
 example, we use the previously named attributes.
 
-|  |
-| --- |
-| ```  Dim oAttribSets As AttributeSets Set oAttribSets = oMyPart.AttributeSets  Dim oAttrib As Inventor.Attribute Set oAttrib = oAttribSets.Item("MyAttribSet").Item("MyAttrib") Debug.Print oAttrib.Value ``` |
+```vb
+Dim oAttribSets As AttributeSets
+Set oAttribSets = oMyPart.AttributeSets
+Dim oAttrib As Inventor.Attribute
+Set oAttrib = oAttribSets.Item("MyAttribSet").Item("MyAttrib")
+Debug.Print oAttrib.Value
+```
 
 For clarity and brevity, the previous example doesn't perform any error checking. You could use the NameIsUsed property (see the next section) to check whether the attribute exists. Given the existence of the attribute 'MyAttrib' this code prints out its value, "Some Text".
 
@@ -73,9 +88,15 @@ Deleting attributes is straightforward, except that it is always wise to check f
 
 The following code uses the delete method of the Attribute object, followed by the delete method of the parent AttributeSet object.
 
-|  |
-| --- |
-| ```  Dim oAttribSets As AttributeSets Set oAttribSets = oMyPart.AttributeSets  If oAttribSets.NameIsUsed("MyAttribSet") Then   Set oAttrib = oAttribSets.Item("MyAttribSet").Item("MyAttrib")   oAttrib.Delete   oAttribSets.Item("MyAttribSet").Delete End If ``` |
+```vb
+Dim oAttribSets As AttributeSets
+Set oAttribSets = oMyPart.AttributeSets
+If oAttribSets.NameIsUsed("MyAttribSet") Then
+    Set oAttrib = oAttribSets.Item("MyAttribSet").Item("MyAttrib")
+    oAttrib.Delete
+    oAttribSets.Item("MyAttribSet").Delete
+End If
+```
 
 Again, the previous code uses minimal error checking, though it does demonstrate the use of the NameIsUsed property to verify the existence of the AttributeSet.
 
@@ -91,9 +112,23 @@ AttributeManager methods such as OpenAttributeSets return an AttributeSetsEnumer
 
 The following code assumes a PartDocument object containing a single part, which in turn has faces to which attributes are attached. This example uses OpenAttributeSets to find AttributeSet "Test" on these face objects, and prints out the value of the first attribute in the AttributeSet. This would be much quicker than opening each face.
 
-|  |
-| --- |
-| ```  Dim oDoc As PartDocument Set oDoc = ThisApplication.ActiveDocument  Dim oFaceColl As ObjectCollection Set oFaceColl = ThisApplication.TransientObjects.CreateObjectCollection For Each oFace In oDoc.ComponentDefinition.SurfaceBodies.Item(1).Faces   oFaceColl.Add oFace Next  Dim oSet As AttributeSet Dim oSetEnum As AttributeSetsEnumerator  Set oSetEnum= oDoc.AttributeManager.OpenAttributeSets(oFaceColl,"Test") For Each oSet In oSetEnum   If oSet.Count > 0 Then     Debug.Print oSet.Item(1).Value   End If Next ``` |
+```vb
+Dim oDoc As PartDocument
+Set oDoc = ThisApplication.ActiveDocument
+Dim oFaceColl As ObjectCollection
+Set oFaceColl = ThisApplication.TransientObjects.CreateObjectCollection
+For Each oFace In oDoc.ComponentDefinition.SurfaceBodies.Item(1).Faces
+    oFaceColl.Add oFace
+Next
+Dim oSet As AttributeSet
+Dim oSetEnum As AttributeSetsEnumerator
+Set oSetEnum= oDoc.AttributeManager.OpenAttributeSets(oFaceColl,"Test")
+For Each oSet In oSetEnum
+    If oSet.Count > 0 Then
+        Debug.Print oSet.Item(1).Value
+    End If
+Next
+```
 
 Other methods supported by the AttributeManager object include FindObjects. As its name suggests, this method returns a collection of objects corresponding to specified AttributeSet or Attribute names, or attribute values.
 

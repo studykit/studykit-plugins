@@ -17,9 +17,3 @@ Enum used to define the types of solution for a mate constraint.
 ## Version
 
 Introduced in version 2019
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

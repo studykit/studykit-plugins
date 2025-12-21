@@ -52,9 +52,3 @@ The Camera defines the view of the model shown within the window.
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

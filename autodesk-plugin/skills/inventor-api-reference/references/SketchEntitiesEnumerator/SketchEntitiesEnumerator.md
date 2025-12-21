@@ -35,9 +35,3 @@ The SketchEntitiesEnumerator object provides access to all of the geometric enti
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

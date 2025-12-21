@@ -28,9 +28,3 @@ The InventorVBAComponents collection object represents a collection of objects i
 ## Version
 
 Introduced in version 6
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

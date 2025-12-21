@@ -20,9 +20,3 @@ DetailDrawingView.**MoveTo**( ***TargetSheet*** As [Sheet](../Sheet/Sheet.md) ) 
 ## Version
 
 Introduced in version 11
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

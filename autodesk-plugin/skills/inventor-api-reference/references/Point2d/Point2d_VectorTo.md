@@ -20,9 +20,3 @@ Point2d.**VectorTo**( ***Point*** As [Point2d](../Point2d/Point2d.md) ) As [Vect
 ## Version
 
 Introduced in version 2008
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

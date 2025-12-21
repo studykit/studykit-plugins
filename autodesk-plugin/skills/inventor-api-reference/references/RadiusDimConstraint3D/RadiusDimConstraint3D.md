@@ -43,9 +43,3 @@ The RadiusDimConstraint3D object represents a constraint that controls the radiu
 ## Version
 
 Introduced in version 2010
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

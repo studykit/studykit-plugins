@@ -44,9 +44,3 @@ A RibbonTab object represents a tab within a ribbon.
 ## Version
 
 Introduced in version 2010
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

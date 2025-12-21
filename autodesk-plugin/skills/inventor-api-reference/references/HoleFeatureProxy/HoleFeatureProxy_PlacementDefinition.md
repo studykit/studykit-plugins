@@ -17,9 +17,3 @@ This is a read/write property whose value is a [HolePlacementDefinition](../Hole
 ## Version
 
 Introduced in version 10
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

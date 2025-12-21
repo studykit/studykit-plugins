@@ -35,9 +35,3 @@ The Columns collection object represents the collection of objects for this tabl
 ## Version
 
 Introduced in version 9
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

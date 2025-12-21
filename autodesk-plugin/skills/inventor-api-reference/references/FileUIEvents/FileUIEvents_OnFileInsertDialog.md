@@ -43,9 +43,3 @@ FileUIEvents.**OnFileInsertDialog**( ***FileTypes***() As String, ***DocumentObj
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

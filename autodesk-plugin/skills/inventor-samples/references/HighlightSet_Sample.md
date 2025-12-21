@@ -8,10 +8,6 @@ This sample highlights the faces of an extrusion, revolution, or hole feature. I
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Private oStartHLSet As HighlightSet
 Private oEndHLSet As HighlightSet
@@ -100,9 +96,3 @@ Public Sub ClearHighlight()
     Set oSideHLSet = Nothing
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

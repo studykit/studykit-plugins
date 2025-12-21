@@ -69,9 +69,3 @@ The DesignProject object represents an Inventor project file (.ipj).
 ## Version
 
 Introduced in version 7
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -49,9 +49,3 @@ The proxy representation of a SketchControlPointSpline3D object. This represents
 ## Version
 
 Introduced in version 2014
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -31,9 +31,3 @@ MiniToolbarControls.**AddLabel**( ***InternalName*** As String, ***Text*** As St
 ## Version
 
 Introduced in version 2012
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

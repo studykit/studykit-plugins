@@ -37,9 +37,3 @@ The DrawingNotes collection object provides access to all of the drawing notes o
 ## Version
 
 Introduced in version 10
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

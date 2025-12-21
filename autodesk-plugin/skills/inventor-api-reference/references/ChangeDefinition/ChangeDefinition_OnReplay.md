@@ -21,9 +21,3 @@ ChangeDefinition.**OnReplay**( ***Context*** As [NameValueMap](../NameValueMap/N
 ## Version
 
 Introduced in version 9
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

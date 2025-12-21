@@ -24,9 +24,3 @@ This is a read only property whose value is an [InventorVBAProject](../InventorV
 ## Version
 
 Introduced in version 6
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

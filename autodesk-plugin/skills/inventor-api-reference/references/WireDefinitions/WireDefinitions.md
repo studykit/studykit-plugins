@@ -28,9 +28,3 @@ Represents a set of definitions of 3D wireframe geometry that will be used to cr
 ## Version
 
 Introduced in version 2013
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

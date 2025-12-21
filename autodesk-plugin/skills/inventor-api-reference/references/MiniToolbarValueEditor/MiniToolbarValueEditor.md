@@ -64,9 +64,3 @@ The MiniToolbarValueEditor object represents a value edit control within a MiniT
 ## Version
 
 Introduced in version 2012
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

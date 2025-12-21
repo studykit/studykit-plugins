@@ -29,9 +29,3 @@ Curve2dEvaluator.**GetParamAtLength**( ***FromParam*** As Double, ***Length*** A
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

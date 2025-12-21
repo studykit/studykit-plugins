@@ -10,10 +10,6 @@ This sample demonstrates the creation of a sketch spline using a geometry defini
 
 Have a part document open and run the following sample.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub SplineByDefinition()
     ' Set a reference to the part component definition.
@@ -70,9 +66,3 @@ Public Sub SplineByDefinition()
     Set oFixedSpline = oSketch2.SketchFixedSplines.Add(oBSplineCurve2d)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

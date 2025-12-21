@@ -20,9 +20,3 @@ SurfaceBody.**GetFaceColors**( [***Faces***] As Variant ) As [ObjectCollection](
 ## Version
 
 Introduced in version 2018
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -10,10 +10,6 @@ This sample demonstrates how to use the search box in a document's browser pane.
 
 Open a document in Inventor first before running below sample.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Sub SearchBoxSample()
     Dim oDoc As Document
@@ -40,9 +36,3 @@ Sub SearchBoxSample()
     Call oSearchBox.Search("Part")
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

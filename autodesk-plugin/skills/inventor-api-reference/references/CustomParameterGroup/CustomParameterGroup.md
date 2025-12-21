@@ -41,9 +41,3 @@ The CustomParameterGroup object represents a grouping of certain parameters in t
 ## Version
 
 Introduced in version 10
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

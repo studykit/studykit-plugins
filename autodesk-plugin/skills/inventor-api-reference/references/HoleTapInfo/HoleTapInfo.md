@@ -49,9 +49,3 @@ This object is really a StandardThreadInfo object with the addition of the prope
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

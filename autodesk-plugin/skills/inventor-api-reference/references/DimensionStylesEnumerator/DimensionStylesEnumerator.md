@@ -21,9 +21,3 @@ The DimensionStylesEnumerator collection object provides access to the existing 
 ## Version
 
 Introduced in version 9
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

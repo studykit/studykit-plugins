@@ -13,9 +13,3 @@ Point2d.**Copy**() As [Point2d](../Point2d/Point2d.md)
 ## Version
 
 Introduced in version 2013
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

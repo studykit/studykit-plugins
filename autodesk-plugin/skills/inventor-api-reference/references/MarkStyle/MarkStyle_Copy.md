@@ -20,9 +20,3 @@ MarkStyle.**Copy**( ***NewName*** As String ) As [MarkStyle](../MarkStyle/MarkSt
 ## Version
 
 Introduced in version 2023
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

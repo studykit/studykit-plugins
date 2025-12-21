@@ -21,9 +21,3 @@ Curve2dEvaluator.**GetTangent**( ***Params***() As Double, ***Tangents***() As D
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

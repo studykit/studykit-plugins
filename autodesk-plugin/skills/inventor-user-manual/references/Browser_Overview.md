@@ -14,9 +14,37 @@ Below is some sample code that illustrates the process of creating and interacti
 
 For this sample, all of the following code is contained within a form module. This is not intended to show the only approach to creating a browser pane. Often this would be done in a class module so you can have a single object that handles all of the browser pane information that is unique to each document. This sample was written this way to make it easier to focus on the browser pane portion of the code without the complication of other issues. To make the sample, create a new ActiveX EXE project and copy this code into the form module.
 
-|  |
-| --- |
-| ```  ' Declare variable for the calendar control. Private WithEvents oCal As MSACAL.Calendar  ' Declare global variables for the Inventor document and Application. Private WithEvents oDocEvents As DocumentEvents Private oPane As BrowserPane Private oApp As Inventor.Application  Private Sub Form_Load()     ' Set a reference to a running instance of Inventor.     ' This expects Inventor to be running.     Set oApp = GetObject(, "Inventor.Application")          ' Get the active document.  This assumes a document is open.     Dim oDoc As Inventor.Document     Set oDoc = oApp.ActiveDocument          ' Connect to the documents events.  Used to     ' listen for when the document is closed.     Set oDocEvents = oDoc.DocumentEvents      ' Create a new browser pane using the Microsoft calendar control.     Set oPane = oDoc.BrowserPanes.Add("Calendar", "MSCAL.Calendar")          ' Set a reference to the calendar control     ' that was created on the pane.     Set oCal = oPane.Control          ' Set the calendar to today's date.     oCal.Today          ' Make the new pane the active pane.     oPane.Activate End Sub ``` |
+```vb
+' Declare variable for the calendar control.
+Private WithEvents oCal As MSACAL.Calendar
+' Declare global variables for the Inventor document and Application.
+Private WithEvents oDocEvents As DocumentEvents
+Private oPane As BrowserPane
+Private oApp As Inventor.Application
+Private Sub Form_Load()
+    '
+    Set a reference to a running instance of Inventor.
+    ' This expects Inventor to be running.
+    Set oApp = GetObject(, "Inventor.Application")
+    ' Get the active document.  This assumes a document is open.
+    Dim oDoc As Inventor.Document
+    Set oDoc = oApp.ActiveDocument
+    ' Connect to the documents events.  Used to
+    ' listen for when the document is closed.
+    Set oDocEvents = oDoc.DocumentEvents
+    ' Create a new browser pane using the Microsoft calendar control.
+    Set oPane = oDoc.BrowserPanes.Add("Calendar", "MSCAL.Calendar")
+    '
+    Set a reference to the calendar control
+    ' that was created on the pane.
+    Set oCal = oPane.Control
+    '
+    Set the calendar to today's date.
+    oCal.Today
+    ' Make the new pane the active pane.
+    oPane.Activate
+End Sub
+```
 
 The first line is declaring a variable to be the type of the control. This is declared using the WithEvents keyword, so you'll be able to capture events from the control. There's one thing to be aware of at this point: in order to declare a variable of this type you must reference the control into your project. You typically think of referencing controls using the Components command within Visual Basic. However, because of what appears to be a bug in Visual Basic, if you reference the control this way, you'll get a "Run-time error 13: Type mismatch" error on the line:
 
@@ -35,20 +63,41 @@ Just creating the pane and adding the ActiveX control is usually not enough. Typ
 
 The variable that is used to reference the control was declared using the WithEvents keyword to enable receiving events from the control. The code below is executed whenever the user clicks a date on the calendar. If the user selects January 1, 2000, it will cause the form to be unloaded. The code for the Form\_Unload event is listed later.
 
-|  |
-| --- |
-| ```  ' Event fired when the calendar is clicked Private Sub oCal_Click()     ' Display the new date in the Inventor status bar.     oApp.StatusBarText = "Selected new date: " & _                         Format(oCal.Value, "mmmm dd, yyyy")                                          ' Check for January 1, 2000 and unload the form.     If oCal.Value = #1/1/2000# Then         Unload Me     End If End Sub ``` |
+```vb
+' Event fired when the calendar is clicked
+Private Sub oCal_Click()
+    ' Display the new date in the Inventor status bar.
+    oApp.StatusBarText = "Selected new date: " & _
+    Format(oCal.Value, "mmmm dd, yyyy")
+        ' Check for January 1, 2000 and unload the form.
+        If oCal.Value = #1/1/2000# Then
+            Unload Me
+        End If
+    End Sub
+```
 
 The code below is executed when the document is closed. It causes the form to be unloaded.
 
-|  |
-| --- |
-| ```  Private Sub oDocEvents_OnClose( _                           ByVal BeforeOrAfter As Inventor.EventTimingEnum, _                           ByVal Context As Inventor.NameValueMap, _                           HandlingCode As Inventor.HandlingCodeEnum)     If BeforeOrAfter = kBefore Then         Unload Me     End If End Sub ``` |
+```vb
+Private Sub oDocEvents_OnClose( _
+    ByVal BeforeOrAfter As Inventor.EventTimingEnum, _
+    ByVal Context As Inventor.NameValueMap, _
+    HandlingCode As Inventor.HandlingCodeEnum)
+    If BeforeOrAfter = kBefore Then
+        Unload Me
+    End If
+End Sub
+```
 
 The code below is executed when the form is unloaded. It releases all references and deletes the pane.
 
-|  |
-| --- |
-| ```  Private Sub Form_Unload(Cancel As Integer)     Set oCal = Nothing     Set oDocEvents = Nothing     Set oApp = Nothing     oPane.Delete End Sub ``` |
+```vb
+Private Sub Form_Unload(Cancel As Integer)
+    Set oCal = Nothing
+    Set oDocEvents = Nothing
+    Set oApp = Nothing
+    oPane.Delete
+End Sub
+```
 
 The browser is a document-centric object. The contents of the browser are unique for each document. When adding panes, they must be added to each document you want the pane to be visible within. Each pane will have its own instance of the ActiveX control, so each one must be managed independently. The browser information is not persisted between sessions by Autodesk Inventor. If you need the data between sessions you'll need to persist the data yourself, create a new pane, and restore the data the next time the document is opened.

@@ -29,15 +29,39 @@ This method has two input arguments and returns a Double value. The first argume
 
 Like the GetValueFromExpression method just discussed, many of the methods supported by the UnitsOfMeasure object require to you to specify the type of unit you are working with. For example, let's say you have a dialog where the user needs to enter a length and they've entered "3.2". Using the GetValueFromExpression method you can pass in the string and the expected unit type and get back the value in the appropriate database value. The code below takes a string from a text box and evaluates it as a length string. Error checking is performed around the GetValueFromExpression call because if the input string does not define a valid length an error will occur. If successful, dLength will contain the resulting length in database length units (centimeters).
 
-|  |
-| --- |
-| ```  ' Set a reference to the UnitsOfMeasure object of the active document. Dim oUOM As UnitsOfMeasure Set oUOM = ThisApplication.ActiveDocument.UnitsOfMeasure      ' Get the length defined by the contents of a text box. Dim dLength As Double On Error Resume Next dLength = oUOM.GetValueFromExpression(txtLength.Text, kDefaultDisplayLengthUnits) If Err Then     MsgBox "Invalid length specified." End If On Error GoTo 0 ``` |
+```vb
+'
+Set a reference to the UnitsOfMeasure object of the active document.
+Dim oUOM As UnitsOfMeasure
+Set oUOM = ThisApplication.ActiveDocument.UnitsOfMeasure
+' Get the length defined by the contents of a text box.
+Dim dLength As Double
+On Error
+Resume Next
+dLength = oUOM.GetValueFromExpression(txtLength.Text, kDefaultDisplayLengthUnits)
+If Err Then
+    MsgBox "Invalid length specified."
+End If
+On Error GoTo 0
+```
 
 As seen above, when using an enum as the input for the UnitsSpecifier argument of the UnitsOfMeasure, you can specify a particular unit or whatever the current document default is for a unit category. This argument can also be a string to allow you to specify units that are not defined in the UnitsTypeEnum enum list. For example, all of the volume measurements are those used primarily for liquids: cup, gallon, liter, ounce, pint, and quart. If you want to use a different volume measurement, i.e. cubic inches, you'll need to define the unit using a string. The following example creates a string that defines volume units using the current default document length unit.
 
-|  |
-| --- |
-| ```  ' Get the enum value that defines the current default length units. Dim eLengthUnit As UnitsTypeEnum eLengthUnit = oUOM.LengthUnits  ' Get the equivalent string of the enum value. Dim sLengthUnit As String sLengthUnit = oUOM.GetStringFromType(eLengthUnit)  ' Create a string that defines a volume using the current length unit. Dim sVolumeUnit As String sVolumeUnit = sLengthUnit & "^3"  ' Create a string showing the volume in the current units. Dim sVolume As String sVolume = oUOM.GetStringFromValue(36.567, sVolumeUnit) MsgBox "Parts volume: " & sVolume ``` |
+```vb
+' Get the enum value that defines the current default length units.
+Dim eLengthUnit As UnitsTypeEnum
+eLengthUnit = oUOM.LengthUnits
+' Get the equivalent string of the enum value.
+Dim sLengthUnit As String
+sLengthUnit = oUOM.GetStringFromType(eLengthUnit)
+' Create a string that defines a volume using the current length unit.
+Dim sVolumeUnit As String
+sVolumeUnit = sLengthUnit & "^3"
+' Create a string showing the volume in the current units.
+Dim sVolume As String
+sVolume = oUOM.GetStringFromValue(36.567, sVolumeUnit)
+MsgBox "Parts volume: " & sVolume
+```
 
 The first section gets the enum value that specifies the current length unit. To define a custom unit we need a string, so the next step calls the GetStringFromType to get the string that is equivalent to the enum value. Let's assume the document default length unit has been set to inches. The call to the LengthUnits property will return kInchLengthUnits. Passing this value into the GetStringFromType method will return "inch". The next step uses this string to create a string that defines a volume. In this case, the result is "inch^3", for cubic inches. This string is used as the UnitsSpecifier argument in the call of the GetStringFromValue method to convert the value 36.567 to cubic inches and return a correctly formatted string. The result is "2.231 in in in". The input value is assumed to be in database units or in this case cubic centimeters.
 

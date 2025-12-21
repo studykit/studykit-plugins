@@ -42,9 +42,3 @@ The ParameterTable object represents the connection to a spreadsheet. From the P
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

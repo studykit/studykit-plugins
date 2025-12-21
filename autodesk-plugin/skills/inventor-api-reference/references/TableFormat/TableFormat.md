@@ -31,9 +31,3 @@ The TableFormat object contains values for the various overrides of the table's 
 ## Version
 
 Introduced in version 9
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

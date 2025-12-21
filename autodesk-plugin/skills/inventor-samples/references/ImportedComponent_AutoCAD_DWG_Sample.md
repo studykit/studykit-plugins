@@ -8,10 +8,6 @@ This sample demonstrates how to import AutoCAD associatively.
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Sub AssociativelyImportAutoCADDWGSample()
     Dim oDoc As PartDocument
@@ -29,9 +25,3 @@ Sub AssociativelyImportAutoCADDWGSample()
     Set oImportedComp = oPartCompDef.ReferenceComponents.ImportedComponents.Add(oImportedDWGCompDef)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

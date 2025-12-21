@@ -46,9 +46,3 @@ The CentermarkStyle object represents a center mark style in a drawing.
 ## Version
 
 Introduced in version 2010
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

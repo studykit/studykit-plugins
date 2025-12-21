@@ -10,10 +10,6 @@ Demonstrates assembly occurrences to a new folder
 
 Have an assembly with at least one occurrence in it and run the sample.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub AddOccurrencesToFolder()
     Dim oDoc As AssemblyDocument
@@ -41,9 +37,3 @@ Public Sub AddOccurrencesToFolder()
     Set oFolder = oPane.AddBrowserFolder("My Occurrence Folder", oOccurrenceNodes)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

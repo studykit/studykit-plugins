@@ -21,9 +21,3 @@ The TrimFeatures collection provides access to all of the TrimFeature objects in
 ## Version
 
 Introduced in version 11
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

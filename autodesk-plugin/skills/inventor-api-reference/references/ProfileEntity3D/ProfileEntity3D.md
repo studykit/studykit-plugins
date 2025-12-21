@@ -38,9 +38,3 @@ The ProfileEntity3D object represents a curve within a 3D profile path.
 ## Version
 
 Introduced in version 6
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

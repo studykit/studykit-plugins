@@ -20,9 +20,3 @@ Vector.**DotProduct**( ***Argument*** As [Vector](../Vector/Vector.md) ) As Doub
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

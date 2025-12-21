@@ -56,9 +56,3 @@ The ChamferNote object represents a chamfer note with an attached leader on a sh
 ## Version
 
 Introduced in version 2010
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

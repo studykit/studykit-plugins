@@ -10,10 +10,6 @@ Demonstrates creating an arc length dimension constraint.
 
 To use this sample a part must be active.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub ArcLengthDimConstraintSample()
     ' Get the active part document.
@@ -40,9 +36,3 @@ Public Sub ArcLengthDimConstraintSample()
     Set arcConstraint = sketch.DimensionConstraints.AddArcLength(arc, tg.CreatePoint2d(10, 9))
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

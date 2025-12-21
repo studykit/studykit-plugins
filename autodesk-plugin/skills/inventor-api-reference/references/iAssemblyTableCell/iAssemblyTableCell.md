@@ -25,9 +25,3 @@ The iAssemblyTableCell object represents an individual cell in the iAssembly fac
 ## Version
 
 Introduced in version 11
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

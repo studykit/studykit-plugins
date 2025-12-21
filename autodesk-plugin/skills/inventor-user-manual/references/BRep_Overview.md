@@ -52,33 +52,58 @@ The following code omits error checking for the sake of clarity and brevity. Alw
 
 As indicated by the object model diagram, BRep information is obtained from the component definition, so the first step is to get the part component definition for the open part document. Then iterate through the SurfaceBodies collection of SurfaceBody objects. The SurfaceBody object has a Faces property providing direct access to that objects collection of faces. The following code begins to loop through that collection of faces:
 
-|  |
-| --- |
-| ```  Dim oPartDef As PartComponentDefinition Set oPartDef = ThisApplication.ActiveDocument.ComponentDefinition      Dim oSurfaceBody As SurfaceBody Dim oFace As Face  For Each oSurfaceBody In oPartDef.SurfaceBodies   For Each oFace In oSurfaceBody.Faces ``` |
+```vb
+Dim oPartDef As PartComponentDefinition
+Set oPartDef = ThisApplication.ActiveDocument.ComponentDefinition
+Dim oSurfaceBody As SurfaceBody
+Dim oFace As Face
+For Each oSurfaceBody In oPartDef.SurfaceBodies
+    For Each oFace In oSurfaceBody.Faces
+```
 
 This sample deals only with planar faces, so check the surface type before obtaining the surface evaluator and the parameter range box for this face:
 
-|  |
-| --- |
-| ```    If oFace.SurfaceType = kPlaneSurface Then                  Dim oEval As SurfaceEvaluator     Set oEval = oFace.Evaluator          Dim oRange As Box2d     Set oRange = oEval.ParamRangeRect ``` |
+```vb
+If oFace.SurfaceType = kPlaneSurface Then
+    Dim oEval As SurfaceEvaluator
+    Set oEval = oFace.Evaluator
+    Dim oRange As Box2d
+    Set oRange = oEval.ParamRangeRect
+```
 
 To calculate the center point of the range box, determine the range of each side and halve it.
 
-|  |
-| --- |
-| ```              Dim params(0 To 1) As Double     params(0) = oRange.MinPoint.X + (oRange.MaxPoint.X - oRange. _         MinPoint.X) * 0.5     params(1) = oRange.MinPoint.Y + (oRange.MaxPoint.Y - oRange. _         MinPoint.Y) * 0.5 ``` |
+```vb
+Dim params(0 To 1) As Double
+params(0) = oRange.MinPoint.X + (oRange.MaxPoint.X - oRange. _
+MinPoint.X) * 0.5
+params(1) = oRange.MinPoint.Y + (oRange.MaxPoint.Y - oRange. _
+MinPoint.Y) * 0.5
+```
 
 The point is in the 2D parameter space of the face. Use the GetPointAtParam method to obtain the X Y Z coordinate of that point in model space, and then create a corresponding Point object.
 
-|  |
-| --- |
-| ```          Dim cenPt() As Double     oEval.GetPointAtParam params, cenPt          Dim oPoint As Point     Set oPoint = ThisApplication.TransientGeometry.CreatePoint _         (cenPt(0), cenPt(1), cenPt(2)) ``` |
+```vb
+Dim cenPt() As Double
+oEval.GetPointAtParam params, cenPt
+Dim oPoint As Point
+Set oPoint = ThisApplication.TransientGeometry.CreatePoint _
+(cenPt(0), cenPt(1), cenPt(2))
+```
 
 Add a new sketch to the sketches collection of the part component definition. Add a sketch point to the sketch, at the previously determined face center point. Use the ModelToSketchSpace method to create the point in the 2D plane of the sketch. Finally, move on to the next Face object or the next SubrfaceBody object.
 
-|  |
-| --- |
-| ```          Dim oSketch As PlanarSketch     Set oSketch = oPartDef.Sketches.Add(oFace)              Dim oPoint2D As Point2d     Set oPoint2D = oSketch.ModelToSketchSpace(oPoint)          Dim oSkPnt As SketchPoint     Set oSkPnt = oSketch.SketchPoints.Add(oPoint2D)    End If      Next Next ``` |
+```vb
+Dim oSketch As PlanarSketch
+Set oSketch = oPartDef.Sketches.Add(oFace)
+Dim oPoint2D As Point2d
+Set oPoint2D = oSketch.ModelToSketchSpace(oPoint)
+Dim oSkPnt As SketchPoint
+Set oSkPnt = oSketch.SketchPoints.Add(oPoint2D)
+End If
+Next
+Next
+```
 
 The sample places new sketches and sketch points in the part document. The sketch points are located at the center of all planar faces. For example, a tapered hexagonal solid results in placement of the following sketch points (here shown in wireframe mode):
 

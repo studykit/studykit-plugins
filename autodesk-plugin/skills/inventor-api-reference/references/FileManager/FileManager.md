@@ -80,9 +80,3 @@ The FileManager object provides access to file-related utility functions.
 ## Version
 
 Introduced in version 6
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

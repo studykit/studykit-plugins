@@ -29,9 +29,3 @@ GraphicsDataSets.**CreateIndexSet**( ***DataSetId*** As Long ) As [GraphicsIndex
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

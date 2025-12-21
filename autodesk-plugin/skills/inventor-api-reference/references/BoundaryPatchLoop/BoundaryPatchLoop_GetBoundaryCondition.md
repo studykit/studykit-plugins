@@ -28,9 +28,3 @@ If the boundary path object, i.e. the object returned by the BoundaryPath proper
 ## Version
 
 Introduced in version 2008
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

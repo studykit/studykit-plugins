@@ -20,15 +20,21 @@ Custom tables are defined by specifying a number of rows and columns. Columns ha
 
 The table is added to the active sheet, so first get this sheet from the active document. Note that this code omits error checking for the sake of clarity and brevity. Always check that return values are of the expected type.
 
-|  |
-| --- |
-| ```  Public Sub CreateTable()          Dim oDrawDoc As DrawingDocument     Set oDrawDoc = ThisApplication.ActiveDocument          Dim oSheet As Sheet     Set oSheet = oDrawDoc.ActiveSheet  ``` |
+```vb
+Public Sub CreateTable()
+    Dim oDrawDoc As DrawingDocument
+    Set oDrawDoc = ThisApplication.ActiveDocument
+    Dim oSheet As Sheet
+    Set oSheet = oDrawDoc.ActiveSheet
+```
 
 Set up a string array to contain the column titles (headers). This table has two columns, so the array contains two strings.
 
-|  |
-| --- |
-| ```      Dim oTitles(1 To 2) As String     oTitles(1) = "Desk Number"     oTitles(2) = "Employee" ``` |
+```vb
+Dim oTitles(1 To 2) As String
+oTitles(1) = "Desk Number"
+oTitles(2) = "Employee"
+```
 
 Now add the content by setting up an array for the two rows and two columns ( 2 x 2 = 4, so the array contains four strings). The table cell order is left-to-right, top-to-bottom.
 
@@ -36,57 +42,71 @@ Now add the content by setting up an array for the two rows and two columns ( 2 
 | --- |
 | **Note:** An empty table can be constructed by not passing content to the CustomTables.Add method, but if an array *is* passed, it must contain string entries for *all* cells, otherwise an error occurs. |
 
-|  |
-| --- |
-| ```      Dim oContents(1 To 4) As String     oContents(1) = "103"     oContents(2) = "Peter Heald"     oContents(3) = "107"     oContents(4) = "Jamie Foss" ``` |
+```vb
+Dim oContents(1 To 4) As String
+oContents(1) = "103"
+oContents(2) = "Peter Heald"
+oContents(3) = "107"
+oContents(4) = "Jamie Foss"
+```
 
 The column width can be left at its default, to fit the content, but here the width is set a little wider for a neater appearance.
 
-|  |
-| --- |
-| ```      Dim oColumnWidths(1 To 2) As Double     oColumnWidths(1) = 3     oColumnWidths(2) = 3 ``` |
+```vb
+Dim oColumnWidths(1 To 2) As Double
+oColumnWidths(1) = 3
+oColumnWidths(2) = 3
+```
 
 For this example the table is placed in an arbitrary position, at x=15 y=15.
 
-|  |
-| --- |
-| ```      Dim InsP As Point2d     Set InsP = ThisApplication.TransientGeometry.CreatePoint2d(15, 15) ``` |
+```vb
+Dim InsP As Point2d
+Set InsP = ThisApplication.TransientGeometry.CreatePoint2d(15, 15)
+```
 
 Add the table to the sheet through the CustomTables.Add method, specifying a two-row, two-column table named "Employees". Pass the values defined previously.
 
-|  |
-| --- |
-| ```      Dim oCustomTable As CustomTable     Set oCustomTable = oSheet.CustomTables.Add("Employees", InsP, 2, 2, oTitles, oContents, oColumnWidths) ``` |
+```vb
+Dim oCustomTable As CustomTable
+Set oCustomTable = oSheet.CustomTables.Add("Employees", InsP, 2, 2, oTitles, oContents, oColumnWidths)
+```
 
 At this point the table appears on the sheet. However, we can continue to make changes to its appearance. The following code changes the justification of the second column to center-justified.
 
-|  |
-| --- |
-| ```      oCustomTable.Columns.Item(2).ValueHorizontalJustification = kAlignTextCenter ``` |
+```vb
+oCustomTable.Columns.Item(2).ValueHorizontalJustification = kAlignTextCenter
+```
 
 To make format changes, set up a TableFormat object that can then be applied to the table.
 
-|  |
-| --- |
-| ```      Dim oFormat As TableFormat     Set oFormat = oSheet.CustomTables.CreateTableFormat ``` |
+```vb
+Dim oFormat As TableFormat
+Set oFormat = oSheet.CustomTables.CreateTableFormat
+```
 
 Change some properties of the TableFormat object (for example, the color of the inside grid lines, and the line weight of the inside and outside grid lines).
 
-|  |
-| --- |
-| ```      oFormat.InsideLineColor = ThisApplication.TransientObjects.CreateColor(0, 0, 255)     oFormat.InsideLineWeight = 0.1     oFormat.OutsideLineWeight = 0.2 ``` |
+```vb
+oFormat.InsideLineColor = ThisApplication.TransientObjects.CreateColor(0, 0, 255)
+oFormat.InsideLineWeight = 0.1
+oFormat.OutsideLineWeight = 0.2
+```
 
 Apply the new format to the table. The line weights and color are updated.
 
-|  |
-| --- |
-| ```      oCustomTable.OverrideFormat = oFormat ``` |
+```vb
+oCustomTable.OverrideFormat = oFormat
+```
 
 The following code demonstrates the ability to access values of individual cells based on their row and column intersection. Note that the column can be specified by its name.
 
-|  |
-| --- |
-| ```      Dim oCell As Cell     Set oCell = oCustomTable.Rows.Item(2).Item("Employee")          Debug.Print oCell.Value              End Sub ``` |
+```vb
+Dim oCell As Cell
+Set oCell = oCustomTable.Rows.Item(2).Item("Employee")
+Debug.Print oCell.Value
+End Sub
+```
 
 The cell value "Jamie Foss" prints to the VBA "immediate" debug screen, if enabled.
 

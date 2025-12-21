@@ -21,9 +21,3 @@ TransientGeometry.**CreatePolyline3dFromCurve**( ***Curve*** As Object, ***Toler
 ## Version
 
 Introduced in version 2009
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -13,9 +13,3 @@ TransientGeometry.**CreateBox2d**() As [Box2d](../Box2d/Box2d.md)
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

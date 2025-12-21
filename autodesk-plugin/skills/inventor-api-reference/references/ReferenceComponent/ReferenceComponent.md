@@ -40,9 +40,3 @@ The ReferenceComponent object is the base class for the DerivedPartComponent and
 ## Version
 
 Introduced in version 5.3
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

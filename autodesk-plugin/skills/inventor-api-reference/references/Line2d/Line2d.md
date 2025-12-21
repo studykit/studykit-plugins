@@ -31,9 +31,3 @@ The Line2d object. A Line2d object is infinite. The object created is a transien
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -22,9 +22,3 @@ SketchArcs3D.**AddAsBend**( ***LineOne*** As [SketchLine3D](../SketchLine3D/Sket
 ## Version
 
 Introduced in version 6
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

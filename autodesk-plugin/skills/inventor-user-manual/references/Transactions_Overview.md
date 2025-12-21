@@ -50,9 +50,31 @@ The transaction API gives you the ability to leverage Inventor's transaction sch
 
 The most basic use of the transaction API is to wrap a set of transactable operations in a transaction. An example would be a client who wishes to publish a command that creates a sketch rectangle by connecting four sketch lines. Such a command would take two input points from the user and create four sketch lines. From Inventor's perspective this command should behave like the creation of a rectangle and not the creation of four lines; i.e. an Undo operation after the command has been executed should undo the creation of the entire rectangle rather than one of its lines. The sample program below demonstrates the use of transaction API to create such a command:
 
-|  |
-| --- |
-| ```  ' Get a reference to the active document. ' This can be an Assembly or Part document. Dim oDoc As Document Set oDoc = ThisApplication.ActiveDocument      Dim oCmpDef As PartComponentDefinition Set oCmpDef = oDoc.ComponentDefinition  Dim oSketch As PlanarSketch Set oSketch = oCmpDef.Sketches(1)  Dim oTG As TransientGeometry Set oTG = ThisApplication.TransientGeometry  ' Get the transaction manager from the application Dim oTxnMgr as TransactionManager Set oTxnMgr = ThisApplication.TransactionManager  ' Start a regular transaction Dim oTxn1 As Transaction Set oTxn = oTxnMgr.StartTransaction(oDoc, "My Rectangle Command")  ' Draw four sketch lines Dim oLine As SketchLine Set oLine = oSketch.SketchLines.AddByTwoPoints(oTG.CreatePoint2d(0, 0), oTG.CreatePoint2d(1, 0)) Set oLine = oSketch.SketchLines.AddByTwoPoints(oLine.EndSketchPoint, oTG.CreatePoint2d(1, 2)) Set oLine = oSketch.SketchLines.AddByTwoPoints(oLine.EndSketchPoint, oTG.CreatePoint2d(0, 2)) Set oLine = oSketch.SketchLines.AddByTwoPoints(oLine.EndSketchPoint, oTG.CreatePoint2d(0, 0))  oTxn.End ``` |
+```vb
+' Get a reference to the active document.
+' This can be an Assembly or Part document.
+Dim oDoc As Document
+Set oDoc = ThisApplication.ActiveDocument
+Dim oCmpDef As PartComponentDefinition
+Set oCmpDef = oDoc.ComponentDefinition
+Dim oSketch As PlanarSketch
+Set oSketch = oCmpDef.Sketches(1)
+Dim oTG As TransientGeometry
+Set oTG = ThisApplication.TransientGeometry
+' Get the transaction manager from the application
+Dim oTxnMgr as TransactionManager
+Set oTxnMgr = ThisApplication.TransactionManager
+' Start a regular transaction
+Dim oTxn1 As Transaction
+Set oTxn = oTxnMgr.StartTransaction(oDoc, "My Rectangle Command")
+' Draw four sketch lines
+Dim oLine As SketchLine
+Set oLine = oSketch.SketchLines.AddByTwoPoints(oTG.CreatePoint2d(0, 0), oTG.CreatePoint2d(1, 0))
+Set oLine = oSketch.SketchLines.AddByTwoPoints(oLine.EndSketchPoint, oTG.CreatePoint2d(1, 2))
+Set oLine = oSketch.SketchLines.AddByTwoPoints(oLine.EndSketchPoint, oTG.CreatePoint2d(0, 2))
+Set oLine = oSketch.SketchLines.AddByTwoPoints(oLine.EndSketchPoint, oTG.CreatePoint2d(0, 0))
+oTxn.End
+```
 
 Creating the "My Rectangle Command" transaction wraps the four sketch lines in a transaction. The transaction timeline for this command is illustrated by the figure below:
 
@@ -64,9 +86,36 @@ Each AddByTwoPoints method creates a Line transaction in the scope of oTxn. Abor
 
 A transaction that is started using the TransactionManager::StartTransaction method can either be a parent or a child transaction. A transaction that is started within the scope of another transaction becomes the child of that transaction. Consider the sample program below:
 
-|  |
-| --- |
-| ```  ' Get a reference to the active document. ' This can be an Assembly or Part document. Dim oDoc As Document Set oDoc = ThisApplication.ActiveDocument      Dim oCmpDef As PartComponentDefinition Set oCmpDef = oDoc.ComponentDefinition  Dim oSketch As PlanarSketch Set oSketch = oCmpDef.Sketches(1)  Dim oTG As TransientGeometry Set oTG = ThisApplication.TransientGeometry  ' Get the transaction manager from the application Dim oTxnMgr as TransactionManager Set oTxnMgr = ThisApplication.TransactionManager  ' Nesting regular transactions ' Start a regular transaction Dim oTxn1 As Transaction Set oTxn1 = oTxnMgr.StartTransaction(oDoc, "My Txn")      ' Draw a sketch line     Dim oLine As SketchLine     Set oLine = oSketch.SketchLines.AddByTwoPoints(oTG.CreatePoint2d(0, 0), oTG.CreatePoint2d(1, 0))      ' Start a nested transaction     Dim oTxn2 As Transaction     Set oTxn2 = oTxnMgr.StartTransaction(oDoc, "My child Txn")      ' Draw a circle     Dim oCircle As SketchCircle     Set oCircle = oSketch.SketchCircles.AddByCenterRadius(oLine.EndSketchPoint, 3)      oTxn2.End  oTxn1.End ``` |
+```vb
+' Get a reference to the active document.
+' This can be an Assembly or Part document.
+Dim oDoc As Document
+Set oDoc = ThisApplication.ActiveDocument
+Dim oCmpDef As PartComponentDefinition
+Set oCmpDef = oDoc.ComponentDefinition
+Dim oSketch As PlanarSketch
+Set oSketch = oCmpDef.Sketches(1)
+Dim oTG As TransientGeometry
+Set oTG = ThisApplication.TransientGeometry
+' Get the transaction manager from the application
+Dim oTxnMgr as TransactionManager
+Set oTxnMgr = ThisApplication.TransactionManager
+' Nesting regular transactions
+' Start a regular transaction
+Dim oTxn1 As Transaction
+Set oTxn1 = oTxnMgr.StartTransaction(oDoc, "My Txn")
+' Draw a sketch line
+Dim oLine As SketchLine
+Set oLine = oSketch.SketchLines.AddByTwoPoints(oTG.CreatePoint2d(0, 0), oTG.CreatePoint2d(1, 0))
+' Start a nested transaction
+Dim oTxn2 As Transaction
+Set oTxn2 = oTxnMgr.StartTransaction(oDoc, "My child Txn")
+' Draw a circle
+Dim oCircle As SketchCircle
+Set oCircle = oSketch.SketchCircles.AddByCenterRadius(oLine.EndSketchPoint, 3)
+oTxn2.End
+oTxn1.End
+```
 
 The above code starts an identified transaction (oTxn1), creates a sketch line (a transaction), starts another transaction (oTxn2), creates a sketch circle (a transaction) and commits oTxn1 and oTxn2. The transaction timeline looks like this:
 
@@ -80,9 +129,28 @@ What this indicates is that oTxn has three child transactions: Line, oTxn2 and C
 
 Each start transaction should be paired with an end or abort transaction. Inventor becomes unstable if the StartTransaction is not paired with a corresponding End or Abort. If any of the API calls fail, i.e. return a bad error code, then the command should handle the error and take care to call EndTransaction. Applying this rule consistently is particularly critical, since even a simple API call can fail rather unexpectedly. In the event that the error is not recoverable, the command should abort the transaction. Aborting the transaction means that the transaction was cancelled prior to completion. The sample below indicates how an error condition should be handled within the scope of a transaction.
 
-|  |
-| --- |
-| ```  ' Get a reference to the active document. ' This can be an Assembly or Part document. Dim oDoc As Document Set oDoc = ThisApplication.ActiveDocument      ' Get the transaction manager from the application Dim oTxnMgr as TransactionManager Set oTxnMgr = ThisApplication.TransactionManager  ' Start a transaction Dim oTxn As Transaction Set oTxn = oTxnMgr.StartTransaction(oDoc, "My Txn")  ' Perform an operation that you wish to transact  ' If the error from the operation is not recoverable, abort the Txn If Err Then     MsgBox "Unrecoverable error occurred during the operation"     oTxn.Abort     Exit Sub End If  ' End the transaction oTxn.End ``` |
+```vb
+' Get a reference to the active document.
+' This can be an Assembly or Part document.
+Dim oDoc As Document
+Set oDoc = ThisApplication.ActiveDocument
+' Get the transaction manager from the application
+Dim oTxnMgr as TransactionManager
+Set oTxnMgr = ThisApplication.TransactionManager
+' Start a transaction
+Dim oTxn As Transaction
+Set oTxn = oTxnMgr.StartTransaction(oDoc, "My Txn")
+' Perform an operation that you wish to transact
+'
+If the error from the operation is not recoverable, abort the Txn
+If Err Then
+    MsgBox "Unrecoverable error occurred during the operation"
+    oTxn.Abort
+    Exit Sub
+End If
+' End the transaction
+oTxn.End
+```
 
 ## Checkpoints
 
@@ -90,9 +158,32 @@ Checkpoints are bookmarks for rollback operations within a transaction. Consider
 
 A side note: Inventor implements checkpoints as child transactions. The GoToCheckpoint operation essentially aborts the checkpoint transaction.
 
-|  |
-| --- |
-| ```  ' Get a reference to the active document. ' This can be an Assembly or Part document. Dim oDoc As Document Set oDoc = ThisApplication.ActiveDocument      ' Get the transaction manager from the application Dim oTxnMgr as TransactionManager Set oTxnMgr = ThisApplication.TransactionManager  ' Start a regular transaction Dim oTxn1 As Transaction Set oTxn1 = oTxnMgr.StartTransaction(oDoc, "Checkpoint Txn")  ' ***************************************** ' Perform the creation of extrude profile ' *****************************************  ' Create a checkpoint before the extrude operation Dim oChkPt as CheckPoint Set oChkPt = oTxnMgr.SetCheckPoint  ' ***************************************** ' Extrude the newly created profile ' *****************************************  ' Handle any error condition from the extrude command  If Err Then     MsgBox "Extrude operation failed. Modify profile ?"     oTxnMgr.GoToCheckPoint oChkPt End If  ``` |
+```vb
+' Get a reference to the active document.
+' This can be an Assembly or Part document.
+Dim oDoc As Document
+Set oDoc = ThisApplication.ActiveDocument
+' Get the transaction manager from the application
+Dim oTxnMgr as TransactionManager
+Set oTxnMgr = ThisApplication.TransactionManager
+' Start a regular transaction
+Dim oTxn1 As Transaction
+Set oTxn1 = oTxnMgr.StartTransaction(oDoc, "Checkpoint Txn")
+' *****************************************
+' Perform the creation of extrude profile
+' *****************************************
+' Create a checkpoint before the extrude operation
+Dim oChkPt as CheckPoint
+Set oChkPt = oTxnMgr.SetCheckPoint
+' *****************************************
+' Extrude the newly created profile
+' *****************************************
+' Handle any error condition from the extrude command
+If Err Then
+    MsgBox "Extrude operation failed. Modify profile ?"
+    oTxnMgr.GoToCheckPoint oChkPt
+End If
+```
 
 ## Transaction Events
 
@@ -100,9 +191,50 @@ The Transaction API allows the client to receive notifications for transaction-r
 
 The following sample program demonstrates the use of transaction events:
 
-|  |
-| --- |
-| ```  Private WithEvents oTxnEvents As TransactionEvents  Private Sub clear_Click()     List.Clear End Sub  Private Sub UserForm_Initialize()     Dim oTxnMgr As TransactionManager     Set oTxnMgr = ThisApplication.TransactionManager          Set oTxnEvents = oTxnMgr.TransactionEvents End Sub  Private Sub oTxnEvents_OnAbort(ByVal TransactionObject As Transaction, ByVal Context As NameValueMap, ByVal BeforeOrAfter As EventTimingEnum)          If BeforeOrAfter = kBefore Then         List.AddItem "Transaction: " & TransactionObject.Id & " will be aborted"     ElseIf BeforeOrAfter = kAfter Then         List.AddItem "Transaction: " & TransactionObject.Id & " has been aborted"     End If      End Sub  Private Sub oTxnEvents_OnCommit(ByVal TransactionObject As Transaction, ByVal Context As NameValueMap, ByVal BeforeOrAfter As EventTimingEnum, HandlingCode As HandlingCodeEnum)      If BeforeOrAfter = kBefore Then         List.AddItem "Transaction: " & TransactionObject.Id & " will be committed"     ElseIf BeforeOrAfter = kAfter Then         List.AddItem "Transaction: " & TransactionObject.Id & " has been committed"     End If      End Sub  Private Sub oTxnEvents_OnRedo(ByVal TransactionObject As Transaction, ByVal Context As NameValueMap, ByVal BeforeOrAfter As EventTimingEnum, HandlingCode As HandlingCodeEnum)          If BeforeOrAfter = kBefore Then         List.AddItem "Transaction: " & TransactionObject.Id & " will be redone"     ElseIf BeforeOrAfter = kAfter Then         List.AddItem "Transaction: " & TransactionObject.Id & " has been redone"     End If      End Sub  Private Sub oTxnEvents_OnUndo(ByVal TransactionObject As Transaction, ByVal Context As NameValueMap, ByVal BeforeOrAfter As EventTimingEnum, HandlingCode As HandlingCodeEnum)          If BeforeOrAfter = kBefore Then         List.AddItem "Transaction: " & TransactionObject.Id & " will be undone"     ElseIf BeforeOrAfter = kAfter Then         List.AddItem "Transaction: " & TransactionObject.Id & " has been undone"     End If      End Sub  Private Sub oTxnEvents_OnDelete(ByVal TransactionObject As Transaction, ByVal Context As NameValueMap, ByVal BeforeOrAfter As EventTimingEnum)      If BeforeOrAfter = kAfter Then         List.AddItem "Transaction: " & TransactionObject.Id & " has been deleted"     End If      End Sub ``` |
+```vb
+Private WithEvents oTxnEvents As TransactionEvents
+Private Sub clear_Click()
+    List.Clear
+End Sub
+Private Sub UserForm_Initialize()
+    Dim oTxnMgr As TransactionManager
+    Set oTxnMgr = ThisApplication.TransactionManager
+    Set oTxnEvents = oTxnMgr.TransactionEvents
+End Sub
+Private Sub oTxnEvents_OnAbort(ByVal TransactionObject As Transaction, ByVal Context As NameValueMap, ByVal BeforeOrAfter As EventTimingEnum)
+    If BeforeOrAfter = kBefore Then
+        List.AddItem "Transaction: " & TransactionObject.Id & " will be aborted"
+    ElseIf BeforeOrAfter = kAfter Then
+        List.AddItem "Transaction: " & TransactionObject.Id & " has been aborted"
+    End If
+End Sub
+Private Sub oTxnEvents_OnCommit(ByVal TransactionObject As Transaction, ByVal Context As NameValueMap, ByVal BeforeOrAfter As EventTimingEnum, HandlingCode As HandlingCodeEnum)
+    If BeforeOrAfter = kBefore Then
+        List.AddItem "Transaction: " & TransactionObject.Id & " will be committed"
+    ElseIf BeforeOrAfter = kAfter Then
+        List.AddItem "Transaction: " & TransactionObject.Id & " has been committed"
+    End If
+End Sub
+Private Sub oTxnEvents_OnRedo(ByVal TransactionObject As Transaction, ByVal Context As NameValueMap, ByVal BeforeOrAfter As EventTimingEnum, HandlingCode As HandlingCodeEnum)
+    If BeforeOrAfter = kBefore Then
+        List.AddItem "Transaction: " & TransactionObject.Id & " will be redone"
+    ElseIf BeforeOrAfter = kAfter Then
+        List.AddItem "Transaction: " & TransactionObject.Id & " has been redone"
+    End If
+End Sub
+Private Sub oTxnEvents_OnUndo(ByVal TransactionObject As Transaction, ByVal Context As NameValueMap, ByVal BeforeOrAfter As EventTimingEnum, HandlingCode As HandlingCodeEnum)
+    If BeforeOrAfter = kBefore Then
+        List.AddItem "Transaction: " & TransactionObject.Id & " will be undone"
+    ElseIf BeforeOrAfter = kAfter Then
+        List.AddItem "Transaction: " & TransactionObject.Id & " has been undone"
+    End If
+End Sub
+Private Sub oTxnEvents_OnDelete(ByVal TransactionObject As Transaction, ByVal Context As NameValueMap, ByVal BeforeOrAfter As EventTimingEnum)
+    If BeforeOrAfter = kAfter Then
+        List.AddItem "Transaction: " & TransactionObject.Id & " has been deleted"
+    End If
+End Sub
+```
 
 This program creates a form, shown below, to monitor the transaction activity in Inventor. The transaction activity is reported using the transaction ID. The output was generated by creating several sketch lines and doing undo and redo on the sketch lines.
 
@@ -112,6 +244,16 @@ This program creates a form, shown below, to monitor the transaction activity in
 
 * An Undo or Redo should be performed only when there is no transaction in progress (during an unidentified transaction).* Do not wrap any Inventor commands within transactions. Do not wrap any user interaction events within transactions. A good rule would be that it is OK to create modal dialogs within a transaction but not modeless dialogs.* The transaction event handling code should not perform any operation that uses transactable memory. For example, it is illegal to create a sketch line in the event handling code for the commit of a transaction.* Do not close any document inside a transaction, even the active one. The exception to this rule is that it is legal to close a document in a transaction when the document was opened in that exact same transaction.
 
-|  |
-| --- |
-| ```  Dim oTxnMgr As TransactionManager Set oTxnMgr = ThisApplication.TransactionManager      Dim oDoc As Document Set oDoc = ThisApplication.ActiveDocument      Dim oTxn As Transaction Set oTxn = oTxnMgr.StartTransaction(oDoc, "Txn1")  ' *************************************** ' Invalid operation ' *************************************** oDoc.Close  oTxn.End ``` |
+```vb
+Dim oTxnMgr As TransactionManager
+Set oTxnMgr = ThisApplication.TransactionManager
+Dim oDoc As Document
+Set oDoc = ThisApplication.ActiveDocument
+Dim oTxn As Transaction
+Set oTxn = oTxnMgr.StartTransaction(oDoc, "Txn1")
+' ***************************************
+' Invalid operation
+' ***************************************
+oDoc.Close
+oTxn.End
+```

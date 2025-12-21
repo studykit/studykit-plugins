@@ -150,9 +150,3 @@ The PlanarSketch object, situated in 3D space. See the overview articles.
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

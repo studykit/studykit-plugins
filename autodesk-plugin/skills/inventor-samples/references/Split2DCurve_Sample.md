@@ -10,10 +10,6 @@ Demonstrates the ability to extract split curves from a transient geometry curve
 
 To use this sample a part must be active.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub SplitCurve2D()
     Dim partDoc As PartDocument
@@ -50,9 +46,3 @@ Public Sub SplitCurve2D()
     spline.Delete
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

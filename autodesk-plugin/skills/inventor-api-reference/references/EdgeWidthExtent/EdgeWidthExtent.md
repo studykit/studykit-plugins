@@ -18,9 +18,3 @@ The EdgeWidthExtent is used by sheet metal features when the width of the featur
 ## Version
 
 Introduced in version 2009
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

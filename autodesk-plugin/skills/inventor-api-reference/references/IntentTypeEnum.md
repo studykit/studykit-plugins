@@ -19,9 +19,3 @@ Constants indicating the type of value that the GeometryIntent's Intent property
 ## Version
 
 Introduced in version 11
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

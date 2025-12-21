@@ -11,10 +11,6 @@ This sample demonstrates adding iPart occurrences to an assembly.
 
 Before running the sample, make sure that C:\temp\iPartFactory.ipt exists and that it is an iPart factory.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub AddiPartOccurrence()
     ' Open the factory document invisible.
@@ -69,10 +65,6 @@ End Sub
 
 Before running the sample, make sure that C:/temp/iPartFactory.ipt exists and that it is an iPart factory. The first line of the C# sample sets the oApp variable to ThisApplication - this should be appropriately changed.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 public void AddiPartOccurrence()
 {
@@ -123,9 +115,3 @@ public void AddiPartOccurrence()
 
 }
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

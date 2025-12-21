@@ -59,9 +59,3 @@ The ReferenceFeature object currently supports all of the methods and properties
 ## Version
 
 Introduced in version 5.3
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

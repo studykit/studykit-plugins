@@ -22,9 +22,3 @@ The DrawingBOMCell object represents a cell within the drawing BOM.
 ## Version
 
 Introduced in version 2009
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -32,9 +32,3 @@ Object required to be supported by Server to qualify as an Autodesk Inventor Tra
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -30,9 +30,3 @@ The ChangeDefinitions collection object provides access to all the objects creat
 ## Version
 
 Introduced in version 9
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

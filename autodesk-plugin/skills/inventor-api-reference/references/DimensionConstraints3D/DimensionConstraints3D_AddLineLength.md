@@ -22,9 +22,3 @@ DimensionConstraints3D.**AddLineLength**( ***Line*** As [SketchLine3D](../Sketch
 ## Version
 
 Introduced in version 11
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

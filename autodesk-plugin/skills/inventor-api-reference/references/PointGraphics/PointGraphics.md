@@ -50,9 +50,3 @@ The PointGraphics object defines a set of points. Each coordinate provided defin
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

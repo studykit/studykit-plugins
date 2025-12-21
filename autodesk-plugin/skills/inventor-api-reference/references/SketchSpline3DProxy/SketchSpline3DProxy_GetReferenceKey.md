@@ -21,9 +21,3 @@ SketchSpline3DProxy.**GetReferenceKey**( ***ReferenceKey***() As Byte, [***KeyCo
 ## Version
 
 Introduced in version 6
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

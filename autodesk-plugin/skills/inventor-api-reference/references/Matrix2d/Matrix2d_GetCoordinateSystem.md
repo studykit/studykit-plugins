@@ -22,9 +22,3 @@ Matrix2d.**GetCoordinateSystem**( ***Origin*** As [Point2d](../Point2d/Point2d.m
 ## Version
 
 Introduced in version 11
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

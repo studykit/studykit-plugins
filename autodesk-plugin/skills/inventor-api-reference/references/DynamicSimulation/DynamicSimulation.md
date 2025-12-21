@@ -44,9 +44,3 @@ The DynamicSimulation object represents a single dynamic simulation.
 ## Version
 
 Introduced in version 2013
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

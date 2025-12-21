@@ -41,9 +41,3 @@ The DiameterDimConstraint object represents a constraint that controls the diame
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -30,9 +30,3 @@ The SurfaceGraphicsFaceList object contains a list of faces currently displayed 
 ## Version
 
 Introduced in version 2009
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

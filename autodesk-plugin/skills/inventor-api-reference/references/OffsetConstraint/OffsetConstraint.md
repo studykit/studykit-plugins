@@ -40,9 +40,3 @@ The OffsetConstraint object represents a constraint that defines an offset of tw
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -15,9 +15,3 @@ Constants identifying the Equation type of an Equation Driven Curve.
 ## Version
 
 Introduced in version 2015
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -26,9 +26,3 @@ GeneralDimensions.**AddLinear**( ***TextOrigin*** As [Point2d](../Point2d/Point2
 ## Version
 
 Introduced in version 11
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

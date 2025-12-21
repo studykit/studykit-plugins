@@ -46,9 +46,3 @@ The FeatureBasedOccurrencePattern object represents a feature-based occurrence p
 ## Version
 
 Introduced in version 6
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

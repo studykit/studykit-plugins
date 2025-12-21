@@ -27,9 +27,3 @@ The DistanceExtent object defines an extent given by a specified distance value.
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

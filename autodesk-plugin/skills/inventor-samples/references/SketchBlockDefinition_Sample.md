@@ -8,10 +8,6 @@ This sample demonstrates inserting a sketch block into a part sketch.
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub CreateSketchBlockDefinition()
     ' Set a reference to the part document.
@@ -60,9 +56,3 @@ Public Sub InsertSketchBlockDefinition()
     Call oSketch.SketchBlocks.AddByDefinition(oSketchBlockDef, oPosition)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

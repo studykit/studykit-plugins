@@ -20,9 +20,3 @@ WeldSymbolStyle.**GetWeldingSymbolsFilter**( ***WeldingSymbolFilter***() As [Wel
 ## Version
 
 Introduced in version 2024
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

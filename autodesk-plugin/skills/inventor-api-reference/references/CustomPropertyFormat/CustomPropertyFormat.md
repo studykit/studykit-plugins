@@ -26,9 +26,3 @@ The CustomPropertyFormat provides control over how the parameter value is format
 ## Version
 
 Introduced in version 2010
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

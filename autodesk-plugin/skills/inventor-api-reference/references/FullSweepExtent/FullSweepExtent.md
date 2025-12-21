@@ -18,9 +18,3 @@ The FullSweepExtent object suggests that a full, 360-degree sweep about an axis,
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

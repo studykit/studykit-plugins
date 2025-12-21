@@ -55,9 +55,3 @@ The DrawingDimension object is the base class for all dimensions placed on a she
 ## Version
 
 Introduced in version 9
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -49,9 +49,3 @@ Event object that provides Triad (3D Move/Rotate tool) events.
 ## Version
 
 Introduced in version 9
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

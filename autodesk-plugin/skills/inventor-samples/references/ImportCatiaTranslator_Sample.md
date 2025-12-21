@@ -8,10 +8,6 @@ This sample demonstrates how open an Catia file using the Catia translator add-i
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub CatiaImport()
     'Set CATIA V4 translator's CLSID and the file name (*.exp and *.dlv3).
@@ -89,9 +85,3 @@ Public Sub CatiaImport()
     Next i
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

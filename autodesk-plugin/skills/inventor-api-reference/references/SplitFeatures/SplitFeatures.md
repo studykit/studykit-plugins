@@ -30,9 +30,3 @@ The Part SplitFeatures object represents a collection of objects.
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

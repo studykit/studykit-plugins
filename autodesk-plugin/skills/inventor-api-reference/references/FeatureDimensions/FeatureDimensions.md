@@ -35,9 +35,3 @@ The FeatureDimensions collection object contains all the dimensions that are ass
 ## Version
 
 Introduced in version 2008
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

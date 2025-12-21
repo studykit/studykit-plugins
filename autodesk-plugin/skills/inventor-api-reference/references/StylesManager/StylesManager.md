@@ -34,9 +34,3 @@ The StylesManager object provides utilities to manage the various styles in a do
 ## Version
 
 Introduced in version 2010
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

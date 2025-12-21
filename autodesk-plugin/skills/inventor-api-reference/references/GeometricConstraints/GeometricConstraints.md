@@ -52,9 +52,3 @@ The GeometricConstraints object provides access to all the geometric sketch cons
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

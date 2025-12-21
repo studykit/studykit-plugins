@@ -28,9 +28,3 @@ The ShellThicknessFaceSet object provides access to the faces and their associat
 ## Version
 
 Introduced in version 9
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

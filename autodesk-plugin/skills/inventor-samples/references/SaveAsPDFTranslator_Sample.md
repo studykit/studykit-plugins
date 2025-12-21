@@ -8,10 +8,6 @@ This sample demonstrates how to save a PDF file using the PDF translator add-in.
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub PublishPDF()
     ' Get the PDF translator Add-In.
@@ -55,9 +51,3 @@ Public Sub PublishPDF()
     Call PDFAddIn.SaveCopyAs(oDocument, oContext, oOptions, oDataMedium)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

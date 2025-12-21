@@ -16,9 +16,3 @@ Enum indicating the type of profile scaling for the sweep feature.
 ## Version
 
 Introduced in version 11
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

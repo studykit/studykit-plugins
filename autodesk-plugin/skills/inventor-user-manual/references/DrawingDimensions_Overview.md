@@ -63,36 +63,49 @@ Figure 2
 
 Select the highlighted lines, then run the VBA code. The code first obtains the active sheet from the active document.
 
-|  |
-| --- |
-| ```  Sub CreateDimension()              Dim oDoc As DrawingDocument     Set oDoc = ThisApplication.ActiveDocument          Dim oSheet As Sheet     Set oSheet = oDoc.ActiveSheet ``` |
+```vb
+Sub CreateDimension()
+    Dim oDoc As DrawingDocument
+    Set oDoc = ThisApplication.ActiveDocument
+    Dim oSheet As Sheet
+    Set oSheet = oDoc.ActiveSheet
+```
 
 Next, obtain DrawingCurve objects from the selected lines. DrawingCurve objects are acceptable for creation of GeometryIntent objects.
 
-|  |
-| --- |
-| ```      Dim oCurve1 As DrawingCurve     Set oCurve1 = oDoc.SelectSet(1).Parent          Dim oCurve2 As DrawingCurve     Set oCurve2 = oDoc.SelectSet(2).Parent ``` |
+```vb
+Dim oCurve1 As DrawingCurve
+Set oCurve1 = oDoc.SelectSet(1).Parent
+Dim oCurve2 As DrawingCurve
+Set oCurve2 = oDoc.SelectSet(2).Parent
+```
 
 Now we're ready to create the GeometryIntent objects. Since we're using the DrawingCurve end points, there
 is no need to specify a point on the geometry, which would be provided by the optional second argument
 for CreateGeometryIntent.
 
-|  |
-| --- |
-| ```      Dim oIntent1 As GeometryIntent     Set oIntent1 = oSheet.CreateGeometryIntent(oCurve1)              Dim oIntent2 As GeometryIntent     Set oIntent2 = oSheet.CreateGeometryIntent(oCurve2) ``` |
+```vb
+Dim oIntent1 As GeometryIntent
+Set oIntent1 = oSheet.CreateGeometryIntent(oCurve1)
+Dim oIntent2 As GeometryIntent
+Set oIntent2 = oSheet.CreateGeometryIntent(oCurve2)
+```
 
 Create a 2D point for the location of the dimension line.
 
-|  |
-| --- |
-| ```      Dim oPt As Point2d     Set oPt = ThisApplication.TransientGeometry.CreatePoint2d(15, 15) ``` |
+```vb
+Dim oPt As Point2d
+Set oPt = ThisApplication.TransientGeometry.CreatePoint2d(15, 15)
+```
 
 Create a linear dimension on the sheet, using the two GeometryIntent objects as
 dimension extension line origin points, and the 2D point for the dimension line location.
 
-|  |
-| --- |
-| ```      Dim oLinDim As LinearGeneralDimension     Set oLinDim = oSheet.DrawingDimensions.GeneralDimensions.AddLinear(oPt, oIntent1, oIntent2)      End Sub ``` |
+```vb
+Dim oLinDim As LinearGeneralDimension
+Set oLinDim = oSheet.DrawingDimensions.GeneralDimensions.AddLinear(oPt, oIntent1, oIntent2)
+End Sub
+```
 
 The sample code will produce a result similar to that shown in Figure 3.
 

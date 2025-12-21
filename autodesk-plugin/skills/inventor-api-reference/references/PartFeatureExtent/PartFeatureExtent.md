@@ -24,9 +24,3 @@ The PartFeatureExtent object is the base class that defines the extent for certa
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

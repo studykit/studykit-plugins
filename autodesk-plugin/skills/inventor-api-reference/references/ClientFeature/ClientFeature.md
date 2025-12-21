@@ -62,9 +62,3 @@ The ClientFeature object represents a client feature in a part or an assembly do
 ## Version
 
 Introduced in version 2008
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

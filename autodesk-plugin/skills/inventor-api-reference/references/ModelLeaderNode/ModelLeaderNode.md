@@ -34,9 +34,3 @@ The ModelLeaderNode represents the node in the leader of a model leader note.
 ## Version
 
 Introduced in version 2018
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

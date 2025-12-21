@@ -54,9 +54,3 @@ The InsertiMateDefinition object represents an insert iMate definition. It is de
 ## Version
 
 Introduced in version 6
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

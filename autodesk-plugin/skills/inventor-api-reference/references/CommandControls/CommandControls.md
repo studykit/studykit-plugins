@@ -49,9 +49,3 @@ The CommandControls collection object provides access to a collection of user in
 ## Version
 
 Introduced in version 2010
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

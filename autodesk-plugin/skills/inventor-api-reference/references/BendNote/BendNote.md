@@ -63,9 +63,3 @@ The BendNote object represents a bend note on a sheet and derives from the Leade
 ## Version
 
 Introduced in version 2010
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

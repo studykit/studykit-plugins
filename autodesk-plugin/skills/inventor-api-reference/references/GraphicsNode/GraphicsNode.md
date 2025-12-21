@@ -80,9 +80,3 @@ The GraphicsNode object provides a logical grouping of Client graphics. It is th
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

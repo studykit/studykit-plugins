@@ -10,10 +10,6 @@ This sample demonstrates deleting a sketch.
 
 To use this sample, have a part document open that contains a sketch named Sketch1. The sketch cannot have any dependents, or the delete will fail.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub DeleteSketch()
     ' Set a reference to the Sketches collection. This assumes
@@ -40,9 +36,3 @@ Public Sub DeleteSketch()
     End If
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

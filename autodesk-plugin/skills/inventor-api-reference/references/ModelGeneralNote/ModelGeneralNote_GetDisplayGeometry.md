@@ -27,9 +27,3 @@ ModelGeneralNote.**GetDisplayGeometry**( ***Camera*** As [Camera](../Camera/Came
 ## Version
 
 Introduced in version 2018
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

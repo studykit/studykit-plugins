@@ -31,9 +31,3 @@ The MapPointCurve object is used to define a set of mapping points between secti
 ## Version
 
 Introduced in version 6
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

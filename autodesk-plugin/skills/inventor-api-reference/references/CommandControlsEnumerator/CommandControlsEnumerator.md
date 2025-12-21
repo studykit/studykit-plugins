@@ -21,9 +21,3 @@ The CommandControlsEnumerator object provides access to a list of CommandControl
 ## Version
 
 Introduced in version 2010
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

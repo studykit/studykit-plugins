@@ -35,9 +35,3 @@ CustomTable.**Export**( ***FileName*** As String, ***FileFormat*** As [FileForma
 ## Version
 
 Introduced in version 2009
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

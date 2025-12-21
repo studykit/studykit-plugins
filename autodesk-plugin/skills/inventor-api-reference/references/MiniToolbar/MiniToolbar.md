@@ -54,9 +54,3 @@ The MiniToolbar object provides the ability to create and display in-canvas cont
 ## Version
 
 Introduced in version 2012
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

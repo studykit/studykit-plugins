@@ -73,9 +73,3 @@ The NonParametricBaseFeature object represents the feature that is created when 
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

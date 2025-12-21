@@ -41,9 +41,3 @@ The MiniToolbarControl object is the base class for all controls within a MiniTo
 ## Version
 
 Introduced in version 2012
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

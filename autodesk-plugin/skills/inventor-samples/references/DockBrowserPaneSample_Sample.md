@@ -11,10 +11,6 @@ This sample demonstrates how to dock the browser pane to a custom ViewFrame.
 
 This sample demonstrates how to dock the browser pane to a custom ViewFrame.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Sub DockBrowserPaneToCustomViewFrameSample()
     ' This sample demonstrates how to create a custom ViewFrame and dock the browser pane into it.
@@ -50,10 +46,6 @@ End Sub
 
 This sample demonstrates how to dock the browser pane to a custom ViewFrame.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Sub DockBrowserPaneToCustomViewFrameSample()
     ' This sample demonstrates how to create a custom ViewFrame and dock the browser pane into it.
@@ -86,9 +78,3 @@ Sub DockBrowserPaneToCustomViewFrameSample()
 
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

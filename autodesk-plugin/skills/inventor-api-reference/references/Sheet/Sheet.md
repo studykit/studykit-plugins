@@ -107,9 +107,3 @@ The Sheet object represents a sheet in a drawing document. See here for an overv
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

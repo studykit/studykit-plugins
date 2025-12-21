@@ -21,9 +21,3 @@ CustomConstraint3D.**GetReferenceKey**( ***ReferenceKey***() As Byte, [***KeyCon
 ## Version
 
 Introduced in version 11
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -12,10 +12,6 @@ This sample demonstrates using pack and go interop to create a package.
 
 Create a VB.Net project and add the reference to the pack and go type interop binary Autodesk.PackAndGo.Interop.dll which is in the Bin folder of Inventor installation folder.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub PackAndGoSample()
     Dim oPacknGoComp As New PackAndGoLib.PackAndGoComponent
@@ -50,10 +46,6 @@ End Sub
 
 Create a C#.Net project and add the reference to the pack and go type interop binary Autodesk.PackAndGo.Interop.dll which is in the Bin folder of Inventor installation folder.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 public void PackAndGoSample()
 {
@@ -86,10 +78,6 @@ public void PackAndGoSample()
 ```
 
 Create a C++ project and add the include the Bin folder of Inventor installation folder where the DTPackAndGo.tlb is located.
-
-|  |
-| --- |
-| Copy Code |
 
 ```
 #import "DTPackAndGo.tlb" no_namespace named_guids \
@@ -134,9 +122,3 @@ void PackAndGoSample()
   packAndGo->MethodCreatePackage(VARIANT_TRUE);
 }
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

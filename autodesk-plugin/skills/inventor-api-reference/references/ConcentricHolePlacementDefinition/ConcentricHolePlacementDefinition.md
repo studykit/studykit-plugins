@@ -20,9 +20,3 @@ The ConcentricHolePlacementDefinition object defines the placement of a hole fea
 ## Version
 
 Introduced in version 10
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

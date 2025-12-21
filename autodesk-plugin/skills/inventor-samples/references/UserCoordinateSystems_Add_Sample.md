@@ -8,10 +8,6 @@ This sample demonstrates the creation of a User Coordinate System (UCS) based on
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Sub CreateUCSBy3Points()
     ' Create a new part document
@@ -47,9 +43,3 @@ Sub CreateUCSBy3Points()
     Set oUCS = oCompDef.UserCoordinateSystems.Add(oUCSDef)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

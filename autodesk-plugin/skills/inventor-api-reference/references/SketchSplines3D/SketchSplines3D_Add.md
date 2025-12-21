@@ -21,9 +21,3 @@ SketchSplines3D.**Add**( ***FitPoints*** As [ObjectCollection](../ObjectCollecti
 ## Version
 
 Introduced in version 8
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -21,9 +21,3 @@ The TextStylesEnumerator Collection Object allows iteration of the available tex
 ## Version
 
 Introduced in version 9
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

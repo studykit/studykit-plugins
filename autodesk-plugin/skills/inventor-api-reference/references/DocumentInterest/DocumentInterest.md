@@ -32,9 +32,3 @@ Provides a means for an application to register an interest in a document. In or
 ## Version
 
 Introduced in version 2008
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

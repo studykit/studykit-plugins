@@ -22,9 +22,3 @@ EdgeSymbol.**CopyTo**( ***TargetSheet*** As [Sheet](../Sheet/Sheet.md), [***NewN
 ## Version
 
 Introduced in version 2024
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

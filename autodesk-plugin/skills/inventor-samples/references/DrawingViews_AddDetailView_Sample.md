@@ -10,10 +10,6 @@ This sample demonstrates the creation of a detail drawing view with an attach po
 
 Before running this sample, select a drawing view in the active drawing.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub CreateDetailView()
     ' Set a reference to the drawing document.
@@ -69,9 +65,3 @@ Public Sub CreateDetailView()
     End If
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

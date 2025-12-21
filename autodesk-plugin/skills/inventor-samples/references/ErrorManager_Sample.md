@@ -8,10 +8,6 @@ Demonstrates using Inventor's error dialog.
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub ErrorDialog()
     ' Create a new part document
@@ -84,9 +80,3 @@ Public Sub ErrorDialog()
     End If
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

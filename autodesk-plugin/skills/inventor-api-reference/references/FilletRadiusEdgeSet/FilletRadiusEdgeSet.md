@@ -24,9 +24,3 @@ The FilletRadiusEdgeSet object is the base class for FilletConstantRadiusEdgeSet
 ## Version
 
 Introduced in version 5.3
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

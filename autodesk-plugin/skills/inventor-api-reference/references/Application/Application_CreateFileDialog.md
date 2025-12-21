@@ -28,9 +28,3 @@ Application.**CreateFileDialog**( ***Dialog*** As [FileDialog](../FileDialog/Fil
 ## Version
 
 Introduced in version 6
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

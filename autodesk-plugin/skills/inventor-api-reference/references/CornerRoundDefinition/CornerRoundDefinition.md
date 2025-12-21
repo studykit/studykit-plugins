@@ -31,9 +31,3 @@ The CornerRoundDefinition object is a utility object used for creating, querying
 ## Version
 
 Introduced in version 2009
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

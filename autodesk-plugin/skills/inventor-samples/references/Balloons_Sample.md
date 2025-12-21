@@ -10,10 +10,6 @@ This sample demonstrates the editing of balloons in a drawing.
 
 To run this sample, open a drawing document with the active sheet that has several balloons (including attached balloons) placed on it. This sample modifies the type and values of all the balloons.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub EditBalloons()
     ' Set a reference to the drawing document.
@@ -56,9 +52,3 @@ Public Sub EditBalloons()
     Next
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -27,9 +27,3 @@ UnitsOfMeasure.**CompatibleUnits**( ***Expression1*** As String, ***UnitsSpecifi
 ## Version
 
 Introduced in version 8
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

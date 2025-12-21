@@ -59,9 +59,3 @@ The UnfoldMethod object provides access to the information associated with a spe
 ## Version
 
 Introduced in version 5.3
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

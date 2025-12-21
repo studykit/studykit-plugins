@@ -20,9 +20,3 @@ The SketchConstraintEnumerator object provides access to a list of SketchConstra
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

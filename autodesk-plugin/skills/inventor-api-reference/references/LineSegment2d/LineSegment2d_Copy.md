@@ -14,9 +14,3 @@ LineSegment2d.**Copy**() As [LineSegment2d](../LineSegment2d/LineSegment2d.md)
 ## Version
 
 Introduced in version 2013
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

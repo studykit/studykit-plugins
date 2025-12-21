@@ -30,9 +30,14 @@ This separation of data from graphics allows a single set of data to be referenc
 
 As indicated by the object diagram, the GraphicsDataSetsCollection object is owned by the document. For the purposes of this code sample, the document may be either a part document or an assembly document. The first step is to add a new GraphicsDataSets object, here named 'CG\_Test', to the GraphicsDataSetsCollection. From there you can create the GraphicsCoordinateSet object.
 
-|  |
-| --- |
-| ```  Dim oDoc As Document Set oDoc = ThisApplication.ActiveDocument     Dim oDataSets As GraphicsDataSets Set oDataSets = oDoc.GraphicsDataSetsCollection.Add("CG_Test")          Dim oCoordSet As GraphicsCoordinateSet Set oCoordSet = oDataSets.CreateCoordinateSet(1) ``` |
+```vb
+Dim oDoc As Document
+Set oDoc = ThisApplication.ActiveDocument
+Dim oDataSets As GraphicsDataSets
+Set oDataSets = oDoc.GraphicsDataSetsCollection.Add("CG_Test")
+Dim oCoordSet As GraphicsCoordinateSet
+Set oCoordSet = oDataSets.CreateCoordinateSet(1)
+```
 
 This code and the code that follows does not perform error checking, for the sake of clarity and brevity. Your code should always check that return values are as expected, and that you are not attempting to create objects that already exist.
 
@@ -42,9 +47,12 @@ Now create a one dimensional array, and add your list of coordinates. Here they 
 
 As indicated by the object model diagram, ClientGraphics can be associated with a number of persistent objects in Autodesk Inventor (ComponentDefinition, DrawingView, and so on). This sample code uses a ComponentDefinition.
 
-|  |
-| --- |
-| ```  Dim oCompDef As ComponentDefinition Set oCompDef = oDoc.ComponentDefinition      Dim oClientGraphics As ClientGraphics Set oClientGraphics = oCompDef.ClientGraphicsCollection.Add("CG_Test") ``` |
+```vb
+Dim oCompDef As ComponentDefinition
+Set oCompDef = oDoc.ComponentDefinition
+Dim oClientGraphics As ClientGraphics
+Set oClientGraphics = oCompDef.ClientGraphicsCollection.Add("CG_Test")
+```
 
 The preceding code obtains the ComponentDefinition (in this case from the document object). Then a new ClientGraphics object is added, also named 'CG\_Test', to its ClientGraphicsCollection.
 
@@ -52,9 +60,12 @@ Autodesk Inventor client graphics uses the concept of nodes. A node is a logical
 
 The next step is to create a new node, and determine what primitives to add to it. A number of different graphics primitives are supported. Referring to the object model diagram, you can see that these include lines, strips of lines, triangles, strips of triangles, and so on. Grouping of primitives into strips allows for more efficient use of point data where line endpoints are coincident. However, for demonstration purposes, this example will create a triangle of three lines as LineGraphics, rather than creating a single TriangleGraphics object. The following code creates a new node and adds a LineGraphics object to it.
 
-|  |
-| --- |
-| ```  Dim oLineNode As GraphicsNode Set oLineNode = oClientGraphics.AddNode(1)  Dim oLineSet As LineGraphics Set oLineSet = oLineNode.AddLineGraphics ``` |
+```vb
+Dim oLineNode As GraphicsNode
+Set oLineNode = oClientGraphics.AddNode(1)
+Dim oLineSet As LineGraphics
+Set oLineSet = oLineNode.AddLineGraphics
+```
 
 Now to define the relationship between the point data (the GraphicsCoordinateSet) and the points required as endpoints of lines. To do this, create a GraphicsIndexSet object and add the indices of each X Y Z point required.
 
@@ -64,23 +75,37 @@ Now to define the relationship between the point data (the GraphicsCoordinateSet
 
 To define a triangle, the GraphicsIndexSet must reference the first coordinate in the data set twice, so the GraphicsIndexSet will contain four points. The following code adds all four points to the GraphicsIndexSet, as indices to the coordinate points in the GraphicsCoordinateSet object.
 
-|  |
-| --- |
-| ```  Dim oIndex As GraphicsIndexSet Set oIndex = oDataSets.CreateIndexSet(1)          Call oIndex.Add(1, 1)  ' Line from point 1 Call oIndex.Add(2, 2)  ' to point 2 Call oIndex.Add(3, 3)  ' to point 3          Call oIndex.Add(4, 1)  ' to point 1  ``` |
+```vb
+Dim oIndex As GraphicsIndexSet
+Set oIndex = oDataSets.CreateIndexSet(1)
+Call oIndex.Add(1, 1)
+' Line from point 1
+Call oIndex.Add(2, 2)
+' to point 2
+Call oIndex.Add(3, 3)
+' to point 3
+Call oIndex.Add(4, 1)
+' to point 1
+```
 
 When creating graphics, typically some control over color is required. The object model diagram refers to the GraphicsColorSet object. Use this to assign a color to a group of graphics primitives.
 
 The GraphicsColorSet is an indexed list of color definitions. Add a color definition to the GraphicsColorSet object, and pass the object to the LineSet object in order to determine the color of the resulting graphics. The example below assigns the RGB values for the color red (255,0,0)
 
-|  |
-| --- |
-| ```  Dim oColorSet As GraphicsColorSet Set oColorSet = oDataSets.CreateColorSet(1) Call oColorSet.Add(1, 255, 0, 0) oLineSet.ColorSet = oColorSet ``` |
+```vb
+Dim oColorSet As GraphicsColorSet
+Set oColorSet = oDataSets.CreateColorSet(1)
+Call oColorSet.Add(1, 255, 0, 0)
+oLineSet.ColorSet = oColorSet
+```
 
 Now all that remains is to apply the coordinates, or more specifically the GraphicsIndexSet indices, to the LineSet object, and then update the active view.
 
-|  |
-| --- |
-| ```  oLineSet.CoordinateSet = oCoordSet oLineSet.CoordinateIndexSet = oIndex ThisApplication.ActiveView.Update ``` |
+```vb
+oLineSet.CoordinateSet = oCoordSet
+oLineSet.CoordinateIndexSet = oIndex
+ThisApplication.ActiveView.Update
+```
 
 This will result in something like the red triangle in the following figure. This triangle will be transformed along with any other parts or assemblies when the Autodesk Inventor rotate tool is invoked. To erase the graphics, call the delete method of the 'CG\_Test' ClientGraphics object.
 
@@ -98,15 +123,62 @@ InteractionGraphics can be of type preview, which equate to regular ClientGraphi
 
 The following sample code demonstrates client graphics transformed by mouse movement. Create a blank form in VBA, with no controls, and add this code to the form.
 
-|  |
-| --- |
-| ```  Private WithEvents oInteraction As InteractionEvents Private WithEvents oMouseEvents As MouseEvents Private oPointCoords(1 To 6) As Double Private oCoordSet As GraphicsCoordinateSet Private oLineNode As GraphicsNode Private oLineSet As LineGraphics Private oClientGraphics As ClientGraphics Private oIG As InteractionGraphics Private oDataSets As GraphicsDataSets  Sub UserForm_Initialize() Set oInteraction = ThisApplication. _     CommandManager.CreateInteractionEvents oInteraction.SelectionActive = False Set oMouseEvents = oInteraction.MouseEvents oMouseEvents.MouseMoveEnabled = True Set oIG = oInteraction.InteractionGraphics Set oDataSets = oIG.GraphicsDataSets Set oCoordSet = oDataSets.CreateCoordinateSet(1) oPointCoords(1) = 0    oPointCoords(2) = 0    oPointCoords(3) = 0    oPointCoords(4) = 6    oPointCoords(5) = 0    oPointCoords(6) = 0    Call oCoordSet.PutCoordinates(oPointCoords) Set oClientGraphics = oIG.OverlayClientGraphics Set oLineNode = oClientGraphics.AddNode(1) Set oLineSet = oLineNode.AddLineGraphics oLineSet.CoordinateSet = oCoordSet oIG.UpdateOverlayGraphics ThisApplication.ActiveView  oInteraction.Start      End Sub  Private Sub oMouseEvents_OnMouseMove(ByVal Button As MouseButtonEnum, _    ByVal ShiftKeys As ShiftStateEnum, ByVal ModelPosition As Point, _    ByVal ViewPosition As Point2d, ByVal view As view) oPointCoords(4) = ModelPosition.X oPointCoords(5) = ModelPosition.Y oPointCoords(6) = ModelPosition.Z Call oCoordSet.PutCoordinates(oPointCoords) oIG.UpdateOverlayGraphics ThisApplication.ActiveView End Sub  Private Sub UserForm_Terminate() oInteraction.Stop Set oMouseEvents = Nothing Set oInteraction = Nothing End Sub ``` |
+```vb
+Private WithEvents oInteraction As InteractionEvents
+Private WithEvents oMouseEvents As MouseEvents
+Private oPointCoords(1 To 6) As Double
+Private oCoordSet As GraphicsCoordinateSet
+Private oLineNode As GraphicsNode
+Private oLineSet As LineGraphics
+Private oClientGraphics As ClientGraphics
+Private oIG As InteractionGraphics
+Private oDataSets As GraphicsDataSets
+Sub UserForm_Initialize()
+    Set oInteraction = ThisApplication. _
+    CommandManager.CreateInteractionEvents
+    oInteraction.SelectionActive = False
+    Set oMouseEvents = oInteraction.MouseEvents
+    oMouseEvents.MouseMoveEnabled = True
+    Set oIG = oInteraction.InteractionGraphics
+    Set oDataSets = oIG.GraphicsDataSets
+    Set oCoordSet = oDataSets.CreateCoordinateSet(1)
+    oPointCoords(1) = 0
+    oPointCoords(2) = 0
+    oPointCoords(3) = 0
+    oPointCoords(4) = 6
+    oPointCoords(5) = 0
+    oPointCoords(6) = 0
+    Call oCoordSet.PutCoordinates(oPointCoords)
+    Set oClientGraphics = oIG.OverlayClientGraphics
+    Set oLineNode = oClientGraphics.AddNode(1)
+    Set oLineSet = oLineNode.AddLineGraphics
+    oLineSet.CoordinateSet = oCoordSet
+    oIG.UpdateOverlayGraphics ThisApplication.ActiveView
+    oInteraction.Start
+End Sub
+Private Sub oMouseEvents_OnMouseMove(ByVal Button As MouseButtonEnum, _
+    ByVal ShiftKeys As ShiftStateEnum, ByVal ModelPosition As Point, _
+    ByVal ViewPosition As Point2d, ByVal view As view)
+    oPointCoords(4) = ModelPosition.X
+    oPointCoords(5) = ModelPosition.Y
+    oPointCoords(6) = ModelPosition.Z
+    Call oCoordSet.PutCoordinates(oPointCoords)
+    oIG.UpdateOverlayGraphics ThisApplication.ActiveView
+End Sub
+Private Sub UserForm_Terminate()
+    oInteraction.Stop
+    Set oMouseEvents = Nothing
+    Set oInteraction = Nothing
+End Sub
+```
 
 Now add the following code to the Modules section of the project. Running this MouseIG macro will cause a custom graphics line to follow the mouse cursor in Autodesk Inventor. One end of the line will be at 0,0,0, the other end will be governed by the coordinates returned by the mouse movement event.
 
-|  |
-| --- |
-| ```  Public Sub MouseIG()     frmMouseTest.Show vbModeless End Sub ``` |
+```vb
+Public Sub MouseIG()
+    frmMouseTest.Show vbModeless
+End Sub
+```
 
 The above sample demonstrates the similarities between interaction graphics and regular client graphics. However, graphics implemented through interaction graphics are not transacted, and so are not subject to the performance overhead imposed by the transaction and undo mechanisms. Interaction graphics are designed for interactive, real-time visual feedback.
 

@@ -10,10 +10,6 @@ This sample demonstrates the creation of a bend table in a drawing from a sheet 
 
 Change the location of the source part in the code below before running the sample.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub CreateBendTable()
     ' Set a reference to the active drawing document
@@ -41,9 +37,3 @@ Public Sub CreateBendTable()
     Set oBendTable = oActiveSheet.CustomTables.AddBendTable("C:\Temp\SheetMetal.ipt", oPoint, "Bend Table", strColumns)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

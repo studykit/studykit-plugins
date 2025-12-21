@@ -21,9 +21,3 @@ Matrix2d.**SetToRotateTo**( ***From*** As [Vector2d](../Vector2d/Vector2d.md), *
 ## Version
 
 Introduced in version 11
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

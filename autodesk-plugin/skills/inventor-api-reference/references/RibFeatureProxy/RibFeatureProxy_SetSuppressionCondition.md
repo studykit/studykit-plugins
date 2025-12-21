@@ -22,9 +22,3 @@ RibFeatureProxy.**SetSuppressionCondition**( ***Parameter*** As [Parameter](../P
 ## Version
 
 Introduced in version 11
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

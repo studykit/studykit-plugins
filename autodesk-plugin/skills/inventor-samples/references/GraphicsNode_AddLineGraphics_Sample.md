@@ -8,10 +8,6 @@ This sample demonstrates the creation of custom graphics using LineGraphics and 
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub DrawCustomLines()
     Dim oDoc As Document
@@ -131,9 +127,3 @@ Public Sub DrawCustomLines()
     End If
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

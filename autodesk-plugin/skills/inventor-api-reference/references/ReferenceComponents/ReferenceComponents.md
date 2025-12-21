@@ -35,9 +35,3 @@ Provides access to all of the objects that are owned by a particular PartCompone
 ## Version
 
 Introduced in version 5.3
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

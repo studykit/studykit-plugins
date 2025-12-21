@@ -8,10 +8,6 @@ This sample demonstrates how to import DWG into sketch.
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Sub ImportDWGIntoSketch()
     ' Get the DWG translator.
@@ -58,9 +54,3 @@ Sub ImportDWGIntoSketch()
     Call oDWGTranslator.Open(oDataMedium, oTranslationContext, oOptions, oDoc)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

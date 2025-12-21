@@ -26,9 +26,3 @@ This is a read only property whose value is a [Sketches3D](../Sketches3D/Sketche
 ## Version
 
 Introduced in version 6
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

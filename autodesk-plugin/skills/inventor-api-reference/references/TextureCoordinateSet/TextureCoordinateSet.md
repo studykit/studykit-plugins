@@ -29,9 +29,3 @@ A TextureCoordinateSet defines the coordinates of the map on the face. The Textu
 ## Version
 
 Introduced in version 10
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

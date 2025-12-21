@@ -10,10 +10,6 @@ This sample demonstrates how to create sketch slot with minitoolbar.
 
 Have a sektch in edit mode before running below sample.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 ' This sample demonstrates creating sketch slot using mini-toolbar
 Sub CreateSketchSlotSample()
@@ -245,9 +241,3 @@ Private Sub CreateSlot()
 
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

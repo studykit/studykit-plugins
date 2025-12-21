@@ -17,9 +17,3 @@ This is a read only property whose value is an [iMateDefinitions](../iMateDefini
 ## Version
 
 Introduced in version 8
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

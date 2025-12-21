@@ -29,9 +29,3 @@ The ModelCompositeAnnotations collection object provides access to all of the an
 ## Version
 
 Introduced in version 2018
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

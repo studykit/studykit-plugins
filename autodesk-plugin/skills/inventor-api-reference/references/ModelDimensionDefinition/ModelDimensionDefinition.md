@@ -44,9 +44,3 @@ The ModelDimensionDefinition object is the base class for all model dimension de
 ## Version
 
 Introduced in version 2018
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

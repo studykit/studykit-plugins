@@ -41,9 +41,3 @@ The TranslationContext object is used in TranslatorAddin workflows.
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -36,9 +36,3 @@ Utility object used to create new WireEdgeDefinition objects.
 ## Version
 
 Introduced in version 2013
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

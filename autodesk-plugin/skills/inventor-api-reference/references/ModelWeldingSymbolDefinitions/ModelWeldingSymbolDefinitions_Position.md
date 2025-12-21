@@ -17,9 +17,3 @@ This is a read/write property whose value is a [Point](../Point/Point.md).
 ## Version
 
 Introduced in version 2024
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

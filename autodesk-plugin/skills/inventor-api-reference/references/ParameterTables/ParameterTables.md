@@ -34,9 +34,3 @@ Creates and provides access to the parameters that were created as a result of r
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

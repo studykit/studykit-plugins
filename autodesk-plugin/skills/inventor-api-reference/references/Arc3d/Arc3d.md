@@ -43,9 +43,3 @@ The Arc3d object is a mathematical representation of a 3d arc.
 ## Version
 
 Introduced in version 6
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

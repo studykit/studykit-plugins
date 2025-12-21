@@ -17,9 +17,3 @@ Defines the constants used to specify the technique used when calculating a loft
 ## Version
 
 Introduced in version 2011
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

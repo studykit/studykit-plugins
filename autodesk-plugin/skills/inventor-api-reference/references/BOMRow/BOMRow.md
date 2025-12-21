@@ -49,9 +49,3 @@ The BOMRow object represents an item in the BOM based on the parent BOMView.
 ## Version
 
 Introduced in version 10
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

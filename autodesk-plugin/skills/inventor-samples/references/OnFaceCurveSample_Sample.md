@@ -10,10 +10,6 @@ This sample demonstrates how to create a OnFaceCurve in 3D sketch.
 
 Open a part document with a surface body in it, and then run below VBA code.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Sub OnFaceCurveSample()
     Dim oDoc As PartDocument
@@ -46,9 +42,3 @@ Sub OnFaceCurveSample()
     Set oOnFaceCurve = oSk3D.OnFaceCurves.Add(oFaces, oFitPoints)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

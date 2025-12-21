@@ -8,10 +8,6 @@ This sample demonstrates the creation of a thread feature. It creates a cylinder
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub ThreadSample()
     ' Create a new part document, using the default part template.
@@ -68,9 +64,3 @@ Public Sub ThreadSample()
                                                 False, False, "2 cm", 0)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

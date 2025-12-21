@@ -29,9 +29,3 @@ PartialChamferEdges.**Add**( ***Edge*** As Object, ***Start*** As Variant, ***En
 ## Version
 
 Introduced in version 2018
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

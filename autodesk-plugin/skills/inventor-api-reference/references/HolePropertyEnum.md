@@ -41,9 +41,3 @@ Enum indicating the various hole properties that can be included as columns in a
 ## Version
 
 Introduced in version 2009
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

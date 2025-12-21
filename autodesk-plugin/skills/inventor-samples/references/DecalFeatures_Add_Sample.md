@@ -10,10 +10,6 @@ This sample demonstrates the creation of a decal feature.
 
 Make sure that the path to the bmp file is valid before running the sample.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub DecalFeature()
     ' ***Change path to point to the desired bmp file.
@@ -74,9 +70,3 @@ Public Sub DecalFeature()
     Set oDecal = oCompDef.Features.DecalFeatures.Add(oSketchImage, oFace, True)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -10,10 +10,6 @@ This test applies texture coordinates expressing distance from the origin to 'th
 
 To operate: 1. Open a part 2. Run Demo - it should show discrete bands moving across the model 3. Click on any of the other "convenience functions" and hit F5 to exercise them.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Dim lastOffset As Double
 Dim mapperType As Integer
@@ -382,9 +378,3 @@ Public Sub OffsetSurface()
     Call OffsetSurfaceBy(lastOffset)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

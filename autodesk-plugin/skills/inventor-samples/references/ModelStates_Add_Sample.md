@@ -10,10 +10,6 @@ This sample demonstrates creation of a model state in an assembly.
 
 Before running the sample, you need to open an assembly and create two part files called C:\Temp\Part1.ipt and C:\Temp\Part2.ipt, or edit the sample code to point to different part files if desired.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub CreateModelState()
     ' Set a reference to the assembly component definintion.
@@ -52,9 +48,3 @@ Public Sub CreateModelState()
     oOcc2.Suppress
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -8,10 +8,6 @@ This sample demonstrates the creation of a loft feature. It uses two sections fo
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub CreateNonPlanarSectionLoft()
     ' Create a new part document, using the default part template.
@@ -74,9 +70,3 @@ Public Sub CreateNonPlanarSectionLoft()
     Call oCompDef.Features.LoftFeatures.Add(oLoftDefinition)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

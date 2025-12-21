@@ -37,9 +37,3 @@ The iFeatureTableCell object represents a single cell within a table associated 
 ## Version
 
 Introduced in version 2009
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

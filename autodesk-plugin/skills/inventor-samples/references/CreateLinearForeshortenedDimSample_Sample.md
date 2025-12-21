@@ -10,10 +10,6 @@ This sample demonstrates the creation of a linear foreshortened dimension.
 
 Have a drawing document open and select two paralell linear drawing curve segments in the same drawing view and run the following macro.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Sub CreateLinearForeshortenedDimSample()
     ' Open a drawing document and select two parallel linear curves in same drawing view first.
@@ -61,9 +57,3 @@ Sub CreateLinearForeshortenedDimSample()
 
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

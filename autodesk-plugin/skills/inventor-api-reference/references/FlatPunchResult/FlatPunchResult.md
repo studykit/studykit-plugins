@@ -33,9 +33,3 @@ The FlatPunchResult object represents a single punch instance in the flat. A pun
 ## Version
 
 Introduced in version 2008
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

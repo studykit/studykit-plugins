@@ -28,9 +28,3 @@ Object provides access to all rows of a feature control frame in a part or assem
 ## Version
 
 Introduced in version 2015
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

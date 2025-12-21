@@ -101,9 +101,15 @@ presentation documents and the ApprenticeServerDrawingDocument
 represents the drawing document. The code below illustrates using
 Apprentice to open a document.
 
-|  |
-| --- |
-| ``` Private Sub TestApprentice()     ' Create a new instance of Apprentice.     Dim oApprentice As New ApprenticeServerComponent          ' Open a document.     Dim oDoc As ApprenticeServerDocument     Set oDoc = oApprentice.Open("C:\Temp\Assembly1.iam")     End Sub ``` |
+```vb
+Private Sub TestApprentice()
+    ' Create a new instance of Apprentice.
+    Dim oApprentice As New ApprenticeServerComponent
+    ' Open a document.
+    Dim oDoc As ApprenticeServerDocument
+    Set oDoc = oApprentice.Open("C:\Temp\Assembly1.iam")
+End Sub
+```
 
 The "New" keyword is used in the declaration of the variable for the
 ApprenticeServerComponent. This creates a new instance of an object of
@@ -120,17 +126,40 @@ Apprentice without any changes. The function below will display an
 assembly tree given a ComponentOccurrences object regardless of whether
 it is used in Apprentice or Autodesk Inventor.
 
-|  |
-| --- |
-| ``` Private Sub GetComponents(InCollection As ComponentOccurrences, _ Level As Long)     ' Iterate through the components in the current collection.     Dim oCompOccurrence As ComponentOccurrence     For Each oCompOccurrence In InCollection         ' Display information about the current component.         Debug.Print Space(Level * 3) & oCompOccurrence.Name              ' Recursively call this function for the suboccurrences          ' of the current component.         Call GetComponents(oCompOccurrence.SubOccurrences, Level + 1)     Next End Sub ``` |
+```vb
+Private Sub GetComponents(InCollection As ComponentOccurrences, _ Level As Long)
+    ' Iterate through the components in the current collection.
+    Dim oCompOccurrence As ComponentOccurrence
+    For Each oCompOccurrence In InCollection
+        ' Display information about the current component.
+        Debug.Print Space(Level * 3) & oCompOccurrence.Name
+        ' Recursively call this function for the suboccurrences
+        ' of the current component.
+        Call GetComponents(oCompOccurrence.SubOccurrences, Level + 1)
+    Next
+End Sub
+```
 
 Here's a modified version of the earlier sample that connects to
 Apprentice and opens a document. It's been updated to check for the
 document type and then call the GetComponents function above.
 
-|  |
-| --- |
-| ``` Private Sub TestApprentice()     ' Create a new instance of Apprentice.     Dim oApprentice As New ApprenticeServerComponent          ' Open a document.     Dim oDoc As ApprenticeServerDocument     Set oDoc = oApprentice.Open("C:\Temp\Assembly1.iam")          ' Display this document's name.     Debug.Print oDoc.DisplayName          ' Check to make sure the document is an assembly.     If oDoc.DocumentType = kAssemblyDocument Then         ' Show the occurrence tree.         Call GetComponents(oDoc.ComponentDefinition.Occurrences, 1)     End If End Sub ``` |
+```vb
+Private Sub TestApprentice()
+    ' Create a new instance of Apprentice.
+    Dim oApprentice As New ApprenticeServerComponent
+    ' Open a document.
+    Dim oDoc As ApprenticeServerDocument
+    Set oDoc = oApprentice.Open("C:\Temp\Assembly1.iam")
+    ' Display this document's name.
+    Debug.Print oDoc.DisplayName
+    ' Check to make sure the document is an assembly.
+    If oDoc.DocumentType = kAssemblyDocument Then
+        ' Show the occurrence tree.
+        Call GetComponents(oDoc.ComponentDefinition.Occurrences, 1)
+    End If
+End Sub
+```
 
 Because Apprentice provides read-only access to some of the
 information in an Autodesk Inventor document, some of the properties on
@@ -165,9 +194,31 @@ exiting the file without saving. The sample below opens an assembly,
 looks for a reference to a specific file, changes the reference to
 point to another file, and then saves the change.
 
-|  |
-| --- |
-| ``` Private Sub ChangeReferenceSample()     Dim oApprentice As New ApprenticeServerComponent          ' Open a document.     Dim oDoc As ApprenticeServerDocument     Set oDoc = oApprentice.Open("C:\Temp\Assembly1.iam")          ' Iterate through the references looking for a     ' reference to a specific file.     Dim oRefFileDesc As ReferencedFileDescriptor     For Each oRefFileDesc In oDoc.ReferencedFileDescriptors         If oRefFileDesc.FullFileName = "C:\Temp\OldPart.ipt" Then             ' Replace the reference.             Call oRefFileDesc.PutLogicalFileNameUsingFull( _                                              "C:\Temp\NewPart.ipt")             Exit For         End If     Next          ' Set a reference to the FileSaveAs object.     Dim oFileSaveAs As FileSaveAs     Set oFileSaveAs = oApprentice.FileSaveAs          ' Save the assembly.     Call oFileSaveAs.AddFileToSave(oDoc, oDoc.FullFileName)     Call oFileSaveAs.ExecuteSave End Sub ``` |
+```vb
+Private Sub ChangeReferenceSample()
+    Dim oApprentice As New ApprenticeServerComponent
+    ' Open a document.
+    Dim oDoc As ApprenticeServerDocument
+    Set oDoc = oApprentice.Open("C:\Temp\Assembly1.iam")
+    ' Iterate through the references looking for a
+    ' reference to a specific file.
+    Dim oRefFileDesc As ReferencedFileDescriptor
+    For Each oRefFileDesc In oDoc.ReferencedFileDescriptors
+        If oRefFileDesc.FullFileName = "C:\Temp\OldPart.ipt" Then
+            ' Replace the reference.
+            Call oRefFileDesc.PutLogicalFileNameUsingFull( _                                              "C:\Temp\NewPart.ipt")
+            Exit For
+        End If
+    Next
+    '
+    Set a reference to the FileSaveAs object.
+    Dim oFileSaveAs As FileSaveAs
+    Set oFileSaveAs = oApprentice.FileSaveAs
+    ' Save the assembly.
+    Call oFileSaveAs.AddFileToSave(oDoc, oDoc.FullFileName)
+    Call oFileSaveAs.ExecuteSave
+End Sub
+```
 
 If you're using Apprentice to access the document properties, and
 that's the only edit you've made to the document, you don't need to use

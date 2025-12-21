@@ -13,9 +13,3 @@ SketchOffsetSpline.**ConvertToSpline**() As [SketchSpline](../SketchSpline/Sketc
 ## Version
 
 Introduced in version 9
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

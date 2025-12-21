@@ -33,9 +33,3 @@ ThreadFeatures.**Add**( ***Face*** As [Face](../Face/Face.md), ***StartEdge*** A
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

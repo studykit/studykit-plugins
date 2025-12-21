@@ -29,9 +29,3 @@ The CornerChamferFeatures collection object provides access to all of the object
 ## Version
 
 Introduced in version 5.3
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

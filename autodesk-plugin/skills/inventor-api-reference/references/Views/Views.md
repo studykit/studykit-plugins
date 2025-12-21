@@ -29,9 +29,3 @@ The Views collection object provides access to all of the graphic  objects assoc
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

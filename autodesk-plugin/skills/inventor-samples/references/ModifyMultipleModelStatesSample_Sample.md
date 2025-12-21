@@ -11,10 +11,6 @@ This sample demonstrates how to set multiple but not all model states into edit 
 
 This sample demonstrates how to set multiple but not all model states into edit mode.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Sub ModifyMultipleModelStatesSample()
     Dim oDoc As PartDocument
@@ -55,10 +51,6 @@ End Sub
 
 This sample demonstrates how to set multiple but not all model states into edit mode.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Sub ModifyMultipleModelStatesSample()
     Dim oDoc As PartDocument
@@ -96,9 +88,3 @@ Sub ModifyMultipleModelStatesSample()
     Debug.Print oModelStates.MemberEditScope = kEditMultipleMembers
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

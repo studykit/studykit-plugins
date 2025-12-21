@@ -17,9 +17,3 @@ This is a read only property whose value is a [ParameterTypeEnum](../ParameterTy
 ## Version
 
 Introduced in version 2024
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

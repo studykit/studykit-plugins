@@ -17,9 +17,3 @@ Enum indicating the type of startup action to perform each time Autodesk Invento
 ## Version
 
 Introduced in version 2008
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

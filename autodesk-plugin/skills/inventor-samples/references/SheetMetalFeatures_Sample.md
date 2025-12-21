@@ -8,10 +8,6 @@ This sample demonstrates the creation of sheet metal face and cut features.
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub FaceAndCutFeatureCreation()
     ' Create a new sheet metal document, using the default sheet metal template.
@@ -84,9 +80,3 @@ Public Sub FaceAndCutFeatureCreation()
     Set oCutFeature = oSheetMetalFeatures.CutFeatures.Add(oCutDefinition)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

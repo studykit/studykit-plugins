@@ -37,9 +37,3 @@ The GroundConstraint object represents a constraint that grounds an entity.
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

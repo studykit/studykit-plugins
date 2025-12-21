@@ -16,9 +16,3 @@ Input the InsertionLocationTypeEnum indicating where to position the DragNodes.
 ## Version
 
 Introduced in version 2018
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

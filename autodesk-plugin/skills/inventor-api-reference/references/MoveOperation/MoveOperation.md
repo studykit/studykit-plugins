@@ -31,9 +31,3 @@ The MoveOperation object is the base class for the various type of move operatio
 ## Version
 
 Introduced in version 2013
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

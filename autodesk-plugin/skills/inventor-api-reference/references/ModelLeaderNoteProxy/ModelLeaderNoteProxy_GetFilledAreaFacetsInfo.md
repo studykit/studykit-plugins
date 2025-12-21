@@ -28,9 +28,3 @@ ModelLeaderNoteProxy.**GetFilledAreaFacetsInfo**( ***Camera*** As [Camera](../Ca
 ## Version
 
 Introduced in version 2018
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

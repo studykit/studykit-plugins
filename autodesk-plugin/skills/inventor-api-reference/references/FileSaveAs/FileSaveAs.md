@@ -21,9 +21,3 @@ Custom interface to access management information about a particular file versio
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -18,9 +18,3 @@ Constants identifying the type of Boolean operation to be performed during this 
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -25,9 +25,3 @@ CornerRoundFeatures.**CreateCornerRoundDefinition**( ***CornerEdges*** As [EdgeC
 ## Version
 
 Introduced in version 2010
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

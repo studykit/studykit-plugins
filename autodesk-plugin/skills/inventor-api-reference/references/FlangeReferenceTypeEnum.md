@@ -17,9 +17,3 @@ Defines the constants used to specify the reference type for flange feature.
 ## Version
 
 Introduced in version 2025
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

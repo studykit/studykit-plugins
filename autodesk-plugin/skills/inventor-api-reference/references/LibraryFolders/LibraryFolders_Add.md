@@ -20,9 +20,3 @@ LibraryFolders.**Add**( [***Name***] As Variant ) As [LibraryFolder](../LibraryF
 ## Version
 
 Introduced in version 2016
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

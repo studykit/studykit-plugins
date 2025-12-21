@@ -13,9 +13,3 @@ Line2d.**Copy**() As [Line2d](../Line2d/Line2d.md)
 ## Version
 
 Introduced in version 2013
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

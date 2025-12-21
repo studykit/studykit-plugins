@@ -47,9 +47,3 @@ Provides access to all of the objects owned by a particular X and supports the m
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

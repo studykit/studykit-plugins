@@ -39,9 +39,3 @@ The ThreadTableQuery object has methods to query the thread table data contained
 ## Version
 
 Introduced in version 11
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -8,10 +8,6 @@ Demonstrates using Inventor's progress bar.
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 ' 64-bit version
 Public Declare PtrSafe Sub Sleep Lib "kernel32" (ByVal dwMilliseconds As LongLong)
@@ -65,9 +61,3 @@ Public Sub TestStatusBarProgressBar()
     oProgressBar.Close
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

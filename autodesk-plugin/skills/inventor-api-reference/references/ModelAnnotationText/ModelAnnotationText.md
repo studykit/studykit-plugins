@@ -32,9 +32,3 @@ The ModelAnnotationText object represents text in a model annotation or dimensio
 ## Version
 
 Introduced in version 2018
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

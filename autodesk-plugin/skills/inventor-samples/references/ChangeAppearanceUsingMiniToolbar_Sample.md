@@ -10,10 +10,6 @@ This sample demonstrates how to use MiniToolBar to change appearance color of pa
 
 You can either run below sample with an open part document or it will create a new part document.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 ' This sample demonstrates how to change colors using mini-toolbar
 Sub ChangeAppearanceMiniToolbarSample()
@@ -418,9 +414,3 @@ Private Sub ChangeColor(sColor As String)
         End If
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

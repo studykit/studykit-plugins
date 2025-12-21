@@ -21,9 +21,3 @@ The WeldBeads object provides access to all the existing  objects within a weldm
 ## Version
 
 Introduced in version 8
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

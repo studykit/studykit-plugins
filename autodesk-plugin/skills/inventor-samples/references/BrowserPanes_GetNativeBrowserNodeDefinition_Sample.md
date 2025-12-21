@@ -8,10 +8,6 @@ This sample demonstrates the navigation between a browser node and it's correspo
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Sub DataModelToBrowser()
     ' Create a new part document, using the default part template.
@@ -54,9 +50,3 @@ Sub DataModelToBrowser()
     oPartDoc.SelectSet.Select oWorkPlane
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

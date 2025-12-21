@@ -10,10 +10,6 @@ The following example demonstrates how to edit an existing thread feature.
 
 You need to make sure that the ThreadInfo object that you create is appropriate (size, etc.) for the face that it will be applied for. A ThreadInfo object represents a row in the Thread.xls spreadsheet.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Sub EditThread()
    Dim oDoc As PartDocument
@@ -34,9 +30,3 @@ Sub EditThread()
    oThread.ThreadInfo = oNewThreadInfo
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

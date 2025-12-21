@@ -23,9 +23,3 @@ ComponentDefinition.**RepositionObject**( ***TargetObject*** As Object, ***Befor
 ## Version
 
 Introduced in version 2025
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

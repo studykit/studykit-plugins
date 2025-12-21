@@ -29,9 +29,3 @@ The UserCoordinateSystemSettings object provides access to various UCS related d
 ## Version
 
 Introduced in version 2010
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

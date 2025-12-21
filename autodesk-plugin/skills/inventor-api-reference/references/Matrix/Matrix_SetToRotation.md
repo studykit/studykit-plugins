@@ -30,9 +30,3 @@ Matrix.**SetToRotation**( ***Angle*** As Double, ***Axis*** As [Vector](../Vecto
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

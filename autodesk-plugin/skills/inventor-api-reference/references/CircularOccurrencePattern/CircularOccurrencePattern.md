@@ -52,9 +52,3 @@ The CircularOccurrencePattern object represents a circular pattern of assembly o
 ## Version
 
 Introduced in version 6
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -36,9 +36,3 @@ The MoveFeatures object provides access to all of the MoveFeature objects in a p
 ## Version
 
 Introduced in version 2010
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

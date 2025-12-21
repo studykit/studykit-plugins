@@ -27,9 +27,3 @@ Features.**CreatePath**( ***SketchCurve*** As Object ) As [Path](../Path/Path.md
 ## Version
 
 Introduced in version 2008
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -35,9 +35,3 @@ The SketchControlPointSplines object supports creating new control point splines
 ## Version
 
 Introduced in version 2014
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

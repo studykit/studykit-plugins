@@ -56,9 +56,3 @@ The SketchBlock object represents a sketch block instance within a sketch.
 ## Version
 
 Introduced in version 2010
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

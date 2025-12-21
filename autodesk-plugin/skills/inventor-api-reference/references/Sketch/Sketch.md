@@ -91,9 +91,3 @@ The generic Sketch object. All types of Sketch objects derive from this object. 
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

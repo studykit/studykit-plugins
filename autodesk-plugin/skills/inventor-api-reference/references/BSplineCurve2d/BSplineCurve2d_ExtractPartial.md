@@ -28,9 +28,3 @@ BSplineCurve2d.**ExtractPartial**( ***StartParam*** As Double, ***EndParam*** As
 ## Version
 
 Introduced in version 2013
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

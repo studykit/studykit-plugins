@@ -36,9 +36,3 @@ The SketchEquationCurves3D object provides access to all the equation curves in 
 ## Version
 
 Introduced in version 2014
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -30,9 +30,3 @@ The ModelHoleThreadNotes collection object provides access to all of the hole an
 ## Version
 
 Introduced in version 2018
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -34,9 +34,3 @@ The Leader object represents a leader associated with a drawing annotation.
 ## Version
 
 Introduced in version 11
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -10,10 +10,6 @@ This sample demonstrates exporting of Inventor files in PDF format.
 
 To run this sample, the document to be exported must be active.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub PublishPDF()
     ' Get the PDF translator Add-In.
@@ -58,9 +54,3 @@ Public Sub PublishPDF()
     Call PDFAddIn.SaveCopyAs(oDocument, oContext, oOptions, oDataMedium)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

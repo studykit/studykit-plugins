@@ -38,51 +38,104 @@ This sample omits error checking for the sake of clarity and brevity. Always che
 
 Create a new VBA project and add a new class module named clsCreateLine. Add the following code to the general declarations section of the new class module. This code defines the change definition, change processor, and button definition as global objects able to respond to events.
 
-|  |
-| --- |
-| ```  Option Explicit Private WithEvents mobjChangeDef As ChangeDefinition Private WithEvents mobjChangeProcessor As ChangeProcessor Private WithEvents mobjButtonDefinitionEvents As ButtonDefinition ``` |
+```vb
+Option Explicit
+Private WithEvents mobjChangeDef As ChangeDefinition
+Private WithEvents mobjChangeProcessor As ChangeProcessor
+Private WithEvents mobjButtonDefinitionEvents As ButtonDefinition
+```
 
 Now add the first of the three subroutines to the class. This one is called when the class is instantiated and is where initialization code should be located. The handler for the button is created here.
 
-|  |
-| --- |
-| ```  Private Sub Class_Initialize()     Dim objCommandMgr As CommandManager     Set objCommandMgr = ThisApplication.CommandManager      Dim colControlDefs As ControlDefinitions     Set colControlDefs = objCommandMgr.ControlDefinitions          Dim objButtonDef As ButtonDefinition     Set objButtonDef = colControlDefs.Item("CreateLine")          Set mobjButtonDefinitionEvents = objButtonDef End Sub ``` |
+```vb
+Private Sub Class_Initialize()
+    Dim objCommandMgr As CommandManager
+    Set objCommandMgr = ThisApplication.CommandManager
+    Dim colControlDefs As ControlDefinitions
+    Set colControlDefs = objCommandMgr.ControlDefinitions
+    Dim objButtonDef As ButtonDefinition
+    Set objButtonDef = colControlDefs.Item("CreateLine")
+    Set mobjButtonDefinitionEvents = objButtonDef
+End Sub
+```
 
 The second subroutine to add to the class defines what happens when the button is pressed. This is where the change processor is created from the existing ChangeDefinition object, and its execute method is called.
 
-|  |
-| --- |
-| ```  Private Sub mobjButtonDefinitionEvents_OnExecute(ByVal Context As NameValueMap)      Dim objChangeMgr As ChangeManager     Set objChangeMgr = ThisApplication.ChangeManager          Dim colChangeDefs As ChangeDefinitions          Set colChangeDefs = objChangeMgr.Item("My_unique_CP_ID")     Set mobjChangeDef = colChangeDefs.Item("CreateLine")     Set mobjChangeProcessor = mobjChangeDef.CreateChangeProcessor          Dim objActiveDoc As Document     Set objActiveDoc = ThisApplication.ActiveDocument          mobjChangeProcessor.Execute objActiveDoc End Sub ``` |
+```vb
+Private Sub mobjButtonDefinitionEvents_OnExecute(ByVal Context As NameValueMap)
+    Dim objChangeMgr As ChangeManager
+    Set objChangeMgr = ThisApplication.ChangeManager
+    Dim colChangeDefs As ChangeDefinitions
+    Set colChangeDefs = objChangeMgr.Item("My_unique_CP_ID")
+    Set mobjChangeDef = colChangeDefs.Item("CreateLine")
+    Set mobjChangeProcessor = mobjChangeDef.CreateChangeProcessor
+    Dim objActiveDoc As Document
+    Set objActiveDoc = ThisApplication.ActiveDocument
+    mobjChangeProcessor.Execute objActiveDoc
+End Sub
+```
 
 The third and last subroutine to add to the clsCreateLine class definition defines what happens when the execute event of the change processor is called. This is the transacted code. The following example adds a sketch line to the open part document.
 
-|  |
-| --- |
-| ```  Private Sub mobjChangeProcessor_OnExecute(ByVal Document As Document, ByVal Context As NameValueMap, Succeeded As Boolean)     Dim objPartDoc As PartDocument     Set objPartDoc = Document               Dim objPartCompDef As PartComponentDefinition     Set objPartCompDef = objPartDoc.ComponentDefinition          Dim objTransGeom As TransientGeometry     Set objTransGeom = objPartDoc.Parent.TransientGeometry          Dim colLine As SketchLine     Set colLine = objPartCompDef.Sketches(1).SketchLines.AddByTwoPoints _         (objTransGeom.CreatePoint2d(0, 0), objTransGeom.CreatePoint2d(4, 0)) End Sub ``` |
+```vb
+Private Sub mobjChangeProcessor_OnExecute(ByVal Document As Document, ByVal Context As NameValueMap, Succeeded As Boolean)
+    Dim objPartDoc As PartDocument
+    Set objPartDoc = Document
+    Dim objPartCompDef As PartComponentDefinition
+    Set objPartCompDef = objPartDoc.ComponentDefinition
+    Dim objTransGeom As TransientGeometry
+    Set objTransGeom = objPartDoc.Parent.TransientGeometry
+    Dim colLine As SketchLine
+    Set colLine = objPartCompDef.Sketches(1).SketchLines.AddByTwoPoints _
+    (objTransGeom.CreatePoint2d(0, 0), objTransGeom.CreatePoint2d(4, 0))
+End Sub
+```
 
 This completes the class definition. Now add the code that instantiates this class. Add a new code module to the modules section of your VBA project. First, add a global declaration of the new class to the general declarations section, as follows.
 
-|  |
-| --- |
-| ```  Option Explicit Public mobjCreateLine As clsCreateLine ``` |
+```vb
+Option Explicit
+Public mobjCreateLine As clsCreateLine
+```
 
 Next, add the public subroutine that will be called to run this application. This does three things. It calls the subroutine to set up the ChangeDefinition object, and it calls the subroutine to add a button to the command panel. Both subroutines are defined in this module. Lastly, it instantiates the clsCreateLine class defined previously.
 
-|  |
-| --- |
-| ```  Sub CreateLineUsingChangeProcessor()     Call AddCreateLineChangeDef     Call AddLineButton     Set mobjCreateLine = New clsCreateLine End Sub ``` |
+```vb
+Sub CreateLineUsingChangeProcessor()
+    Call AddCreateLineChangeDef
+    Call AddLineButton
+    Set mobjCreateLine = New clsCreateLine
+End Sub
+```
 
 Now add the subroutine that creates the ChangeDefinition object. This object is created through the Add method if the ChangeDefinitions object, which is created through the Add method of the ChangeManager object. A unique ID is associated with the ChangeDefinitions object, to aid in identification elsewhere in the application. Similarly, the ChangeDefinition is named too, however this information is used in the user interface. The 'Create Line' text in the following code will be displayed in the Autodesk Inventor Edit menu as the last command that can be undone. If undone, it will display as the command that can be redone.
 
-|  |
-| --- |
-| ```  Private Sub AddCreateLineChangeDef()        Dim objChangeMgr As ChangeManager     Set objChangeMgr = ThisApplication.ChangeManager          Dim colChangeDefs As ChangeDefinitions     Set colChangeDefs = objChangeMgr.Add("My_unique_CP_ID")           Dim objDhangeDef As ChangeDefinition     Set objDhangeDef = colChangeDefs.Add("CreateLine", "Create Line")      End Sub ``` |
+```vb
+Private Sub AddCreateLineChangeDef()
+    Dim objChangeMgr As ChangeManager
+    Set objChangeMgr = ThisApplication.ChangeManager
+    Dim colChangeDefs As ChangeDefinitions
+    Set colChangeDefs = objChangeMgr.Add("My_unique_CP_ID")
+    Dim objDhangeDef As ChangeDefinition
+    Set objDhangeDef = colChangeDefs.Add("CreateLine", "Create Line")
+End Sub
+```
 
 Finally, add the subroutine that adds the button to the command panel. This uses the standard user interface customization API. User interface customization is covered elsewhere in the Autodesk Inventor programming Help.
 
-|  |
-| --- |
-| ```  Private Sub AddLineButton()     Dim objCommandMgr As CommandManager     Set objCommandMgr = ThisApplication.CommandManager          Dim colControlDefs As ControlDefinitions     Set colControlDefs = objCommandMgr.ControlDefinitions          Dim objButtonDef As ButtonDefinition     Set objButtonDef = colControlDefs.AddButtonDefinition("Line", _         "CreateLine", kShapeEditCmdType, "", "Create Line", "Line")      Call ThisApplication.UserInterfaceManager.Ribbons("Part").RibbonTabs("id_TabSketch").RibbonPanels("id_PanelP_2DSketchDraw").CommandControls.AddButton(objButtonDef)          objButtonDef.Enabled = True    End Sub ``` |
+```vb
+Private Sub AddLineButton()
+    Dim objCommandMgr As CommandManager
+    Set objCommandMgr = ThisApplication.CommandManager
+    Dim colControlDefs As ControlDefinitions
+    Set colControlDefs = objCommandMgr.ControlDefinitions
+    Dim objButtonDef As ButtonDefinition
+    Set objButtonDef = colControlDefs.AddButtonDefinition("Line", _
+    "CreateLine", kShapeEditCmdType, "", "Create Line", "Line")
+    Call ThisApplication.UserInterfaceManager.Ribbons("Part").RibbonTabs("id_TabSketch").RibbonPanels("id_PanelP_2DSketchDraw").CommandControls.AddButton(objButtonDef)
+    objButtonDef.Enabled = True
+End Sub
+```
 
 Once all the preceding code is added, the VBA project browser should appear as follows.
 

@@ -19,9 +19,3 @@ Constants indicating the various types of dimension text orientation.
 ## Version
 
 Introduced in version 2015
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

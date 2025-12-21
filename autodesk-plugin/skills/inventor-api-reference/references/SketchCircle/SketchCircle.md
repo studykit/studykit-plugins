@@ -76,9 +76,3 @@ The SketchCircle object represents a circle within a sketch. See the article in 
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

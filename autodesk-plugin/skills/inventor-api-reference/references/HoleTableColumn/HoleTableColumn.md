@@ -33,9 +33,3 @@ The HoleTableColumn object defines a column within the hole table, including the
 ## Version
 
 Introduced in version 10
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

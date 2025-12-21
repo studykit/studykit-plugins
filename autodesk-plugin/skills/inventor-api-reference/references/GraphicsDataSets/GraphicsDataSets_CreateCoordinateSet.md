@@ -34,9 +34,3 @@ GraphicsDataSets.**CreateCoordinateSet**( ***DataSetId*** As Long ) As [Graphics
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

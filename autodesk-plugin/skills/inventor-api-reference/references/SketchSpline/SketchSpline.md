@@ -80,9 +80,3 @@ The SketchSpline object represents a spline within a sketch. See the article in 
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

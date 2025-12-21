@@ -8,10 +8,6 @@ This sample will fly the camera around the model. To simplify the code, the targ
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub RotateCamera()
     ' Get the active camera.
@@ -53,9 +49,3 @@ Public Sub RotateCamera()
     Next
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

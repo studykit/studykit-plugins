@@ -10,10 +10,6 @@ This sample demonstrates how to replace the content part referenced by an assemb
 
 Open an assembly that contains an occurrence of a content part and run the macro.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Sub ReplaceContentCenterPart()
     ' Set a reference to the active assembly document.
@@ -62,9 +58,3 @@ Sub ReplaceContentCenterPart()
     Call oOcc.Replace(strContentPartFileName, False)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

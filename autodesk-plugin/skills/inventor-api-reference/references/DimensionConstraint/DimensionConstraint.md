@@ -38,9 +38,3 @@ The DimensionConstraint object represents the base class of all dimension constr
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

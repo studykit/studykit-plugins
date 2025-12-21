@@ -20,9 +20,3 @@ The LegacyDistanceHeightExtent is used by the FlangeFeature object when the 'Old
 ## Version
 
 Introduced in version 2009
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -23,9 +23,3 @@ The HoleTableCell object represents an individual cell in the hole table.
 ## Version
 
 Introduced in version 10
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

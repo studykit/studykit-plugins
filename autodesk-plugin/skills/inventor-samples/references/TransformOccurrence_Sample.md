@@ -10,10 +10,6 @@ This sample demonstrates moving a component occurrence. This sample performs a t
 
 Before running the sample you need to open an assembly and select the occurrence to move. The sample code first moves the occurrence honoring any existing constraints and then moves it ignoring any constraints.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub MoveOccurrence()
    ' Set a reference to the assembly component definintion.
@@ -45,9 +41,3 @@ Public Sub MoveOccurrence()
    Call oOccurrence.SetTransformWithoutConstraints(oTransform)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

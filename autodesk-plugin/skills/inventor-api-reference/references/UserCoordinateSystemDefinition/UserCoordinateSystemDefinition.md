@@ -38,9 +38,3 @@ The UserCoordinateSystemDefinition object represents the information that define
 ## Version
 
 Introduced in version 2011
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

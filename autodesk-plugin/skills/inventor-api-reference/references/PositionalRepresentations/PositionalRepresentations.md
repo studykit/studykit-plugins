@@ -30,9 +30,3 @@ The PositionalRepresentations collection object provides access to all the posit
 ## Version
 
 Introduced in version 11
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

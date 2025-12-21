@@ -21,9 +21,3 @@ ClientResourceMaps.**Add**( ***ClientId*** As String, ***Id*** As Long ) As [Cli
 ## Version
 
 Introduced in version 2022
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -10,10 +10,6 @@ This sample demonstrates getting region properties from a sketch profile.
 
 To run the sample you must have a sketch active that contains some sketch entities.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub GetProfileRegionProperties()
     ' Set a reference to the active sketch.
@@ -74,9 +70,3 @@ Public Sub GetProfileRegionProperties()
 
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

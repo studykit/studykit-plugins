@@ -30,9 +30,3 @@ Object that encapsulates a given software version. Used in various contexts.
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

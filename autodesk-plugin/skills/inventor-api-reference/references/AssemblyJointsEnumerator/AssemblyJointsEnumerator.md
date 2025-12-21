@@ -20,9 +20,3 @@ Provides access to the joints acting directly on a particular occurrence. This o
 ## Version
 
 Introduced in version 2014
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -8,10 +8,6 @@ This sample demonstrates how to print a Part or Assembly document.
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub PrintPartOrAssembly()
     ' Set a reference to the print manager object of the active document.
@@ -57,9 +53,3 @@ Public Sub PrintPartOrAssembly()
     oPrintMgr.SubmitPrint
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

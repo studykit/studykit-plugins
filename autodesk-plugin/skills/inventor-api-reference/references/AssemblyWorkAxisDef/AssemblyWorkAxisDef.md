@@ -27,9 +27,3 @@ The AssemblyWorkAxisDef object allows you to get and set the information that sp
 ## Version
 
 Introduced in version 6
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -22,9 +22,3 @@ The DragContext object provides methods that allow a user to move an object simi
 ## Version
 
 Introduced in version 2011
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

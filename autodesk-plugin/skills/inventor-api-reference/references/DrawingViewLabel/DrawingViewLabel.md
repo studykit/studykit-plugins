@@ -41,9 +41,3 @@ The DrawingViewLabel object represents the text in a drawing view label.
 ## Version
 
 Introduced in version 2009
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

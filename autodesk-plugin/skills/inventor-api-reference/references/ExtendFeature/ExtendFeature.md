@@ -57,9 +57,3 @@ For information on this object, please refer to PartFeature, which provides iden
 ## Version
 
 Introduced in version 11
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

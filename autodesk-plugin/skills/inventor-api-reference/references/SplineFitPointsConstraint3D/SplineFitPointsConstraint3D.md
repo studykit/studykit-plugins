@@ -38,9 +38,3 @@ The SplineFitPointsConstraint3D object represents a constraint that makes a spli
 ## Version
 
 Introduced in version 8
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

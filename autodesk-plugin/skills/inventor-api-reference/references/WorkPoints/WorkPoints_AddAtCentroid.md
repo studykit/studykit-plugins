@@ -21,9 +21,3 @@ WorkPoints.**AddAtCentroid**( ***Entities*** As Object, [***Construction***] As 
 ## Version
 
 Introduced in version 2008
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -31,9 +31,3 @@ CutFeatures.**Add**( ***CutDefinition*** As [CutDefinition](../CutDefinition/Cut
 ## Version
 
 Introduced in version 2009
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

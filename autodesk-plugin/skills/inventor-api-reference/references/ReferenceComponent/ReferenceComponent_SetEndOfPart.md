@@ -24,9 +24,3 @@ ReferenceComponent.**SetEndOfPart**( ***Before*** As Boolean )
 ## Version
 
 Introduced in version 7
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

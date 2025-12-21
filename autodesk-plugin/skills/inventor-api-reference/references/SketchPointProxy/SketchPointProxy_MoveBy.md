@@ -20,9 +20,3 @@ SketchPointProxy.**MoveBy**( ***Vector*** As [Vector2d](../Vector2d/Vector2d.md)
 ## Version
 
 Introduced in version 6
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

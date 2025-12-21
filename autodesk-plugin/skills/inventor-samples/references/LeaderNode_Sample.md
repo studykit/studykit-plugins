@@ -10,10 +10,6 @@ This sample illustrates creating leader text on a sheet.
 
 Before running this sample, open a drawing document and select a linear drawing edge.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub AddLeaderNote()
     ' Set a reference to the drawing document.
@@ -75,9 +71,3 @@ Public Sub AddLeaderNote()
     Call oFirstNode.InsertNode(oSecondNode, oTG.CreatePoint2d(oMidPoint.X + 5, oMidPoint.Y + 5))
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

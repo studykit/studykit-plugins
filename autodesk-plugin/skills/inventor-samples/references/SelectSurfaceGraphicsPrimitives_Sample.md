@@ -10,10 +10,6 @@ This demonstrates the ability to select client graphic primitives, by creating S
 
 To use this sample a part or assembly must be active.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub SelectablePrimitives()
     ' Make sure a part or assembly is active.
@@ -109,9 +105,3 @@ Public Sub SelectablePrimitives()
     End If
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

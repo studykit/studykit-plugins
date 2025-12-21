@@ -10,10 +10,6 @@ This sample demonstrates creating lines. It uses all of the various methods to c
 
 To run this sample you must have a sketch active.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub DrawSketchLine()
     ' Check to make sure a sketch is open.
@@ -79,9 +75,3 @@ Public Sub DrawSketchLine()
     oTransGeom.CreatePoint2d(8, 8))
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

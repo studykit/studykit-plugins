@@ -23,8 +23,3 @@ PluginLicenseManagerEvents.**OnChangeLicense**( ***BeforeOrAfter*** As [EventTim
 
 Introduced in version 2020
 
----
-
-|  |  |
-| --- | --- |
-| Â© Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -29,9 +29,3 @@ The ToExtent object defines the feature extent type where the feature extent is 
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

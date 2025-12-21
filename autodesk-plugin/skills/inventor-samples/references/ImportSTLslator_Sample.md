@@ -8,10 +8,6 @@ This sample demonstrates how open an STL file using the STL translator add-in.
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Sub ImportFunc()
     ' Set STL translator's CLSID and STL file name.
@@ -59,9 +55,3 @@ Sub ImportFunc()
     oTransAddIn.Open file, context, options, sourceObj
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

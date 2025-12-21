@@ -69,9 +69,3 @@ The HoleTableStyle object represents a hole table style in a drawing. The proper
 ## Version
 
 Introduced in version 2009
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -22,9 +22,3 @@ The DSValue object represents a value where the value can be either a constant v
 ## Version
 
 Introduced in version 2013
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

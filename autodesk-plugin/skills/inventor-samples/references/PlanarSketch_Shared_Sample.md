@@ -10,10 +10,6 @@ This sample demonstrates setting a sketch so it is shared.
 
 To use this sample, open a part document open that contains at least one extrusion feature and run the sample. The sketch of the first extrusion feature should not already be shared.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub MakeSketchShared()
    ' Set a reference to the part component definition.
@@ -34,9 +30,3 @@ Public Sub MakeSketchShared()
    oSketch.Shared = True
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

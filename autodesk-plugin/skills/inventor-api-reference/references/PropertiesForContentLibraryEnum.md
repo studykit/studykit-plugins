@@ -33,9 +33,3 @@ Content Library Component Properties {B9600981-DEE8-4547-8D7C-E525B3A1727A}.
 ## Version
 
 Introduced in version 6
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -11,10 +11,6 @@ This sample demonstrates creating a fixed work point and edit its position. It d
 
 The first line of this sample sets the oApp variable to ThisApplication - this should be appropriately changed.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 public void WorkPointAtMassCenter()
 {
@@ -56,10 +52,6 @@ public void WorkPointAtMassCenter()
 }
 ```
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub WorkPointAtMassCenter()
     ' Check to make sure a part document is active.
@@ -96,9 +88,3 @@ Public Sub WorkPointAtMassCenter()
     End If
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

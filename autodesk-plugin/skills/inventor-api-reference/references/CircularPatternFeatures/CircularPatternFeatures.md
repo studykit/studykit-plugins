@@ -29,9 +29,3 @@ The CircularPatternFeatures collection object provides access to all of the obje
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

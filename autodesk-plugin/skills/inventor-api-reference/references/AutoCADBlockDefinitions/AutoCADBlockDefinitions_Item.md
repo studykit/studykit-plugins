@@ -31,9 +31,3 @@ This is a read only property whose value is an [AutoCADBlockDefinition](../AutoC
 ## Version
 
 Introduced in version 2011
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

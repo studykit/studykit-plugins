@@ -10,10 +10,6 @@ This sample demonstrates the creation of a punch note on the drawing view of a f
 
 Select a punch edge on a flat pattern drawing view and run the sample.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Sub AddPunchNote()
     ' Assumes that a drawing document is active
@@ -50,9 +46,3 @@ Sub AddPunchNote()
     Set oPunchNote = oDoc.ActiveSheet.DrawingNotes.PunchNotes.Add(oPosition, oPunchEdgeIntent)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

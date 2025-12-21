@@ -18,9 +18,3 @@ The AssemblyWorkPointDef object allows you to get and set the information that s
 ## Version
 
 Introduced in version 6
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

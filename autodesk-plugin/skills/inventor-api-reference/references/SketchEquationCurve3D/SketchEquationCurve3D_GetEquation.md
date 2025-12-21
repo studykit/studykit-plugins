@@ -25,9 +25,3 @@ SketchEquationCurve3D.**GetEquation**( ***CoordinateSystemType*** As [Coordinate
 ## Version
 
 Introduced in version 2014
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

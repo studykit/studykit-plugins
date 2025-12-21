@@ -21,9 +21,3 @@ UnitVector2d.**IsEqualTo**( ***Vector*** As [UnitVector2d](../UnitVector2d/UnitV
 ## Version
 
 Introduced in version 11
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

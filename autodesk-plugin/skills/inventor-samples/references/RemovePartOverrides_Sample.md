@@ -8,10 +8,6 @@ This sample removes all appearance overrides that have been placed on a part.
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub RemovePartOverrides()
     ' Get the active part document.
@@ -36,9 +32,3 @@ Public Sub RemovePartOverrides()
     Next
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

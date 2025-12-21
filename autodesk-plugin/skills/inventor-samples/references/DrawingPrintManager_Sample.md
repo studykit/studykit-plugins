@@ -8,10 +8,6 @@ This sample demonstrates how to print all sheets in a drawing document and set s
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub PlotAllSheetsInDrawing()
     'Print all sheets in drawing document
@@ -39,9 +35,3 @@ Public Sub PlotAllSheetsInDrawing()
     End If
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

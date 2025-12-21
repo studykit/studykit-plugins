@@ -29,9 +29,3 @@ ContourFlangeFeatures.**CreateDefinition**( ***Path*** As [Path](../Path/Path.md
 ## Version
 
 Introduced in version 2026
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

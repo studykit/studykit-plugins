@@ -20,9 +20,3 @@ Application.**UnreserveLicense**( ***ClientId*** As String )
 ## Version
 
 Introduced in version 2009
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

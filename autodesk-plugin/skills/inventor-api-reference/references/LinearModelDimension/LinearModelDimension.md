@@ -49,9 +49,3 @@ The LinearModelDimension object represents a linear general dimension in a part 
 ## Version
 
 Introduced in version 2018
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -47,9 +47,3 @@ The Plane object. A plane object is infinite. The object created is a transient 
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

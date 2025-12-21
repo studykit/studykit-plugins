@@ -32,9 +32,3 @@ The FreeDragMoveOperation object represents the definition of a free drag within
 ## Version
 
 Introduced in version 2013
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

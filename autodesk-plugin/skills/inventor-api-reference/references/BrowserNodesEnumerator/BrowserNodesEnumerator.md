@@ -35,9 +35,3 @@ This object provides access to the individual objects in a collection of nodes; 
 ## Version
 
 Introduced in version 8
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

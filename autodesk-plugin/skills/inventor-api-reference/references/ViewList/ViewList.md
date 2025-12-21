@@ -28,9 +28,3 @@ A ViewList object is a collection of  objects.
 ## Version
 
 Introduced in version 9
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

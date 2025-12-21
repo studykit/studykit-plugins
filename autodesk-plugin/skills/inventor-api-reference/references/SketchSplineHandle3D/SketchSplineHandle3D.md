@@ -52,9 +52,3 @@ The SketchSplineHandle3D object represents a spline handle within a 3D sketch at
 ## Version
 
 Introduced in version 2008
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

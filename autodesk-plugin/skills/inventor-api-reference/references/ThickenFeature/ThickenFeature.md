@@ -67,9 +67,3 @@ The ThickenFeature object represents a thicken feature, which is created interac
 ## Version
 
 Introduced in version 6
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

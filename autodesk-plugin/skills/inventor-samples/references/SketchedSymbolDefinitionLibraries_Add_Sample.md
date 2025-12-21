@@ -8,10 +8,6 @@ This sample demonstrates how to create a sketched symbol definition and save it 
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Sub SketchSymbolDefinitionLibrarySample()
     Dim oDoc As DrawingDocument
@@ -59,9 +55,3 @@ Sub SketchSymbolDefinitionLibrarySample()
     Call oNewDoc.Sheets(1).SketchedSymbols.Add(oNewSymbolDef, ThisApplication.TransientGeometry.CreatePoint2d(12, 12))
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

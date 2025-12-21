@@ -25,9 +25,3 @@ SketchArcs3D.**AddByCenterStartSweepAngle**( ***CenterPoint*** As Object, ***Nor
 ## Version
 
 Introduced in version 2008
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

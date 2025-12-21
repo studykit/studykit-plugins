@@ -37,9 +37,3 @@ The SketchBlocks collection object provides access to all sketch block instances
 ## Version
 
 Introduced in version 2010
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

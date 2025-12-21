@@ -21,9 +21,3 @@ TransientBRep.**GetIdenticalBodies**( ***InputSurfaceBodies*** As [ObjectCollect
 ## Version
 
 Introduced in version 2021
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

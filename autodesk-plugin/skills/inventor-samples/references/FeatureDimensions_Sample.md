@@ -8,10 +8,6 @@ This sample demonstrates querying the dimensions of a feature in a part or an as
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Sub QueryAndShowFeatureDimensions()
     Dim oDoc As Document
@@ -44,9 +40,3 @@ Sub QueryAndShowFeatureDimensions()
     oFeature.FeatureDimensions.Show
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

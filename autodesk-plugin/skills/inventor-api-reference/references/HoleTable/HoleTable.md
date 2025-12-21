@@ -62,9 +62,3 @@ A hole table contains information for some or all holes in a drawing view. A hol
 ## Version
 
 Introduced in version 10
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

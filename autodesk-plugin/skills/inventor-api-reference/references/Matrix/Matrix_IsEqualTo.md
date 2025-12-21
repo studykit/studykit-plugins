@@ -21,9 +21,3 @@ Matrix.**IsEqualTo**( ***Matrix*** As [Matrix](../Matrix/Matrix.md), [***Toleran
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

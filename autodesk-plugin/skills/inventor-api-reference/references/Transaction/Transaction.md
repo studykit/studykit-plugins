@@ -47,9 +47,3 @@ The Transaction object that stands for a single transaction. See the article in 
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

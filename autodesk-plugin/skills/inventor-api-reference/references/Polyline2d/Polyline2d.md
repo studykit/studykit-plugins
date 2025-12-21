@@ -29,9 +29,3 @@ The Polyline2d object is a mathematical utility object that represents a set of 
 ## Version
 
 Introduced in version 2009
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

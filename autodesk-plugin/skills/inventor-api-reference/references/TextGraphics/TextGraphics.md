@@ -59,9 +59,3 @@ The TextGraphics object defines a set of text strings that are displayed within 
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

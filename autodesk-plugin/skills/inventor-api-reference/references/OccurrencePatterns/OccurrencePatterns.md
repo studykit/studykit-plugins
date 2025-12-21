@@ -31,9 +31,3 @@ The OccurrencePatterns collection object provides access to the existing assembl
 ## Version
 
 Introduced in version 6
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

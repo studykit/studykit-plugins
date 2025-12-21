@@ -8,10 +8,6 @@ The following sample demonstrates the creation of a transient surface body consi
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub CreateRectangleFace()
     Dim oTransBRep As TransientBRep
@@ -116,9 +112,3 @@ Public Sub CreateRectangleFace()
     Set oBaseFeature = oDef.Features.NonParametricBaseFeatures.AddByDefinition(oFeatureDef)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

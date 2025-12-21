@@ -21,9 +21,3 @@ AssemblyDocument.**Save2**( [***SaveDependents***] As Boolean, [***DocumentsToSa
 ## Version
 
 Introduced in version 2010
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

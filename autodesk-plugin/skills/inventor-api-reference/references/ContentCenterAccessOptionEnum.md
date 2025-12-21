@@ -15,9 +15,3 @@ Enum indicating whether the access option for CC is Inventor Desktop or Vault/Pr
 ## Version
 
 Introduced in version 2010
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

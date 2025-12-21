@@ -37,9 +37,3 @@ The ModelWeldingSymbolDefinitions collection object provides access to the defin
 ## Version
 
 Introduced in version 2024
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

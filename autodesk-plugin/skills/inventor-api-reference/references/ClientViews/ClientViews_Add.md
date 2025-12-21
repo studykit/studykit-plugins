@@ -20,9 +20,3 @@ ClientViews.**Add**( ***HWND*** As Long ) As [ClientView](../ClientView/ClientVi
 ## Version
 
 Introduced in version 6
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

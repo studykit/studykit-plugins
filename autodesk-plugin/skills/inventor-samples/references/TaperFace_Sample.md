@@ -10,10 +10,6 @@ This sample demonstrates much of the wire body creation functionality. To run th
 
 To use this sample a part must be active.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub TaperFace()
     Dim testFace As Face
@@ -202,9 +198,3 @@ Private Sub DrawWire(partDef As PartComponentDefinition, WireToDisplay As Wire, 
     trans.End
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

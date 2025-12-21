@@ -30,9 +30,3 @@ The ClientViews collection object represents the collection of objects for a doc
 ## Version
 
 Introduced in version 6
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

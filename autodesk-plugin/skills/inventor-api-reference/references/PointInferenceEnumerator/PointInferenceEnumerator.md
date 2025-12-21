@@ -20,9 +20,3 @@ This object returns all of the information gleaned by Autodesk Inventor's infere
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

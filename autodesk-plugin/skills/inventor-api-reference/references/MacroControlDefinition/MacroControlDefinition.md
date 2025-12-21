@@ -52,9 +52,3 @@ The MacroControlDefinition object represents a command that causes a macro to ru
 ## Version
 
 Introduced in version 9
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

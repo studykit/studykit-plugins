@@ -10,10 +10,6 @@ Demonstrate creating a transient ruled surface. This sample uses all straight li
 
 To use this sample a part must be active.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub RuledSurf()
     ' Get the transient B-Rep and Geometry objects.
@@ -95,9 +91,3 @@ Public Sub RuledSurf()
     ThisApplication.ActiveView.Fit
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

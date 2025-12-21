@@ -24,41 +24,85 @@ The samples that follow show how to add new environments to Autodesk Inventor. T
 
 The first step is to get the Environments collection from the UserInterfaceManager. From this, obtain a built-in environment to use as the basis for the new environment. This sample and the following code omit error checking for the sake of clarity and brevity. Always check that return values are of the expected type.
 
-|  |
-| --- |
-| ```  Sub AddParallelEnv1()     Dim oEnvs As Environments     Set oEnvs = ThisApplication.UserInterfaceManager.Environments          Dim oEnv As Environment     Set oEnv = oEnvs("MBxSheetMetalEnvironment") ``` |
+```vb
+Sub AddParallelEnv1()
+    Dim oEnvs As Environments
+    Set oEnvs = ThisApplication.UserInterfaceManager.Environments
+    Dim oEnv As Environment
+    Set oEnv = oEnvs("MBxSheetMetalEnvironment")
+```
 
 Next, add a new environment to the environments collection. Here, we use a display name of "FEA" - this is the name that will be displayed in the Applications menu. The string "FEA Env's internal name" is this the internal name for the new environment - its equivalent to the internal names of built-in environments, such as "DLxDrawingEnvironment". (A ClientId is not supplied so this environment is not persisted.)
 
-|  |
-| --- |
-| ```      Dim oNewEnv As Environment     Set oNewEnv = Nothing     Set oNewEnv = oEnvs.Add("FEA", "FEA Env's internal name") ``` |
+```vb
+Dim oNewEnv As Environment
+Set oNewEnv = Nothing
+Set oNewEnv = oEnvs.Add("FEA", "FEA Env's internal name")
+```
 
 This example will use the same default command bar as the source environment, and will populate the new environment's panel bar with some command bars. It will also copy the command bars from the context menu.
 
-|  |
-| --- |
-| ```      oNewEnv.DefaultRibbonTab = oEnv.DefaultRibbonTab     Dim sTabs(0 To 1) As String     sTabs(0) = "id_TabSheetMetal"     sTabs(1) = "id_TabFlatPattern"              oNewEnv.AdditionalVisibleRibbonTabs = sTabs     oNewEnv.InheritAllRibbonTabs = True ``` |
+```vb
+oNewEnv.DefaultRibbonTab = oEnv.DefaultRibbonTab
+Dim sTabs(0 To 1) As String
+sTabs(0) = "id_TabSheetMetal"
+sTabs(1) = "id_TabFlatPattern"
+oNewEnv.AdditionalVisibleRibbonTabs = sTabs
+oNewEnv.InheritAllRibbonTabs = True
+```
 
 In this case the new environment will inherit all the command bars from the parent environment.
 
-|  |
-| --- |
-| ```      oNewEnv.PanelBar.CommandBarList.InheritAll = True     oNewEnv.ContextMenuList.InheritAll = True ``` |
+```vb
+oNewEnv.PanelBar.CommandBarList.InheritAll = True
+oNewEnv.ContextMenuList.InheritAll = True
+```
 
 All that remains is to add the new environment to the list of parallel environments (thus adding the environment to the list of available environments, as indicated by the Applications menu shown in the figure below.
 
-|  |
-| --- |
-| ```      Dim oParEnvs As EnvironmentList     Set oParEnvs = ThisApplication.UserInterfaceManager.ParallelEnvironments     Call oParEnvs.Add(oNewEnv) End Sub ``` |
+```vb
+Dim oParEnvs As EnvironmentList
+Set oParEnvs = ThisApplication.UserInterfaceManager.ParallelEnvironments
+Call oParEnvs.Add(oNewEnv)
+End Sub
+```
 
 ![](../images/ov.env_02.png)
 
 Next, add another two environments named "Rendering" and "Aerofoil", based on the assembly and weldment environments respectively. This code is much the same as that in the previous section.
 
-|  |
-| --- |
-| ```  Sub AddParallelEnv2()     Dim oEnvs As Environments     Set oEnvs = ThisApplication.UserInterfaceManager.Environments          Dim oEnv As Environment     Set oEnv = oEnvs("AMxAssemblyEnvironment")            Dim oNewEnv As Environment     Set oNewEnv = Nothing          Set oNewEnv = oEnvs.Add("Rendering", "Rendering Env's internal name")          Dim sTabs(0 To 1) As String     sTabs(0) = "id_TabAssemble"     sTabs(1) = "id_TabDesign"          oNewEnv.DefaultRibbonTab = oEnv.DefaultRibbonTab     oNewEnv.InheritAllRibbonTabs = False          Dim oParEnvs As EnvironmentList     Set oParEnvs = ThisApplication.UserInterfaceManager.ParallelEnvironments          Call oParEnvs.Add(oNewEnv)     End Sub   Sub AddParallelEnv3()     Dim oEnvs As Environments     Set oEnvs = ThisApplication.UserInterfaceManager.Environments          Dim oEnv As Environment     Set oEnv = oEnvs("AMxWeldmentEnvironment")          Dim oNewEnv As Environment     Set oNewEnv = oEnvs.Add("Aerofoil", "Aerofoil Env's internal name")           oNewEnv.DefaultRibbonTab = oEnv.DefaultRibbonTab     oNewEnv.InheritAllRibbonTabs = True          Dim oParEnvs As EnvironmentList     Set oParEnvs = ThisApplication.UserInterfaceManager.ParallelEnvironments          Call oParEnvs.Add(oNewEnv)     End Sub ``` |
+```vb
+Sub AddParallelEnv2()
+    Dim oEnvs As Environments
+    Set oEnvs = ThisApplication.UserInterfaceManager.Environments
+    Dim oEnv As Environment
+    Set oEnv = oEnvs("AMxAssemblyEnvironment")
+    Dim oNewEnv As Environment
+    Set oNewEnv = Nothing
+    Set oNewEnv = oEnvs.Add("Rendering", "Rendering Env's internal name")
+    Dim sTabs(0 To 1) As String
+    sTabs(0) = "id_TabAssemble"
+    sTabs(1) = "id_TabDesign"
+    oNewEnv.DefaultRibbonTab = oEnv.DefaultRibbonTab
+    oNewEnv.InheritAllRibbonTabs = False
+    Dim oParEnvs As EnvironmentList
+    Set oParEnvs = ThisApplication.UserInterfaceManager.ParallelEnvironments
+    Call oParEnvs.Add(oNewEnv)
+End Sub
+Sub AddParallelEnv3()
+    Dim oEnvs As Environments
+    Set oEnvs = ThisApplication.UserInterfaceManager.Environments
+    Dim oEnv As Environment
+    Set oEnv = oEnvs("AMxWeldmentEnvironment")
+    Dim oNewEnv As Environment
+    Set oNewEnv = oEnvs.Add("Aerofoil", "Aerofoil Env's internal name")
+    oNewEnv.DefaultRibbonTab = oEnv.DefaultRibbonTab
+    oNewEnv.InheritAllRibbonTabs = True
+    Dim oParEnvs As EnvironmentList
+    Set oParEnvs = ThisApplication.UserInterfaceManager.ParallelEnvironments
+    Call oParEnvs.Add(oNewEnv)
+End Sub
+```
 
 The preceding code will add the new FEA, Rendering and Aerofoil environments to Autodesk Inventor's Applications menu, as shown below. Each environment has its own set of command bars, but so far none has a specific edit target defined.
 
@@ -66,9 +110,21 @@ The preceding code will add the new FEA, Rendering and Aerofoil environments to 
 
 Now to add an edit target to one of these new environments. This indicates a specific editing requirement. An example in Autodesk Inventor is the sketch editing facility within the Part environment. The code is much the same as previously except now the SetCurrentEnvironment method of the EnvironmentManager object is used - this sets the environment for this document but it is not persisted.
 
-|  |
-| --- |
-| ```  Sub ActivateET()     Dim oEnvs As Environments     Set oEnvs = ThisApplication.UserInterfaceManager.Environments          Dim oEnv As Environment     Set oEnv = oEnvs("MBxSheetMetalEnvironment")        Dim oPartDoc As PartDocument     Set oPartDoc = ThisApplication.ActiveDocument          Dim oNewEnv As Environment     Set oNewEnv = oEnvs.Add("Aerofoil-ET", "ET Env's internal name")          oNewEnv.DefaultRibbonTab = oEnv.DefaultRibbonTab     oNewEnv.InheritAllRibbonTabs = True           Call oPartDoc.EnvironmentManager.SetCurrentEnvironment(oNewEnv, "ET's Cookie")    End Sub ``` |
+```vb
+Sub ActivateET()
+    Dim oEnvs As Environments
+    Set oEnvs = ThisApplication.UserInterfaceManager.Environments
+    Dim oEnv As Environment
+    Set oEnv = oEnvs("MBxSheetMetalEnvironment")
+    Dim oPartDoc As PartDocument
+    Set oPartDoc = ThisApplication.ActiveDocument
+    Dim oNewEnv As Environment
+    Set oNewEnv = oEnvs.Add("Aerofoil-ET", "ET Env's internal name")
+    oNewEnv.DefaultRibbonTab = oEnv.DefaultRibbonTab
+    oNewEnv.InheritAllRibbonTabs = True
+    Call oPartDoc.EnvironmentManager.SetCurrentEnvironment(oNewEnv, "ET's Cookie")
+End Sub
+```
 
 The result of this code is indicated in the following figure. Note that the Applications menu now has the new Aerofoil-ET edit target checked instead of the Part edit target. Note too the change to the panel bar.
 
@@ -76,15 +132,38 @@ The result of this code is indicated in the following figure. Note that the Appl
 
 Although the previous edit target is not persisted in the sense that it will not be active when the document is next loaded, you can return to this edit target by calling the SetCurrentEnvironment method again.
 
-|  |
-| --- |
-| ```  Sub ActivateETAgain()     Dim oEnvs As Environments     Set oEnvs = ThisApplication.UserInterfaceManager.Environments          Dim oPartDoc As PartDocument     Set oPartDoc = ThisApplication.ActiveDocument          Dim oNewEnv As Environment     Set oNewEnv = Nothing          Set oNewEnv = oEnvs("ET Env's internal name")          Call oPartDoc.EnvironmentManager.SetCurrentEnvironment(oNewEnv, "ET's Cookie") End Sub ``` |
+```vb
+Sub ActivateETAgain()
+    Dim oEnvs As Environments
+    Set oEnvs = ThisApplication.UserInterfaceManager.Environments
+    Dim oPartDoc As PartDocument
+    Set oPartDoc = ThisApplication.ActiveDocument
+    Dim oNewEnv As Environment
+    Set oNewEnv = Nothing
+    Set oNewEnv = oEnvs("ET Env's internal name")
+    Call oPartDoc.EnvironmentManager.SetCurrentEnvironment(oNewEnv, "ET's Cookie")
+End Sub
+```
 
 However, an edit target can be made persistent by setting the OverrideEnvironment property of the EnvironmentManager object. Thus, when a document is loaded, the specified edit target will be present.
 
-|  |
-| --- |
-| ```  Sub TestOverrideEnv()     Dim oEnvs As Environments     Set oEnvs = ThisApplication.UserInterfaceManager.Environments          Dim oEnv As Environment     Set oEnv = oEnvs("MBxSheetMetalEnvironment")          Dim oPartDoc As PartDocument     Set oPartDoc = ThisApplication.ActiveDocument          Dim oNewEnv As Environment     Set oNewEnv = oEnvs.Add("OverrideTmp", "OverrideTmp Env's internal name")          oNewEnv.DefaultRibbonTab = oEnv.DefaultRibbonTab     oNewEnv.InheritAllRibbonTabs = True          Dim oEnvMgr As EnvironmentManager     Set oEnvMgr = oPartDoc.EnvironmentManager      oEnvMgr.OverrideEnvironment = oNewEnv End Sub ``` |
+```vb
+Sub TestOverrideEnv()
+    Dim oEnvs As Environments
+    Set oEnvs = ThisApplication.UserInterfaceManager.Environments
+    Dim oEnv As Environment
+    Set oEnv = oEnvs("MBxSheetMetalEnvironment")
+    Dim oPartDoc As PartDocument
+    Set oPartDoc = ThisApplication.ActiveDocument
+    Dim oNewEnv As Environment
+    Set oNewEnv = oEnvs.Add("OverrideTmp", "OverrideTmp Env's internal name")
+    oNewEnv.DefaultRibbonTab = oEnv.DefaultRibbonTab
+    oNewEnv.InheritAllRibbonTabs = True
+    Dim oEnvMgr As EnvironmentManager
+    Set oEnvMgr = oPartDoc.EnvironmentManager
+    oEnvMgr.OverrideEnvironment = oNewEnv
+End Sub
+```
 
 ### Summary
 

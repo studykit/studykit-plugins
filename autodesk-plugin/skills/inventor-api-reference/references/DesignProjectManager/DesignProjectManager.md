@@ -40,9 +40,3 @@ The DesignProjectManager object provides access to project files related functio
 ## Version
 
 Introduced in version 2011
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

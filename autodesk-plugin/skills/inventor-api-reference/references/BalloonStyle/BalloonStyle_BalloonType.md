@@ -17,9 +17,3 @@ This is a read/write property whose value is a [BalloonTypeEnum](../BalloonTypeE
 ## Version
 
 Introduced in version 2009
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

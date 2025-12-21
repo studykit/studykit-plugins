@@ -47,9 +47,3 @@ Provides access to all of the  objects in the parent document and provides metho
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -10,10 +10,6 @@ The following sample demonstrates the creation of a shrinkwrap substitute within
 
 Open any assembly document and run the sample. A shrinkwrap part is created at the same location as the assembly.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Sub CreateShrinkwrapSubstitute()
     ' Set a reference to the active assembly document
@@ -65,9 +61,3 @@ Sub CreateShrinkwrapSubstitute()
     oPartDoc.ReleaseReference
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -13,9 +13,3 @@ EllipseFull2d.**Copy**() As [EllipseFull2d](../EllipseFull2d/EllipseFull2d.md)
 ## Version
 
 Introduced in version 2013
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -30,9 +30,3 @@ The StyleEvents object provides notification of style events including new, acti
 ## Version
 
 Introduced in version 11
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

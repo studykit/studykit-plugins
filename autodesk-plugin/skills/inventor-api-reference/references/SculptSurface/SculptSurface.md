@@ -20,9 +20,3 @@ The SculptSurface object provides access to a sculpt surface and its associated 
 ## Version
 
 Introduced in version 11
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

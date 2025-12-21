@@ -8,10 +8,6 @@ Places all of the items in a specified family within an assembly. The specific f
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub PlaceFromContentCenter()
     Dim asmDoc As AssemblyDocument
@@ -65,9 +61,3 @@ Public Sub PlaceFromContentCenter()
     End If
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

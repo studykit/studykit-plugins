@@ -66,9 +66,3 @@ The ContourFlangeFeature object represents a sheet metal contour flange feature.
 ## Version
 
 Introduced in version 5.3
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

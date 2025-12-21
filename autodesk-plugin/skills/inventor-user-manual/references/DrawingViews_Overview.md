@@ -30,9 +30,14 @@ This sample and the following code omit error checking for the sake of clarity a
 
 The first step is to obtain the sheet object, in order to place a view. The location of the view is provided by a 2D point. The following code uses transient geometry to define a 2D point at X=5, Y=5.
 
-|  |
-| --- |
-| ```  Dim oDrawingDoc As DrawingDocument Set oDrawingDoc = ThisApplication.ActiveDocument         Dim oSheet As Sheet Set oSheet = oDrawingDoc.Sheets.Item(1)         Dim oPoint1 As Point2d Set oPoint1 = ThisApplication.TransientGeometry.CreatePoint2d(5#, 5#) ``` |
+```vb
+Dim oDrawingDoc As DrawingDocument
+Set oDrawingDoc = ThisApplication.ActiveDocument
+Dim oSheet As Sheet
+Set oSheet = oDrawingDoc.Sheets.Item(1)
+Dim oPoint1 As Point2d
+Set oPoint1 = ThisApplication.TransientGeometry.CreatePoint2d(5#, 5#)
+```
 
 This sample places a regular drawing view of a model part. The following code uses an arbitrary hard-coded part file reference that should be changed as appropriate.
 
@@ -42,9 +47,14 @@ This sample places a regular drawing view of a model part. The following code us
 
 The new hidden line DrawingView object is added to the DrawingViews collection using a bottom view of the opened part file, at point 5,5, at a scale of 1:1. Immediately afterwards, the part file is closed. It is good practice to keep file references open no longer that necessary.
 
-|  |
-| --- |
-| ```  Dim oPartDoc As PartDocument Set oPartDoc = ThisApplication.Documents.Open("c:\testpart.ipt", False)  Dim oView1 As DrawingView Set oView1 = oSheet.DrawingViews.AddBaseView(oPartDoc, _     oPoint1, 1#, kBottomViewOrientation, kHiddenLineDrawingViewStyle)  Call oPartDoc.Close(True) ``` |
+```vb
+Dim oPartDoc As PartDocument
+Set oPartDoc = ThisApplication.Documents.Open("c:\testpart.ipt", False)
+Dim oView1 As DrawingView
+Set oView1 = oSheet.DrawingViews.AddBaseView(oPartDoc, _
+oPoint1, 1#, kBottomViewOrientation, kHiddenLineDrawingViewStyle)
+Call oPartDoc.Close(True)
+```
 
 The following is an example of how this appears on the sheet.
 
@@ -56,15 +66,26 @@ The previous example placed a drawing view of a part. The following code places 
 
 The first task is to indicate the section line, either using existing geometry, or by creating a sketch containing a sketch line, as in the following code.
 
-|  |
-| --- |
-| ```  Dim oPoint2 As Point2d Set oPoint2 = ThisApplication.TransientGeometry.CreatePoint2d(15#, 40#)  Dim oDrawingSketch As DrawingSketch Set oDrawingSketch = oView1.Sketches.Add      oDrawingSketch.Edit Dim oSketchLine As SketchLine Set oSketchLine = oDrawingSketch.SketchLines.AddByTwoPoints(oPoint1, _     oPoint2) oDrawingSketch.ExitEdit ``` |
+```vb
+Dim oPoint2 As Point2d
+Set oPoint2 = ThisApplication.TransientGeometry.CreatePoint2d(15#, 40#)
+Dim oDrawingSketch As DrawingSketch
+Set oDrawingSketch = oView1.Sketches.Add
+oDrawingSketch.Edit
+Dim oSketchLine As SketchLine
+Set oSketchLine = oDrawingSketch.SketchLines.AddByTwoPoints(oPoint1, _
+oPoint2)
+oDrawingSketch.ExitEdit
+```
 
 For simplicity, this code reuses the view placement points to define the ends of the sketch line. In reality, this sketch line would be placed at a specific point relative to the base view. Now to add the section view by calling AddSectionView.
 
-|  |
-| --- |
-| ```  Dim oView2 As SectionDrawingView Set oView2 = oSheet.DrawingViews.AddSectionView(oView1, _      oDrawingSketch, oPoint2, kHiddenLineRemovedDrawingViewStyle)  oDrawingSketch.Visible = False ``` |
+```vb
+Dim oView2 As SectionDrawingView
+Set oView2 = oSheet.DrawingViews.AddSectionView(oView1, _
+oDrawingSketch, oPoint2, kHiddenLineRemovedDrawingViewStyle)
+oDrawingSketch.Visible = False
+```
 
 Note the absence of a part file reference in the preceding code. Unlike base view creation, the previously created view is passed as an argument, together with the sketch line indicating the cut line. The two views now look something like the following illustration.
 

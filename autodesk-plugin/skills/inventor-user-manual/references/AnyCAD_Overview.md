@@ -22,21 +22,60 @@ When import a generic AnyCAD file other than AutoCAD  DWG file to Inventor part
 
 Import a generic AnyCAD file to Inventor part:
 
-|  |
-| --- |
-| ```  Sub AssociativelyImportAliasToPartSample()      Dim oDoc As PartDocument      Set oDoc = ThisApplication.Documents.Add(kPartDocumentObject)       Dim oPartCompDef As PartComponentDefinition      Set oPartCompDef = oDoc.ComponentDefinition       ' Create the ImportedGenericComponentDefinition bases on an Alias file      Dim oImportedGenericCompDef As ImportedGenericComponentDefinition      Set oImportedGenericCompDef = oPartCompDef.ReferenceComponents.ImportedComponents.CreateDefinition("C:\ProjectName\iPod.wire")       ' Set the ReferenceModel to associatively import the Alias file, set this property to False will just convert the      oImportedGenericCompDef.ReferenceModel = True      oImportedGenericCompDef.IncludeAll      ' Import the Alias      Dim oImportedComp As ImportedComponent      Set oImportedComp = oPartCompDef.ReferenceComponents.ImportedComponents.Add(oImportedGenericCompDef)  End Sub   ``` |
+```vb
+Sub AssociativelyImportAliasToPartSample()
+    Dim oDoc As PartDocument
+    Set oDoc = ThisApplication.Documents.Add(kPartDocumentObject)
+    Dim oPartCompDef As PartComponentDefinition
+    Set oPartCompDef = oDoc.ComponentDefinition
+    ' Create the ImportedGenericComponentDefinition bases on an Alias file
+    Dim oImportedGenericCompDef As ImportedGenericComponentDefinition
+    Set oImportedGenericCompDef = oPartCompDef.ReferenceComponents.ImportedComponents.CreateDefinition("C:\ProjectName\iPod.wire")
+    '
+    Set the ReferenceModel to associatively import the Alias file, set this property to False will just convert the
+    oImportedGenericCompDef.ReferenceModel = True
+    oImportedGenericCompDef.IncludeAll
+    ' Import the Alias
+    Dim oImportedComp As ImportedComponent
+    Set oImportedComp = oPartCompDef.ReferenceComponents.ImportedComponents.Add(oImportedGenericCompDef)
+End Sub
+```
 
 Import a generic AnyCAD file to Inventor assembly:
 
-|  |
-| --- |
-| ```  Sub AssociativelyImportSolidworksToAssemblySample()     Dim oDoc As AssemblyDocument     Set oDoc = ThisApplication.Documents.Add(kAssemblyDocumentObject)      Dim oAssyCompDef As AssemblyComponentDefinition     Set oAssyCompDef = oDoc.ComponentDefinition      'Create the ImportedGenericComponentDefinition bases on an Alias file     Dim oImportedGenericCompDef As ImportedGenericComponentDefinition     Set oImportedGenericCompDef = oAssyCompDef.ImportedComponents.CreateDefinition("C:\ProjectName\iPod.SLDPRT")      'Set the ReferenceModel to associatively import the Alias file     oImportedGenericCompDef.ReferenceModel = True      'Import the Solidworks to assembly     Dim oImportedComp As ImportedComponent     Set oImportedComp = oAssyCompDef.ImportedComponents.Add(oImportedGenericCompDef) End Sub  ``` |
+```vb
+Sub AssociativelyImportSolidworksToAssemblySample()
+    Dim oDoc As AssemblyDocument
+    Set oDoc = ThisApplication.Documents.Add(kAssemblyDocumentObject)
+    Dim oAssyCompDef As AssemblyComponentDefinition
+    Set oAssyCompDef = oDoc.ComponentDefinition
+    'Create the ImportedGenericComponentDefinition bases on an Alias file
+    Dim oImportedGenericCompDef As ImportedGenericComponentDefinition
+    Set oImportedGenericCompDef = oAssyCompDef.ImportedComponents.CreateDefinition("C:\ProjectName\iPod.SLDPRT")
+    'Set the ReferenceModel to associatively import the Alias file
+    oImportedGenericCompDef.ReferenceModel = True
+    'Import the Solidworks to assembly
+    Dim oImportedComp As ImportedComponent
+    Set oImportedComp = oAssyCompDef.ImportedComponents.Add(oImportedGenericCompDef)
+End Sub
+```
 
 When import an AutoCAD DWG file into part you can refer to below VBA sample:
 
-|  |
-| --- |
-| ```  Sub AssociativelyImportDWGToPartSample()     Dim oDoc As PartDocument     Set oDoc = ThisApplication.Documents.Add(kPartDocumentObject)          Dim oPartCompDef As PartComponentDefinition     Set oPartCompDef = oDoc.ComponentDefinition          'Create the ImportedDWGComponentDefinition bases on an AutoCAD DWG file     Dim oImportedDWGCompDef As ImportedDWGComponentDefinition     Set oImportedDWGCompDef = oPartCompDef.ReferenceComponents.ImportedComponents.CreateDefinition("C:\ProjectName\Basic.dwg")      'Import the AutoCAD DWG     Dim oImportedComp As ImportedComponent     Set oImportedComp = oPartCompDef.ReferenceComponents.ImportedComponents.Add(oImportedDWGCompDef) End Sub  ``` |
+```vb
+Sub AssociativelyImportDWGToPartSample()
+    Dim oDoc As PartDocument
+    Set oDoc = ThisApplication.Documents.Add(kPartDocumentObject)
+    Dim oPartCompDef As PartComponentDefinition
+    Set oPartCompDef = oDoc.ComponentDefinition
+    'Create the ImportedDWGComponentDefinition bases on an AutoCAD DWG file
+    Dim oImportedDWGCompDef As ImportedDWGComponentDefinition
+    Set oImportedDWGCompDef = oPartCompDef.ReferenceComponents.ImportedComponents.CreateDefinition("C:\ProjectName\Basic.dwg")
+    'Import the AutoCAD DWG
+    Dim oImportedComp As ImportedComponent
+    Set oImportedComp = oPartCompDef.ReferenceComponents.ImportedComponents.Add(oImportedDWGCompDef)
+End Sub
+```
 
 ### More info about AnyCAD
 

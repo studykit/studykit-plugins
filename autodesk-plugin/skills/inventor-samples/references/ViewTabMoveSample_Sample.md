@@ -11,10 +11,6 @@ This sample demonstrates how to move views using ViewTab between different view 
 
 This sample demonstrates how to move a View via its ViewTab to generate a new ViewFrame and move it to another ViewFrame.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Sub MoveViewTabSample()
     Dim oDoc As PartDocument
@@ -52,10 +48,6 @@ End Sub
 
 This sample demonstrates how to move a View via its ViewTab to generate a new ViewFrame and move it to another ViewFrame.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Sub MoveViewTabSample()
     Dim oDoc As PartDocument
@@ -90,9 +82,3 @@ Sub MoveViewTabSample()
     Call oViewTab3.MoveToGroup(True, oViewTab1, kDockBottom)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

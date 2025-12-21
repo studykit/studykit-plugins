@@ -11,10 +11,6 @@ This sample demonstrates how to move the text position of drawing view annotatio
 
 This sample demonstrates how to move the text position of drawing view annotation. Create a detail or section view before running this sample.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Sub MoveViewAnnotationTextPositionSample()
     Dim oDoc As DrawingDocument
@@ -43,10 +39,6 @@ End Sub
 
 This sample demonstrates how to move the text position of drawing view annotation. Create a detail or section view before running this sample.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Sub MoveViewAnnotationTextPositionSample()
     Dim oDoc As DrawingDocument
@@ -72,9 +64,3 @@ Sub MoveViewAnnotationTextPositionSample()
     Next
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

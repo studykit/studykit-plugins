@@ -17,9 +17,3 @@ Enumeration of the kind of UI used to select object.
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

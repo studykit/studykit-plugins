@@ -21,9 +21,3 @@ ModelDatumTargetProxy.**GetReferenceKey**( ***ReferenceKey***() As Byte, [***Key
 ## Version
 
 Introduced in version 2023
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

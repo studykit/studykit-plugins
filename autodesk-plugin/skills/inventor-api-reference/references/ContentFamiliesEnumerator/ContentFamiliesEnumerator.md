@@ -21,9 +21,3 @@ Object allowing enumeration of ContentFamily objects.
 ## Version
 
 Introduced in version 2010
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

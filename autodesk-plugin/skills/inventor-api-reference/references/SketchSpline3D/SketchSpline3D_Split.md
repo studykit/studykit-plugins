@@ -20,9 +20,3 @@ SketchSpline3D.**Split**( ***FitPoint*** As Variant ) As [SketchSpline3D](../Ske
 ## Version
 
 Introduced in version 8
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

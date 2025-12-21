@@ -10,10 +10,6 @@ This sample demonstrates the creation of a drawing sheet based on a particular s
 
 Have a drawing document open and run the following macro.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub AddUsingSheetFormat()
     'Set a reference to the drawing document.
@@ -34,9 +30,3 @@ Public Sub AddUsingSheetFormat()
     Set oSheet = oDrawDoc.Sheets.AddUsingSheetFormat(oFormat, oModel)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

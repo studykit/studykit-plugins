@@ -10,10 +10,6 @@ This sample is to demonstrate how to create a drawing welding symbol.
 
 This sample is to demonstrate how to create a drawing welding symbol.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub AddDrawingWeldingSymbolSample()
     ' Set a reference to the drawing document.
@@ -74,9 +70,3 @@ Public Sub AddDrawingWeldingSymbolSample()
     Set oSymbol = oActiveSheet.WeldingSymbols.Add(oLeaderPoints, oWeldingSymDefs)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

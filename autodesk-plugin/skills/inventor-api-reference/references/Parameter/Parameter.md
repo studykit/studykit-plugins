@@ -59,9 +59,3 @@ General parameter type that serves as the base class for all types of parameters
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

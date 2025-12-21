@@ -20,9 +20,3 @@ LoftFeatures.**CreateMapCurves**( ***Sections*** As [ObjectCollection](../Object
 ## Version
 
 Introduced in version 6
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

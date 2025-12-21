@@ -8,10 +8,6 @@ This sample demonstrates how to create a sketch hatch region in drawing.
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Sub DrawingSketchHatchRegionSample()
     Dim oDoc As DrawingDocument
@@ -39,9 +35,3 @@ Sub DrawingSketchHatchRegionSample()
     oSketch.ExitEdit
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

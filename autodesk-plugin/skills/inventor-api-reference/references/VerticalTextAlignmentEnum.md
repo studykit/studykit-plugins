@@ -17,9 +17,3 @@ Constants identifying the vertical positioning of text about a given point coord
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

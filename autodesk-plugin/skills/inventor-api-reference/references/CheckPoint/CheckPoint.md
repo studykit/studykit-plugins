@@ -23,9 +23,3 @@ The CheckPoint object serves as a bookmark within a transaction. See the article
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

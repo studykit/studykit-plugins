@@ -40,9 +40,3 @@ The ApprenticePrintManager object supports properties and methods that allow you
 ## Version
 
 Introduced in version 9
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

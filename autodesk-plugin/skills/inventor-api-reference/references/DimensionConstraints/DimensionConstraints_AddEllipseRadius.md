@@ -31,9 +31,3 @@ DimensionConstraints.**AddEllipseRadius**( ***Entity*** As [SketchEntity](../Ske
 ## Version
 
 Introduced in version 10
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -20,9 +20,3 @@ Point2d.**TranslateBy**( ***Vector*** As [Vector2d](../Vector2d/Vector2d.md) )
 ## Version
 
 Introduced in version 2008
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

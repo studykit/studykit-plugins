@@ -17,9 +17,3 @@ This is a read only property whose value is a [SpellCheckOptions](../SpellCheckO
 ## Version
 
 Introduced in version 2020
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

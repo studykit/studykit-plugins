@@ -59,9 +59,3 @@ The RadiusGeneralDimension object represents a radial general dimension placed o
 ## Version
 
 Introduced in version 11
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

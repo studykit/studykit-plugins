@@ -22,9 +22,3 @@ DesignProjectManager.**ResolveFile**( ***SourcePath*** As String, ***Destination
 ## Version
 
 Introduced in version 2011
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

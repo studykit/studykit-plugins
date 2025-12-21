@@ -10,10 +10,6 @@ The following sample demonstrates creation of point client graphics with a custo
 
 The sample assumes that you've placed a MyImage.bmp in the C:\Temp\ directory.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub ImageInPointClientGraphics()
     Dim oDoc As Document
@@ -97,9 +93,3 @@ Public Sub ImageInPointClientGraphics()
     End If
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

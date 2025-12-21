@@ -10,10 +10,6 @@ This sample illustrates editing the contents of the parts list.
 
 To run this sample have a sheet active that contains a parts list.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub PartListEdit()
     ' Set a reference to the drawing document.
@@ -58,9 +54,3 @@ Public Sub PartListEdit()
     Next
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

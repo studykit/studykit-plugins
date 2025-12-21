@@ -17,9 +17,3 @@ This is a read/write property whose value is an [EdgeSymbolStyle](../EdgeSymbolS
 ## Version
 
 Introduced in version 2024
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

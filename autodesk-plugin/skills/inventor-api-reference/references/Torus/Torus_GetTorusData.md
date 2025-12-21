@@ -23,9 +23,3 @@ Torus.**GetTorusData**( ***CenterPoint***() As Double, ***AxisVector***() As Dou
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

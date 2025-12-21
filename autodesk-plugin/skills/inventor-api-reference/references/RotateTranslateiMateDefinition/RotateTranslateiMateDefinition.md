@@ -46,9 +46,3 @@ The RotateTranslateiMateDefinition object represents a rotate translate iMate de
 ## Version
 
 Introduced in version 6
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

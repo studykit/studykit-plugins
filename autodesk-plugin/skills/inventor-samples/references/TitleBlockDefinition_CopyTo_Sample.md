@@ -10,10 +10,6 @@ This sample demonstrates copying a title block definition from one drawing to an
 
 Before running this sample, have the drawing document open with a sheet active that contains the title block you want to copy. Also, change the path of the new document (oNewDocument) to point to a drawing document in which you want the titleblocks changed.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub TitleBlockCopy()
     Dim oSourceDocument As DrawingDocument
@@ -41,9 +37,3 @@ Public Sub TitleBlockCopy()
     Next
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

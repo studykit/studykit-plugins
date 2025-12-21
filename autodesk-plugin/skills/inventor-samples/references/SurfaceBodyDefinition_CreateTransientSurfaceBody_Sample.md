@@ -8,10 +8,6 @@ The following sample demonstrates the creation of a transient solid block body. 
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub CreateBlock()
     Dim oTransBRep As TransientBRep
@@ -173,9 +169,3 @@ Public Sub CreateBlock()
     ThisApplication.ActiveView.Update
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

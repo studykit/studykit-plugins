@@ -16,9 +16,3 @@ Enum indicating the dimension text update option in drawing document.
 ## Version
 
 Introduced in version 11
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -25,9 +25,3 @@ DrawingDimension.**GetReferenceKey**( ***ReferenceKey***() As Byte, [***KeyConte
 ## Version
 
 Introduced in version 9
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

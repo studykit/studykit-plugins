@@ -57,9 +57,3 @@ The ContourRollFeature object represents a contour roll sheet metal feature.
 ## Version
 
 Introduced in version 2010
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

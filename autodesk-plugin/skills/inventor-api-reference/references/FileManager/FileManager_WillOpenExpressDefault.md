@@ -20,9 +20,3 @@ FileManager.**WillOpenExpressDefault**( ***FullFileName*** As String ) As Boolea
 ## Version
 
 Introduced in version 2015
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -21,9 +21,3 @@ The AnnotationPlanes collection object provides access to the existing annotatio
 ## Version
 
 Introduced in version 2018
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

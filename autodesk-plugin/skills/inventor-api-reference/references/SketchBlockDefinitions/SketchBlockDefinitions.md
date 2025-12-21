@@ -35,9 +35,3 @@ The SketchBlockDefinitions collection object provides access to all sketch block
 ## Version
 
 Introduced in version 2010
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

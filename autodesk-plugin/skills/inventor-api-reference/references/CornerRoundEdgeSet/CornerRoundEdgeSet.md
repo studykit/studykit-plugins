@@ -21,9 +21,3 @@ The CornerRoundEdgeSet object represents a set of edges and an associated fillet
 ## Version
 
 Introduced in version 2009
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

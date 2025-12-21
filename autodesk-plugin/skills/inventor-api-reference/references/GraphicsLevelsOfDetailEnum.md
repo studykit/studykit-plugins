@@ -19,9 +19,3 @@ Bits indicating the Levels of Detail in the graphics system. It controls the fin
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

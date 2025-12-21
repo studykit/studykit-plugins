@@ -49,9 +49,3 @@ The DerivedPartCoordinateSystemDef object allows you to define the transformatio
 ## Version
 
 Introduced in version 6
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

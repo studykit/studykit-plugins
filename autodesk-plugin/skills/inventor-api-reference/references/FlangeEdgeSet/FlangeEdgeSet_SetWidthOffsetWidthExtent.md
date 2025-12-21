@@ -23,9 +23,3 @@ FlangeEdgeSet.**SetWidthOffsetWidthExtent**( ***Width*** As Variant, ***OffsetDi
 ## Version
 
 Introduced in version 2025
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

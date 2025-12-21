@@ -10,10 +10,6 @@ This sample demonstrates the creation of hole tables in a drawing.
 
 Select a drawing view that contains holes and run the following sample.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Sub CreateHoleTables()
     ' Set a reference to the drawing document.
@@ -83,9 +79,3 @@ Sub CreateHoleTables()
             True, True, True, True, False, False, False)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

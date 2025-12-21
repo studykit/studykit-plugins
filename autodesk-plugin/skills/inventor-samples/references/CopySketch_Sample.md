@@ -10,10 +10,6 @@ This sample demonstrates copying the contents of a sketch into another sketch vi
 
 Before running the sample, have a part document open that contains a sketch with some sketch entities in it.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub CopySketch()
     ' Set a reference to the active document.
@@ -62,9 +58,3 @@ Public Sub CopySketch()
     Call oNewSketch.MoveSketchObjects(oSketchEnts, ThisApplication.TransientGeometry.CreateVector2d(1, 0))
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

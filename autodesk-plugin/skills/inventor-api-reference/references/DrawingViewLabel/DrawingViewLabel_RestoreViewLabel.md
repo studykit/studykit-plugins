@@ -13,9 +13,3 @@ DrawingViewLabel.**RestoreViewLabel**()
 ## Version
 
 Introduced in version 2025.2
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

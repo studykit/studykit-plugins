@@ -8,10 +8,6 @@ Sample showing how to break the alignment of a drawing section view by calling t
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Sub BreakAlignment()
    Dim oDoc As DrawingDocument
@@ -31,9 +27,3 @@ Sub BreakAlignment()
    oDoc.SelectSet.Clear
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

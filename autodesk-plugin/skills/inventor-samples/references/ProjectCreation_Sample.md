@@ -8,10 +8,6 @@ The following sample demonstrates the creation of an Inventor project.
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub CreateProject()
     ' Set a reference to the DesignProjectManager object.
@@ -23,9 +19,3 @@ Public Sub CreateProject()
     Set oProject = oDesignProjectMgr.DesignProjects.Add(kSingleUserMode, "MyProject", "C:\temp\")
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

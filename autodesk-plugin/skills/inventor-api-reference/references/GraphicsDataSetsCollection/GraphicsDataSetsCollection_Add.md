@@ -31,9 +31,3 @@ GraphicsDataSetsCollection.**Add**( ***ClientId*** As String ) As [GraphicsDataS
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

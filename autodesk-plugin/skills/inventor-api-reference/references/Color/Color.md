@@ -40,9 +40,3 @@ The Color object provides access to all of the components defining a color.
 ## Version
 
 Introduced in version 8
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

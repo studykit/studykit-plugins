@@ -31,9 +31,3 @@ The Welds object provides access to all of the existing welds within a weldment.
 ## Version
 
 Introduced in version 8
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

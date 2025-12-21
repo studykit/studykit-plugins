@@ -20,9 +20,3 @@ Edge.**GetSourceEdge**( [***GetLeafSource***] As Boolean ) As [Edge](../Edge/Edg
 ## Version
 
 Introduced in version 10
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

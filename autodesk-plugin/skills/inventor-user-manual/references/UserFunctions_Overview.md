@@ -20,9 +20,18 @@ The Parameter command converts the return value of the user-defined function to 
 
 The function below demonstrates a correctly defined function.
 
-|  |
-| --- |
-| ```  Public Function Sample(Arg1 As Double, Arg2 As Double) As Double     'Use the input arguments to compute a value.     If Arg1 < 5 Then         Sample = Arg2      ElseIf Arg1 < 10 Then         Sample = Arg2 * 2     Else         Sample = Arg2 * 3     End If End Function ``` |
+```vb
+Public Function Sample(Arg1 As Double, Arg2 As Double) As Double
+    'Use the input arguments to compute a value.
+    If Arg1 < 5 Then
+        Sample = Arg2
+    ElseIf Arg1 < 10 Then
+        Sample = Arg2 * 2
+    Else
+        Sample = Arg2 * 3
+    End If
+End Function
+```
 
 This function takes two arguments as input, uses these values to compute a new value, and returns it as the result.
 

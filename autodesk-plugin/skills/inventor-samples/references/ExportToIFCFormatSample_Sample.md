@@ -10,10 +10,6 @@ This sample demonstrates how to export an assembly to IFC format.
 
 This sample demonstrates how to export an assembly to IFC format. You should open an assembly before running below code sample.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Sub ExportToIFCFormatSample()
     ' Make sure the BIM Content addin is loaded.
@@ -41,9 +37,3 @@ Sub ExportToIFCFormatSample()
     oBIMComp.ExportBuildingComponentWithOptions "C:\Temp\MyIFC.ifc", oOptions
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

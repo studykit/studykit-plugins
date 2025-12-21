@@ -10,10 +10,6 @@ This sample demonstrates how to use the PostPrivateEvent to configure the option
 
 This sample demonstrates how to use the PostPrivateEvent to configure the options for placing a part component.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Sub AssemblyPlaceComponentCmdWithPPE()
     ' In UI create a part and create an iMate definition to its face, save it and set its full filename below.
@@ -59,9 +55,3 @@ Sub AssemblyPlaceComponentCmdWithPPE()
     Call oCat.Execute2(True)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

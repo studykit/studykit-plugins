@@ -43,9 +43,3 @@ The Profile3D object defines a set of connected curves within a 3D sketch. The P
 ## Version
 
 Introduced in version 6
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

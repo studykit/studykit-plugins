@@ -36,9 +36,3 @@ The ProjectedCut object represents a set of projected cut edges on the sketch.
 ## Version
 
 Introduced in version 2010
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

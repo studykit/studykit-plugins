@@ -16,9 +16,3 @@ Constants identifying the horizontal positioning of text about a given point coo
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

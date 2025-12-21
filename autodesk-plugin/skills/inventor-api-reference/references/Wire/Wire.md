@@ -37,9 +37,3 @@ A Wire object represents a set of 3D curves. They are used in several different 
 ## Version
 
 Introduced in version 2008
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

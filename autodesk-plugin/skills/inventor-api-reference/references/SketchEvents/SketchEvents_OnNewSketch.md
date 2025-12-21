@@ -24,9 +24,3 @@ SketchEvents.**OnNewSketch**( ***DocumentObject*** As [Document](../Document/Doc
 ## Version
 
 Introduced in version 11
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

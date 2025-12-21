@@ -20,9 +20,3 @@ Vector2d.**ScaleBy**( ***Value*** As Double )
 ## Version
 
 Introduced in version 11
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

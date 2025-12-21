@@ -26,9 +26,3 @@ DrawingViews.**AddAuxiliaryView**( ***ParentView*** As [DrawingView](../DrawingV
 ## Version
 
 Introduced in version 2010
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

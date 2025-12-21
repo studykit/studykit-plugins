@@ -28,9 +28,3 @@ The CombineFeatures collection object provides access to existing combine featur
 ## Version
 
 Introduced in version 2010
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

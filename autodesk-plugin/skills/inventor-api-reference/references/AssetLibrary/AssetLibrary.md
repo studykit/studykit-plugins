@@ -45,9 +45,3 @@ The AssetLibrary object represents a material and appearance library which exist
 ## Version
 
 Introduced in version 2014
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -22,9 +22,3 @@ LipFeature.**SetSuppressionCondition**( ***Parameter*** As [Parameter](../Parame
 ## Version
 
 Introduced in version 2010
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

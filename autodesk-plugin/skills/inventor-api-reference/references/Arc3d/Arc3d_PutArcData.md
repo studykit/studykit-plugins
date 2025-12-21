@@ -25,9 +25,3 @@ Arc3d.**PutArcData**( ***Center***() As Double, ***AxisVector***() As Double, **
 ## Version
 
 Introduced in version 6
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

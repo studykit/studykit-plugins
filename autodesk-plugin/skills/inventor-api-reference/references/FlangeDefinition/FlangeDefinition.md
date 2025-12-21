@@ -54,9 +54,3 @@ The FlangeDefinition object represents the information that defines a flange fea
 ## Version
 
 Introduced in version 2009
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

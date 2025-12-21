@@ -15,9 +15,3 @@ Bits indicating the relationship of the model to data directly stored in the lib
 ## Version
 
 Introduced in version 6
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

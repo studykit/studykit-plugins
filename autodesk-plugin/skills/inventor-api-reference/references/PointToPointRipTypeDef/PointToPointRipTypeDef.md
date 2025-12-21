@@ -19,9 +19,3 @@ The PointToPointRipTypeDef object defines the inputs unique to a point to point 
 ## Version
 
 Introduced in version 2011
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

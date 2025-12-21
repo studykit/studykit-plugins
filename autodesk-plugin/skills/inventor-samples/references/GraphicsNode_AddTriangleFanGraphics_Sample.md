@@ -10,10 +10,6 @@ This sample demonstrates the creation of client graphics triangles using triange
 
 To run this sample you need to have an assembly or part document open. The sample code will prompt for the number of sides of the cylinder. This is the number of facets the cylinder will be approximated by.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub DrawCustomTriangles()
     Dim oDoc As Document
@@ -246,9 +242,3 @@ Public Sub DrawCustomTriangles()
     End If
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

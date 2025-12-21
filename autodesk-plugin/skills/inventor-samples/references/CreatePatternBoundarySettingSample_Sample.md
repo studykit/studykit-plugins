@@ -10,10 +10,6 @@ This sample demonstrates how to create a rectangular pattern feature with bounda
 
 This sample demonstrates how to create a rectangular pattern feature with boundary settings.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub CreatePatternBoundarySettingSample()
     ' Create a new part document, using the default part template.
@@ -100,9 +96,3 @@ Public Sub CreatePatternBoundarySettingSample()
     Set oRectPatternFeature = oCompDef.Features.RectangularPatternFeatures.AddByDefinition(oRectPatternDef)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

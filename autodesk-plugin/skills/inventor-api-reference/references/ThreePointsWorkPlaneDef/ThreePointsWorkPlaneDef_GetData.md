@@ -22,9 +22,3 @@ ThreePointsWorkPlaneDef.**GetData**( ***Point1*** As Object, ***Point2*** As Obj
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

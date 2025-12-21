@@ -68,15 +68,73 @@ The first thing you need to do is create the control definitions for the control
 
 For the following code to work you’ll need to add references to the .Net stdole and System.Windows.Forms libraries.
 
-|  |
-| --- |
-| ```  Private m_InventorApplication As Inventor.Application = Nothing Private WithEvents m_buttonDef As ButtonDefinition = Nothing Private WithEvents m_uiEvents As UserInterfaceEvents = Nothing Private m_clientID As String = "{311a4c02-49df-4947-a01c-47765ec06b27}"  Public Sub Activate(...) Implements Inventor.ApplicationAddInServer.Activate     ' Save reference to the Application object in member variable.     m_inventorApplication = addInSiteObject.Application      ' Get a reference to the UserInterfaceManager object.      Dim UIManager As Inventor.UserInterfaceManager = _                                             m_inventorApplication.UserInterfaceManager      ' Get a reference to the ControlDefinitions object.      Dim controlDefs As ControlDefinitions = _                               m_inventorApplication.CommandManager.ControlDefinitions      ' Get the images from the resources.  They are stored as .Net images and the     ' PictureConverter class is used to convert them to IPictureDisp objects, which     ' the Inventor API requires.      Dim smallPicture As stdole.IPictureDisp = _             PictureConverter.ImageToPictureDisp(My.Resources.MySmallImage)      Dim largePicture As stdole.IPictureDisp = _             PictureConverter.ImageToPictureDisp(My.Resources.MyLargeImage)      ' Create the button definition.      m_buttonDef = controlDefs.AddButtonDefinition("One", "UIRibbonSampleOne", _                                          CommandTypesEnum.kNonShapeEditCmdType, _                                          m_clientID, , , smallPicture, largePicture)      ' Call the function to add information to the user-interface.     If firstTime Then         CreateUserInterface()     End If      ' Connect to UI events to be able to handle a UI reset.     m_uiEvents = m_InventorApplication.UserInterfaceManager.UserInterfaceEvents End Sub   ' Creates the add-in’s UI in the ribbon. Private Sub CreateUserInterface()     ' Get a reference to the UserInterfaceManager object.      Dim UIManager As Inventor.UserInterfaceManager = _                                            m_inventorApplication.UserInterfaceManager      ' Get the zero doc ribbon.     Dim zeroRibbon As Inventor.Ribbon = UIManager.Ribbons.Item("ZeroDoc")      ' Get the getting started tab.     Dim startedTab As Inventor.RibbonTab = zeroRibbon.RibbonTabs.Item("id_GetStarted")      ' Get the new features panel.     Dim newFeaturesPanel As Inventor.RibbonPanel     newFeaturesPanel = startedTab.RibbonPanels.Item("id_Panel_GetStartedWhatsNew")      ' Add a button to the panel, using the previously created button definition.     newFeaturesPanel.CommandControls.AddButton(m_buttonDef, True) End Sub ``` |
+```vb
+Private m_InventorApplication As Inventor.Application = Nothing
+Private WithEvents m_buttonDef As ButtonDefinition = Nothing
+Private WithEvents m_uiEvents As UserInterfaceEvents = Nothing
+Private m_clientID As String = "{311a4c02-49df-4947-a01c-47765ec06b27}"
+Public Sub Activate(...) Implements Inventor.ApplicationAddInServer.Activate
+    ' Save reference to the Application object in member variable.
+    m_inventorApplication = addInSiteObject.Application
+    ' Get a reference to the UserInterfaceManager object.
+    Dim UIManager As Inventor.UserInterfaceManager = _
+    m_inventorApplication.UserInterfaceManager
+    ' Get a reference to the ControlDefinitions object.
+    Dim controlDefs As ControlDefinitions = _
+    m_inventorApplication.CommandManager.ControlDefinitions
+    ' Get the images from the resources.  They are stored as .Net images and the
+    ' PictureConverter class is used to convert them to IPictureDisp objects, which
+    ' the Inventor API requires.
+    Dim smallPicture As stdole.IPictureDisp = _
+    PictureConverter.ImageToPictureDisp(My.Resources.MySmallImage)
+    Dim largePicture As stdole.IPictureDisp = _
+    PictureConverter.ImageToPictureDisp(My.Resources.MyLargeImage)
+    ' Create the button definition.
+    m_buttonDef = controlDefs.AddButtonDefinition("One", "UIRibbonSampleOne", _
+    CommandTypesEnum.kNonShapeEditCmdType, _
+    m_clientID, , , smallPicture, largePicture)
+    '
+    Call the function to add information to the user-interface.
+    If firstTime Then
+        CreateUserInterface()
+    End If
+    ' Connect to UI events to be able to handle a UI reset.
+    m_uiEvents = m_InventorApplication.UserInterfaceManager.UserInterfaceEvents
+End Sub
+' Creates the add-in’s UI in the ribbon.
+Private Sub CreateUserInterface()
+    ' Get a reference to the UserInterfaceManager object.
+    Dim UIManager As Inventor.UserInterfaceManager = _
+    m_inventorApplication.UserInterfaceManager
+    ' Get the zero doc ribbon.
+    Dim zeroRibbon As Inventor.Ribbon = UIManager.Ribbons.Item("ZeroDoc")
+    ' Get the getting started tab.
+    Dim startedTab As Inventor.RibbonTab = zeroRibbon.RibbonTabs.Item("id_GetStarted")
+    ' Get the new features panel.
+    Dim newFeaturesPanel As Inventor.RibbonPanel
+    newFeaturesPanel = startedTab.RibbonPanels.Item("id_Panel_GetStartedWhatsNew")
+    ' Add a button to the panel, using the previously created button definition.
+    newFeaturesPanel.CommandControls.AddButton(m_buttonDef, True)
+End Sub
+```
 
 Outside of the StandardAddInServer class, add the class below. This class wraps some functionality available in one of the .Net classes that’s not typically exposed that allows you to convert a .Net Image object to an IPictureDisp object, which is what Inventor requires when working with images.
 
-|  |
-| --- |
-| ```  <System.ComponentModel.DesignerCategory("")> _ Friend Class PictureConverter     Inherits System.Windows.Forms.AxHost      Private Sub New()         MyBase.New(String.Empty)     End Sub      Public Shared Function ImageToPictureDisp( _                            ByVal image As System.Drawing.Image) As stdole.IPictureDisp         Return CType(GetIPictureDispFromPicture(image), stdole.IPictureDisp)     End Function End Class ``` |
+```xml
+<System.ComponentModel.DesignerCategory("")> _
+ Friend Class PictureConverter
+     Inherits System.Windows.Forms.AxHost
+ 
+     Private Sub New()
+         MyBase.New(String.Empty)
+     End Sub
+ 
+     Public Shared Function ImageToPictureDisp( _
+                            ByVal image As System.Drawing.Image) As stdole.IPictureDisp
+         Return CType(GetIPictureDispFromPicture(image), stdole.IPictureDisp)
+     End Function
+ End Class
+```
 
 The result of loading this add-in is shown below.
 
@@ -97,6 +155,8 @@ In the ribbon interface the user can use the Reset Ribbon command to reset the e
 
 For an add-in to handle the Reset Ribbon command it needs to listen to the OnResetRibbonInterface event. All you need to do in response to this event is exactly what you did when the add-in was executed for the first time. The code below illustrates this by calling the same function that was called in the Activate method of the add-in.
 
-|  |
-| --- |
-| ```  Private Sub m_uiEvents_OnResetRibbonInterface(...) Handles m_uiEvents.OnResetRibbonInterface     CreateUserInterface() End Sub ``` |
+```vb
+Private Sub m_uiEvents_OnResetRibbonInterface(...) Handles m_uiEvents.OnResetRibbonInterface
+    CreateUserInterface()
+End Sub
+```

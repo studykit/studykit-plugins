@@ -17,9 +17,3 @@ Constants enumerating the methods of specifying teh scale of the print.
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

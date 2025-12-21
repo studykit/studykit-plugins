@@ -8,10 +8,6 @@ The following sample demonstrates querying existing library paths associated wit
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Sub QueryAndCreateLibraryPaths()
     Dim oProjectMgr As DesignProjectManager
@@ -34,9 +30,3 @@ Sub QueryAndCreateLibraryPaths()
     Next
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

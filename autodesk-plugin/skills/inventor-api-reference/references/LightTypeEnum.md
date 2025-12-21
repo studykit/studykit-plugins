@@ -16,9 +16,3 @@ Coordinate space in which light direction (and position if applicable) is define
 ## Version
 
 Introduced in version 10
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -49,50 +49,76 @@ The code omits error checking for the sake of clarity and brevity. Always check 
 
 First, obtain the BOM object for this assembly's ComponentDefinition.
 
-|  |
-| --- |
-| ```  Dim oBOM As BOM Set oBOM = ThisApplication.ActiveDocument.ComponentDefinition.BOM ``` |
+```vb
+Dim oBOM As BOM
+Set oBOM = ThisApplication.ActiveDocument.ComponentDefinition.BOM
+```
 
 From the BOM object, get the base BOMView object, named "Structured." A BOM may also contain
 views where the items have been reordered or renumbered.
 
-|  |
-| --- |
-| ```  Dim oBOMView As BOMView Set oBOMView = oBOM.BOMViews.Item("Structured") ``` |
+```vb
+Dim oBOMView As BOMView
+Set oBOMView = oBOM.BOMViews.Item("Structured")
+```
 
 Iterate through the rows in the BOM view, obtaining each BOMRow object.
 
-|  |
-| --- |
-| ```  Dim i As Long For i = 1 To oBOMView.BOMRows.Count    Dim oRow As BOMRow   Set oRow = oBOMView.BOMRows.Item(i) ``` |
+```vb
+Dim i As Long
+For i = 1 To oBOMView.BOMRows.Count
+    Dim oRow As BOMRow
+    Set oRow = oBOMView.BOMRows.Item(i)
+```
 
 For some of the BOM data, we'll need to query a property set of the component referenced by
 each row. The PropertySets collections are accessed through the parent document of the
 ComponentDefinition, so obtain the ComponentDefinition of the component.
 
-|  |
-| --- |
-| ```    Dim oCompDef As ComponentDefinition   Set oCompDef = oRow.ComponentDefinitions.Item(1) ``` |
+```vb
+Dim oCompDef As ComponentDefinition
+Set oCompDef = oRow.ComponentDefinitions.Item(1)
+```
 
 The required property set is named "Design Tracking Properties." Obtain this from the owning document of the component.
 
-|  |
-| --- |
-| ```    Dim oPropSet As PropertySet   Set oPropSet = oCompDef.Document.PropertySets.Item("Design Tracking Properties") ``` |
+```vb
+Dim oPropSet As PropertySet
+Set oPropSet = oCompDef.Document.PropertySets.Item("Design Tracking Properties")
+```
 
 Now we have all the information necessary to list the BOM content. Obtain variable information such as the
 item number and quantity from the BOMRow object, and the part number and description from the property set.
 
-|  |
-| --- |
-| ```    Debug.Print "#: "; oRow.ItemNumber; _               " Quantity:"; oRow.ItemQuantity; _               "Part: "; oPropSet.Item("Part Number").Value; _               " Desc: "; oPropSet.Item("Description").Value Next ``` |
+```vb
+Debug.Print "#: "; oRow.ItemNumber; _
+" Quantity:"; oRow.ItemQuantity; _
+"Part: "; oPropSet.Item("Part Number").Value; _
+" Desc: "; oPropSet.Item("Description").Value
+Next
+```
 
 The preceding code iterates through all the BOMRows in the BOMView object, printing BOM data to the
 VBA debug window. The output should appear something like the following example.
 
-|  |
-| --- |
-| ```  #: 1 Quantity: 1 Part: Arbor Press Desc:  #: 2 Quantity: 1 Part: FACE PLATE Desc:  #: 3 Quantity: 1 Part: PINION SHAFT Desc:  #: 4 Quantity: 1 Part: LEVER ARM Desc:  #: 5 Quantity: 1 Part: THUMB SCREW Desc:  #: 6 Quantity: 1 Part: TABLE PLATE Desc:  #: 7 Quantity: 1 Part: RAM Desc:  #: 8 Quantity: 2 Part: HANDLE CAPipt Desc:  #: 9 Quantity: 1 Part: COLLAR Desc:  #: 10 Quantity: 1 Part: GIB PLATE Desc:  #: 11 Quantity: 1 Part: GROOVE PIN Desc:  #: 12 Quantity: 4 Part: ANSI B18.3 - 1/4 - 20 - 7/8 Desc: Hexagon Socket Head Cap Screw #: 13 Quantity: 4 Part: ANSI B18.3 - 10-32 UNF x 0.58 Desc: Hexagon Socket Set Screw - Flat Point #: 14 Quantity: 1 Part: ANSI B18.6.2 - 10-32 UNF - 0.1875 Desc: Slotted Headless Set Screw - Flat Point - UNF (Fine Thread - Inch) ``` |
+```vb
+#: 1 Quantity: 1 Part: Arbor Press Desc:
+#: 2 Quantity: 1 Part: FACE PLATE Desc:
+#: 3 Quantity: 1 Part: PINION SHAFT Desc:
+#: 4 Quantity: 1 Part: LEVER ARM Desc:
+#: 5 Quantity: 1 Part: THUMB SCREW Desc:
+#: 6 Quantity: 1 Part: TABLE PLATE Desc:
+#: 7 Quantity: 1 Part: RAM Desc:
+#: 8 Quantity: 2 Part: HANDLE CAPipt Desc:
+#: 9 Quantity: 1 Part: COLLAR Desc:
+#: 10 Quantity: 1 Part: GIB PLATE Desc:
+#: 11 Quantity: 1 Part: GROOVE PIN Desc:
+#: 12 Quantity: 4 Part: ANSI B18.3 - 1/4 - 20 - 7/8 Desc: Hexagon Socket Head Cap Screw
+#: 13 Quantity: 4 Part: ANSI B18.3 - 10-32 UNF x 0.58 Desc: Hexagon Socket
+Set Screw - Flat Point
+#: 14 Quantity: 1 Part: ANSI B18.6.2 - 10-32 UNF - 0.1875 Desc: Slotted Headless
+Set Screw - Flat Point - UNF (Fine Thread - Inch)
+```
 
 ### Summary
 

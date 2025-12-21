@@ -22,9 +22,3 @@ Color.**GetColor**( ***Red*** As Byte, ***Green*** As Byte, ***Blue*** As Byte )
 ## Version
 
 Introduced in version 8
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

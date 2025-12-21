@@ -31,9 +31,3 @@ The LumpDefinition represents a transient definition of a lump. A lump represent
 ## Version
 
 Introduced in version 2011
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

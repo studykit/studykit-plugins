@@ -44,9 +44,3 @@ The FilletDefinition object is used to define all of the input required for fill
 ## Version
 
 Introduced in version 5.3
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

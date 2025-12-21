@@ -76,9 +76,3 @@ The SketchEllipticalArc object represents an elliptical arc within a sketch. See
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

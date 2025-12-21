@@ -10,10 +10,6 @@ This program demonstrates the placement of a standard iFeature in a part.
 
 A part must be open and a planar face within that part selected. The iFeature used is delivered as a sample with Inventor.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub PlaceiFeature()
     ' Get the part document and component definition of the active document.
@@ -73,9 +69,3 @@ Public Sub PlaceiFeature()
     Set oiFeature = oFeatures.iFeatures.Add(oiFeatureDef)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -10,10 +10,6 @@ This sample demonstrates how to create a base view by specifying various represe
 
 Before running this sample, make sure that the file C:\temp\Reps.iam exists (or change the path in the sample). The file must contain a level of detail representation named MyLODRep, a positional representation named MyPositionalRep and a design view representation named MyDesignViewRep. The first line of the C# sample sets the oApp variable to ThisApplication - this should be appropriately changed.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 public void AddBaseViewWithRepresentations()
 {
@@ -52,9 +48,3 @@ public void AddBaseViewWithRepresentations()
 
 }
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

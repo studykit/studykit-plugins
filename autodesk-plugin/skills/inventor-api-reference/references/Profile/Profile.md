@@ -59,9 +59,3 @@ The Profile object defines a set of connected curves used as input for a feature
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

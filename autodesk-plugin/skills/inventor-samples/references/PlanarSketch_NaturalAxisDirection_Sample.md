@@ -10,10 +10,6 @@ This sample demonstrates modifying the orientation of a sketch.
 
 To use this sample, have a part document open that contains a box and run the program.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub ChangeSketchPlane()
    ' Set a reference to the part component definition.
@@ -87,9 +83,3 @@ Public Sub ChangeSketchPlane()
    oSketch.AxisIsX = False
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

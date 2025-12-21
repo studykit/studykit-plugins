@@ -29,9 +29,3 @@ The iMateResults collection provides access to all of the objects in an assembly
 ## Version
 
 Introduced in version 6
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

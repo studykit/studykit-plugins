@@ -11,10 +11,6 @@ This sample demonstrates how to create a mark feature in part document.
 
 This sample demonstrates how to create a mark feature in part document.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Sub MarkFeatureSample()
     ' Create a new part document.
@@ -93,10 +89,6 @@ End Sub
 
 This sample demonstrates how to create a mark feature in part document.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Sub MarkFeatureSample()
     ' Create a new part document.
@@ -172,9 +164,3 @@ Sub MarkFeatureSample()
     Set oMark = oMarkFeatures.Add(oMarkDef)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

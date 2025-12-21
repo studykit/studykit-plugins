@@ -39,9 +39,3 @@ The Sketch ConcentricConstraint object represents a concentric constraint within
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

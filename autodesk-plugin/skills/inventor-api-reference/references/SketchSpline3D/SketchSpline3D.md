@@ -62,9 +62,3 @@ The SketchSpline3D object represents a spline within a 3D sketch. See the articl
 ## Version
 
 Introduced in version 6
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

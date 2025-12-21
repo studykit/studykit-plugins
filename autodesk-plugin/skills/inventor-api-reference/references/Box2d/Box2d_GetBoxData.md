@@ -21,9 +21,3 @@ Box2d.**GetBoxData**( ***MinPoint***() As Double, ***MaxPoint***() As Double )
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

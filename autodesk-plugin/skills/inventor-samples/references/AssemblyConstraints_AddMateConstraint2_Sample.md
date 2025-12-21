@@ -10,10 +10,6 @@ This sample demonstrates creating a mate constraint between two occurrences usin
 
 To use the sample, have an assembly open that contains at least two occurrences, (part or subassembly), and run the program.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub MateConstraintOfWorkPlanes()
     Dim oAsmCompDef As AssemblyComponentDefinition
@@ -51,9 +47,3 @@ Public Sub MateConstraintOfWorkPlanes()
     Call oAsmCompDef.Constraints.AddMateConstraint(oAsmPlane1, oAsmPlane2, 0)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -36,9 +36,3 @@ The DockableWindows collection object provides access to all existing dockable w
 ## Version
 
 Introduced in version 2011
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

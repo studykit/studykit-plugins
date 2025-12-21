@@ -8,10 +8,6 @@ Add iMate definitions using AddMateiMateDefinition and AddInsertiMateDefinition.
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub CreateiMateDefinitionSample()
     ' Create a new part document, using the default part template.
@@ -86,9 +82,3 @@ Public Sub CreateiMateDefinitionSample()
                         oExtrude2.SideFaces.Item(1), False, 0, , "InsertA", strMatchList)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

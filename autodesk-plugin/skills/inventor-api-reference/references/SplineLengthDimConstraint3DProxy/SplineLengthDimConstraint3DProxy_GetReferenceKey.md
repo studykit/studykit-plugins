@@ -21,9 +21,3 @@ SplineLengthDimConstraint3DProxy.**GetReferenceKey**( ***ReferenceKey***() As By
 ## Version
 
 Introduced in version 2019
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

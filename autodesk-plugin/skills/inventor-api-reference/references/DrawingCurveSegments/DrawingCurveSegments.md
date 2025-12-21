@@ -21,9 +21,3 @@ The DrawingCurveSegments object provides access to the segments of a drawing cur
 ## Version
 
 Introduced in version 11
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

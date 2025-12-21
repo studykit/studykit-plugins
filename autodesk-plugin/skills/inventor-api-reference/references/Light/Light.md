@@ -33,9 +33,3 @@ The Light object provides access to all of the properties that define a specific
 ## Version
 
 Introduced in version 10
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

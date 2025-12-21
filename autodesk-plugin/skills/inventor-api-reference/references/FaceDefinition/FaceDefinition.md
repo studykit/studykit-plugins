@@ -30,9 +30,3 @@ The FaceDefinition represents a transient definition of a Face object.
 ## Version
 
 Introduced in version 2011
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

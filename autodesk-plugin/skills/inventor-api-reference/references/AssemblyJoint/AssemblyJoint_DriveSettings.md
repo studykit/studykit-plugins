@@ -24,9 +24,3 @@ This is a read only property whose value is a [DriveSettings](../DriveSettings/D
 ## Version
 
 Introduced in version 2014
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -47,9 +47,3 @@ The DrawingStylesManager object provides utilities to manage the various styles 
 ## Version
 
 Introduced in version 9
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

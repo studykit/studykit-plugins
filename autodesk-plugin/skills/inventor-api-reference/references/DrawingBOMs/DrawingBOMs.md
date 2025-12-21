@@ -28,9 +28,3 @@ The DrawingBOMs collection object returns the collection of all locally stored B
 ## Version
 
 Introduced in version 2009
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

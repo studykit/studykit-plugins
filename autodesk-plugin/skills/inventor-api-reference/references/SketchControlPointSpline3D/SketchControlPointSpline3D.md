@@ -55,9 +55,3 @@ The SketchControlPointSpline3D object represents a control point spline within a
 ## Version
 
 Introduced in version 2014
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

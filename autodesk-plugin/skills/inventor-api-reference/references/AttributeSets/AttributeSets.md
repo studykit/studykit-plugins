@@ -32,9 +32,3 @@ Provides access to the objects associated with a specific object and provides th
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -8,10 +8,6 @@ This sample demonstrates the creation of primitive (solid) BRep.
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub CreateBRep()
     ' Create a new part document, using the default part template.
@@ -57,9 +53,3 @@ Public Sub CreateBRep()
     Set oBaseFeature = oCompDef.Features.NonParametricBaseFeatures.Add(oBody)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

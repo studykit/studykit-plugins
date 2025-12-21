@@ -21,9 +21,3 @@ PartsListColumn.**Reposition**( [***TargetIndex***] As Long, [***InsertBefore***
 ## Version
 
 Introduced in version 10
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

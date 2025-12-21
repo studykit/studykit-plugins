@@ -32,9 +32,3 @@ The iFeatureTable object represents the table associated with a table driven iFe
 ## Version
 
 Introduced in version 2009
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

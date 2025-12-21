@@ -25,9 +25,3 @@ TransientGeometry.**CreateEllipticalArc2d**( ***Center*** As [Point2d](../Point2
 ## Version
 
 Introduced in version 11
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

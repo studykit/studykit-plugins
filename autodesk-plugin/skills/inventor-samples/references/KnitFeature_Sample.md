@@ -8,10 +8,6 @@ This sample demonstrates the creation of a stitch feature (known as the Knit fea
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Sub StitchFeatureCreate()
     ' Create a new part document, using the default part template.
@@ -78,9 +74,3 @@ Sub StitchFeatureCreate()
     Set oKnitFeature = oCompDef.Features.KnitFeatures.Add(oSurfaces)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

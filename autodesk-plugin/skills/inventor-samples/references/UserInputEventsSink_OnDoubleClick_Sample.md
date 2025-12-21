@@ -8,10 +8,6 @@ Demonstrates how to receive (and in this case, cancel) a double click from a use
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Option Explicit
    Private WithEvents oUIEvents As UserInputEvents
@@ -29,9 +25,3 @@ Private Sub oUIEvents_OnDoubleClick(ByVal SelectedEntities As ObjectsEnumerator,
        End If
    End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

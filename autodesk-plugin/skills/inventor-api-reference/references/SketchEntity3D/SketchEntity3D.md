@@ -42,9 +42,3 @@ The SketchEntity object is the base class for all geometric sketch entities. See
 ## Version
 
 Introduced in version 6
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

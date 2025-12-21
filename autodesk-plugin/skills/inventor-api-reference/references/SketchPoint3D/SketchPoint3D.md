@@ -50,9 +50,3 @@ The SketchPoint3D object represents a point within a 3D sketch. See the article 
 ## Version
 
 Introduced in version 6
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

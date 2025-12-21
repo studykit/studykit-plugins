@@ -23,9 +23,3 @@ Camera.**ComputeWithMouseInput**( ***FromPoint*** As [Point2d](../Point2d/Point2
 ## Version
 
 Introduced in version 6
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

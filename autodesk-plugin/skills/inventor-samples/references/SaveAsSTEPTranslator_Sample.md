@@ -8,10 +8,6 @@ This sample demonstrates how to save a STEP file using the STEP translator add-i
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub ExportToSTEP()
     ' Get the STEP translator Add-In.
@@ -49,9 +45,3 @@ Public Sub ExportToSTEP()
     End If
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

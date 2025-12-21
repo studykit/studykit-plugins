@@ -15,9 +15,3 @@ DMAC list of bit-fields that are used to specify the selection region relative t
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

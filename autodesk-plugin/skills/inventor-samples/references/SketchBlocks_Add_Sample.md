@@ -8,10 +8,6 @@ This sample demonstrates creating a sketch block from an existing sketch.
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub CreateSketchBlock()
     ' Set a reference to the part document.
@@ -48,9 +44,3 @@ Public Sub CreateSketchBlock()
     Call oSketch.SketchBlocks.Add(oSketchObjects)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

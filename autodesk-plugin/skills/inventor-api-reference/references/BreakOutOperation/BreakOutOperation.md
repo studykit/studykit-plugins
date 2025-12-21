@@ -36,9 +36,3 @@ A BreakOutOperation object represents a break out applied to a drawing view. Edi
 ## Version
 
 Introduced in version 2010
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

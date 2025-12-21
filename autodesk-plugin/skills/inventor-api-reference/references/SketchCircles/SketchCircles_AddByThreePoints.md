@@ -22,9 +22,3 @@ SketchCircles.**AddByThreePoints**( ***PointOne*** As [Point2d](../Point2d/Point
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

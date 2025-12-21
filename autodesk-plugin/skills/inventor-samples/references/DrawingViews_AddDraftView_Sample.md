@@ -10,10 +10,6 @@ This sample demonstrates the creation of a draft view in a drawing.
 
 Open a drawing document and run the following sample.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub CreateDraftView()
     ' Set a reference to the drawing document.
@@ -47,9 +43,3 @@ Public Sub CreateDraftView()
 
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

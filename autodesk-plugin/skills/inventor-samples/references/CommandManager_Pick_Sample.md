@@ -8,10 +8,6 @@ The following sample demonstrates getting a single selection from the user.
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub GetSingleSelection()
     ' Get a feature selection from the user
@@ -21,9 +17,3 @@ Public Sub GetSingleSelection()
     MsgBox "Picked: " & oObject.Name
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

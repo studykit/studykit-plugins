@@ -29,9 +29,3 @@ The KeyboardEvents object supports a set of events that can be received by the c
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

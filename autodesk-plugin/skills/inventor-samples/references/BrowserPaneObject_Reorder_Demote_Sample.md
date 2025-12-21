@@ -8,10 +8,6 @@ This sample demonstrates how to demote a top level occurrence in an assembly int
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub Demote()
     ' Get the active assembly document
@@ -62,9 +58,3 @@ Public Sub Demote()
     Call oPane.Reorder(oTargetNode, False, oSourceNode)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -21,9 +21,3 @@ PartDocument.**GetPrivateStream**( ***StreamName*** As String, ***CreateIfNecess
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

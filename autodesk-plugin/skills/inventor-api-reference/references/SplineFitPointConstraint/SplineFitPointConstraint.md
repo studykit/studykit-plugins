@@ -38,9 +38,3 @@ The SplineFitPointConstraint object represents a constraint that makes a spline 
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

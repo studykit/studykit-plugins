@@ -22,9 +22,3 @@ AssemblyComponentDefinition.**TransformOccurrences**( ***Occurrences*** As [Obje
 ## Version
 
 Introduced in version 2009
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -10,10 +10,6 @@ Demonstrates the creation of a Move feature.
 
 To use this sample a part must be active.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub MoveFeatureCreationSample()
     ' Get the active part document.
@@ -58,9 +54,3 @@ Public Sub MoveFeatureCreationSample()
     Set oMoveFeature = oCompDef.Features.MoveFeatures.Add(oMoveDef)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

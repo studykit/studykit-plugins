@@ -28,9 +28,3 @@ Object that represents an opaque reference held in this Document to a file.
 ## Version
 
 Introduced in version 2017
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

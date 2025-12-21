@@ -26,9 +26,3 @@ EllipticalArc.**GetEllipticalArcData**( ***Center***() As Double, ***MajorAxis**
 ## Version
 
 Introduced in version 6
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -10,10 +10,6 @@ This sample demonstrates the creation of a flat pattern base view in a drawing.
 
 Open a drawing document and run the sample. The sheet metal part must have a flat pattern within it or a folded view will still be created.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub AddFlatPatternDrawingView()
     ' Set a reference to the drawing document.
@@ -47,9 +43,3 @@ Public Sub AddFlatPatternDrawingView()
     , , oBaseViewOptions)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

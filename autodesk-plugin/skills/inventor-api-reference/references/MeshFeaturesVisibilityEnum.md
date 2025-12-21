@@ -16,9 +16,3 @@ Defines the visibility types of the Mesh Features .
 ## Version
 
 Introduced in version 2017
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

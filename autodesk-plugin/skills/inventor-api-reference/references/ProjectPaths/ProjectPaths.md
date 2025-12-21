@@ -37,9 +37,3 @@ The ProjectPaths collection object provides access to a list of folder paths and
 ## Version
 
 Introduced in version 2011
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

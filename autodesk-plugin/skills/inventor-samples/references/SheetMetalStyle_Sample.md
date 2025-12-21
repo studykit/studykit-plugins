@@ -8,10 +8,6 @@ This sample illustrates getting information about sheet metal styles.
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub SheetMetalStyleDisplay()
     ' Set a reference to the sheet metal document.
@@ -180,9 +176,3 @@ Public Sub SheetMetalStyleDisplay()
     Next
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

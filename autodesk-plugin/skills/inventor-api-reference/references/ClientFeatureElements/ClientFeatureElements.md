@@ -28,9 +28,3 @@ Provides access to the composited elements within a ClientFeature and provides m
 ## Version
 
 Introduced in version 2008
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

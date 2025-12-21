@@ -10,10 +10,6 @@ This sample demonstrates the creation of a thread note on a drawing view.
 
 Select a thread edge on a drawing view and run the sample.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Sub AddThreadNote()
     ' Assumes that a drawing document is active
@@ -47,9 +43,3 @@ Sub AddThreadNote()
     Set oThreadNote = oDoc.ActiveSheet.DrawingNotes.HoleThreadNotes.Add(oPosition, oThreadEdge)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

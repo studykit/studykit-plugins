@@ -10,10 +10,6 @@ This sample demonstrates the query functionality available for sketch entities.
 
 To use this sample, select a sketch entity that you want to query. Run the program and it will display information about the selected entity in the immediate window.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub SketchEntities()
     ' Get the first item in the select set.  This assumes
@@ -144,9 +140,3 @@ Public Sub SketchEntities()
     End If
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

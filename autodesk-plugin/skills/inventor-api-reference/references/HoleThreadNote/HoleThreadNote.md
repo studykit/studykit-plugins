@@ -78,9 +78,3 @@ The HoleThreadNote object represents either a hole note or a thread note on a sh
 ## Version
 
 Introduced in version 2010
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

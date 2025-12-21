@@ -27,9 +27,3 @@ Call-back or 'outgoing' sink interface through which Inventor fires the DrawingV
 ## Version
 
 Introduced in version 9
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

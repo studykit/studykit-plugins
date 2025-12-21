@@ -19,9 +19,3 @@ Semantic description of data on Inventor's Private Event Queue.
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

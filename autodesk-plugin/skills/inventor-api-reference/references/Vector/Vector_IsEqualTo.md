@@ -21,9 +21,3 @@ Vector.**IsEqualTo**( ***Argument*** As [Vector](../Vector/Vector.md), [***Toler
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

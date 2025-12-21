@@ -44,9 +44,3 @@ The iAssemblyFactory object provides access to the iAssembly table and provides 
 ## Version
 
 Introduced in version 11
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

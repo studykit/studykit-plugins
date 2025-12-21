@@ -10,10 +10,6 @@ This sample illustrates creating a new sketched symbol definition object and ins
 
 This sample consists of two subs. The first demonstrates the creation of a sketched symbol definition and the second inserts it into the active sheet. To run the sample have a drawing document open and run the CreateSketchedSymbolDefinition Sub. After this you can run the InsertSketchedSymbolOnSheet to insert the sketched symbol into the active sheet. The insertion sub demonstrates the use of the insertion point in the symbol's definition while inserting the symbol.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub CreateSketchedSymbolDefinition()
     ' Set a reference to the drawing document.
@@ -87,9 +83,3 @@ Public Sub InsertSketchedSymbolOnSheet()
     Set oSketchedSymbol = oSheet.SketchedSymbols.Add(oSketchedSymbolDef, oTG.CreatePoint2d(0, 0), (3.14159 / 4), 0.75, sPromptStrings)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

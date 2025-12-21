@@ -10,10 +10,6 @@ This sample demonstrates creating a sketch within an existing drawing view.
 
 To run this sample have a drawing open where the active sheet contains at least one drawing view.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Private Sub CreateDrawingSketchInView()
     ' Set a reference to the active document.  This assumes it
@@ -45,9 +41,3 @@ Private Sub CreateDrawingSketchInView()
     oSketch.ExitEdit
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

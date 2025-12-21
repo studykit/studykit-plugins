@@ -43,9 +43,3 @@ The WorkSurface object represents a work surface, which is a type of work featur
 ## Version
 
 Introduced in version 6
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

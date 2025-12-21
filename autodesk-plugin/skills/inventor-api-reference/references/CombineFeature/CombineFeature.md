@@ -61,9 +61,3 @@ The CombineFeature object represents an existing combine feature in an Inventor 
 ## Version
 
 Introduced in version 2010
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -35,9 +35,3 @@ The EllipticalArc2d object. The object created is a transient mathematical objec
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -16,9 +16,3 @@ Constants identifying the direction in which a feature extension needs to take p
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -38,9 +38,3 @@ The GeometryIntent object represents a geometry intent for use in various annota
 ## Version
 
 Introduced in version 11
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

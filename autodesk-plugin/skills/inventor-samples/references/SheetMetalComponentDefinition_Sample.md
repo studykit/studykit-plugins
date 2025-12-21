@@ -10,10 +10,6 @@ This sample illustrates getting basic information from the various sheet metal f
 
 Before running the sample, open a sheet metal document that contains some features.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub SheetMetalFeatureDisplay()
     ' Set a reference to the sheet metal document.
@@ -207,9 +203,3 @@ Public Sub SheetMetalFeatureDisplay()
     Next
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

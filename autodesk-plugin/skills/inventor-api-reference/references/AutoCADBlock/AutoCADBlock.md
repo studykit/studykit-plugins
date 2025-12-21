@@ -51,9 +51,3 @@ The AutoCADBlock object represents an instance of an AutoCAD block definition on
 ## Version
 
 Introduced in version 2011
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

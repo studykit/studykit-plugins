@@ -31,9 +31,3 @@ SketchArcs.**AddByFillet**( ***EntityOne*** As [SketchEntity](../SketchEntity/Sk
 ## Version
 
 Introduced in version 5.3
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

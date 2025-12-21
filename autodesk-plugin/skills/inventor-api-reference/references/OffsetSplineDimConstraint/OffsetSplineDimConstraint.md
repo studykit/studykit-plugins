@@ -42,9 +42,3 @@ The OffsetSplineDimConstraint is automatically created when offset spline dimens
 ## Version
 
 Introduced in version 11
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

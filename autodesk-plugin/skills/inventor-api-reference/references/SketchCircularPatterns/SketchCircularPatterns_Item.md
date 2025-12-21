@@ -24,9 +24,3 @@ This is a read only property whose value is a [SketchCircularPattern](../SketchC
 ## Version
 
 Introduced in version 2025
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

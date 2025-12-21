@@ -67,9 +67,3 @@ The SheetMetalStyle object contains all of the information about a particular sh
 ## Version
 
 Introduced in version 5.3
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

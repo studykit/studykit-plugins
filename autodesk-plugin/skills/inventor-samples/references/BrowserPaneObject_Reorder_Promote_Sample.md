@@ -8,10 +8,6 @@ This sample demonstrates how to promote an occurrence.
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub Promote()
     ' Get the active assembly document
@@ -43,9 +39,3 @@ Public Sub Promote()
     Call oPane.Reorder(oTargetNode, True, oSourceNode)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

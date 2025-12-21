@@ -17,9 +17,3 @@ Enumeration of the buttons on a mouse.
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

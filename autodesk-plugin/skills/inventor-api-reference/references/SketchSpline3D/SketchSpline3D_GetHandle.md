@@ -20,9 +20,3 @@ SketchSpline3D.**GetHandle**( ***FitPoint*** As [SketchPoint3D](../SketchPoint3D
 ## Version
 
 Introduced in version 2008
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

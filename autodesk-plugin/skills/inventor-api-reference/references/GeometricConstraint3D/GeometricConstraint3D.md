@@ -34,9 +34,3 @@ The GeometricConstraint3D object represents the base class of all 3D geometric c
 ## Version
 
 Introduced in version 6
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -17,9 +17,3 @@ Constants identifying shape definition type of a helical curve.
 ## Version
 
 Introduced in version 2019
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -20,9 +20,3 @@ PartDocument.**Rebuild2**( [***AcceptErrorsAndContinue***] As Boolean ) As Boole
 ## Version
 
 Introduced in version 2008
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

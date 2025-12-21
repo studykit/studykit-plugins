@@ -10,10 +10,6 @@ This sample demonstrates exporting of Inventor files in IGES format.
 
 To run this sample, the document to be exported must be active. The IGES file is created as C:\temptest.igs (this can be changed in the code below).
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub ExportToIGES()
     ' Get the IGES translator Add-In.
@@ -51,9 +47,3 @@ Public Sub ExportToIGES()
     End If
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

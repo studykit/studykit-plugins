@@ -31,9 +31,3 @@ GraphicsDataSets.**CreateImageSet**( ***DataSetId*** As Long ) As [GraphicsImage
 ## Version
 
 Introduced in version 2011
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

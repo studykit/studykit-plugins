@@ -40,9 +40,3 @@ The MoveDefinition object is used to define all of the input required for move b
 ## Version
 
 Introduced in version 2013
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

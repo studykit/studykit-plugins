@@ -27,9 +27,3 @@ Object required to be supported by Server to qualify as an Autodesk Inventor Add
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

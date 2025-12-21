@@ -32,9 +32,3 @@ The BendOptions object defines the settings that influence the creation of a ben
 ## Version
 
 Introduced in version 2009
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

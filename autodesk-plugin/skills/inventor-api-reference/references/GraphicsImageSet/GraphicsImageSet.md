@@ -38,9 +38,3 @@ The GraphicsImageSet defines images that can be used when displaying client grap
 ## Version
 
 Introduced in version 2011
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

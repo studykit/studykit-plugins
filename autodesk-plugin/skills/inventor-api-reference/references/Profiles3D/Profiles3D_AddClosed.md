@@ -13,9 +13,3 @@ Profiles3D.**AddClosed**() As [Profile3D](../Profile3D/Profile3D.md)
 ## Version
 
 Introduced in version 6
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

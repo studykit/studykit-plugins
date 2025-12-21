@@ -8,10 +8,6 @@ This sample demonstrates importing AutoCAD block definitions from an external dw
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Sub ImportAutoCADBlockDefinitionsFromFile()
     ' Set a reference to the drawing document.
@@ -31,9 +27,3 @@ Sub ImportAutoCADBlockDefinitionsFromFile()
     Set oBlockDefs = oDrawDoc.AutoCADBlockDefinitions.AddFromFile("C:\temp\acad.dwg", oDefNames)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

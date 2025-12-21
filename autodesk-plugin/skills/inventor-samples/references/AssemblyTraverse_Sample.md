@@ -8,10 +8,6 @@ This sample shows how to recursively traverse an assembly and get the count of l
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub AssemblyCount()
     ' Set reference to active document.
@@ -73,9 +69,3 @@ Private Sub processAllSubOcc(ByVal oCompOcc As ComponentOccurrence, _
     Next
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

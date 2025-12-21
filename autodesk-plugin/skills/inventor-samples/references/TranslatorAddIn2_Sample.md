@@ -8,10 +8,6 @@ This sample uses the DWG Translator Addin to publish to DWG.
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub PublishDWG()
     ' Get the DWG translator Add-In.
@@ -50,9 +46,3 @@ Public Sub PublishDWG()
     Call DWGAddIn.SaveCopyAs(oDocument, oContext, oOptions, oDataMedium)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

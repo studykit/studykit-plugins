@@ -43,9 +43,3 @@ The CustomTables object contains the collection of objects for a given Sheet. Se
 ## Version
 
 Introduced in version 9
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

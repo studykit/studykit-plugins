@@ -10,10 +10,6 @@ This sample demonstrates the creation of a sweep feature. The profile is a circl
 
 To run the sample have a part document open.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub SweepFeature()
     ' Set a reference to the currently active document.
@@ -100,9 +96,3 @@ Public Sub SweepFeature()
     Set oSweep = oCompDef.Features.SweepFeatures.AddUsingPath(oProfile, oPath, kJoinOperation)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -23,9 +23,3 @@ Matrix.**SetCoordinateSystem**( ***Origin*** As [Point](../Point/Point.md), ***X
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

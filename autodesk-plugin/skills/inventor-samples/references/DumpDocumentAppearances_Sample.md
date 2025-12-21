@@ -8,10 +8,6 @@ This sample writes out information about all of the appearances in the active do
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub DumpDocumentAppearances()
     ' Check that a part or assembly document is active.
@@ -183,9 +179,3 @@ Private Function ColorString(InColor As color) As String
     ColorString = InColor.Red & "," & InColor.Green & "," & InColor.Blue & "," & InColor.Opacity
 End Function
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

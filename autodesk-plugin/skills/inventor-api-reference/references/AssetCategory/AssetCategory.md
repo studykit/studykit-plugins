@@ -37,9 +37,3 @@ The AssetCategory object represents a category within a library.
 ## Version
 
 Introduced in version 2014
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

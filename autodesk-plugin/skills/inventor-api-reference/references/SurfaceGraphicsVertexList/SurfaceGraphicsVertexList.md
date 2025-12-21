@@ -37,9 +37,3 @@ The SurfaceGraphicsVertexList object contains a list of vertices currently displ
 ## Version
 
 Introduced in version 2013
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

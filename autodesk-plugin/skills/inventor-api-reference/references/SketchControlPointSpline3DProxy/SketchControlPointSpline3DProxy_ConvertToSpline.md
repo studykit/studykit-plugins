@@ -13,9 +13,3 @@ SketchControlPointSpline3DProxy.**ConvertToSpline**() As [SketchSpline3D](../Ske
 ## Version
 
 Introduced in version 2014
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

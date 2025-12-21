@@ -10,10 +10,6 @@ This sample demonstrates the use of the OnDrag event to drag fixed work points w
 
 To use the sample copy the WorkPointDrag sub into a code module. Create a new class module called clsDragWorkPoint and copy all of the rest of the code into it. Have a part document open that contains at least one fixed work point. Run the sample and drag the fixed work point.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Option Explicit
 Public oDragWorkPoint As clsDragWorkPoint
@@ -177,9 +173,3 @@ Private Sub ProjectPoint(ByVal ModelPosition As Inventor.Point, ByVal WorkPointP
     Set ProjectedPoint = oWPPlane.IntersectWithLine(oLine)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -58,9 +58,3 @@ The MoveFaceFeature provides the ability to move any face of a part along it's n
 ## Version
 
 Introduced in version 10
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

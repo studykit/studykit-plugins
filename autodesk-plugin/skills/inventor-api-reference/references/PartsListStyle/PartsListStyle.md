@@ -54,9 +54,3 @@ The PartsListStyle object represents a parts list style in a drawing. The proper
 ## Version
 
 Introduced in version 2011
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

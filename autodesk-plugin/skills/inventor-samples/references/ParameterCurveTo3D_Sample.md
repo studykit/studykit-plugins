@@ -10,10 +10,6 @@ Demonstrates the conversion of a 2d parameteric space curve into the equivalent 
 
 To use this sample a part must be active.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub ParamCurveto3D()
     ' Have the user select a face whose parametric space will be used.
@@ -96,9 +92,3 @@ Public Sub ParamCurveto3D()
     ThisApplication.ActiveView.Fit
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

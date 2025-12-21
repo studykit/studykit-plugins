@@ -68,9 +68,3 @@ The DecalFeature object represents a decal feature on a part.
 ## Version
 
 Introduced in version 6
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

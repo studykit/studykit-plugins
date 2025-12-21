@@ -64,9 +64,3 @@ The BrowserPane object represents an independent window or panel inside the brow
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

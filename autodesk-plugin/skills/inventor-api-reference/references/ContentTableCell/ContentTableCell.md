@@ -24,9 +24,3 @@ The ContentTableCell object represents a specific cell with a content center fam
 ## Version
 
 Introduced in version 2010
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

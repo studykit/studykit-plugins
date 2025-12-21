@@ -8,10 +8,6 @@ Demonstrates creating Face, Boundary Patch and Stitch features.
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub BoundaryPatchFeature()
     ' Create a new part document, using the default part template.
@@ -95,9 +91,3 @@ Public Sub BoundaryPatchFeature()
     Set oStitch = oCompDef.Features.KnitFeatures.Add(oSurfaceToStitch)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

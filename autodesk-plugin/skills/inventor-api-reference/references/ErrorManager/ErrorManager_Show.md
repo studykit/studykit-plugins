@@ -34,9 +34,3 @@ ErrorManager.**Show**( ***Title*** As String, ***AllowAccept*** As Boolean, ***A
 ## Version
 
 Introduced in version 2010
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

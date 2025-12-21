@@ -28,9 +28,3 @@ The FileManagerEvents object provides access to file events, such as file deleti
 ## Version
 
 Introduced in version 9
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

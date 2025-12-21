@@ -29,9 +29,3 @@ The Lights collection object allows for the creation of new Light objects and pr
 ## Version
 
 Introduced in version 10
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

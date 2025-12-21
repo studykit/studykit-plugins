@@ -34,9 +34,3 @@ The GeomtricConstraint object represents the base class of all geometric constra
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

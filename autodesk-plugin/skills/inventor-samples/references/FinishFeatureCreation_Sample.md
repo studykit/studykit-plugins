@@ -10,10 +10,6 @@ This sample demonstrates how to create a finish feature.
 
 This sample demonstrates how to create a finish feature.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Sub FinishFeatureSample()
     ' Create a new part document.
@@ -76,9 +72,3 @@ Sub FinishFeatureSample()
 
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

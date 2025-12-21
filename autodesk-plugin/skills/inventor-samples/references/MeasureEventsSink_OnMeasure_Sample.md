@@ -10,10 +10,6 @@ This sample demonstrates using the measure events to measure distance and angle.
 
 To run the sample, have a document open that contains some geometry and run the InteractiveMeasureDistance and InteractiveMeasureAngle subs.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub InteractiveMeasureDistance()
     ' Create a new clsMeasure object.
@@ -105,9 +101,3 @@ Private Sub oMeasureEvents_OnMeasure(ByVal MeasureType As MeasureTypeEnum, ByVal
 
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

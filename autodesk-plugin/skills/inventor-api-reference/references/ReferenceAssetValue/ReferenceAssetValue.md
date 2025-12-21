@@ -37,9 +37,3 @@ The ReferenceAssetValue object represents an asset value that consists of a refe
 ## Version
 
 Introduced in version 2014
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

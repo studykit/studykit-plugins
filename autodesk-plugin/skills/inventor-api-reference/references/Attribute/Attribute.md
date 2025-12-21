@@ -29,9 +29,3 @@ The Attribute object stores a name and value and belongs to a specific attribute
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

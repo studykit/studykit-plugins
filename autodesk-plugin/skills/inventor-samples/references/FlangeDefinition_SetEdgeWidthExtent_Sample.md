@@ -8,10 +8,6 @@ This sample demonstrates editing the width extent of an existing flange feature.
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub EditFlangeWidths()
     ' Create the active sheet metal document.
@@ -60,9 +56,3 @@ Public Sub EditFlangeWidths()
     Call smCompDef.SetEndOfPartToTopOrBottom(False)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -37,9 +37,3 @@ The iPartTableRow object represents a row in the iPart factory table.
 ## Version
 
 Introduced in version 6
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

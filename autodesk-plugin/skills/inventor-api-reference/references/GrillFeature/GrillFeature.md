@@ -57,9 +57,3 @@ The GrillFeature object represents a grill feature within the model.
 ## Version
 
 Introduced in version 2010
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

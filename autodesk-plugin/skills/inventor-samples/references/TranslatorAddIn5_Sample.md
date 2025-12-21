@@ -10,10 +10,6 @@ This sample demonstrates exporting of Inventor files in STEP format.
 
 To run this sample, the document to be exported must be active. The STEP file is created as C:\temptest.stp (this can be changed in the code below).
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub ExportToSTEP()
     ' Get the STEP translator Add-In.
@@ -51,9 +47,3 @@ Public Sub ExportToSTEP()
     End If
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

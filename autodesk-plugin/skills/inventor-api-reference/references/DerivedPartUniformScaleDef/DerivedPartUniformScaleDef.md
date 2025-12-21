@@ -65,9 +65,3 @@ The DerivedPartUniformScaleDef object allows you to query and define the uniform
 ## Version
 
 Introduced in version 6
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

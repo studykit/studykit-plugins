@@ -53,9 +53,3 @@ The GrahicsDataSets object supports methods to create the various graphics-relat
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -8,10 +8,6 @@ Demonstrates creating flange features of various width extents. This creates a n
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub FlangeWidthsCreation()
     ' Create a new sheet metal document.
@@ -87,9 +83,3 @@ Public Sub FlangeWidthsCreation()
     Call smFeatures.FlangeFeatures.Add(flangeDef)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

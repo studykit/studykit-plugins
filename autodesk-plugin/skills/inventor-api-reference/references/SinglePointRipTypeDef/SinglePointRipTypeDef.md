@@ -18,9 +18,3 @@ The SinglePointRipTypeDef object defines the inputs unique to a single point rip
 ## Version
 
 Introduced in version 2011
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

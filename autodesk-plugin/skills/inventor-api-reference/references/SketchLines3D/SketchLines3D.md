@@ -36,9 +36,3 @@ The SketchLines3D object provides access to all of the objects in a sketch and p
 ## Version
 
 Introduced in version 6
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

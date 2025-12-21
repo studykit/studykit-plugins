@@ -17,9 +17,3 @@ Constants specifying the resolution quality to apply to the display of the model
 ## Version
 
 Introduced in version 11
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

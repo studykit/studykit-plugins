@@ -29,9 +29,3 @@ The ModelWeldingSymbols collection object provides access to all the model weldi
 ## Version
 
 Introduced in version 2024
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -16,9 +16,3 @@ The DoubleHemDefinition defines all of the inputs that are unique to a double st
 ## Version
 
 Introduced in version 2009
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

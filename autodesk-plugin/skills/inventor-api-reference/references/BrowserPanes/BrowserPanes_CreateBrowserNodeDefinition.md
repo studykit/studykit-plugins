@@ -26,9 +26,3 @@ BrowserPanes.**CreateBrowserNodeDefinition**( ***Label*** As String, ***Id*** As
 ## Version
 
 Introduced in version 8
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

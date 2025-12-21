@@ -43,9 +43,3 @@ The GraphicsColorSet object contains a list of colors. This object can be refere
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -21,9 +21,3 @@ DetailDrawingView.**SetVisibility**( ***Object*** As Object, ***Visible*** As Bo
 ## Version
 
 Introduced in version 11
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

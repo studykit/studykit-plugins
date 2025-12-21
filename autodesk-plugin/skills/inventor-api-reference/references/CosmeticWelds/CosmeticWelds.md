@@ -29,9 +29,3 @@ The CosmeticWelds object provides access to all the existing objects within a we
 ## Version
 
 Introduced in version 8
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

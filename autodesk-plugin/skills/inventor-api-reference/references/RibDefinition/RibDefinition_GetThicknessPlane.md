@@ -21,9 +21,3 @@ RibDefinition.**GetThicknessPlane**( ***HoldThicknessAt*** As [RibThicknessPlane
 ## Version
 
 Introduced in version 2012
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -17,9 +17,3 @@ Constants identifying kind of application of the normals in the associated norma
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

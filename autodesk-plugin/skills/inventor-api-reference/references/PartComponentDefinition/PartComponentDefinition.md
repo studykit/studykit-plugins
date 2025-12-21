@@ -115,9 +115,3 @@ The PartComponentDefinition object that provides access to the Part.
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

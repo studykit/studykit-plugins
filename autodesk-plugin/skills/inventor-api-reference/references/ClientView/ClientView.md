@@ -34,9 +34,3 @@ The ClientView object represents a view of the document/drawing sheet attached t
 ## Version
 
 Introduced in version 6
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

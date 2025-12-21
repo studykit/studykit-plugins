@@ -21,9 +21,3 @@ The iPartTableColumns collection object provides access to all existing objects 
 ## Version
 
 Introduced in version 6
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

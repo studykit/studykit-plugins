@@ -15,9 +15,3 @@ Default file open behavior for non-inventor DWG files.
 ## Version
 
 Introduced in version 2008
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

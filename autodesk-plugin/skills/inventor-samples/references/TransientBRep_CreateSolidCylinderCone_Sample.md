@@ -11,10 +11,6 @@ This sample demonstrates the creation of 3D primitives (cylinder, cone, etc.) us
 
 To use the sample you need to have an assembly or part document open. The program has two behaviors: the first time it is run it will draw the graphics. The second time it is run it deletes the previously drawn graphics.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub ClientGraphics3DPrimitives()
     Dim oDoc As Document
@@ -89,10 +85,6 @@ End Sub
 ```
 
 To use the sample you need to have an assembly or part document open. The program has two behaviors: the first time it is run it will draw the graphics. The second time it is run it deletes the previously drawn graphics. The first line of this sample sets the oApp variable to ThisApplication - this should be appropriately changed.
-
-|  |
-| --- |
-| Copy Code |
 
 ```
 public void ClientGraphics3DPrimitives()
@@ -169,9 +161,3 @@ public void ClientGraphics3DPrimitives()
     }
 }
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

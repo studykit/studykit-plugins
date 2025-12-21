@@ -35,9 +35,3 @@ The SketchSplines object provides access to all the objects in a sketch and prov
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

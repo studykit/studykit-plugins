@@ -43,9 +43,3 @@ The TitleBlockDefinition object represents a title block definition.
 ## Version
 
 Introduced in version 5.3
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

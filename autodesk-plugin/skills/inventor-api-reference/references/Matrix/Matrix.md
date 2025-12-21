@@ -58,9 +58,3 @@ A 4x4 Matrix object. For more information, see the Transient Geometry article in
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

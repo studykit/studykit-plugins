@@ -56,9 +56,3 @@ The Asset object represents an appearance, material, or physical asset within a 
 ## Version
 
 Introduced in version 2014
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

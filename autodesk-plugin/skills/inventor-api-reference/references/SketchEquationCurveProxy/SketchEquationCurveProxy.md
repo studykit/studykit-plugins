@@ -56,9 +56,3 @@ Derived from: [SketchEquationCurve](../SketchEquationCurve/SketchEquationCurve.m
 ## Version
 
 Introduced in version 2014
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

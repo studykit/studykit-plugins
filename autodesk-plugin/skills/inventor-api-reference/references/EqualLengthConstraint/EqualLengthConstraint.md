@@ -38,9 +38,3 @@ The EqualLengthConstraint object represents a constraint that makes two lines eq
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

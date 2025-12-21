@@ -40,9 +40,3 @@ The RipDefinition object represents all of the information that defines a rip fe
 ## Version
 
 Introduced in version 2011
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

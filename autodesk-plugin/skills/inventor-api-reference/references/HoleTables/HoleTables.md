@@ -30,9 +30,3 @@ The HoleTables collection object represents all the hole tables on a sheet.
 ## Version
 
 Introduced in version 10
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

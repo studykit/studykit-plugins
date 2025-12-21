@@ -61,9 +61,3 @@ Provides access to the objects associated with the object the collection was obt
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

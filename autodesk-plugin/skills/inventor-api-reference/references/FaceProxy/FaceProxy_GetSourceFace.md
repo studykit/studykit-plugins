@@ -20,9 +20,3 @@ FaceProxy.**GetSourceFace**( [***GetLeafSource***] As Boolean ) As [Face](../Fac
 ## Version
 
 Introduced in version 10
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

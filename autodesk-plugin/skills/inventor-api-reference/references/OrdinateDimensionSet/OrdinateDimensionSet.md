@@ -43,9 +43,3 @@ The OrdinateDimensionSet object represents an ordinate dimension set placed on a
 ## Version
 
 Introduced in version 2010
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

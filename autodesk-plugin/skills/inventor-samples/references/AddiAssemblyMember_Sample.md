@@ -11,10 +11,6 @@ This sample demonstrates adding iAssembly occurrences to an assembly.
 
 Before running the sample, make sure that C:\temp\iAssemblyFactory.iam exists and that it is an iAssembly factory.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub AddiAssemblyOccurrence()
     ' Open the factory document invisible.
@@ -69,10 +65,6 @@ End Sub
 
 Before running the sample, make sure that C:/temp/iAssemblyFactory.iam exists and that it is an iAssembly factory. The first line of the C# sample sets the oApp variable to ThisApplication - this should be appropriately changed.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 public void AddiAssemblyOccurrence()
 {
@@ -123,9 +115,3 @@ public void AddiAssemblyOccurrence()
 
 }
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -22,9 +22,3 @@ ModelParameters.**AddByExpression**( ***Expression*** As String, ***UnitsSpecifi
 ## Version
 
 Introduced in version 10
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -21,9 +21,3 @@ SectionDrawingView.**RotateByAngle**( ***Angle*** As Double, [***Clockwise***] A
 ## Version
 
 Introduced in version 11
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -20,9 +20,3 @@ iAssemblyTableRow.**Copy**( [***NewMemberName***] As String ) As [iAssemblyTable
 ## Version
 
 Introduced in version 11
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

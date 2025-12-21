@@ -10,10 +10,6 @@ This sample demonstrates the sketch fill functionality in drawing sketches.
 
 Have a drawing document open and run the sample.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub DrawingSketchFill()
     ' Set a reference to the active document. This assumes it
@@ -72,9 +68,3 @@ Public Sub DrawingSketchFill()
     oSketch.ExitEdit
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

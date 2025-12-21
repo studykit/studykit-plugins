@@ -91,9 +91,3 @@ The valid input is one of the constants in PartFeatureExtentDirectionEnum: kNega
 ## Version
 
 Introduced in version 2010
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -20,9 +20,3 @@ AssetLibraries.**Open**( ***FullFileName*** As String ) As [AssetLibrary](../Ass
 ## Version
 
 Introduced in version 2014
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

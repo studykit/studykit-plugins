@@ -48,9 +48,3 @@ The FileDialog object represents the Inventor dialogs that are displayed when th
 ## Version
 
 Introduced in version 6
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

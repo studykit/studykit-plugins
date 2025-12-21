@@ -29,9 +29,3 @@ The LightingStyles collection object allows for the creation of new LightingStyl
 ## Version
 
 Introduced in version 10
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

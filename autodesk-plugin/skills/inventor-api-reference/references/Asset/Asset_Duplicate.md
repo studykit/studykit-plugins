@@ -20,9 +20,3 @@ Asset.**Duplicate**( [***NewDisplayName***] As Variant ) As [Asset](../Asset/Ass
 ## Version
 
 Introduced in version 2014
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

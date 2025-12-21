@@ -39,9 +39,3 @@ The Box2d object is a mathematical utility object that represents a rectangle wh
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

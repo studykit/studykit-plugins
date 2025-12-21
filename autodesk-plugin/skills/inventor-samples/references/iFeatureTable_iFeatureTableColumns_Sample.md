@@ -8,10 +8,6 @@ This program demonstrates the edit of a table driven iFeature to change which ro
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub EditTableDriveniFeature()
     ' Get the part document and component definition of the active document.
@@ -73,9 +69,3 @@ Public Sub EditTableDriveniFeature()
     oiFeature.iFeatureDefinition.ActiveTableRow = oCell.Row
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

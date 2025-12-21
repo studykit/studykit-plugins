@@ -65,9 +65,3 @@ The DeleteFaceFeature object represents a delete face feature on a part. A delet
 ## Version
 
 Introduced in version 6
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

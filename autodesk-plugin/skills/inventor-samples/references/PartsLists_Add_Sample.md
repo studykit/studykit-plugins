@@ -10,10 +10,6 @@ This sample demonstrates the creation of a parts list. The parts list is placed 
 
 To run this sample, have a drawing document open. The active sheet in the drawing should have at least one drawing view and the first drawing view on the sheet should not be a draft view.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub CreatePartsList()
     On Error Resume Next
@@ -54,9 +50,3 @@ Public Sub CreatePartsList()
     Set oPartsList = oSheet.PartsLists.Add(oDrawingView, oPlacementPoint)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

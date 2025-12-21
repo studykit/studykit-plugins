@@ -17,9 +17,3 @@ This is a read only property whose value is a [ModelStateTable](../ModelStateTab
 ## Version
 
 Introduced in version 2022
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

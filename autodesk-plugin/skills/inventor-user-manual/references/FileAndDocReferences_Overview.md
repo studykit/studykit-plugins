@@ -68,9 +68,26 @@ Figure 1 : The File References API Model
 
 The following code sample demonstrates the file references traversal and prints the file names of all the files referenced by the active document.
 
-|  |
-| --- |
-| ```  Public Sub FileReferenceSample()    Dim oFile As File   Set oFile = ThisApplication.ActiveDocument.File        Call ProcessReferences(oFile)      End Sub  Private Sub ProcessReferences ( ByVal oFile As File )        Dim oFileDescriptor As FileDescriptor       For Each oFileDescriptor In oFile.ReferencedFileDescriptors                	     Debug.Print oFileDescriptor.FullFileName              If Not oFileDescriptor.ReferenceMissing Then                ' Since the ReferenceMissing has returned False, the ReferencedFile will return a File       ' Recurse unless this is a foreign file reference       If Not oFileDescriptor.ReferencedFileType = kForeignFileType Then          Call ProcessReferences(oFileDescriptor.ReferencedFile)           			        End If                 End If           Next     End Sub ``` |
+```vb
+Public Sub FileReferenceSample()
+    Dim oFile As File
+    Set oFile = ThisApplication.ActiveDocument.File
+    Call ProcessReferences(oFile)
+End Sub
+Private Sub ProcessReferences ( ByVal oFile As File )
+    Dim oFileDescriptor As FileDescriptor
+    For Each oFileDescriptor In oFile.ReferencedFileDescriptors
+        Debug.Print oFileDescriptor.FullFileName
+        If Not oFileDescriptor.ReferenceMissing Then
+            ' Since the ReferenceMissing has returned False, the ReferencedFile will return a File
+            ' Recurse unless this is a foreign file reference
+            If Not oFileDescriptor.ReferencedFileType = kForeignFileType Then
+                Call ProcessReferences(oFileDescriptor.ReferencedFile)
+            End If
+        End If
+    Next
+End Sub
+```
 
 ### Also consider
 

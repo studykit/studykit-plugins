@@ -24,9 +24,3 @@ When adding a dialog (by passing in an HWND as input), it must be created as a m
 ## Version
 
 Introduced in version 2011
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -20,9 +20,3 @@ FlatPatternOrientation.**Copy**( [***Name***] As String ) As [FlatPatternOrienta
 ## Version
 
 Introduced in version 2015
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

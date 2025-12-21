@@ -36,9 +36,3 @@ The FlatBendResult object represents a single bend instance in the flat. A bend 
 ## Version
 
 Introduced in version 2008
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

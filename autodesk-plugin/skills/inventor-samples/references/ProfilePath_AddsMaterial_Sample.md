@@ -8,10 +8,6 @@ This sample demonstrates the usage of the Profiles API to control the shape of t
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub SketchProfileControl()
     ' Create a new part document, using the default part template.
@@ -79,9 +75,3 @@ Public Sub SketchProfileControl()
     oSketch.Visible = True
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

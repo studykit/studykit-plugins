@@ -63,9 +63,3 @@ The SweepFeature object represents swept modeling features. The properties and m
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

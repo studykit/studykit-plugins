@@ -20,9 +20,3 @@ Box.**Contains**( ***Point*** As [Point](../Point/Point.md) ) As Boolean
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

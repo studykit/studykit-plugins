@@ -10,10 +10,6 @@ This sample demonstrates how to get the instance properties of all components in
 
 This VBA sample demonstrates how to get the instance properties of all components in an assembly.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Sub PrintInstancePropertiesSample()
     If ThisApplication.ActiveDocument Is Nothing Then
@@ -60,9 +56,3 @@ Sub GetInstancePropInfo(oOccus As ComponentOccurrences)
     Next
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

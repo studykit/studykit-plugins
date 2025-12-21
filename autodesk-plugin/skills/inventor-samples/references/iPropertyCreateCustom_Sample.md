@@ -8,10 +8,6 @@ Creates custom iProperties of various types. A document must be open when this s
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub CreateCustomProperties()
     ' Get the active document.
@@ -42,9 +38,3 @@ Public Sub CreateCustomProperties()
     Set invProperty = invCustomPropertySet.Add(blYesOrNo, "Test Yes or No")
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

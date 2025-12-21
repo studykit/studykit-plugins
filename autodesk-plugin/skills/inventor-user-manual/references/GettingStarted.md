@@ -91,9 +91,15 @@ The object model is a hierarchical diagram that illustrates the relationships be
 
 The code below illustrates using the relationships indicated in the object model diagram above to access the extrude feature named “Extrusion1”.
 
-|  |
-| --- |
-| ```  Public Sub GetExtrudeFeature()    Dim partDoc as PartDocument    Set partDoc = ThisApplication.ActiveDocument     Dim extrude As ExtrudeFeature    Set extrude = partDoc.ComponentDefinition.Features.ExtrudeFeatures.Item(1)         MsgBox "Extrusion " & extrude.Name & " is suppressed: " & extrude.Suppressed End Sub ``` |
+```vb
+Public Sub GetExtrudeFeature()
+    Dim partDoc as PartDocument
+    Set partDoc = ThisApplication.ActiveDocument
+    Dim extrude As ExtrudeFeature
+    Set extrude = partDoc.ComponentDefinition.Features.ExtrudeFeatures.Item(1)
+    MsgBox "Extrusion " & extrude.Name & " is suppressed: " & extrude.Suppressed
+End Sub
+```
 
 Examining the code above, there are a lot of basic concepts used that many people struggle with when first starting to use Inventor’s API. These concepts are: obtaining the Application object, traversing the object model, collection objects, and derived objects. The following looks at each of these.
 
@@ -101,15 +107,57 @@ Examining the code above, there are a lot of basic concepts used that many peopl
 
 The first thing illustrated in the sample is accessing the Application object. In Inventor’s VBA you can use the ThisApplication global property to get the Application object, which is what the sample does. When writing an add-in, when Inventor starts the add-in it passes it the Application object. When writing an exe you need to use other API's to get the Application object. In this case you can choose to either get the Application object from a running instance of Inventor or to start Inventor and get the Application object from it. Below is some VB.Net exe code that is the equivalent the VBA code above. The first portion of the code uses the .Net GetActiveObject method to get the Inventor application object. This is wrapped within a Try Catch statement to handle the case where Inventor isn't running. The remaining code is almost identical to the VBA sample.
 
-|  |
-| --- |
-| ```  Imports Inventor Imports System.Runtime.InteropServices ------  Public Sub GetExtrudeFeature()     ' Get the Inventor Application object.     Dim inventorApp As Inventor.Application = Nothing     Try         inventorApp = Marshal.GetActiveObject("Inventor.Application")     Catch ex As Exception         MessageBox.Show("Cannot connect to Inventor")         Exit Sub     End Try      Dim partDoc As PartDocument     partDoc = inventorApp.ActiveDocument      Dim extrude As ExtrudeFeature     extrude = partDoc.ComponentDefinition.Features.ExtrudeFeatures.Item(1)      MessageBox.Show("Extrusion " & extrude.Name & " is suppressed: " & extrude.Suppressed) End Sub ``` |
+```vb
+Imports Inventor
+Imports System.Runtime.InteropServices
+------
+Public Sub GetExtrudeFeature()
+    ' Get the Inventor Application object.
+    Dim inventorApp As Inventor.Application = Nothing
+    Try
+    inventorApp = Marshal.GetActiveObject("Inventor.Application")
+    Catch ex As Exception
+    MessageBox.Show("Cannot connect to Inventor")
+    Exit Sub
+End Try
+Dim partDoc As PartDocument
+partDoc = inventorApp.ActiveDocument
+Dim extrude As ExtrudeFeature
+extrude = partDoc.ComponentDefinition.Features.ExtrudeFeatures.Item(1)
+MessageBox.Show("Extrusion " & extrude.Name & " is suppressed: " & extrude.Suppressed)
+End Sub
+```
 
 Here's the same example in C#.
 
-|  |
-| --- |
-| ```  using Inventor; using System.Runtime.InteropServices; ------  private void GetExtrudeFeature() {     Inventor.Application inventorApp = null;     try      {        // Attempt to get a reference to a running instance of Inventor.        inventorApp =(Inventor.Application)Marshal.GetActiveObject("Inventor.Application");     }     catch      {        MessageBox.Show("Unable to connect to Inventor.");        return;     }      PartDocument partDoc = null;     partDoc = (PartDocument)inventorApp.ActiveDocument;      ExtrudeFeature extrude = null;     extrude = partDoc.ComponentDefinition.Features.ExtrudeFeatures[1];      MessageBox.Show("Extrusion " + extrude.Name + " is suppressed: " + extrude.Suppressed); } ``` |
+```csharp
+using Inventor;
+ using System.Runtime.InteropServices;
+ ------
+ 
+ private void GetExtrudeFeature()
+ {
+     Inventor.Application inventorApp = null;
+     try 
+     {
+        // Attempt to get a reference to a running instance of Inventor.
+        inventorApp =(Inventor.Application)Marshal.GetActiveObject("Inventor.Application");
+     }
+     catch 
+     {
+        MessageBox.Show("Unable to connect to Inventor.");
+        return;
+     }
+ 
+     PartDocument partDoc = null;
+     partDoc = (PartDocument)inventorApp.ActiveDocument;
+ 
+     ExtrudeFeature extrude = null;
+     extrude = partDoc.ComponentDefinition.Features.ExtrudeFeatures[1];
+ 
+     MessageBox.Show("Extrusion " + extrude.Name + " is suppressed: " + extrude.Suppressed);
+ }
+```
 
 ### Traversing the Object Model
 
@@ -125,21 +173,41 @@ Collection objects are a special type of utility object in the API. A collection
 
 The primary difference between collection objects and other objects is the concept that they provide access to a set of objects. They do this by supporting the Count and Item properties. All collection objects support these two properties. The Count property returns the number of objects currently in the collection. For example, if you call the Count property of the ExtrudeFeatures collection object it will return the number of extrude features in that document. The Item property returns a specific object within the collection. Typically, when using the Item property you specify the index of the item you want from the collection. For example, the code below prints out the names of all of the ExtrudeFeature objects in the document by going through the contents of the collection one by one by using the Count and Item properties of the ExtrudeFeatures collection object.
 
-|  |
-| --- |
-| ```  Public Sub ShowExtrudeFeature()    ' Get the active document.  This assumes it is a part document.    Dim partDoc as PartDocument    Set partDoc = ThisApplication.ActiveDocument     ' Get the ExtrudeFeatures collection object.    Dim extrudeFeatures As ExtrudeFeatures    Set extrudeFeatures = partDoc.ComponentDefinition.Features.ExtrudeFeatures     ' Iterate through the contents of the ExtrudeFeatures collection.    Dim i As Integer    For i = 1 to extrudeFeatures.Count       ' Get a specific item from the ExtrudeFeatures collection.       Dim extrude As ExtrudeFeature       Set extrude = extrudeFeatures.Item(i)        Debug.Print extrude.Name    Next End Sub ``` |
+```vb
+Public Sub ShowExtrudeFeature()
+    ' Get the active document.  This assumes it is a part document.
+    Dim partDoc as PartDocument
+    Set partDoc = ThisApplication.ActiveDocument
+    ' Get the ExtrudeFeatures collection object.
+    Dim extrudeFeatures As ExtrudeFeatures
+    Set extrudeFeatures = partDoc.ComponentDefinition.Features.ExtrudeFeatures
+    ' Iterate through the contents of the ExtrudeFeatures collection.
+    Dim i As Integer
+    For i = 1 to extrudeFeatures.Count
+        ' Get a specific item from the ExtrudeFeatures collection.
+        Dim extrude As ExtrudeFeature
+        Set extrude = extrudeFeatures.Item(i)
+        Debug.Print extrude.Name
+    Next
+End Sub
+```
 
 When the Item property is used with a value indicating the index of the item, the first item in the collection is 1 and the last item is the value returned by the collection’s Count property. For some collections the Item property also supports specifying the name of the item you want. Instead of providing the index of the item you can supply a String that specifies the name. The code below demonstrates how to get the extrude feature named "My Extrude". The call will fail if there's not an extrusion with that name. The online help and the object browser (both are discussed below) can be used to determine if an Item supports indexing by name. All Item properties support indexing by value.
 
-|  |
-| --- |
-| ```  Dim extrude As ExtrudeFeature Set extrude = extrudeFeatures.Item("My Extrude") ``` |
+```vb
+Dim extrude As ExtrudeFeature
+Set extrude = extrudeFeatures.Item("My Extrude")
+```
 
 When iterating through the objects contained within a collection you can also use a For Each statement. The following does the same thing as the earlier sample but is more concise and will typically be faster.
 
-|  |
-| --- |
-| ```  ' Iterate through the contents of the ExtrudeFeatures collection. Dim extrude As ExtrudeFeature For Each extrude In extrudeFeatures    Debug.Print extrude.Name Next ``` |
+```vb
+' Iterate through the contents of the ExtrudeFeatures collection.
+Dim extrude As ExtrudeFeature
+For Each extrude In extrudeFeatures
+    Debug.Print extrude.Name
+Next
+```
 
 In addition to providing access to their contents through the Count and Item properties, many collections also support methods to allow you to create new objects within that collection. For example, the ExtrudeFeatures collection supports the Add method that lets you create new extrusions.
 
@@ -153,9 +221,22 @@ The Insect, Bird, and Mammal objects are derived from the Animal object, so they
 
 Let’s look at how this concept applies to Inventor. Inventor has base class objects and derived objects. An example is the Document, PartDocument, AssemblyDocument, and DrawingDocument objects. The base class object is the Document object. This object can represent any type of document. The specific document type objects are derived from the Document object. They support everything the Document object supports plus they support additional methods and properties that are specific to that document type. For example, from the Document object you can get the filename, referenced documents, and iProperty information. From a PartDocument object you can get all of that, plus you can get sketches, features, and parameters. Another example is the PartFeature object. This is the base class object for all features. Again, it can represent any part feature and supports the functions that are common to all features. The code below illustrates this concept in use. It checks every feature in the active part and unsuppresses any suppressed feature.
 
-|  |
-| --- |
-| ```  Public Sub SuppressOff()     ' Get the active part document.  Assumes a part is active.     Dim partDoc As PartDocument     Set partDoc = ThisApplication.ActiveDocument          ' Iterate through all of the features.     Dim feature As PartFeature     For Each feature In partDoc.ComponentDefinition.Features         ' Check to see if the feature is suppressed.         If feature.Suppressed Then             ' Unsuppress the feature.             feature.Suppressed = False         End If     Next End Sub ``` |
+```vb
+Public Sub SuppressOff()
+    ' Get the active part document.  Assumes a part is active.
+    Dim partDoc As PartDocument
+    Set partDoc = ThisApplication.ActiveDocument
+    ' Iterate through all of the features.
+    Dim feature As PartFeature
+    For Each feature In partDoc.ComponentDefinition.Features
+        ' Check to see if the feature is suppressed.
+        If feature.Suppressed Then
+            ' Unsuppress the feature.
+            feature.Suppressed = False
+        End If
+    Next
+End Sub
+```
 
 In the sample above the variable feature is declared as PartFeature type. This is the base class object for all features. It then iterates through all of the features in the part. All features can be suppressed so the Suppressed property is supported by the base class PartFeature. This sample checks the suppression state of each feature and unsuppresses any suppressed features by setting the Suppressed property to False.
 

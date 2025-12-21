@@ -21,9 +21,3 @@ DrawingView.**Align**( ***DrawingView*** As [DrawingView](../DrawingView/Drawing
 ## Version
 
 Introduced in version 2010
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

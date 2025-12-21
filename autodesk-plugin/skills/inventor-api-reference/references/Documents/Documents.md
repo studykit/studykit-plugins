@@ -45,9 +45,3 @@ The Document collection object contains all in-memory Inventor documents.
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

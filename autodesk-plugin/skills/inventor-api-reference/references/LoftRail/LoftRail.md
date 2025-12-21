@@ -30,9 +30,3 @@ The LoftRail object is used to define a rail in a loft feature.
 ## Version
 
 Introduced in version 11
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -17,9 +17,3 @@ This is a read/write property whose value is a [ConstraintInferencePriorityEnum]
 ## Version
 
 Introduced in version 2015
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

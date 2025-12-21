@@ -11,10 +11,6 @@ This sample demonstrates how to create a simplify feature in part document.
 
 This sample demonstrates how to create a simplify feature in part document. You need to open a part document firstly before running below sample code.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Sub PartSimplifyFeatureSample()
     Dim oDoc As PartDocument
@@ -45,10 +41,6 @@ End Sub
 
 This sample demonstrates how to create a simplify feature in part document. You need to open a part document firstly before running below sample code.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Sub PartSimplifyFeatureSample()
     Dim oDoc As PartDocument
@@ -76,9 +68,3 @@ Sub PartSimplifyFeatureSample()
     Set oSimplifyFeature = oSimplifyFeatures.Add(oSimplifyDef)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

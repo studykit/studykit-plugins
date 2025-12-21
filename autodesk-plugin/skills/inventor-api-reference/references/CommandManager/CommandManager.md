@@ -62,9 +62,3 @@ The CommandManager object provides functionality that interacts with the various
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

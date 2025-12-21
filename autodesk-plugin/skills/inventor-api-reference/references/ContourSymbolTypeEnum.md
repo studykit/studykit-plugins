@@ -19,9 +19,3 @@ Constants that define the contour finish types for the weld.
 ## Version
 
 Introduced in version 2024
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

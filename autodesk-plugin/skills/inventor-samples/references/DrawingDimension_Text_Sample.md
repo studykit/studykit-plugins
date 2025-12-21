@@ -10,10 +10,6 @@ This sample demonstrates aligning the selected drawing dimensions along a horizo
 
 The first dimension selected defines the origin of the axis. A drawing document must be open and at least two dimensions selected.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub DimensionAlign()
    Dim oDrawDoc As DrawingDocument
@@ -74,9 +70,3 @@ Public Sub DimensionAlign()
    Next
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

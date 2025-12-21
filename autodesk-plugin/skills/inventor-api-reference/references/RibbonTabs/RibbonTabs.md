@@ -37,9 +37,3 @@ The RibbonTabs collection object provides access to all existing tabs within a r
 ## Version
 
 Introduced in version 2010
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

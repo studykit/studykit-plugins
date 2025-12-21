@@ -8,10 +8,6 @@ Sets the appearance of a selected occurrence in an assembly.
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub SetOccurrenceAppearance()
     Dim asmDoc As AssemblyDocument
@@ -54,9 +50,3 @@ Public Sub SetOccurrenceAppearance()
     occ.appearance = localAsset
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

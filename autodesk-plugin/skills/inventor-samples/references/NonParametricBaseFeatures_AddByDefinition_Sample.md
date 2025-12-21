@@ -10,10 +10,6 @@ The following sample demonstrates copying bodies (associatively and non-associat
 
 Before running the sample, create an assembly with two parts in it. The sample copies the body from the first part into the second part.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Sub AssociativeBodyCopy()
     ' Set a reference to the active assembly document.
@@ -73,9 +69,3 @@ Sub AssociativeBodyCopy()
     oAssemblyDoc.Update
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

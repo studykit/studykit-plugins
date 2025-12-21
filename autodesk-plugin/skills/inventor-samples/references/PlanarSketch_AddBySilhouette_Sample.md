@@ -8,10 +8,6 @@ This sample creates a cylindrical solid, creates a new sketch plane and creates 
 
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub SilhouetteSample()
     ' Create a new part document using the default part template.
@@ -76,9 +72,3 @@ Public Sub SilhouetteSample()
                             oExtrusion.EndFaces.Item(1).Edges.Item(1))
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

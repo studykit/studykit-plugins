@@ -40,9 +40,3 @@ The BendConstraint object represents a bend constraint within a 3D sketch.
 ## Version
 
 Introduced in version 6
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

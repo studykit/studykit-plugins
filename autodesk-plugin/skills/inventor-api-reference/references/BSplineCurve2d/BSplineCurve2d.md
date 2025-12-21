@@ -41,9 +41,3 @@ The BSplineCurve2d object. For more information, see the Transient Geometry over
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

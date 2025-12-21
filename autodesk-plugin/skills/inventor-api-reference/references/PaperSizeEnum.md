@@ -44,9 +44,3 @@ Constants enumerating the various sizes of paper to be used for printing. Consta
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

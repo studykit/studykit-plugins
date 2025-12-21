@@ -10,10 +10,6 @@ This sample demonstrates the creation of a chain dimension set in a drawing.
 
 Create a drawing view and select multiple edges in the view before running the sample.
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Public Sub CreateChainDimensionSet()
     ' Set a reference to the drawing document.
@@ -59,9 +55,3 @@ Public Sub CreateChainDimensionSet()
     Set oChainDimSet = oChainDimSets.Add(oIntentCollection, oPlacementPoint, kHorizontalDimensionType)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

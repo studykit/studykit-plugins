@@ -21,9 +21,3 @@ GraphicsNodeProxy.**Copy**( ***Transformation*** As [Matrix](../Matrix/Matrix.md
 ## Version
 
 Introduced in version 2008
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

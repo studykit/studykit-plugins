@@ -9,10 +9,6 @@ This sample demonstrates how to edit a chamfer feature to set the partial chamfe
 * [VBA](#VBA)
 * [VBA](#VBA)
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Sub PartialChamferSample()
     Dim oDoc As PartDocument
@@ -59,10 +55,6 @@ Sub PartialChamferSample()
 End Sub
 ```
 
-|  |
-| --- |
-| Copy Code |
-
 ```
 Sub PartialChamferSample()
     Dim oDoc As PartDocument
@@ -108,9 +100,3 @@ Sub PartialChamferSample()
     Call oChamfer.SetEndOfPart(False)
 End Sub
 ```
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

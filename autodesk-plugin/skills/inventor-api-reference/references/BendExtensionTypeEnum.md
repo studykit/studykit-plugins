@@ -15,9 +15,3 @@ Defines the constants used to specify the bend extension type for contour flange
 ## Version
 
 Introduced in version 2026
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -24,9 +24,3 @@ This is a read/write property whose value is an [EdgeDefinition](../EdgeDefiniti
 ## Version
 
 Introduced in version 2011
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

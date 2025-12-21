@@ -38,9 +38,3 @@ The VeticalAlignConstraint object represents a constraint the makes two sketch p
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

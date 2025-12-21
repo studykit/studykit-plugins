@@ -26,33 +26,50 @@ The following example uses Visual Basic, though any fully ActiveX-compliant envi
 
 In Visual Basic, add a PictureBox control to a new form. Keep the default control name Picture1. Double-click the control to enter the code module, and add the following code in the declarations section:
 
-|  |
-| --- |
-| ```  Dim oSvr As ApprenticeServerComponent Dim oAppDoc As ApprenticeServerDocument Dim oClientView As ClientView ``` |
+```vb
+Dim oSvr As ApprenticeServerComponent
+Dim oAppDoc As ApprenticeServerDocument
+Dim oClientView As ClientView
+```
 
 At this point, Visual Basic has no idea what an ApprenticeServerComponent is. A reference to the Apprentice Server type library is needed. In the Visual Basic user interface, select Project, then References. In the list of available references, put a check against the item labeled Autodesk Inventor's Apprentice Object Library. This points to the RxApprentice.tlb type library.
 
 Continue adding code. In the Form\_Load sub, add the following:
 
-|  |
-| --- |
-| ```  Private Sub Form_Load()   Dim filename As String   filename = "C:\Autodesk\Inventor 10\Tutorial Files\analyze-2.iam"   Set oSvr = New ApprenticeServerComponent   Set oAppDoc = oSvr.Open(filename)   Set oClientView = oAppDoc.ClientViews.Add(Picture1.hWnd) End Sub ``` |
+```vb
+Private Sub Form_Load()
+    Dim filename As String
+    filename = "C:\Autodesk\Inventor 10\Tutorial Files\analyze-2.iam"
+    Set oSvr = New ApprenticeServerComponent
+    Set oAppDoc = oSvr.Open(filename)
+    Set oClientView = oAppDoc.ClientViews.Add(Picture1.hWnd)
+End Sub
+```
 
 The preceding code references an assembly file. Change this reference to suit. An instance of the ApprenticeServerComponent is created, and the assembly document is opened by Apprentice Server. The last line adds a new ClientView object to the document's ClientViews collection, and references the window handle (hWnd) of the Picture1 control.
 
 In the Picture1\_Click sub, add the following code:
 
-|  |
-| --- |
-| ```  Private Sub Picture1_Click()   Dim oCamera As Camera   Set oCamera = oClientView.Camera   oCamera.ViewOrientationType = kIsoBottomLeftViewOrientation   oCamera.Perspective = True   oCamera.Apply   Me.Refresh End Sub ``` |
+```vb
+Private Sub Picture1_Click()
+    Dim oCamera As Camera
+    Set oCamera = oClientView.Camera
+    oCamera.ViewOrientationType = kIsoBottomLeftViewOrientation
+    oCamera.Perspective = True
+    oCamera.Apply
+    Me.Refresh
+End Sub
+```
 
 The preceding code responds to a click event on the Picture1 control, setting various camera properties before refreshing the view. The ISO orientation type is set to bottom left, and perspective viewing is enabled.
 
 Lastly, add the following code to the Form\_Paint event. This is to ensure the view is maintained if the window is changed in any way. The Update method takes a Boolean argument; true if the view is dynamically updated, to improve performance.
 
-|  |
-| --- |
-| ```  Private Sub Form_Paint()   oClientView.Update (False) End Sub ``` |
+```vb
+Private Sub Form_Paint()
+    oClientView.Update (False)
+End Sub
+```
 
 The following figure shows the results of running the sample code and clicking on the picture control:
 

@@ -70,9 +70,3 @@ Represents a work axis. See [here](WorkFeatures_Overview.md) for an overview.
 ## Version
 
 Introduced in version 4
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

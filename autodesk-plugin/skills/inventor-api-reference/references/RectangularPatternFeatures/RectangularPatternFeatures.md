@@ -36,9 +36,3 @@ The RectangularPatternFeatures object provides access to all of the objects in a
 ## Version
 
 Introduced in version 5
-
----
-
-|  |  |
-| --- | --- |
-| © Copyright 2025 Autodesk, Inc. | Comment on this page. |
