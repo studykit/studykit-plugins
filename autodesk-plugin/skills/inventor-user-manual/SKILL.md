@@ -13,6 +13,7 @@ This skill provides access to Autodesk Inventor's official API User's Manual doc
 The Inventor API User's Manual contains comprehensive documentation for:
 
 - **API Fundamentals**: Programming concepts, object model, and development setup
+- **Object Model**: Complete hierarchy of all Inventor API objects
 - **Part & Assembly Modeling**: Sketches, features, assemblies, BOM
 - **Drawings**: Views, dimensions, balloons, tables
 - **User Interface Customization**: Ribbon, dialogs, browser, environments
@@ -52,6 +53,22 @@ Core concepts applicable across all Inventor programming:
 | `Proxies_Overview.md` | Proxy objects in assemblies |
 | `FileAndDocReferences_Overview.md` | File references, document management |
 | `ConsistentMaterials_Overview.md` | Materials and appearances |
+
+### Object Model Hierarchy
+
+Read this file to understand the complete API object hierarchy:
+- **`InventorObjectModel.md`**
+
+This document contains:
+- Object relationships and inheritance
+- Document types (Part, Assembly, Drawing, Presentation)
+- Feature types and their collections
+- Constraint types (Mate, Angle, Tangent, etc.)
+- Sketch objects (2D and 3D)
+- Work features (WorkPlane, WorkAxis, WorkPoint)
+- B-Rep topology (Face, Edge, Vertex)
+- User interface objects
+- Transient geometry objects
 
 ### Part and Assembly Modeling
 

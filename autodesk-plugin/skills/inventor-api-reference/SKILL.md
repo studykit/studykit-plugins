@@ -12,7 +12,6 @@ This skill provides access to the Autodesk Inventor API Reference Manual, contai
 
 The API Reference contains:
 
-- **Object Model**: Complete hierarchy of all Inventor API objects
 - **Classes/Objects**: Object definitions with properties and methods (stored in folders)
 - **Enumerations**: Constant value definitions (stored as individual .md files)
 
@@ -22,22 +21,6 @@ All API reference documentation is located in:
 ```
 ${CLAUDE_PLUGIN_ROOT}/inventor/references/api-doc/
 ```
-
-### Object Model Hierarchy
-
-Read this file to understand the complete API object hierarchy:
-- **`inventor/references/api-doc/InventorObjectModel.md`**
-
-This document contains:
-- Object relationships and inheritance
-- Document types (Part, Assembly, Drawing, Presentation)
-- Feature types and their collections
-- Constraint types (Mate, Angle, Tangent, etc.)
-- Sketch objects (2D and 3D)
-- Work features (WorkPlane, WorkAxis, WorkPoint)
-- B-Rep topology (Face, Edge, Vertex)
-- User interface objects
-- Transient geometry objects
 
 ### Class Documentation (Folders)
 
@@ -68,16 +51,14 @@ inventor/references/api-doc/DocumentTypeEnum.md
 
 To answer questions about specific API elements:
 
-1. **Understand object hierarchy**: Read `inventor/references/api-doc/InventorObjectModel.md` first
-2. **Find the class**: Navigate to `inventor/references/api-doc/ClassName/ClassName.md`
-3. **Find specific members**: Read `inventor/references/api-doc/ClassName/ClassName_MemberName.md`
-4. **Find enum values**: Read `inventor/references/api-doc/EnumName.md` directly
+1. **Find the class**: Navigate to `inventor/references/api-doc/ClassName/ClassName.md`
+2. **Find specific members**: Read `inventor/references/api-doc/ClassName/ClassName_MemberName.md`
+3. **Find enum values**: Read `inventor/references/api-doc/EnumName.md` directly
 
 ## Search Examples
 
 To find API information, search within `inventor/references/api-doc/`:
 
-- Object model overview: `InventorObjectModel.md`
 - Class documentation: `ClassName/ClassName.md`
 - Property/method detail: `ClassName/ClassName_MemberName.md`
 - Enum values: `*Enum.md` files
