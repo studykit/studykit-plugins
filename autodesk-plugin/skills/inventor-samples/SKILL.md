@@ -20,10 +20,7 @@ The sample programs collection contains:
 
 ## Reference Files
 
-All sample programs are located at:
-```
-${CLAUDE_PLUGIN_ROOT}/inventor/references/sample-programs/
-```
+All sample programs are located in the `references/` folder within this skill directory. Reference files using relative paths like `references/ExtrudeFeature_Sample.md`.
 
 File naming convention: `ClassName_MethodName_Sample.md` or `FeatureName_Sample.md`
 
@@ -137,7 +134,7 @@ File naming convention: `ClassName_MethodName_Sample.md` or `FeatureName_Sample.
 To find sample code:
 
 1. Identify the API feature or operation needed
-2. Search for matching sample file in `${CLAUDE_PLUGIN_ROOT}/inventor/references/sample-programs/`
+2. Search for matching sample file in `references/`
 3. Read the sample file for description and code
 4. Adapt the VBA code to Python or C# if needed
 
@@ -149,13 +146,6 @@ To find sample code:
 ' VBA
 Dim oDoc As PartDocument
 Set oDoc = ThisApplication.ActiveDocument
-```
-
-```python
-# Python
-import win32com.client
-inventor = win32com.client.Dispatch("Inventor.Application")
-oDoc = inventor.ActiveDocument
 ```
 
 ### VBA to C#

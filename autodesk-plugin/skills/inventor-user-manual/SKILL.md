@@ -22,10 +22,7 @@ The Inventor API User's Manual contains comprehensive documentation for:
 
 ## Reference Files Location
 
-All user manual documentation is located in:
-```
-${CLAUDE_PLUGIN_ROOT}/inventor/references/user-manual/
-```
+All user manual documentation is located in the `references/` folder within this skill directory. Reference files using relative paths like `references/GettingStarted.md`.
 
 ## Document Categories
 
@@ -146,7 +143,7 @@ Additional specialized topics:
 To answer questions about Inventor API concepts:
 
 1. Identify the topic category from the user's question
-2. Read the relevant overview document from `references/user-manual/`
+2. Read the relevant overview document from `references/`
 3. Extract relevant code examples and explanations
 4. Provide clear guidance with working code samples
 
@@ -189,7 +186,7 @@ When working with Inventor API:
 
 ## Additional Resources
 
-For detailed information on specific topics, read the corresponding file from `${CLAUDE_PLUGIN_ROOT}/inventor/references/user-manual/`.
+For detailed information on specific topics, read the corresponding file from `references/`.
 
 The `TOC.md` file provides a complete table of contents with links to all documents.
 

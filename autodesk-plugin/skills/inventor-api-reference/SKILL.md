@@ -19,7 +19,7 @@ The API Reference contains:
 
 All API reference documentation is located in:
 ```
-${CLAUDE_PLUGIN_ROOT}/inventor/references/api-doc/
+${CLAUDE_PLUGIN_ROOT}/references/inventor/api-doc/
 ```
 
 ### Class Documentation (Folders)
@@ -31,7 +31,7 @@ Each class is stored as a **folder** containing multiple files:
 
 Example for `ExtrudeFeature`:
 ```
-inventor/references/api-doc/ExtrudeFeature/
+references/inventor/api-doc/ExtrudeFeature/
 ├── ExtrudeFeature.md              # Main class doc
 ├── ExtrudeFeature_Operation.md    # Operation property
 ├── ExtrudeFeature_Profile.md      # Profile property
@@ -42,9 +42,9 @@ inventor/references/api-doc/ExtrudeFeature/
 
 Enums are individual `.md` files at the root level:
 ```
-inventor/references/api-doc/PartFeatureExtentEnum.md
-inventor/references/api-doc/PartFeatureOperationEnum.md
-inventor/references/api-doc/DocumentTypeEnum.md
+references/inventor/api-doc/PartFeatureExtentEnum.md
+references/inventor/api-doc/PartFeatureOperationEnum.md
+references/inventor/api-doc/DocumentTypeEnum.md
 ```
 
 ## Usage Workflow
@@ -57,7 +57,7 @@ To answer questions about specific API elements:
 
 ## Search Examples
 
-To find API information, search within `inventor/references/api-doc/`:
+To find API information, search within `references/inventor/api-doc/`:
 
 - Class documentation: `ClassName/ClassName.md`
 - Property/method detail: `ClassName/ClassName_MemberName.md`
