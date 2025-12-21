@@ -18,9 +18,9 @@ The API Reference contains:
 
 ## Reference Files
 
-All API reference documentation is located relative to the plugin root:
+All API reference documentation is located in:
 ```
-inventor/references/api-doc/
+${CLAUDE_PLUGIN_ROOT}/inventor/references/api-doc/
 ```
 
 ### Object Model Hierarchy

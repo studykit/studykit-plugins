@@ -22,7 +22,7 @@ The sample programs collection contains:
 
 All sample programs are located at:
 ```
-inventor/references/sample-programs/
+${CLAUDE_PLUGIN_ROOT}/inventor/references/sample-programs/
 ```
 
 File naming convention: `ClassName_MethodName_Sample.md` or `FeatureName_Sample.md`
@@ -137,7 +137,7 @@ File naming convention: `ClassName_MethodName_Sample.md` or `FeatureName_Sample.
 To find sample code:
 
 1. Identify the API feature or operation needed
-2. Search for matching sample file in `inventor/references/sample-programs/`
+2. Search for matching sample file in `${CLAUDE_PLUGIN_ROOT}/inventor/references/sample-programs/`
 3. Read the sample file for description and code
 4. Adapt the VBA code to Python or C# if needed
 
