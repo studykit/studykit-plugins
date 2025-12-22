@@ -1,6 +1,6 @@
 ---
 name: Inventor API Reference
-description: This skill should be used when the user asks about "Inventor API class", "Inventor method", "Inventor property", "Inventor enum", "Inventor enumeration", "ExtrudeFeature", "PartDocument", "AssemblyDocument", "Sketch object", "ComponentDefinition", "Inventor object model", or needs to look up specific Inventor API classes, methods, properties, enumerations, or object definitions. Provides access to Autodesk Inventor API Reference Manual.
+description: This skill should be used when the user asks about "Inventor API class", "Inventor method", "Inventor property", "Inventor enum", "Inventor enumeration", "ExtrudeFeature", "PartDocument", "AssemblyDocument", "Sketch object", "ComponentDefinition", "Inventor object model", or needs to look up specific Inventor API classes, methods, properties, enumerations, or object definitions. Provides access to Autodesk Inventor API Reference Manual. NOT for sample code or working examples - use inventor-samples skill instead.
 version: 0.1.0
 ---
 

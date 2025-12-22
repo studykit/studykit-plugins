@@ -65,29 +65,30 @@ autodesk-plugin/
 │   └── plugin.json
 ├── agents/
 │   └── inventor-api-guide.md
-├── skills/
-│   ├── inventor-user-manual/
-│   ├── inventor-api-reference/
-│   └── inventor-samples/
-├── inventor/
-│   └── references/
-│       ├── user-manual/        # API User's Manual
-│       ├── api-doc/            # API Reference + Object Model
-│       └── sample-programs/    # VBA samples
-└── Inventor_API_개발가이드.md  # Development setup guide
+└── skills/
+    ├── inventor-api-reference/
+    │   ├── images/
+    │   ├── references/
+    │   └── SKILL.md
+    ├── inventor-samples/
+    │   ├── images/
+    │   ├── references/
+    │   └── SKILL.md
+    └── inventor-user-manual/
+        ├── images/
+        ├── references/
+        └── SKILL.md
 ```
 
 ## Supported Languages
 
-- **Python** (pywin32)
 - **C#** (.NET Add-In)
 - **VBA** (Inventor macros)
 
 ## Requirements
 
 - Autodesk Inventor 2026 (or compatible version)
-- For Python: `pip install pywin32`
-- For C#: Visual Studio 2022 with .NET 8
+- .NET 8
 
 ## Future Plans
 
