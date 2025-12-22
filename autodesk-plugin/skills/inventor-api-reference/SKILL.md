@@ -17,10 +17,7 @@ The API Reference contains:
 
 ## Reference Files
 
-All API reference documentation is located in:
-```
-${CLAUDE_PLUGIN_ROOT}/references/inventor/api-doc/
-```
+All API reference documentation is located in the [references/](references/) folder.
 
 ### Class Documentation (Folders)
 
@@ -31,7 +28,7 @@ Each class is stored as a **folder** containing multiple files:
 
 Example for `ExtrudeFeature`:
 ```
-references/inventor/api-doc/ExtrudeFeature/
+references/ExtrudeFeature/
 ├── ExtrudeFeature.md              # Main class doc
 ├── ExtrudeFeature_Operation.md    # Operation property
 ├── ExtrudeFeature_Profile.md      # Profile property
@@ -42,36 +39,27 @@ references/inventor/api-doc/ExtrudeFeature/
 
 Enums are individual `.md` files at the root level:
 ```
-references/inventor/api-doc/PartFeatureExtentEnum.md
-references/inventor/api-doc/PartFeatureOperationEnum.md
-references/inventor/api-doc/DocumentTypeEnum.md
+references/PartFeatureExtentEnum.md
+references/PartFeatureOperationEnum.md
+references/DocumentTypeEnum.md
 ```
 
 ## Usage Workflow
 
 To answer questions about specific API elements:
 
-1. **Find the class**: Navigate to `inventor/references/api-doc/ClassName/ClassName.md`
-2. **Find specific members**: Read `inventor/references/api-doc/ClassName/ClassName_MemberName.md`
-3. **Find enum values**: Read `inventor/references/api-doc/EnumName.md` directly
+1. **Find the class**: Navigate to [references/ClassName/ClassName.md](references/)
+2. **Find specific members**: Read `references/ClassName/ClassName_MemberName.md`
+3. **Find enum values**: Read `references/EnumName.md` directly
 
 ## Search Examples
 
-To find API information, search within `references/inventor/api-doc/`:
+To find API information, search within the [references/](references/) folder:
 
 - Class documentation: `ClassName/ClassName.md`
 - Property/method detail: `ClassName/ClassName_MemberName.md`
 - Enum values: `*Enum.md` files
 
-## Common Object Categories
-
-| Category | Key Objects |
-|----------|-------------|
-| Documents | `PartDocument`, `AssemblyDocument`, `DrawingDocument` |
-| Part Features | `ExtrudeFeature`, `RevolveFeature`, `HoleFeature`, `FilletFeature` |
-| Assembly | `ComponentOccurrence`, `MateConstraint`, `AssemblyJoint` |
-| Sketches | `PlanarSketch`, `Sketch3D`, `SketchLine`, `SketchCircle` |
-| Drawing | `Sheet`, `DrawingView`, `GeneralDimension`, `Balloon` |
 
 ## Related Skills
 
