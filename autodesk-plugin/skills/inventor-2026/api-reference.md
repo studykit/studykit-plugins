@@ -1,9 +1,3 @@
----
-name: Inventor API Reference
-description: This skill should be used when the user asks about "Inventor API class", "Inventor method", "Inventor property", "Inventor enum", "Inventor enumeration", "ExtrudeFeature", "PartDocument", "AssemblyDocument", "Sketch object", "ComponentDefinition", "Inventor object model", or needs to look up specific Inventor API classes, methods, properties, enumerations, or object definitions. Provides access to Autodesk Inventor API Reference Manual. NOT for sample code or working examples - use inventor-samples skill instead.
-version: 0.1.0
----
-
 # Inventor API Reference
 
 This skill provides access to the Autodesk Inventor API Reference Manual, containing detailed documentation for all API classes, methods, properties, and enumerations.
@@ -17,7 +11,7 @@ The API Reference contains:
 
 ## Reference Files
 
-All API reference documentation is located in the [references/](references/) folder.
+All API reference documentation is located in the [references/api-reference/](references/api-reference/) folder.
 
 ### Class Documentation (Folders)
 
@@ -28,7 +22,7 @@ Each class is stored as a **folder** containing multiple files:
 
 Example for `ExtrudeFeature`:
 ```
-references/ExtrudeFeature/
+references/api-reference/ExtrudeFeature/
 ├── ExtrudeFeature.md              # Main class doc
 ├── ExtrudeFeature_Operation.md    # Operation property
 ├── ExtrudeFeature_Profile.md      # Profile property
@@ -39,22 +33,22 @@ references/ExtrudeFeature/
 
 Enums are individual `.md` files at the root level:
 ```
-references/PartFeatureExtentEnum.md
-references/PartFeatureOperationEnum.md
-references/DocumentTypeEnum.md
+references/api-reference/PartFeatureExtentEnum.md
+references/api-reference/PartFeatureOperationEnum.md
+references/api-reference/DocumentTypeEnum.md
 ```
 
 ## Usage Workflow
 
 To answer questions about specific API elements:
 
-1. **Find the class**: Navigate to [references/ClassName/ClassName.md](references/)
-2. **Find specific members**: Read `references/ClassName/ClassName_MemberName.md`
-3. **Find enum values**: Read `references/EnumName.md` directly
+1. **Find the class**: Navigate to [references/api-reference/ClassName/ClassName.md](references/api-reference/)
+2. **Find specific members**: Read `references/api-reference/ClassName/ClassName_MemberName.md`
+3. **Find enum values**: Read `references/api-reference/EnumName.md` directly
 
 ## Search Examples
 
-To find API information, search within the [references/](references/) folder:
+To find API information, search within the [references/api-reference/](references/api-reference/) folder:
 
 - Class documentation: `ClassName/ClassName.md`
 - Property/method detail: `ClassName/ClassName_MemberName.md`

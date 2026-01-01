@@ -1,9 +1,3 @@
----
-name: Inventor Sample Programs
-description: This skill should be used when the user asks for "Inventor API example", "Inventor sample code", "Inventor VBA sample", "how to create extrude in Inventor API", "Inventor code example", "Inventor API tutorial", or needs working code examples for Inventor automation. Provides access to official Autodesk Inventor API sample programs.
-version: 0.1.0
----
-
 # Inventor Sample Programs
 
 This skill provides access to official Autodesk Inventor API sample programs, demonstrating practical implementations of various API features.
@@ -20,7 +14,7 @@ The sample programs collection contains:
 
 ## Reference Files
 
-All sample programs are located in the `references/` folder within this skill directory. Reference files using relative paths like `references/ExtrudeFeature_Sample.md`.
+All sample programs are located in the `references/samples/` folder within this skill directory. Reference files using relative paths like `references/samples/ExtrudeFeature_Sample.md`.
 
 File naming convention: `ClassName_MethodName_Sample.md` or `FeatureName_Sample.md`
 
@@ -134,7 +128,7 @@ File naming convention: `ClassName_MethodName_Sample.md` or `FeatureName_Sample.
 To find sample code:
 
 1. Identify the API feature or operation needed
-2. Search for matching sample file in `references/`
+2. Search for matching sample file in `references/samples/`
 3. Read the sample file for description and code
 4. Adapt the VBA code to Python or C# if needed
 

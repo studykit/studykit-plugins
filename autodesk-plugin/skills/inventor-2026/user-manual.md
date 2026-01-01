@@ -1,9 +1,3 @@
----
-name: Inventor User Manual
-description: This skill should be used when the user asks about "Inventor API concepts", "how to use Inventor API", "VBA programming in Inventor", "creating Inventor add-ins", "Inventor sketches", "Inventor features", "Inventor assembly", "Inventor drawings", "Inventor BOM", "iLogic programming", "Inventor customization", "Inventor automation basics", or needs to understand Inventor API architecture, object model, and development workflows. Provides comprehensive guidance from Autodesk Inventor API User's Manual.
-version: 0.1.0
----
-
 # Inventor API User's Manual
 
 This skill provides access to Autodesk Inventor's official API User's Manual documentation, covering concepts, workflows, and programming guidance for Inventor automation and customization.
@@ -22,7 +16,7 @@ The Inventor API User's Manual contains comprehensive documentation for:
 
 ## Reference Files Location
 
-All user manual documentation is located in the `references/` folder within this skill directory. Reference files using relative paths like `references/GettingStarted.md`.
+All user manual documentation is located in the `references/user-manual/` folder within this skill directory. Reference files using relative paths like `references/user-manual/GettingStarted.md`.
 
 ## Document Categories
 
@@ -143,7 +137,7 @@ Additional specialized topics:
 To answer questions about Inventor API concepts:
 
 1. Identify the topic category from the user's question
-2. Read the relevant overview document from `references/`
+2. Read the relevant overview document from `references/user-manual/`
 3. Extract relevant code examples and explanations
 4. Provide clear guidance with working code samples
 
@@ -186,7 +180,7 @@ When working with Inventor API:
 
 ## Additional Resources
 
-For detailed information on specific topics, read the corresponding file from `references/`.
+For detailed information on specific topics, read the corresponding file from `references/user-manual/`.
 
 The `TOC.md` file provides a complete table of contents with links to all documents.
 
