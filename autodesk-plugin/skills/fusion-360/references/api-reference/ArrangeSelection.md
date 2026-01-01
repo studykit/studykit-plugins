@@ -1,0 +1,53 @@
+# ArrangeSelection Object
+
+Derived from: [GeometrySelection](GeometrySelection.htm) Object
+
+Defined in namespace "adsk::cam" and the header file is <Cam/GeometrySelections/ArrangeSelection.h>
+
+## Description
+
+Class for arrange selections. Provides access to the selected geometry and its properties.
+
+## Methods
+
+|  |  |
+| --- | --- |
+| Name | Description |
+| [classType](ArrangeSelection_classType.htm) | Static function that all classes support that returns the type of the class as a string. The returned string matches the string returned by the objectType property. For example if you have a reference to an object and you want to check if it's a SketchLine you can use myObject.objectType == fusion.SketchLine.classType(). |
+
+## Properties
+
+|  |  |
+| --- | --- |
+| Name | Description |
+| [customQuantity](ArrangeSelection_customQuantity.htm) | Gets and sets the custom quantity. This function is not available in Fusion for Personal Use. Throws an exception when calling this function in Fusion for Personal Use. The default value for this property is 1. Note: If customQuantity is called, isUsingCustomQuantity will be set to true automatically. |
+| [customRotationX](ArrangeSelection_customRotationX.htm) | Gets and sets the rotation increments (in degrees) for the x-axis. This function is not available in Fusion for Personal Use. Throws an exception when calling this function in Fusion for Personal Use. To enable any rotation the parameter "arrange\_rotation\_group" of the operation must be set to true. To disable x-axis rotation for this selection, customRotationX must be set to 0. The default value for this property is 45 degrees. Note: If customRotationX is called, isUsingCustomRotationX will be set to true automatically. |
+| [customRotationY](ArrangeSelection_customRotationY.htm) | Gets and sets the rotation increments (in degrees) for the y-axis. This function is not available in Fusion for Personal Use. Throws an exception when calling this function in Fusion for Personal Use. To enable any rotation the parameter "arrange\_rotation\_group" of the operation must be set to true. To disable y-axis rotation for this selection, customRotationY must be set to 0. The default value for this property is 45 degrees. Note: If customRotationY is called, isUsingCustomRotationY will be set to true automatically. |
+| [customRotationZ](ArrangeSelection_customRotationZ.htm) | Gets and sets the rotation increments (in degrees) for the z-axis. This function is not available in Fusion for Personal Use. Throws an exception when calling this function in Fusion for Personal Use. To enable any rotation the parameter "arrange\_rotation\_group" of the operation must be set to true. To disable z-axis rotation for this selection, customRotationZ must be set to 0. The default value for this property is 45 degrees. Note: If customRotationZ is called, isUsingCustomRotationZ will be set to true automatically. |
+| [error](ArrangeSelection_error.htm) | Gets the last warning string encountered after the selection was applied to a parent. |
+| [hasError](ArrangeSelection_hasError.htm) | Gets if errors were encountered when applying the selection to a a parent. |
+| [hasWarning](ArrangeSelection_hasWarning.htm) | Gets if warnings were encountered when applying the selection to a parent. |
+| [inputGeometry](ArrangeSelection_inputGeometry.htm) | Gets and sets the value of the input geometry. If the value originates from a component instead of an occurrence, or an occurrence outside of the CAM environment, then the subpath is checked against the CAM model tree. For some child classes, this may be the same as the value property, but might also consist of fewer elements. Valid elements depend on the capabilities of the derived class. An exception is thrown if the matching fails or the given entity does not match the expected type. |
+| [isUsingCustomQuantity](ArrangeSelection_isUsingCustomQuantity.htm) | Gets and sets if custom quantity is used for this element. This function is not available in Fusion for Personal Use. Throws an exception when calling this function in Fusion for Personal Use. If isUsingCustomQuantity is false, the global quantity of the operation's parameter "arrange\_global\_quantity" is used. The default value for this property false. |
+| [isUsingCustomRotationX](ArrangeSelection_isUsingCustomRotationX.htm) | Gets and sets if custom rotation is used for the x-axis. This function is not available in Fusion for Personal Use. Throws an exception when calling this function in Fusion for Personal Use. To enable any rotation the parameter "arrange\_rotation\_group" of the operation must be set to true. If isUsingCustomRotationX is false, the rotation of the operation's parameter "arrange\_rotation\_x" is used. The default value for this property false. |
+| [isUsingCustomRotationY](ArrangeSelection_isUsingCustomRotationY.htm) | Gets and sets if custom rotation is used for the y-axis. This function is not available in Fusion for Personal Use. Throws an exception when calling this function in Fusion for Personal Use. To enable any rotation the parameter "arrange\_rotation\_group" of the operation must be set to true. If isUsingCustomRotationY is false, the rotation of the operation's parameter "arrange\_rotation\_y" is used. The default value for this property false. |
+| [isUsingCustomRotationZ](ArrangeSelection_isUsingCustomRotationZ.htm) | Gets and sets if custom rotation is used for the z-axis. This function is not available in Fusion for Personal Use. Throws an exception when calling this function in Fusion for Personal Use. To enable any rotation the parameter "arrange\_rotation\_group" of the operation must be set to true. If isUsingCustomRotationZ is false, the rotation of the operation's parameter "arrange\_rotation\_z" is used. The default value for this property true. |
+| [isValid](ArrangeSelection_isValid.htm) | Indicates if this object is still valid, i.e. hasn't been deleted or some other action done to invalidate the reference. |
+| [objectType](ArrangeSelection_objectType.htm) | This property is supported by all objects in the API and returns a string that contains the full name (namespace::objecttype) describing the type of the object. |
+| [priorityType](ArrangeSelection_priorityType.htm) | Gets and sets the priority value for each element in the selection list. This function is not available in Fusion for Personal Use. Throws an exception when calling this function in Fusion for Personal Use. The default value for this property is MediumArrangePriorityType. |
+| [value](ArrangeSelection_value.htm) | Returns the resulting value of the selection. In general, this returns the input selection, but child classes can override the return value if needed. Refer to the child classes comments for further details. The collection may contain duplicates. For OperationInputs, the return value may not be the same as for Operations, as additional geometry selected by child classes is not evaluated for OperationInputs. |
+| [warning](ArrangeSelection_warning.htm) | Gets the last warning string encountered after the selection was applied to a parent. |
+
+## Accessed From
+
+[ArrangeSelections.createNewArrangeSelection](ArrangeSelections_createNewArrangeSelection.htm), [ArrangeSelections.item](ArrangeSelections_item.htm)
+
+## Version
+
+Introduced in version March 2024
+
+---
+
+|  |  |
+| --- | --- |
+| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

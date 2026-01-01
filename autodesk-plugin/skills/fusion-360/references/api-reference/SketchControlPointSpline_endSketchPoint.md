@@ -1,0 +1,31 @@
+# SketchControlPointSpline.endSketchPoint Property
+
+Parent Object: [SketchControlPointSpline](SketchControlPointSpline.htm)
+Defined in namespace "adsk::fusion" and the header file is <Fusion/Sketch/SketchControlPointSpline.h>
+
+## Description
+
+The sketch point at the end of the spline. If the curve is closed the start and end sketch points will be the same.
+
+## Syntax
+
+* [Python](#Python)
+* [C++](#C++)
+
+"sketchControlPointSpline\_var" is a variable referencing a SketchControlPointSpline object. |
+
+"sketchControlPointSpline\_var" is a variable referencing a SketchControlPointSpline object. ```` ``` #include <Fusion/Sketch/SketchControlPointSpline.h>  // Get the value of the property. Ptr<SketchPoint> propertyValue = sketchControlPointSpline_var->endSketchPoint(); ``` ```` |
+
+## Property Value
+
+This is a read only property whose value is a [SketchPoint](SketchPoint.htm).
+
+## Version
+
+Introduced in version July 2022
+
+---
+
+|  |  |
+| --- | --- |
+| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

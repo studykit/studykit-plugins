@@ -1,0 +1,31 @@
+# MeshBodies.objectType Property
+
+Parent Object: [MeshBodies](MeshBodies.htm)
+Defined in namespace "adsk::fusion" and the header file is <Fusion/MeshBody/MeshBodies.h>
+
+## Description
+
+This property is supported by all objects in the API and returns a string that contains the full name (namespace::objecttype) describing the type of the object.
+
+## Syntax
+
+* [Python](#Python)
+* [C++](#C++)
+
+"meshBodies\_var" is a variable referencing a MeshBodies object.  ```` ``` # Get the value of the property. propertyValue = meshBodies_var.objectType ``` ```` |
+
+"meshBodies\_var" is a variable referencing a MeshBodies object. ```` ``` #include <Fusion/MeshBody/MeshBodies.h>  // Get the value of the property. string propertyValue = meshBodies_var->objectType(); ``` ```` |
+
+## Property Value
+
+This is a read only property whose value is a string.
+
+## Version
+
+Introduced in version August 2014
+
+---
+
+|  |  |
+| --- | --- |
+| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

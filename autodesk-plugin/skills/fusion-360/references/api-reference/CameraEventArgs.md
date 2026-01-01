@@ -1,0 +1,36 @@
+# CameraEventArgs Object
+
+Derived from: [EventArgs](EventArgs.htm) Object
+
+Defined in namespace "adsk::core" and the header file is <Core/Application/CameraEventArgs.h>
+
+## Description
+
+The CameraEventArgs provides information associated with a camera change. Camera changes happen when user changes the view by rotating, zooming in or out, panning, changing from parallel to perspective, or when the extents of the viewport changes.
+
+## Methods
+
+|  |  |
+| --- | --- |
+| Name | Description |
+| [classType](CameraEventArgs_classType.htm) | Static function that all classes support that returns the type of the class as a string. The returned string matches the string returned by the objectType property. For example if you have a reference to an object and you want to check if it's a SketchLine you can use myObject.objectType == fusion.SketchLine.classType(). |
+
+## Properties
+
+|  |  |
+| --- | --- |
+| Name | Description |
+| [firingEvent](CameraEventArgs_firingEvent.htm) | The event that the firing is in response to. |
+| [isValid](CameraEventArgs_isValid.htm) | Indicates if this object is still valid, i.e. hasn't been deleted or some other action done to invalidate the reference. |
+| [objectType](CameraEventArgs_objectType.htm) | This property is supported by all objects in the API and returns a string that contains the full name (namespace::objecttype) describing the type of the object. |
+| [viewport](CameraEventArgs_viewport.htm) | Returns the viewport that the modified camera is associated with. |
+
+## Version
+
+Introduced in version December 2017
+
+---
+
+|  |  |
+| --- | --- |
+| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

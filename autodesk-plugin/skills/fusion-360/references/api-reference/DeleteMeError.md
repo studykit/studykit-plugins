@@ -1,0 +1,23 @@
+# DeleteMeError Enumerator
+
+## Description
+
+Specific error types for DeleteMe methods.
+Defined in namespace "adsk::fusion" and the header file is <Fusion\FusionTypeDefs.h>
+
+## Methods
+
+|  |  |  |
+| --- | --- | --- |
+| Name | Value | Description |
+| ParameterReferencedByOtherParameterError | 200 | The parameter is referenced by another parameter. |
+
+## Version
+
+Introduced in version August 2014
+
+---
+
+|  |  |
+| --- | --- |
+| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

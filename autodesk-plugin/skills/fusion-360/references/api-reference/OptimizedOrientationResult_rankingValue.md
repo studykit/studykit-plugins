@@ -1,0 +1,31 @@
+# OptimizedOrientationResult.rankingValue Property
+
+Parent Object: [OptimizedOrientationResult](OptimizedOrientationResult.htm)
+Defined in namespace "adsk::cam" and the header file is <Cam/GeneratedData/OptimizedOrientationResult.h>
+
+## Description
+
+The value which the initial ordering is based on. Calculated based on the properties above by the orientation operation.
+
+## Syntax
+
+* [Python](#Python)
+* [C++](#C++)
+
+"optimizedOrientationResult\_var" is a variable referencing an OptimizedOrientationResult object. |
+
+"optimizedOrientationResult\_var" is a variable referencing an OptimizedOrientationResult object. ```` ``` #include <Cam/GeneratedData/OptimizedOrientationResult.h>  // Get the value of the property. float propertyValue = optimizedOrientationResult_var->rankingValue(); ``` ```` |
+
+## Property Value
+
+This is a read only property whose value is a float.
+
+## Version
+
+Introduced in version July 2023
+
+---
+
+|  |  |
+| --- | --- |
+| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -1,0 +1,31 @@
+# LinearMarkingMenu.objectType Property
+
+Parent Object: [LinearMarkingMenu](LinearMarkingMenu.htm)
+Defined in namespace "adsk::core" and the header file is <Core/UserInterface/LinearMarkingMenu.h>
+
+## Description
+
+This property is supported by all objects in the API and returns a string that contains the full name (namespace::objecttype) describing the type of the object.
+
+## Syntax
+
+* [Python](#Python)
+* [C++](#C++)
+
+"linearMarkingMenu\_var" is a variable referencing a LinearMarkingMenu object.  ```` ``` # Get the value of the property. propertyValue = linearMarkingMenu_var.objectType ``` ```` |
+
+"linearMarkingMenu\_var" is a variable referencing a LinearMarkingMenu object. ```` ``` #include <Core/UserInterface/LinearMarkingMenu.h>  // Get the value of the property. string propertyValue = linearMarkingMenu_var->objectType(); ``` ```` |
+
+## Property Value
+
+This is a read only property whose value is a string.
+
+## Version
+
+Introduced in version January 2017
+
+---
+
+|  |  |
+| --- | --- |
+| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

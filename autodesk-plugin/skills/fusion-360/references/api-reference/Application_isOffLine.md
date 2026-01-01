@@ -1,0 +1,31 @@
+# Application.isOffLine Property
+
+Parent Object: [Application](Application.htm)
+Defined in namespace "adsk::core" and the header file is <Core/Application/Application.h>
+
+## Description
+
+Gets and sets if Fusion is offline or not.
+
+## Syntax
+
+* [Python](#Python)
+* [C++](#C++)
+
+"application\_var" is a variable referencing an Application object. |
+
+"application\_var" is a variable referencing an Application object. ```` ``` #include <Core/Application/Application.h>  // Get the value of the property. boolean propertyValue = application_var->isOffLine();  // Set the value of the property, where value_var is a boolean. bool returnValue = application_var->isOffLine(value_var); ``` ```` |
+
+## Property Value
+
+This is a read/write property whose value is a boolean.
+
+## Version
+
+Introduced in version November 2015
+
+---
+
+|  |  |
+| --- | --- |
+| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

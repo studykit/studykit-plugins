@@ -1,0 +1,51 @@
+# MeshCombineFeatures.createInput Method![](../images/TestTubeLarge.png)
+
+Parent Object: [MeshCombineFeatures](MeshCombineFeatures.htm)
+
+![Preview](../images/TestTubeSmall.png)This functionality is provided as a preview
+of intended future API capabilities. You are encouraged to use it and report any problems or suggestions using the
+[Fusion API and Scripts](https://forums.autodesk.com/t5/fusion-360-api-and-scripts/bd-p/22) forum.
+
+Because this is a preview of future functionality, there is the possibility that it will change, which will possibly
+break any existing programs that use this functionality. Because of that, you should never deliver any programs that use
+any preview capabilities. For a distributed program, you should wait until it has moved from preview to released state.
+
+Defined in namespace "adsk::fusion" and the header file is <Fusion/MeshBody/MeshCombineFeatures.h>
+
+## Description
+
+Creates a MeshCombineFeatureInput object. Use properties and methods on this object to define the mesh combine you want to create and then use the add method, passing in the MeshCombineFeatureInput object.
+
+## Syntax
+
+* [Python](#Python)
+* [C++](#C++)
+
+"meshCombineFeatures\_var" is a variable referencing a [MeshCombineFeatures](MeshCombineFeatures.htm) object.```` ``` returnValue = meshCombineFeatures_var.createInput(targetBody, toolBodies) ``` ```` |
+
+"meshCombineFeatures\_var" is a variable referencing a [MeshCombineFeatures](MeshCombineFeatures.htm) object. |
+
+## Return Value
+
+|  |  |
+| --- | --- |
+| Type | Description |
+| [MeshCombineFeatureInput](MeshCombineFeatureInput.htm) | Returns the newly created MeshCombineFeatureInput object or null if the creation failed. |
+
+## Parameters
+
+|  |  |  |
+| --- | --- | --- |
+| Name | Type | Description |
+| targetBody | [MeshBody](MeshBody.htm) | The MeshBody in either a parametric or direct modeling design, which represent the target body. |
+| toolBodies | MeshBody[] | The MeshBodies in either a parametric or direct modeling design, which represent the tool bodies. |
+
+## Version
+
+Introduced in version January 2025
+
+---
+
+|  |  |
+| --- | --- |
+| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

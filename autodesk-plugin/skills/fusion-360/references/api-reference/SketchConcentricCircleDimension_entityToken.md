@@ -1,0 +1,31 @@
+# SketchConcentricCircleDimension.entityToken Property
+
+Parent Object: [SketchConcentricCircleDimension](SketchConcentricCircleDimension.htm)
+Defined in namespace "adsk::fusion" and the header file is <Fusion/Sketch/SketchConcentricCircleDimension.h>
+
+## Description
+
+Returns a token for the SketchDimension object. This can be saved and used at a later time with the Design.findEntityByToken method to get back the same sketch dimension.
+
+## Syntax
+
+* [Python](#Python)
+* [C++](#C++)
+
+"sketchConcentricCircleDimension\_var" is a variable referencing a SketchConcentricCircleDimension object.  ```` ``` # Get the value of the property. propertyValue = sketchConcentricCircleDimension_var.entityToken ``` ```` |
+
+"sketchConcentricCircleDimension\_var" is a variable referencing a SketchConcentricCircleDimension object. ```` ``` #include <Fusion/Sketch/SketchConcentricCircleDimension.h>  // Get the value of the property. string propertyValue = sketchConcentricCircleDimension_var->entityToken(); ``` ```` |
+
+## Property Value
+
+This is a read only property whose value is a string.
+
+## Version
+
+Introduced in version September 2020
+
+---
+
+|  |  |
+| --- | --- |
+| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

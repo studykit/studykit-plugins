@@ -1,0 +1,31 @@
+# SceneSettings.brightness Property
+
+Parent Object: [SceneSettings](SceneSettings.htm)
+Defined in namespace "adsk::fusion" and the header file is <Fusion/Render/SceneSettings.h>
+
+## Description
+
+Gets and sets the brightness or luminance of the scene. This must be a value between 0 and 100,000 and is in lux units.
+
+## Syntax
+
+* [Python](#Python)
+* [C++](#C++)
+
+"sceneSettings\_var" is a variable referencing a SceneSettings object. |
+
+"sceneSettings\_var" is a variable referencing a SceneSettings object. ```` ``` #include <Fusion/Render/SceneSettings.h>  // Get the value of the property. double propertyValue = sceneSettings_var->brightness();  // Set the value of the property, where value_var is a double. bool returnValue = sceneSettings_var->brightness(value_var); ``` ```` |
+
+## Property Value
+
+This is a read/write property whose value is a double.
+
+## Version
+
+Introduced in version May 2023
+
+---
+
+|  |  |
+| --- | --- |
+| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

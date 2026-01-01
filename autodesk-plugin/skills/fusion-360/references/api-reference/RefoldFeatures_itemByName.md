@@ -1,0 +1,41 @@
+# RefoldFeatures.itemByName Method
+
+Parent Object: [RefoldFeatures](RefoldFeatures.htm)
+Defined in namespace "adsk::fusion" and the header file is <Fusion/SheetMetal/RefoldFeatures.h>
+
+## Description
+
+Function that returns the specified refold feature using the name of the feature.
+
+## Syntax
+
+* [Python](#Python)
+* [C++](#C++)
+
+"refoldFeatures\_var" is a variable referencing a [RefoldFeatures](RefoldFeatures.htm) object.```` ``` returnValue = refoldFeatures_var.itemByName(name) ``` ```` |
+
+"refoldFeatures\_var" is a variable referencing a [RefoldFeatures](RefoldFeatures.htm) object. |
+
+## Return Value
+
+|  |  |
+| --- | --- |
+| Type | Description |
+| [RefoldFeature](RefoldFeature.htm) | Returns the specified item or null if the specified name was not found. |
+
+## Parameters
+
+|  |  |  |
+| --- | --- | --- |
+| Name | Type | Description |
+| name | string | The name of the feature within the collection to return. This is the name seen in the timeline. |
+
+## Version
+
+Introduced in version August 2020
+
+---
+
+|  |  |
+| --- | --- |
+| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

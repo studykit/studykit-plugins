@@ -1,0 +1,31 @@
+# SketchOffsetCurvesDimension.isDeletable Property
+
+Parent Object: [SketchOffsetCurvesDimension](SketchOffsetCurvesDimension.htm)
+Defined in namespace "adsk::fusion" and the header file is <Fusion/Sketch/SketchOffsetCurvesDimension.h>
+
+## Description
+
+Indicates if this dimension is deletable.
+
+## Syntax
+
+* [Python](#Python)
+* [C++](#C++)
+
+"sketchOffsetCurvesDimension\_var" is a variable referencing a SketchOffsetCurvesDimension object. |
+
+"sketchOffsetCurvesDimension\_var" is a variable referencing a SketchOffsetCurvesDimension object. ```` ``` #include <Fusion/Sketch/SketchOffsetCurvesDimension.h>  // Get the value of the property. boolean propertyValue = sketchOffsetCurvesDimension_var->isDeletable(); ``` ```` |
+
+## Property Value
+
+This is a read only property whose value is a boolean.
+
+## Version
+
+Introduced in version March 2016
+
+---
+
+|  |  |
+| --- | --- |
+| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

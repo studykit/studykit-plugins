@@ -1,0 +1,42 @@
+# Joint.setAsSliderJointMotion Method
+
+Parent Object: [Joint](Joint.htm)
+Defined in namespace "adsk::fusion" and the header file is <Fusion/Components/Joint.h>
+
+## Description
+
+Redefines the relationship between the two joint geometries as a slider joint.
+
+## Syntax
+
+* [Python](#Python)
+* [C++](#C++)
+
+"joint\_var" is a variable referencing a [Joint](Joint.htm) object.```` ``` # Uses no optional arguments. returnValue = joint_var.setAsSliderJointMotion(sliderDirection)  # Uses optional arguments. returnValue = joint_var.setAsSliderJointMotion(sliderDirection, customSliderDirectionEntity) ``` ```` |
+
+"joint\_var" is a variable referencing a [Joint](Joint.htm) object.  ```` ``` #include <Fusion/Components/Joint.h>  // Uses no optional arguments. returnValue = joint_var->setAsSliderJointMotion(sliderDirection);  // Uses optional arguments. returnValue = joint_var->setAsSliderJointMotion(sliderDirection, customSliderDirectionEntity); ``` ```` |
+
+## Return Value
+
+|  |  |
+| --- | --- |
+| Type | Description |
+| boolean | Returns true if the operation was successful. |
+
+## Parameters
+
+|  |  |  |
+| --- | --- | --- |
+| Name | Type | Description |
+| sliderDirection | [JointDirections](JointDirections.htm) | Specifies which axis the slide direction is along. If this is set to CustomJointDirection then the customSliderDirectionEntity argument must also be provided. |
+| customSliderDirectionEntity | [Base](Base.htm) | If the sliderDirection is CustomJointDirection this argument is used to specify the entity that defines the custom slider direction. This can be several types of entities that can define a direction.   This is an optional argument whose default value is null. |
+
+## Version
+
+Introduced in version July 2015
+
+---
+
+|  |  |
+| --- | --- |
+| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

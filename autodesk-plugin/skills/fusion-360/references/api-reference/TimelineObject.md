@@ -1,0 +1,62 @@
+# TimelineObject Object
+
+Derived from: [Base](Base.htm) Object
+
+Defined in namespace "adsk::fusion" and the header file is <Fusion/Fusion/TimelineObject.h>
+
+## Description
+
+Represents an object in the timeline.
+
+## Methods
+
+|  |  |
+| --- | --- |
+| Name | Description |
+| [canReorder](TimelineObject_canReorder.htm) | Checks to see if this object can be reordered to the specified position. The default value of -1 indicates the end of the timeline. |
+| [classType](TimelineObject_classType.htm) | Static function that all classes support that returns the type of the class as a string. The returned string matches the string returned by the objectType property. For example if you have a reference to an object and you want to check if it's a SketchLine you can use myObject.objectType == fusion.SketchLine.classType(). |
+| [reorder](TimelineObject_reorder.htm) | Reorders this object to the position specified. The default value of -1 indicates the end of the timeline. |
+| [rollTo](TimelineObject_rollTo.htm) | Rolls the timeline by repositioning the marker to either before or after this object. This method will fail if this is a timelineGroup object and the group is expanded. |
+
+## Properties
+
+|  |  |
+| --- | --- |
+| Name | Description |
+| [entity](TimelineObject_entity.htm) | Returns the entity associated with this timeline object. Edit operations can be performed by getting the object representing the associated entity and using the methods and properties on that entity to make changes.   Returns null if this TimelineObject represents a TimelineGroup object, since it does not have an associated entity. |
+| [errorOrWarningMessage](TimelineObject_errorOrWarningMessage.htm) | Returns the error or warning message in the case where the healthState property returns either WarningFeatureHealthState or ErrorFeatureHealthState. Otherwise this property returns an empty string. |
+| [healthState](TimelineObject_healthState.htm) | Returns the current health state of the object associated with this TimelineObject. |
+| [index](TimelineObject_index.htm) | Returns the position of this item within the timeline where the first item has an index of 0.   This property can return -1 in the two cases where this object is not currently represented in the timeline. The two cases are:   1. When this is a TimelineGroup object and the group is expanded.   2. When this object is part of a group and the group is collapsed. |
+| [isGroup](TimelineObject_isGroup.htm) | Indicates if this TimelineObject represents a group. If True you can operate on this object as a TimelineGroup object. |
+| [isRolledBack](TimelineObject_isRolledBack.htm) | Indicates if this item is currently not being computed because it has been rolled back.   If this is a timelineGroup object and the group is expanded the value of this property should be ignored. |
+| [isSuppressed](TimelineObject_isSuppressed.htm) | Gets and sets if this object is suppressed. |
+| [isValid](TimelineObject_isValid.htm) | Indicates if this object is still valid, i.e. hasn't been deleted or some other action done to invalidate the reference. |
+| [name](TimelineObject_name.htm) | Gets and sets the name of this timeline object. This name is shared by the object the timeline object represents. For example, if the TimelineObject represents a Sketch and you change the name using the TimelineObject, the name of the sketch in the browser is also changed. The reverse is also true. Setting the name of an object; sketch, feature construction geometry, etc, will also change the name of the associated node in the timeline. |
+| [objectType](TimelineObject_objectType.htm) | This property is supported by all objects in the API and returns a string that contains the full name (namespace::objecttype) describing the type of the object.   It's often useful to use this in combination with the classType method to see if an object is a certain type. For example: if obj.objectType == adsk.core.Point3D.classType(): |
+| [parentGroup](TimelineObject_parentGroup.htm) | Returns the parent group, if this object is part of a group. Returns null if this object is not part of a group. |
+
+## Accessed From
+
+[ArrangeFeature.timelineObject](ArrangeFeature_timelineObject.htm), [AsBuiltJoint.timelineObject](AsBuiltJoint_timelineObject.htm), [AssemblyConstraint.timelineObject](AssemblyConstraint_timelineObject.htm), [BaseFeature.timelineObject](BaseFeature_timelineObject.htm), [BossFeature.timelineObject](BossFeature_timelineObject.htm), [BoundaryFillFeature.timelineObject](BoundaryFillFeature_timelineObject.htm), [BoxFeature.timelineObject](BoxFeature_timelineObject.htm), [Canvas.timelineObject](Canvas_timelineObject.htm), [ChamferFeature.timelineObject](ChamferFeature_timelineObject.htm), [CircularPatternFeature.timelineObject](CircularPatternFeature_timelineObject.htm), [CoilFeature.timelineObject](CoilFeature_timelineObject.htm), [CombineFeature.timelineObject](CombineFeature_timelineObject.htm), [ConstructionAxis.timelineObject](ConstructionAxis_timelineObject.htm), [ConstructionPlane.timelineObject](ConstructionPlane_timelineObject.htm), [ConstructionPoint.timelineObject](ConstructionPoint_timelineObject.htm), [CopyPasteBody.timelineObject](CopyPasteBody_timelineObject.htm), [CustomFeature.timelineObject](CustomFeature_timelineObject.htm), [CutPasteBody.timelineObject](CutPasteBody_timelineObject.htm), [CylinderFeature.timelineObject](CylinderFeature_timelineObject.htm), [Decal.timelineObject](Decal_timelineObject.htm), [DeleteFaceFeature.timelineObject](DeleteFaceFeature_timelineObject.htm), [DraftFeature.timelineObject](DraftFeature_timelineObject.htm), [EmbossFeature.timelineObject](EmbossFeature_timelineObject.htm), [ExtendFeature.timelineObject](ExtendFeature_timelineObject.htm), [ExtrudeFeature.timelineObject](ExtrudeFeature_timelineObject.htm), [Feature.timelineObject](Feature_timelineObject.htm), [FilletFeature.timelineObject](FilletFeature_timelineObject.htm), [FlangeFeature.timelineObject](FlangeFeature_timelineObject.htm), [FlatPattern.timelineObject](FlatPattern_timelineObject.htm), [FormFeature.timelineObject](FormFeature_timelineObject.htm), [HemFeature.timelineObject](HemFeature_timelineObject.htm), [HoleFeature.timelineObject](HoleFeature_timelineObject.htm), [Joint.timelineObject](Joint_timelineObject.htm), [JointOrigin.timelineObject](JointOrigin_timelineObject.htm), [LoftFeature.timelineObject](LoftFeature_timelineObject.htm), [MeshCombineFaceGroupsFeature.timelineObject](MeshCombineFaceGroupsFeature_timelineObject.htm), [MeshCombineFeature.timelineObject](MeshCombineFeature_timelineObject.htm), [MeshConvertFeature.timelineObject](MeshConvertFeature_timelineObject.htm), [MeshFeature.timelineObject](MeshFeature_timelineObject.htm), [MeshGenerateFaceGroupsFeature.timelineObject](MeshGenerateFaceGroupsFeature_timelineObject.htm), [MeshReduceFeature.timelineObject](MeshReduceFeature_timelineObject.htm), [MeshRemeshFeature.timelineObject](MeshRemeshFeature_timelineObject.htm), [MeshRepairFeature.timelineObject](MeshRepairFeature_timelineObject.htm), [MeshReverseNormalFeature.timelineObject](MeshReverseNormalFeature_timelineObject.htm), [MeshSeparateFeature.timelineObject](MeshSeparateFeature_timelineObject.htm), [MeshShellFeature.timelineObject](MeshShellFeature_timelineObject.htm), [MeshSmoothFeature.timelineObject](MeshSmoothFeature_timelineObject.htm), [MirrorFeature.timelineObject](MirrorFeature_timelineObject.htm), [MoveFeature.timelineObject](MoveFeature_timelineObject.htm), [Occurrence.timelineObject](Occurrence_timelineObject.htm), [OffsetFacesFeature.timelineObject](OffsetFacesFeature_timelineObject.htm), [OffsetFeature.timelineObject](OffsetFeature_timelineObject.htm), [PatchFeature.timelineObject](PatchFeature_timelineObject.htm), [PathPatternFeature.timelineObject](PathPatternFeature_timelineObject.htm), [PipeFeature.timelineObject](PipeFeature_timelineObject.htm), [RectangularPatternFeature.timelineObject](RectangularPatternFeature_timelineObject.htm), [RefoldFeature.timelineObject](RefoldFeature_timelineObject.htm), [RemoveFeature.timelineObject](RemoveFeature_timelineObject.htm), [ReplaceFaceFeature.timelineObject](ReplaceFaceFeature_timelineObject.htm), [ReverseNormalFeature.timelineObject](ReverseNormalFeature_timelineObject.htm), [RevolveFeature.timelineObject](RevolveFeature_timelineObject.htm), [RibFeature.timelineObject](RibFeature_timelineObject.htm), [RigidGroup.timelineObject](RigidGroup_timelineObject.htm), [RipFeature.timelineObject](RipFeature_timelineObject.htm), [RuledSurfaceFeature.timelineObject](RuledSurfaceFeature_timelineObject.htm), [RuleFilletFeature.timelineObject](RuleFilletFeature_timelineObject.htm), [ScaleFeature.timelineObject](ScaleFeature_timelineObject.htm), [ShellFeature.timelineObject](ShellFeature_timelineObject.htm), [SilhouetteSplitFeature.timelineObject](SilhouetteSplitFeature_timelineObject.htm), [Sketch.timelineObject](Sketch_timelineObject.htm), [Snapshot.timelineObject](Snapshot_timelineObject.htm), [SphereFeature.timelineObject](SphereFeature_timelineObject.htm), [SplitBodyFeature.timelineObject](SplitBodyFeature_timelineObject.htm), [SplitFaceFeature.timelineObject](SplitFaceFeature_timelineObject.htm), [StitchFeature.timelineObject](StitchFeature_timelineObject.htm), [SurfaceDeleteFaceFeature.timelineObject](SurfaceDeleteFaceFeature_timelineObject.htm), [SweepFeature.timelineObject](SweepFeature_timelineObject.htm), [TangentRelationship.timelineObject](TangentRelationship_timelineObject.htm), [TessellateFeature.timelineObject](TessellateFeature_timelineObject.htm), [ThickenFeature.timelineObject](ThickenFeature_timelineObject.htm), [ThreadFeature.timelineObject](ThreadFeature_timelineObject.htm), [Timeline.item](Timeline_item.htm), [TimelineGroup.item](TimelineGroup_item.htm), [TorusFeature.timelineObject](TorusFeature_timelineObject.htm), [TrimFeature.timelineObject](TrimFeature_timelineObject.htm), [UnfoldFeature.timelineObject](UnfoldFeature_timelineObject.htm), [UnstitchFeature.timelineObject](UnstitchFeature_timelineObject.htm), [UntrimFeature.timelineObject](UntrimFeature_timelineObject.htm), [VolumetricCustomFeature.timelineObject](VolumetricCustomFeature_timelineObject.htm), [VolumetricModelToMeshFeature.timelineObject](VolumetricModelToMeshFeature_timelineObject.htm), [WebFeature.timelineObject](WebFeature_timelineObject.htm)
+
+## Derived Classes
+
+[TimelineGroup](TimelineGroup.htm)
+
+## Samples
+
+|  |  |
+| --- | --- |
+| Name | Description |
+| [Extrude Feature API Sample](ExtrudeFeatureSample_Sample.htm) | Demonstrates creating a new extrude feature. |
+| [Fillet Feature Edit API Sample](FilletFeatureEditSample_Sample.htm) | Demonstrates editing a fillet feature. To successfully run this sample you can use this [[Ruled Surface Feature API Sample](RuledSurfaceFeatureSample_Sample.htm)](../ExtraFiles/APISampleFilletEdgeSetData.f3d%3E%20file%3C/a%3E%20or%20create%20a%20new%20model%20with%20the%20described%20fillet%20feature.%3C/p%3E%3Cp%3E%3Col%3E%3Cli%3ECreate%20a%20new%20model%20and%20add%20a%20block%20feature.%3C/li%3E%3Cli%3ECreate%20a%20single%20fillet%20feature%20that%20defines%20three%20different%20fillets.%20The%20fillets%20need%20to%20be%20created%20in%20a%20way%20where%20they%20don%27t%20interact%20with%20one%20another.%20The%20easiest%20way%20is%20to%20create%20the%20fillets%20only%20on%20the%20vertical%20edges%20of%20the%20box.%3Col%3E%3Cli%3ECreate%20a%20constant%20radius%20fillet%20with%20a%20radius%20that%20is%20about%201/4%20the%20size%20of%20the%20box.%3C/li%3E%3Cli%3ECreate%20a%20chord%20length%20fillet%20whose%20radius%20is%20also%20about%201/4%20the%20size%20of%20the%20box.%3C/li%3E%3Cli%3ECreate%20a%20variable%20radius%20fillet%20with%20one%20intermediate%20radius%20and%20the%20radii%20are%20about%201/4%20the%20size%20of%20the%20box%20and%20less.%3C/li%3E%3C/ol%3E%3C/ol%3ERunning%20the%20sample%20script%20will%20modify%20various%20settings%20of%20each%20fillet%20and%20change%20the%20edge%20each%20fillet%20is%20applied%20to.%3C/p%3E%3C/td%3E%20%20%20%20%20%20%3C/tr%3E%20%20%20%20%20%20%3Ctr%3E%20%20%20%20%20%20%20%20%3Ctd%20class%3D) | Demonstrates creating a new ruled surface feature. |
+
+## Version
+
+Introduced in version August 2014
+
+---
+
+|  |  |
+| --- | --- |
+| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

@@ -1,0 +1,31 @@
+# ExtrudeFeatureInput.taperAngleTwo Property
+
+Parent Object: [ExtrudeFeatureInput](ExtrudeFeatureInput.htm)
+Defined in namespace "adsk::fusion" and the header file is <Fusion/Features/ExtrudeFeatureInput.h>
+
+## Description
+
+Gets the value that will be used as the taper angle for side two of a two-sided extrusion. If the extrusion is single-sided, this property will return null. The hasTwoExtents property can be used to determine if there are two sides or not. To set the taper angle, use one of the set methods on the ExtrudeFeatureInput object.
+
+## Syntax
+
+* [Python](#Python)
+* [C++](#C++)
+
+"extrudeFeatureInput\_var" is a variable referencing an ExtrudeFeatureInput object. |
+
+"extrudeFeatureInput\_var" is a variable referencing an ExtrudeFeatureInput object. ```` ``` #include <Fusion/Features/ExtrudeFeatureInput.h>  // Get the value of the property. Ptr<ValueInput> propertyValue = extrudeFeatureInput_var->taperAngleTwo(); ``` ```` |
+
+## Property Value
+
+This is a read only property whose value is a [ValueInput](ValueInput.htm).
+
+## Version
+
+Introduced in version November 2016
+
+---
+
+|  |  |
+| --- | --- |
+| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

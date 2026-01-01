@@ -1,0 +1,39 @@
+# CommandDefinition.controlDefinition Property
+
+Parent Object: [CommandDefinition](CommandDefinition.htm)
+Defined in namespace "adsk::core" and the header file is <Core/UserInterface/CommandDefinition.h>
+
+## Description
+
+Gets the ControlDefinition associated with this command. The control definition defines the type of control that can exist in the user interface to execute this command. You can use properties on the control definition to define the look and behavior of the control.
+
+## Syntax
+
+* [Python](#Python)
+* [C++](#C++)
+
+"commandDefinition\_var" is a variable referencing a CommandDefinition object. |
+
+"commandDefinition\_var" is a variable referencing a CommandDefinition object. ```` ``` #include <Core/UserInterface/CommandDefinition.h>  // Get the value of the property. Ptr<ControlDefinition> propertyValue = commandDefinition_var->controlDefinition(); ``` ```` |
+
+## Property Value
+
+This is a read only property whose value is a [ControlDefinition](ControlDefinition.htm).
+
+## Samples
+
+|  |  |
+| --- | --- |
+| Name | Description |
+| [Customizing the UI using the API Sample](UICustomizationSample_Sample.htm) | Demonstrates how to work with tabs, panels, and command in the user interface. The full source for [C++](../ExtraFiles/UICustomizationSampleCPP.zip) and [Python](../ExtraFiles/UICustomizationSamplePython.zip) samples can be downloaded. This is especially useful for getting the resource files. |
+| [Write user interface to a file API Sample](WriteUserInterfaceToFile_Sample.htm) | Writes out the full structure of the Fusion user interface. This information is useful when editing the user-interface, as discussed in the usre manual topic [User-Interface Customization with Fusion's API](UserInterface_UM.htm) |
+
+## Version
+
+Introduced in version August 2014
+
+---
+
+|  |  |
+| --- | --- |
+| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

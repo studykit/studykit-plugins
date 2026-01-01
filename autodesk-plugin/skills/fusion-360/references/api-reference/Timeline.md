@@ -1,0 +1,56 @@
+# Timeline Object
+
+Derived from: [Base](Base.htm) Object
+
+Defined in namespace "adsk::fusion" and the header file is <Fusion/Fusion/Timeline.h>
+
+## Description
+
+A collection of TimelineObjects in a parametric design.
+
+## Methods
+
+|  |  |
+| --- | --- |
+| Name | Description |
+| [classType](Timeline_classType.htm) | Static function that all classes support that returns the type of the class as a string. The returned string matches the string returned by the objectType property. For example if you have a reference to an object and you want to check if it's a SketchLine you can use myObject.objectType == fusion.SketchLine.classType(). |
+| [deleteAllAfterMarker](Timeline_deleteAllAfterMarker.htm) | Deletes all objects in the timeline that are after the current position of the marker. |
+| [item](Timeline_item.htm) | Function that returns the specified item in the timeline using an index into the collection. The items are returned in the order they appear in the timeline. |
+| [moveToBeginning](Timeline_moveToBeginning.htm) | Moves the marker to the beginning of the timeline. |
+| [moveToEnd](Timeline_moveToEnd.htm) | Moves the marker to the end of the timeline. |
+| [movetoNextStep](Timeline_movetoNextStep.htm) | Moves the marker to the next step in the timeline. |
+| [moveToPreviousStep](Timeline_moveToPreviousStep.htm) | Moves the marker to the previous step in the timeline. |
+| [play](Timeline_play.htm) | Plays the timeline beginning at the current position of the marker. |
+
+## Properties
+
+|  |  |
+| --- | --- |
+| Name | Description |
+| [count](Timeline_count.htm) | Returns the number of items in the collection. |
+| [isValid](Timeline_isValid.htm) | Indicates if this object is still valid, i.e. hasn't been deleted or some other action done to invalidate the reference. |
+| [markerPosition](Timeline_markerPosition.htm) | Gets and sets the current position of the marker where 0 is at the beginning of the timeline and the value of Timeline.count is the end of the timeline. |
+| [objectType](Timeline_objectType.htm) | This property is supported by all objects in the API and returns a string that contains the full name (namespace::objecttype) describing the type of the object. |
+| [timelineGroups](Timeline_timelineGroups.htm) | Returns the collection of groups within the timeline. |
+
+## Accessed From
+
+[Design.timeline](Design_timeline.htm), [FlatPatternProduct.timeline](FlatPatternProduct_timeline.htm), [WorkingModel.timeline](WorkingModel_timeline.htm)
+
+## Samples
+
+|  |  |
+| --- | --- |
+| Name | Description |
+| [Extrude Feature API Sample](ExtrudeFeatureSample_Sample.htm) | Demonstrates creating a new extrude feature. |
+| [Fillet Feature Edit API Sample](FilletFeatureEditSample_Sample.htm) | Demonstrates editing a fillet feature. To successfully run this sample you can use this [[Ruled Surface Feature API Sample](RuledSurfaceFeatureSample_Sample.htm)](../ExtraFiles/APISampleFilletEdgeSetData.f3d%3E%20file%3C/a%3E%20or%20create%20a%20new%20model%20with%20the%20described%20fillet%20feature.%3C/p%3E%3Cp%3E%3Col%3E%3Cli%3ECreate%20a%20new%20model%20and%20add%20a%20block%20feature.%3C/li%3E%3Cli%3ECreate%20a%20single%20fillet%20feature%20that%20defines%20three%20different%20fillets.%20The%20fillets%20need%20to%20be%20created%20in%20a%20way%20where%20they%20don%27t%20interact%20with%20one%20another.%20The%20easiest%20way%20is%20to%20create%20the%20fillets%20only%20on%20the%20vertical%20edges%20of%20the%20box.%3Col%3E%3Cli%3ECreate%20a%20constant%20radius%20fillet%20with%20a%20radius%20that%20is%20about%201/4%20the%20size%20of%20the%20box.%3C/li%3E%3Cli%3ECreate%20a%20chord%20length%20fillet%20whose%20radius%20is%20also%20about%201/4%20the%20size%20of%20the%20box.%3C/li%3E%3Cli%3ECreate%20a%20variable%20radius%20fillet%20with%20one%20intermediate%20radius%20and%20the%20radii%20are%20about%201/4%20the%20size%20of%20the%20box%20and%20less.%3C/li%3E%3C/ol%3E%3C/ol%3ERunning%20the%20sample%20script%20will%20modify%20various%20settings%20of%20each%20fillet%20and%20change%20the%20edge%20each%20fillet%20is%20applied%20to.%3C/p%3E%3C/td%3E%20%20%20%20%20%20%3C/tr%3E%20%20%20%20%20%20%3Ctr%3E%20%20%20%20%20%20%20%20%3Ctd%20class%3D) | Demonstrates creating a new ruled surface feature. |
+
+## Version
+
+Introduced in version August 2014
+
+---
+
+|  |  |
+| --- | --- |
+| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

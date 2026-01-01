@@ -1,0 +1,70 @@
+# MeshReduceFeature Object ![Preview](../images/TestTubeLarge.png)
+
+Derived from: [MeshFeature](MeshFeature.htm) Object
+
+Defined in namespace "adsk::fusion" and the header file is <Fusion/MeshBody/MeshReduceFeature.h>
+
+![Preview](../images/TestTubeSmall.png)This functionality is provided as a preview
+of intended future API capabilities. You are encouraged to use it and report any problems or suggestions using the
+[Fusion API and Scripts](https://forums.autodesk.com/t5/fusion-360-api-and-scripts/bd-p/22) forum.
+
+Because this is a preview of future functionality, there is the possibility that it will change, which will possibly
+break any existing programs that use this functionality. Because of that, you should never deliver any programs that use
+any preview capabilities. For a distributed program, you should wait until it has moved from preview to released state.
+
+## Description
+
+Object that represents an existing mesh reduce feature in a design. To change the properties of this feature, you need to position the timeline marker to immediately before this feature. This can be accomplished using the following code: thisFeature.timelineObject.rollTo(True)
+
+## Methods
+
+|  |  |
+| --- | --- |
+| Name | Description |
+| [classType](MeshReduceFeature_classType.htm) | Static function that all classes support that returns the type of the class as a string. The returned string matches the string returned by the objectType property. For example if you have a reference to an object and you want to check if it's a SketchLine you can use myObject.objectType == fusion.SketchLine.classType(). |
+| [createForAssemblyContext](MeshReduceFeature_createForAssemblyContext.htm) | Creates or returns a proxy for the native object - i.e. a new object that represents this object but adds the assembly context defined by the input occurrence. |
+| [deleteMe](MeshReduceFeature_deleteMe.htm) | Deletes the feature. This works for both parametric and non-parametric features. |
+| [dissolve](MeshReduceFeature_dissolve.htm) | Dissolves the feature so that the feature information is lost and only the B-Rep geometry defined by the feature remains. This is only valid for non-parametric features. |
+
+## Properties
+
+|  |  |
+| --- | --- |
+| Name | Description |
+| [assemblyContext](MeshReduceFeature_assemblyContext.htm) | Returns the assembly occurrence (i.e. the occurrence) of this object in an assembly. This is only valid in the case where this is acting as a proxy in an assembly. Returns null in the case where the object is not in the context of an assembly but is already the native object. |
+| [attributes](MeshReduceFeature_attributes.htm) | Returns the collection of attributes associated with this face. |
+| [baseFeature](MeshReduceFeature_baseFeature.htm) | If this feature is associated with a base feature, this property will return that base feature. If it's not associated with a base feature, this property will return null. |
+| [bodies](MeshReduceFeature_bodies.htm) | Returns the bodies that were modified or created by this feature. This property works for both parametric and non-parametric features. |
+| [entityToken](MeshReduceFeature_entityToken.htm) | Returns a token for the Feature object. This can be saved and used at a later time with the Design.findEntityByToken method to get back the same feature.   When using entity tokens it's important to understand that the token string returned for a specific entity can be different over time. However, even if you have two different token strings that were obtained from the same entity, when you use findEntityByToken they will both return the same entity. Because of that you should never compare entity tokens as way to determine what the token represents. Instead, you need to use the findEntityByToken method to get the two entities identified by the tokens and then compare them. |
+| [errorOrWarningMessage](MeshReduceFeature_errorOrWarningMessage.htm) | Returns the error or warning message in the case where the healthState property returns either WarningFeatureHealthState or ErrorFeatureHealthState. Otherwise this property returns an empty string. |
+| [facecount](MeshReduceFeature_facecount.htm) | Gets and sets the target face count for the reduced mesh as a target for the reduction. Only valid if meshReduceTargetType is FaceCountMeshReduceTargetType. |
+| [faces](MeshReduceFeature_faces.htm) | Returns the faces that were created by this feature. This works for both parametric and non-parametric features.   Depending on the modifications made to the body after the feature was created, this may not return all of the faces. For example, when a component is created from a body, the original body and its faces no longer exist, so this won't return any faces. However, you can roll the timeline to immediately after the feature, and all the original faces will be available. |
+| [healthState](MeshReduceFeature_healthState.htm) | Returns the current health state of the feature. |
+| [isParametric](MeshReduceFeature_isParametric.htm) | Indicates if this feature is parametric or not. |
+| [isSuppressed](MeshReduceFeature_isSuppressed.htm) | Gets and sets if this feature is suppressed. This is only valid for parametric features. |
+| [isValid](MeshReduceFeature_isValid.htm) | Indicates if this object is still valid, i.e. hasn't been deleted or some other action done to invalidate the reference. |
+| [linkedFeatures](MeshReduceFeature_linkedFeatures.htm) | Returns the set of features that are linked to this feature. The set of linked features are all of the features that were created in various components as the result of a single feature being created in the user interface. |
+| [maximumDeviation](MeshReduceFeature_maximumDeviation.htm) | Controls the maximum deviation of the reduced mesh to the original mesh. Only valid if meshReduceTargetType is MaximumDeviationMeshReduceTargetType. |
+| [mesh](MeshReduceFeature_mesh.htm) | Gets and sets the input mesh body.   To use this property, you need to position the timeline marker to immediately before this feature. This can be accomplished using the following code: thisFeature.timelineObject.rollTo(True) |
+| [meshReduceMethodType](MeshReduceFeature_meshReduceMethodType.htm) | Gets and sets the type of mesh reduce. |
+| [meshReduceTargetType](MeshReduceFeature_meshReduceTargetType.htm) | Gets and sets the target criteria for the reduction. |
+| [name](MeshReduceFeature_name.htm) | Returns the name of the feature as seen in the browser (non-parametric) or in the timeline (parametric). |
+| [nativeObject](MeshReduceFeature_nativeObject.htm) | The NativeObject is the object outside the context of an assembly and in the context of it's parent component. Returns null in the case where this object is not in the context of an assembly but is already the native object. |
+| [objectType](MeshReduceFeature_objectType.htm) | This property is supported by all objects in the API and returns a string that contains the full name (namespace::objecttype) describing the type of the object.   It's often useful to use this in combination with the classType method to see if an object is a certain type. For example: if obj.objectType == adsk.core.Point3D.classType(): |
+| [parentComponent](MeshReduceFeature_parentComponent.htm) | Returns the parent component that owns this feature. |
+| [proportion](MeshReduceFeature_proportion.htm) | Gets and sets the proportion of number of faces of the reduced mesh to the number of faces of original mesh as a target for the reduction. The value can range between 0 and 100 percent. Only valid if meshReduceTargetType is ProportionMeshReduceTargetType. |
+| [timelineObject](MeshReduceFeature_timelineObject.htm) | Returns the timeline object associated with this feature. |
+
+## Accessed From
+
+[MeshReduceFeature.createForAssemblyContext](MeshReduceFeature_createForAssemblyContext.htm), [MeshReduceFeature.nativeObject](MeshReduceFeature_nativeObject.htm), [MeshReduceFeatures.add](MeshReduceFeatures_add.htm), [MeshReduceFeatures.item](MeshReduceFeatures_item.htm), [MeshReduceFeatures.itemByName](MeshReduceFeatures_itemByName.htm)
+
+## Version
+
+Introduced in version March 2024
+
+---
+
+|  |  |
+| --- | --- |
+| © Copyright 2025 Autodesk, Inc. | Comment on this page. |

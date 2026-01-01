@@ -1,0 +1,9 @@
+# FilenameProperty Object
+
+Derived from: [Property](Property.htm) Object
+
+Defined in namespace "adsk::core" and the header file is <Core/Application/FilenameProperty.h>
+
+## Description
+
+A property that defines a filename.
