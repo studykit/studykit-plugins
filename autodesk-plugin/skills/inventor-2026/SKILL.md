@@ -1,7 +1,6 @@
 ---
 name: Inventor 2026 API Guide
 description: This skill should be used when the user asks about "Inventor API", "Inventor add-in", "Inventor VBA", "Inventor C#", "Inventor .NET", "Inventor automation", "PartDocument", "AssemblyDocument", "DrawingDocument", "ComponentDefinition", "Inventor sketches", "Inventor features", "Inventor assembly constraints", "Inventor BOM", "Inventor iProperties", "Inventor ribbon customization", "Inventor transactions", or needs guidance on Autodesk Inventor 2026 API development, add-in creation, scripting, or automation.
-version: 0.1.0
 ---
 
 # Inventor 2026 API Development Guide
