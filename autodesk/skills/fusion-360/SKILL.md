@@ -1,5 +1,6 @@
 ---
 name: Fusion 360 API Guide
+disable-model-invocation: true
 description: This skill should be used when the user asks about "Fusion 360 API", "Fusion API", "Fusion add-in", "Fusion script", "Fusion Python", "adsk.core", "adsk.fusion", "adsk.cam", "Fusion object model", "Fusion custom feature", "Fusion command", "Fusion UI customization", "Fusion CAM API", "Fusion event handling", "Fusion sketch", "Fusion extrude", or needs guidance on Autodesk Fusion 360 API development, scripting, add-in creation, or automation.
 ---
 
