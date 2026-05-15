@@ -12,6 +12,7 @@ if str(_SCRIPTS_DIR) not in sys.path:
 
 from workflow_relationship_renderers import (  # noqa: E402
     render_github_relationship_summary,
+    render_jira_relationship_summary,
     render_relationship_summary,
 )
 
@@ -22,6 +23,20 @@ _SAMPLE_GITHUB_RELATIONSHIPS = {
     "dependencies": {
         "blocked_by": [{"number": 33}],
         "blocking": [{"number": 45}],
+    },
+}
+
+_SAMPLE_JIRA_RELATIONSHIPS = {
+    "remote_links": [{"url": "https://example.com/design"}],
+    "workflow": {
+        "parent": {"key": "TEST-1200", "title": "Parent"},
+        "children": [{"key": "TEST-1237"}],
+        "dependencies": {
+            "blocked_by": [{"key": "TEST-1233"}],
+            "blocking": [{"key": "TEST-1235"}],
+        },
+        "related": [{"key": "TEST-1236"}],
+        "external_links": [{"url": "https://example.com/design"}],
     },
 }
 
@@ -140,10 +155,26 @@ def test_dispatch_routes_github_kind_to_github_renderer() -> None:
     assert expected == "parent #28; children #41; blocked_by #33; blocking #45"
 
 
+def test_renders_jira_workflow_projection() -> None:
+    assert render_jira_relationship_summary(_SAMPLE_JIRA_RELATIONSHIPS) == (
+        "parent TEST-1200; children TEST-1237; blocked_by TEST-1233; "
+        "blocking TEST-1235; related TEST-1236; external_links 1"
+    )
+
+
+def test_jira_renderer_ignores_native_relationships_without_workflow_projection() -> None:
+    assert render_jira_relationship_summary({"issue_links": [{"outward_issue": {"key": "TEST-1235"}}]}) == ""
+
+
+def test_dispatch_routes_jira_kind_to_jira_renderer() -> None:
+    expected = render_jira_relationship_summary(_SAMPLE_JIRA_RELATIONSHIPS)
+
+    assert render_relationship_summary("jira", _SAMPLE_JIRA_RELATIONSHIPS) == expected
+
+
 def test_dispatch_returns_empty_for_unsupported_provider() -> None:
     """Unsupported providers must omit the relationship suffix rather than guess."""
 
-    assert render_relationship_summary("jira", _SAMPLE_GITHUB_RELATIONSHIPS) == ""
     assert render_relationship_summary("confluence", _SAMPLE_GITHUB_RELATIONSHIPS) == ""
     assert render_relationship_summary("filesystem", _SAMPLE_GITHUB_RELATIONSHIPS) == ""
 
