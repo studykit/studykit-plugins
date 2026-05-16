@@ -59,13 +59,31 @@ Use `$WORKFLOW` for bundled workflow scripts. Ask the caller for the launcher pa
 Use the workflow launcher as the primary path for bundled scripts:
 
 - `scripts/workflow_config.py`
-- `scripts/workflow_cache_fetch.py`
-- `scripts/workflow_cache_issue_drafts.py`
-- `scripts/workflow_cache_writeback.py`
-- `scripts/workflow_cache_comments.py`
-- `scripts/workflow_cache_relationships.py`
+- `scripts/github_issue_fetch.py`
+- `scripts/github_issue_drafts.py`
+- `scripts/github_issue_writeback.py`
+- `scripts/github_issue_comments.py`
+- `scripts/github_issue_relationships.py`
+- `scripts/github_issue_metadata.py`
+- `scripts/jira_issue_fetch.py`
+- `scripts/jira_issue_drafts.py`
+- `scripts/jira_issue_writeback.py`
+- `scripts/jira_issue_comments.py`
+- `scripts/jira_issue_relationships.py`
+- `scripts/jira_issue_metadata.py`
 - `scripts/workflow_github.py`
 - `scripts/authoring_resolver.py`
+
+
+Before running issue commands, inspect `.workflow/config.yml` and choose the
+command family that matches `providers.issues.kind`. Use GitHub issue scripts
+only for `kind: github`, and Jira issue scripts only for `kind: jira`; the
+scripts fail on provider mismatch.
+
+Use these variables in examples after selecting the provider family:
+
+- GitHub: `ISSUE_FETCH=github_issue_fetch.py`, `ISSUE_DRAFTS=github_issue_drafts.py`, `ISSUE_WRITEBACK=github_issue_writeback.py`, `ISSUE_COMMENTS=github_issue_comments.py`, `ISSUE_RELATIONSHIPS=github_issue_relationships.py`, `ISSUE_METADATA=github_issue_metadata.py`
+- Jira: `ISSUE_FETCH=jira_issue_fetch.py`, `ISSUE_DRAFTS=jira_issue_drafts.py`, `ISSUE_WRITEBACK=jira_issue_writeback.py`, `ISSUE_COMMENTS=jira_issue_comments.py`, `ISSUE_RELATIONSHIPS=jira_issue_relationships.py`, `ISSUE_METADATA=jira_issue_metadata.py`
 
 If the workflow scripts do not support the requested GitHub operation or cannot
 complete it successfully, fall back to raw `gh`. Keep this fallback behind the
@@ -73,7 +91,7 @@ same role boundary: return operational metadata, paths, relationship metadata,
 and verification details only.
 
 If a raw `gh` write fallback succeeds, refresh the affected issue cache with
-`workflow_cache_fetch.py --cache-policy refresh` when possible.
+the selected issue fetch command and `--cache-policy refresh` when possible.
 
 Do not directly edit provider metadata, projection frontmatter, cache sidecars,
 or pending relationship files. Use workflow provider/cache scripts for those
@@ -88,7 +106,7 @@ cache schema from that path.
 For explicit provider fetch or cache refresh operations:
 
 ```bash
-"$WORKFLOW" workflow_cache_fetch.py \
+"$WORKFLOW" "$ISSUE_FETCH" \
   --json \
   [--cache-policy refresh] \
   <issue-number-or-ref>...
@@ -162,28 +180,28 @@ Use workflow write commands:
 Supported subcommands are `create`, `edit-body`, `comment`, `close`, and
 `reopen`. Follow `workflow_github.py --help` for exact flags when needed.
 For new issues, use the pending draft flow: prepare a bodyless draft with
-`workflow_cache_issue_drafts.py prepare`, return the draft `issue.md` path,
+`$ISSUE_DRAFTS prepare`, return the draft `issue.md` path,
 and let the caller fill only the body below existing frontmatter. Do not create
 the provider issue from a pending draft until the caller explicitly states that
 the user approved provider issue creation. When that approval is present, create
 the provider issue with
-`workflow_cache_issue_drafts.py create --confirm-provider-create`. Treat
+`$ISSUE_DRAFTS create --confirm-provider-create`. Treat
 ambiguous requests to write or draft an issue as pending draft preparation only.
 Do not ask the caller to create provider cache frontmatter under
 `.workflow-cache/issues-pending/`.
 If the caller provides relationship intent for a new issue, stage it with
-`workflow_cache_issue_drafts.py stage-relationships`; do not ask the caller to
+`$ISSUE_DRAFTS stage-relationships`; do not ask the caller to
 write `relationships-pending.yml`.
 For cached issue body edits, prepare or refresh the projection first and return
 `.workflow-cache/issues/<number>/issue.md` as the editable draft. The caller
 edits only the Markdown body below the existing YAML frontmatter; provider
-frontmatter is projection-owned. Then run `workflow_cache_writeback.py`. Use
+frontmatter is projection-owned. Then run `$ISSUE_WRITEBACK`. Use
 `workflow_github.py edit-body` only when the caller explicitly requests a direct
 provider edit or no cache projection exists.
 If `workflow_github.py` cannot support or complete the requested operation,
 fall back to raw `gh` only after the caller has completed the authoring-doc read
 flow. After successful issue mutations, refresh the affected issue cache with
-`workflow_cache_fetch.py --cache-policy refresh` when possible.
+the selected issue fetch command and `--cache-policy refresh` when possible.
 
 ## Local Cache Write-Back
 
@@ -193,7 +211,7 @@ requests a direct provider edit.
 For new issue drafts:
 
 ```bash
-"$WORKFLOW" workflow_cache_issue_drafts.py \
+"$WORKFLOW" "$ISSUE_DRAFTS" \
   prepare \
   --local-id <local-id> \
   --type <issue-type> \
@@ -206,7 +224,7 @@ After the caller fills only the body and explicitly states that the user
 approved provider issue creation, create the provider issue:
 
 ```bash
-"$WORKFLOW" workflow_cache_issue_drafts.py \
+"$WORKFLOW" "$ISSUE_DRAFTS" \
   create \
   --type <issue-type> \
   --confirm-provider-create \
@@ -220,7 +238,7 @@ return the draft path.
 For relationship intent on a pending issue draft:
 
 ```bash
-"$WORKFLOW" workflow_cache_issue_drafts.py \
+"$WORKFLOW" "$ISSUE_DRAFTS" \
   stage-relationships \
   --local-id <local-id> \
   [--parent <issue-ref>] \
@@ -231,13 +249,13 @@ For relationship intent on a pending issue draft:
 ```
 
 If pending relationships are moved to the created issue, apply them with
-`workflow_cache_relationships.py` for the created provider issue ref.
+`$ISSUE_RELATIONSHIPS` for the created provider issue ref.
 
 Do not ask the caller to create `.workflow-cache/**/issue.md`. If an issue body
 projection is missing, fetch, prepare, or create it through a workflow command first.
 
 ```bash
-"$WORKFLOW" workflow_cache_writeback.py \
+"$WORKFLOW" "$ISSUE_WRITEBACK" \
   --type <issue-type> \
   --json \
   <issue-number-or-ref>...
@@ -246,7 +264,7 @@ projection is missing, fetch, prepare, or create it through a workflow command f
 For pending local comment append:
 
 ```bash
-"$WORKFLOW" workflow_cache_comments.py \
+"$WORKFLOW" "$ISSUE_COMMENTS" \
   --type <issue-type> \
   --json \
   <issue-number-or-ref>...
@@ -255,7 +273,7 @@ For pending local comment append:
 For pending local relationship apply:
 
 ```bash
-"$WORKFLOW" workflow_cache_relationships.py \
+"$WORKFLOW" "$ISSUE_RELATIONSHIPS" \
   --type <issue-type> \
   --json \
   <issue-number-or-ref>...
@@ -264,7 +282,7 @@ For pending local relationship apply:
 For relationship intent on an existing cached issue:
 
 ```bash
-"$WORKFLOW" workflow_cache_relationships.py \
+"$WORKFLOW" "$ISSUE_RELATIONSHIPS" \
   --stage \
   [--parent <issue-ref>] \
   [--child <issue-ref>]... \
@@ -274,7 +292,7 @@ For relationship intent on an existing cached issue:
   <issue-number-or-ref>
 ```
 
-Then apply the staged relationship file with `workflow_cache_relationships.py`
+Then apply the staged relationship file with `$ISSUE_RELATIONSHIPS`
 without `--stage`.
 
 These scripts perform their own provider refresh and cleanup where supported.

@@ -714,9 +714,12 @@ def test_session_start_injects_policy_for_configured_project(
     assert "Do not inspect `.workflow-cache`" not in context
     assert "UserPromptSubmit may pre-read" not in context
     assert "Stop may record session-mentioned issue references" not in context
-    assert "scripts/workflow_cache_fetch.py" not in context
-    assert "scripts/workflow_cache_writeback.py" not in context
-    assert "scripts/workflow_cache_comments.py" not in context
+    assert "scripts/github_issue_fetch.py" not in context
+    assert "scripts/jira_issue_fetch.py" not in context
+    assert "scripts/github_issue_writeback.py" not in context
+    assert "scripts/jira_issue_writeback.py" not in context
+    assert "scripts/github_issue_comments.py" not in context
+    assert "scripts/jira_issue_comments.py" not in context
 
 
 def test_claude_session_start_appends_workflow_env_file(
