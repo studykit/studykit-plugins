@@ -12,7 +12,8 @@ _SCRIPTS_DIR = _PLUGIN_ROOT / "scripts"
 if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
-from workflow_cache_fetch import main as cache_fetch_main  # noqa: E402
+from github_issue_fetch import main as github_issue_fetch_main  # noqa: E402
+from jira_issue_fetch import main as jira_issue_fetch_main  # noqa: E402
 from workflow_command import CommandRequest, CommandResult  # noqa: E402
 from workflow_config import load_workflow_config  # noqa: E402
 from workflow_github_issue_cache import GitHubIssueCache  # noqa: E402
@@ -256,7 +257,7 @@ def test_cache_fetch_uses_cache_hit_without_remote_issue_view(tmp_path: Path) ->
     runner = FakeRunner({})
     stdout = io.StringIO()
 
-    code = cache_fetch_main(
+    code = github_issue_fetch_main(
         ["--project", str(tmp_path), "--json", "42"],
         stdout=stdout,
         runner=runner,
@@ -279,7 +280,7 @@ def test_cache_fetch_plain_output_uses_project_relative_issue_path(tmp_path: Pat
     cache.write_issue_bundle(repo(), issue_payload(42, body="Cached body."))
     stdout = io.StringIO()
 
-    code = cache_fetch_main(
+    code = github_issue_fetch_main(
         ["--project", str(tmp_path), "42"],
         stdout=stdout,
         runner=FakeRunner({}),
@@ -310,7 +311,7 @@ def test_cache_fetch_plain_output_uses_shared_prefix_for_multiple_issues(tmp_pat
     )
     stdout = io.StringIO()
 
-    code = cache_fetch_main(
+    code = github_issue_fetch_main(
         ["--project", str(tmp_path), "42", "43"],
         stdout=stdout,
         runner=FakeRunner({}),
@@ -340,7 +341,7 @@ def test_cache_fetch_refresh_reads_remote_and_updates_cache(tmp_path: Path) -> N
     )
     stdout = io.StringIO()
 
-    code = cache_fetch_main(
+    code = github_issue_fetch_main(
         ["--project", str(tmp_path), "--json", "--cache-policy", "refresh", "42"],
         stdout=stdout,
         runner=runner,
@@ -380,7 +381,7 @@ def test_cache_fetch_uses_jira_cache_hit_without_remote_read(tmp_path: Path) -> 
     runner = FakeRunner({})
     stdout = io.StringIO()
 
-    code = cache_fetch_main(
+    code = jira_issue_fetch_main(
         ["--project", str(tmp_path), "--json", "test-1234"],
         stdout=stdout,
         runner=runner,
@@ -408,7 +409,7 @@ def test_cache_fetch_plain_output_uses_jira_snapshot_path(tmp_path: Path) -> Non
     cache.write_issue_bundle(site, jira_issue_payload(), remote_links=[])
     stdout = io.StringIO()
 
-    code = cache_fetch_main(
+    code = jira_issue_fetch_main(
         ["--project", str(tmp_path), "test-1234"],
         stdout=stdout,
         runner=FakeRunner({}),
@@ -435,7 +436,7 @@ def test_cache_fetch_refresh_reads_remote_jira_and_updates_cache(tmp_path: Path)
     )
     stdout = io.StringIO()
 
-    code = cache_fetch_main(
+    code = jira_issue_fetch_main(
         ["--project", str(tmp_path), "--json", "--cache-policy", "refresh", "TEST-1234"],
         stdout=stdout,
         runner=runner,

@@ -12,7 +12,8 @@ _SCRIPTS_DIR = _PLUGIN_ROOT / "scripts"
 if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
-from workflow_cache_comments import main as cache_comments_main  # noqa: E402
+from github_issue_comments import main as github_issue_comments_main  # noqa: E402
+from jira_issue_comments import main as jira_issue_comments_main  # noqa: E402
 from workflow_command import CommandRequest, CommandResult  # noqa: E402
 from workflow_config import load_workflow_config  # noqa: E402
 from workflow_github_issue_cache import GitHubIssueCache  # noqa: E402
@@ -182,7 +183,7 @@ Pending comment body.
 
     stdout = io.StringIO()
 
-    code = cache_comments_main(
+    code = github_issue_comments_main(
         ["--project", str(tmp_path), "--type", "task", "--json", "43"],
         stdout=stdout,
         runner=runner,
@@ -242,7 +243,7 @@ def test_cache_comments_script_dispatches_jira_pending_comment_append(tmp_path: 
 
     stdout = io.StringIO()
 
-    code = cache_comments_main(
+    code = jira_issue_comments_main(
         ["--project", str(tmp_path), "--type", "task", "--json", "test-1234"],
         stdout=stdout,
         runner=runner,
