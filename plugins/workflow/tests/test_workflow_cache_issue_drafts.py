@@ -11,9 +11,10 @@ _SCRIPTS_DIR = Path(__file__).resolve().parent.parent / "scripts"
 if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
-from workflow_cache_issue_drafts import main as issue_drafts_main  # noqa: E402
-from workflow_cache_issue_drafts import prepare_pending_issue_draft  # noqa: E402
-from workflow_cache_issue_drafts import stage_pending_issue_relationships  # noqa: E402
+from github_issue_drafts import main as github_issue_drafts_main  # noqa: E402
+from github_issue_drafts import prepare_pending_issue_draft as prepare_github_pending_issue_draft  # noqa: E402
+from github_issue_drafts import stage_pending_issue_relationships as stage_github_pending_issue_relationships  # noqa: E402
+from jira_issue_drafts import prepare_pending_issue_draft as prepare_jira_pending_issue_draft  # noqa: E402
 from workflow_command import CommandRequest, CommandResult  # noqa: E402
 from workflow_github_issue_cache import GitHubIssueCache  # noqa: E402
 from workflow_github import DEFAULT_ISSUE_FIELDS  # noqa: E402
@@ -155,7 +156,7 @@ def _gh_api_args(*args: str) -> tuple[str, ...]:
 def test_prepare_pending_issue_draft_writes_bodyless_provider_frontmatter(tmp_path: Path) -> None:
     _write_config(tmp_path)
 
-    payload = prepare_pending_issue_draft(
+    payload = prepare_github_pending_issue_draft(
         project=tmp_path,
         local_id="draft-1",
         artifact_type="task",
@@ -180,7 +181,7 @@ def test_prepare_pending_issue_draft_writes_bodyless_provider_frontmatter(tmp_pa
 def test_prepare_jira_review_pending_issue_draft_prefixes_summary(tmp_path: Path) -> None:
     _write_jira_config(tmp_path)
 
-    payload = prepare_pending_issue_draft(
+    payload = prepare_jira_pending_issue_draft(
         project=tmp_path,
         local_id="review-1",
         artifact_type="review",
@@ -199,7 +200,7 @@ def test_prepare_jira_review_pending_issue_draft_prefixes_summary(tmp_path: Path
 def test_prepare_jira_research_pending_issue_draft_prefixes_summary(tmp_path: Path) -> None:
     _write_jira_config(tmp_path)
 
-    payload = prepare_pending_issue_draft(
+    payload = prepare_jira_pending_issue_draft(
         project=tmp_path,
         local_id="research-1",
         artifact_type="research",
@@ -218,7 +219,7 @@ def test_prepare_jira_research_pending_issue_draft_prefixes_summary(tmp_path: Pa
 def test_prepare_jira_spike_pending_issue_draft_prefixes_summary(tmp_path: Path) -> None:
     _write_jira_config(tmp_path)
 
-    payload = prepare_pending_issue_draft(
+    payload = prepare_jira_pending_issue_draft(
         project=tmp_path,
         local_id="spike-1",
         artifact_type="spike",
@@ -236,7 +237,7 @@ def test_prepare_jira_spike_pending_issue_draft_prefixes_summary(tmp_path: Path)
 
 def test_stage_pending_issue_relationships_writes_operator_owned_file(tmp_path: Path) -> None:
     _write_config(tmp_path)
-    prepare_pending_issue_draft(
+    prepare_github_pending_issue_draft(
         project=tmp_path,
         local_id="draft-1",
         artifact_type="task",
@@ -244,7 +245,7 @@ def test_stage_pending_issue_relationships_writes_operator_owned_file(tmp_path: 
         labels=("task",),
     )
 
-    payload = stage_pending_issue_relationships(
+    payload = stage_github_pending_issue_relationships(
         project=tmp_path,
         local_id="draft-1",
         parent="#28",
@@ -288,7 +289,7 @@ Draft body.
     runner = FakeRunner()
     stdout = io.StringIO()
 
-    code = issue_drafts_main(
+    code = github_issue_drafts_main(
         [
             "--project",
             str(tmp_path),
@@ -334,7 +335,7 @@ Draft body.
     stdout = io.StringIO()
     stderr = io.StringIO()
 
-    code = issue_drafts_main(
+    code = github_issue_drafts_main(
         ["--project", str(tmp_path), "create", "--type", "task", "--json", "draft-1"],
         stdout=stdout,
         stderr=stderr,

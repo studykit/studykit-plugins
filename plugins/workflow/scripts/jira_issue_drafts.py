@@ -2,7 +2,7 @@
 # /// script
 # dependencies = ["python-frontmatter", "PyYAML"]
 # ///
-"""Prepare and create provider-backed pending issue drafts."""
+"""Prepare and create Jira-backed pending issue drafts."""
 
 from __future__ import annotations
 
@@ -12,31 +12,23 @@ import sys
 from pathlib import Path
 from typing import TextIO
 
-from workflow_cache import (
-    SCHEMA_VERSION,
-    _atomic_write_text,
-    _dump_yaml,
-    _format_markdown,
-    pending_relationship_operations_from_mapping,
-)
-from workflow_jira_issue_cache import JiraDataCenterIssueCache
-from workflow_github_issue_cache import GitHubIssueCache
+from workflow_cache import SCHEMA_VERSION, _atomic_write_text, _dump_yaml, _format_markdown
 from workflow_command import CommandRunner
 from workflow_config import WorkflowConfig, WorkflowConfigError, load_workflow_config
 from workflow_env import workflow_project_dir_from_env
-from workflow_github import GitHubRepositoryError, resolve_github_repository
 from workflow_jira_data_center_client import resolve_jira_data_center_site
+from workflow_jira_issue_cache import JiraDataCenterIssueCache
+from workflow_jira_issue_provider import JiraDataCenterIssueNativeProvider
 from workflow_jira_issue_refs import JiraProviderError
-from workflow_providers import ProviderDispatcher, default_provider_registry, request_from_config
-
-
-class WorkflowCacheIssueDraftError(RuntimeError):
-    """Raised when pending issue draft operations cannot proceed."""
-
+from workflow_providers import ProviderContext, ProviderRequest
 
 JIRA_REVIEW_TITLE_PREFIX = "[Review] "
 JIRA_RESEARCH_TITLE_PREFIX = "[Research] "
 JIRA_SPIKE_TITLE_PREFIX = "[Spike] "
+
+
+class JiraIssueDraftError(RuntimeError):
+    """Raised when Jira pending issue draft operations cannot proceed."""
 
 
 def prepare_pending_issue_draft(
@@ -51,48 +43,30 @@ def prepare_pending_issue_draft(
     replace: bool = False,
     runner: CommandRunner | None = None,
 ) -> dict[str, object]:
-    """Create a provider-owned pending issue draft with an empty body."""
+    """Create a Jira-owned pending issue draft with an empty body."""
 
-    config = _load_issue_config(project)
+    _ = runner
+    config = _load_jira_issue_config(project)
     local_id = _required_text(local_id, "local id")
     artifact_type = _required_text(artifact_type, "artifact type")
-    title = _required_text(title, "title")
-    if config.issues.kind == "jira":
-        title = _jira_issue_title(artifact_type, title)
+    title = _jira_issue_title(artifact_type, _required_text(title, "title"))
     normalized_state = (state or "open").strip().lower()
     normalized_labels = tuple(label.strip() for label in labels if label.strip())
-    if config.issues.kind == "github" and artifact_type not in normalized_labels:
-        normalized_labels = (artifact_type, *normalized_labels)
 
-    if config.issues.kind == "github":
-        try:
-            repo = resolve_github_repository(config.root, runner=runner)
-        except GitHubRepositoryError as exc:
-            raise WorkflowCacheIssueDraftError(str(exc)) from exc
-        cache = GitHubIssueCache.for_project(config.root, configured_repo=repo)
-        issue_file = cache.pending_issue_file(repo, local_id)
-        provider_payload: dict[str, object] = {"repository": repo.to_json()}
-    elif config.issues.kind == "jira":
-        try:
-            site = resolve_jira_data_center_site(config.root)
-        except (WorkflowConfigError, JiraProviderError) as exc:
-            raise WorkflowCacheIssueDraftError(str(exc)) from exc
-        cache = JiraDataCenterIssueCache.for_project(config.root)
-        issue_file = cache.pending_issue_file(site, local_id)
-        provider_payload = {"site": site.to_json()}
-    else:
-        raise WorkflowCacheIssueDraftError(
-            f"pending issue drafts currently support GitHub and Jira issue providers, not {config.issues.kind}"
-        )
-
+    try:
+        site = resolve_jira_data_center_site(config.root)
+    except (WorkflowConfigError, JiraProviderError) as exc:
+        raise JiraIssueDraftError(str(exc)) from exc
+    cache = JiraDataCenterIssueCache.for_project(config.root)
+    issue_file = cache.pending_issue_file(site, local_id)
     if issue_file.exists() and not replace:
-        raise WorkflowCacheIssueDraftError(f"pending issue draft already exists: {issue_file}")
+        raise JiraIssueDraftError(f"pending issue draft already exists: {issue_file}")
 
     frontmatter: dict[str, object] = {
         "schema_version": SCHEMA_VERSION,
         "type": artifact_type,
         "role": "issue",
-        "provider": config.issues.kind,
+        "provider": "jira",
         "title": title,
         "labels": list(normalized_labels),
         "state": normalized_state,
@@ -106,7 +80,7 @@ def prepare_pending_issue_draft(
     return {
         "operation": "prepare_pending_issue",
         "role": "issue",
-        "kind": config.issues.kind,
+        "kind": "jira",
         "local_id": local_id,
         "issue_file": str(issue_file),
         "artifact_type": artifact_type,
@@ -114,7 +88,7 @@ def prepare_pending_issue_draft(
         "labels": list(normalized_labels),
         "state": normalized_state,
         "body_empty": True,
-        **provider_payload,
+        "site": site.to_json(),
     }
 
 
@@ -126,23 +100,22 @@ def create_pending_issue(
     confirm_provider_create: bool = False,
     runner: CommandRunner | None = None,
 ) -> dict[str, object]:
-    """Create a provider issue from an existing pending issue draft."""
+    """Create a Jira issue from an existing pending issue draft."""
 
     if not confirm_provider_create:
-        raise WorkflowCacheIssueDraftError(
-            "provider issue creation requires --confirm-provider-create after explicit user approval"
-        )
+        raise JiraIssueDraftError("provider issue creation requires --confirm-provider-create after explicit user approval")
 
-    config = _load_issue_config(project)
-    dispatcher = ProviderDispatcher(default_provider_registry(runner=runner))
-    request = request_from_config(
-        config,
-        role="issue",
-        operation="create",
-        artifact_type=artifact_type,
-        payload={"pending_local_id": _required_text(local_id, "local id")},
+    config = _load_jira_issue_config(project)
+    provider = JiraDataCenterIssueNativeProvider(runner=runner)
+    response = provider.call(
+        ProviderRequest(
+            role="issue",
+            kind="jira",
+            operation="create",
+            context=ProviderContext(project=config.root, artifact_type=artifact_type),
+            payload={"pending_local_id": _required_text(local_id, "local id")},
+        )
     )
-    response = dispatcher.dispatch(request)
     return dict(response.payload)
 
 
@@ -158,98 +131,44 @@ def stage_pending_issue_relationships(
     replace: bool = False,
     runner: CommandRunner | None = None,
 ) -> dict[str, object]:
-    """Stage provider-native relationships for a pending provider issue draft."""
+    """Stage provider-native relationships for a pending Jira issue draft."""
 
-    config = _load_issue_config(project)
+    _ = runner
+    config = _load_jira_issue_config(project)
     local_id = _required_text(local_id, "local id")
-    if config.issues.kind == "github":
-        if related:
-            raise WorkflowCacheIssueDraftError("related relationship staging is not supported for GitHub issue providers")
-        try:
-            repo = resolve_github_repository(config.root, runner=runner)
-        except GitHubRepositoryError as exc:
-            raise WorkflowCacheIssueDraftError(str(exc)) from exc
-        cache = GitHubIssueCache.for_project(config.root, configured_repo=repo)
-        issue_file = cache.pending_issue_file(repo, local_id)
-        provider_payload: dict[str, object] = {"kind": "github", "repository": repo.to_json()}
-        read_operations = lambda: cache.read_pending_draft_relationships(repo, local_id)
-        write_operations = lambda payload: cache.write_pending_draft_relationships(
-            repo,
-            local_id,
-            pending_relationship_operations_from_mapping(
-                payload,
-                path=issue_file,
-                target_kind="pending_issue",
-                target_id=local_id,
-            ),
-            replace_existing=replace,
-        )
-    elif config.issues.kind == "jira":
-        try:
-            site = resolve_jira_data_center_site(config.root)
-        except (WorkflowConfigError, JiraProviderError) as exc:
-            raise WorkflowCacheIssueDraftError(str(exc)) from exc
-        cache = JiraDataCenterIssueCache.for_project(config.root)
-        issue_file = cache.pending_issue_file(site, local_id)
-        relationships_file = cache.pending_issue_relationships_pending_file(site, local_id)
-        provider_payload = {"kind": "jira", "site": site.to_json()}
-        read_operations = lambda: cache.read_pending_draft_relationships(site, local_id)
-        write_operations = None
-    else:
-        raise WorkflowCacheIssueDraftError(
-            f"pending issue relationship staging supports GitHub and Jira issue providers, not {config.issues.kind}"
-        )
-
+    try:
+        site = resolve_jira_data_center_site(config.root)
+    except (WorkflowConfigError, JiraProviderError) as exc:
+        raise JiraIssueDraftError(str(exc)) from exc
+    cache = JiraDataCenterIssueCache.for_project(config.root)
+    issue_file = cache.pending_issue_file(site, local_id)
+    relationships_file = cache.pending_issue_relationships_pending_file(site, local_id)
     if not issue_file.is_file():
-        raise WorkflowCacheIssueDraftError(f"pending issue draft does not exist: {issue_file}")
+        raise JiraIssueDraftError(f"pending issue draft does not exist: {issue_file}")
+    if relationships_file.exists() and not replace:
+        raise JiraIssueDraftError(f"pending relationship file already exists: {relationships_file}")
 
-    if config.issues.kind == "github":
-        if not replace and read_operations():
-            raise WorkflowCacheIssueDraftError(f"pending relationship operations already exist for GitHub pending issue {local_id}")
-    elif relationships_file.exists() and not replace:
-        raise WorkflowCacheIssueDraftError(f"pending relationship file already exists: {relationships_file}")
-
-    payload: dict[str, object] = {"schema_version": SCHEMA_VERSION}
-    if parent:
-        payload["parent"] = _required_text(parent, "parent")
-    normalized_children = _normalized_refs(children)
-    normalized_blocked_by = _normalized_refs(blocked_by)
-    normalized_blocking = _normalized_refs(blocking)
-    if normalized_children:
-        payload["children"] = normalized_children
-    dependencies: dict[str, object] = {}
-    if normalized_blocked_by:
-        dependencies["blocked_by"] = normalized_blocked_by
-    if normalized_blocking:
-        dependencies["blocking"] = normalized_blocking
-    if dependencies:
-        payload["dependencies"] = dependencies
-    normalized_related = _normalized_refs(related)
-    if normalized_related:
-        payload["related"] = normalized_related
-    if len(payload) == 1:
-        raise WorkflowCacheIssueDraftError("at least one relationship value is required")
-
-    if config.issues.kind == "github":
-        assert write_operations is not None
-        pending_location = write_operations(payload)
-    else:
-        relationships_file.parent.mkdir(parents=True, exist_ok=True)
-        _atomic_write_text(relationships_file, _dump_yaml(payload))
-        pending_location = relationships_file
-    operations = read_operations()
-    result: dict[str, object] = {
+    payload = _relationship_payload(
+        parent=parent,
+        children=children,
+        blocked_by=blocked_by,
+        blocking=blocking,
+        related=related,
+    )
+    relationships_file.parent.mkdir(parents=True, exist_ok=True)
+    _atomic_write_text(relationships_file, _dump_yaml(payload))
+    operations = cache.read_pending_draft_relationships(site, local_id)
+    return {
         "operation": "stage_pending_issue_relationships",
         "role": "issue",
+        "kind": "jira",
+        "site": site.to_json(),
         "local_id": local_id,
         "issue_file": str(issue_file),
-        "pending_location": str(pending_location),
+        "pending_location": str(relationships_file),
+        "relationships_file": str(relationships_file),
         "operations": [operation.to_json() for operation in operations],
-        **provider_payload,
     }
-    if config.issues.kind == "jira":
-        result["relationships_file"] = str(pending_location)
-    return result
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -276,10 +195,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     create.add_argument("local_id")
 
-    relationships = subparsers.add_parser(
-        "stage-relationships",
-        help="stage provider-native relationships for a pending issue draft",
-    )
+    relationships = subparsers.add_parser("stage-relationships", help="stage provider-native relationships")
     relationships.add_argument("--local-id", required=True)
     relationships.add_argument("--parent")
     relationships.add_argument("--child", action="append", default=[])
@@ -340,9 +256,9 @@ def main(
                 runner=runner,
             )
         else:
-            raise WorkflowCacheIssueDraftError(f"unsupported command: {args.command}")
+            raise JiraIssueDraftError(f"unsupported command: {args.command}")
     except Exception as exc:
-        print(f"workflow cache issue draft error: {exc}", file=errors)
+        print(f"Jira issue draft error: {exc}", file=errors)
         return 2
 
     if args.json:
@@ -352,47 +268,67 @@ def main(
     return 0
 
 
-def _load_issue_config(project: Path) -> WorkflowConfig:
+def _load_jira_issue_config(project: Path) -> WorkflowConfig:
     try:
         config = load_workflow_config(project)
     except WorkflowConfigError as exc:
-        raise WorkflowCacheIssueDraftError(str(exc)) from exc
+        raise JiraIssueDraftError(str(exc)) from exc
     if config is None:
-        raise WorkflowCacheIssueDraftError(".workflow/config.yml was not found")
+        raise JiraIssueDraftError(".workflow/config.yml was not found")
+    if config.issues.kind != "jira":
+        raise JiraIssueDraftError(
+            f"Jira issue draft commands require configured issue provider kind jira, found {config.issues.kind}"
+        )
     return config
+
+
+def _relationship_payload(
+    *,
+    parent: str | None,
+    children: tuple[str, ...],
+    blocked_by: tuple[str, ...],
+    blocking: tuple[str, ...],
+    related: tuple[str, ...],
+) -> dict[str, object]:
+    payload: dict[str, object] = {"schema_version": SCHEMA_VERSION}
+    if parent:
+        payload["parent"] = _required_text(parent, "parent")
+    normalized_children = _normalized_refs(children)
+    normalized_blocked_by = _normalized_refs(blocked_by)
+    normalized_blocking = _normalized_refs(blocking)
+    normalized_related = _normalized_refs(related)
+    if normalized_children:
+        payload["children"] = normalized_children
+    dependencies: dict[str, object] = {}
+    if normalized_blocked_by:
+        dependencies["blocked_by"] = normalized_blocked_by
+    if normalized_blocking:
+        dependencies["blocking"] = normalized_blocking
+    if dependencies:
+        payload["dependencies"] = dependencies
+    if normalized_related:
+        payload["related"] = normalized_related
+    if len(payload) == 1:
+        raise JiraIssueDraftError("at least one relationship value is required")
+    return payload
 
 
 def _required_text(value: str, name: str) -> str:
     text = str(value or "").strip()
     if not text:
-        raise WorkflowCacheIssueDraftError(f"{name} is required")
+        raise JiraIssueDraftError(f"{name} is required")
     return text
 
 
-def _is_review_artifact_type(value: str) -> bool:
-    return value.strip().lower() == "review"
-
-
-def _is_research_artifact_type(value: str) -> bool:
-    return value.strip().lower() == "research"
-
-
-def _is_spike_artifact_type(value: str) -> bool:
-    return value.strip().lower() == "spike"
-
-
 def _jira_issue_title(artifact_type: str, title: str) -> str:
-    if _is_review_artifact_type(artifact_type):
+    artifact = artifact_type.strip().lower()
+    if artifact == "review":
         return _jira_prefixed_title(title, JIRA_REVIEW_TITLE_PREFIX)
-    if _is_research_artifact_type(artifact_type):
+    if artifact == "research":
         return _jira_prefixed_title(title, JIRA_RESEARCH_TITLE_PREFIX)
-    if _is_spike_artifact_type(artifact_type):
+    if artifact == "spike":
         return _jira_prefixed_title(title, JIRA_SPIKE_TITLE_PREFIX)
     return title
-
-
-def _jira_review_title(title: str) -> str:
-    return _jira_prefixed_title(title, JIRA_REVIEW_TITLE_PREFIX)
 
 
 def _jira_prefixed_title(title: str, prefix: str) -> str:
@@ -415,8 +351,7 @@ def _print_plain(payload: dict[str, object], output: TextIO) -> None:
         return
     if operation == "stage_pending_issue_relationships":
         print(
-            f"staged relationships for pending issue {payload.get('local_id')}: "
-            f"{payload.get('pending_location')}",
+            f"staged relationships for pending issue {payload.get('local_id')}: {payload.get('pending_location')}",
             file=output,
         )
         return
