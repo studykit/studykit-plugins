@@ -2,7 +2,7 @@
 # /// script
 # dependencies = ["python-frontmatter", "PyYAML"]
 # ///
-"""Agent-facing workflow issue semantic metadata update entrypoint."""
+"""GitHub issue semantic metadata update entrypoint."""
 
 from __future__ import annotations
 
@@ -13,20 +13,18 @@ from pathlib import Path
 from typing import Any, TextIO
 
 from workflow_cache import WorkflowCacheError
-from workflow_jira_issue_cache import JiraDataCenterIssueCache
-from workflow_github_issue_cache import GitHubIssueCache
 from workflow_command import CommandRunner
 from workflow_config import WorkflowConfig, WorkflowConfigError, load_workflow_config
 from workflow_env import workflow_project_dir_from_env
 from workflow_github import GitHubRepositoryError, resolve_github_repository
-from workflow_issue_cache import issue_numbers_from_references
-from workflow_jira_data_center_client import resolve_jira_data_center_site
-from workflow_jira_issue_refs import JiraProviderError, normalize_jira_issue_key
-from workflow_providers import ProviderDispatcher, default_provider_registry, request_from_config
+from workflow_github_issue_cache import GitHubIssueCache
+from workflow_github_issue_provider import GitHubIssueNativeProvider
+from workflow_github_issue_refs import issue_numbers_from_references
+from workflow_providers import ProviderContext, ProviderRequest
 
 
 class WorkflowIssueMetadataError(RuntimeError):
-    """Raised when semantic issue metadata cannot be updated safely."""
+    """Raised when semantic GitHub issue metadata cannot be updated safely."""
 
 
 _GITHUB_TYPE_LABELS = {"task", "bug", "spike", "epic", "review", "usecase", "research"}
@@ -41,7 +39,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--workflow-type", help="new workflow type metadata value")
     parser.add_argument("--status", help="semantic status; unsupported unless mapping is configured")
     parser.add_argument("--priority", help="semantic priority; unsupported unless mapping is configured")
-    parser.add_argument("issue", help="configured-provider issue reference")
+    parser.add_argument("issue", help="GitHub issue reference")
     return parser
 
 
@@ -56,47 +54,9 @@ def update_issue_metadata_payload(
     priority: str | None = None,
     runner: CommandRunner | None = None,
 ) -> dict[str, Any]:
-    """Update safe semantic metadata for one configured-provider issue."""
+    """Update safe semantic metadata for one GitHub issue."""
 
-    config = _load_issue_config(project)
-    if config.issues.kind == "github":
-        return _update_github_metadata(
-            config,
-            issue,
-            artifact_type=artifact_type,
-            title=title,
-            workflow_type=workflow_type,
-            status=status,
-            priority=priority,
-            runner=runner,
-        )
-    if config.issues.kind == "jira":
-        return _update_jira_metadata(
-            config,
-            issue,
-            artifact_type=artifact_type,
-            title=title,
-            workflow_type=workflow_type,
-            status=status,
-            priority=priority,
-            runner=runner,
-        )
-    raise WorkflowIssueMetadataError(
-        f"workflow issue metadata updates support GitHub and Jira issue providers, not {config.issues.kind}"
-    )
-
-
-def _update_github_metadata(
-    config: WorkflowConfig,
-    issue: str,
-    *,
-    artifact_type: str,
-    title: str | None,
-    workflow_type: str | None,
-    status: str | None,
-    priority: str | None,
-    runner: CommandRunner | None,
-) -> dict[str, Any]:
+    config = _load_github_issue_config(project)
     if status is not None:
         raise WorkflowIssueMetadataError("GitHub semantic status writes require explicit metadata mapping config")
     if priority is not None:
@@ -106,12 +66,7 @@ def _update_github_metadata(
         repo = resolve_github_repository(config.root, runner=runner)
     except GitHubRepositoryError as exc:
         raise WorkflowIssueMetadataError(str(exc)) from exc
-    issue_numbers = issue_numbers_from_references(
-        [issue],
-        repo=repo,
-        issue_id_format=config.issue_id_format,
-        allow_bare_numbers=True,
-    )
+    issue_numbers = issue_numbers_from_references([issue], repo=repo, allow_bare_numbers=True)
     if len(issue_numbers) != 1:
         raise WorkflowIssueMetadataError("metadata update requires exactly one GitHub issue ref")
     issue_number = issue_numbers[0]
@@ -134,13 +89,13 @@ def _update_github_metadata(
     if len(payload) == 2:
         raise WorkflowIssueMetadataError("metadata update requires at least one supported metadata value")
 
-    dispatcher = ProviderDispatcher(default_provider_registry(runner=runner))
-    response = dispatcher.dispatch(
-        request_from_config(
-            config,
+    provider = GitHubIssueNativeProvider(runner=runner)
+    response = provider.call(
+        ProviderRequest(
             role="issue",
+            kind="github",
             operation="update",
-            artifact_type=artifact_type,
+            context=ProviderContext(project=config.root, artifact_type=artifact_type),
             payload=payload,
         )
     )
@@ -154,63 +109,6 @@ def _update_github_metadata(
     }
 
 
-def _update_jira_metadata(
-    config: WorkflowConfig,
-    issue: str,
-    *,
-    artifact_type: str,
-    title: str | None,
-    workflow_type: str | None,
-    status: str | None,
-    priority: str | None,
-    runner: CommandRunner | None,
-) -> dict[str, Any]:
-    if workflow_type is not None:
-        raise WorkflowIssueMetadataError("Jira semantic type writes require explicit safe type-change config")
-    if status is not None:
-        raise WorkflowIssueMetadataError("Jira semantic status writes require explicit transition or field mapping config")
-    if priority is not None:
-        raise WorkflowIssueMetadataError("Jira semantic priority writes require explicit metadata mapping config")
-
-    try:
-        site = resolve_jira_data_center_site(config.root)
-        issue_key = normalize_jira_issue_key(issue)
-    except (WorkflowConfigError, JiraProviderError) as exc:
-        raise WorkflowIssueMetadataError(str(exc)) from exc
-
-    cache = JiraDataCenterIssueCache.for_project(config.root)
-    try:
-        cached = cache.read_issue(site, issue_key, include_body=False, include_comments=False, include_relationships=False)
-    except WorkflowCacheError as exc:
-        raise WorkflowIssueMetadataError(f"refresh the Jira issue cache before metadata update: {exc}") from exc
-
-    payload: dict[str, Any] = {"issue": issue_key, "freshness_check": True}
-    if title is not None:
-        payload["title"] = title
-    if len(payload) == 2:
-        raise WorkflowIssueMetadataError("metadata update requires at least one supported metadata value")
-
-    dispatcher = ProviderDispatcher(default_provider_registry(runner=runner))
-    response = dispatcher.dispatch(
-        request_from_config(
-            config,
-            role="issue",
-            operation="update",
-            artifact_type=artifact_type,
-            payload=payload,
-        )
-    )
-    return {
-        "operation": "update_issue_metadata",
-        "kind": "jira",
-        "issue": issue_key,
-        "key": issue_key,
-        "site": site.to_json(),
-        "updated": _updated_fields(title=title),
-        "provider": dict(response.payload),
-    }
-
-
 def _replace_github_type_label(labels: set[str], workflow_type: str) -> set[str]:
     desired = workflow_type.strip()
     if not desired:
@@ -220,11 +118,7 @@ def _replace_github_type_label(labels: set[str], workflow_type: str) -> set[str]
     return labels
 
 
-def _updated_fields(
-    *,
-    title: str | None,
-    workflow_type: str | None = None,
-) -> list[str]:
+def _updated_fields(*, title: str | None, workflow_type: str | None = None) -> list[str]:
     fields = []
     if title is not None:
         fields.append("title")
@@ -257,13 +151,17 @@ def _string_list(value: Any) -> list[str]:
     return [str(value)]
 
 
-def _load_issue_config(project: Path) -> WorkflowConfig:
+def _load_github_issue_config(project: Path) -> WorkflowConfig:
     try:
         config = load_workflow_config(project)
     except WorkflowConfigError as exc:
         raise WorkflowIssueMetadataError(str(exc)) from exc
     if config is None:
         raise WorkflowIssueMetadataError(".workflow/config.yml was not found")
+    if config.issues.kind != "github":
+        raise WorkflowIssueMetadataError(
+            f"GitHub issue metadata updates require configured issue provider kind github, found {config.issues.kind}"
+        )
     return config
 
 
@@ -291,7 +189,7 @@ def main(
             runner=runner,
         )
     except Exception as exc:
-        print(f"workflow issue metadata error: {exc}", file=errors)
+        print(f"GitHub issue metadata error: {exc}", file=errors)
         return 2
 
     if args.json:

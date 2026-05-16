@@ -14,8 +14,8 @@ if str(_SCRIPTS_DIR) not in sys.path:
 
 from workflow_cache import pending_relationship_operations_from_mapping  # noqa: E402
 from workflow_github_issue_cache import GitHubIssueCache  # noqa: E402
-from workflow_cache_relationships import main as cache_relationships_main  # noqa: E402
-from workflow_cache_relationships import stage_relationships_payload  # noqa: E402
+from github_issue_relationships import main as github_issue_relationships_main  # noqa: E402
+from github_issue_relationships import stage_relationships_payload  # noqa: E402
 from workflow_command import CommandRequest, CommandResult  # noqa: E402
 from workflow_github import GitHubRepository  # noqa: E402
 
@@ -125,7 +125,7 @@ def test_cache_relationships_script_dispatches_pending_relationship_apply(tmp_pa
 
     stdout = io.StringIO()
 
-    code = cache_relationships_main(
+    code = github_issue_relationships_main(
         ["--project", str(tmp_path), "--type", "task", "--json", "44"],
         stdout=stdout,
         runner=runner,
@@ -173,7 +173,7 @@ def test_cache_relationships_script_stages_existing_issue_relationship_intent(tm
     cache.write_issue_bundle(repo(), issue_payload(), fetched_at="2026-05-14T00:10:00Z")
 
     stdout = io.StringIO()
-    code = cache_relationships_main(
+    code = github_issue_relationships_main(
         [
             "--project",
             str(tmp_path),

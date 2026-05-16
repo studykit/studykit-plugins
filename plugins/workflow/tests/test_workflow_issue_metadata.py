@@ -16,10 +16,14 @@ if str(_SCRIPTS_DIR) not in sys.path:
 from workflow_command import CommandRequest, CommandResult  # noqa: E402
 from workflow_github_issue_cache import GitHubIssueCache  # noqa: E402
 from workflow_github import DEFAULT_ISSUE_FIELDS, GitHubRepository  # noqa: E402
-from workflow_issue_metadata import (  # noqa: E402
-    WorkflowIssueMetadataError,
-    update_issue_metadata_payload,
+from github_issue_metadata import (  # noqa: E402
+    WorkflowIssueMetadataError as GitHubIssueMetadataError,
 )
+from github_issue_metadata import update_issue_metadata_payload as update_github_issue_metadata_payload  # noqa: E402
+from jira_issue_metadata import (  # noqa: E402
+    WorkflowIssueMetadataError as JiraIssueMetadataError,
+)
+from jira_issue_metadata import update_issue_metadata_payload as update_jira_issue_metadata_payload  # noqa: E402
 
 
 class FakeRunner:
@@ -169,7 +173,7 @@ def test_github_metadata_update_writes_title_and_type_through_provider(tmp_path:
         }
     )
 
-    payload = update_issue_metadata_payload(
+    payload = update_github_issue_metadata_payload(
         project=tmp_path,
         issue="#39",
         artifact_type="task",
@@ -201,8 +205,8 @@ def test_github_metadata_update_writes_title_and_type_through_provider(tmp_path:
 def test_github_metadata_update_rejects_unmapped_status(tmp_path: Path) -> None:
     write_github_config(tmp_path)
 
-    with pytest.raises(WorkflowIssueMetadataError, match="status writes require explicit metadata mapping"):
-        update_issue_metadata_payload(
+    with pytest.raises(GitHubIssueMetadataError, match="status writes require explicit metadata mapping"):
+        update_github_issue_metadata_payload(
             project=tmp_path,
             issue="#39",
             artifact_type="task",
@@ -213,8 +217,8 @@ def test_github_metadata_update_rejects_unmapped_status(tmp_path: Path) -> None:
 def test_jira_metadata_update_rejects_type_without_safe_mapping(tmp_path: Path) -> None:
     write_jira_config(tmp_path)
 
-    with pytest.raises(WorkflowIssueMetadataError, match="type writes require explicit safe type-change config"):
-        update_issue_metadata_payload(
+    with pytest.raises(JiraIssueMetadataError, match="type writes require explicit safe type-change config"):
+        update_jira_issue_metadata_payload(
             project=tmp_path,
             issue="TEST-1234",
             artifact_type="task",
