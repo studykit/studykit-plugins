@@ -31,7 +31,7 @@ from workflow_github import GitHubRepository, GitHubRepositoryError, normalize_i
 from workflow_github import resolve_github_repository  # noqa: E402
 from workflow_issue_cache import cache_issue_references  # noqa: E402
 from workflow_issue_cache import extract_issue_numbers, format_issue_cache_context  # noqa: E402
-from workflow_jira import normalize_jira_issue_key  # noqa: E402
+from workflow_jira_issue_refs import normalize_jira_issue_key  # noqa: E402
 from workflow_session_state import (  # noqa: E402
     commit_prefix_was_announced,
     read_session_issues,

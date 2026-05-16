@@ -4,7 +4,9 @@
 from __future__ import annotations
 
 import os
+import json
 from collections.abc import Mapping
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -30,19 +32,17 @@ from workflow_cache import (
     _require_schema,
     _safe_path_segment,
 )
-from workflow_jira import (
+from workflow_jira_data_center_client import (
     DEPLOYMENT_DATA_CENTER,
     JiraDataCenterSite,
+)
+from workflow_jira_issue_relationships import (
     filter_jira_payload,
     normalize_jira_data_center_issue,
-    normalize_jira_issue_key,
-    render_jira_snapshot,
-    _format_json,
-    _normalize_optional,
-    _read_json_list_if_exists,
-    _read_json_mapping,
-    _utc_now,
 )
+from workflow_jira_issue_refs import normalize_jira_issue_key
+from workflow_jira_issue_snapshot import render_jira_snapshot
+
 
 class JiraDataCenterIssueCache:
     """Repo-local Jira Data Center cache with native JSON plus an LLM snapshot."""
@@ -387,3 +387,44 @@ class JiraDataCenterIssueCache:
             "comments_pending": str(moved_comments) if moved_comments is not None else None,
             "relationships_pending": str(moved_relationships) if moved_relationships is not None else None,
         }
+
+
+def _read_json_mapping(path: Path) -> Mapping[str, Any]:
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise WorkflowCacheCorrupt(f"invalid JSON cache file: {path}: {exc}") from exc
+    if not isinstance(value, Mapping):
+        raise WorkflowCacheCorrupt(f"JSON cache file must contain an object: {path}")
+    return value
+
+
+def _read_json_list_if_exists(path: Path) -> list[Mapping[str, Any]]:
+    if not path.is_file():
+        return []
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise WorkflowCacheCorrupt(f"invalid JSON cache file: {path}: {exc}") from exc
+    return _mapping_list(value)
+
+
+def _format_json(value: Any) -> str:
+    return json.dumps(value, ensure_ascii=False, indent=2) + "\n"
+
+
+def _mapping_list(value: Any) -> list[Mapping[str, Any]]:
+    if not isinstance(value, list):
+        return []
+    return [item for item in value if isinstance(item, Mapping)]
+
+
+def _normalize_optional(value: Any) -> str | None:
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None
+
+
+def _utc_now() -> str:
+    return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")

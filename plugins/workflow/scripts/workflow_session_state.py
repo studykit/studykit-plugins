@@ -28,7 +28,7 @@ if _SCRIPTS_DIR not in sys.path:
 
 from workflow_github_issue_cache import GitHubIssueCache
 from workflow_github import normalize_issue_number  # noqa: E402
-from workflow_jira import normalize_jira_issue_key  # noqa: E402
+from workflow_jira_issue_refs import normalize_jira_issue_key  # noqa: E402
 
 HOOK_STATE_DIR_NAME = "hook-state"
 

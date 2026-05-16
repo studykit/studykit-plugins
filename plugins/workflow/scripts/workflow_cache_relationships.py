@@ -24,11 +24,8 @@ from workflow_command import CommandRunner
 from workflow_config import WorkflowConfigError, load_workflow_config
 from workflow_github import GitHubRepositoryError, resolve_github_repository
 from workflow_issue_cache import issue_numbers_from_references
-from workflow_jira import (
-    JiraProviderError,
-    normalize_jira_issue_key,
-    resolve_jira_data_center_site,
-)
+from workflow_jira_data_center_client import resolve_jira_data_center_site
+from workflow_jira_issue_refs import JiraProviderError, normalize_jira_issue_key
 from workflow_providers import ProviderDispatcher, default_provider_registry, request_from_config
 from workflow_env import workflow_project_dir_from_env
 

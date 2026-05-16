@@ -19,7 +19,7 @@ from workflow_github_issue_cache import GitHubIssueCache  # noqa: E402
 from workflow_github import DEFAULT_ISSUE_FIELDS, GitHubRepository  # noqa: E402
 from workflow_issue_cache import issue_numbers_from_references  # noqa: E402
 from workflow_jira_issue_cache import JiraDataCenterIssueCache  # noqa: E402
-from workflow_jira import jira_data_center_site_from_provider_config  # noqa: E402
+from workflow_jira_data_center_client import jira_data_center_site_from_provider_config  # noqa: E402
 
 
 class FakeRunner:
