@@ -12,7 +12,8 @@ _SCRIPTS_DIR = _PLUGIN_ROOT / "scripts"
 if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
-from workflow_cache import GitHubIssueCache, pending_relationship_operations_from_mapping  # noqa: E402
+from workflow_cache import pending_relationship_operations_from_mapping  # noqa: E402
+from workflow_github_issue_cache import GitHubIssueCache  # noqa: E402
 from workflow_cache_relationships import main as cache_relationships_main  # noqa: E402
 from workflow_cache_relationships import stage_relationships_payload  # noqa: E402
 from workflow_command import CommandRequest, CommandResult  # noqa: E402

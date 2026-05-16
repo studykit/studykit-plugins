@@ -13,18 +13,18 @@ from pathlib import Path
 from typing import TextIO
 
 from workflow_cache import (
-    GitHubIssueCache,
     SCHEMA_VERSION,
     _atomic_write_text,
     _dump_yaml,
     pending_relationship_operations_from_mapping,
 )
+from workflow_jira_issue_cache import JiraDataCenterIssueCache
+from workflow_github_issue_cache import GitHubIssueCache
 from workflow_command import CommandRunner
 from workflow_config import WorkflowConfigError, load_workflow_config
 from workflow_github import GitHubRepositoryError, resolve_github_repository
 from workflow_issue_cache import issue_numbers_from_references
 from workflow_jira import (
-    JiraDataCenterIssueCache,
     JiraProviderError,
     normalize_jira_issue_key,
     resolve_jira_data_center_site,

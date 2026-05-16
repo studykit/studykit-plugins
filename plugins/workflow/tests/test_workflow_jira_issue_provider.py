@@ -15,8 +15,8 @@ if str(_SCRIPTS_DIR) not in sys.path:
 
 from workflow_command import CommandRequest, CommandResult  # noqa: E402
 from workflow_cache_relationships import stage_relationships_payload  # noqa: E402
+from workflow_jira_issue_cache import JiraDataCenterIssueCache  # noqa: E402
 from workflow_jira import (  # noqa: E402
-    JiraDataCenterIssueCache,
     jira_data_center_site_from_provider_config,
 )
 from workflow_providers import (  # noqa: E402

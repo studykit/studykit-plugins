@@ -26,7 +26,7 @@ _SCRIPTS_DIR = str(Path(__file__).resolve().parent)
 if _SCRIPTS_DIR not in sys.path:
     sys.path.insert(0, _SCRIPTS_DIR)
 
-from workflow_cache import GitHubIssueCache  # noqa: E402
+from workflow_github_issue_cache import GitHubIssueCache
 from workflow_github import normalize_issue_number  # noqa: E402
 from workflow_jira import normalize_jira_issue_key  # noqa: E402
 

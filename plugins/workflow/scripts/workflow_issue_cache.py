@@ -9,11 +9,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from workflow_cache import GitHubIssueCache
 from workflow_command import CommandRunner
 from workflow_config import WorkflowConfig
+from workflow_github_issue_cache import GitHubIssueCache
 from workflow_github import GitHubRepository, normalize_issue_number
-from workflow_jira import JiraDataCenterIssueCache, normalize_jira_issue_key, resolve_jira_data_center_site
+from workflow_jira_issue_cache import JiraDataCenterIssueCache
+from workflow_jira import normalize_jira_issue_key, resolve_jira_data_center_site
 from workflow_providers import CACHE_POLICY_DEFAULT, ProviderDispatcher, default_provider_registry
 from workflow_providers import request_from_config
 from workflow_relationship_renderers import render_relationship_summary

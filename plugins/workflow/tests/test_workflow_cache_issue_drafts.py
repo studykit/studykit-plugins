@@ -11,14 +11,15 @@ _SCRIPTS_DIR = Path(__file__).resolve().parent.parent / "scripts"
 if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
-from workflow_cache import GitHubIssueCache  # noqa: E402
 from workflow_cache_issue_drafts import main as issue_drafts_main  # noqa: E402
 from workflow_cache_issue_drafts import prepare_pending_issue_draft  # noqa: E402
 from workflow_cache_issue_drafts import stage_pending_issue_relationships  # noqa: E402
 from workflow_command import CommandRequest, CommandResult  # noqa: E402
+from workflow_github_issue_cache import GitHubIssueCache  # noqa: E402
 from workflow_github import DEFAULT_ISSUE_FIELDS  # noqa: E402
 from workflow_github import GitHubRepository  # noqa: E402
-from workflow_jira import JiraDataCenterIssueCache, resolve_jira_data_center_site  # noqa: E402
+from workflow_jira_issue_cache import JiraDataCenterIssueCache  # noqa: E402
+from workflow_jira import resolve_jira_data_center_site  # noqa: E402
 
 
 class FakeRunner:
