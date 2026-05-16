@@ -19,9 +19,7 @@ from workflow_cache import (
 from workflow_jira_issue_cache import JiraDataCenterIssueCache
 from workflow_command import CommandRunner
 from workflow_config import WorkflowConfigError, load_workflow_config
-from workflow_jira import (
-    JiraProviderError,
-    filter_jira_payload,
+from workflow_jira_data_center_client import (
     jira_data_center_comments_path,
     jira_data_center_issue_path,
     jira_data_center_issue_link_path,
@@ -32,10 +30,13 @@ from workflow_jira import (
     jira_delete,
     jira_get_json,
     jira_send_json,
-    normalize_jira_data_center_issue,
-    normalize_jira_issue_key,
-    normalize_jira_remote_links,
     resolve_jira_data_center_site,
+)
+from workflow_jira_issue_refs import JiraProviderError, normalize_jira_issue_key
+from workflow_jira_issue_relationships import (
+    filter_jira_payload,
+    normalize_jira_data_center_issue,
+    normalize_jira_remote_links,
 )
 from workflow_providers import (
     CACHE_POLICY_BYPASS,
