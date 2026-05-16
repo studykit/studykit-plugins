@@ -16,10 +16,10 @@ from workflow_cache import (
     WorkflowFreshnessConflict,
     require_provider_freshness,
 )
+from workflow_jira_issue_cache import JiraDataCenterIssueCache
 from workflow_command import CommandRunner
 from workflow_config import WorkflowConfigError, load_workflow_config
 from workflow_jira import (
-    JiraDataCenterIssueCache,
     JiraProviderError,
     filter_jira_payload,
     jira_data_center_comments_path,

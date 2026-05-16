@@ -12,14 +12,15 @@ import sys
 from pathlib import Path
 from typing import Any, TextIO
 
-from workflow_cache import GitHubIssueCache, WorkflowCacheError
+from workflow_cache import WorkflowCacheError
+from workflow_jira_issue_cache import JiraDataCenterIssueCache
+from workflow_github_issue_cache import GitHubIssueCache
 from workflow_command import CommandRunner
 from workflow_config import WorkflowConfig, WorkflowConfigError, load_workflow_config
 from workflow_env import workflow_project_dir_from_env
 from workflow_github import GitHubRepositoryError, resolve_github_repository
 from workflow_issue_cache import issue_numbers_from_references
 from workflow_jira import (
-    JiraDataCenterIssueCache,
     JiraProviderError,
     normalize_jira_issue_key,
     resolve_jira_data_center_site,
