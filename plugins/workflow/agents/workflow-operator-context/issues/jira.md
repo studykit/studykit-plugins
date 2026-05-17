@@ -20,8 +20,9 @@ Create provider issues from drafts only after explicit user approval and
 `--confirm-provider-create`.
 Use `$ISSUE_WRITEBACK`, `$ISSUE_COMMENTS`, `$ISSUE_RELATIONSHIPS`, and
 `$ISSUE_METADATA` for provider/cache mutations they support.
-After any provider state mutation, run `$ISSUE_FETCH` with
-`--cache-policy refresh` for the affected issues so cache projections match the
-provider.
-If a requested provider operation is unsupported, return that limitation instead
-of guessing another provider command.
+Provider mutation scripts refresh affected cache projections internally.
+If a mutation response has `status=blocked` and `reread_required=true`, stop and
+tell the main agent to reread the listed cache paths before retrying.
+If a requested provider operation is unsupported, return that limitation and
+tell the main agent to decide whether to use a raw provider CLI outside the
+operator. Do not guess another provider command.

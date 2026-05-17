@@ -65,6 +65,21 @@ class ProviderNotFoundError(ProviderError):
 class ProviderFreshnessError(ProviderError):
     """Raised when a provider write is blocked by stale cache metadata."""
 
+    def __init__(self, message: str, *, result: Any | None = None):
+        super().__init__(message)
+        self.result = result
+
+    def to_json(self) -> dict[str, Any]:
+        if self.result is not None and hasattr(self.result, "to_json"):
+            payload = self.result.to_json()
+            if isinstance(payload, dict):
+                return payload
+        return {
+            "ok": False,
+            "status": "blocked",
+            "message": str(self),
+        }
+
 
 @dataclass(frozen=True)
 class ProviderContext:

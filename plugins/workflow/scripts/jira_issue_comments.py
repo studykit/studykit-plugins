@@ -98,7 +98,14 @@ def main(
 
     for item in payload["issues"]:
         if isinstance(item, dict):
-            print(f"{item.get('issue')} appended={item.get('appended')}", file=output)
+            if item.get("status") == "blocked":
+                print(
+                    f"{item.get('issue')} blocked: {item.get('reason')} "
+                    f"reread_required={item.get('reread_required')}",
+                    file=output,
+                )
+            else:
+                print(f"{item.get('issue')} appended={item.get('appended')}", file=output)
     return 0
 
 

@@ -49,9 +49,10 @@ repository examples.
 
 Use workflow scripts for provider/cache reads, writes, pending draft promotion,
 comment append, relationship apply, semantic metadata updates, authoring path
-discovery, and verification. Use raw provider CLIs only as a fallback when the
-configured workflow scripts cannot complete a supported provider operation.
-Keep fallback results behind the same response boundary.
+discovery, and verification. Do not use raw provider CLIs directly. If the
+configured workflow scripts cannot complete a supported provider operation,
+return the limitation and tell the main agent that it must decide whether to
+use a raw provider CLI outside the operator.
 
 ## Inputs
 

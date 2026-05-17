@@ -282,7 +282,17 @@ class JiraDataCenterIssueNativeProvider(IssueProvider):
     ) -> Mapping[str, Any]:
         site = resolve_jira_data_center_site(request.context.project)
         cache = JiraDataCenterIssueCache.for_project(request.context.project)
-        self._require_write_freshness(request, site, cache, issue_key, target="issue")
+        try:
+            self._require_write_freshness(request, site, cache, issue_key, target="issue")
+        except ProviderFreshnessError as exc:
+            return self._stale_cache_block_payload(
+                site=site,
+                cache=cache,
+                issue_key=issue_key,
+                operation=operation,
+                target="issue",
+                error=exc,
+            )
         update_issue(site, issue_key, fields=fields, runner=self.runner)
         write_result = self._refresh_cache(site, cache, issue_key)
         return {
@@ -315,7 +325,18 @@ class JiraDataCenterIssueNativeProvider(IssueProvider):
         if not pending_comments:
             raise ProviderOperationError(f"no pending comment files found for Jira issue {issue_key}")
 
-        self._require_write_freshness(request, site, cache, issue_key, target="comments")
+        try:
+            self._require_write_freshness(request, site, cache, issue_key, target="comments")
+        except ProviderFreshnessError as exc:
+            return self._stale_cache_block_payload(
+                site=site,
+                cache=cache,
+                issue_key=issue_key,
+                operation="append_pending_comments",
+                target="comments",
+                error=exc,
+                pending_files=[pending.file_name for pending in pending_comments],
+            )
         appended = [add_comment(site, issue_key, body=pending.body, runner=self.runner) for pending in pending_comments]
         write_result = self._refresh_cache(site, cache, issue_key)
         removed = cache.remove_pending_issue_comments(site, issue_key, pending_comments)
@@ -334,7 +355,17 @@ class JiraDataCenterIssueNativeProvider(IssueProvider):
     def _append_comment(self, request: ProviderRequest, issue_key: str, body: str) -> Mapping[str, Any]:
         site = resolve_jira_data_center_site(request.context.project)
         cache = JiraDataCenterIssueCache.for_project(request.context.project)
-        self._require_write_freshness(request, site, cache, issue_key, target="comments")
+        try:
+            self._require_write_freshness(request, site, cache, issue_key, target="comments")
+        except ProviderFreshnessError as exc:
+            return self._stale_cache_block_payload(
+                site=site,
+                cache=cache,
+                issue_key=issue_key,
+                operation="add_comment",
+                target="comments",
+                error=exc,
+            )
         created = add_comment(site, issue_key, body=body, runner=self.runner)
         write_result = self._refresh_cache(site, cache, issue_key)
         return {
@@ -528,7 +559,7 @@ class JiraDataCenterIssueNativeProvider(IssueProvider):
         try:
             require_provider_freshness(metadata, provider_updated_at=provider_updated_at, artifact=artifact)
         except WorkflowFreshnessConflict as exc:
-            raise ProviderFreshnessError(str(exc)) from exc
+            raise ProviderFreshnessError(str(exc), result=exc.result) from exc
         return provider_current
 
     def _refresh_cache(
@@ -540,6 +571,57 @@ class JiraDataCenterIssueNativeProvider(IssueProvider):
         raw_issue = get_issue(site, issue_key, runner=self.runner)
         remote_links = get_remote_links(site, issue_key, runner=self.runner)
         return cache.write_issue_bundle(site, raw_issue, remote_links=remote_links)
+
+    def _stale_cache_block_payload(
+        self,
+        *,
+        site: Any,
+        cache: JiraDataCenterIssueCache,
+        issue_key: str,
+        operation: str,
+        target: str,
+        error: ProviderFreshnessError,
+        pending_files: list[str] | None = None,
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            "operation": operation,
+            "issue": issue_key,
+            "key": issue_key,
+            "status": "blocked",
+            "reason": "stale_cache",
+            "message": (
+                f"{operation} blocked because Jira issue {issue_key} {target} changed on the provider. "
+                "The cache was refreshed; reread the listed paths before retrying."
+            ),
+            "target": target,
+            "freshness": error.to_json(),
+            "reread_required": True,
+            "reread_paths": self._reread_paths(cache, site, issue_key),
+        }
+        if pending_files is not None:
+            payload["pending_files"] = pending_files
+        try:
+            write_result = self._refresh_cache(site, cache, issue_key)
+        except Exception as refresh_exc:  # pragma: no cover - defensive reporting path
+            payload["cache_refreshed"] = False
+            payload["refresh_error"] = str(refresh_exc)
+        else:
+            payload["cache_refreshed"] = True
+            payload["cache"] = dict(write_result)
+        return payload
+
+    def _reread_paths(
+        self,
+        cache: JiraDataCenterIssueCache,
+        site: Any,
+        issue_key: str,
+    ) -> list[str]:
+        return [
+            str(cache.snapshot_file(site, issue_key)),
+            str(cache.metadata_file(site, issue_key)),
+            str(cache.issue_json_file(site, issue_key)),
+            str(cache.remote_links_json_file(site, issue_key)),
+        ]
 
 
 def get_issue(

@@ -15,6 +15,7 @@ if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
 from workflow_cache import pending_relationship_operations_from_mapping  # noqa: E402
+from github_issue_lifecycle import lifecycle_payload  # noqa: E402
 from workflow_github_issue_cache import GitHubIssueCache  # noqa: E402
 from workflow_command import CommandRequest, CommandResult  # noqa: E402
 from workflow_config import parse_workflow_config  # noqa: E402
@@ -30,7 +31,6 @@ from workflow_providers import (  # noqa: E402
     KnowledgeProvider,
     ProviderContext,
     ProviderDispatcher,
-    ProviderFreshnessError,
     ProviderOperationError,
     ProviderRegistry,
     ProviderRequest,
@@ -388,6 +388,27 @@ def test_github_issue_update_blocks_stale_freshness_before_mutation(tmp_path: Pa
                 returncode=0,
                 stdout=json.dumps({"number": 39, "updatedAt": "2026-05-13T13:00:00Z"}),
             )
+        if request.args == gh_issue_view_args(39, ",".join(DEFAULT_ISSUE_FIELDS)):
+            events.append("refresh")
+            return CommandResult(
+                request=request,
+                returncode=0,
+                stdout=json.dumps(cached_issue_payload(updated_at="2026-05-13T13:00:00Z")),
+            )
+        if request.args == gh_api_args("repos/studykit/studykit-plugins/issues/39"):
+            return CommandResult(
+                request=request,
+                returncode=0,
+                stdout=json.dumps({"id": 3900, "number": 39, "updated_at": "2026-05-13T13:00:00Z"}),
+            )
+        if request.args == gh_api_args("repos/studykit/studykit-plugins/issues/39/parent"):
+            return CommandResult(request=request, returncode=404, stderr="not found")
+        if request.args in {
+            gh_api_args("repos/studykit/studykit-plugins/issues/39/sub_issues", "--paginate"),
+            gh_api_args("repos/studykit/studykit-plugins/issues/39/dependencies/blocked_by", "--paginate"),
+            gh_api_args("repos/studykit/studykit-plugins/issues/39/dependencies/blocking", "--paginate"),
+        }:
+            return CommandResult(request=request, returncode=0, stdout="[]")
         if request.args[:3] == ("gh", "issue", "edit"):
             events.append("edit")
             return CommandResult(request=request, returncode=0)
@@ -395,18 +416,22 @@ def test_github_issue_update_blocks_stale_freshness_before_mutation(tmp_path: Pa
 
     dispatcher = ProviderDispatcher(default_provider_registry(runner=runner))
 
-    with pytest.raises(ProviderFreshnessError, match="Refresh the provider cache before writing"):
-        dispatcher.dispatch(
-            ProviderRequest(
-                role="issue",
-                kind="github",
-                operation="update",
-                context=ProviderContext(project=tmp_path, artifact_type="task", session_id="s1"),
-                payload={"issue": 39, "body": "Updated body.", "freshness_check": True},
-            )
+    response = dispatcher.dispatch(
+        ProviderRequest(
+            role="issue",
+            kind="github",
+            operation="update",
+            context=ProviderContext(project=tmp_path, artifact_type="task", session_id="s1"),
+            payload={"issue": 39, "body": "Updated body.", "freshness_check": True},
         )
+    )
 
-    assert events == ["freshness"]
+    assert response.payload["status"] == "blocked"
+    assert response.payload["reason"] == "stale_cache"
+    assert response.payload["reread_required"] is True
+    assert response.payload["cache_refreshed"] is True
+    assert response.payload["freshness"]["status"] == "stale"
+    assert events == ["freshness", "refresh"]
 
 
 def test_github_issue_update_from_cache_projection_checks_freshness_and_refreshes_cache(
@@ -553,6 +578,27 @@ def test_github_issue_update_from_cache_blocks_stale_projection_before_mutation(
                     }
                 ),
             )
+        if request.args == gh_issue_view_args(39, ",".join(DEFAULT_ISSUE_FIELDS)):
+            events.append("refresh")
+            return CommandResult(
+                request=request,
+                returncode=0,
+                stdout=json.dumps(cached_issue_payload(updated_at="2026-05-13T13:00:00Z")),
+            )
+        if request.args == gh_api_args("repos/studykit/studykit-plugins/issues/39"):
+            return CommandResult(
+                request=request,
+                returncode=0,
+                stdout=json.dumps({"id": 3900, "number": 39, "updated_at": "2026-05-13T13:00:00Z"}),
+            )
+        if request.args == gh_api_args("repos/studykit/studykit-plugins/issues/39/parent"):
+            return CommandResult(request=request, returncode=404, stderr="not found")
+        if request.args in {
+            gh_api_args("repos/studykit/studykit-plugins/issues/39/sub_issues", "--paginate"),
+            gh_api_args("repos/studykit/studykit-plugins/issues/39/dependencies/blocked_by", "--paginate"),
+            gh_api_args("repos/studykit/studykit-plugins/issues/39/dependencies/blocking", "--paginate"),
+        }:
+            return CommandResult(request=request, returncode=0, stdout="[]")
         if request.args[:3] == ("gh", "issue", "edit"):
             events.append("edit")
             return CommandResult(request=request, returncode=0)
@@ -560,18 +606,23 @@ def test_github_issue_update_from_cache_blocks_stale_projection_before_mutation(
 
     dispatcher = ProviderDispatcher(default_provider_registry(runner=runner))
 
-    with pytest.raises(ProviderFreshnessError, match="Refresh the provider cache before writing"):
-        dispatcher.dispatch(
-            ProviderRequest(
-                role="issue",
-                kind="github",
-                operation="update",
-                context=ProviderContext(project=tmp_path, artifact_type="task", session_id="s1"),
-                payload={"issue": 39, "from_cache": True},
-            )
+    response = dispatcher.dispatch(
+        ProviderRequest(
+            role="issue",
+            kind="github",
+            operation="update",
+            context=ProviderContext(project=tmp_path, artifact_type="task", session_id="s1"),
+            payload={"issue": 39, "from_cache": True},
         )
+    )
 
-    assert events == ["freshness"]
+    assert response.payload["operation"] == "update_issue_from_cache"
+    assert response.payload["status"] == "blocked"
+    assert response.payload["reason"] == "stale_cache"
+    assert response.payload["reread_required"] is True
+    assert response.payload["cache_refreshed"] is True
+    assert "issue.md" in "\n".join(response.payload["reread_paths"])
+    assert events == ["freshness", "refresh"]
 
 
 def test_github_issue_create_from_pending_draft_refreshes_cache_and_finalizes_pending(
@@ -671,6 +722,83 @@ Draft body.
     assert events == ["create", "verify", "refresh"]
 
 
+def test_github_issue_lifecycle_close_checks_freshness_and_refreshes_cache(
+    tmp_path: Path,
+) -> None:
+    write_config(tmp_path)
+    cache = GitHubIssueCache.for_project(tmp_path, configured_repo=github_repo())
+    cache.write_issue_bundle(github_repo(), cached_issue_payload(), fetched_at="2026-05-14T00:00:00Z")
+    events: list[str] = []
+
+    def runner(request: CommandRequest) -> CommandResult:
+        if request.args == git_args(tmp_path, "remote", "get-url", "origin"):
+            return CommandResult(
+                request=request,
+                returncode=0,
+                stdout="git@github.com:studykit/studykit-plugins.git\n",
+            )
+        if request.args == gh_issue_freshness_args(39):
+            events.append("freshness")
+            return CommandResult(
+                request=request,
+                returncode=0,
+                stdout=json.dumps({"number": 39, "updatedAt": "2026-05-13T12:00:00Z"}),
+            )
+        if request.args == (
+            "gh",
+            "issue",
+            "close",
+            "39",
+            "--repo",
+            "studykit/studykit-plugins",
+            "--reason",
+            "completed",
+        ):
+            events.append("close")
+            return CommandResult(request=request, returncode=0)
+        if request.args == gh_issue_view_args(39, "state,stateReason"):
+            events.append("verify")
+            return CommandResult(
+                request=request,
+                returncode=0,
+                stdout=json.dumps({"state": "CLOSED", "stateReason": "COMPLETED"}),
+            )
+        if request.args == gh_issue_view_args(39, ",".join(DEFAULT_ISSUE_FIELDS)):
+            events.append("refresh")
+            return CommandResult(request=request, returncode=0, stdout=json.dumps(writeback_issue_payload()))
+        if request.args == gh_api_args("repos/studykit/studykit-plugins/issues/39"):
+            return CommandResult(
+                request=request,
+                returncode=0,
+                stdout=json.dumps({"id": 3900, "number": 39, "updated_at": "2026-05-13T12:00:00Z"}),
+            )
+        if request.args == gh_api_args("repos/studykit/studykit-plugins/issues/39/parent"):
+            return CommandResult(request=request, returncode=404, stderr="not found")
+        if request.args in {
+            gh_api_args("repos/studykit/studykit-plugins/issues/39/sub_issues", "--paginate"),
+            gh_api_args("repos/studykit/studykit-plugins/issues/39/dependencies/blocked_by", "--paginate"),
+            gh_api_args("repos/studykit/studykit-plugins/issues/39/dependencies/blocking", "--paginate"),
+        }:
+            return CommandResult(request=request, returncode=0, stdout="[]")
+        return CommandResult(request=request, returncode=127, stderr="unexpected command")
+
+    payload = lifecycle_payload(
+        project=tmp_path,
+        operation="close",
+        issues=["#39"],
+        artifact_type="task",
+        runner=runner,
+    )
+
+    assert payload["operation"] == "lifecycle_close"
+    issue_payload_result = payload["issues"][0]
+    assert issue_payload_result["operation"] == "close_issue"
+    assert issue_payload_result["verified"] is True
+    assert issue_payload_result["cache_refreshed"] is True
+    assert cache.read_issue(github_repo(), 39)["state"] == "closed"
+    assert events == ["freshness", "close", "verify", "refresh"]
+
+
 def test_github_issue_add_comment_from_pending_files_dispatches_and_refreshes_cache(
     tmp_path: Path,
 ) -> None:
@@ -697,11 +825,18 @@ Pending comment body.
                 returncode=0,
                 stdout="git@github.com:studykit/studykit-plugins.git\n",
             )
+        if request.args == gh_issue_view_args(39, "number,updatedAt,comments"):
+            events.append("freshness")
+            return CommandResult(
+                request=request,
+                returncode=0,
+                stdout=json.dumps({"number": 39, "updatedAt": "2026-05-13T12:00:00Z", "comments": []}),
+            )
         if request.args[:3] == ("gh", "issue", "comment"):
             events.append("comment")
             body_file = Path(request.args[request.args.index("--body-file") + 1])
             assert body_file.read_text(encoding="utf-8") == "Pending comment body.\n"
-            assert events == ["comment"]
+            assert events == ["freshness", "comment"]
             return CommandResult(request=request, returncode=0)
         if request.args == gh_issue_view_args(39, ",".join(DEFAULT_ISSUE_FIELDS)):
             events.append("refresh")
@@ -729,7 +864,91 @@ Pending comment body.
     cached = cache.read_comments(github_repo(), 39)
     assert cached["comments"][0]["id"] == "4440388606"
     assert cached["comments"][0]["body"] == "Pending comment body.\n"
-    assert events == ["comment", "refresh"]
+    assert events == ["freshness", "comment", "refresh"]
+
+
+def test_github_issue_pending_comment_stale_cache_blocks_and_refreshes_before_mutation(
+    tmp_path: Path,
+) -> None:
+    cache = GitHubIssueCache.for_project(tmp_path, configured_repo=github_repo())
+    cache.write_issue_bundle(github_repo(), cached_issue_payload(), fetched_at="2026-05-14T00:00:00Z")
+    pending_dir = cache.comments_pending_dir(github_repo(), 39)
+    pending_dir.mkdir(parents=True)
+    pending_file = pending_dir / "2026-05-14T000000Z-local.md"
+    pending_file.write_text("---\nschema_version: 1\n---\n\nPending comment body.\n", encoding="utf-8")
+    events: list[str] = []
+
+    def runner(request: CommandRequest) -> CommandResult:
+        if request.args == git_args(tmp_path, "remote", "get-url", "origin"):
+            return CommandResult(
+                request=request,
+                returncode=0,
+                stdout="git@github.com:studykit/studykit-plugins.git\n",
+            )
+        if request.args == gh_issue_view_args(39, "number,updatedAt,comments"):
+            events.append("freshness")
+            return CommandResult(
+                request=request,
+                returncode=0,
+                stdout=json.dumps(
+                    {
+                        "number": 39,
+                        "updatedAt": "2026-05-14T00:10:00Z",
+                        "comments": [
+                            {
+                                "id": "IC_kwDOQplzFM8AAAABCKrz_g",
+                                "url": "https://github.com/studykit/studykit-plugins/issues/39#issuecomment-4440388606",
+                                "author": {"login": "studykit"},
+                                "body": "Provider comment.",
+                                "createdAt": "2026-05-14T00:00:00Z",
+                                "updatedAt": "2026-05-14T00:10:00Z",
+                            }
+                        ],
+                    }
+                ),
+            )
+        if request.args == gh_issue_view_args(39, ",".join(DEFAULT_ISSUE_FIELDS)):
+            events.append("refresh")
+            return CommandResult(request=request, returncode=0, stdout=json.dumps(commented_issue_payload()))
+        if request.args == gh_api_args("repos/studykit/studykit-plugins/issues/39"):
+            return CommandResult(
+                request=request,
+                returncode=0,
+                stdout=json.dumps({"id": 3900, "number": 39, "updated_at": "2026-05-14T00:10:00Z"}),
+            )
+        if request.args == gh_api_args("repos/studykit/studykit-plugins/issues/39/parent"):
+            return CommandResult(request=request, returncode=404, stderr="not found")
+        if request.args in {
+            gh_api_args("repos/studykit/studykit-plugins/issues/39/sub_issues", "--paginate"),
+            gh_api_args("repos/studykit/studykit-plugins/issues/39/dependencies/blocked_by", "--paginate"),
+            gh_api_args("repos/studykit/studykit-plugins/issues/39/dependencies/blocking", "--paginate"),
+        }:
+            return CommandResult(request=request, returncode=0, stdout="[]")
+        if request.args[:3] == ("gh", "issue", "comment"):
+            events.append("comment")
+            return CommandResult(request=request, returncode=0)
+        return CommandResult(request=request, returncode=127, stderr="unexpected command")
+
+    dispatcher = ProviderDispatcher(default_provider_registry(runner=runner))
+
+    response = dispatcher.dispatch(
+        ProviderRequest(
+            role="issue",
+            kind="github",
+            operation="add_comment",
+            context=ProviderContext(project=tmp_path, artifact_type="task", session_id="s1"),
+            payload={"issue": 39, "from_pending": True},
+        )
+    )
+
+    assert response.payload["operation"] == "append_pending_comments"
+    assert response.payload["status"] == "blocked"
+    assert response.payload["reason"] == "stale_cache"
+    assert response.payload["target"] == "comments"
+    assert response.payload["pending_files"] == ["2026-05-14T000000Z-local.md"]
+    assert response.payload["reread_required"] is True
+    assert pending_file.exists()
+    assert events == ["freshness", "refresh"]
 
 
 def test_github_issue_apply_relationships_from_pending_file_dispatches_refreshes_and_cleans(

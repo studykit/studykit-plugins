@@ -173,6 +173,12 @@ Pending comment body.
         encoding="utf-8",
     )
     def runner(request: CommandRequest) -> CommandResult:
+        if request.args == gh_issue_view_args(43, "number,updatedAt,comments"):
+            return CommandResult(
+                request=request,
+                returncode=0,
+                stdout=json.dumps({"number": 43, "updatedAt": "2026-05-14T00:00:00Z", "comments": []}),
+            )
         if request.args[:3] == ("gh", "issue", "comment"):
             body_file = Path(request.args[request.args.index("--body-file") + 1])
             assert body_file.read_text(encoding="utf-8") == "Pending comment body.\n"

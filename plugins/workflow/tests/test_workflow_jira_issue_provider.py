@@ -22,7 +22,6 @@ from workflow_providers import (  # noqa: E402
     CACHE_POLICY_REFRESH,
     ProviderContext,
     ProviderDispatcher,
-    ProviderFreshnessError,
     ProviderOperationError,
     ProviderRequest,
     default_provider_registry,
@@ -846,19 +845,61 @@ def test_data_center_stale_cache_blocks_write_before_put(tmp_path: Path) -> None
         remote_links=remote_links_payload(),
         fetched_at="2026-05-15T10:00:00.000+0900",
     )
-    runner = FakeRunner(
-        {
-            curl_args(issue_url()): result(
-                curl_args(issue_url()),
-                stdout=json.dumps(jira_issue_payload(body="Newer provider body.")),
-            )
-        }
-    )
     newer = jira_issue_payload(body="Newer provider body.")
     newer["fields"]["updated"] = "2026-05-15T11:00:00.000+0900"  # type: ignore[index]
-    runner.responses[curl_args(issue_url())] = result(curl_args(issue_url()), stdout=json.dumps(newer))
+    runner = FakeRunner(
+        {
+            curl_args(issue_url()): [
+                result(curl_args(issue_url()), stdout=json.dumps(newer)),
+                result(curl_args(issue_url()), stdout=json.dumps(newer)),
+            ],
+            curl_args(remote_links_url()): result(curl_args(remote_links_url()), stdout=json.dumps(remote_links_payload())),
+        }
+    )
 
-    with pytest.raises(ProviderFreshnessError, match="Stale workflow cache"):
-        dispatch_write(tmp_path, runner, "update", issue="TEST-1234", from_cache=True)
+    response = dispatch_write(tmp_path, runner, "update", issue="TEST-1234", from_cache=True)
 
+    assert response.payload["operation"] == "update_issue_from_cache"
+    assert response.payload["status"] == "blocked"
+    assert response.payload["reason"] == "stale_cache"
+    assert response.payload["reread_required"] is True
+    assert response.payload["cache_refreshed"] is True
+    assert response.payload["freshness"]["status"] == "stale"
+    assert "snapshot.md" in "\n".join(response.payload["reread_paths"])
+    assert all(request.args != curl_write_args() for request in runner.requests)
+
+
+def test_data_center_pending_comment_stale_cache_blocks_and_refreshes_before_post(tmp_path: Path) -> None:
+    write_jira_config(tmp_path)
+    site = jira_site(tmp_path)
+    cache = JiraDataCenterIssueCache.for_project(tmp_path)
+    cache.write_issue_bundle(
+        site,
+        jira_issue_payload(),
+        remote_links=remote_links_payload(),
+        fetched_at="2026-05-15T10:00:00.000+0900",
+    )
+    pending = cache.comments_pending_dir(site, "TEST-1234") / "001.md"
+    pending.parent.mkdir(parents=True, exist_ok=True)
+    pending.write_text("---\n---\n\nPending comment body.\n", encoding="utf-8")
+    newer = jira_issue_payload(body="Newer provider body.")
+    newer["fields"]["updated"] = "2026-05-15T11:00:00.000+0900"  # type: ignore[index]
+    runner = FakeRunner(
+        {
+            curl_args(issue_url()): [
+                result(curl_args(issue_url()), stdout=json.dumps(newer)),
+                result(curl_args(issue_url()), stdout=json.dumps(newer)),
+            ],
+            curl_args(remote_links_url()): result(curl_args(remote_links_url()), stdout=json.dumps(remote_links_payload())),
+        }
+    )
+
+    response = dispatch_write(tmp_path, runner, "add_comment", issue="TEST-1234", pending_comments=True)
+
+    assert response.payload["operation"] == "append_pending_comments"
+    assert response.payload["status"] == "blocked"
+    assert response.payload["target"] == "comments"
+    assert response.payload["pending_files"] == ["001.md"]
+    assert response.payload["reread_required"] is True
+    assert pending.exists()
     assert all(request.args != curl_write_args() for request in runner.requests)
