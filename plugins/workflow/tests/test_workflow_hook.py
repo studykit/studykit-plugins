@@ -1479,7 +1479,7 @@ def test_user_prompt_ignores_stop_pending_issue_state(
     ).exists()
 
 
-def test_user_prompt_injects_compact_relationship_summary(
+def test_user_prompt_lists_issue_path_when_frontmatter_has_relationships(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -1518,11 +1518,7 @@ def test_user_prompt_injects_compact_relationship_summary(
 
     payload = json.loads(captured.getvalue())
     context = payload["hookSpecificOutput"]["additionalContext"]
-    assert context == (
-        "## Workflow issue cache\n\n"
-        "- #39 → `.workflow-cache/issues/39/issue.md` — "
-        "parent #28; children #41; blocked_by #33; blocking #45"
-    )
+    assert context == "## Workflow issue cache\n\n- #39 → `.workflow-cache/issues/39/issue.md`"
 
 
 def test_stop_does_not_carry_issue_refs_to_next_user_prompt(
