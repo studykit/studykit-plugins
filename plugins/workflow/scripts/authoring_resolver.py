@@ -149,6 +149,26 @@ def absolute_authoring_paths(parts: Iterable[str]) -> tuple[Path, ...]:
     return tuple(paths)
 
 
+def authoring_relative_path(path: Path, *, plugin_root: Path | None = None) -> str | None:
+    root = (plugin_root or PLUGIN_ROOT).expanduser().resolve()
+    authoring_dir = (root / "authoring").resolve()
+    resolved = path.expanduser()
+    if not resolved.is_absolute():
+        resolved = Path.cwd() / resolved
+    resolved = resolved.resolve()
+    try:
+        relative = resolved.relative_to(authoring_dir)
+    except ValueError:
+        return None
+    if not resolved.is_file():
+        return None
+    return relative.as_posix()
+
+
+def is_authoring_file(path: Path, *, plugin_root: Path | None = None) -> bool:
+    return authoring_relative_path(path, plugin_root=plugin_root) is not None
+
+
 def resolve_authoring(
     artifact_type: str,
     *,

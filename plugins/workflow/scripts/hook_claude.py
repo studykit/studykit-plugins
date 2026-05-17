@@ -30,6 +30,7 @@ if _SCRIPTS_DIR not in sys.path:
     sys.path.insert(0, _SCRIPTS_DIR)
 
 from workflow_command import CommandRunner  # noqa: E402
+from authoring_resolver import authoring_relative_path  # noqa: E402
 from workflow_hook import (  # noqa: E402
     EditTarget,
     block_provider_cache_body_write,
@@ -48,6 +49,7 @@ from workflow_operator_context import (  # noqa: E402
     build_operator_session_context,
 )
 from workflow_session_state import (  # noqa: E402
+    record_authoring_file_read,
     record_session_policy_announced,
     session_policy_was_announced,
 )
@@ -88,6 +90,19 @@ class ClaudePreToolUsePayload(ClaudeCommonPayload):
 
 
 @dataclass(frozen=True)
+class ClaudePostToolUsePayload(ClaudeCommonPayload):
+    permission_mode: str | None
+    effort: dict[str, Any] | None
+    agent_id: str | None
+    agent_type: str | None
+    tool_name: str
+    tool_input: dict[str, Any]
+    tool_response: Any
+    tool_use_id: str | None
+    duration_ms: int | None
+
+
+@dataclass(frozen=True)
 class ClaudeUserPromptSubmitPayload(ClaudeCommonPayload):
     permission_mode: str | None
     agent_id: str | None
@@ -109,6 +124,7 @@ ClaudeEventPayload = (
     ClaudeSessionStartPayload
     | ClaudeSubagentStartPayload
     | ClaudePreToolUsePayload
+    | ClaudePostToolUsePayload
     | ClaudeUserPromptSubmitPayload
     | ClaudeStopPayload
 )
@@ -276,6 +292,20 @@ def _build_pre_tool_use_payload(payload: dict[str, Any]) -> ClaudePreToolUsePayl
     )
 
 
+def _build_post_tool_use_payload(payload: dict[str, Any]) -> ClaudePostToolUsePayload:
+    return ClaudePostToolUsePayload(
+        **_common_payload_fields(payload),
+        **_permission_payload_fields(payload),
+        **_effort_payload_fields(payload),
+        **_agent_payload_fields(payload),
+        tool_name=as_string(payload.get("tool_name")),
+        tool_input=_tool_input(payload),
+        tool_response=payload.get("tool_response"),
+        tool_use_id=_string_or_none(payload.get("tool_use_id")),
+        duration_ms=_int_or_none(payload.get("duration_ms")),
+    )
+
+
 def _build_user_prompt_submit_payload(
     payload: dict[str, Any],
 ) -> ClaudeUserPromptSubmitPayload:
@@ -309,6 +339,8 @@ def parse_claude_event_payload(
         return _build_subagent_start_payload(data)
     if event_name == "PreToolUse":
         return _build_pre_tool_use_payload(data)
+    if event_name == "PostToolUse":
+        return _build_post_tool_use_payload(data)
     if event_name == "UserPromptSubmit":
         return _build_user_prompt_submit_payload(data)
     if event_name == "Stop":
@@ -413,6 +445,39 @@ def pre_write(
     )
 
 
+def post_read(
+    event_payload: ClaudePostToolUsePayload,
+    *,
+    stdout: TextIO | None = None,
+) -> int:
+    """Record Claude main-assistant authoring file reads in session state."""
+
+    _ = stdout
+    if event_payload.tool_name != "Read" or event_payload.agent_type:
+        return 0
+
+    target = _read_target(event_payload.tool_input)
+    if target is None:
+        return 0
+
+    relative_path = authoring_relative_path(target, plugin_root=_plugin_root())
+    if relative_path is None:
+        return 0
+
+    config = workflow_config_for_project(_project_dir())
+    if config is None:
+        return 0
+
+    record_authoring_file_read(
+        config.root,
+        "claude",
+        event_payload.session_id,
+        path=target,
+        relative_path=relative_path,
+    )
+    return 0
+
+
 def user_prompt_submit(
     event_payload: ClaudeUserPromptSubmitPayload,
     *,
@@ -463,6 +528,8 @@ def main(
         return subagent_start(event_payload, stdout=stdout)
     if isinstance(event_payload, ClaudePreToolUsePayload):
         return pre_write(event_payload, stdout=stdout)
+    if isinstance(event_payload, ClaudePostToolUsePayload):
+        return post_read(event_payload, stdout=stdout)
     if isinstance(event_payload, ClaudeUserPromptSubmitPayload):
         return user_prompt_submit(event_payload, stdout=stdout)
     if isinstance(event_payload, ClaudeStopPayload):

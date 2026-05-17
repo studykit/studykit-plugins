@@ -12,7 +12,12 @@ _SCRIPTS_DIR = _PLUGIN_ROOT / "scripts"
 if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
-from authoring_resolver import ResolverError, resolve_authoring  # noqa: E402
+from authoring_resolver import (  # noqa: E402
+    ResolverError,
+    authoring_relative_path,
+    is_authoring_file,
+    resolve_authoring,
+)
 
 
 def _config_path(project: Path) -> Path:
@@ -139,3 +144,16 @@ def test_invalid_provider_for_role_is_rejected() -> None:
 def test_require_config_fails_when_missing(tmp_path: Path) -> None:
     with pytest.raises(ResolverError, match=".workflow/config.yml was not found"):
         resolve_authoring("task", project=tmp_path, require_config=True)
+
+
+def test_authoring_path_classification_uses_plugin_authoring_root(tmp_path: Path) -> None:
+    authoring_file = _PLUGIN_ROOT / "authoring" / "common" / "task-authoring.md"
+    outside_file = tmp_path / "task-authoring.md"
+    outside_file.write_text("# Task\n", encoding="utf-8")
+
+    assert authoring_relative_path(authoring_file, plugin_root=_PLUGIN_ROOT) == (
+        "common/task-authoring.md"
+    )
+    assert is_authoring_file(authoring_file, plugin_root=_PLUGIN_ROOT)
+    assert authoring_relative_path(outside_file, plugin_root=_PLUGIN_ROOT) is None
+    assert not is_authoring_file(outside_file, plugin_root=_PLUGIN_ROOT)

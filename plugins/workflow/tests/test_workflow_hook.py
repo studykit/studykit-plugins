@@ -22,7 +22,11 @@ from workflow_github_issue_cache import GitHubIssueCache  # noqa: E402
 from workflow_github import DEFAULT_ISSUE_FIELDS, GitHubRepository  # noqa: E402
 from workflow_github_issue_refs import extract_issue_numbers as extract_github_issue_numbers  # noqa: E402
 from workflow_jira_issue_refs import jira_issue_keys_from_references  # noqa: E402
-from hook_claude import ClaudeCommonPayload, ClaudePreToolUsePayload  # noqa: E402
+from hook_claude import (  # noqa: E402
+    ClaudeCommonPayload,
+    ClaudePostToolUsePayload,
+    ClaudePreToolUsePayload,
+)
 from hook_claude import ClaudeSessionStartPayload  # noqa: E402
 from hook_claude import ClaudeSubagentStartPayload  # noqa: E402
 from hook_claude import main as claude_main  # noqa: E402
@@ -483,6 +487,95 @@ def test_claude_main_dispatches_from_payload_event_name(
     assert payload["hookSpecificOutput"]["hookEventName"] == "SessionStart"
 
 
+def test_claude_post_read_records_authoring_file_reads_in_session_state(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _write_config(tmp_path)
+    _hook_env(monkeypatch, tmp_path, runtime="claude")
+    authoring_file = _PLUGIN_ROOT / "authoring" / "common" / "task-authoring.md"
+    payload = {
+        "session_id": "claude-authoring-read",
+        "cwd": str(tmp_path),
+        "permission_mode": "default",
+        "hook_event_name": "PostToolUse",
+        "tool_name": "Read",
+        "tool_input": {"file_path": str(authoring_file)},
+        "tool_response": {"filePath": str(authoring_file)},
+        "tool_use_id": "toolu_read",
+        "duration_ms": 12,
+    }
+
+    captured = io.StringIO()
+    assert claude_main(payload=payload, stdout=captured) == 0
+    assert claude_main(payload=payload, stdout=captured) == 0
+
+    assert captured.getvalue() == ""
+    state_file = session_state_path(tmp_path, "claude", "claude-authoring-read")
+    assert state_file is not None
+    state = json.loads(state_file.read_text(encoding="utf-8"))
+    assert state["authoring"]["read_files"] == [
+        {
+            "path": str(authoring_file.resolve()),
+            "relative_path": "common/task-authoring.md",
+        }
+    ]
+
+
+def test_claude_post_read_skips_non_authoring_reads(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _write_config(tmp_path)
+    _hook_env(monkeypatch, tmp_path, runtime="claude")
+    readme = tmp_path / "README.md"
+    readme.write_text("# Project\n", encoding="utf-8")
+
+    captured = io.StringIO()
+    assert claude_main(
+        payload={
+            "session_id": "claude-non-authoring-read",
+            "cwd": str(tmp_path),
+            "hook_event_name": "PostToolUse",
+            "tool_name": "Read",
+            "tool_input": {"file_path": str(readme)},
+        },
+        stdout=captured,
+    ) == 0
+
+    assert captured.getvalue() == ""
+    state_file = session_state_path(tmp_path, "claude", "claude-non-authoring-read")
+    assert state_file is not None
+    assert not state_file.exists()
+
+
+def test_claude_post_read_skips_subagent_authoring_reads(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _write_config(tmp_path)
+    _hook_env(monkeypatch, tmp_path, runtime="claude")
+    authoring_file = _PLUGIN_ROOT / "authoring" / "common" / "task-authoring.md"
+
+    captured = io.StringIO()
+    assert claude_main(
+        payload={
+            "session_id": "claude-subagent-authoring-read",
+            "cwd": str(tmp_path),
+            "hook_event_name": "PostToolUse",
+            "agent_type": "workflow-operator",
+            "tool_name": "Read",
+            "tool_input": {"file_path": str(authoring_file)},
+        },
+        stdout=captured,
+    ) == 0
+
+    assert captured.getvalue() == ""
+    state_file = session_state_path(tmp_path, "claude", "claude-subagent-authoring-read")
+    assert state_file is not None
+    assert not state_file.exists()
+
+
 def test_parse_claude_event_payload_builds_event_structures(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -547,6 +640,38 @@ def test_parse_claude_event_payload_builds_event_structures(
     assert tool_event.tool_input == {"file_path": "workflow/task.md", "content": "body"}
     assert tool_event.tool_use_id == "toolu_123"
     assert not hasattr(tool_event, "edit_targets")
+
+    post_tool_event = parse_claude_event_payload(
+        {
+            "session_id": "s1",
+            "cwd": str(tmp_path),
+            "permission_mode": "default",
+            "effort": {"level": "medium"},
+            "hook_event_name": "PostToolUse",
+            "tool_name": "Read",
+            "tool_input": {
+                "file_path": "plugins/workflow/authoring/common/task-authoring.md"
+            },
+            "tool_response": {
+                "filePath": "plugins/workflow/authoring/common/task-authoring.md"
+            },
+            "tool_use_id": "toolu_456",
+            "duration_ms": 9,
+        }
+    )
+    assert isinstance(post_tool_event, ClaudePostToolUsePayload)
+    assert post_tool_event.hook_event_name == "PostToolUse"
+    assert post_tool_event.permission_mode == "default"
+    assert post_tool_event.effort == {"level": "medium"}
+    assert post_tool_event.tool_name == "Read"
+    assert post_tool_event.tool_input == {
+        "file_path": "plugins/workflow/authoring/common/task-authoring.md"
+    }
+    assert post_tool_event.tool_response == {
+        "filePath": "plugins/workflow/authoring/common/task-authoring.md"
+    }
+    assert post_tool_event.tool_use_id == "toolu_456"
+    assert post_tool_event.duration_ms == 9
 
 
 def test_session_start_clear_uses_documented_source_only(

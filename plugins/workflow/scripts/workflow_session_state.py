@@ -250,6 +250,46 @@ def record_session_env_exports(
     return True
 
 
+def read_authoring_file_reads(
+    project: Path,
+    runtime: str,
+    session_id: str,
+) -> list[dict[str, str]]:
+    return _authoring_file_reads(_read_session_state(project, runtime, session_id))
+
+
+def record_authoring_file_read(
+    project: Path,
+    runtime: str,
+    session_id: str,
+    *,
+    path: Path,
+    relative_path: str,
+) -> bool:
+    normalized_relative = str(relative_path).strip().lstrip("/")
+    if not normalized_relative:
+        return False
+    normalized_path = str(path.expanduser().resolve())
+
+    def mutator(state: dict[str, Any]) -> None:
+        authoring = _authoring_section(state)
+        reads = {
+            item["path"]: item
+            for item in _authoring_file_reads(state)
+            if item.get("path")
+        }
+        reads[normalized_path] = {
+            "path": normalized_path,
+            "relative_path": normalized_relative,
+        }
+        authoring["read_files"] = sorted(
+            reads.values(),
+            key=lambda item: (item["relative_path"], item["path"]),
+        )
+
+    return _mutate_session_state(project, runtime, session_id, mutator)
+
+
 def _read_session_state(project: Path, runtime: str, session_id: str) -> dict[str, Any]:
     path = session_state_path(project, runtime, session_id)
     if path is None or not path.is_file():
@@ -326,6 +366,7 @@ def _empty_state(runtime: str, session_id: str) -> dict[str, Any]:
         "env": {},
         "flags": {},
         "issues": {},
+        "authoring": {},
     }
 
 
@@ -352,6 +393,8 @@ def _normalize_state(state: dict[str, Any], *, runtime: str, session_id: str) ->
         normalized["flags"] = {}
     if not isinstance(normalized.get("issues"), dict):
         normalized["issues"] = {}
+    if not isinstance(normalized.get("authoring"), dict):
+        normalized["authoring"] = {}
     return normalized
 
 
@@ -399,6 +442,38 @@ def _set_state_issues(state: dict[str, Any], kind: str, values: set[str]) -> Non
         issues[kind] = ordered
         return
     issues.pop(kind, None)
+
+
+def _authoring_section(state: dict[str, Any]) -> dict[str, Any]:
+    authoring = state.get("authoring")
+    if not isinstance(authoring, dict):
+        authoring = {}
+        state["authoring"] = authoring
+    return authoring
+
+
+def _authoring_file_reads(state: Mapping[str, Any]) -> list[dict[str, str]]:
+    authoring = state.get("authoring")
+    if not isinstance(authoring, Mapping):
+        return []
+    values = authoring.get("read_files")
+    if not isinstance(values, list):
+        return []
+
+    reads: dict[str, dict[str, str]] = {}
+    for value in values:
+        if not isinstance(value, Mapping):
+            continue
+        path = value.get("path")
+        relative_path = value.get("relative_path")
+        if not isinstance(path, str) or not isinstance(relative_path, str):
+            continue
+        path = path.strip()
+        relative_path = relative_path.strip().lstrip("/")
+        if not path or not relative_path:
+            continue
+        reads[path] = {"path": path, "relative_path": relative_path}
+    return sorted(reads.values(), key=lambda item: (item["relative_path"], item["path"]))
 
 
 def _read_legacy_session_issues(project: Path, session_id: str, kind: str) -> set[str]:
