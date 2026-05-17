@@ -14,8 +14,9 @@ explicit in workflow scripts rather than using hidden authoring read tracking.
 Codex has no native ``SubagentStart`` event, so the operator-subagent
 environment file is prepared from the Codex ``SessionStart`` path when
 transcript metadata identifies the spawned agent as ``workflow-operator``. The
-same path injects a small bootstrap context with the absolute workflow launcher
-path, because the static Codex agent instructions cannot know the plugin root.
+same path injects a config-specific bootstrap context with the absolute
+workflow launcher path, because the static Codex agent instructions cannot know
+the plugin root or the active project providers.
 
 The script is the executable entry point for Codex's hook manifest
 (``plugins/workflow/hooks/hooks.codex.json``). Each hook command invokes this
@@ -29,7 +30,6 @@ from __future__ import annotations
 
 import json
 import os
-import shlex
 import subprocess
 import sys
 from collections.abc import Mapping
@@ -50,7 +50,10 @@ from workflow_hook import (  # noqa: E402
 )
 from util import as_string, emit_json, read_payload_or_stdin, scan_text_values  # noqa: E402
 from workflow_env import write_codex_env_file  # noqa: E402
-from workflow_operator_context import agent_name_matches_operator  # noqa: E402
+from workflow_operator_context import (  # noqa: E402
+    agent_name_matches_operator,
+    build_operator_session_context,
+)
 from workflow_session_state import (  # noqa: E402
     record_session_policy_announced,
     session_policy_was_announced,
@@ -184,25 +187,6 @@ def _user_prompt_text(payload: dict[str, Any]) -> str:
 
 def _stop_scan_text(payload: dict[str, Any]) -> str:
     return scan_text_values(as_string(payload.get("last_assistant_message")))
-
-
-def _operator_bootstrap_context(*, launcher: Path) -> str:
-    launcher_assignment = f"WORKFLOW={shlex.quote(str(launcher))}"
-    return "\n".join(
-        [
-            "## workflow operator bootstrap",
-            "",
-            "Use this workflow launcher path before running workflow commands:",
-            "",
-            "```bash",
-            launcher_assignment,
-            "```",
-            "",
-            "Use `$WORKFLOW` for bundled workflow scripts. The launcher owns Codex",
-            "session translation; do not derive the launcher from project layout",
-            "or inspect runtime-specific session files directly.",
-        ]
-    )
 
 
 def _codex_session_start_context(config: Any) -> str:
@@ -436,8 +420,9 @@ def _handle_agent_session_start(
         {
             "hookSpecificOutput": {
                 "hookEventName": "SessionStart",
-                "additionalContext": _operator_bootstrap_context(
-                    launcher=_plugin_root() / "scripts" / "workflow"
+                "additionalContext": build_operator_session_context(
+                    config,
+                    launcher=_plugin_root() / "scripts" / "workflow",
                 ),
             }
         },

@@ -43,6 +43,10 @@ from workflow_env import (  # noqa: E402
     CLAUDE_ENV_FILE_ENV,
     append_claude_env_file,
 )
+from workflow_operator_context import (  # noqa: E402
+    agent_name_matches_operator,
+    build_operator_session_context,
+)
 from workflow_session_state import (  # noqa: E402
     record_session_policy_announced,
     session_policy_was_announced,
@@ -63,6 +67,12 @@ class ClaudeCommonPayload:
 class ClaudeSessionStartPayload(ClaudeCommonPayload):
     source: str
     model: str | None
+    agent_type: str | None
+
+
+@dataclass(frozen=True)
+class ClaudeSubagentStartPayload(ClaudeCommonPayload):
+    agent_id: str | None
     agent_type: str | None
 
 
@@ -97,6 +107,7 @@ class ClaudeStopPayload(ClaudeCommonPayload):
 
 ClaudeEventPayload = (
     ClaudeSessionStartPayload
+    | ClaudeSubagentStartPayload
     | ClaudePreToolUsePayload
     | ClaudeUserPromptSubmitPayload
     | ClaudeStopPayload
@@ -246,6 +257,13 @@ def _build_session_start_payload(payload: dict[str, Any]) -> ClaudeSessionStartP
     )
 
 
+def _build_subagent_start_payload(payload: dict[str, Any]) -> ClaudeSubagentStartPayload:
+    return ClaudeSubagentStartPayload(
+        **_common_payload_fields(payload),
+        **_agent_payload_fields(payload),
+    )
+
+
 def _build_pre_tool_use_payload(payload: dict[str, Any]) -> ClaudePreToolUsePayload:
     return ClaudePreToolUsePayload(
         **_common_payload_fields(payload),
@@ -287,6 +305,8 @@ def parse_claude_event_payload(
     event_name = as_string(data.get("hook_event_name"))
     if event_name == "SessionStart":
         return _build_session_start_payload(data)
+    if event_name == "SubagentStart":
+        return _build_subagent_start_payload(data)
     if event_name == "PreToolUse":
         return _build_pre_tool_use_payload(data)
     if event_name == "UserPromptSubmit":
@@ -314,6 +334,35 @@ def session_start(
         return 0
 
     return emit_session_start_policy(event_payload, config=config, stdout=stdout)
+
+
+def subagent_start(
+    event_payload: ClaudeSubagentStartPayload,
+    *,
+    stdout: TextIO | None = None,
+) -> int:
+    """Handle a Claude ``SubagentStart`` hook invocation."""
+
+    if not agent_name_matches_operator(event_payload.agent_type):
+        return 0
+
+    config = workflow_config_for_project(_project_dir())
+    if config is None:
+        return 0
+
+    emit_json(
+        {
+            "hookSpecificOutput": {
+                "hookEventName": "SubagentStart",
+                "additionalContext": build_operator_session_context(
+                    config,
+                    launcher=_plugin_root() / "scripts" / "workflow",
+                ),
+            }
+        },
+        stdout=stdout,
+    )
+    return 0
 
 
 def emit_session_start_policy(
@@ -409,6 +458,8 @@ def main(
     event_payload = parse_claude_event_payload(payload)
     if isinstance(event_payload, ClaudeSessionStartPayload):
         return session_start(event_payload, stdout=stdout)
+    if isinstance(event_payload, ClaudeSubagentStartPayload):
+        return subagent_start(event_payload, stdout=stdout)
     if isinstance(event_payload, ClaudePreToolUsePayload):
         return pre_write(event_payload, stdout=stdout)
     if isinstance(event_payload, ClaudeUserPromptSubmitPayload):

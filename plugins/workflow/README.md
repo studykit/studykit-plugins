@@ -15,7 +15,7 @@ Key files:
 - `.codex-plugin/plugin.json` — Codex plugin metadata.
 - `hooks/hooks.json` — Claude hook declarations.
 - `hooks/hooks.codex.json` — Codex hook declarations.
-- `agents/workflow-operator.md` — operator agent instructions.
+- `agents/workflow-operator.md` — operator role-boundary instructions.
 - `scripts/` — internal provider, cache, and hook entrypoints.
 - `authoring/` — workflow artifact authoring contracts.
 
@@ -88,6 +88,10 @@ files, the workflow operator returns `NONE`.
 
 The main assistant delegates workflow provider/cache operations to
 `agents/workflow-operator.md` instead of carrying script recipes in context.
+The static operator prompt keeps durable role boundaries only. In Codex
+operator subagent sessions, `hooks/hooks.codex.json` routes `SessionStart`
+through `scripts/hook_codex.py`, which injects command aliases for the active
+providers in `.workflow/config.yml`.
 
 Use the operator for:
 
