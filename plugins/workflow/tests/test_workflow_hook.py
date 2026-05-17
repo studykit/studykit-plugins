@@ -1165,6 +1165,12 @@ def test_session_start_prepares_codex_operator_env_file_and_bootstrap_context(
     assert state["session_id"] == "codex-session"
     assert state["parent_session_id"] == "codex-main-thread"
     assert state["env"]["WORKFLOW_SESSION_ID"] == "codex-main-thread"
+    parent_state = session_state_path(tmp_path, "codex", "codex-main-thread")
+    assert parent_state is not None
+    parent_state_payload = json.loads(parent_state.read_text(encoding="utf-8"))
+    assert parent_state_payload["subagents"]["started"] == [
+        {"agent_id": "codex-session", "agent_type": "workflow-operator"}
+    ]
 
 
 def test_codex_operator_bootstrap_uses_configured_jira_issue_aliases(
@@ -1256,7 +1262,7 @@ def test_operator_runtime_context_fragments_hold_provider_command_guidance() -> 
     assert "tell the main agent to decide whether to use a raw provider CLI" in jira
 
 
-def test_session_start_skips_codex_subagent_when_not_operator(
+def test_session_start_records_codex_subagent_when_not_operator(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -1272,6 +1278,15 @@ def test_session_start_skips_codex_subagent_when_not_operator(
     )
 
     assert out == ""
+    parent_state = session_state_path(tmp_path, "codex", "parent-thread")
+    assert parent_state is not None
+    parent_state_payload = json.loads(parent_state.read_text(encoding="utf-8"))
+    assert parent_state_payload["subagents"]["started"] == [
+        {"agent_id": "codex-session", "agent_type": "default"}
+    ]
+    subagent_state = session_state_path(tmp_path, "codex", "codex-session")
+    assert subagent_state is not None
+    assert not subagent_state.exists()
 
 
 def test_session_start_skips_claude_subagent_payload(
