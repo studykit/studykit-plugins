@@ -14,6 +14,8 @@ ISSUE_METADATA=jira_issue_metadata.py
 Do not use another issue provider command family in this project.
 
 Resolve authoring paths with `authoring_resolver.py`.
+For comment-only requests, resolve authoring paths with the resolver's comment
+scope so the caller reads only the Markdown and Jira issue convention files.
 Fetch or refresh issues with `$ISSUE_FETCH`.
 Prepare new issues as pending drafts with `$ISSUE_DRAFTS prepare`.
 Create provider issues from drafts only after explicit user approval and

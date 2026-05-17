@@ -109,6 +109,28 @@ providers:
     ]
 
 
+def test_comment_scope_github_issue_resolution_uses_only_comment_relevant_files() -> None:
+    resolution = resolve_authoring("task", role="issue", provider="github", scope="comment")
+
+    assert resolution.role == "issue"
+    assert resolution.provider == "github"
+    assert _rel_paths(resolution.files) == [
+        "common/markdown-authoring.md",
+        "providers/github-issue-convention.md",
+    ]
+
+
+def test_comment_scope_jira_issue_resolution_uses_only_comment_relevant_files() -> None:
+    resolution = resolve_authoring("task", role="issue", provider="jira", scope="comment")
+
+    assert resolution.role == "issue"
+    assert resolution.provider == "jira"
+    assert _rel_paths(resolution.files) == [
+        "common/markdown-authoring.md",
+        "providers/jira-issue-convention.md",
+    ]
+
+
 def test_invalid_provider_for_role_is_rejected() -> None:
     with pytest.raises(ResolverError, match="not valid for role 'knowledge'"):
         resolve_authoring("spec", provider="jira")
