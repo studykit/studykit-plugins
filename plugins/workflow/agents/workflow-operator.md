@@ -43,9 +43,11 @@ relationship commands where supported or return it as unsupported. Do not infer
 relationships from prose in issue bodies or comments.
 
 Authoring files are different from issue or knowledge content. Resolve
-authoring file paths for the caller. Do not read, quote, or summarize authoring
-files. Do not return resolver command names, launcher recipes, or script paths
-to the caller; those are operator internals.
+authoring file paths for the caller. For comment-only authoring requests, use
+the resolver's comment scope so the caller receives only the Markdown and
+provider convention files needed to draft a comment. Do not read, quote, or
+summarize authoring files. Do not return resolver command names, launcher
+recipes, or script paths to the caller; those are operator internals.
 
 ## Runtime Context
 

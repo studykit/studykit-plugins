@@ -34,6 +34,7 @@ ISSUE_TYPES = {"task", "bug", "spike", "epic", "review"}
 KNOWLEDGE_TYPES = {"spec", "architecture", "domain", "context", "actors", "nfr", "ci"}
 DUAL_TYPES = {"usecase", "research"}
 ALL_TYPES = ISSUE_TYPES | KNOWLEDGE_TYPES | DUAL_TYPES
+AUTHORING_SCOPES = {"content", "comment"}
 
 ISSUE_PROVIDER_FILES = {
     "github": "providers/github-issue-convention.md",
@@ -125,6 +126,19 @@ def normalize_role(value: str | None, artifact_type: str) -> str:
     return normalized
 
 
+def normalize_scope(value: str | None) -> str:
+    if value is None:
+        return "content"
+    normalized = value.strip().lower().replace("_", "-")
+    if normalized in {"body", "edit", "full"}:
+        normalized = "content"
+    if normalized in {"comments", "comment-only", "comment-only-work"}:
+        normalized = "comment"
+    if normalized not in AUTHORING_SCOPES:
+        raise ResolverError(f"unsupported authoring scope: {value}")
+    return normalized
+
+
 def absolute_authoring_paths(parts: Iterable[str]) -> tuple[Path, ...]:
     paths: list[Path] = []
     for rel in parts:
@@ -142,9 +156,11 @@ def resolve_authoring(
     provider: str | None = None,
     project: Path | None = None,
     require_config: bool = False,
+    scope: str = "content",
 ) -> Resolution:
     normalized_type = normalize_type(artifact_type)
     normalized_role = normalize_role(role, normalized_type)
+    normalized_scope = normalize_scope(scope)
 
     config_path: Path | None = None
     config_provider: str | None = None
@@ -165,6 +181,19 @@ def resolve_authoring(
             raise ResolverError(str(exc)) from exc
 
     parts = ["common/markdown-authoring.md"]
+    if normalized_scope == "comment":
+        if normalized_role == "issue" and normalized_provider in ISSUE_PROVIDER_FILES:
+            parts.append(ISSUE_PROVIDER_FILES[normalized_provider])
+        if normalized_role == "knowledge" and normalized_provider in KNOWLEDGE_PROVIDER_FILES:
+            parts.append(KNOWLEDGE_PROVIDER_FILES[normalized_provider])
+        return Resolution(
+            artifact_type=normalized_type,
+            role=normalized_role,
+            provider=normalized_provider,
+            files=absolute_authoring_paths(parts),
+            config_path=config_path.resolve() if config_path else None,
+        )
+
     if normalized_role == "issue":
         parts.append("common/issue-body.md")
         parts.append("common/issue-authoring.md")
@@ -205,6 +234,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--role", help="issue or knowledge; required for usecase/research")
     parser.add_argument("--provider", help="provider override, such as github, jira, or confluence")
     parser.add_argument(
+        "--scope",
+        choices=sorted(AUTHORING_SCOPES),
+        default="content",
+        help="authoring surface to resolve; use comment for comment-only work",
+    )
+    parser.add_argument(
         "--project",
         type=Path,
         default=workflow_project_dir_from_env(),
@@ -226,6 +261,7 @@ def main(argv: list[str] | None = None) -> int:
             provider=args.provider,
             project=args.project,
             require_config=args.require_config,
+            scope=args.scope,
         )
     except ResolverError as exc:
         print(f"authoring resolver error: {exc}", file=sys.stderr)
