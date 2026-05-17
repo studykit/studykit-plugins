@@ -88,10 +88,10 @@ files, the workflow operator returns `NONE`.
 
 The main assistant delegates workflow provider/cache operations to
 `agents/workflow-operator.md` instead of carrying script recipes in context.
-The static operator prompt keeps durable role boundaries only. In Codex
-operator subagent sessions, `hooks/hooks.codex.json` routes `SessionStart`
-through `scripts/hook_codex.py`, which injects command aliases for the active
-providers in `.workflow/config.yml`.
+The static operator prompt keeps durable role boundaries only. Operator runtime
+context snippets live under `agents/workflow-operator-context/`; hooks load only
+the fragments that match the active providers and inject them into the operator
+subagent.
 
 Use the operator for:
 
