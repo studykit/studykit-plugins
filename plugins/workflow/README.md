@@ -59,9 +59,9 @@ Inspect resolved configuration:
 ```
 
 The `scripts/workflow` launcher is the shell-tool entrypoint. It executes the
-requested workflow script directly for Claude sessions and sources the
-hook-generated Codex export file before execution for Codex sessions. In a
-plain terminal, it falls back to local defaults for `WORKFLOW`,
+requested workflow script directly for Claude sessions and reads generated
+exports from the Codex session-state file before execution for Codex sessions.
+In a plain terminal, it falls back to local defaults for `WORKFLOW`,
 `WORKFLOW_PLUGIN_ROOT`, and `WORKFLOW_PROJECT_DIR` without inventing a
 `WORKFLOW_SESSION_ID`. Hooks publish `WORKFLOW`, `WORKFLOW_PLUGIN_ROOT`,
 `WORKFLOW_PROJECT_DIR`, and `WORKFLOW_SESSION_ID` so repeated assistant shell
@@ -115,7 +115,7 @@ Session hooks are intentionally concise:
 - `SessionStart` injects configured workflow policy only for main sessions.
 - `UserPromptSubmit` prepares cache projections for mentioned GitHub issue
   references and injects project-relative cache paths.
-- `Stop` records mentioned issue references as pending for the next prompt.
+- `Stop` stays silent and does not mutate issue cache state.
 - `PreToolUse` on writes protects provider cache issue body projections from
   unsafe frontmatter edits.
 

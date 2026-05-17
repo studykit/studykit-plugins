@@ -21,7 +21,6 @@ from workflow_command import CommandRequest, CommandResult  # noqa: E402
 from workflow_github_issue_cache import GitHubIssueCache  # noqa: E402
 from workflow_github import DEFAULT_ISSUE_FIELDS, GitHubRepository  # noqa: E402
 from workflow_github_issue_refs import extract_issue_numbers as extract_github_issue_numbers  # noqa: E402
-from workflow_hook import record_session_issues  # noqa: E402
 from workflow_jira_issue_refs import jira_issue_keys_from_references  # noqa: E402
 from hook_claude import ClaudeCommonPayload, ClaudePreToolUsePayload  # noqa: E402
 from hook_claude import ClaudeSessionStartPayload  # noqa: E402
@@ -34,7 +33,12 @@ from hook_codex import CodexStopPayload, CodexUserPromptSubmitPayload  # noqa: E
 from hook_codex import parse_codex_event_payload  # noqa: E402
 from hook_codex import session_start as codex_session_start  # noqa: E402
 from hook_codex import stop, user_prompt_submit  # noqa: E402
-from workflow_env import codex_env_file_path  # noqa: E402
+from workflow_env import codex_env_exports  # noqa: E402
+from workflow_session_state import (  # noqa: E402
+    legacy_session_env_state_path,
+    session_policy_state_path,
+    session_state_path,
+)
 
 
 class FakeRunner:
@@ -776,12 +780,92 @@ def test_codex_session_start_writes_session_export_file(
         payload_update={"session_id": "codex-shell-session"},
     )
 
-    env_file = codex_env_file_path(tmp_path, "codex-shell-session")
-    content = env_file.read_text(encoding="utf-8")
+    content = codex_env_exports(tmp_path, "codex-shell-session")
     assert f"export WORKFLOW={_PLUGIN_ROOT / 'scripts' / 'workflow'}" in content
     assert f"export WORKFLOW_PLUGIN_ROOT={_PLUGIN_ROOT}" in content
     assert f"export WORKFLOW_PROJECT_DIR={tmp_path}" in content
     assert "export WORKFLOW_SESSION_ID=codex-shell-session" in content
+
+
+def test_codex_hook_state_uses_single_file_per_session(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _write_config(tmp_path)
+    session_id = "codex-clean-session"
+
+    _run_session_start(
+        tmp_path,
+        monkeypatch,
+        runtime="codex",
+        payload_update={"session_id": session_id},
+    )
+    event_payload = parse_codex_event_payload(
+        {
+            "session_id": session_id,
+            "turn_id": "turn-1",
+            "cwd": str(tmp_path),
+            "hook_event_name": "UserPromptSubmit",
+            "prompt": "커밋 전에 #45 확인",
+        },
+    )
+    assert isinstance(event_payload, CodexUserPromptSubmitPayload)
+    assert user_prompt_submit(
+        event_payload,
+        stdout=io.StringIO(),
+        runner=FakeRunner(
+            {
+                gh_issue_view_args(45): result(
+                    gh_issue_view_args(45),
+                    stdout=json.dumps(issue_payload(45)),
+                )
+            }
+        ),
+    ) == 0
+
+    state_file = session_state_path(tmp_path, "codex", session_id)
+    assert state_file is not None
+    session_files = sorted(path.name for path in state_file.parent.glob(f"*{session_id}*"))
+    assert session_files == [state_file.name]
+
+    state = json.loads(state_file.read_text(encoding="utf-8"))
+    assert state["env"]["WORKFLOW_SESSION_ID"] == session_id
+    assert state["flags"]["session_policy"] is True
+    assert state["flags"]["commit_prefix"] is True
+    assert state["issues"]["announced"] == ["45"]
+
+
+def test_codex_session_start_migrates_legacy_split_state(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _write_config(tmp_path)
+    session_id = "codex-legacy-session"
+    legacy_env = legacy_session_env_state_path(tmp_path, "codex", session_id)
+    legacy_policy = session_policy_state_path(tmp_path, "codex", session_id)
+    assert legacy_env is not None
+    assert legacy_policy is not None
+    legacy_env.parent.mkdir(parents=True)
+    legacy_env.write_text("export WORKFLOW_SESSION_ID=old-session\n", encoding="utf-8")
+    legacy_policy.write_text("announced\n", encoding="utf-8")
+
+    out = _run_session_start(
+        tmp_path,
+        monkeypatch,
+        runtime="codex",
+        payload_update={"session_id": session_id},
+    )
+
+    assert out == ""
+    assert not legacy_env.exists()
+    assert not legacy_policy.exists()
+    state_file = session_state_path(tmp_path, "codex", session_id)
+    assert state_file is not None
+    assert sorted(path.name for path in state_file.parent.glob(f"*{session_id}*")) == [state_file.name]
+
+    state = json.loads(state_file.read_text(encoding="utf-8"))
+    assert state["env"]["WORKFLOW_SESSION_ID"] == session_id
+    assert state["flags"]["session_policy"] is True
 
 
 @pytest.mark.parametrize("runtime", ["claude", "codex"])
@@ -946,10 +1030,16 @@ def test_session_start_prepares_codex_operator_env_file_and_bootstrap_context(
     assert "GitHub knowledge documents are repository Markdown files under `wiki/`" in context
     assert "hook-state" not in context
     assert "parent_thread_id" not in context
-    env_file = codex_env_file_path(tmp_path, "codex-session")
-    content = env_file.read_text(encoding="utf-8")
+    content = codex_env_exports(tmp_path, "codex-session")
     assert f"export WORKFLOW={_PLUGIN_ROOT / 'scripts' / 'workflow'}" in content
     assert "export WORKFLOW_SESSION_ID=codex-main-thread" in content
+    subagent_state = session_state_path(tmp_path, "codex", "codex-session")
+    assert subagent_state is not None
+    assert subagent_state.is_file()
+    state = json.loads(subagent_state.read_text(encoding="utf-8"))
+    assert state["session_id"] == "codex-session"
+    assert state["parent_session_id"] == "codex-main-thread"
+    assert state["env"]["WORKFLOW_SESSION_ID"] == "codex-main-thread"
 
 
 def test_codex_operator_bootstrap_uses_configured_jira_issue_aliases(
@@ -1406,56 +1496,6 @@ def test_user_prompt_dedupes_announced_issue_paths_within_session(
     assert second.getvalue() == ""
 
 
-def test_user_prompt_ignores_stop_pending_issue_state(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    _write_config(tmp_path)
-    _hook_env(monkeypatch, tmp_path)
-    record_session_issues(tmp_path, "s1", ["33", "45"], "pending")
-    runner = FakeRunner(
-        {
-            gh_issue_view_args(39): result(
-                gh_issue_view_args(39),
-                stdout=json.dumps(issue_payload(39, title="Requested issue")),
-            ),
-        }
-    )
-
-    captured = io.StringIO()
-    event_payload = parse_codex_event_payload(
-        {
-            "session_id": "s1",
-            "turn_id": "turn-1",
-            "cwd": str(tmp_path),
-            "hook_event_name": "UserPromptSubmit",
-            "prompt": "#39 작업 내용 확인",
-        },
-    )
-    assert isinstance(event_payload, CodexUserPromptSubmitPayload)
-    assert user_prompt_submit(event_payload, stdout=captured, runner=runner) == 0
-
-    payload = json.loads(captured.getvalue())
-    context = payload["hookSpecificOutput"]["additionalContext"]
-    assert context == "\n".join(
-        [
-            "## Workflow issue cache",
-            "",
-            "- #39 → `.workflow-cache/issues/39/issue.md`",
-        ]
-    )
-    assert [request.args for request in runner.requests] == [
-        gh_issue_view_args(39),
-        *empty_relationship_read_args(39),
-    ]
-    assert (
-        tmp_path
-        / ".workflow-cache"
-        / "hook-state"
-        / "workflow-pending-issues-s1.txt"
-    ).exists()
-
-
 def test_user_prompt_lists_issue_path_when_frontmatter_has_relationships(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -1528,13 +1568,9 @@ def test_stop_does_not_carry_issue_refs_to_next_user_prompt(
 
     assert captured.getvalue() == ""
     assert runner.requests == []
-    pending_file = (
-        tmp_path
-        / ".workflow-cache"
-        / "hook-state"
-        / "workflow-pending-issues-s2.txt"
-    )
-    assert not pending_file.exists()
+    state_file = session_state_path(tmp_path, "codex", "s2")
+    assert state_file is not None
+    assert not state_file.exists()
     issue_file = (
         tmp_path
         / ".workflow-cache"
@@ -1558,7 +1594,7 @@ def test_stop_does_not_carry_issue_refs_to_next_user_prompt(
     assert user_prompt_submit(follow_event, stdout=prompt_context, runner=runner) == 0
 
     assert not issue_file.exists()
-    assert not pending_file.exists()
+    assert not state_file.exists()
     assert prompt_context.getvalue() == ""
 
 

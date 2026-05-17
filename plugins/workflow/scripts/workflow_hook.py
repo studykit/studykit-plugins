@@ -91,6 +91,7 @@ def inject_prompt_issue_context(
     *,
     project_dir: Path | None,
     session_id: str,
+    runtime: str,
     prompt_text: str,
     stdout: TextIO | None = None,
     runner: CommandRunner | None = None,
@@ -103,7 +104,7 @@ def inject_prompt_issue_context(
 
     context_parts: list[str] = []
     commit_context = build_prompt_commit_context(config, prompt_text)
-    if commit_context and commit_prefix_was_announced(config.root, session_id):
+    if commit_context and commit_prefix_was_announced(config.root, session_id, runtime=runtime):
         commit_context = ""
 
     repo = None
@@ -111,7 +112,7 @@ def inject_prompt_issue_context(
         repo = github_repo_for_config(config, runner=runner)
         if repo is None:
             if commit_context:
-                record_commit_prefix_announced(config.root, session_id)
+                record_commit_prefix_announced(config.root, session_id, runtime=runtime)
                 emit_user_prompt_context([commit_context], stdout=stdout)
             return 0
 
@@ -123,11 +124,11 @@ def inject_prompt_issue_context(
         issue_numbers = _ordered_issue_union(prompt_numbers, issue_id_format="jira")
     if not issue_numbers:
         if commit_context:
-            record_commit_prefix_announced(config.root, session_id)
+            record_commit_prefix_announced(config.root, session_id, runtime=runtime)
             emit_user_prompt_context([commit_context], stdout=stdout)
         return 0
 
-    already_announced = read_session_issues(config.root, session_id, "announced")
+    already_announced = read_session_issues(config.root, session_id, "announced", runtime=runtime)
     if config.issues.kind == "github":
         assert repo is not None
         contexts = cache_github_issue_references(config, issue_numbers, repo=repo, runner=runner)
@@ -140,13 +141,14 @@ def inject_prompt_issue_context(
             session_id,
             [context.number for context in fresh_contexts],
             "announced",
+            runtime=runtime,
         )
         context_parts.append(format_issue_cache_context(fresh_contexts, include_details=False))
     if commit_context:
         context_parts.append(commit_context)
     if context_parts:
         if commit_context:
-            record_commit_prefix_announced(config.root, session_id)
+            record_commit_prefix_announced(config.root, session_id, runtime=runtime)
         emit_user_prompt_context(context_parts, stdout=stdout)
     return 0
 

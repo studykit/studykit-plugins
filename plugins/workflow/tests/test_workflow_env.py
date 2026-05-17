@@ -15,8 +15,10 @@ if str(_SCRIPTS_DIR) not in sys.path:
 
 from workflow_env import (  # noqa: E402
     codex_env_file_path,
+    codex_env_exports,
     detect_shell_runtime,
     render_shell_exports,
+    write_codex_env_file,
     workflow_project_dir_from_env,
     workflow_session_id_from_env,
 )
@@ -67,8 +69,24 @@ def test_codex_env_file_path_uses_workflow_hook_state(tmp_path: Path) -> None:
     path = codex_env_file_path(tmp_path, "session/with spaces")
 
     assert path.parent == tmp_path / ".workflow-cache" / "hook-state"
-    assert path.name.startswith("workflow-env-codex-session_with_spaces")
-    assert path.suffix == ".sh"
+    assert path.name.startswith("workflow-session-codex-session_with_spaces")
+    assert path.suffix == ".json"
+
+
+def test_codex_env_exports_reads_session_state(tmp_path: Path) -> None:
+    assert write_codex_env_file(
+        project_dir=tmp_path,
+        plugin_root=_PLUGIN_ROOT,
+        codex_session_id="codex-shell",
+        workflow_session_id="parent-shell",
+    )
+
+    rendered = codex_env_exports(tmp_path, "codex-shell")
+
+    assert f"export WORKFLOW={_SCRIPTS_DIR / 'workflow'}" in rendered
+    assert f"export WORKFLOW_PLUGIN_ROOT={_PLUGIN_ROOT}" in rendered
+    assert f"export WORKFLOW_PROJECT_DIR={tmp_path}" in rendered
+    assert "export WORKFLOW_SESSION_ID=parent-shell" in rendered
 
 
 def test_workflow_wrapper_sources_codex_env_file(tmp_path: Path) -> None:
@@ -79,19 +97,11 @@ def test_workflow_wrapper_sources_codex_env_file(tmp_path: Path) -> None:
         "('WORKFLOW', 'WORKFLOW_PLUGIN_ROOT', 'WORKFLOW_PROJECT_DIR', 'WORKFLOW_SESSION_ID')}))\n",
         encoding="utf-8",
     )
-    env_file = codex_env_file_path(tmp_path, "codex-shell")
-    env_file.parent.mkdir(parents=True)
-    env_file.write_text(
-        "\n".join(
-            [
-                f"export WORKFLOW={_SCRIPTS_DIR / 'workflow'}",
-                f"export WORKFLOW_PLUGIN_ROOT={_PLUGIN_ROOT}",
-                f"export WORKFLOW_PROJECT_DIR={tmp_path}",
-                "export WORKFLOW_SESSION_ID=parent-shell",
-            ]
-        )
-        + "\n",
-        encoding="utf-8",
+    assert write_codex_env_file(
+        project_dir=tmp_path,
+        plugin_root=_PLUGIN_ROOT,
+        codex_session_id="codex-shell",
+        workflow_session_id="parent-shell",
     )
 
     proc = subprocess.run(
@@ -169,9 +179,12 @@ def test_workflow_wrapper_prefers_claude_when_both_runtime_markers_exist(tmp_pat
         "print(os.environ.get('WORKFLOW_SESSION_ID', '<missing>'))\n",
         encoding="utf-8",
     )
-    env_file = codex_env_file_path(tmp_path, "codex-shell")
-    env_file.parent.mkdir(parents=True)
-    env_file.write_text("export WORKFLOW_SESSION_ID=codex-parent\n", encoding="utf-8")
+    assert write_codex_env_file(
+        project_dir=tmp_path,
+        plugin_root=_PLUGIN_ROOT,
+        codex_session_id="codex-shell",
+        workflow_session_id="codex-parent",
+    )
 
     proc = subprocess.run(
         [str(_SCRIPTS_DIR / "workflow"), str(script)],
