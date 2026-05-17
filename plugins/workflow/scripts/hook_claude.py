@@ -49,6 +49,7 @@ from workflow_operator_context import (  # noqa: E402
     build_operator_session_context,
 )
 from workflow_session_state import (  # noqa: E402
+    read_authoring_file_reads,
     record_authoring_file_read,
     record_session_policy_announced,
     record_subagent_start,
@@ -454,6 +455,61 @@ def pre_write(
     )
 
 
+def pre_read(
+    event_payload: ClaudePreToolUsePayload,
+    *,
+    stdout: TextIO | None = None,
+) -> int:
+    """Notify Claude when an authoring file read was already recorded."""
+
+    if event_payload.tool_name != "Read" or event_payload.agent_type:
+        return 0
+
+    target = _read_target(event_payload.tool_input)
+    if target is None:
+        return 0
+
+    relative_path = authoring_relative_path(target, plugin_root=_plugin_root())
+    if relative_path is None:
+        return 0
+
+    config = workflow_config_for_project(_project_dir())
+    if config is None:
+        return 0
+
+    normalized_path = str(target.expanduser().resolve())
+    for item in read_authoring_file_reads(config.root, "claude", event_payload.session_id):
+        if item.get("path") != normalized_path and item.get("relative_path") != relative_path:
+            continue
+        emit_json(
+            {
+                "hookSpecificOutput": {
+                    "hookEventName": "PreToolUse",
+                    "additionalContext": (
+                        "Workflow authoring file already read in this session: "
+                        f"`{relative_path}`."
+                    ),
+                }
+            },
+            stdout=stdout,
+        )
+        return 0
+
+    return 0
+
+
+def pre_tool_use(
+    event_payload: ClaudePreToolUsePayload,
+    *,
+    stdout: TextIO | None = None,
+) -> int:
+    """Handle a Claude ``PreToolUse`` hook invocation."""
+
+    if event_payload.tool_name == "Read":
+        return pre_read(event_payload, stdout=stdout)
+    return pre_write(event_payload, stdout=stdout)
+
+
 def post_read(
     event_payload: ClaudePostToolUsePayload,
     *,
@@ -536,7 +592,7 @@ def main(
     if isinstance(event_payload, ClaudeSubagentStartPayload):
         return subagent_start(event_payload, stdout=stdout)
     if isinstance(event_payload, ClaudePreToolUsePayload):
-        return pre_write(event_payload, stdout=stdout)
+        return pre_tool_use(event_payload, stdout=stdout)
     if isinstance(event_payload, ClaudePostToolUsePayload):
         return post_read(event_payload, stdout=stdout)
     if isinstance(event_payload, ClaudeUserPromptSubmitPayload):
