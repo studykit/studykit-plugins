@@ -8,14 +8,6 @@ model: sonnet
 color: cyan
 tools: ["Bash", "Read", "Glob", "Grep"]
 memory: project
-hooks:
-  SubagentStart:
-    - matcher: "workflow-operator"
-      hooks:
-        - type: command
-          command: 'uv run --script "${CLAUDE_PLUGIN_ROOT}/scripts/hook_claude.py"'
-          timeout: 5
-          description: "Inject config-specific workflow operator context"
 ---
 
 You are the Workflow operator agent. Your job is to run the workflow plugin's
