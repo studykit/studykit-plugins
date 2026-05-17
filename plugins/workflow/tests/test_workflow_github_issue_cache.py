@@ -21,7 +21,7 @@ from workflow_cache import (  # noqa: E402
     pending_relationship_operations_from_mapping,
     require_provider_freshness,
 )
-from workflow_github_issue_cache import GitHubIssueCache  # noqa: E402
+from workflow_github_issue_cache import GitHubIssueCache, is_github_issue_cache_body_path  # noqa: E402
 from workflow_command import CommandRequest, CommandResult  # noqa: E402
 from workflow_github import DEFAULT_ISSUE_FIELDS, GitHubRepository  # noqa: E402
 from workflow_providers import (  # noqa: E402
@@ -74,6 +74,23 @@ def repo() -> GitHubRepository:
 
 def external_repo() -> GitHubRepository:
     return GitHubRepository(host="github.com", owner="other", name="repo")
+
+
+def test_github_issue_cache_body_path_recognizer_matches_issue_body_layouts(tmp_path: Path) -> None:
+    configured_issue = tmp_path / ".workflow-cache" / "issues" / "39" / "issue.md"
+    configured_pending = tmp_path / ".workflow-cache" / "issues-pending" / "draft-1" / "issue.md"
+    external_issue = tmp_path / ".workflow-cache" / "github.com" / "other" / "repo" / "issues" / "39" / "issue.md"
+    external_pending = (
+        tmp_path / ".workflow-cache" / "github.com" / "other" / "repo" / "issues-pending" / "draft-1" / "issue.md"
+    )
+
+    assert is_github_issue_cache_body_path(configured_issue, tmp_path)
+    assert is_github_issue_cache_body_path(configured_pending, tmp_path)
+    assert is_github_issue_cache_body_path(external_issue, tmp_path)
+    assert is_github_issue_cache_body_path(external_pending, tmp_path)
+    assert not is_github_issue_cache_body_path(configured_issue.with_name("metadata.yml"), tmp_path)
+    assert not is_github_issue_cache_body_path(tmp_path / ".workflow-cache" / "issues-created" / "39-draft" / "issue.md", tmp_path)
+    assert not is_github_issue_cache_body_path(tmp_path / "issue.md", tmp_path)
 
 
 def issue_payload(

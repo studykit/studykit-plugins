@@ -11,11 +11,22 @@ if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
 from workflow_jira_data_center_client import JiraDataCenterSite  # noqa: E402
-from workflow_jira_issue_cache import JiraDataCenterIssueCache  # noqa: E402
+from workflow_jira_issue_cache import JiraDataCenterIssueCache, is_jira_issue_cache_body_path  # noqa: E402
 
 
 def jira_site() -> JiraDataCenterSite:
     return JiraDataCenterSite(base_url="https://jira.example.test", authority="jira.example.test")
+
+
+def test_jira_issue_cache_body_path_recognizer_matches_pending_draft_layout(tmp_path: Path) -> None:
+    draft_body = tmp_path / ".workflow-cache" / "jira" / "jira.example.test" / "issues-pending" / "draft-1" / "issue.md"
+    snapshot = tmp_path / ".workflow-cache" / "jira" / "jira.example.test" / "issues" / "TEST-1234" / "snapshot.md"
+    issue_json = tmp_path / ".workflow-cache" / "jira" / "jira.example.test" / "issues" / "TEST-1234" / "issue.json"
+
+    assert is_jira_issue_cache_body_path(draft_body, tmp_path)
+    assert not is_jira_issue_cache_body_path(snapshot, tmp_path)
+    assert not is_jira_issue_cache_body_path(issue_json, tmp_path)
+    assert not is_jira_issue_cache_body_path(tmp_path / "issue.md", tmp_path)
 
 
 def test_jira_issue_cache_paths_are_provider_specific(tmp_path: Path) -> None:

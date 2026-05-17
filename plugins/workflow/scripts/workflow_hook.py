@@ -29,8 +29,13 @@ from workflow_edit_target import EditTarget  # noqa: E402
 from workflow_config import WorkflowConfig, WorkflowConfigError, load_workflow_config  # noqa: E402
 from workflow_github import GitHubRepository, GitHubRepositoryError, normalize_issue_number  # noqa: E402
 from workflow_github import resolve_github_repository  # noqa: E402
-from workflow_issue_cache import cache_issue_references  # noqa: E402
-from workflow_issue_cache import extract_issue_numbers, format_issue_cache_context  # noqa: E402
+from workflow_github_issue_cache import is_github_issue_cache_body_path  # noqa: E402
+from workflow_github_issue_context import cache_github_issue_references  # noqa: E402
+from workflow_github_issue_refs import extract_issue_numbers as extract_github_issue_numbers  # noqa: E402
+from workflow_issue_cli_output import format_issue_cache_context  # noqa: E402
+from workflow_jira_issue_cache import is_jira_issue_cache_body_path  # noqa: E402
+from workflow_jira_issue_context import cache_jira_issue_references  # noqa: E402
+from workflow_jira_issue_refs import jira_issue_keys_from_references  # noqa: E402
 from workflow_jira_issue_refs import normalize_jira_issue_key  # noqa: E402
 from workflow_session_state import (  # noqa: E402
     commit_prefix_was_announced,
@@ -108,12 +113,12 @@ def inject_prompt_issue_context(
                 emit_user_prompt_context([commit_context], stdout=stdout)
             return 0
 
-    prompt_numbers = extract_issue_numbers(
-        prompt_text,
-        repo=repo,
-        issue_id_format=config.issue_id_format,
-    )
-    issue_numbers = _ordered_issue_union(prompt_numbers, issue_id_format=config.issue_id_format)
+    if config.issues.kind == "github":
+        prompt_numbers = extract_github_issue_numbers(prompt_text, repo=repo)
+        issue_numbers = _ordered_issue_union(prompt_numbers, issue_id_format="github")
+    else:
+        prompt_numbers = jira_issue_keys_from_references([prompt_text])
+        issue_numbers = _ordered_issue_union(prompt_numbers, issue_id_format="jira")
     if not issue_numbers:
         if commit_context:
             record_commit_prefix_announced(config.root, session_id)
@@ -121,7 +126,11 @@ def inject_prompt_issue_context(
         return 0
 
     already_announced = read_session_issues(config.root, session_id, "announced")
-    contexts = cache_issue_references(config, issue_numbers, repo=repo, runner=runner)
+    if config.issues.kind == "github":
+        assert repo is not None
+        contexts = cache_github_issue_references(config, issue_numbers, repo=repo, runner=runner)
+    else:
+        contexts = cache_jira_issue_references(config, issue_numbers, runner=runner)
     fresh_contexts = [context for context in contexts if context.number not in already_announced]
     if fresh_contexts:
         record_session_issues(
@@ -240,21 +249,10 @@ def github_repo_for_config(
 def is_provider_issue_cache_body(path: Path, config: WorkflowConfig) -> bool:
     """Return whether ``path`` is a provider issue body cache projection."""
 
-    if config.issues.kind not in {"github", "jira"} or path.name != "issue.md":
-        return False
-    try:
-        parts = path.expanduser().resolve(strict=False).relative_to(
-            config.root / ".workflow-cache"
-        ).parts
-    except ValueError:
-        return False
-
-    if config.issues.kind == "github" and len(parts) == 3:
-        return parts[0] in {"issues", "issues-pending"}
-    if config.issues.kind == "github" and len(parts) == 6:
-        return parts[3] in {"issues", "issues-pending"}
-    if config.issues.kind == "jira" and len(parts) == 5:
-        return parts[0] == "jira" and parts[2] == "issues-pending"
+    if config.issues.kind == "github":
+        return is_github_issue_cache_body_path(path, config.root)
+    if config.issues.kind == "jira":
+        return is_jira_issue_cache_body_path(path, config.root)
     return False
 
 

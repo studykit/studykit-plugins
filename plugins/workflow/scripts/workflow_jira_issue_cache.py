@@ -44,6 +44,21 @@ from workflow_jira_issue_refs import normalize_jira_issue_key
 from workflow_jira_issue_snapshot import render_jira_snapshot
 
 
+def is_jira_issue_cache_body_path(path: Path, project: Path) -> bool:
+    """Return whether ``path`` is a Jira issue body cache projection."""
+
+    if path.name != "issue.md":
+        return False
+    try:
+        parts = path.expanduser().resolve(strict=False).relative_to(
+            project.expanduser().resolve(strict=False) / CACHE_ROOT_NAME
+        ).parts
+    except ValueError:
+        return False
+
+    return len(parts) == 5 and parts[0] == "jira" and parts[2] == "issues-pending"
+
+
 class JiraDataCenterIssueCache:
     """Repo-local Jira Data Center cache with native JSON plus an LLM snapshot."""
 
