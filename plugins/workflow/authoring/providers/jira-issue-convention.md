@@ -93,8 +93,6 @@ Summary:
 - <material change>
 
 Validation: local workflow checks passed.
-
-- <commit-ref>
 ```
 
 Rules:
@@ -103,7 +101,13 @@ Rules:
   behavior or documentation, or the work changes an agent, provider, or
   authoring boundary.
 - Do not paste unit test output, test file lists, or verbose validation logs into issue comments.
-- Prefer one short commit reference per relevant commit.
+- Do not list commit references by default. When commit subjects prefix the
+  Jira issue key (`ABC-123 …`) and the project has a DVCS or Smart Commit
+  integration, Jira already links those commits to the issue.
+- Include commit reference bullets only when the auto-link cannot fire (no
+  DVCS integration, commits in a different repository, or commits whose
+  subject does not carry the issue key) or when a few commits in a large set
+  need explicit highlighting.
 - Keep implementation details high-level; link or reference changed files only when the distinction matters.
 
 ## Branch, commit, and PR conventions

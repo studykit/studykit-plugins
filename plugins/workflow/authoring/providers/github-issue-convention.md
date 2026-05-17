@@ -87,8 +87,6 @@ Summary:
 - <material change>
 
 Validation: local workflow checks passed.
-
-- <short-sha>
 ```
 
 Rules:
@@ -97,10 +95,14 @@ Rules:
   behavior or documentation, or the work changes an agent, provider, or
   authoring boundary.
 - Do not paste unit test output, test file lists, or verbose validation logs into issue comments.
-- Do not include full commit URLs when GitHub can autolink a short SHA.
-- Do not wrap commit or file SHAs in inline code, backticks, or quotes; GitHub
-  autolinks only plain SHA text in issue comments.
-- Prefer one short SHA bullet per relevant commit.
+- Do not list commit SHAs by default. When commit subjects prefix the issue
+  ref (`#123 …`), the GitHub timeline already links those commits to the
+  issue, so repeating them as bullets is noise.
+- Include short SHA bullets only when the auto-link cannot fire (commits in a
+  different repo, or commits whose subject does not carry the issue ref) or
+  when a few commits in a large set need explicit highlighting.
+- When SHAs are included, use plain short SHA text — no backticks, no full
+  commit URLs. GitHub autolinks only unquoted SHA text in issue comments.
 - Keep implementation details high-level; link or reference changed files only when the distinction matters.
 
 ## Closing keywords
