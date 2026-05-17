@@ -98,6 +98,8 @@ Rules:
   authoring boundary.
 - Do not paste unit test output, test file lists, or verbose validation logs into issue comments.
 - Do not include full commit URLs when GitHub can autolink a short SHA.
+- Do not wrap commit or file SHAs in inline code, backticks, or quotes; GitHub
+  autolinks only plain SHA text in issue comments.
 - Prefer one short SHA bullet per relevant commit.
 - Keep implementation details high-level; link or reference changed files only when the distinction matters.
 
