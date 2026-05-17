@@ -83,12 +83,24 @@ Use comments for conversation, interview notes, and feedback threads.
 
 The curated use case page should contain the stable user-facing content.
 
-Required:
+Place a metadata line immediately under the page title that points back to the
+paired workflow issue:
+
+```
+source: <Markdown link or provider URL>
+```
+
+Required body sections:
 
 ```markdown
 ## Goal
 
 <what the actor wants to accomplish>
+
+## Actors
+
+- <actor> — <role in this use case>
+- <actor> — <role in this use case>
 
 ## Situation
 
@@ -104,9 +116,12 @@ Required:
 <observable successful outcome>
 ```
 
+List every actor that participates in this use case under `## Actors`. Use the
+same actor name across use cases when referring to the same role, so the actor
+catalog can be read off the curated pages.
+
 Optional:
 
-- `## Actors` — actor list when not obvious from the flow.
 - `## Validation` — user-visible input constraints, limits, or required formats.
 - `## Error Handling` — what the actor sees when things fail.
 - `## Related Work` — workflow issues, tasks, specs, or research.
@@ -127,17 +142,10 @@ Publish or update the curated page when:
 
 The first publication should add a `## Change Log` entry linking to the workflow issue.
 
-## Task linkage
-
-Tasks that implement the use case should link to the curated page or workflow issue through the `implements` relationship according to the selected authoring files.
-
-Prefer the curated page when it exists, because it contains the stable implementation-facing content. Use the workflow issue when the curated page has not been published yet.
-
 ## Knowledge side effects
 
 Authoring or revising a use case may require updates to other knowledge pages:
 
-- New actor → `actors` page.
 - New domain concept → `domain` page.
 - Scope or problem framing change → `context` page.
 - New screen or interaction group → `context` or product-facing page.
@@ -172,4 +180,4 @@ When splitting:
 - Do not create the curated page before the workflow issue unless importing existing documents.
 - Do not store use case discussion only in the knowledge page.
 - Do not pack multiple actor goals into one use case.
-- Do not auto-trigger a skill just because a use case is being written; follow the authoring resolver policy.
+

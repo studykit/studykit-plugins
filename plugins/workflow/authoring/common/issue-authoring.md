@@ -58,7 +58,6 @@ Issue relationships are not issue metadata fields. Type-specific authoring files
 Common relationship meanings:
 
 - `target` — item, page, or external reference reviewed or affected by a review item.
-- `implements` — use case, requirement, spec, or knowledge page implemented by a work item.
 - `parent` — epic or parent work item that coordinates this item.
 - `depends_on` — blocking or ordering dependency.
 - `related` — useful non-blocking relationship.

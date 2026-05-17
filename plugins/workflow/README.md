@@ -75,8 +75,8 @@ Markdown frontmatter and `PyYAML` for `.workflow/config.yml`.
 Workflow authoring contracts apply only to workflow artifact types:
 
 - Issue-backed: `task`, `bug`, `spike`, `epic`, and `review`.
-- Knowledge-backed: `spec`, `architecture`, `domain`, `context`, `actors`,
-  `nfr`, and `ci`.
+- Knowledge-backed: `spec`, `architecture`, `domain`, `context`, `nfr`, and
+  `ci`.
 - Dual-role: `usecase` and `research`.
 
 Before editing a workflow artifact, ask `workflow-operator` for the required

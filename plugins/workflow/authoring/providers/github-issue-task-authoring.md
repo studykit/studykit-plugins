@@ -31,3 +31,7 @@ Common optional sections are defined by `../common/task-authoring.md` and `../co
 - `## Why Discarded`
 
 GitHub label is automatically set to `task`.
+
+## Use case linkage
+
+When this task implements a use case, link it as a blocker of the use case workflow issue using a GitHub issue dependency: `blocked_by` intent, source = use case issue, target = this task.

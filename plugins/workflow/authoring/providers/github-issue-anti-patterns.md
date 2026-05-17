@@ -24,7 +24,6 @@ Avoid these sections in GitHub Issue bodies:
 - `## Blocked By`
 - `## Blocking`
 - `## Target`
-- `## Implements`
 - `## Follow-Up`
 
 Also avoid equivalent variants such as:
@@ -53,7 +52,6 @@ Do not create body sections only to mirror GitHub sub-issues or dependency relat
 
 - Do not add `## Children` only to repeat GitHub sub-issues.
 - Do not add `## Target`; use a GitHub dependency relationship or `## Related`.
-- Do not add `## Implements`; use `## Related`.
 - Do not add `## Follow-Up`; use `## Related`.
 - Do not use `## Related` for blockers, parent issues, dependencies, or sequencing constraints.
 

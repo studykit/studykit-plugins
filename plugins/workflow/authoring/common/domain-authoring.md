@@ -117,4 +117,3 @@ Do not duplicate the issue discussion in the page.
 
 - Do not store domain as an issue.
 - Do not use page comments as a substitute for review items when terminology feedback needs workflow tracking.
-- Do not auto-trigger a skill just because domain is being written; follow the authoring resolver policy.
