@@ -774,7 +774,9 @@ class GitHubIssueCache:
             preserve_existing=False,
         )
 
-        comments_index = self._write_comments(repo, issue_number, issue, fetched_at=now)
+        comments_index = self.comments_index_file(repo, issue_number)
+        if _has_comment_projection_payload(issue):
+            comments_index = self._write_comments(repo, issue_number, issue, fetched_at=now)
 
         return CacheWriteResult(
             issue_dir=issue_dir,
@@ -1174,6 +1176,17 @@ def _comments_from_issue(issue: Mapping[str, Any]) -> list[Mapping[str, Any]]:
     if not isinstance(comments, list):
         return []
     return [item for item in comments if isinstance(item, Mapping)]
+
+
+def _has_comment_projection_payload(issue: Mapping[str, Any]) -> bool:
+    """Return true when the provider payload explicitly carries comments.
+
+    Some targeted provider reads omit the ``comments`` field. Treat that as
+    unknown comment state and preserve any existing comment projection instead
+    of overwriting it with an empty index.
+    """
+
+    return "comments" in issue
 
 
 def _comment_ids(comment: Mapping[str, Any], *, fallback: str) -> tuple[str, str | None]:

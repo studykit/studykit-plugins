@@ -173,6 +173,23 @@ def test_github_issue_cache_writes_minimal_markdown_comment_index_and_relationsh
     assert relationships["dependencies"]["blocked_by"][0] == {"number": 32}
 
 
+def test_github_issue_cache_preserves_comments_when_provider_payload_omits_comments(tmp_path: Path) -> None:
+    cache = GitHubIssueCache.for_project(tmp_path)
+    initial = cache.write_issue_bundle(repo(), issue_payload(), fetched_at="2026-05-13T12:34:56Z")
+    initial_index = initial.comments_index.read_text(encoding="utf-8")
+    comment_file = initial.comments_index.parent / "2026-05-13T112053Z-4440388606.md"
+    assert comment_file.is_file()
+
+    payload = issue_payload(body="Body from targeted read.", updated_at="2026-05-13T13:00:00Z")
+    payload.pop("comments")
+    write = cache.write_issue_bundle(repo(), payload, fetched_at="2026-05-13T13:01:00Z")
+
+    assert write.comments_index == initial.comments_index
+    assert write.issue_file.read_text(encoding="utf-8").endswith("Body from targeted read.")
+    assert write.comments_index.read_text(encoding="utf-8") == initial_index
+    assert comment_file.read_text(encoding="utf-8").endswith("Raw provider comment body.")
+
+
 def test_github_issue_cache_writes_project_membership_status_to_frontmatter(tmp_path: Path) -> None:
     cache = GitHubIssueCache.for_project(tmp_path)
 

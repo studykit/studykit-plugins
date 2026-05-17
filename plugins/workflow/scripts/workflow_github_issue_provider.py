@@ -203,10 +203,21 @@ class GitHubIssueNativeProvider(IssueProvider):
         labels = request.payload.get("labels")
         if title is None and body is None and labels is None:
             raise ProviderOperationError("GitHub issue update requires from_cache or at least one of title, body, labels")
-        self._require_write_freshness(request, issue, default_target="issue")
         issue_number = normalize_issue_number(issue)
         repo = resolve_github_repository(request.context.project, runner=self.runner)
         cache = GitHubIssueCache.for_project(request.context.project, configured_repo=repo)
+        try:
+            self._require_write_freshness(request, issue_number, default_target="issue")
+        except ProviderFreshnessError as exc:
+            return self._stale_cache_block_payload(
+                request=request,
+                repo=repo,
+                cache=cache,
+                issue_number=issue_number,
+                operation="update_issue",
+                target="issue",
+                error=exc,
+            )
         current_labels: tuple[str, ...] | None = None
         if labels is not None:
             current = view_issue(
@@ -254,7 +265,18 @@ class GitHubIssueNativeProvider(IssueProvider):
             include_comments=False,
             include_relationships=False,
         )
-        provider_current = self._require_cached_issue_write_freshness(request, repo, cache, issue_number)
+        try:
+            provider_current = self._require_cached_issue_write_freshness(request, repo, cache, issue_number)
+        except ProviderFreshnessError as exc:
+            return self._stale_cache_block_payload(
+                request=request,
+                repo=repo,
+                cache=cache,
+                issue_number=issue_number,
+                operation="update_issue_from_cache",
+                target="issue",
+                error=exc,
+            )
         current_labels = tuple(_string_list(provider_current.get("labels")))
 
         edited = edit_issue(
@@ -338,7 +360,26 @@ class GitHubIssueNativeProvider(IssueProvider):
                 )
             raise ProviderOperationError(f"no pending comment files found for GitHub issue #{issue_number}")
 
-        self._require_write_freshness(request, issue_number, default_target="comments")
+        freshness_payload = dict(request.payload)
+        freshness_payload.setdefault("freshness_check", True)
+        freshness_payload.setdefault("freshness_target", "comments")
+        try:
+            self._require_write_freshness(
+                replace(request, payload=freshness_payload),
+                issue_number,
+                default_target="comments",
+            )
+        except ProviderFreshnessError as exc:
+            return self._stale_cache_block_payload(
+                request=request,
+                repo=repo,
+                cache=cache,
+                issue_number=issue_number,
+                operation="append_pending_comments",
+                target="comments",
+                error=exc,
+                pending_files=[pending.file_name for pending in pending_comments],
+            )
         appended = [
             comment_issue(
                 issue_number,
@@ -567,6 +608,79 @@ class GitHubIssueNativeProvider(IssueProvider):
         )
         return cache.write_relationships_projection(repo, issue_number, relationships)
 
+    def _refresh_issue_bundle(
+        self,
+        request: ProviderRequest,
+        repo: GitHubRepository,
+        cache: GitHubIssueCache,
+        issue_number: str,
+    ):
+        refreshed = view_issue(issue_number, project=request.context.project, runner=self.runner)
+        return cache.write_issue_bundle(
+            repo,
+            self._payload_with_relationship_projection(
+                request,
+                issue=issue_number,
+                payload=refreshed,
+            ),
+        )
+
+    def _stale_cache_block_payload(
+        self,
+        *,
+        request: ProviderRequest,
+        repo: GitHubRepository,
+        cache: GitHubIssueCache,
+        issue_number: str,
+        operation: str,
+        target: str,
+        error: ProviderFreshnessError,
+        pending_files: list[str] | None = None,
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            "operation": operation,
+            "issue": issue_number,
+            "status": "blocked",
+            "reason": "stale_cache",
+            "message": (
+                f"{operation} blocked because GitHub issue #{issue_number} {target} changed on the provider. "
+                "The cache was refreshed; reread the listed paths before retrying."
+            ),
+            "target": target,
+            "freshness": error.to_json(),
+            "reread_required": True,
+            "reread_paths": self._reread_paths(cache, repo, issue_number, target=target),
+        }
+        if pending_files is not None:
+            payload["pending_files"] = pending_files
+        try:
+            write_result = self._refresh_issue_bundle(request, repo, cache, issue_number)
+        except Exception as refresh_exc:  # pragma: no cover - defensive reporting path
+            payload["cache_refreshed"] = False
+            payload["refresh_error"] = str(refresh_exc)
+        else:
+            payload["cache_refreshed"] = True
+            payload["cache"] = write_result.to_json()
+        return payload
+
+    def _reread_paths(
+        self,
+        cache: GitHubIssueCache,
+        repo: GitHubRepository,
+        issue_number: str,
+        *,
+        target: str,
+    ) -> list[str]:
+        paths = [
+            cache.issue_file(repo, issue_number),
+            cache.issue_metadata_file(repo, issue_number),
+        ]
+        if target == "comments":
+            paths.append(cache.comments_index_file(repo, issue_number))
+        if target == "relationships":
+            paths.append(cache.issue_file(repo, issue_number))
+        return [str(path) for index, path in enumerate(paths) if path not in paths[:index]]
+
     def _validate_relationship_operations(self, operations: list[_ResolvedRelationshipOperation]) -> None:
         supported = {"parent", "child", "blocked_by", "blocking"}
         for operation in operations:
@@ -683,27 +797,81 @@ class GitHubIssueNativeProvider(IssueProvider):
 
     def close(self, request: ProviderRequest) -> Mapping[str, Any]:
         issue = _required_payload_value(request, "issue")
+        issue_number = normalize_issue_number(issue)
         reason = str(request.payload.get("reason") or "completed")
         comment = request.payload.get("comment")
-        self._require_write_freshness(request, issue, default_target="issue")
-        return close_issue(
-            issue,
+        repo = resolve_github_repository(request.context.project, runner=self.runner)
+        cache = GitHubIssueCache.for_project(request.context.project, configured_repo=repo)
+        freshness_payload = dict(request.payload)
+        freshness_payload.setdefault("freshness_check", True)
+        freshness_payload.setdefault("freshness_target", "issue")
+        try:
+            self._require_write_freshness(
+                replace(request, payload=freshness_payload),
+                issue_number,
+                default_target="issue",
+            )
+        except ProviderFreshnessError as exc:
+            return self._stale_cache_block_payload(
+                request=request,
+                repo=repo,
+                cache=cache,
+                issue_number=issue_number,
+                operation="close_issue",
+                target="issue",
+                error=exc,
+            )
+        closed = close_issue(
+            issue_number,
             project=request.context.project,
             reason=reason,
             comment=str(comment) if comment is not None else None,
             runner=self.runner,
         )
+        write_result = self._refresh_issue_bundle(request, repo, cache, issue_number)
+        return {
+            **dict(closed),
+            "cache_refreshed": True,
+            "cache": write_result.to_json(),
+        }
 
     def reopen(self, request: ProviderRequest) -> Mapping[str, Any]:
         issue = _required_payload_value(request, "issue")
+        issue_number = normalize_issue_number(issue)
         comment = request.payload.get("comment")
-        self._require_write_freshness(request, issue, default_target="issue")
-        return reopen_issue(
-            issue,
+        repo = resolve_github_repository(request.context.project, runner=self.runner)
+        cache = GitHubIssueCache.for_project(request.context.project, configured_repo=repo)
+        freshness_payload = dict(request.payload)
+        freshness_payload.setdefault("freshness_check", True)
+        freshness_payload.setdefault("freshness_target", "issue")
+        try:
+            self._require_write_freshness(
+                replace(request, payload=freshness_payload),
+                issue_number,
+                default_target="issue",
+            )
+        except ProviderFreshnessError as exc:
+            return self._stale_cache_block_payload(
+                request=request,
+                repo=repo,
+                cache=cache,
+                issue_number=issue_number,
+                operation="reopen_issue",
+                target="issue",
+                error=exc,
+            )
+        reopened = reopen_issue(
+            issue_number,
             project=request.context.project,
             comment=str(comment) if comment is not None else None,
             runner=self.runner,
         )
+        write_result = self._refresh_issue_bundle(request, repo, cache, issue_number)
+        return {
+            **dict(reopened),
+            "cache_refreshed": True,
+            "cache": write_result.to_json(),
+        }
 
     def logs(self, request: ProviderRequest) -> Mapping[str, Any]:
         issue = _required_payload_value(request, "issue")
@@ -789,7 +957,7 @@ class GitHubIssueNativeProvider(IssueProvider):
                 artifact=artifact,
             )
         except WorkflowFreshnessConflict as exc:
-            raise ProviderFreshnessError(str(exc)) from exc
+            raise ProviderFreshnessError(str(exc), result=exc.result) from exc
 
     def _require_cached_issue_write_freshness(
         self,
@@ -822,7 +990,7 @@ class GitHubIssueNativeProvider(IssueProvider):
                 artifact=artifact,
             )
         except WorkflowFreshnessConflict as exc:
-            raise ProviderFreshnessError(str(exc)) from exc
+            raise ProviderFreshnessError(str(exc), result=exc.result) from exc
         return provider_current
 
     def _provider_freshness_timestamp(

@@ -2,7 +2,7 @@
 # /// script
 # dependencies = ["python-frontmatter", "PyYAML"]
 # ///
-"""GitHub Issues cache write-back entrypoint."""
+"""GitHub Issues lifecycle mutation entrypoint."""
 
 from __future__ import annotations
 
@@ -21,8 +21,8 @@ from workflow_github_issue_refs import issue_numbers_from_references
 from workflow_providers import ProviderContext, ProviderRequest
 
 
-class GitHubIssueWritebackError(RuntimeError):
-    """Raised when GitHub issue cache write-back cannot proceed."""
+class GitHubIssueLifecycleError(RuntimeError):
+    """Raised when a GitHub issue lifecycle mutation cannot proceed."""
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -30,45 +30,60 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--project", type=Path, default=workflow_project_dir_from_env(), help="project path")
     parser.add_argument("--type", default="task", help="workflow artifact type")
     parser.add_argument("--json", action="store_true", help="emit JSON")
+    parser.add_argument("--reason", default="completed", help="close reason for close operations")
+    parser.add_argument("--comment", help="optional provider comment attached to the lifecycle mutation")
+    parser.add_argument("operation", choices=("close", "reopen"), help="lifecycle operation")
     parser.add_argument("issues", nargs="+", help="GitHub issue IDs or configured repository issue references")
     return parser
 
 
-def writeback_cache_payload(
+def lifecycle_payload(
     *,
     project: Path,
+    operation: str,
     issues: list[str],
     artifact_type: str,
+    reason: str = "completed",
+    comment: str | None = None,
     runner: CommandRunner | None = None,
 ) -> dict[str, object]:
-    """Write cached GitHub issue projections back to GitHub."""
+    """Close or reopen GitHub issues through the provider/cache layer."""
 
     config = _load_github_issue_config(project)
     try:
         repo = resolve_github_repository(config.root, runner=runner)
     except GitHubRepositoryError as exc:
-        raise GitHubIssueWritebackError(str(exc)) from exc
+        raise GitHubIssueLifecycleError(str(exc)) from exc
 
     issue_numbers = issue_numbers_from_references(issues, repo=repo, allow_bare_numbers=True)
     if not issue_numbers:
-        raise GitHubIssueWritebackError("no configured GitHub issue references were found")
+        raise GitHubIssueLifecycleError("no configured GitHub issue references were found")
 
     provider = GitHubIssueNativeProvider(runner=runner)
     results = []
     for issue in issue_numbers:
+        payload: dict[str, object] = {
+            "issue": issue,
+            "freshness_check": True,
+            "freshness_target": "issue",
+        }
+        if operation == "close":
+            payload["reason"] = reason
+        if comment is not None:
+            payload["comment"] = comment
         response = provider.call(
             ProviderRequest(
                 role="issue",
                 kind="github",
-                operation="update",
+                operation=operation,
                 context=ProviderContext(project=config.root, artifact_type=artifact_type),
-                payload={"issue": issue, "from_cache": True},
+                payload=payload,
             )
         )
         results.append(dict(response.payload))
 
     return {
-        "operation": "cache_writeback",
+        "operation": f"lifecycle_{operation}",
         "role": "issue",
         "kind": "github",
         "repository": repo.to_json(),
@@ -89,14 +104,17 @@ def main(
     errors = stderr or sys.stderr
 
     try:
-        payload = writeback_cache_payload(
+        payload = lifecycle_payload(
             project=args.project,
+            operation=args.operation,
             issues=list(args.issues),
             artifact_type=args.type,
+            reason=args.reason,
+            comment=args.comment,
             runner=runner,
         )
     except Exception as exc:
-        print(f"GitHub issue write-back error: {exc}", file=errors)
+        print(f"GitHub issue lifecycle error: {exc}", file=errors)
         return 2
 
     if args.json:
@@ -104,15 +122,15 @@ def main(
         return 0
 
     for item in payload["issues"]:
-        if isinstance(item, dict):
-            if item.get("status") == "blocked":
-                print(
-                    f"#{item.get('issue')} blocked: {item.get('reason')} "
-                    f"reread_required={item.get('reread_required')}",
-                    file=output,
-                )
-            else:
-                print(f"#{item.get('issue')} {item.get('operation')} verified={item.get('verified')}", file=output)
+        if not isinstance(item, dict):
+            continue
+        if item.get("status") == "blocked":
+            print(
+                f"#{item.get('issue')} blocked: {item.get('reason')} reread_required={item.get('reread_required')}",
+                file=output,
+            )
+        else:
+            print(f"#{item.get('issue')} {item.get('operation')} verified={item.get('verified')}", file=output)
     return 0
 
 
@@ -120,12 +138,12 @@ def _load_github_issue_config(project: Path) -> WorkflowConfig:
     try:
         config = load_workflow_config(project)
     except WorkflowConfigError as exc:
-        raise GitHubIssueWritebackError(str(exc)) from exc
+        raise GitHubIssueLifecycleError(str(exc)) from exc
     if config is None:
-        raise GitHubIssueWritebackError(".workflow/config.yml was not found")
+        raise GitHubIssueLifecycleError(".workflow/config.yml was not found")
     if config.issues.kind != "github":
-        raise GitHubIssueWritebackError(
-            f"GitHub issue write-back requires configured issue provider kind github, found {config.issues.kind}"
+        raise GitHubIssueLifecycleError(
+            f"GitHub issue lifecycle requires configured issue provider kind github, found {config.issues.kind}"
         )
     return config
 
