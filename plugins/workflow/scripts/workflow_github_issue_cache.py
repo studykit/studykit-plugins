@@ -41,6 +41,26 @@ from workflow_cache import (
 )
 from workflow_github import GitHubRepository, normalize_issue_number
 
+
+def is_github_issue_cache_body_path(path: Path, project: Path) -> bool:
+    """Return whether ``path`` is a GitHub issue body cache projection."""
+
+    if path.name != "issue.md":
+        return False
+    try:
+        parts = path.expanduser().resolve(strict=False).relative_to(
+            project.expanduser().resolve(strict=False) / CACHE_ROOT_NAME
+        ).parts
+    except ValueError:
+        return False
+
+    if len(parts) == 3:
+        return parts[0] in {"issues", "issues-pending"}
+    if len(parts) == 6:
+        return parts[3] in {"issues", "issues-pending"}
+    return False
+
+
 @dataclass(frozen=True)
 class CacheWriteResult:
     """Paths written for one cache projection refresh."""

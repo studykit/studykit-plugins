@@ -15,13 +15,13 @@ _SCRIPTS_DIR = _PLUGIN_ROOT / "scripts"
 if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
+import workflow_hook  # noqa: E402
 from workflow_command import CommandRequest, CommandResult  # noqa: E402
 from workflow_github_issue_cache import GitHubIssueCache  # noqa: E402
 from workflow_github import DEFAULT_ISSUE_FIELDS, GitHubRepository  # noqa: E402
-from workflow_hook import (  # noqa: E402
-    extract_issue_numbers,
-    record_session_issues,
-)
+from workflow_github_issue_refs import extract_issue_numbers as extract_github_issue_numbers  # noqa: E402
+from workflow_hook import record_session_issues  # noqa: E402
+from workflow_jira_issue_refs import jira_issue_keys_from_references  # noqa: E402
 from hook_claude import ClaudeCommonPayload, ClaudePreToolUsePayload  # noqa: E402
 from hook_claude import ClaudeSessionStartPayload  # noqa: E402
 from hook_claude import ClaudeSubagentStartPayload  # noqa: E402
@@ -648,8 +648,8 @@ def test_extract_issue_numbers_respects_issue_id_format() -> None:
         "and Jira keys test-1234 plus TEST-1235."
     )
 
-    assert extract_issue_numbers(text, repo=repo, issue_id_format="github") == ["45", "48", "50"]
-    assert extract_issue_numbers(text, issue_id_format="jira") == ["TEST-1234", "TEST-1235"]
+    assert extract_github_issue_numbers(text, repo=repo) == ["45", "48", "50"]
+    assert jira_issue_keys_from_references([text]) == ["TEST-1234", "TEST-1235"]
 
 
 def _hook_env(
@@ -1669,6 +1669,31 @@ Updated body.
     assert "projection has not been prepared yet" in reason
     assert f"Target: {issue_file}" in reason
     assert "Ask `workflow-operator` to prepare or refresh the cache projection" in reason
+
+
+def test_provider_issue_cache_body_recognition_dispatches_to_provider_module(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _write_config(tmp_path)
+    config = workflow_hook.workflow_config_for_project(tmp_path)
+    assert config is not None
+    calls: list[tuple[Path, Path]] = []
+
+    def fake_github_recognizer(path: Path, project: Path) -> bool:
+        calls.append((path, project))
+        return True
+
+    def unexpected_jira_recognizer(path: Path, project: Path) -> bool:
+        raise AssertionError("Jira recognizer should not run for GitHub issue config")
+
+    monkeypatch.setattr(workflow_hook, "is_github_issue_cache_body_path", fake_github_recognizer)
+    monkeypatch.setattr(workflow_hook, "is_jira_issue_cache_body_path", unexpected_jira_recognizer)
+
+    target = tmp_path / "provider-owned-layout-is-not-parsed-here.md"
+
+    assert workflow_hook.is_provider_issue_cache_body(target, config)
+    assert calls == [(target, tmp_path)]
 
 
 def test_claude_pre_write_blocks_github_cache_issue_frontmatter_changes(

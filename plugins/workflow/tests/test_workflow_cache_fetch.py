@@ -18,9 +18,10 @@ from workflow_command import CommandRequest, CommandResult  # noqa: E402
 from workflow_config import load_workflow_config  # noqa: E402
 from workflow_github_issue_cache import GitHubIssueCache  # noqa: E402
 from workflow_github import DEFAULT_ISSUE_FIELDS, GitHubRepository  # noqa: E402
-from workflow_issue_cache import issue_numbers_from_references  # noqa: E402
+from workflow_github_issue_refs import issue_numbers_from_references  # noqa: E402
 from workflow_jira_issue_cache import JiraDataCenterIssueCache  # noqa: E402
 from workflow_jira_data_center_client import jira_data_center_site_from_provider_config  # noqa: E402
+from workflow_jira_issue_refs import jira_issue_keys_from_references  # noqa: E402
 
 
 class FakeRunner:
@@ -247,7 +248,7 @@ def test_issue_numbers_from_references_accepts_jira_keys() -> None:
         "https://github.com/studykit/studykit-plugins/issues/43",
     ]
 
-    assert issue_numbers_from_references(references, issue_id_format="jira") == ["TEST-1234", "TEST-1235"]
+    assert jira_issue_keys_from_references(references) == ["TEST-1234", "TEST-1235"]
 
 
 def test_cache_fetch_uses_cache_hit_without_remote_issue_view(tmp_path: Path) -> None:
