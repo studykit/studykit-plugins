@@ -24,7 +24,6 @@ Avoid these sections in Jira issue bodies:
 - `## Blocked By`
 - `## Blocking`
 - `## Target`
-- `## Implements`
 - `## Follow-Up`
 
 Also avoid equivalent variants such as:
@@ -54,7 +53,6 @@ Do not use those sections as a disguised parent, child, blocked-by, or sequencin
 Do not create fallback sections only to mirror Jira issue links, hierarchy, or remote links. In particular:
 
 - Do not add `## Related` only to repeat a Jira issue link or remote link.
-- Do not add `## Implements`; use a provider-native relationship or `## Related`.
 - Do not add `## Target`; use a provider-native relationship or `## Related`.
 - Do not add `## Follow-Up`; use `## Related`.
 - Do not use `## Dependencies` for soft related work, parent links, or implementation links.

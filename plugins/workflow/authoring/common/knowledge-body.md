@@ -2,7 +2,7 @@
 
 Body-level rules for knowledge pages stored in a knowledge backend.
 
-Knowledge page types include `spec`, `architecture`, `domain`, `context`, `actors`, `nfr`, `ci`, and the curated output side of `usecase` and `research`.
+Knowledge page types include `spec`, `architecture`, `domain`, `context`, `nfr`, `ci`, and the curated output side of `usecase` and `research`.
 
 ## Purpose
 

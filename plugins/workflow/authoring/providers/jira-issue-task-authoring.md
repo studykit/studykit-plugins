@@ -31,3 +31,7 @@ Common optional sections are defined by `../common/task-authoring.md` and `../co
 - `## Why Discarded`
 
 Issue type is automatically set to `Task`.
+
+## Use case linkage
+
+When this task implements a use case, link it as a blocker of the use case workflow issue using the configured Jira blocking link: `blocked_by` intent, source = use case issue, target = this task. The project configuration must define the blocking link type and direction.

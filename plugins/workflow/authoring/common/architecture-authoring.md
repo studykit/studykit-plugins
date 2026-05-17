@@ -120,4 +120,3 @@ Use these boundaries to place architecture content. Do not encode these as metad
 
 - Do not store architecture as an issue.
 - Do not use page comments as a substitute for review items when feedback needs workflow tracking.
-- Do not auto-trigger a skill just because architecture is being written; follow the authoring resolver policy.

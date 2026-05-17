@@ -122,4 +122,3 @@ A spec should not be used as an implementation contract until:
 - Do not store specs as issue-backed tasks.
 - Do not author specs for routine implementation details such as variable names or formatting choices.
 - Do not make research conclusions directly prescriptive; cite research and record the spec decision separately.
-- Do not auto-trigger a skill just because a spec is being written; follow the authoring resolver policy.

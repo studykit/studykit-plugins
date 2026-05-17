@@ -57,7 +57,7 @@ Represent this metadata structurally when possible.
 
 Use canonical issue identity for the workflow issue. Do not use local integer ids.
 
-Do not use implementation-only fields such as `implements` or `cycle` for research.
+Do not use implementation-only fields such as `cycle` for research.
 
 ## Workflow issue relationships
 
@@ -230,7 +230,6 @@ The workflow issue remains useful for audit and discussion, but the curated repo
 
 ## Do not
 
-- Do not use `implements` or implementation cycle fields on research.
+- Do not use implementation cycle fields on research.
 - Do not store the final research deliverable only in an issue body when a knowledge backend is configured.
 - Do not create the curated report before the workflow issue unless importing existing documents.
-- Do not auto-trigger a skill just because research is being written; follow the authoring resolver policy.

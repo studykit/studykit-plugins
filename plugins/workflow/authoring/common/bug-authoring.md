@@ -2,76 +2,18 @@
 
 A workflow bug is an **issue-backed defect fix** against expected behavior. It tracks production behavior that is wrong, missing, regressed, or inconsistent with a use case, spec, test expectation, or user-visible contract.
 
-Bugs are stored in the configured issue backend. They are not local Markdown files unless a local projection workflow is explicitly configured.
+Bugs are stored in the configured issue backend.
 
 Companion contracts:
 
 - `./issue-body.md`
 - Issue rules: `./issue-authoring.md`
 
-## Storage role
-
-`bug` is stored in the issue backend.
-
-Use canonical issue identity. Do not use local integer ids.
-
-## Required metadata
-
-Represent this metadata structurally when possible. If a field cannot be stored structurally, include the value in the body when the selected authoring files require it.
-
-| Field | Required | Notes |
-| --- | --- | --- |
-| `type` | yes | Always `bug`. Use issue metadata when available. |
-| `title` | yes | Short summary of the broken behavior. |
-| `status` | yes | Workflow lifecycle status. |
-| `severity` | recommended | Workflow priority/severity if available. |
-| `tags` | optional | Classification tags. |
-
-## Relationships
-
-Represent relationships structurally when possible. Body representation depends on the selected provider and type authoring files.
-
-| Relationship | Required | Notes |
-| --- | --- | --- |
-| `spec` | optional | Spec or knowledge page whose expected behavior is violated. |
-| `depends_on` | optional | Blocking or ordering dependency. |
-| `parent` | optional | Epic or parent issue coordinating the fix. |
-| `related` | optional | Non-blocking references useful for diagnosis or implementation. |
-
-## Lifecycle
-
-Recommended semantic lifecycle:
-
-```text
-open → queued → progress → done
-open → discarded
-queued → progress | holding | discarded
-progress → holding | failing | done | discarded
-holding → queued | progress | discarded
-failing → queued | discarded
-done → terminal
-discarded → terminal
-```
-
-Status mapping depends on the configured issue backend.
-
-Status meaning:
-
-- `open` — Captured but not yet ready for fix.
-- `queued` — Reproduction and expected behavior are clear enough to fix.
-- `progress` — Fix is active.
-- `holding` — Paused for input, access, or sequencing.
-- `failing` — Fix attempt failed or reproduction is unstable.
-- `done` — Regression is fixed and verified.
-- `discarded` — No longer applicable or intentionally not fixing.
-
-`open` is the default initial status unless the user explicitly asks to queue it.
-
 ## Evidence-readiness
 
 A bug without a reproducible failure path is not ready for implementation.
 
-Before moving to `queued`, capture enough evidence for a handoff:
+Before treating a bug as ready for fix, capture enough evidence for a handoff:
 
 - Reproduction steps or command.
 - Observed behavior.
@@ -129,17 +71,6 @@ The test should:
 
 If no automated regression test is feasible, document the manual verification path and reason in `## Unit Test Strategy`.
 
-## Anchors and scope
-
-A bug may link to:
-
-- A use case whose flow or expected outcome is violated.
-- A spec whose contract is violated.
-- An architecture/domain/NFR/CI page affected by the fix.
-- A parent epic or task where the bug was discovered.
-
-If the bug reveals that expected behavior is undocumented, create a review item with `kind: gap` targeting the missing knowledge page.
-
 ## Artifacts
 
 Issue-backed bugs usually do not need a local evidence directory.
@@ -154,9 +85,9 @@ Use linked external evidence only when evidence has lasting value, such as:
 
 Production source paths are recorded by git history. Mention planned source changes in `## Change Plan` when they help scope the fix.
 
-## Done rule
+## Completion criteria
 
-A bug should not be marked `done` until:
+Treat a bug as complete only when:
 
 - Reproduction no longer fails, or the issue explains why the original reproduction is obsolete.
 - Regression test or manual verification is complete.
@@ -180,9 +111,9 @@ Keep the bug body as the current compact defect contract.
 
 - Missing `## Reproduction`.
 - Missing `## Unit Test Strategy` or regression test plan.
-- Capturing a vague symptom as `queued` before reproduction is clear.
+- Treating a vague symptom as ready for fix before reproduction is clear.
 - Treating comments as the only source of expected behavior.
-- Marking `done` without a regression test or documented manual verification.
+- Marking a bug complete without a regression test or documented manual verification.
 - Using local projection paths or local integer ids as canonical identity.
 
 ## Do not
@@ -190,4 +121,3 @@ Keep the bug body as the current compact defect contract.
 - Do not create local Markdown bug files unless explicitly using a local projection workflow.
 - Do not ship a fix without a regression test or a clear reason why one is not feasible.
 - Do not use closing keywords or Smart Commit commands unless the workflow intentionally wants automated side effects.
-- Do not auto-trigger a skill just because a bug is being written; follow the authoring resolver policy.

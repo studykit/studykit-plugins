@@ -69,12 +69,13 @@ def main_context_fragment(name: str) -> str:
 
 
 def expected_session_start_context(*, runtime: str, knowledge_kind: str) -> str:
-    fragments = [main_context_fragment("session-policy.md")]
+    policy_fragments = [main_context_fragment("session-policy.md")]
     if knowledge_kind == "github":
-        fragments.append(main_context_fragment("knowledge/github.md"))
+        policy_fragments.append(main_context_fragment("knowledge/github.md"))
+    sections = ["\n".join(policy_fragments)]
     if runtime == "codex":
-        fragments.append(main_context_fragment("codex-operator-reuse.md"))
-    return "\n".join(fragments)
+        sections.append(main_context_fragment("codex-operator-reuse.md"))
+    return "\n\n".join(sections)
 
 
 def default_github_relationship_response(request: CommandRequest) -> CommandResult | None:

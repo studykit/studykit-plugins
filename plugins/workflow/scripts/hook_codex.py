@@ -189,7 +189,7 @@ def _stop_scan_text(payload: dict[str, Any]) -> str:
 
 
 def _codex_session_start_context(config: Any) -> str:
-    return "\n".join(
+    return "\n\n".join(
         [
             build_session_start_context(config, _plugin_root()),
             build_codex_operator_reuse_context(),

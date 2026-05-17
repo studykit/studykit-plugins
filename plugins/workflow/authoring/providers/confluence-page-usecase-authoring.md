@@ -18,13 +18,13 @@ Use this final Confluence body structure for `usecase` pages.
 Common required sections are defined by `../common/usecase-authoring.md`:
 
 - `## Goal`
+- `## Actors`
 - `## Situation`
 - `## Flow`
 - `## Expected Outcome`
 
 Common optional sections are defined by `../common/usecase-authoring.md` and `../common/knowledge-body.md`:
 
-- `## Actors`
 - `## Validation`
 - `## Error Handling`
 - `## Related Work`

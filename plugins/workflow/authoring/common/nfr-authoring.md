@@ -124,4 +124,3 @@ Do not duplicate issue discussion in the page.
 
 - Do not store NFRs as issues.
 - Do not use page comments as a substitute for review items when NFR feedback needs workflow tracking.
-- Do not auto-trigger a skill just because NFRs are being written; follow the authoring resolver policy.

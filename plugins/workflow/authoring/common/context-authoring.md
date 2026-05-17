@@ -98,9 +98,8 @@ Do not duplicate issue discussion in the page.
 
 Use these boundaries to place framing content. Do not encode these as metadata relationships.
 
-- Use `actors` for actor roster and definitions.
 - Use `domain` for shared vocabulary and concepts.
-- Use `usecase` curated pages for detailed user-visible flows.
+- Use `usecase` curated pages for detailed user-visible flows and the actors that participate in each.
 - Use `architecture` for system shape.
 - Use `spec` for implementation contracts.
 - Use `nfr` for non-functional targets.
@@ -118,4 +117,3 @@ Use these boundaries to place framing content. Do not encode these as metadata r
 
 - Do not store context as an issue.
 - Do not use page comments as a substitute for review items when framing feedback needs workflow tracking.
-- Do not auto-trigger a skill just because context is being written; follow the authoring resolver policy.
