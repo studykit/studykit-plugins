@@ -8,7 +8,8 @@ that session.
 
 Helpers stay narrow: every function takes ``project``/``session_id`` plus the
 minimum extras it needs and is silent on filesystem errors so hook execution
-never breaks on disk hiccups.
+never breaks on disk hiccups. State mutations take an exclusive file lock so
+parallel hook processes do not overwrite each other's parent-session updates.
 """
 
 from __future__ import annotations
