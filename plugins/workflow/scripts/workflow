@@ -46,11 +46,10 @@ source_codex_env_file() {
   local project_dir
   project_dir="$(resolve_project_dir)"
 
-  local env_file
-  env_file="$(uv run --script "$SCRIPT_DIR/workflow_env.py" codex-env-path --project "$project_dir" --session "$CODEX_THREAD_ID")"
-  if [ -f "$env_file" ]; then
-    # shellcheck disable=SC1090
-    . "$env_file"
+  local env_exports
+  env_exports="$(uv run --script "$SCRIPT_DIR/workflow_env.py" codex-env-exports --project "$project_dir" --session "$CODEX_THREAD_ID")"
+  if [ -n "$env_exports" ]; then
+    eval "$env_exports"
   fi
 }
 

@@ -478,6 +478,7 @@ def user_prompt_submit(
     return inject_prompt_issue_context(
         project_dir=_project_dir(event_payload),
         session_id=event_payload.session_id,
+        runtime="codex",
         prompt_text=event_payload.prompt_text,
         stdout=stdout,
         runner=runner,

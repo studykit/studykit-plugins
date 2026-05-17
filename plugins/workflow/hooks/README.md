@@ -35,10 +35,10 @@ Behavior:
 - The hook prepares a normalized shell environment contract for workflow shell commands: `WORKFLOW`, `WORKFLOW_PLUGIN_ROOT`, `WORKFLOW_PROJECT_DIR`, and `WORKFLOW_SESSION_ID`.
 - Claude writes that contract to `CLAUDE_ENV_FILE` when Claude provides it for `SessionStart`. Claude operator subagent shell commands can use the same persisted `WORKFLOW_*` contract.
 - The Claude `workflow-operator` agent frontmatter registers a `SubagentStart` hook. When the spawned agent matches `workflow-operator`, `hook_claude.py` loads configured fragments from `../agents/workflow-operator-context/` and injects a bootstrap context containing the absolute `../scripts/workflow` launcher path, the configured issue command aliases, and configured knowledge-provider guidance.
-- Codex cannot persist environment variables from `SessionStart`; `hook_codex.py` writes a session-scoped export file under `.workflow-cache/hook-state/`, keyed by the Codex hook `session_id`. The `../scripts/workflow` wrapper later locates and sources that file from the shell-visible `CODEX_THREAD_ID`.
+- Codex cannot persist environment variables from `SessionStart`; `hook_codex.py` records a unified session state file under `.workflow-cache/hook-state/`, keyed by the Codex hook `session_id`. The `../scripts/workflow` wrapper later reads that state and evaluates the generated exports from the shell-visible `CODEX_THREAD_ID`.
 - If the active project has a valid `.workflow/config.yml`, the hook injects a concise routing policy as `additionalContext`. The policy is intentionally narrow: it tells the main assistant to delegate workflow operations to `../agents/workflow-operator.md` and keep provider CLI use behind the operator.
 - Codex main-session policy additionally tells the main assistant to reuse an already open `workflow-operator` thread for later workflow operations. Claude main-session policy does not include this Codex-specific thread-reuse instruction.
-- In Codex subagent shells, `CODEX_THREAD_ID` is the subagent's own thread id and no parent-thread environment variable is available. For Codex subagent `SessionStart` payloads, `hook_codex.py` checks `transcript_path` for `session_meta` records that identify the spawned agent. When the spawned agent matches `workflow-operator`, the hook extracts the parent thread id from transcript metadata and writes the Codex export file under the subagent hook `session_id`, with `WORKFLOW_SESSION_ID` set to the parent thread id. The hook also loads configured fragments from `../agents/workflow-operator-context/` and injects a bootstrap context containing the absolute `../scripts/workflow` launcher path, the configured issue command aliases, and configured knowledge-provider guidance. The operator uses that path as `$WORKFLOW`; `../scripts/workflow` owns session translation.
+- In Codex subagent shells, `CODEX_THREAD_ID` is the subagent's own thread id and no parent-thread environment variable is available. For Codex subagent `SessionStart` payloads, `hook_codex.py` checks `transcript_path` for `session_meta` records that identify the spawned agent. When the spawned agent matches `workflow-operator`, the hook extracts the parent thread id from transcript metadata, records a state file keyed by the subagent session id, and stores `parent_session_id` plus `WORKFLOW_SESSION_ID` set to the parent thread id. The hook also loads configured fragments from `../agents/workflow-operator-context/` and injects a bootstrap context containing the absolute `../scripts/workflow` launcher path, the configured issue command aliases, and configured knowledge-provider guidance. The operator uses that path as `$WORKFLOW`; `../scripts/workflow` owns session translation.
 - For all other subagent SessionStart payloads (non-operator agents, or operator subagents without an extractable parent id), the hook emits nothing.
 - Claude operator subagents use the persisted contract from the Claude session environment plus the `SubagentStart` bootstrap context. If Claude sends an agent-tagged `SessionStart` payload, the hook does not inject the main-session policy into that subagent.
 - For GitHub issue providers, the policy adds that the main assistant does not run raw `gh` for workflow operations; the operator runs workflow scripts and may fall back to raw `gh` internally. New issue flows stop at pending draft creation until the user explicitly approves provider issue creation. Cached issue body edits use cached `issue.md` projections before delegating write-back.
@@ -65,12 +65,11 @@ Behavior:
 
 ## Stop
 
-`Stop` records pending issue references.
+`Stop` is intentionally silent.
 
 Behavior:
 
-- Records issue references from the stop payload and unannounced session-mentioned issues as pending.
-- Does not read providers or write issue cache projections; the next `UserPromptSubmit` performs that work.
+- Does not read providers or write issue cache projections.
 - Emits no JSON output; `Stop` output is reserved for host-supported block decisions.
 - Skips when `stop_hook_active` is true to avoid hook loops.
 - Emits nothing for clean no-op cases and never blocks the stop flow.

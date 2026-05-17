@@ -107,7 +107,7 @@ def write_shell_exports(path: Path, values: Mapping[str, str]) -> bool:
 
 
 def codex_env_file_path(project: Path, session_id: str) -> Path:
-    """Return the session-scoped Codex workflow export file path."""
+    """Return the session-scoped Codex workflow state file path."""
 
     from workflow_session_state import session_env_state_path
 
@@ -117,6 +117,15 @@ def codex_env_file_path(project: Path, session_id: str) -> Path:
     return path
 
 
+def codex_env_exports(project: Path, session_id: str) -> str:
+    """Return POSIX shell exports for a Codex session, if hook state exists."""
+
+    from workflow_session_state import read_session_env_exports
+
+    values = read_session_env_exports(project.expanduser().resolve(), "codex", session_id)
+    return render_shell_exports(values) if values else ""
+
+
 def write_codex_env_file(
     *,
     project_dir: Path,
@@ -124,7 +133,11 @@ def write_codex_env_file(
     codex_session_id: str,
     workflow_session_id: str,
 ) -> Path | None:
-    """Write the Codex export file keyed by the shell-visible Codex session id."""
+    """Record Codex exports keyed by the shell-visible Codex thread id.
+
+    For subagents, ``workflow_session_id`` is the parent session id and is
+    stored in the state so the subagent can recover its workflow parent.
+    """
 
     if not codex_session_id or not workflow_session_id:
         return None
@@ -134,7 +147,17 @@ def write_codex_env_file(
         project_dir=project_dir,
         session_id=workflow_session_id,
     )
-    return path if write_shell_exports(path, values) else None
+    from workflow_session_state import record_session_env_exports
+
+    if not record_session_env_exports(
+        project_dir.expanduser().resolve(),
+        "codex",
+        codex_session_id,
+        values,
+        parent_session_id=workflow_session_id if codex_session_id != workflow_session_id else "",
+    ):
+        return None
+    return path
 
 
 def append_claude_env_file(
@@ -204,9 +227,13 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    codex_path = subparsers.add_parser("codex-env-path", help="print the Codex workflow env file path")
+    codex_path = subparsers.add_parser("codex-env-path", help="print the Codex workflow state file path")
     codex_path.add_argument("--project", type=Path, default=workflow_project_dir_from_env(), help="project path")
     codex_path.add_argument("--session", required=True, help="Codex session id")
+
+    codex_exports = subparsers.add_parser("codex-env-exports", help="print Codex workflow shell exports")
+    codex_exports.add_argument("--project", type=Path, default=workflow_project_dir_from_env(), help="project path")
+    codex_exports.add_argument("--session", required=True, help="Codex session id")
     return parser
 
 
@@ -216,6 +243,9 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.command == "codex-env-path":
             print(codex_env_file_path(args.project, args.session))
+            return 0
+        if args.command == "codex-env-exports":
+            print(codex_env_exports(args.project, args.session), end="")
             return 0
     except WorkflowEnvError as exc:
         print(f"workflow env error: {exc}", file=sys.stderr)

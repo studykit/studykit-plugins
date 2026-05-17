@@ -1,5 +1,5 @@
 {
-  "description": "Workflow hooks. SessionStart persists workflow shell environment exports when .workflow/config.yml exists and injects provider-backed workflow authoring policy only for main sessions. PreToolUse protects provider cache issue body projections from unsafe frontmatter edits. UserPromptSubmit reads mentioned and pending GitHub issue references through cache-aware provider reads and injects project-relative issue cache paths as additionalContext. Stop records session-mentioned issues as pending without provider reads or JSON output.",
+  "description": "Workflow hooks. SessionStart persists workflow shell environment exports when .workflow/config.yml exists and injects provider-backed workflow authoring policy only for main sessions. PreToolUse protects provider cache issue body projections from unsafe frontmatter edits. UserPromptSubmit reads mentioned GitHub issue references through cache-aware provider reads and injects project-relative issue cache paths as additionalContext. Stop emits no JSON output.",
   "hooks": {
     "PreToolUse": [
       {
@@ -45,7 +45,7 @@
             "type": "command",
             "command": "uv run --script \"${CLAUDE_PLUGIN_ROOT}/scripts/hook_claude.py\"",
             "timeout": 10,
-            "description": "Record session-mentioned GitHub issues as pending without provider reads or Stop JSON output"
+            "description": "Finish the workflow Stop hook without provider reads or JSON output"
           }
         ]
       }
