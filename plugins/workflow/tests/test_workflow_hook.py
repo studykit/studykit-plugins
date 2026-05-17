@@ -1328,8 +1328,15 @@ def test_claude_subagent_start_injects_operator_bootstrap_context(
     assert "Provider mutation scripts refresh affected cache projections internally." in context
     assert "jira_issue_fetch.py" not in context
 
+    state_file = session_state_path(tmp_path, "claude", "claude-session")
+    assert state_file is not None
+    state = json.loads(state_file.read_text(encoding="utf-8"))
+    assert state["subagents"]["started"] == [
+        {"agent_id": "agent-123", "agent_type": "workflow-operator"}
+    ]
 
-def test_claude_subagent_start_emits_nothing_for_non_operator(
+
+def test_claude_subagent_start_records_non_operator_and_emits_nothing(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -1351,15 +1358,59 @@ def test_claude_subagent_start_emits_nothing_for_non_operator(
     ) == 0
 
     assert captured.getvalue() == ""
+    state_file = session_state_path(tmp_path, "claude", "claude-session")
+    assert state_file is not None
+    state = json.loads(state_file.read_text(encoding="utf-8"))
+    assert state["subagents"]["started"] == [
+        {"agent_id": "agent-123", "agent_type": "general-purpose"}
+    ]
 
 
-def test_static_workflow_operator_prompt_registers_claude_subagent_start_hook() -> None:
-    text = (_PLUGIN_ROOT / "agents" / "workflow-operator.md").read_text(encoding="utf-8")
+def test_claude_subagent_start_deduplicates_agent_identity_records(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _write_config(tmp_path)
+    monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(tmp_path))
+    monkeypatch.setenv("CLAUDE_PLUGIN_ROOT", str(_PLUGIN_ROOT))
 
-    assert "SubagentStart:" in text
-    assert 'matcher: "workflow-operator"' in text
-    assert 'uv run --script "${CLAUDE_PLUGIN_ROOT}/scripts/hook_claude.py"' in text
-    assert "Inject config-specific workflow operator context" in text
+    payload = {
+        "session_id": "claude-session",
+        "transcript_path": "/tmp/transcript.jsonl",
+        "cwd": str(tmp_path),
+        "hook_event_name": "SubagentStart",
+        "agent_id": "agent-123",
+        "agent_type": "general-purpose",
+    }
+
+    assert claude_main(payload=payload, stdout=io.StringIO()) == 0
+    assert claude_main(payload=payload, stdout=io.StringIO()) == 0
+    assert claude_main(
+        payload={**payload, "agent_id": "agent-456", "agent_type": "Plan"},
+        stdout=io.StringIO(),
+    ) == 0
+
+    state_file = session_state_path(tmp_path, "claude", "claude-session")
+    assert state_file is not None
+    state = json.loads(state_file.read_text(encoding="utf-8"))
+    assert state["subagents"]["started"] == [
+        {"agent_id": "agent-123", "agent_type": "general-purpose"},
+        {"agent_id": "agent-456", "agent_type": "Plan"},
+    ]
+
+
+def test_static_claude_manifest_registers_global_subagent_start_hook() -> None:
+    manifest = json.loads((_PLUGIN_ROOT / "hooks" / "hooks.json").read_text(encoding="utf-8"))
+    operator_text = (_PLUGIN_ROOT / "agents" / "workflow-operator.md").read_text(
+        encoding="utf-8"
+    )
+
+    assert "SubagentStart" in manifest["hooks"]
+    assert "matcher" not in manifest["hooks"]["SubagentStart"][0]
+    assert manifest["hooks"]["SubagentStart"][0]["hooks"][0]["command"] == (
+        'uv run --script "${CLAUDE_PLUGIN_ROOT}/scripts/hook_claude.py"'
+    )
+    assert "SubagentStart:" not in operator_text
 
 
 def test_user_prompt_caches_issue_and_injects_project_relative_path(

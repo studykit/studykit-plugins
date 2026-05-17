@@ -8,7 +8,8 @@ injection, provider cache projection protection, and issue-cache context.
 
 The Codex manifest registers only `SessionStart`, `UserPromptSubmit`, and
 `Stop`. Claude also registers `PreToolUse` for provider cache projection
-protection and `PostToolUse` for main-session authoring read tracking.
+protection, `PostToolUse` for main-session authoring read tracking, and
+`SubagentStart` for spawned subagent identity tracking.
 
 When either runtime script writes hook output to stdout, it writes JSON only.
 Empty stdout is used for no-op hook runs.
@@ -36,6 +37,18 @@ Behavior:
 - Stores each read entry as `path` plus `relative_path`; the hook matcher already identifies the tool.
 - Emits nothing for subagents, non-workflow projects, non-authoring files, or clean no-op cases.
 
+## SubagentStart (Claude only)
+
+`SubagentStart` records spawned subagent identities in the main session state.
+
+Behavior:
+
+- Records `agent_id` and `agent_type` for each spawned Claude subagent under `subagents.started` in the unified session state file.
+- Deduplicates repeated records by `agent_id`.
+- Emits workflow operator bootstrap context only when `agent_type` matches `workflow-operator`.
+- Emits nothing for non-operator subagents after recording their identity.
+- Emits nothing for non-workflow projects.
+
 ## SessionStart
 
 `SessionStart` injects workflow policy for configured projects.
@@ -46,7 +59,7 @@ Behavior:
 - Main-assistant SessionStart wording lives under `../agents/workflow-main-context/`: base policy in `../agents/workflow-main-context/session-policy.md`, GitHub knowledge guidance in `../agents/workflow-main-context/knowledge/github.md`, and Codex reuse guidance in `../agents/workflow-main-context/codex-operator-reuse.md`.
 - The hook prepares a normalized shell environment contract for workflow shell commands: `WORKFLOW`, `WORKFLOW_PLUGIN_ROOT`, `WORKFLOW_PROJECT_DIR`, and `WORKFLOW_SESSION_ID`.
 - Claude writes that contract to `CLAUDE_ENV_FILE` when Claude provides it for `SessionStart`. Claude operator subagent shell commands can use the same persisted `WORKFLOW_*` contract.
-- The Claude `workflow-operator` agent frontmatter registers a `SubagentStart` hook. When the spawned agent matches `workflow-operator`, `hook_claude.py` loads configured fragments from `../agents/workflow-operator-context/` and injects a bootstrap context containing the absolute `../scripts/workflow` launcher path, the configured issue command aliases, and configured knowledge-provider guidance.
+- The Claude hook manifest registers a `SubagentStart` hook. When the spawned agent matches `workflow-operator`, `hook_claude.py` loads configured fragments from `../agents/workflow-operator-context/` and injects a bootstrap context containing the absolute `../scripts/workflow` launcher path, the configured issue command aliases, and configured knowledge-provider guidance.
 - Codex cannot persist environment variables from `SessionStart`; `hook_codex.py` records a unified session state file under `.workflow-cache/hook-state/`, keyed by the Codex hook `session_id`. The `../scripts/workflow` wrapper later reads that state and evaluates the generated exports from the shell-visible `CODEX_THREAD_ID`.
 - If the active project has a valid `.workflow/config.yml`, the hook injects a concise routing policy as `additionalContext`. The policy is intentionally narrow: it tells the main assistant to delegate workflow operations to `../agents/workflow-operator.md` and keep provider CLI use behind the operator.
 - Codex main-session policy additionally tells the main assistant to reuse an already open `workflow-operator` thread for later workflow operations. Claude main-session policy does not include this Codex-specific thread-reuse instruction.
