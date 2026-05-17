@@ -24,6 +24,7 @@ from workflow_hook import (  # noqa: E402
 )
 from hook_claude import ClaudeCommonPayload, ClaudePreToolUsePayload  # noqa: E402
 from hook_claude import ClaudeSessionStartPayload  # noqa: E402
+from hook_claude import ClaudeSubagentStartPayload  # noqa: E402
 from hook_claude import main as claude_main  # noqa: E402
 from hook_claude import parse_claude_event_payload  # noqa: E402
 from hook_claude import session_start as claude_session_start  # noqa: E402
@@ -492,6 +493,22 @@ def test_parse_claude_event_payload_builds_event_structures(
     assert session_event.source == "startup"
     assert session_event.model == "claude-sonnet-4-6"
 
+    subagent_event = parse_claude_event_payload(
+        {
+            "session_id": "s1",
+            "transcript_path": "/tmp/transcript.jsonl",
+            "cwd": str(tmp_path),
+            "hook_event_name": "SubagentStart",
+            "agent_id": "agent-123",
+            "agent_type": "workflow-operator",
+        }
+    )
+    assert isinstance(subagent_event, ClaudeSubagentStartPayload)
+    assert subagent_event.hook_event_name == "SubagentStart"
+    assert subagent_event.agent_id == "agent-123"
+    assert subagent_event.agent_type == "workflow-operator"
+    assert not hasattr(subagent_event, "model")
+
     tool_event = parse_claude_event_payload(
         {
             "session_id": "s1",
@@ -922,12 +939,87 @@ def test_session_start_prepares_codex_operator_env_file_and_bootstrap_context(
     assert payload["hookSpecificOutput"]["hookEventName"] == "SessionStart"
     assert "## workflow operator bootstrap" in context
     assert f"WORKFLOW={_PLUGIN_ROOT / 'scripts' / 'workflow'}" in context
+    assert "Issues: github" in context
+    assert "Knowledge: github" in context
+    assert "ISSUE_FETCH=github_issue_fetch.py" in context
+    assert "ISSUE_DRAFTS=github_issue_drafts.py" in context
+    assert "ISSUE_WRITEBACK=github_issue_writeback.py" in context
+    assert "ISSUE_COMMENTS=github_issue_comments.py" in context
+    assert "ISSUE_RELATIONSHIPS=github_issue_relationships.py" in context
+    assert "ISSUE_METADATA=github_issue_metadata.py" in context
+    assert "jira_issue_fetch.py" not in context
+    assert "GitHub knowledge documents are repository Markdown files under `wiki/`" in context
     assert "hook-state" not in context
     assert "parent_thread_id" not in context
     env_file = codex_env_file_path(tmp_path, "codex-session")
     content = env_file.read_text(encoding="utf-8")
     assert f"export WORKFLOW={_PLUGIN_ROOT / 'scripts' / 'workflow'}" in content
     assert "export WORKFLOW_SESSION_ID=codex-main-thread" in content
+
+
+def test_codex_operator_bootstrap_uses_configured_jira_issue_aliases(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _write_jira_config(tmp_path)
+    transcript = tmp_path / "subagent-rollout.jsonl"
+    _write_operator_subagent_transcript(transcript)
+
+    out = _run_session_start(
+        tmp_path,
+        monkeypatch,
+        runtime="codex",
+        payload_update={"source": "startup", "transcript_path": str(transcript)},
+    )
+
+    payload = json.loads(out)
+    context = payload["hookSpecificOutput"]["additionalContext"]
+    assert "Issues: jira" in context
+    assert "Knowledge: github" in context
+    assert "ISSUE_FETCH=jira_issue_fetch.py" in context
+    assert "ISSUE_DRAFTS=jira_issue_drafts.py" in context
+    assert "ISSUE_WRITEBACK=jira_issue_writeback.py" in context
+    assert "ISSUE_COMMENTS=jira_issue_comments.py" in context
+    assert "ISSUE_RELATIONSHIPS=jira_issue_relationships.py" in context
+    assert "ISSUE_METADATA=jira_issue_metadata.py" in context
+    assert "github_issue_fetch.py" not in context
+    assert "Do not use another issue provider command family in this project." in context
+
+
+def test_codex_operator_bootstrap_uses_configured_filesystem_context(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _write_filesystem_config(tmp_path)
+    transcript = tmp_path / "subagent-rollout.jsonl"
+    _write_operator_subagent_transcript(transcript)
+
+    out = _run_session_start(
+        tmp_path,
+        monkeypatch,
+        runtime="codex",
+        payload_update={"source": "startup", "transcript_path": str(transcript)},
+    )
+
+    payload = json.loads(out)
+    context = payload["hookSpecificOutput"]["additionalContext"]
+    assert "Issues: filesystem" in context
+    assert "Knowledge: filesystem" in context
+    assert "github_issue_fetch.py" not in context
+    assert "jira_issue_fetch.py" not in context
+    assert "No provider issue command family is configured for filesystem issues." in context
+    assert "Filesystem knowledge documents use configured local repository paths." in context
+    assert "GitHub knowledge documents are repository Markdown files under `wiki/`" not in context
+
+
+def test_static_workflow_operator_prompt_omits_provider_command_catalog() -> None:
+    text = (_PLUGIN_ROOT / "agents" / "workflow-operator.md").read_text(encoding="utf-8")
+
+    assert "## Runtime Context" in text
+    assert "github_issue_fetch.py" not in text
+    assert "jira_issue_fetch.py" not in text
+    assert "workflow_github.py" not in text
+    assert "$ISSUE_FETCH" not in text
 
 
 def test_session_start_skips_codex_subagent_when_not_operator(
@@ -968,6 +1060,70 @@ def test_session_start_skips_claude_subagent_payload(
     content = env_file.read_text(encoding="utf-8")
     assert f"export WORKFLOW={_PLUGIN_ROOT / 'scripts' / 'workflow'}" in content
     assert "export WORKFLOW_SESSION_ID=claude-subagent-session" in content
+
+
+def test_claude_subagent_start_injects_operator_bootstrap_context(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _write_config(tmp_path)
+    monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(tmp_path))
+    monkeypatch.setenv("CLAUDE_PLUGIN_ROOT", str(_PLUGIN_ROOT))
+
+    captured = io.StringIO()
+    assert claude_main(
+        payload={
+            "session_id": "claude-session",
+            "transcript_path": "/tmp/transcript.jsonl",
+            "cwd": str(tmp_path),
+            "hook_event_name": "SubagentStart",
+            "agent_id": "agent-123",
+            "agent_type": "workflow-operator",
+        },
+        stdout=captured,
+    ) == 0
+
+    payload = json.loads(captured.getvalue())
+    context = payload["hookSpecificOutput"]["additionalContext"]
+    assert payload["hookSpecificOutput"]["hookEventName"] == "SubagentStart"
+    assert "## workflow operator bootstrap" in context
+    assert f"WORKFLOW={_PLUGIN_ROOT / 'scripts' / 'workflow'}" in context
+    assert "Issues: github" in context
+    assert "ISSUE_FETCH=github_issue_fetch.py" in context
+    assert "jira_issue_fetch.py" not in context
+
+
+def test_claude_subagent_start_emits_nothing_for_non_operator(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _write_config(tmp_path)
+    monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(tmp_path))
+    monkeypatch.setenv("CLAUDE_PLUGIN_ROOT", str(_PLUGIN_ROOT))
+
+    captured = io.StringIO()
+    assert claude_main(
+        payload={
+            "session_id": "claude-session",
+            "transcript_path": "/tmp/transcript.jsonl",
+            "cwd": str(tmp_path),
+            "hook_event_name": "SubagentStart",
+            "agent_id": "agent-123",
+            "agent_type": "general-purpose",
+        },
+        stdout=captured,
+    ) == 0
+
+    assert captured.getvalue() == ""
+
+
+def test_static_workflow_operator_prompt_registers_claude_subagent_start_hook() -> None:
+    text = (_PLUGIN_ROOT / "agents" / "workflow-operator.md").read_text(encoding="utf-8")
+
+    assert "SubagentStart:" in text
+    assert 'matcher: "workflow-operator"' in text
+    assert 'uv run --script "${CLAUDE_PLUGIN_ROOT}/scripts/hook_claude.py"' in text
+    assert "Inject config-specific workflow operator context" in text
 
 
 def test_user_prompt_caches_issue_and_injects_project_relative_path(

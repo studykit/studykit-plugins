@@ -8,9 +8,9 @@ frontmatter fields, or pending-write shapes.
 
 - Main-facing authoring docs describe only semantic authoring behavior that a
   content-writing assistant needs.
-- `workflow-operator` instructions describe script selection, required inputs,
-  result handoff, and the rule that provider/cache mutations go through workflow
-  scripts.
+- `workflow-operator` instructions and injected runtime context describe script
+  selection, required inputs, result handoff, and the rule that provider/cache
+  mutations go through workflow scripts.
 - Contributor implementation work uses provider/cache code and tests as the
   source of truth for projection shape.
 - If projection shape changes, update the relevant scripts and tests in the same
