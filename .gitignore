@@ -219,3 +219,4 @@ session-tree.lock
 *.lock
 # Workflow provider read cache
 /.workflow-cache/
+.cache/
