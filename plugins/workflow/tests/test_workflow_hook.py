@@ -941,12 +941,16 @@ def test_session_start_prepares_codex_operator_env_file_and_bootstrap_context(
     assert f"WORKFLOW={_PLUGIN_ROOT / 'scripts' / 'workflow'}" in context
     assert "Issues: github" in context
     assert "Knowledge: github" in context
+    assert "ISSUE_PROVIDER=workflow_github.py" in context
     assert "ISSUE_FETCH=github_issue_fetch.py" in context
     assert "ISSUE_DRAFTS=github_issue_drafts.py" in context
     assert "ISSUE_WRITEBACK=github_issue_writeback.py" in context
     assert "ISSUE_COMMENTS=github_issue_comments.py" in context
     assert "ISSUE_RELATIONSHIPS=github_issue_relationships.py" in context
     assert "ISSUE_METADATA=github_issue_metadata.py" in context
+    assert "Use `$ISSUE_PROVIDER close` or `$ISSUE_PROVIDER reopen`" in context
+    assert "After any provider state mutation, run `$ISSUE_FETCH` with" in context
+    assert "`--cache-policy refresh` for the affected issues" in context
     assert "jira_issue_fetch.py" not in context
     assert "GitHub knowledge documents are repository Markdown files under `wiki/`" in context
     assert "hook-state" not in context
@@ -983,6 +987,9 @@ def test_codex_operator_bootstrap_uses_configured_jira_issue_aliases(
     assert "ISSUE_RELATIONSHIPS=jira_issue_relationships.py" in context
     assert "ISSUE_METADATA=jira_issue_metadata.py" in context
     assert "github_issue_fetch.py" not in context
+    assert "workflow_github.py" not in context
+    assert "Use `$ISSUE_PROVIDER close` or `$ISSUE_PROVIDER reopen`" not in context
+    assert "After any provider state mutation, run `$ISSUE_FETCH` with" in context
     assert "Do not use another issue provider command family in this project." in context
 
 
@@ -1020,6 +1027,21 @@ def test_static_workflow_operator_prompt_omits_provider_command_catalog() -> Non
     assert "jira_issue_fetch.py" not in text
     assert "workflow_github.py" not in text
     assert "$ISSUE_FETCH" not in text
+
+
+def test_operator_runtime_context_fragments_hold_provider_command_guidance() -> None:
+    context_root = _PLUGIN_ROOT / "agents" / "workflow-operator-context"
+
+    github = (context_root / "issues" / "github.md").read_text(encoding="utf-8")
+    jira = (context_root / "issues" / "jira.md").read_text(encoding="utf-8")
+    bootstrap = (context_root / "bootstrap.md").read_text(encoding="utf-8")
+
+    assert "WORKFLOW={{WORKFLOW}}" in bootstrap
+    assert "ISSUE_PROVIDER=workflow_github.py" in github
+    assert "Use `$ISSUE_PROVIDER close` or `$ISSUE_PROVIDER reopen`" in github
+    assert "After any provider state mutation, run `$ISSUE_FETCH` with" in github
+    assert "ISSUE_FETCH=jira_issue_fetch.py" in jira
+    assert "workflow_github.py" not in jira
 
 
 def test_session_start_skips_codex_subagent_when_not_operator(
@@ -1089,7 +1111,9 @@ def test_claude_subagent_start_injects_operator_bootstrap_context(
     assert "## workflow operator bootstrap" in context
     assert f"WORKFLOW={_PLUGIN_ROOT / 'scripts' / 'workflow'}" in context
     assert "Issues: github" in context
+    assert "ISSUE_PROVIDER=workflow_github.py" in context
     assert "ISSUE_FETCH=github_issue_fetch.py" in context
+    assert "After any provider state mutation, run `$ISSUE_FETCH` with" in context
     assert "jira_issue_fetch.py" not in context
 
 

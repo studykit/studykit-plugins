@@ -49,9 +49,8 @@ to the caller; those are operator internals.
 
 ## Runtime Context
 
-At agent start, workflow hooks may inject project-specific runtime context based
-on the active `.workflow/config.yml`. Treat that injected context as the source
-of truth for:
+At agent start, workflow hooks may inject project-specific runtime context.
+Treat that injected context as the source of truth for:
 
 - The `$WORKFLOW` launcher path.
 - The configured issue provider and active issue command aliases.
@@ -59,9 +58,9 @@ of truth for:
 - Provider-specific unsupported-operation boundaries.
 
 Use only the configured provider family from the injected context. If the
-injected context is missing, inspect `.workflow/config.yml` before running any
-provider command. Do not guess a provider from issue text or from repository
-examples.
+injected context is missing, report the missing bootstrap context instead of
+running provider commands. Do not guess a provider from issue text or from
+repository examples.
 
 Use workflow scripts for provider/cache reads, writes, pending draft promotion,
 comment append, relationship apply, semantic metadata updates, authoring path
