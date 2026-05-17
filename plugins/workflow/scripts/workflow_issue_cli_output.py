@@ -18,7 +18,6 @@ class IssueFetchContext:
     title: str
     state: str
     cache_hit: bool | None = None
-    relationship_summary: str = ""
     provider_kind: str = "github"
     issue_file: str = "issue.md"
 
@@ -30,8 +29,6 @@ class IssueFetchContext:
             "state": self.state,
             "cache_hit": self.cache_hit,
         }
-        if self.relationship_summary:
-            payload["relationships"] = self.relationship_summary
         if self.issue_file != "issue.md":
             payload["issue_file"] = self.issue_file
         return payload
@@ -60,9 +57,8 @@ def format_issue_cache_context(
         lines.append(f"Base: `{shared_base}`")
     for context in contexts:
         issue_path = issue_file_relative_to_base(context, shared_base)
-        relationship_suffix = f" — {context.relationship_summary}" if context.relationship_summary else ""
         issue_ref = f"#{context.number}" if context.provider_kind == "github" else context.number
-        lines.append(f"- {issue_ref} → `{issue_path}`{relationship_suffix}")
+        lines.append(f"- {issue_ref} → `{issue_path}`")
     return "\n".join(lines)
 
 
@@ -102,7 +98,6 @@ def format_issue_cache_context_from_payload(payload: dict[str, object]) -> str:
                 title=str(item.get("title") or ""),
                 state=str(item.get("state") or ""),
                 cache_hit=cache_hit if isinstance(cache_hit, bool) else None,
-                relationship_summary=str(item.get("relationships") or ""),
                 provider_kind=str(payload.get("kind") or "github"),
                 issue_file=str(item.get("issue_file") or "issue.md"),
             )

@@ -9,7 +9,6 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from collections.abc import Mapping
 from pathlib import Path
 from typing import TextIO
 
@@ -28,7 +27,6 @@ from workflow_jira_issue_cache import JiraDataCenterIssueCache
 from workflow_jira_issue_provider import JiraDataCenterIssueNativeProvider
 from workflow_jira_issue_refs import JiraProviderError, jira_issue_keys_from_references, normalize_jira_issue_key
 from workflow_providers import CACHE_POLICY_DEFAULT, CACHE_POLICY_REFRESH, ProviderContext, ProviderRequest
-from workflow_relationship_renderers import render_relationship_summary
 
 CACHE_FETCH_POLICIES = (CACHE_POLICY_DEFAULT, CACHE_POLICY_REFRESH)
 
@@ -97,7 +95,6 @@ def fetch_cache_payload(
             )
         )
         issue_dir = cache.issue_dir(site, issue_key)
-        relationship_summary = _cached_relationship_summary(cache, site, issue_key)
         contexts.append(
             IssueFetchContext(
                 number=issue_key,
@@ -105,7 +102,6 @@ def fetch_cache_payload(
                 title=str(response.payload.get("title") or ""),
                 state=str(response.payload.get("state") or "").upper(),
                 cache_hit=cache_hit_from_payload(response.payload, default=False),
-                relationship_summary=relationship_summary,
                 provider_kind="jira",
                 issue_file="snapshot.md",
             )
@@ -161,17 +157,6 @@ def _load_jira_issue_config(project: Path) -> WorkflowConfig:
             f"Jira issue fetch requires configured issue provider kind jira, found {config.issues.kind}"
         )
     return config
-
-
-def _cached_relationship_summary(cache: JiraDataCenterIssueCache, site, issue_key: str) -> str:
-    try:
-        cached = cache.read_issue(site, issue_key, include_body=False, include_comments=False, include_relationships=True)
-    except Exception:
-        return ""
-    relationships = cached.get("relationships") if isinstance(cached, Mapping) else {}
-    if not isinstance(relationships, Mapping):
-        return ""
-    return render_relationship_summary("jira", relationships)
 
 
 if __name__ == "__main__":

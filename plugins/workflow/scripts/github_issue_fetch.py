@@ -27,7 +27,6 @@ from workflow_issue_cli_output import (
     format_issue_cache_json,
 )
 from workflow_providers import CACHE_POLICY_DEFAULT, CACHE_POLICY_REFRESH, ProviderContext, ProviderRequest
-from workflow_relationship_renderers import render_relationship_summary
 
 CACHE_FETCH_POLICIES = (CACHE_POLICY_DEFAULT, CACHE_POLICY_REFRESH)
 
@@ -92,7 +91,6 @@ def fetch_cache_payload(
             )
         )
         issue_dir = cache.issue_dir(repo, issue)
-        relationship_summary = _cached_relationship_summary(cache, repo, issue)
         contexts.append(
             IssueFetchContext(
                 number=issue,
@@ -100,7 +98,6 @@ def fetch_cache_payload(
                 title=str(response.payload.get("title") or ""),
                 state=str(response.payload.get("state") or "").upper(),
                 cache_hit=cache_hit_from_payload(response.payload, default=False),
-                relationship_summary=relationship_summary,
                 provider_kind="github",
             )
         )
@@ -156,14 +153,6 @@ def _load_github_issue_config(project: Path) -> WorkflowConfig:
             f"GitHub issue fetch requires configured issue provider kind github, found {config.issues.kind}"
         )
     return config
-
-
-def _cached_relationship_summary(cache: GitHubIssueCache, repo, issue: str) -> str:
-    try:
-        relationships = cache.read_relationships(repo, issue)
-    except Exception:
-        return ""
-    return render_relationship_summary("github", relationships)
 
 
 if __name__ == "__main__":

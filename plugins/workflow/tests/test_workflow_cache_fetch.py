@@ -323,7 +323,7 @@ def test_cache_fetch_plain_output_uses_shared_prefix_for_multiple_issues(tmp_pat
             "## Workflow issue cache",
             "",
             "Base: `.workflow-cache/issues/`",
-            "- #42 → `42/issue.md` — parent #40; children #44,#45; blocked_by #41; blocking #46",
+            "- #42 → `42/issue.md`",
             "- #43 → `43/issue.md`",
             "",
         ]
@@ -365,7 +365,7 @@ def test_cache_fetch_refresh_reads_remote_and_updates_cache(tmp_path: Path) -> N
     assert relationships["parent"]["number"] == 40
     assert relationships["children"][0]["number"] == 43
     assert relationships["dependencies"]["blocked_by"][0]["number"] == 41
-    assert payload["issues"][0]["relationships"] == "parent #40; children #43; blocked_by #41"
+    assert "relationships" not in payload["issues"][0]
 
 
 def test_cache_fetch_uses_jira_cache_hit_without_remote_read(tmp_path: Path) -> None:
@@ -395,10 +395,7 @@ def test_cache_fetch_uses_jira_cache_hit_without_remote_read(tmp_path: Path) -> 
     assert payload["issues"][0]["issue_dir"] == ".workflow-cache/jira/jira.example.test/issues/TEST-1234/"
     assert payload["issues"][0]["issue_file"] == "snapshot.md"
     assert payload["issues"][0]["cache_hit"] is True
-    assert payload["issues"][0]["relationships"] == (
-        "parent TEST-1200; children TEST-1237; blocked_by TEST-1233; "
-        "blocking TEST-1235; external_links 1"
-    )
+    assert "relationships" not in payload["issues"][0]
     assert runner.requests == []
 
 

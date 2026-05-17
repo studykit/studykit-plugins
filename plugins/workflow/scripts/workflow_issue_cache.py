@@ -18,7 +18,6 @@ from workflow_jira_data_center_client import resolve_jira_data_center_site
 from workflow_jira_issue_refs import normalize_jira_issue_key
 from workflow_providers import CACHE_POLICY_DEFAULT, ProviderDispatcher, default_provider_registry
 from workflow_providers import request_from_config
-from workflow_relationship_renderers import render_relationship_summary
 
 MAX_ISSUE_REFS = 20
 
@@ -43,7 +42,6 @@ class IssueCacheContext:
     title: str
     state: str
     cache_hit: bool | None = None
-    relationship_summary: str = ""
     provider_kind: str = "github"
     issue_file: str = "issue.md"
 
@@ -55,8 +53,6 @@ class IssueCacheContext:
             "state": self.state,
             "cache_hit": self.cache_hit,
         }
-        if self.relationship_summary:
-            payload["relationships"] = self.relationship_summary
         if self.issue_file != "issue.md":
             payload["issue_file"] = self.issue_file
         return payload
@@ -220,7 +216,6 @@ def cache_issue_references(
 
     dispatcher = ProviderDispatcher(default_provider_registry(runner=runner))
     cache = GitHubIssueCache.for_project(config.root, configured_repo=repo)
-    issue_provider_kind = config.issues.kind
     contexts: list[IssueCacheContext] = []
 
     for number in issue_numbers:
@@ -242,9 +237,6 @@ def cache_issue_references(
             response = dispatcher.dispatch(request)
             issue_dir = cache.issue_dir(repo, normalized)
             project_issue_dir = display_project_path(issue_dir, config.root, trailing_slash=True)
-            relationship_summary = cached_relationship_summary(
-                cache, repo, normalized, provider_kind=issue_provider_kind
-            )
             contexts.append(
                 IssueCacheContext(
                     number=normalized,
@@ -252,7 +244,6 @@ def cache_issue_references(
                     title=str(response.payload.get("title") or ""),
                     state=str(response.payload.get("state") or "").upper(),
                     cache_hit=cache_hit_from_payload(response.payload, default=False),
-                    relationship_summary=relationship_summary,
                 )
             )
         except Exception:
@@ -297,23 +288,6 @@ def cache_jira_issue_references(
             response = dispatcher.dispatch(request)
             issue_dir = cache.issue_dir(site, normalized)
             project_issue_dir = display_project_path(issue_dir, config.root, trailing_slash=True)
-            relationships_payload = {}
-            try:
-                cached = cache.read_issue(
-                    site,
-                    normalized,
-                    include_body=False,
-                    include_comments=False,
-                    include_relationships=True,
-                )
-                relationships_payload = cached.get("relationships") if isinstance(cached, Mapping) else {}
-            except Exception:
-                relationships_payload = {}
-            relationship_summary = (
-                render_relationship_summary("jira", relationships_payload)
-                if isinstance(relationships_payload, Mapping)
-                else ""
-            )
             contexts.append(
                 IssueCacheContext(
                     number=normalized,
@@ -321,7 +295,6 @@ def cache_jira_issue_references(
                     title=str(response.payload.get("title") or ""),
                     state=str(response.payload.get("state") or "").upper(),
                     cache_hit=cache_hit_from_payload(response.payload, default=False),
-                    relationship_summary=relationship_summary,
                     provider_kind="jira",
                     issue_file="snapshot.md",
                 )
@@ -357,26 +330,9 @@ def format_issue_cache_context(
         lines.append(f"Base: `{shared_base}`")
     for context in contexts:
         issue_path = issue_file_relative_to_base(context, shared_base)
-        relationship_suffix = f" — {context.relationship_summary}" if context.relationship_summary else ""
         issue_ref = f"#{context.number}" if context.provider_kind == "github" else context.number
-        lines.append(f"- {issue_ref} → `{issue_path}`{relationship_suffix}")
+        lines.append(f"- {issue_ref} → `{issue_path}`")
     return "\n".join(lines)
-
-
-def cached_relationship_summary(
-    cache: GitHubIssueCache,
-    repo: GitHubRepository,
-    issue: str,
-    *,
-    provider_kind: str | None,
-) -> str:
-    """Read cached relationships and dispatch to the provider-specific renderer."""
-
-    try:
-        relationships = cache.read_relationships(repo, issue)
-    except Exception:
-        return ""
-    return render_relationship_summary(provider_kind, relationships)
 
 
 def shared_issue_dir_base(contexts: Sequence[IssueCacheContext]) -> str | None:
