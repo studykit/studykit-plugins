@@ -11,10 +11,10 @@ Codex exposes ``SessionStart``, ``UserPromptSubmit``, and ``Stop`` events for
 this plugin. Provider cache projection protection and other write checks stay
 explicit in workflow scripts rather than using hidden authoring read tracking.
 
-Codex has no native ``SubagentStart`` event, so the operator-subagent
-environment file is prepared from the Codex ``SessionStart`` path when
-transcript metadata identifies the spawned agent as ``workflow-operator``. The
-same path injects a config-specific bootstrap context with the absolute
+Codex has no native ``SubagentStart`` event, so subagent identity tracking and
+the operator-subagent environment file are prepared from the Codex
+``SessionStart`` path when transcript metadata identifies a spawned agent. The
+operator path injects a config-specific bootstrap context with the absolute
 workflow launcher path, because the static Codex agent instructions cannot know
 the plugin root or the active project providers.
 
@@ -57,6 +57,7 @@ from workflow_operator_context import (  # noqa: E402
 from workflow_main_context import build_codex_operator_reuse_context  # noqa: E402
 from workflow_session_state import (  # noqa: E402
     record_session_policy_announced,
+    record_subagent_start,
     session_policy_was_announced,
 )
 
@@ -309,6 +310,26 @@ def _agent_name_from_metadata(metadata: Mapping[str, Any]) -> str:
     return ""
 
 
+def _agent_id_from_metadata(metadata: Mapping[str, Any]) -> str:
+    for key in ("agent_id", "subagent_id", "agent_thread_id"):
+        value = as_string(metadata.get(key))
+        if value:
+            return value
+    subagent = _nested_mapping(metadata, "source", "subagent")
+    if subagent is not None:
+        for key in ("agent_id", "subagent_id", "agent_thread_id"):
+            value = as_string(subagent.get(key))
+            if value:
+                return value
+        spawn = subagent.get("thread_spawn")
+        if isinstance(spawn, Mapping):
+            for key in ("agent_id", "subagent_id", "agent_thread_id"):
+                value = as_string(spawn.get(key))
+                if value:
+                    return value
+    return ""
+
+
 def _nested_mapping(root: Mapping[str, Any], *keys: str) -> Mapping[str, Any] | None:
     current: Any = root
     for key in keys:
@@ -393,19 +414,28 @@ def _handle_agent_session_start(
     *,
     stdout: TextIO | None = None,
 ) -> int:
-    """Codex subagent SessionStart: prepare operator shell environment."""
+    """Codex subagent SessionStart: track identity and prepare operator env."""
 
     if metadata is None:
         return 0
     parent_thread_id = _parent_thread_id_from_metadata(metadata)
     if not parent_thread_id:
         return 0
-    agent_name = _agent_name_from_metadata(metadata)
-    if not agent_name_matches_operator(agent_name):
-        return 0
 
     config = workflow_config_for_project(_project_dir(event_payload))
     if config is None:
+        return 0
+
+    agent_name = _agent_name_from_metadata(metadata)
+    record_subagent_start(
+        config.root,
+        "codex",
+        parent_thread_id,
+        agent_id=_agent_id_from_metadata(metadata) or event_payload.session_id,
+        agent_type=agent_name or "subagent",
+    )
+
+    if not agent_name_matches_operator(agent_name):
         return 0
 
     _persist_codex_shell_env(
