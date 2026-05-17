@@ -16,6 +16,7 @@ Key files:
 - `hooks/hooks.json` — Claude hook declarations.
 - `hooks/hooks.codex.json` — Codex hook declarations.
 - `agents/workflow-operator.md` — operator role-boundary instructions.
+- `agents/workflow-main-context/` — main-assistant injection fragments.
 - `scripts/` — internal provider, cache, and hook entrypoints.
 - `authoring/` — workflow artifact authoring contracts.
 

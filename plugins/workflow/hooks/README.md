@@ -31,6 +31,7 @@ Behavior:
 Behavior:
 
 - If the active project has no `.workflow/config.yml`, the hook emits nothing.
+- Main-assistant SessionStart wording lives under `../agents/workflow-main-context/`: base policy in `../agents/workflow-main-context/session-policy.md`, GitHub knowledge guidance in `../agents/workflow-main-context/knowledge/github.md`, and Codex reuse guidance in `../agents/workflow-main-context/codex-operator-reuse.md`.
 - The hook prepares a normalized shell environment contract for workflow shell commands: `WORKFLOW`, `WORKFLOW_PLUGIN_ROOT`, `WORKFLOW_PROJECT_DIR`, and `WORKFLOW_SESSION_ID`.
 - Claude writes that contract to `CLAUDE_ENV_FILE` when Claude provides it for `SessionStart`. Claude operator subagent shell commands can use the same persisted `WORKFLOW_*` contract.
 - The Claude `workflow-operator` agent frontmatter registers a `SubagentStart` hook. When the spawned agent matches `workflow-operator`, `hook_claude.py` loads configured fragments from `../agents/workflow-operator-context/` and injects a bootstrap context containing the absolute `../scripts/workflow` launcher path, the configured issue command aliases, and configured knowledge-provider guidance.
@@ -48,7 +49,7 @@ Behavior:
 
 ## UserPromptSubmit
 
-`UserPromptSubmit` caches issue references.
+`UserPromptSubmit` caches issue references and injects terse commit guidance.
 
 Behavior:
 
@@ -56,9 +57,11 @@ Behavior:
 - Reads each detected issue through the workflow provider read path with the default cache policy.
 - Uses existing cache projections on cache hits; fetches provider data and writes the cache on misses.
 - Emits concise `additionalContext` only for issue numbers not already announced in the current session.
+- When the prompt asks for a commit, injects the main-assistant commit guidance from `../agents/workflow-main-context/commit-prefix.md` at most once per session.
 - For Codex subagent sessions, emits nothing. The main session owns workflow prompt context.
 - Reports project-relative issue cache paths, for example `.workflow-cache/issues/45/`.
-- Emits nothing for non-workflow projects, non-GitHub issue providers, missing issue references, or provider read failures.
+- For issue-cache context, emits nothing for missing issue references or provider read failures.
+- Emits nothing for non-workflow projects or unsupported issue providers.
 
 ## Stop
 

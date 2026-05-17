@@ -1,0 +1,1 @@
+For GitHub-backed knowledge documents, choose a target Markdown file under `wiki/`, ask `workflow-operator` for authoring paths with the document type and `knowledge` role, then edit the file directly in the working tree.

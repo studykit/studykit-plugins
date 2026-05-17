@@ -37,6 +37,8 @@ from workflow_jira_issue_cache import is_jira_issue_cache_body_path  # noqa: E40
 from workflow_jira_issue_context import cache_jira_issue_references  # noqa: E402
 from workflow_jira_issue_refs import jira_issue_keys_from_references  # noqa: E402
 from workflow_jira_issue_refs import normalize_jira_issue_key  # noqa: E402
+from workflow_main_context import build_commit_prefix_context  # noqa: E402
+from workflow_main_context import build_session_policy_context  # noqa: E402
 from workflow_session_state import (  # noqa: E402
     commit_prefix_was_announced,
     read_session_issues,
@@ -175,27 +177,7 @@ def build_session_start_context(config: WorkflowConfig, plugin_root: Path) -> st
     """Build the context block injected for configured workflow projects."""
 
     _ = plugin_root  # plugin_root reserved for future template extensions
-    lines = [
-        "## workflow policy",
-        "",
-        "Before editing a workflow issue or knowledge document, ask `workflow-operator` "
-        "for the required authoring paths, then read those files locally before drafting "
-        "or editing content.",
-        "For comment-only workflow issue updates, ask `workflow-operator` for comment-scope "
-        "authoring paths and read only those files before drafting the comment.",
-        "For workflow issues, draft or edit title/body/labels locally. After local "
-        "draft/edit content is complete, tell `workflow-operator`; it will publish "
-        "and verify provider updates.",
-        "For new workflow issues, stop at the pending draft until the user explicitly "
-        "approves provider issue creation.",
-    ]
-    if config.knowledge.kind == "github":
-        lines.append(
-            "For GitHub-backed knowledge documents, choose a target Markdown file under "
-            "`wiki/`, ask `workflow-operator` for authoring paths with the document type "
-            "and `knowledge` role, then edit the file directly in the working tree."
-        )
-    return "\n".join(lines)
+    return build_session_policy_context(config)
 
 
 def build_prompt_commit_context(config: WorkflowConfig, prompt_text: str) -> str:
@@ -207,14 +189,7 @@ def build_prompt_commit_context(config: WorkflowConfig, prompt_text: str) -> str
         return ""
     if config.issues.kind not in {"github", "jira"}:
         return ""
-    return "\n".join(
-        [
-            "## Workflow commit",
-            "",
-            "Handle staging, commit message authoring, and commit execution in the main assistant.",
-            "Prefix the subject with the related issue ref.",
-        ]
-    )
+    return build_commit_prefix_context()
 
 
 def emit_user_prompt_context(context_parts: list[str], *, stdout: TextIO | None = None) -> None:
