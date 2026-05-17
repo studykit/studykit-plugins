@@ -36,6 +36,8 @@ DUAL_TYPES = {"usecase", "research"}
 ALL_TYPES = ISSUE_TYPES | KNOWLEDGE_TYPES | DUAL_TYPES
 AUTHORING_SCOPES = {"content", "comment"}
 
+PRD_COMPONENT_TYPES = {"context", "usecase", "nfr", "spec", "domain"}
+
 ISSUE_PROVIDER_FILES = {
     "github": "providers/github-issue-convention.md",
     "jira": "providers/jira-issue-convention.md",
@@ -59,6 +61,10 @@ ISSUE_PROVIDER_TYPE_PATTERNS = {
 KNOWLEDGE_PROVIDER_TYPE_PATTERNS = {
     "github": "providers/github-knowledge-{artifact_type}-authoring.md",
     "confluence": "providers/confluence-page-{artifact_type}-authoring.md",
+}
+
+KNOWLEDGE_PROVIDER_PRD_FILES = {
+    "github": "providers/github-knowledge-prd-paths.md",
 }
 
 PROVIDER_EXTRA_FILES = {
@@ -219,6 +225,8 @@ def resolve_authoring(
         parts.append("common/issue-authoring.md")
     else:
         parts.append("common/knowledge-body.md")
+    if normalized_type in PRD_COMPONENT_TYPES:
+        parts.append("common/prd-authoring.md")
     parts.append(f"common/{normalized_type}-authoring.md")
 
     if normalized_role == "issue" and normalized_provider in ISSUE_PROVIDER_FILES:
@@ -236,6 +244,11 @@ def resolve_authoring(
                 artifact_type=normalized_type
             )
         )
+        if (
+            normalized_type in PRD_COMPONENT_TYPES
+            and normalized_provider in KNOWLEDGE_PROVIDER_PRD_FILES
+        ):
+            parts.append(KNOWLEDGE_PROVIDER_PRD_FILES[normalized_provider])
     if normalized_provider is not None:
         parts.extend(PROVIDER_EXTRA_FILES.get((normalized_role, normalized_provider), ()))
 

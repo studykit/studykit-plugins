@@ -71,6 +71,7 @@ def test_spec_confluence_knowledge_resolution() -> None:
     assert _rel_paths(resolution.files) == [
         "common/markdown-authoring.md",
         "common/knowledge-body.md",
+        "common/prd-authoring.md",
         "common/spec-authoring.md",
         "providers/confluence-page-convention.md",
         "providers/confluence-page-spec-authoring.md",
@@ -80,6 +81,70 @@ def test_spec_confluence_knowledge_resolution() -> None:
 def test_dual_artifact_requires_explicit_role() -> None:
     with pytest.raises(ResolverError, match="specify --role"):
         resolve_authoring("research", provider="jira")
+
+
+@pytest.mark.parametrize(
+    "artifact_type,role",
+    [
+        ("context", None),
+        ("usecase", "knowledge"),
+        ("usecase", "issue"),
+        ("nfr", None),
+        ("spec", None),
+        ("domain", None),
+    ],
+)
+def test_prd_component_includes_prd_index(artifact_type: str, role: str | None) -> None:
+    resolution = resolve_authoring(artifact_type, role=role)
+    assert "common/prd-authoring.md" in _rel_paths(resolution.files)
+
+
+@pytest.mark.parametrize(
+    "artifact_type,role",
+    [
+        ("architecture", None),
+        ("ci", None),
+        ("task", None),
+        ("bug", None),
+        ("review", None),
+        ("epic", None),
+        ("spike", None),
+        ("research", "issue"),
+        ("research", "knowledge"),
+    ],
+)
+def test_non_prd_artifact_excludes_prd_index(artifact_type: str, role: str | None) -> None:
+    resolution = resolve_authoring(artifact_type, role=role)
+    assert "common/prd-authoring.md" not in _rel_paths(resolution.files)
+
+
+def test_comment_scope_excludes_prd_index() -> None:
+    resolution = resolve_authoring("usecase", role="issue", scope="comment")
+    assert "common/prd-authoring.md" not in _rel_paths(resolution.files)
+
+
+@pytest.mark.parametrize(
+    "artifact_type",
+    ["context", "usecase", "nfr", "spec", "domain"],
+)
+def test_github_knowledge_prd_paths_included_for_prd_components(artifact_type: str) -> None:
+    resolution = resolve_authoring(artifact_type, role="knowledge", provider="github")
+    assert "providers/github-knowledge-prd-paths.md" in _rel_paths(resolution.files)
+
+
+def test_github_knowledge_prd_paths_excluded_for_non_prd_type() -> None:
+    resolution = resolve_authoring("architecture", role="knowledge", provider="github")
+    assert "providers/github-knowledge-prd-paths.md" not in _rel_paths(resolution.files)
+
+
+def test_confluence_knowledge_does_not_include_github_prd_paths() -> None:
+    resolution = resolve_authoring("spec", role="knowledge", provider="confluence")
+    assert "providers/github-knowledge-prd-paths.md" not in _rel_paths(resolution.files)
+
+
+def test_usecase_issue_role_does_not_include_github_prd_paths() -> None:
+    resolution = resolve_authoring("usecase", role="issue", provider="github")
+    assert "providers/github-knowledge-prd-paths.md" not in _rel_paths(resolution.files)
 
 
 def test_provider_can_be_inferred_from_workflow_config(tmp_path: Path) -> None:
