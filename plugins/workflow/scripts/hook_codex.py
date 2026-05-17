@@ -54,6 +54,7 @@ from workflow_operator_context import (  # noqa: E402
     agent_name_matches_operator,
     build_operator_session_context,
 )
+from workflow_main_context import build_codex_operator_reuse_context  # noqa: E402
 from workflow_session_state import (  # noqa: E402
     record_session_policy_announced,
     session_policy_was_announced,
@@ -71,9 +72,6 @@ _PAYLOAD_AGENT_STRING_KEYS = (
     "parent_session_id",
     "parent_thread_id",
     "parent_conversation_id",
-)
-_CODEX_OPERATOR_REUSE_CONTEXT = (
-    "If a `workflow-operator` thread is already open, reuse it for later workflow operations."
 )
 _PAYLOAD_AGENT_SOURCE_KEYS = (
     "source",
@@ -193,7 +191,7 @@ def _codex_session_start_context(config: Any) -> str:
     return "\n".join(
         [
             build_session_start_context(config, _plugin_root()),
-            _CODEX_OPERATOR_REUSE_CONTEXT,
+            build_codex_operator_reuse_context(),
         ]
     )
 

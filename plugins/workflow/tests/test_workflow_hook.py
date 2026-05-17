@@ -12,6 +12,7 @@ import pytest
 
 _PLUGIN_ROOT = Path(__file__).resolve().parent.parent
 _SCRIPTS_DIR = _PLUGIN_ROOT / "scripts"
+_MAIN_CONTEXT_ROOT = _PLUGIN_ROOT / "agents" / "workflow-main-context"
 if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
@@ -53,6 +54,19 @@ class FakeRunner:
 
 def result(args: tuple[str, ...], stdout: str = "", stderr: str = "", returncode: int = 0) -> CommandResult:
     return CommandResult(request=CommandRequest(args=args), returncode=returncode, stdout=stdout, stderr=stderr)
+
+
+def main_context_fragment(name: str) -> str:
+    return (_MAIN_CONTEXT_ROOT / name).read_text(encoding="utf-8").strip()
+
+
+def expected_session_start_context(*, runtime: str, knowledge_kind: str) -> str:
+    fragments = [main_context_fragment("session-policy.md")]
+    if knowledge_kind == "github":
+        fragments.append(main_context_fragment("knowledge/github.md"))
+    if runtime == "codex":
+        fragments.append(main_context_fragment("codex-operator-reuse.md"))
+    return "\n".join(fragments)
 
 
 def default_github_relationship_response(request: CommandRequest) -> CommandResult | None:
@@ -680,21 +694,8 @@ def test_session_start_injects_policy_for_configured_project(
 
     payload = json.loads(out)
     context = payload["hookSpecificOutput"]["additionalContext"]
-    expected_context = [
-        "## workflow policy",
-        "",
-        "Before editing a workflow issue or knowledge document, ask `workflow-operator` for the required authoring paths, then read those files locally before drafting or editing content.",
-        "For comment-only workflow issue updates, ask `workflow-operator` for comment-scope authoring paths and read only those files before drafting the comment.",
-        "For workflow issues, draft or edit title/body/labels locally. After local draft/edit content is complete, tell `workflow-operator`; it will publish and verify provider updates.",
-        "For new workflow issues, stop at the pending draft until the user explicitly approves provider issue creation.",
-        "For GitHub-backed knowledge documents, choose a target Markdown file under `wiki/`, ask `workflow-operator` for authoring paths with the document type and `knowledge` role, then edit the file directly in the working tree.",
-    ]
-    if runtime == "codex":
-        expected_context.append(
-            "If a `workflow-operator` thread is already open, reuse it for later workflow operations."
-        )
     assert payload["hookSpecificOutput"]["hookEventName"] == "SessionStart"
-    assert context == "\n".join(expected_context)
+    assert context == expected_session_start_context(runtime=runtime, knowledge_kind="github")
     assert ", and session id" not in context
     assert "session id" not in context
     assert "script recipes" not in context
@@ -795,19 +796,7 @@ def test_session_start_uses_filesystem_issue_policy_for_local_artifacts(
 
     payload = json.loads(out)
     context = payload["hookSpecificOutput"]["additionalContext"]
-    expected_context = [
-        "## workflow policy",
-        "",
-        "Before editing a workflow issue or knowledge document, ask `workflow-operator` for the required authoring paths, then read those files locally before drafting or editing content.",
-        "For comment-only workflow issue updates, ask `workflow-operator` for comment-scope authoring paths and read only those files before drafting the comment.",
-        "For workflow issues, draft or edit title/body/labels locally. After local draft/edit content is complete, tell `workflow-operator`; it will publish and verify provider updates.",
-        "For new workflow issues, stop at the pending draft until the user explicitly approves provider issue creation.",
-    ]
-    if runtime == "codex":
-        expected_context.append(
-            "If a `workflow-operator` thread is already open, reuse it for later workflow operations."
-        )
-    assert context == "\n".join(expected_context)
+    assert context == expected_session_start_context(runtime=runtime, knowledge_kind="filesystem")
     assert "issue provider: `filesystem`" not in context
     assert "Workflow issues are filesystem-backed local Markdown artifacts" not in context
     assert "The operator does not interpret content" not in context
@@ -1223,14 +1212,7 @@ def test_user_prompt_injects_github_commit_prefix_hint_without_issue_fetch(
 
     payload = json.loads(captured.getvalue())
     context = payload["hookSpecificOutput"]["additionalContext"]
-    assert context == "\n".join(
-        [
-            "## Workflow commit",
-            "",
-            "Handle staging, commit message authoring, and commit execution in the main assistant.",
-            "Prefix the subject with the related issue ref.",
-        ]
-    )
+    assert context == main_context_fragment("commit-prefix.md")
 
     repeated = io.StringIO()
     repeated_event = parse_codex_event_payload(raw_payload)
@@ -1385,14 +1367,7 @@ def test_user_prompt_injects_jira_commit_prefix_hint_without_issue_fetch(
 
     payload = json.loads(captured.getvalue())
     context = payload["hookSpecificOutput"]["additionalContext"]
-    assert context == "\n".join(
-        [
-            "## Workflow commit",
-            "",
-            "Handle staging, commit message authoring, and commit execution in the main assistant.",
-            "Prefix the subject with the related issue ref.",
-        ]
-    )
+    assert context == main_context_fragment("commit-prefix.md")
     assert runner.requests == []
 
 
