@@ -522,6 +522,62 @@ def test_claude_post_read_records_authoring_file_reads_in_session_state(
     ]
 
 
+def test_claude_pre_read_notifies_when_authoring_file_was_already_read(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _write_config(tmp_path)
+    _hook_env(monkeypatch, tmp_path, runtime="claude")
+    authoring_file = _PLUGIN_ROOT / "authoring" / "common" / "task-authoring.md"
+    post_payload = {
+        "session_id": "claude-authoring-reread",
+        "cwd": str(tmp_path),
+        "hook_event_name": "PostToolUse",
+        "tool_name": "Read",
+        "tool_input": {"file_path": str(authoring_file)},
+        "tool_response": {"filePath": str(authoring_file)},
+    }
+    pre_payload = {
+        **post_payload,
+        "hook_event_name": "PreToolUse",
+    }
+
+    assert claude_main(payload=post_payload, stdout=io.StringIO()) == 0
+    captured = io.StringIO()
+    assert claude_main(payload=pre_payload, stdout=captured) == 0
+
+    payload = json.loads(captured.getvalue())
+    hook_output = payload["hookSpecificOutput"]
+    assert hook_output["hookEventName"] == "PreToolUse"
+    assert hook_output["additionalContext"] == (
+        "Workflow authoring file already read in this session: "
+        "`common/task-authoring.md`."
+    )
+
+
+def test_claude_pre_read_emits_nothing_for_first_authoring_read(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _write_config(tmp_path)
+    _hook_env(monkeypatch, tmp_path, runtime="claude")
+    authoring_file = _PLUGIN_ROOT / "authoring" / "common" / "task-authoring.md"
+
+    captured = io.StringIO()
+    assert claude_main(
+        payload={
+            "session_id": "claude-authoring-first-read",
+            "cwd": str(tmp_path),
+            "hook_event_name": "PreToolUse",
+            "tool_name": "Read",
+            "tool_input": {"file_path": str(authoring_file)},
+        },
+        stdout=captured,
+    ) == 0
+
+    assert captured.getvalue() == ""
+
+
 def test_claude_post_read_skips_non_authoring_reads(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

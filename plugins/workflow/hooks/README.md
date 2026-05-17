@@ -8,8 +8,9 @@ injection, provider cache projection protection, and issue-cache context.
 
 The Codex manifest registers only `SessionStart`, `UserPromptSubmit`, and
 `Stop`. Claude also registers `PreToolUse` for provider cache projection
-protection, `PostToolUse` for main-session authoring read tracking, and
-`SubagentStart` for spawned subagent identity tracking.
+protection and repeated authoring-read notices, `PostToolUse` for main-session
+authoring read tracking, and `SubagentStart` for spawned subagent identity
+tracking.
 
 When either runtime script writes hook output to stdout, it writes JSON only.
 Empty stdout is used for no-op hook runs.
@@ -24,6 +25,18 @@ Behavior:
 - Blocks provider cache issue body writes when the projection is missing.
 - Blocks provider cache issue body writes that alter projection-owned YAML frontmatter.
 - Emits nothing for non-workflow projects or safe body-only writes.
+
+## PreToolUse Read (Claude only)
+
+`PreToolUse` on `Read` notifies the main assistant when an authoring file was already read in the same session.
+
+Behavior:
+
+- Checks only main-assistant `Read` calls whose resolved file path is under `../authoring/`.
+- Reads the unified session state file under `.workflow-cache/hook-state/`.
+- Emits `additionalContext` when the same authoring file is already recorded in `authoring.read_files`.
+- Does not block or modify the read.
+- Emits nothing for the first read, subagents, non-workflow projects, non-authoring files, or clean no-op cases.
 
 ## PostToolUse Read (Claude only)
 
