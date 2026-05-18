@@ -96,6 +96,7 @@ subagent.
 
 Use the operator for:
 
+- Status and completion checks for provider-backed workflow issues.
 - Cache-aware provider reads.
 - GitHub issue writes through workflow commands.
 - Local issue projection write-back.
