@@ -1,1 +1,1 @@
-GitHub knowledge documents are Markdown files under `wiki/`. Choose the target file before requesting authoring paths.
+GitHub knowledge documents are Markdown files under `wiki/`. Choose the target file before requesting authoring paths. Edit the file directly in the working tree after the target file and authoring paths are resolved.

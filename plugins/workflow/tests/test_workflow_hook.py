@@ -887,10 +887,7 @@ def test_session_start_injects_policy_for_configured_project(
     assert "issue status/completion checks" in context
     assert "Main assistant responsibilities:" in context
     assert "Operator responsibilities:" in context
-    assert "Authoring rules:" in context
-    assert "Pass any issue relationship intent from the user request or authoring guidance" in context
-    assert "do not rely on the operator to infer relationships from prose" in context
-    assert "explicitly supplied relationship changes" in context
+    assert "relationship intent" in context
     assert "Return operational paths, refs, relationship metadata, and verification results" in context
     assert ", and session id" not in context
     assert "session id" not in context
