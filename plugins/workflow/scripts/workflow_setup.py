@@ -164,7 +164,7 @@ def build_jira_relationship_mappings(
     warnings: list[str] = []
     if not mappings:
         warnings.append(
-            "Jira relationship writes remain unavailable until explicit relationship mappings are provided"
+            "No Jira relationship mappings were provided; collect sample Jira issues, run jira-relationship-inspect, and confirm exact mappings before building Jira config"
         )
     return {
         "operation": "jira_relationship_mappings",
@@ -311,6 +311,7 @@ def build_config(
 
     if issue_provider == "jira":
         _reject_cloud_provider("Jira", issues)
+        _require_jira_relationship_mappings(jira_relationship_mappings)
         _validate_relationship_mappings(jira_relationship_mappings)
     if knowledge_provider == "confluence":
         _reject_cloud_provider("Confluence", knowledge)
@@ -364,7 +365,11 @@ def write_config(
 
     project = project.expanduser().resolve()
     target = project / CONFIG_RELATIVE_PATH
-    parse_workflow_config(raw, path=target)
+    config = parse_workflow_config(raw, path=target)
+    if config.issues.kind == "jira":
+        mappings = _mapping_or_none(config.issues.settings.get("relationship_mappings"))
+        _require_jira_relationship_mappings(mappings)
+        _validate_relationship_mappings(mappings)
 
     if target.exists() and not force:
         raise WorkflowSetupError(
@@ -616,8 +621,8 @@ def _dispatch(args: argparse.Namespace) -> dict[str, Any]:
 def _add_config_build_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--project", type=Path, default=workflow_project_dir_from_env(), help="project path")
     parser.add_argument("--mode", default="remote-native", help="workflow mode")
-    parser.add_argument("--issue-provider", required=False, choices=sorted(ISSUE_PROVIDERS), default="github")
-    parser.add_argument("--knowledge-provider", required=False, choices=sorted(KNOWLEDGE_PROVIDERS), default="github")
+    parser.add_argument("--issue-provider", choices=sorted(ISSUE_PROVIDERS), help="explicit issue provider")
+    parser.add_argument("--knowledge-provider", choices=sorted(KNOWLEDGE_PROVIDERS), help="explicit knowledge provider")
     parser.add_argument("--probe-git-remote", action="store_true", help="seed GitHub repo settings from a git remote")
     parser.add_argument("--remote", default="origin", help="git remote name used with --probe-git-remote")
     parser.add_argument("--github-repo", help="GitHub issue repository slug, e.g. owner/repo")
@@ -653,10 +658,12 @@ def _add_config_build_args(parser: argparse.ArgumentParser) -> None:
 
 
 def _config_from_args(args: argparse.Namespace) -> dict[str, Any]:
+    issue_provider = _explicit_provider_arg(args, "issue_provider", role="issue")
+    knowledge_provider = _explicit_provider_arg(args, "knowledge_provider", role="knowledge")
     return build_config(
         project=args.project,
-        issue_provider=args.issue_provider,
-        knowledge_provider=args.knowledge_provider,
+        issue_provider=issue_provider,
+        knowledge_provider=knowledge_provider,
         github_repo=args.github_repo,
         github_host=args.github_host,
         github_issue_host=args.github_issue_host,
@@ -684,6 +691,14 @@ def _config_from_args(args: argparse.Namespace) -> dict[str, Any]:
         probe_remote=args.probe_git_remote,
         remote=args.remote,
     )
+
+
+def _explicit_provider_arg(args: argparse.Namespace, name: str, *, role: str) -> str:
+    value = getattr(args, name, None)
+    if value:
+        return value
+    flag = f"--{name.replace('_', '-')}"
+    raise WorkflowSetupError(f"{flag} is required; collect the {role} provider explicitly before building config")
 
 
 def _raw_config_for_write(args: argparse.Namespace) -> Mapping[str, Any]:
@@ -808,7 +823,7 @@ def _issue_capabilities(provider: str, has_jira_mappings: bool) -> dict[str, Any
         warnings = ["Jira setup targets Data Center or Server only"]
         if not has_jira_mappings:
             warnings.append(
-                "Jira relationship writes remain unavailable until providers.issues.relationship_mappings is configured explicitly"
+                "Jira issue provider setup is incomplete until providers.issues.relationship_mappings is filled from inspected site data; run jira-relationship-inspect, confirm exact mappings, and pass them to build-config"
             )
         return {
             "provider": provider,
@@ -1141,6 +1156,16 @@ def _validate_relationship_mappings(mappings: Mapping[str, Any] | None) -> None:
             value = _normalize_token(raw_mapping.get("value") or raw_mapping.get("value_kind") or raw_mapping.get("valueKind"))
             if value not in FIELD_VALUE_KINDS:
                 raise WorkflowSetupError(f"Jira field relationship mapping for '{name}' requires value key, key_object, or string")
+
+
+def _require_jira_relationship_mappings(mappings: Mapping[str, Any] | None) -> None:
+    if mappings:
+        return
+    raise WorkflowSetupError(
+        "Jira issue provider setup requires providers.issues.relationship_mappings; "
+        "run jira-relationship-inspect with sample issues, confirm exact mappings, "
+        "and pass --jira-relationship-mappings-file or --jira-relationship-mappings-json before building config"
+    )
 
 
 def _reject_cloud_provider(product: str, settings: Mapping[str, Any]) -> None:

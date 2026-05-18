@@ -26,7 +26,7 @@ Useful commands:
 "$WORKFLOW" workflow_setup.py jira-relationship-inspect --jira-site <url> --jira-project <PROJECT> --issue <ISSUE-123> --json
 "$WORKFLOW" workflow_setup.py jira-relationship-inspect --jira-site <url> --field-query <field-name-or-id> --json
 "$WORKFLOW" workflow_setup.py jira-relationship-mappings --issue-link blocked_by=Blocks:inward --field child=parent:target:key --json
-"$WORKFLOW" workflow_setup.py build-config --project <project-root> <options...> --json
+"$WORKFLOW" workflow_setup.py build-config --project <project-root> --issue-provider <provider> --knowledge-provider <provider> <options...> --json
 "$WORKFLOW" workflow_setup.py write --project <project-root> --config <reviewed-yaml-file> --json
 "$WORKFLOW" workflow_config.py --project <project-root> --require --json
 ```
@@ -39,15 +39,25 @@ Useful commands:
    knowledge provider, local projection mode, and commit reference style. Do not
    overwrite it unless the user explicitly requests overwrite; pass `--force`
    only after that confirmation.
-3. Collect the issue provider: `github`, `jira`, or `filesystem`.
+3. Collect the issue provider: `github`, `jira`, or `filesystem`. Ask the user
+   when it was not already named explicitly by the user or a provider profile;
+   do not infer it from a Git remote or assume GitHub.
 4. Collect the knowledge provider: `github`, `confluence`, or `filesystem`.
-5. Collect local projection mode (`none`, `ephemeral`, or `persistent`), local
+   Ask the user when it was not already named explicitly by the user or a
+   provider profile; do not infer it from the issue provider.
+5. If the issue provider is `jira`, run the Jira site profiling flow before
+   `capabilities` or `build-config`. Collect representative sample issue keys,
+   inspect relationship surfaces, ask the user to confirm exact mappings, and
+   generate mapping YAML with `jira-relationship-mappings`. If the sample
+   issues or confirmed mappings are unavailable, stop setup as incomplete; do
+   not offer to defer Jira relationship setup until later.
+6. Collect local projection mode (`none`, `ephemeral`, or `persistent`), local
    projection path when applicable, and commit reference style.
-6. Run `capabilities` for the selected providers and show limitations before
+7. Run `capabilities` for the selected providers and show limitations before
    confirmation.
-7. Run `build-config --json`, show the generated YAML and warnings to the user,
+8. Run `build-config --json`, show the generated YAML and warnings to the user,
    and ask for explicit confirmation before writing.
-8. After confirmation, write with `write --config <reviewed-yaml-file>`. Then
+9. After confirmation, write with `write --config <reviewed-yaml-file>`. Then
    verify with `workflow_config.py --require --json`.
 
 ## Provider Rules
@@ -57,6 +67,9 @@ Useful commands:
   slug. When the issue repository is not on `github.com`, use
   `--github-issue-host`; use `--github-host` only as a shared fallback when the
   issue and knowledge repositories are on the same GitHub host.
+- Always pass explicit `--issue-provider` and `--knowledge-provider` values to
+  `build-config` or `write` when building config from options. Missing provider
+  flags mean setup is incomplete; ask for the provider choice before continuing.
 - GitHub knowledge setup represents a repository `wiki/<plugin>/` directory.
   Use `--github-wiki-path`, defaulting to `wiki/workflow` when the user accepts
   that path. If the knowledge/wiki repository host differs from the issue
@@ -65,11 +78,13 @@ Useful commands:
   including `*.atlassian.net` sites.
 - Confluence setup targets Data Center or Server only. Reject or report Cloud,
   including `*.atlassian.net` sites.
-- Jira relationship writes require explicit
-  `providers.issues.relationship_mappings`. Collect mappings as exact user
-  input or warn that relationship writes remain unavailable. Do not infer Jira
-  link type, direction, remote-link surface, parent field, `write_to`, or value
-  semantics from prose.
+- Jira issue setup requires explicit `providers.issues.relationship_mappings`
+  before final config generation. Collect sample issue keys, inspect the Jira
+  site, and ask the user to confirm exact mappings. If site data or confirmed
+  mappings are unavailable, pause setup as incomplete; do not build or write a
+  Jira issue config and do not suggest configuring relationships later. Do not
+  infer Jira link type, direction, remote-link surface, parent field,
+  `write_to`, or value semantics from prose.
 - For Jira relationship setup, use `jira-relationship-inspect` only to show
   observed link types, fields, and sample issue relationship data. Then ask the
   user to confirm the exact mappings and generate the mapping YAML with
@@ -89,11 +104,11 @@ Useful commands:
 
 ## Jira Site Profiling
 
-Use this flow when Jira setup needs relationship mappings, custom fields, issue
-type rules, label policy, body formatting, or sub-task behavior. Keep a hard
-boundary between observed Jira data and confirmed workflow config: inspect the
-site, show the evidence, ask for confirmation, then use only the exact confirmed
-values in setup.
+This flow is required whenever the issue provider is `jira`. Also use it when
+Jira setup needs custom fields, issue type rules, label policy, body formatting,
+or sub-task behavior. Keep a hard boundary between observed Jira data and
+confirmed workflow config: inspect the site, show the evidence, ask for
+confirmation, then use only the exact confirmed values in setup.
 
 1. Resolve the Jira site, deployment, API version, and project key from the
    user, provider profile, or `.workflow/config.yml`.
