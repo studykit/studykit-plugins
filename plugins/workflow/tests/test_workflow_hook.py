@@ -1207,18 +1207,17 @@ def test_session_start_prepares_codex_operator_env_file_and_bootstrap_context(
     context = payload["hookSpecificOutput"]["additionalContext"]
     assert payload["hookSpecificOutput"]["hookEventName"] == "SessionStart"
     assert "## workflow operator bootstrap" in context
-    assert "Use `$WORKFLOW`" in context
-    assert "persisted by SessionStart" in context
-    assert "Issues: github" in context
-    assert "Knowledge: github" in context
-    assert "ISSUE_FETCH=github_issue_fetch.py" in context
-    assert "ISSUE_DRAFTS=github_issue_drafts.py" in context
-    assert "ISSUE_LIFECYCLE=github_issue_lifecycle.py" in context
-    assert "ISSUE_WRITEBACK=github_issue_writeback.py" in context
-    assert "ISSUE_COMMENTS=github_issue_comments.py" in context
-    assert "ISSUE_RELATIONSHIPS=github_issue_relationships.py" in context
-    assert "ISSUE_METADATA=github_issue_metadata.py" in context
-    assert "Use `$ISSUE_LIFECYCLE close` or `$ISSUE_LIFECYCLE reopen`" in context
+    assert "plugins/workflow/scripts/workflow" in context
+    assert "plugins/workflow/scripts/authoring_resolver.py" in context
+    assert "$WORKFLOW github_issue_fetch.py" in context
+    assert "$WORKFLOW github_issue_lifecycle.py close" in context
+    assert "$WORKFLOW github_issue_drafts.py publish" in context
+    assert "$WORKFLOW github_issue_comments.py append" in context
+    assert "$WORKFLOW github_issue_writeback.py update" in context
+    assert "$WORKFLOW github_issue_relationships.py" in context
+    assert "$WORKFLOW github_issue_metadata.py" in context
+    assert "ISSUE_FETCH=github_issue_fetch.py" not in context
+    assert "$ISSUE_LIFECYCLE" not in context
     assert "Provider mutation scripts refresh affected cache projections internally." in context
     assert "reread_required=true" in context
     assert "$AUTHORING_RESOLVER --type" in context
@@ -1263,17 +1262,16 @@ def test_codex_operator_bootstrap_uses_configured_jira_issue_aliases(
 
     payload = json.loads(out)
     context = payload["hookSpecificOutput"]["additionalContext"]
-    assert "Issues: jira" in context
-    assert "Knowledge: github" in context
-    assert "ISSUE_FETCH=jira_issue_fetch.py" in context
-    assert "ISSUE_DRAFTS=jira_issue_drafts.py" in context
-    assert "ISSUE_WRITEBACK=jira_issue_writeback.py" in context
-    assert "ISSUE_COMMENTS=jira_issue_comments.py" in context
-    assert "ISSUE_RELATIONSHIPS=jira_issue_relationships.py" in context
-    assert "ISSUE_METADATA=jira_issue_metadata.py" in context
+    assert "$WORKFLOW jira_issue_fetch.py" in context
+    assert "$WORKFLOW jira_issue_drafts.py publish" in context
+    assert "$WORKFLOW jira_issue_writeback.py" in context
+    assert "$WORKFLOW jira_issue_comments.py" in context
+    assert "$WORKFLOW jira_issue_relationships.py" in context
+    assert "$WORKFLOW jira_issue_metadata.py" in context
+    assert "ISSUE_FETCH=jira_issue_fetch.py" not in context
+    assert "$ISSUE_LIFECYCLE" not in context
     assert "github_issue_fetch.py" not in context
     assert "workflow_github.py" not in context
-    assert "Use `$ISSUE_LIFECYCLE close` or `$ISSUE_LIFECYCLE reopen`" not in context
     assert "Provider mutation scripts refresh affected cache projections internally." in context
     assert "reread_required=true" in context
     assert "Do not use another issue provider command family in this project." in context
@@ -1296,8 +1294,6 @@ def test_codex_operator_bootstrap_uses_configured_filesystem_context(
 
     payload = json.loads(out)
     context = payload["hookSpecificOutput"]["additionalContext"]
-    assert "Issues: filesystem" in context
-    assert "Knowledge: filesystem" in context
     assert "github_issue_fetch.py" not in context
     assert "jira_issue_fetch.py" not in context
     assert "No provider issue command family is configured for filesystem issues." in context
@@ -1323,15 +1319,22 @@ def test_operator_runtime_context_fragments_hold_provider_command_guidance() -> 
     github = (context_root / "issues" / "github.md").read_text(encoding="utf-8")
     jira = (context_root / "issues" / "jira.md").read_text(encoding="utf-8")
     bootstrap = (context_root / "bootstrap.md").read_text(encoding="utf-8")
+    bootstrap_codex = (context_root / "bootstrap-codex.md").read_text(encoding="utf-8")
 
-    assert "Use `$WORKFLOW`" in bootstrap
+    assert "$WORKFLOW" in bootstrap
     assert "{{WORKFLOW}}" not in bootstrap
-    assert "ISSUE_LIFECYCLE=github_issue_lifecycle.py" in github
+    assert "plugins/workflow/scripts/workflow" not in bootstrap
+    assert "plugins/workflow/scripts/workflow" in bootstrap_codex
+    assert "plugins/workflow/scripts/authoring_resolver.py" in bootstrap_codex
+    assert "$WORKFLOW github_issue_lifecycle.py" in github
+    assert "ISSUE_LIFECYCLE=github_issue_lifecycle.py" not in github
+    assert "$ISSUE_LIFECYCLE" not in github
     assert "workflow_github.py" not in github
-    assert "Use `$ISSUE_LIFECYCLE close` or `$ISSUE_LIFECYCLE reopen`" in github
     assert "Provider mutation scripts refresh affected cache projections internally." in github
     assert "tell the main agent to decide whether to use a raw provider CLI" in github
-    assert "ISSUE_FETCH=jira_issue_fetch.py" in jira
+    assert "$WORKFLOW jira_issue_fetch.py" in jira
+    assert "ISSUE_FETCH=jira_issue_fetch.py" not in jira
+    assert "$ISSUE_LIFECYCLE" not in jira
     assert "workflow_github.py" not in jira
     assert "tell the main agent to decide whether to use a raw provider CLI" in jira
 
@@ -1411,10 +1414,12 @@ def test_claude_subagent_start_injects_operator_bootstrap_context(
     context = payload["hookSpecificOutput"]["additionalContext"]
     assert payload["hookSpecificOutput"]["hookEventName"] == "SubagentStart"
     assert "## workflow operator bootstrap" in context
-    assert "Use `$WORKFLOW`" in context
-    assert "Issues: github" in context
-    assert "ISSUE_LIFECYCLE=github_issue_lifecycle.py" in context
-    assert "ISSUE_FETCH=github_issue_fetch.py" in context
+    assert "$WORKFLOW" in context
+    assert "plugins/workflow/scripts/workflow" not in context
+    assert "$WORKFLOW github_issue_lifecycle.py close" in context
+    assert "$WORKFLOW github_issue_fetch.py" in context
+    assert "ISSUE_LIFECYCLE=github_issue_lifecycle.py" not in context
+    assert "$ISSUE_LIFECYCLE" not in context
     assert "Provider mutation scripts refresh affected cache projections internally." in context
     assert "jira_issue_fetch.py" not in context
 
