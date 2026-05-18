@@ -191,33 +191,22 @@ class JiraDataCenterIssueNativeProvider(IssueProvider):
     def create(self, request: ProviderRequest) -> Mapping[str, Any]:
         site = resolve_jira_data_center_site(request.context.project)
         cache = JiraDataCenterIssueCache.for_project(request.context.project)
-        pending_local_id = _optional_string(
-            request.payload.get("pending_local_id") or request.payload.get("local_id")
-        )
 
-        draft_issue_type = None
-        draft_subtask_parent = None
-        if pending_local_id:
-            draft = cache.read_pending_issue_draft(site, pending_local_id)
-            title = draft.title
-            body = draft.body
-            labels = draft.labels
-            draft_issue_type = draft.issue_type
-            draft_subtask_parent = draft.subtask_parent
-        else:
-            title = str(_required_payload_value(request, "title"))
-            body = str(_required_payload_value(request, "body"))
-            labels = tuple(_string_list(request.payload.get("labels")))
+        title = str(_required_payload_value(request, "title"))
+        body = str(_required_payload_value(request, "body"))
+        labels = tuple(_string_list(request.payload.get("labels")))
 
         settings = _jira_issue_provider_settings(request.context.project)
         title = _jira_issue_title(request, title)
-        project_key = _optional_string(request.payload.get("project") or request.payload.get("project_key")) or site.project
+        project_key = (
+            _optional_string(request.payload.get("project") or request.payload.get("project_key"))
+            or site.project
+        )
         explicit_issue_type = _optional_string(
             request.payload.get("jira_issue_type") or request.payload.get("provider_issue_type")
         )
         issue_type = (
             explicit_issue_type
-            or draft_issue_type
             or _jira_artifact_issue_type(request, settings=settings)
             or _optional_string(request.payload.get("issue_type") or request.payload.get("issuetype"))
             or site.issue_type
@@ -226,7 +215,7 @@ class JiraDataCenterIssueNativeProvider(IssueProvider):
             raise ProviderOperationError("Jira issue create requires provider project or payload.project")
         if not issue_type:
             raise ProviderOperationError("Jira issue create requires provider issue_type or payload.issue_type")
-        subtask_parent_key = _jira_create_subtask_parent_key(request, draft_subtask_parent)
+        subtask_parent_key = _jira_create_subtask_parent_key(request)
         if subtask_parent_key and not _is_jira_subtask_issue_type(issue_type):
             raise ProviderOperationError("Jira subtask_parent can only be used when issue_type is Sub-task")
 
@@ -247,9 +236,6 @@ class JiraDataCenterIssueNativeProvider(IssueProvider):
             if subtask_parent_key
             else None
         )
-        pending_result = None
-        if pending_local_id:
-            pending_result = cache.finalize_pending_issue_creation(site, pending_local_id, issue_key)
         payload: dict[str, Any] = {
             "operation": "create_issue",
             "issue": issue_key,
@@ -257,9 +243,6 @@ class JiraDataCenterIssueNativeProvider(IssueProvider):
             "verified": True,
             "cache_refreshed": True,
             "cache": write_result,
-            "pending_local_id": pending_local_id,
-            "pending_finalized": pending_result is not None,
-            "pending": pending_result,
         }
         if subtask_parent_key:
             payload["subtask_parent"] = subtask_parent_key
@@ -413,31 +396,15 @@ class JiraDataCenterIssueNativeProvider(IssueProvider):
     def _apply_pending_relationships(self, request: ProviderRequest, issue_key: str) -> Mapping[str, Any]:
         site = resolve_jira_data_center_site(request.context.project)
         cache = JiraDataCenterIssueCache.for_project(request.context.project)
-        pending_local_id = _optional_string(
-            request.payload.get("pending_local_id") or request.payload.get("local_id")
-        )
-        if pending_local_id:
-            pending_operations = cache.read_pending_draft_relationships(site, pending_local_id)
-            pending_source = "pending_issue"
-        else:
-            pending_operations = cache.read_pending_issue_relationships(site, issue_key)
-            pending_source = "issue"
-
+        pending_operations = cache.read_pending_issue_relationships(site, issue_key)
         if not pending_operations:
-            if pending_local_id:
-                raise ProviderOperationError(
-                    f"no pending relationship file found for Jira pending issue {pending_local_id}"
-                )
             raise ProviderOperationError(f"no pending relationship file found for Jira issue {issue_key}")
 
         result = self._apply_relationship_operations(request, site, cache, issue_key, pending_operations)
-        if pending_local_id:
-            removed = cache.remove_pending_draft_relationships(site, pending_local_id, pending_operations)
-        else:
-            removed = cache.remove_pending_issue_relationships(site, issue_key, pending_operations)
+        removed = cache.remove_pending_issue_relationships(site, issue_key, pending_operations)
         return {
             **result,
-            "pending_source": pending_source,
+            "pending_source": "issue",
             "pending_file": pending_operations[0].file_name,
             "removed_pending_files": [str(path) for path in removed],
         }
@@ -906,8 +873,8 @@ def _jira_configured_artifact_issue_types(settings: Mapping[str, Any]) -> Mappin
     return result
 
 
-def _jira_create_subtask_parent_key(request: ProviderRequest, draft_subtask_parent: str | None) -> str | None:
-    raw_parent = draft_subtask_parent
+def _jira_create_subtask_parent_key(request: ProviderRequest) -> str | None:
+    raw_parent: str | None = None
     for key in ("subtask_parent", "subtask_parent_key", "subtaskParent", "subtaskParentKey"):
         if request.payload.get(key) is not None:
             raw_parent = str(request.payload[key])

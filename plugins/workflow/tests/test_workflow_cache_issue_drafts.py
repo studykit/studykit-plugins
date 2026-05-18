@@ -1,4 +1,4 @@
-"""Tests for provider-owned pending issue draft helpers."""
+"""Tests for provider-owned issue publish CLIs."""
 
 from __future__ import annotations
 
@@ -12,18 +12,16 @@ if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
 from github_issue_drafts import main as github_issue_drafts_main  # noqa: E402
-from github_issue_drafts import prepare_pending_issue_draft as prepare_github_pending_issue_draft  # noqa: E402
-from github_issue_drafts import stage_pending_issue_relationships as stage_github_pending_issue_relationships  # noqa: E402
-from jira_issue_drafts import prepare_pending_issue_draft as prepare_jira_pending_issue_draft  # noqa: E402
+from jira_issue_drafts import main as jira_issue_drafts_main  # noqa: E402
 from workflow_command import CommandRequest, CommandResult  # noqa: E402
 from workflow_github_issue_cache import GitHubIssueCache  # noqa: E402
 from workflow_github import DEFAULT_ISSUE_FIELDS  # noqa: E402
 from workflow_github import GitHubRepository  # noqa: E402
-from workflow_jira_issue_cache import JiraDataCenterIssueCache  # noqa: E402
 from workflow_jira_data_center_client import resolve_jira_data_center_site  # noqa: E402
+from workflow_jira_issue_cache import JiraDataCenterIssueCache  # noqa: E402
 
 
-class FakeRunner:
+class GitHubFakeRunner:
     def __init__(self) -> None:
         self.requests: list[CommandRequest] = []
 
@@ -153,175 +151,33 @@ def _gh_api_args(*args: str) -> tuple[str, ...]:
     return ("gh", "api", *args)
 
 
-def test_prepare_pending_issue_draft_writes_bodyless_provider_frontmatter(tmp_path: Path) -> None:
+def _write_body_file(project: Path, body: str, *, name: str = "draft.md") -> Path:
+    path = project / name
+    path.write_text(body, encoding="utf-8")
+    return path
+
+
+def test_github_publish_creates_issue_and_deletes_body_file(tmp_path: Path) -> None:
     _write_config(tmp_path)
-
-    payload = prepare_github_pending_issue_draft(
-        project=tmp_path,
-        local_id="draft-1",
-        artifact_type="task",
-        title="Draft issue",
-        labels=("workflow",),
-    )
-
-    cache = GitHubIssueCache.for_project(tmp_path, configured_repo=_repo())
-    draft = cache.read_pending_issue_draft(_repo(), "draft-1")
-    issue_file = cache.pending_issue_file(_repo(), "draft-1")
-
-    assert payload["operation"] == "prepare_pending_issue"
-    assert payload["artifact_type"] == "task"
-    assert payload["issue_file"] == str(issue_file)
-    assert draft.title == "Draft issue"
-    assert draft.labels == ("task", "workflow")
-    assert draft.state == "open"
-    assert draft.body == ""
-    assert issue_file.read_text(encoding="utf-8").endswith("---\n\n")
-
-
-def test_prepare_jira_review_pending_issue_draft_prefixes_summary(tmp_path: Path) -> None:
-    _write_jira_config(tmp_path)
-
-    payload = prepare_jira_pending_issue_draft(
-        project=tmp_path,
-        local_id="review-1",
-        artifact_type="review",
-        title="Clarify target",
-    )
-
-    site = resolve_jira_data_center_site(tmp_path)
-    cache = JiraDataCenterIssueCache.for_project(tmp_path)
-    draft = cache.read_pending_issue_draft(site, "review-1")
-
-    assert payload["artifact_type"] == "review"
-    assert payload["title"] == "[Review] Clarify target"
-    assert draft.title == "[Review] Clarify target"
-
-
-def test_prepare_jira_research_pending_issue_draft_prefixes_summary(tmp_path: Path) -> None:
-    _write_jira_config(tmp_path)
-
-    payload = prepare_jira_pending_issue_draft(
-        project=tmp_path,
-        local_id="research-1",
-        artifact_type="research",
-        title="Compare issue types",
-    )
-
-    site = resolve_jira_data_center_site(tmp_path)
-    cache = JiraDataCenterIssueCache.for_project(tmp_path)
-    draft = cache.read_pending_issue_draft(site, "research-1")
-
-    assert payload["artifact_type"] == "research"
-    assert payload["title"] == "[Research] Compare issue types"
-    assert draft.title == "[Research] Compare issue types"
-
-
-def test_prepare_jira_spike_pending_issue_draft_prefixes_summary(tmp_path: Path) -> None:
-    _write_jira_config(tmp_path)
-
-    payload = prepare_jira_pending_issue_draft(
-        project=tmp_path,
-        local_id="spike-1",
-        artifact_type="spike",
-        title="Probe Jira issue type",
-    )
-
-    site = resolve_jira_data_center_site(tmp_path)
-    cache = JiraDataCenterIssueCache.for_project(tmp_path)
-    draft = cache.read_pending_issue_draft(site, "spike-1")
-
-    assert payload["artifact_type"] == "spike"
-    assert payload["title"] == "[Spike] Probe Jira issue type"
-    assert draft.title == "[Spike] Probe Jira issue type"
-
-
-def test_prepare_jira_pending_subtask_draft_records_parent_and_issue_type(tmp_path: Path) -> None:
-    _write_jira_config(tmp_path)
-
-    payload = prepare_jira_pending_issue_draft(
-        project=tmp_path,
-        local_id="subtask-1",
-        artifact_type="task",
-        title="Create child work item",
-        subtask_parent="test-1200",
-    )
-
-    site = resolve_jira_data_center_site(tmp_path)
-    cache = JiraDataCenterIssueCache.for_project(tmp_path)
-    draft = cache.read_pending_issue_draft(site, "subtask-1")
-
-    assert payload["artifact_type"] == "task"
-    assert payload["issue_type"] == "Sub-task"
-    assert payload["subtask_parent"] == "TEST-1200"
-    assert draft.title == "Create child work item"
-    assert draft.issue_type == "Sub-task"
-    assert draft.subtask_parent == "TEST-1200"
-
-
-def test_stage_pending_issue_relationships_writes_operator_owned_file(tmp_path: Path) -> None:
-    _write_config(tmp_path)
-    prepare_github_pending_issue_draft(
-        project=tmp_path,
-        local_id="draft-1",
-        artifact_type="task",
-        title="Draft issue",
-        labels=("task",),
-    )
-
-    payload = stage_github_pending_issue_relationships(
-        project=tmp_path,
-        local_id="draft-1",
-        parent="#28",
-        blocked_by=("#33",),
-        blocking=("#45",),
-    )
-
-    cache = GitHubIssueCache.for_project(tmp_path, configured_repo=_repo())
-    operations = cache.read_pending_draft_relationships(_repo(), "draft-1")
-    issue_file = cache.pending_issue_file(_repo(), "draft-1")
-
-    assert payload["operation"] == "stage_pending_issue_relationships"
-    assert payload["pending_location"] == str(issue_file)
-    assert "relationships_file" not in payload
-    assert [(item.relationship, item.target_ref) for item in operations] == [
-        ("parent", "#28"),
-        ("blocked_by", "#33"),
-        ("blocking", "#45"),
-    ]
-    assert all(item.path == issue_file for item in operations)
-
-
-def test_create_command_creates_provider_issue(tmp_path: Path) -> None:
-    _write_config(tmp_path)
-    cache = GitHubIssueCache.for_project(tmp_path, configured_repo=_repo())
-    draft_path = cache.pending_issue_file(_repo(), "draft-1")
-    draft_path.parent.mkdir(parents=True)
-    draft_path.write_text(
-        """---
-title: "Draft issue"
-labels:
-  - task
-  - workflow
-state: open
----
-
-Draft body.
-""",
-        encoding="utf-8",
-    )
-    runner = FakeRunner()
+    body_file = _write_body_file(tmp_path, "Draft body.\n")
+    runner = GitHubFakeRunner()
     stdout = io.StringIO()
 
     code = github_issue_drafts_main(
         [
             "--project",
             str(tmp_path),
-            "create",
+            "publish",
             "--type",
             "task",
+            "--title",
+            "Draft issue",
+            "--label",
+            "workflow",
+            "--body-file",
+            str(body_file),
             "--confirm-provider-create",
             "--json",
-            "draft-1",
         ],
         stdout=stdout,
         runner=runner,
@@ -329,37 +185,37 @@ Draft body.
 
     payload = json.loads(stdout.getvalue())
     assert code == 0
-    assert payload["operation"] == "create_issue"
+    assert payload["operation"] == "publish_issue"
     assert payload["issue"] == "51"
-    assert payload["pending_finalized"] is True
+    assert payload["body_file_removed"] is True
+    assert payload["cache_refreshed"] is True
+    assert payload["issue_file"].endswith("/issues/51/issue.md")
+    cache = GitHubIssueCache.for_project(tmp_path, configured_repo=_repo())
     assert cache.read_issue(_repo(), 51)["body"] == "Draft body.\n"
-    assert not draft_path.exists()
+    assert not body_file.exists()
     assert runner.requests[0].args[:3] == ("gh", "issue", "create")
 
 
-def test_create_command_requires_provider_create_confirmation(tmp_path: Path) -> None:
+def test_github_publish_requires_provider_create_confirmation(tmp_path: Path) -> None:
     _write_config(tmp_path)
-    cache = GitHubIssueCache.for_project(tmp_path, configured_repo=_repo())
-    draft_path = cache.pending_issue_file(_repo(), "draft-1")
-    draft_path.parent.mkdir(parents=True)
-    draft_path.write_text(
-        """---
-title: "Draft issue"
-labels:
-  - task
-state: open
----
-
-Draft body.
-""",
-        encoding="utf-8",
-    )
-    runner = FakeRunner()
+    body_file = _write_body_file(tmp_path, "Draft body.\n")
+    runner = GitHubFakeRunner()
     stdout = io.StringIO()
     stderr = io.StringIO()
 
     code = github_issue_drafts_main(
-        ["--project", str(tmp_path), "create", "--type", "task", "--json", "draft-1"],
+        [
+            "--project",
+            str(tmp_path),
+            "publish",
+            "--type",
+            "task",
+            "--title",
+            "Draft issue",
+            "--body-file",
+            str(body_file),
+            "--json",
+        ],
         stdout=stdout,
         stderr=stderr,
         runner=runner,
@@ -368,5 +224,218 @@ Draft body.
     assert code == 2
     assert stdout.getvalue() == ""
     assert "--confirm-provider-create" in stderr.getvalue()
-    assert draft_path.exists()
+    assert body_file.exists()
+    assert runner.requests == []
+
+
+def test_github_publish_rejects_body_file_with_frontmatter(tmp_path: Path) -> None:
+    _write_config(tmp_path)
+    body_file = _write_body_file(tmp_path, "---\ntitle: nope\n---\n\nBody.\n")
+    runner = GitHubFakeRunner()
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+
+    code = github_issue_drafts_main(
+        [
+            "--project",
+            str(tmp_path),
+            "publish",
+            "--type",
+            "task",
+            "--title",
+            "Draft issue",
+            "--body-file",
+            str(body_file),
+            "--confirm-provider-create",
+            "--json",
+        ],
+        stdout=stdout,
+        stderr=stderr,
+        runner=runner,
+    )
+
+    assert code == 2
+    assert "frontmatter" in stderr.getvalue()
+    assert body_file.exists()
+    assert runner.requests == []
+
+
+def test_github_publish_missing_body_file_fails(tmp_path: Path) -> None:
+    _write_config(tmp_path)
+    runner = GitHubFakeRunner()
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+
+    code = github_issue_drafts_main(
+        [
+            "--project",
+            str(tmp_path),
+            "publish",
+            "--type",
+            "task",
+            "--title",
+            "Draft issue",
+            "--body-file",
+            str(tmp_path / "missing.md"),
+            "--confirm-provider-create",
+            "--json",
+        ],
+        stdout=stdout,
+        stderr=stderr,
+        runner=runner,
+    )
+
+    assert code == 2
+    assert "body file does not exist" in stderr.getvalue()
+    assert runner.requests == []
+
+
+class JiraFakeRunner:
+    def __init__(self, responses: dict[tuple[str, ...], CommandResult]) -> None:
+        self.responses = responses
+        self.requests: list[CommandRequest] = []
+
+    def __call__(self, request: CommandRequest) -> CommandResult:
+        self.requests.append(request)
+        for key, value in self.responses.items():
+            if request.args == key:
+                return CommandResult(
+                    request=request,
+                    returncode=value.returncode,
+                    stdout=value.stdout,
+                    stderr=value.stderr,
+                )
+        return CommandResult(request=request, returncode=127, stderr=f"unexpected: {request.args}")
+
+
+def _jira_curl_get_args(url: str) -> tuple[str, ...]:
+    return (
+        "curl",
+        "--silent",
+        "--show-error",
+        "--fail",
+        "--request",
+        "GET",
+        "--config",
+        "-",
+        url,
+    )
+
+
+def _jira_write_args() -> tuple[str, ...]:
+    return (
+        "curl",
+        "--silent",
+        "--show-error",
+        "--fail",
+        "--config",
+        "-",
+    )
+
+
+def _jira_issue_payload(key: str = "TEST-1234") -> dict[str, object]:
+    return {
+        "id": "10001",
+        "key": key,
+        "fields": {
+            "summary": "Published Jira issue",
+            "description": "Body.\n",
+            "labels": ["workflow"],
+            "status": {"name": "Open"},
+            "issuetype": {"name": "Task"},
+            "created": "2026-05-14T00:00:00.000+0000",
+            "updated": "2026-05-14T00:00:00.000+0000",
+        },
+    }
+
+
+def test_jira_publish_creates_issue_inline_and_deletes_body_file(tmp_path: Path) -> None:
+    _write_jira_config(tmp_path)
+    body_file = _write_body_file(tmp_path, "Body.\n")
+    site = resolve_jira_data_center_site(tmp_path)
+    issue_url = "https://jira.example.test/rest/api/2/issue/TEST-1234"
+    remote_links_url = "https://jira.example.test/rest/api/2/issue/TEST-1234/remotelink"
+
+    runner = JiraFakeRunner(
+        {
+            _jira_write_args(): CommandResult(
+                request=CommandRequest(args=()),
+                returncode=0,
+                stdout=json.dumps({"id": "10001", "key": "TEST-1234"}),
+            ),
+            _jira_curl_get_args(issue_url): CommandResult(
+                request=CommandRequest(args=()),
+                returncode=0,
+                stdout=json.dumps(_jira_issue_payload()),
+            ),
+            _jira_curl_get_args(remote_links_url): CommandResult(
+                request=CommandRequest(args=()),
+                returncode=0,
+                stdout=json.dumps([]),
+            ),
+        }
+    )
+    stdout = io.StringIO()
+
+    code = jira_issue_drafts_main(
+        [
+            "--project",
+            str(tmp_path),
+            "publish",
+            "--type",
+            "task",
+            "--title",
+            "Published Jira issue",
+            "--label",
+            "workflow",
+            "--body-file",
+            str(body_file),
+            "--confirm-provider-create",
+            "--json",
+        ],
+        stdout=stdout,
+        runner=runner,
+    )
+
+    payload = json.loads(stdout.getvalue())
+    assert code == 0
+    assert payload["operation"] == "publish_issue"
+    assert payload["issue"] == "TEST-1234"
+    assert payload["body_file_removed"] is True
+    assert payload["issue_file"].endswith("issues/TEST-1234/snapshot.md")
+    cache = JiraDataCenterIssueCache.for_project(tmp_path)
+    assert cache.issue_json_file(site, "TEST-1234").is_file()
+    assert not body_file.exists()
+    assert runner.requests[0].args == _jira_write_args()
+
+
+def test_jira_publish_requires_provider_create_confirmation(tmp_path: Path) -> None:
+    _write_jira_config(tmp_path)
+    body_file = _write_body_file(tmp_path, "Body.\n")
+    runner = JiraFakeRunner({})
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+
+    code = jira_issue_drafts_main(
+        [
+            "--project",
+            str(tmp_path),
+            "publish",
+            "--type",
+            "task",
+            "--title",
+            "Published Jira issue",
+            "--body-file",
+            str(body_file),
+            "--json",
+        ],
+        stdout=stdout,
+        stderr=stderr,
+        runner=runner,
+    )
+
+    assert code == 2
+    assert stdout.getvalue() == ""
+    assert "--confirm-provider-create" in stderr.getvalue()
+    assert body_file.exists()
     assert runner.requests == []
