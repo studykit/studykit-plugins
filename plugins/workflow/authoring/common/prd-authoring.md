@@ -39,5 +39,5 @@ For authoring rules of any individual component, read its authoring file directl
 ## Do not
 
 - Do not create a single combined PRD page or issue. Each component is its own page or item.
-- Do not duplicate content across components. Use cross-references (`## Related Work`, `## Sources`) instead.
+- Do not duplicate content across components. Use cross-references via the `Related Work` or `Sources` sections instead.
 - Do not treat this index as authoring rules — it only points to them.

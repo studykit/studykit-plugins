@@ -15,23 +15,19 @@ Use this binding for Jira `task` issues. The final body structure is listed belo
 
 ## Final body structure
 
-Use this final Jira body structure for `task` issues.
+Use this final Jira body structure for `task` issues. Emit each section in wiki markup (`h2. Name`); see `./jira-issue-convention.md` for the markup mapping.
 
 Common required sections are defined by `../common/task-authoring.md`:
 
-- `## Description`
-- `## Unit Test Strategy`
-- `## Acceptance Criteria`
+- `h2. Description`
+- `h2. Unit Test Strategy`
+- `h2. Acceptance Criteria`
 
 Common optional sections are defined by `../common/task-authoring.md` and `../common/issue-body.md`:
 
-- `## Change Plan`
-- `## Interface Contracts`
-- `## Resume`
-- `## Why Discarded`
+- `h2. Change Plan`
+- `h2. Interface Contracts`
+- `h2. Resume`
+- `h2. Why Discarded`
 
 Issue type is automatically set to `Task`.
-
-## Use case linkage
-
-When this task implements a use case, link it as a blocker of the use case workflow issue using the configured Jira blocking link: `blocked_by` intent, source = use case issue, target = this task. The project configuration must define the blocking link type and direction.

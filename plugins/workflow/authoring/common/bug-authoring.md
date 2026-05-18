@@ -26,38 +26,24 @@ If reproduction is unknown and the task is mostly discovery, use `spike` or `res
 
 ## Body shape
 
-Required:
+Required sections:
 
-```markdown
-## Description
+- `Description` — what is broken, observed behavior, expected behavior, and why it matters.
+- `Reproduction` — steps, command, data, or conditions that reproduce the bug.
+- `Unit Test Strategy` — regression test scenario, isolation strategy, and expected test locations.
+- `Acceptance Criteria` — completion-oriented checklist items such as "bug no longer reproduces" and "regression test fails before fix and passes after fix".
 
-<what is broken, observed behavior, expected behavior, and why it matters>
-
-## Reproduction
-
-<steps, command, data, or conditions that reproduce the bug>
-
-## Unit Test Strategy
-
-<regression test scenario, isolation strategy, and expected test locations>
-
-## Acceptance Criteria
-
-- <bug no longer reproduces>
-- <regression test fails before fix and passes after fix>
-```
-
-`## Acceptance Criteria` must exist even when the bug is linked to a use case or spec.
+The `Acceptance Criteria` section must exist even when the bug is linked to a use case or spec.
 
 Optional sections:
 
-- `## Environment` — version, browser, OS, tenant, data shape, feature flags, or deployment context.
-- `## Change Plan` — forward-looking scope fence naming files, packages, APIs, or migration steps expected to change.
-- `## Interface Contracts` — contracts the fix consumes or restores.
-- `## Resume` — current-state snapshot while mid-flight. See `./issue-body.md`.
-- `## Why Discarded` — reason when discarded. See `./issue-body.md`.
+- `Environment` — version, browser, OS, tenant, data shape, feature flags, or deployment context.
+- `Change Plan` — forward-looking scope fence naming files, packages, APIs, or migration steps expected to change.
+- `Interface Contracts` — contracts the fix consumes or restores.
+- `Resume` — current-state snapshot while mid-flight. See `./issue-body.md`.
+- `Why Discarded` — reason when discarded. See `./issue-body.md`.
 
-Unknown Title Case H2 headings are tolerated.
+Unknown well-named sections are tolerated.
 
 ## Regression test rule
 
@@ -69,7 +55,7 @@ The test should:
 - Pass after the fix.
 - Pin the expected behavior that was violated.
 
-If no automated regression test is feasible, document the manual verification path and reason in `## Unit Test Strategy`.
+If no automated regression test is feasible, document the manual verification path and reason in the `Unit Test Strategy` section.
 
 ## Artifacts
 
@@ -83,41 +69,25 @@ Use linked external evidence only when evidence has lasting value, such as:
 - Minimal repro repositories.
 - Problematic input files.
 
-Production source paths are recorded by git history. Mention planned source changes in `## Change Plan` when they help scope the fix.
+Production source paths are recorded by git history. Mention planned source changes in the `Change Plan` section when they help scope the fix.
 
 ## Completion criteria
 
-Treat a bug as complete only when:
+A bug is complete when:
 
 - Reproduction no longer fails, or the issue explains why the original reproduction is obsolete.
 - Regression test or manual verification is complete.
-- Acceptance criteria are satisfied.
-- Affected knowledge pages are updated when the bug changes documented behavior, architecture, domain, NFRs, CI, specs, use cases, or research conclusions.
-- Follow-up feedback is captured as review items rather than hidden in comments.
-
-## Comments and discussion
-
-Use comments for:
-
-- Diagnosis discussion.
-- Logs and screenshots discovered after creation.
-- Fix attempt notes.
-- Review feedback.
-- Verification summaries.
-
-Keep the bug body as the current compact defect contract.
 
 ## Common mistakes
 
-- Missing `## Reproduction`.
-- Missing `## Unit Test Strategy` or regression test plan.
+- Missing the `Reproduction` section.
+- Missing the `Unit Test Strategy` section or regression test plan.
 - Treating a vague symptom as ready for fix before reproduction is clear.
 - Treating comments as the only source of expected behavior.
 - Marking a bug complete without a regression test or documented manual verification.
-- Using local projection paths or local integer ids as canonical identity.
 
 ## Do not
 
-- Do not create local Markdown bug files unless explicitly using a local projection workflow.
+- Do not create local bug projection files unless explicitly using a local projection workflow.
 - Do not ship a fix without a regression test or a clear reason why one is not feasible.
 - Do not use closing keywords or Smart Commit commands unless the workflow intentionally wants automated side effects.

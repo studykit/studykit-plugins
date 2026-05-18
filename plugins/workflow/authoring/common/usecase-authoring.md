@@ -53,29 +53,16 @@ The workflow issue body should summarize discovery state and link to the curated
 
 Recommended sections:
 
-```markdown
-## Description
-
-<why this use case is being explored and who needs it>
-
-## Actors
-
-- <actor>
-
-## Current Draft
-
-<short current summary or link to curated page draft>
-
-## Open Questions
-
-- <question>
-```
+- `Description` — why this use case is being explored and who needs it.
+- `Actors` — list of actors that participate in this use case, one per bullet.
+- `Current Draft` — short current summary or link to curated page draft.
+- `Open Questions` — outstanding questions, one per bullet.
 
 Optional sections:
 
-- `## Related Work` — related tasks, specs, reviews, research, or pages.
-- `## Supersedes` — prior use case when replacing one.
-- `## Resume` — current-state snapshot while shaping. See `./issue-body.md`.
+- `Related Work` — related tasks, specs, reviews, research, or pages.
+- `Supersedes` — prior use case when replacing one.
+- `Resume` — current-state snapshot while shaping. See `./issue-body.md`.
 
 Use comments for conversation, interview notes, and feedback threads.
 
@@ -83,50 +70,25 @@ Use comments for conversation, interview notes, and feedback threads.
 
 The curated use case page should contain the stable user-facing content.
 
-Place a metadata line immediately under the page title that points back to the
-paired workflow issue:
-
-```
-source: <Markdown link or provider URL>
-```
+Place a metadata line immediately under the page title that points back to the paired workflow issue, in the provider's link form. The metadata line should read `source: <link to paired workflow issue>`.
 
 Required body sections:
 
-```markdown
-## Goal
+- `Goal` — what the actor wants to accomplish.
+- `Actors` — every actor that participates in this use case, with each actor's role.
+- `Situation` — trigger and context.
+- `Flow` — ordered list of user-visible steps and responses.
+- `Expected Outcome` — observable successful outcome.
 
-<what the actor wants to accomplish>
+List every actor that participates in this use case under the `Actors` section. Use the same actor name across use cases when referring to the same role, so the actor catalog can be read off the curated pages.
 
-## Actors
+Optional sections:
 
-- <actor> — <role in this use case>
-- <actor> — <role in this use case>
-
-## Situation
-
-<trigger and context>
-
-## Flow
-
-1. <user-visible step>
-2. <user-visible response or next action>
-
-## Expected Outcome
-
-<observable successful outcome>
-```
-
-List every actor that participates in this use case under `## Actors`. Use the
-same actor name across use cases when referring to the same role, so the actor
-catalog can be read off the curated pages.
-
-Optional:
-
-- `## Validation` — user-visible input constraints, limits, or required formats.
-- `## Error Handling` — what the actor sees when things fail.
-- `## Related Work` — workflow issues, tasks, specs, or research.
-- `## Supersedes` — prior use case page when replacing one.
-- `## Change Log` — required for material updates. See `./knowledge-body.md`.
+- `Validation` — user-visible input constraints, limits, or required formats.
+- `Error Handling` — what the actor sees when things fail.
+- `Related Work` — workflow issues, tasks, specs, or research.
+- `Supersedes` — prior use case page when replacing one.
+- `Change Log` — required for material updates. See `./knowledge-body.md`.
 
 Do not include raw discovery discussion in the curated page.
 
@@ -140,7 +102,7 @@ Publish or update the curated page when:
 - Blocking open questions are resolved or intentionally deferred.
 - User-visible validation and error handling are known or explicitly out of scope.
 
-The first publication should add a `## Change Log` entry linking to the workflow issue.
+The first publication should add a `Change Log` entry linking to the workflow issue.
 
 ## Knowledge side effects
 
@@ -173,7 +135,6 @@ When splitting:
 - Leaving the workflow issue without a link to the curated page after publication.
 - Putting long discovery discussion into the curated page.
 - Creating tasks from a use case whose flow or expected outcome is still unclear.
-- Using local projection paths or local integer ids as canonical identity.
 
 ## Do not
 

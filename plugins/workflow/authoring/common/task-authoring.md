@@ -49,33 +49,15 @@ Use an epic or parent issue when siblings need shared coordination.
 
 ## Body shape
 
-Required:
+Required sections:
 
-```markdown
-## Description
+- `Description` — what is changing and why. State the motivation explicitly for removals, boundary changes, agent responsibility changes, schema or contract changes, and work that prevents a known regression.
+- `Unit Test Strategy` — scenarios, isolation strategy, and expected test locations.
+- `Acceptance Criteria` — one or more observable completion conditions, expressed as completion-oriented checklist items.
 
-<what and why>
+The `Acceptance Criteria` section must exist even when the task has issue links to use cases or specs.
 
-## Unit Test Strategy
-
-<scenarios, isolation strategy, and expected test locations>
-
-## Acceptance Criteria
-
-- <observable completion condition>
-```
-
-`## Acceptance Criteria` must exist even when the task has issue links to use cases or specs.
-
-`## Description` must include why the task exists, not only what will change.
-State the motivation explicitly for removals, boundary changes, agent
-responsibility changes, schema or contract changes, and work that prevents a
-known regression.
-
-Use `## Change Plan` for the expected implementation scope. Do not hide the
-motivation only in the plan. If the rationale is a long-lived design decision,
-create or update the relevant knowledge page instead of embedding the full
-decision record in the task body.
+Use the `Change Plan` section for expected implementation scope when present. Do not hide the motivation only in the plan. If the rationale is a long-lived design decision, create or update the relevant knowledge page instead of embedding the full decision record in the task body.
 
 Acceptance criteria should be grounded in:
 
@@ -86,12 +68,12 @@ Acceptance criteria should be grounded in:
 
 Optional sections:
 
-- `## Change Plan` — forward-looking scope fence naming files, packages, APIs, or migration steps expected to change.
-- `## Interface Contracts` — contracts this task consumes or provides.
-- `## Resume` — current-state snapshot while mid-flight. See `./issue-body.md`.
-- `## Why Discarded` — reason when discarded. See `./issue-body.md`.
+- `Change Plan` — forward-looking scope fence naming files, packages, APIs, or migration steps expected to change.
+- `Interface Contracts` — contracts this task consumes or provides.
+- `Resume` — current-state snapshot while mid-flight. See `./issue-body.md`.
+- `Why Discarded` — reason when discarded. See `./issue-body.md`.
 
-Unknown Title Case H2 headings are tolerated.
+Unknown well-named sections are tolerated.
 
 ## Evidence-readiness
 
@@ -118,34 +100,17 @@ Use linked external evidence only when they have evidentiary or comparative valu
 - Migration dry-run output.
 - Benchmark data.
 
-Production source paths are recorded by git history. Mention planned source changes in `## Change Plan` when they help scope the work.
+Production source paths are recorded by git history. Mention planned source changes in the `Change Plan` section when they help scope the work.
 
 ## Completion criteria
 
-Treat a task as complete only when:
+A task is complete when:
 
-- Acceptance criteria are satisfied.
 - Required tests or verification steps have passed, or the issue explains why they are not applicable.
-- Relevant knowledge pages are updated when the task changes architecture, domain, NFRs, CI, specs, use cases, or research conclusions.
-- Any follow-up feedback is captured as review items rather than hidden in comments.
-
-## Comments and discussion
-
-Use comments for:
-
-- Implementation discussion.
-- Work notes.
-- Test output summaries.
-- Review feedback.
-- Blocker resolution.
-- Closing rationale when the final result, scope, or reason is not obvious from
-  the body.
-
-Keep the task body as the current compact contract.
 
 ## Common mistakes
 
-- Missing `## Description`, `## Unit Test Strategy`, or `## Acceptance Criteria`.
+- Missing the `Description`, `Unit Test Strategy`, or `Acceptance Criteria` section.
 - Creating an anchorless task for work that really needs a use case or spec.
 - Treating comments as the only source of acceptance criteria.
 - Treating a task as complete without updating affected knowledge pages.

@@ -31,34 +31,21 @@ Use `research` when:
 
 ## Body shape
 
-Required:
+Required sections:
 
-```markdown
-## Description
-
-<question being explored, why a spike is needed, and what decision it will inform>
-
-## Hypothesis
-
-<what the spike is trying to prove, disprove, or measure>
-
-## Validation Method
-
-<experiment, benchmark, integration probe, prototype, or sample-driven check>
-
-## Acceptance Criteria
-
-- <observable outcome that answers the question>
-```
+- `Description` — question being explored, why a spike is needed, and what decision it will inform.
+- `Hypothesis` — what the spike is trying to prove, disprove, or measure.
+- `Validation Method` — experiment, benchmark, integration probe, prototype, or sample-driven check.
+- `Acceptance Criteria` — one or more observable outcomes that answer the question.
 
 Optional sections:
 
-- `## Artifact Links` — branch, gist, repository path, benchmark output, screenshots, or other throwaway evidence.
-- `## Change Plan` — planned experiment files, temporary branches, scripts, or environments.
-- `## Resume` — current-state snapshot while mid-flight. See `./issue-body.md`.
-- `## Why Discarded` — reason when discarded. See `./issue-body.md`.
+- `Artifact Links` — branch, gist, repository path, benchmark output, screenshots, or other throwaway evidence.
+- `Change Plan` — planned experiment files, temporary branches, scripts, or environments.
+- `Resume` — current-state snapshot while mid-flight. See `./issue-body.md`.
+- `Why Discarded` — reason when discarded. See `./issue-body.md`.
 
-Unknown Title Case H2 headings are tolerated.
+Unknown well-named sections are tolerated.
 
 ## Artifact handling
 
@@ -75,15 +62,13 @@ Acceptable links include:
 
 PoC code should remain throwaway. If the outcome should become production code, create a follow-up `task` rather than turning the spike into the task.
 
-## Done rule
+## Completion criteria
 
 A spike is complete when:
 
 - The hypothesis is answered or invalidated.
 - Evidence is linked or summarized.
 - The decision impact is clear.
-- Follow-up work is captured as a task, spec, research item, or review when needed.
-- Any curated knowledge page that should record the outcome has been updated.
 
 Completion does not mean production code shipped. It means the exploration produced an answer.
 
@@ -98,22 +83,10 @@ Common follow-ups:
 
 Link follow-ups visibly in the issue body or comments.
 
-## Comments and discussion
-
-Use comments for:
-
-- Experiment notes.
-- Intermediate command output.
-- Failed attempts.
-- Links discovered midstream.
-- Discussion of what the evidence means.
-
-Keep the spike body as the current compact experiment contract.
-
 ## Common mistakes
 
 - Using `spike` for production implementation work.
-- Missing `## Hypothesis` or `## Validation Method`.
+- Missing the `Hypothesis` or `Validation Method` section.
 - Treating the spike as complete without evidence.
 - Letting throwaway PoC code become production code without a follow-up task.
 - Using spike when a written `research` item would be enough.

@@ -15,21 +15,21 @@ Use this binding for Jira `bug` issues. The final body structure is listed below
 
 ## Final body structure
 
-Use this final Jira body structure for `bug` issues.
+Use this final Jira body structure for `bug` issues. Emit each section in wiki markup (`h2. Name`); see `./jira-issue-convention.md` for the markup mapping.
 
 Common required sections are defined by `../common/bug-authoring.md`:
 
-- `## Description`
-- `## Reproduction`
-- `## Unit Test Strategy`
-- `## Acceptance Criteria`
+- `h2. Description`
+- `h2. Reproduction`
+- `h2. Unit Test Strategy`
+- `h2. Acceptance Criteria`
 
 Common optional sections are defined by `../common/bug-authoring.md` and `../common/issue-body.md`:
 
-- `## Environment`
-- `## Change Plan`
-- `## Interface Contracts`
-- `## Resume`
-- `## Why Discarded`
+- `h2. Environment`
+- `h2. Change Plan`
+- `h2. Interface Contracts`
+- `h2. Resume`
+- `h2. Why Discarded`
 
 Issue type is automatically set to `Bug`.

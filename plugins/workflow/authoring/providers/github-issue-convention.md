@@ -10,6 +10,14 @@ This file defines GitHub-wide issue writing conventions only.
 Provider relationship boundaries belong in `./github-issue-relationships.md`.
 GitHub body anti-patterns belong in `./github-issue-anti-patterns.md`.
 
+## Body markup
+
+GitHub Issue bodies render as GitHub-Flavored Markdown.
+
+Canonical section names from common authoring map to `## Name` headings. Do not emit an H1; the issue title is stored separately.
+
+Use GFM task-list items (`- [ ]` / `- [x]`) for completion-oriented sections such as `Acceptance Criteria`, review checklists, and migration checklists.
+
 ## Identity and references
 
 Use GitHub-native references in visible text.
@@ -17,10 +25,6 @@ Use GitHub-native references in visible text.
 - Same repository: `#123`.
 - Cross repository on the same host: `owner/repo#123`.
 - Outside GitHub-native contexts or when ambiguous: full issue URL.
-
-Resolve `#123` using `.workflow/config.yml` first, then the configured git remote, then `origin`.
-
-GitHub Enterprise host, owner, and repo should be inferred from the configured remote when explicit config is absent.
 
 ## Related body section
 

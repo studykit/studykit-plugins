@@ -11,49 +11,43 @@ Read after:
 
 ## Scope
 
-Use this binding when feedback needs a separate Jira issue for independent
-tracking. If the feedback is local to an existing Jira issue and can be
-resolved as part of that issue, use a Jira comment instead.
+Use this binding when feedback needs a separate Jira issue for independent tracking. If the feedback is local to an existing Jira issue and can be resolved as part of that issue, use a Jira comment instead.
 
 ## Issue comment feedback
 
-Use a Jira issue comment when the feedback is local to the issue and can be
-resolved as part of that issue.
+Use a Jira issue comment when the feedback is local to the issue and can be resolved as part of that issue.
 
-Recommended comment shape:
+Recommended comment shape (wiki markup):
 
-```markdown
+```text
 Review feedback: <finding, gap, or question>
 
 Why it matters:
-- <short reason>
+* <short reason>
 
 Suggested fix:
-- <short action>
+* <short action>
 ```
 
-Keep the comment short. If the discussion needs independent tracking, create a
-separate review issue instead.
+Keep the comment short. If the discussion needs independent tracking, create a separate review issue instead.
 
 ## Separate review issue body structure
 
-Use this final Jira body structure for `review` issues.
+Use this final Jira body structure for `review` issues. Emit each section in wiki markup (`h2. Name`); see `./jira-issue-convention.md` for the markup mapping.
 
 Common required sections are defined by `../common/review-authoring.md`:
 
-- `## Description`
+- `h2. Description`
 
 Common optional sections are defined by `../common/review-authoring.md` and `../common/issue-body.md`:
 
-- `## Resume`
-- `## Suggested Fix`
-- `## Evidence`
+- `h2. Resume`
+- `h2. Suggested Fix`
+- `h2. Evidence`
 
 ## Jira issue target relationship
 
-When a separate review issue targets a Jira issue, represent the target with the
-configured Jira blocking relationship. The target issue should be blocked by the
-review issue until the concern is resolved.
+When a separate review issue targets a Jira issue, represent the target with the configured Jira blocking relationship. The target issue should be blocked by the review issue until the concern is resolved.
 
 Do not rely on body text alone for Jira issue-to-issue review targets.
 

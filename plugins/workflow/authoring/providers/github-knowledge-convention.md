@@ -10,6 +10,14 @@ Use these rules for knowledge pages stored in GitHub repository Markdown files.
 
 This file defines repository Markdown storage, identity, references, visible links, change-log, and common mistake rules only. Type-specific body structure and page-level guidance belong in the matching GitHub knowledge type authoring file.
 
+## Body markup
+
+Knowledge pages under `wiki/` are GitHub Markdown files rendered as GitHub-Flavored Markdown.
+
+Canonical section names from common authoring map to `## Name` headings. Do not emit an H1; the page title is stored separately (file name or front matter).
+
+Use GFM task-list items (`- [ ]` / `- [x]`) for completion-oriented lists when a section requires them.
+
 ## Storage model
 
 The repository knowledge root is:

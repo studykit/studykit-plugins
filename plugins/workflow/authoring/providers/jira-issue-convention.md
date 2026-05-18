@@ -8,6 +8,16 @@ Use these rules for issue-backed items stored in Jira.
 
 This file defines Jira-wide issue writing rules only. Provider relationship authoring boundaries belong in `./jira-issue-relationships.md`. Jira body anti-patterns belong in `./jira-issue-anti-patterns.md`. Type-specific body structure and allowed relationship body fallback sections belong in the matching Jira issue type authoring file.
 
+## Body markup
+
+Jira Data Center issue descriptions and comments render as **Jira wiki markup**, not GitHub Markdown. Emit wiki markup when writing any Jira issue body or comment.
+
+Canonical section names from common authoring map to `h2. Name` headings. Use `h3. Name` / `h4. Name` for subsections.
+
+Wiki markup has no native task-list. Where common authoring asks for a completion-oriented checklist (for example, `Acceptance Criteria` items), emit each item as a normal bulleted line (`* item`). Do not write `- [ ]` or `- [x]`; those render as literal text in Jira.
+
+For Markdown-to-wiki mistake mappings (Markdown headings, bold, lists, inline code, code fences, links, tables, checklists), see the "Markdown leakage" section in `./jira-issue-anti-patterns.md`.
+
 ## Identity and references
 
 Use Jira issue keys in visible text.
@@ -18,8 +28,6 @@ Examples:
 - `[PROJ-123]` in GitHub comments when GitHub for Atlassian should create a Jira link.
 - Full Jira URL when outside Jira/Atlassian-aware contexts or when a portable link is needed.
 
-Resolve keys using `.workflow/config.yml`, especially the Jira site.
-
 ## Relationships
 
 Read `./jira-issue-relationships.md` for provider relationship storage and body-boundary rules.
@@ -28,32 +36,28 @@ Read `./jira-issue-anti-patterns.md` for forbidden relationship body sections.
 
 Allowed body fallback sections for Jira relationships are type-specific and belong in the matching Jira issue type authoring file.
 
-## Related body section
+## `Related` body section
 
-`## Related` is available to any Jira issue type.
+A `Related` section (rendered as `h2. Related`) is available to any Jira issue type.
 
-Use `## Related` for human-readable references that are not stored as
-Jira-native issue links, hierarchy fields, or remote links. This includes
-implementation anchors, non-Jira review targets, follow-up work, external
-pages, or other soft references.
+Use it for human-readable references that are not stored as Jira-native issue links, hierarchy fields, or remote links. This includes implementation anchors, non-Jira review targets, follow-up work, external pages, or other soft references.
 
-Do not use `## Related` for parent, child, blocking, dependency, related-work,
-or remote-link relationships that are stored natively in Jira.
+Do not use `Related` for parent, child, blocking, dependency, related-work, or remote-link relationships that are stored natively in Jira.
 
 When used:
 
-- Start with one bullet per related reference.
+- Start with one bullet (`* …`) per related reference.
 - Keep descriptions short.
 
-## Dependency body fallback
+## `Dependencies` body fallback
 
 Use Jira issue links or remote links for dependency relationships whenever possible.
 
-Use `## Dependencies` only when dependency links cannot be stored natively and the issue body needs human-readable dependency context.
+Use a `Dependencies` section (rendered as `h2. Dependencies`) only when dependency links cannot be stored natively and the issue body needs human-readable dependency context.
 
 When used:
 
-- Start with one bullet per dependency.
+- Start with one bullet (`* …`) per dependency.
 - Use Jira issue keys or full URLs whenever possible.
 - Keep the section limited to blocking or ordering dependencies.
 
@@ -74,23 +78,23 @@ workflow extension that documents and supports the selected field or transition.
 
 Use Jira comments, history, and worklog for discussion and work logs.
 
-Do not create a body `## Log` section. Keep the issue body structured and current.
+Do not create a body `Log` section (`h2. Log`). Keep the issue body structured and current.
 
 ## Implementation summary comments
 
 When updating an issue after implementation, keep the comment concise.
 
-Recommended shape:
+Recommended shape (wiki markup):
 
-```markdown
+```text
 Implemented <short outcome>.
 
 Why:
-- <reason this change was needed>
+* <reason this change was needed>
 
 Summary:
-- <material change>
-- <material change>
+* <material change>
+* <material change>
 
 Validation: local workflow checks passed.
 ```

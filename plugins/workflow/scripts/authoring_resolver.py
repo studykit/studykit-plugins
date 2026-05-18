@@ -206,7 +206,7 @@ def resolve_authoring(
         except WorkflowConfigError as exc:
             raise ResolverError(str(exc)) from exc
 
-    parts = ["common/markdown-authoring.md"]
+    parts: list[str] = []
     if normalized_scope == "comment":
         if normalized_role == "issue" and normalized_provider in ISSUE_PROVIDER_FILES:
             parts.append(ISSUE_PROVIDER_FILES[normalized_provider])
