@@ -18,7 +18,7 @@ Create a self-contained handoff for a fresh session. Assume the next session can
 
 ## Workflow
 
-1. Commit relevant non-handoff work first.
+1. Commit relevant non-handoff work.
    - Inspect `git status --short` and `git diff --stat`.
    - Stage only changes that clearly belong to this session.
    - Split commits by meaningful unit, such as implementation, tests, docs, cleanup, or unrelated feature slices.
@@ -26,7 +26,7 @@ Create a self-contained handoff for a fresh session. Assume the next session can
    - Ask only when ownership of a pending change is unclear.
    - Skip this step if there is no relevant non-handoff work; do not create an empty commit.
    - Use specific commit messages, not generic "pre-handoff" labels.
-   - Do not include the handoff file in these commits.
+   - Do not include the handoff file in these commits; this skill leaves the handoff file uncommitted.
 2. Choose the handoff path.
    - Write directly under `<repo-root>/.handoff/`; do not create subdirectories.
    - Use the Context-provided handoff number as `<n>`. Do not reimplement numbering.
@@ -45,10 +45,9 @@ Create a self-contained handoff for a fresh session. Assume the next session can
    - Run relevant tests, linters, validators, or smoke checks when feasible.
    - Record exact commands and outcomes.
    - If checks are skipped or fail, explain why and preserve the risk or failure.
-5. Commit the handoff file alone.
-   - Commit it after the pre-handoff commits, or on top of `HEAD` if none were needed.
-   - Ensure only the new handoff file is in this commit's diff.
-   - Use a message like `docs(handoff): snapshot <topic> session state`.
+5. Leave the handoff file uncommitted.
+   - Do not stage or commit the new handoff file.
+   - The handoff file stays in the working tree as an untracked file.
 
 ## Additional Requirements
 
@@ -115,8 +114,7 @@ Section guidance:
 
 ## Output
 
-After writing the handoff and creating the required commits, report only:
+After writing the handoff, report only:
 
-- handoff file path
+- handoff file path (left uncommitted)
 - pre-handoff commit SHA(s), or `skipped`
-- handoff-only commit SHA

@@ -220,3 +220,4 @@ session-tree.lock
 # Workflow provider read cache
 /.workflow-cache/
 .cache/
+.handoff/
