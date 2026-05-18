@@ -87,6 +87,7 @@ def test_codex_env_exports_reads_session_state(tmp_path: Path) -> None:
     assert f"export WORKFLOW_PLUGIN_ROOT={_PLUGIN_ROOT}" in rendered
     assert f"export WORKFLOW_PROJECT_DIR={tmp_path}" in rendered
     assert "export WORKFLOW_SESSION_ID=parent-shell" in rendered
+    assert f"export AUTHORING_RESOLVER={_SCRIPTS_DIR / 'authoring_resolver.py'}" in rendered
 
 
 def test_workflow_wrapper_sources_codex_env_file(tmp_path: Path) -> None:
@@ -94,7 +95,7 @@ def test_workflow_wrapper_sources_codex_env_file(tmp_path: Path) -> None:
     script.write_text(
         "import json, os\n"
         "print(json.dumps({key: os.environ.get(key) for key in "
-        "('WORKFLOW', 'WORKFLOW_PLUGIN_ROOT', 'WORKFLOW_PROJECT_DIR', 'WORKFLOW_SESSION_ID')}))\n",
+        "('WORKFLOW', 'WORKFLOW_PLUGIN_ROOT', 'WORKFLOW_PROJECT_DIR', 'WORKFLOW_SESSION_ID', 'AUTHORING_RESOLVER')}))\n",
         encoding="utf-8",
     )
     assert write_codex_env_file(
@@ -122,6 +123,7 @@ def test_workflow_wrapper_sources_codex_env_file(tmp_path: Path) -> None:
     assert payload["WORKFLOW_PLUGIN_ROOT"] == str(_PLUGIN_ROOT)
     assert payload["WORKFLOW_PROJECT_DIR"] == str(tmp_path)
     assert payload["WORKFLOW_SESSION_ID"] == "parent-shell"
+    assert payload["AUTHORING_RESOLVER"] == str(_SCRIPTS_DIR / "authoring_resolver.py")
 
 
 def test_workflow_wrapper_does_not_use_codex_thread_id_as_session_fallback(tmp_path: Path) -> None:

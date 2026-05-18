@@ -396,10 +396,7 @@ def subagent_start(
         {
             "hookSpecificOutput": {
                 "hookEventName": "SubagentStart",
-                "additionalContext": build_operator_session_context(
-                    config,
-                    launcher=_plugin_root() / "scripts" / "workflow",
-                ),
+                "additionalContext": build_operator_session_context(config),
             }
         },
         stdout=stdout,
