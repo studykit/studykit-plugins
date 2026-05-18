@@ -882,6 +882,16 @@ def test_session_start_injects_policy_for_configured_project(
     context = payload["hookSpecificOutput"]["additionalContext"]
     assert payload["hookSpecificOutput"]["hookEventName"] == "SessionStart"
     assert context == expected_session_start_context(runtime=runtime, knowledge_kind="github")
+    assert "Use `workflow-operator` for workflow operations" in context
+    assert "before reading local workflow\ncache snapshots or running provider commands yourself" in context
+    assert "issue status/completion checks" in context
+    assert "Main assistant responsibilities:" in context
+    assert "Operator responsibilities:" in context
+    assert "Authoring rules:" in context
+    assert "Pass any issue relationship intent from the user request or authoring guidance" in context
+    assert "do not rely on the operator to infer relationships from prose" in context
+    assert "explicitly supplied relationship changes" in context
+    assert "Return operational paths, refs, relationship metadata, and verification results" in context
     assert ", and session id" not in context
     assert "session id" not in context
     assert "script recipes" not in context
@@ -913,8 +923,6 @@ def test_session_start_injects_policy_for_configured_project(
     assert "$WORKFLOW_PLUGIN_ROOT/scripts/" not in context
     assert "scripts/authoring_resolver.py" not in context
     assert "scripts/workflow_github.py" not in context
-    assert "cache" not in context.lower()
-    assert "write-back" not in context
     assert "## workflow provider cache context" not in context
     assert "Do not inspect `.workflow-cache`" not in context
     assert "UserPromptSubmit may pre-read" not in context
@@ -1076,8 +1084,6 @@ def test_session_start_uses_filesystem_issue_policy_for_local_artifacts(
     assert "raw GitHub CLI (`gh`)" not in context
     assert "should not run raw `gh`" not in context
     assert "raw provider CLIs" not in context
-    assert "cache" not in context.lower()
-    assert "write-back" not in context
 
 
 def test_session_start_discovers_config_from_nested_project_path(
