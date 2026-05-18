@@ -17,10 +17,19 @@ Resolve authoring paths with `authoring_resolver.py`.
 For comment-only requests, resolve authoring paths with the resolver's comment
 scope so the caller reads only the Markdown and Jira issue convention files.
 Fetch or refresh issues with `$ISSUE_FETCH`.
-Prepare new issues as pending drafts with `$ISSUE_DRAFTS prepare`.
-Return the `issue_file` path from prepare as the caller-editable draft path.
-Create provider issues from drafts only after explicit user approval and
-`--confirm-provider-create`.
+Publish new provider issues with `$ISSUE_DRAFTS publish`. The caller supplies
+the metadata (`--type`, `--title`, `--label`, plus `--issue-type` and
+`--subtask-parent` when the Jira issue type or sub-task parent must be set at
+create time) and an opaque body file path (`--body-file`); the file must not
+contain frontmatter. Publish only after explicit user approval and
+`--confirm-provider-create`. On success the script publishes, refreshes the
+cache, deletes the body file, and returns the cached `snapshot.md` path
+(surfaced as `issue_file` in the response) along with the issue key and
+verified flag; return those to the caller. On failure the body file is
+preserved so the caller can retry.
+Apply relationships separately with `$ISSUE_RELATIONSHIPS` against the
+freshly-published issue when the caller's metadata included relationship
+intent.
 Use `$ISSUE_WRITEBACK`, `$ISSUE_COMMENTS`, `$ISSUE_RELATIONSHIPS`, and
 `$ISSUE_METADATA` for provider/cache mutations they support.
 Provider mutation scripts refresh affected cache projections internally.

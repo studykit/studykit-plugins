@@ -20,10 +20,17 @@ scope so the caller reads only the Markdown and GitHub issue convention files.
 Fetch or refresh issues with `$ISSUE_FETCH`.
 Use `$ISSUE_LIFECYCLE close` or `$ISSUE_LIFECYCLE reopen` for supported provider
 lifecycle mutations.
-Prepare new issues as pending drafts with `$ISSUE_DRAFTS prepare`.
-Return the `issue_file` path from prepare as the caller-editable draft path.
-Create provider issues from drafts only after explicit user approval and
-`--confirm-provider-create`.
+Publish new provider issues with `$ISSUE_DRAFTS publish`. The caller supplies
+the metadata (`--type`, `--title`, `--label`, `--state`, `--state-reason`) and
+an opaque body file path (`--body-file`); the file must not contain
+frontmatter. Publish only after explicit user approval and
+`--confirm-provider-create`. On success the script publishes, refreshes the
+cache, deletes the body file, and returns the cached `issue.md` path along
+with the issue ref and verified flag; return those to the caller. On failure
+the body file is preserved so the caller can retry.
+Apply relationships separately with `$ISSUE_RELATIONSHIPS` against the
+freshly-published issue when the caller's metadata included relationship
+intent.
 Use `$ISSUE_WRITEBACK`, `$ISSUE_COMMENTS`, `$ISSUE_LIFECYCLE`,
 `$ISSUE_RELATIONSHIPS`, and `$ISSUE_METADATA` for provider/cache mutations they
 support.
