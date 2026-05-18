@@ -890,8 +890,10 @@ def test_session_start_injects_policy_for_configured_project(
     assert "relationship intent" in context
     assert "Return operational paths, refs, relationship metadata, and verification results" in context
     assert "New provider issue flow:" in context
+    assert "New comment flow:" in context
     assert "no frontmatter" in context
     assert "pending draft" not in context.lower()
+    assert "comments-pending" not in context
     assert ", and session id" not in context
     assert "session id" not in context
     assert "script recipes" not in context

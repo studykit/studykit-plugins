@@ -18,6 +18,14 @@ New provider issue flow:
 5. After approval, hand `workflow-operator` the metadata (title, labels, issue type, role, relationship intent) and the temp file path with publish intent.
 6. `workflow-operator` publishes, refreshes the cache, deletes the temp file on success, and returns the cached issue file path with the issue ref and success/failure. On failure the temp file is preserved for retry.
 
+New comment flow:
+1. Ask `workflow-operator` for matching authoring paths with the comment scope.
+2. Read the returned authoring paths.
+3. Write the comment body to a temp file you choose; body content only, no frontmatter.
+4. Present the issue ref, any optional state change, and the draft body to the user. Wait for explicit append approval.
+5. After approval, hand `workflow-operator` the issue ref, the temp file path, and any optional state and relationship intent with append intent.
+6. `workflow-operator` runs a freshness check against the issue body and comments, posts the comment, applies any optional state change, refreshes the cache, deletes the temp file on success, and returns the cached issue file path with the issue ref and success/failure. On freshness drift the operator returns blocked with the paths to reread; the temp file is preserved for retry. Relationship intent triggers a follow-up `$ISSUE_RELATIONSHIPS` step.
+
 Operator responsibilities:
 - Resolve authoring paths.
 - Perform the workflow operations listed above and verify results.

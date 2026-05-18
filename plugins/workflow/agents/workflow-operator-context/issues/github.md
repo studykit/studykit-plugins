@@ -23,14 +23,27 @@ lifecycle mutations.
 Publish new provider issues with `$ISSUE_DRAFTS publish`. The caller supplies
 the metadata (`--type`, `--title`, `--label`, `--state`, `--state-reason`) and
 an opaque body file path (`--body-file`); the file must not contain
-frontmatter. Publish only after explicit user approval and
-`--confirm-provider-create`. On success the script publishes, refreshes the
-cache, deletes the body file, and returns the cached `issue.md` path along
-with the issue ref and verified flag; return those to the caller. On failure
-the body file is preserved so the caller can retry.
+frontmatter. Publish only after explicit user approval. On success the script
+publishes, refreshes the cache, deletes the body file, and returns the cached
+`issue.md` path along with the issue ref and verified flag; return those to
+the caller. On failure the body file is preserved so the caller can retry.
 Apply relationships separately with `$ISSUE_RELATIONSHIPS` against the
 freshly-published issue when the caller's metadata included relationship
 intent.
+Append a new comment with `$ISSUE_COMMENTS append`. The caller supplies the
+issue ref (`--issue`) and an opaque body file path (`--body-file`); the file
+must not contain frontmatter. Optional `--state open|closed` and
+`--state-reason completed|not_planned|reopened` ride along on the same call
+to change the issue state inline. Append only after explicit user approval.
+The script runs a freshness check on both the issue body and the comments
+target before posting. On success it posts the comment, applies any
+requested state change, refreshes the cache, deletes the body file, and
+returns the cached `issue.md` path along with the issue ref, the posted
+comment, and whether state changed. On freshness drift it returns
+`status=blocked` with `reread_required=true`, preserves the body file, and
+applies no state change — tell the main agent to reread the listed cache
+paths before retrying. Apply relationship intent separately through
+`$ISSUE_RELATIONSHIPS`.
 Use `$ISSUE_WRITEBACK`, `$ISSUE_COMMENTS`, `$ISSUE_LIFECYCLE`,
 `$ISSUE_RELATIONSHIPS`, and `$ISSUE_METADATA` for provider/cache mutations they
 support.
