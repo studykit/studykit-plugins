@@ -115,7 +115,8 @@ Session hooks are intentionally concise:
 - `SessionStart` injects configured workflow policy only for main sessions.
 - `UserPromptSubmit` prepares cache projections for mentioned GitHub issue
   references and injects project-relative cache paths.
-- `Stop` stays silent and does not mutate issue cache state.
+- Workflow manifests do not register `Stop`; there is no stop-time cache
+  mutation.
 - `PreToolUse` on writes protects provider cache issue body projections from
   unsafe frontmatter edits.
 

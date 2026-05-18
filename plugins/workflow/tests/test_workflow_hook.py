@@ -1485,6 +1485,23 @@ def test_static_claude_manifest_registers_global_subagent_start_hook() -> None:
     assert "SubagentStart:" not in operator_text
 
 
+def test_static_claude_manifest_does_not_register_stop_hook() -> None:
+    manifest = json.loads((_PLUGIN_ROOT / "hooks" / "hooks.json").read_text(encoding="utf-8"))
+
+    assert "Stop" not in manifest["hooks"]
+    assert "Stop" not in manifest["description"]
+
+
+def test_static_codex_manifest_does_not_register_stop_hook() -> None:
+    manifest = json.loads(
+        (_PLUGIN_ROOT / "hooks" / "hooks.codex.json").read_text(encoding="utf-8")
+    )
+
+    assert {"SessionStart", "UserPromptSubmit"}.issubset(manifest["hooks"])
+    assert "Stop" not in manifest["hooks"]
+    assert "Stop" not in manifest["description"]
+
+
 def test_user_prompt_caches_issue_and_injects_project_relative_path(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
