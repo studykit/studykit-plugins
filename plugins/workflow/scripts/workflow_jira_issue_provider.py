@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import hashlib
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 from typing import Any
 from urllib.parse import urlparse
@@ -167,7 +167,13 @@ class JiraDataCenterIssueNativeProvider(IssueProvider):
             payload = normalize_jira_data_center_issue(raw_issue, site=site, remote_links=remote_links)
 
             if request.context.cache_policy != CACHE_POLICY_BYPASS:
-                cache.write_issue_bundle(site, raw_issue, remote_links=remote_links)
+                settings = _jira_issue_provider_settings(request.context.project)
+                cache.write_issue_bundle(
+                    site,
+                    raw_issue,
+                    remote_links=remote_links,
+                    snapshot_hidden_comment_markers=_jira_snapshot_hidden_comment_markers(settings),
+                )
 
             return filter_jira_payload(
                 payload,
@@ -235,8 +241,12 @@ class JiraDataCenterIssueNativeProvider(IssueProvider):
             runner=self.runner,
         )
         issue_key = normalize_jira_issue_key(created.get("key") or created.get("issue") or "")
-        write_result = self._refresh_cache(site, cache, issue_key)
-        parent_write_result = self._refresh_cache(site, cache, subtask_parent_key) if subtask_parent_key else None
+        write_result = self._refresh_cache(request.context.project, site, cache, issue_key)
+        parent_write_result = (
+            self._refresh_cache(request.context.project, site, cache, subtask_parent_key)
+            if subtask_parent_key
+            else None
+        )
         pending_result = None
         if pending_local_id:
             pending_result = cache.finalize_pending_issue_creation(site, pending_local_id, issue_key)
@@ -308,13 +318,14 @@ class JiraDataCenterIssueNativeProvider(IssueProvider):
             return self._stale_cache_block_payload(
                 site=site,
                 cache=cache,
+                project=request.context.project,
                 issue_key=issue_key,
                 operation=operation,
                 target="issue",
                 error=exc,
             )
         update_issue(site, issue_key, fields=fields, runner=self.runner)
-        write_result = self._refresh_cache(site, cache, issue_key)
+        write_result = self._refresh_cache(request.context.project, site, cache, issue_key)
         return {
             "operation": operation,
             "issue": issue_key,
@@ -351,6 +362,7 @@ class JiraDataCenterIssueNativeProvider(IssueProvider):
             return self._stale_cache_block_payload(
                 site=site,
                 cache=cache,
+                project=request.context.project,
                 issue_key=issue_key,
                 operation="append_pending_comments",
                 target="comments",
@@ -358,7 +370,7 @@ class JiraDataCenterIssueNativeProvider(IssueProvider):
                 pending_files=[pending.file_name for pending in pending_comments],
             )
         appended = [add_comment(site, issue_key, body=pending.body, runner=self.runner) for pending in pending_comments]
-        write_result = self._refresh_cache(site, cache, issue_key)
+        write_result = self._refresh_cache(request.context.project, site, cache, issue_key)
         removed = cache.remove_pending_issue_comments(site, issue_key, pending_comments)
         return {
             "operation": "append_pending_comments",
@@ -381,13 +393,14 @@ class JiraDataCenterIssueNativeProvider(IssueProvider):
             return self._stale_cache_block_payload(
                 site=site,
                 cache=cache,
+                project=request.context.project,
                 issue_key=issue_key,
                 operation="add_comment",
                 target="comments",
                 error=exc,
             )
         created = add_comment(site, issue_key, body=body, runner=self.runner)
-        write_result = self._refresh_cache(site, cache, issue_key)
+        write_result = self._refresh_cache(request.context.project, site, cache, issue_key)
         return {
             "operation": "add_comment",
             "issue": issue_key,
@@ -452,7 +465,7 @@ class JiraDataCenterIssueNativeProvider(IssueProvider):
         for operation in prepared:
             applied.append(self._dispatch_relationship_operation(site, operation))
 
-        write_result = self._refresh_cache(site, cache, issue_key)
+        write_result = self._refresh_cache(request.context.project, site, cache, issue_key)
         return {
             "operation": "apply_relationships",
             "issue": issue_key,
@@ -584,19 +597,27 @@ class JiraDataCenterIssueNativeProvider(IssueProvider):
 
     def _refresh_cache(
         self,
+        project: Any,
         site: Any,
         cache: JiraDataCenterIssueCache,
         issue_key: str,
     ) -> Mapping[str, str]:
         raw_issue = get_issue(site, issue_key, runner=self.runner)
         remote_links = get_remote_links(site, issue_key, runner=self.runner)
-        return cache.write_issue_bundle(site, raw_issue, remote_links=remote_links)
+        settings = _jira_issue_provider_settings(project)
+        return cache.write_issue_bundle(
+            site,
+            raw_issue,
+            remote_links=remote_links,
+            snapshot_hidden_comment_markers=_jira_snapshot_hidden_comment_markers(settings),
+        )
 
     def _stale_cache_block_payload(
         self,
         *,
         site: Any,
         cache: JiraDataCenterIssueCache,
+        project: Any,
         issue_key: str,
         operation: str,
         target: str,
@@ -621,7 +642,7 @@ class JiraDataCenterIssueNativeProvider(IssueProvider):
         if pending_files is not None:
             payload["pending_files"] = pending_files
         try:
-            write_result = self._refresh_cache(site, cache, issue_key)
+            write_result = self._refresh_cache(project, site, cache, issue_key)
         except Exception as refresh_exc:  # pragma: no cover - defensive reporting path
             payload["cache_refreshed"] = False
             payload["refresh_error"] = str(refresh_exc)
@@ -978,6 +999,32 @@ def _jira_issue_provider_settings(project: Any) -> Mapping[str, Any]:
     if config is None or config.issues.kind != "jira":
         raise ProviderOperationError("workflow issue provider is not configured as Jira")
     return config.issues.settings
+
+
+def _jira_snapshot_hidden_comment_markers(settings: Mapping[str, Any]) -> tuple[str, ...]:
+    snapshot = settings.get("snapshot")
+    raw = None
+    if isinstance(snapshot, Mapping):
+        raw = (
+            snapshot.get("hidden_comment_markers")
+            or snapshot.get("hiddenCommentMarkers")
+            or snapshot.get("hide_comment_markers")
+            or snapshot.get("comment_hide_markers")
+            or snapshot.get("comment_exclude_markers")
+        )
+    if raw is None:
+        raw = settings.get("snapshot_hidden_comment_markers") or settings.get("snapshotHiddenCommentMarkers")
+    return _string_tuple(raw, setting="providers.issues.snapshot.hidden_comment_markers")
+
+
+def _string_tuple(value: Any, *, setting: str) -> tuple[str, ...]:
+    if value is None:
+        return ()
+    if isinstance(value, str):
+        return tuple(item.strip() for item in value.split(",") if item.strip())
+    if isinstance(value, list | tuple | set):
+        return tuple(str(item).strip() for item in value if str(item).strip())
+    raise ProviderOperationError(f"{setting} must be a string or a list of strings")
 
 
 def _resolve_jira_relationship_operation(

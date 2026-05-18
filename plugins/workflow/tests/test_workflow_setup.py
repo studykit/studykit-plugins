@@ -117,6 +117,20 @@ def test_build_config_defaults_issue_id_format_to_provider_native(tmp_path: Path
     assert raw["issue_id_format"] == "jira"
 
 
+def test_build_config_records_jira_snapshot_hidden_comment_markers(tmp_path: Path) -> None:
+    raw = build_config(
+        project=tmp_path,
+        issue_provider="jira",
+        knowledge_provider="confluence",
+        jira_site="https://jira.example.test",
+        jira_relationship_mappings=_jira_relationship_mappings(),
+        jira_snapshot_hidden_comment_markers=("!git-event",),
+        confluence_site="https://confluence.example.test",
+    )
+
+    assert raw["providers"]["issues"]["snapshot"] == {"hidden_comment_markers": ["!git-event"]}
+
+
 def test_build_config_requires_jira_relationship_mappings(tmp_path: Path) -> None:
     with pytest.raises(WorkflowSetupError, match="relationship_mappings"):
         build_config(

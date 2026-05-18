@@ -62,6 +62,7 @@ def write_jira_config(
     project: Path,
     *,
     deployment: str = "data-center",
+    snapshot_settings: str = "",
     relationship_mappings: str = "",
 ) -> None:
     path = project / ".workflow" / "config.yml"
@@ -79,6 +80,7 @@ providers:
     project: TEST
     issue_type: Task
 """
+            + snapshot_settings
             + relationship_mappings
             + """
   knowledge:
@@ -363,6 +365,67 @@ def test_data_center_provider_fetches_issue_remote_links_and_writes_llm_snapshot
     assert "Parent: TEST-1200 (Parent task)" in snapshot
     assert "Blocked by: TEST-1233 (Blocking predecessor)" in snapshot
     assert "Blocking: TEST-1235 (Follow-up)" in snapshot
+    assert "## Raw Cache" not in snapshot
+    assert "issue.json" not in snapshot
+    assert "remote-links.json" not in snapshot
+    assert "metadata.yml" not in snapshot
+
+
+def test_data_center_snapshot_hides_comments_with_configured_markers(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    write_jira_config(
+        tmp_path,
+        snapshot_settings="""
+    snapshot:
+      hidden_comment_markers:
+        - "!git-event"
+""",
+    )
+    monkeypatch.delenv("JIRA_PERSONAL_TOKEN", raising=False)
+    monkeypatch.delenv("JIRA_PAT", raising=False)
+    monkeypatch.delenv("JIRA_USERNAME", raising=False)
+    monkeypatch.delenv("JIRA_PASSWORD", raising=False)
+    payload = jira_issue_payload()
+    comments = payload["fields"]["comment"]["comments"]  # type: ignore[index]
+    comments.append(  # type: ignore[attr-defined]
+        {
+            "id": "20002",
+            "author": {"displayName": "Automation", "name": "automation"},
+            "body": "!git-event pushed commit abc123",
+            "created": "2026-05-15T09:40:00.000+0900",
+            "updated": "2026-05-15T09:40:00.000+0900",
+        }
+    )
+    comments.append(  # type: ignore[attr-defined]
+        {
+            "id": "20003",
+            "author": {"displayName": "Human User", "name": "human"},
+            "body": "Human follow-up remains visible.",
+            "created": "2026-05-15T09:45:00.000+0900",
+            "updated": "2026-05-15T09:45:00.000+0900",
+        }
+    )
+    runner = FakeRunner(
+        {
+            curl_args(issue_url()): result(curl_args(issue_url()), stdout=json.dumps(payload)),
+            curl_args(remote_links_url()): result(curl_args(remote_links_url()), stdout=json.dumps(remote_links_payload())),
+        }
+    )
+
+    response = dispatch_get(tmp_path, runner)
+
+    assert any("!git-event" in comment["body"] for comment in response.payload["comments"])
+    cache = JiraDataCenterIssueCache.for_project(tmp_path)
+    site = jira_site(tmp_path)
+    issue_dir = cache.issue_dir(site, "TEST-1234")
+    assert "!git-event" in (issue_dir / "issue.json").read_text(encoding="utf-8")
+    snapshot = (issue_dir / "snapshot.md").read_text(encoding="utf-8")
+    assert "Please keep Data Center first." in snapshot
+    assert "Human follow-up remains visible." in snapshot
+    assert "!git-event" not in snapshot
+    assert "pushed commit abc123" not in snapshot
 
 
 def test_default_cache_policy_uses_data_center_cache_hit_without_curl(tmp_path: Path) -> None:
