@@ -434,12 +434,12 @@ def test_github_issue_update_blocks_stale_freshness_before_mutation(tmp_path: Pa
     assert events == ["freshness", "refresh"]
 
 
-def test_github_issue_update_from_cache_projection_checks_freshness_and_refreshes_cache(
+def test_github_issue_update_applies_inline_state_change_and_refreshes_cache(
     tmp_path: Path,
 ) -> None:
     GitHubIssueCache.for_project(tmp_path).write_issue_bundle(
         github_repo(),
-        writeback_issue_payload(),
+        cached_issue_payload(),
         fetched_at="2026-05-13T12:34:56Z",
     )
     events: list[str] = []
@@ -451,42 +451,24 @@ def test_github_issue_update_from_cache_projection_checks_freshness_and_refreshe
                 returncode=0,
                 stdout="git@github.com:studykit/studykit-plugins.git\n",
             )
-        if request.args == gh_issue_view_args(39, "number,updatedAt,labels,state,stateReason"):
+        if request.args == gh_issue_freshness_args(39):
             events.append("freshness")
             return CommandResult(
                 request=request,
                 returncode=0,
-                stdout=json.dumps(
-                    {
-                        "number": 39,
-                        "updatedAt": "2026-05-13T12:00:00Z",
-                        "labels": [{"name": "task"}, {"name": "old"}],
-                        "state": "OPEN",
-                        "stateReason": None,
-                    }
-                ),
+                stdout=json.dumps({"number": 39, "updatedAt": "2026-05-13T12:00:00Z"}),
             )
         if request.args[:3] == ("gh", "issue", "edit"):
             events.append("edit")
             body_file = Path(request.args[request.args.index("--body-file") + 1])
-            assert body_file.read_text(encoding="utf-8") == "Cached write-back body."
-            assert request.args[request.args.index("--title") + 1] == "Cached write-back title"
-            assert ("--add-label", "workflow") in zip(request.args, request.args[1:])
-            assert ("--remove-label", "old") in zip(request.args, request.args[1:])
-            assert events == ["freshness", "edit"]
+            assert body_file.read_text(encoding="utf-8") == "Closing body."
             return CommandResult(request=request, returncode=0)
-        if request.args == gh_issue_view_args(39, "title,body,labels"):
+        if request.args == gh_issue_view_args(39, "body"):
             events.append("verify-edit")
             return CommandResult(
                 request=request,
                 returncode=0,
-                stdout=json.dumps(
-                    {
-                        "title": "Cached write-back title",
-                        "body": "Cached write-back body.",
-                        "labels": [{"name": "task"}, {"name": "workflow"}],
-                    }
-                ),
+                stdout=json.dumps({"body": "Closing body."}),
             )
         if request.args == (
             "gh",
@@ -509,12 +491,23 @@ def test_github_issue_update_from_cache_projection_checks_freshness_and_refreshe
             )
         if request.args == gh_issue_view_args(39, ",".join(DEFAULT_ISSUE_FIELDS)):
             events.append("refresh")
-            return CommandResult(request=request, returncode=0, stdout=json.dumps(writeback_issue_payload()))
+            return CommandResult(
+                request=request,
+                returncode=0,
+                stdout=json.dumps(
+                    {
+                        **cached_issue_payload(updated_at="2026-05-13T12:05:00Z"),
+                        "body": "Closing body.",
+                        "state": "CLOSED",
+                        "stateReason": "COMPLETED",
+                    }
+                ),
+            )
         if request.args == gh_api_args("repos/studykit/studykit-plugins/issues/39"):
             return CommandResult(
                 request=request,
                 returncode=0,
-                stdout=json.dumps({"id": 3900, "number": 39, "updated_at": "2026-05-13T12:00:00Z"}),
+                stdout=json.dumps({"id": 3900, "number": 39, "updated_at": "2026-05-13T12:05:00Z"}),
             )
         if request.args == gh_api_args("repos/studykit/studykit-plugins/issues/39/parent"):
             return CommandResult(request=request, returncode=404, stderr="not found")
@@ -534,27 +527,32 @@ def test_github_issue_update_from_cache_projection_checks_freshness_and_refreshe
             kind="github",
             operation="update",
             context=ProviderContext(project=tmp_path, artifact_type="task", session_id="s1"),
-            payload={"issue": 39, "from_cache": True},
+            payload={
+                "issue": 39,
+                "body": "Closing body.",
+                "state": "closed",
+                "state_reason": "completed",
+                "freshness_check": True,
+            },
         )
     )
 
-    assert response.payload["operation"] == "update_issue_from_cache"
+    assert response.payload["operation"] == "update_issue"
     assert response.payload["issue"] == "39"
     assert response.payload["verified"] is True
+    assert response.payload["state_changed"] is True
+    assert response.payload["state"]["operation"] == "close_issue"
     assert response.payload["cache_refreshed"] is True
-    assert GitHubIssueCache.for_project(tmp_path).read_issue(github_repo(), 39)["body"] == "Cached write-back body."
+    assert GitHubIssueCache.for_project(tmp_path).read_issue(github_repo(), 39)["body"] == "Closing body."
     assert events == ["freshness", "edit", "verify-edit", "close", "verify-state", "refresh"]
 
 
-def test_github_issue_update_from_cache_blocks_stale_projection_before_mutation(
-    tmp_path: Path,
-) -> None:
+def test_github_issue_update_rejects_payload_without_any_writable_field(tmp_path: Path) -> None:
     GitHubIssueCache.for_project(tmp_path).write_issue_bundle(
         github_repo(),
-        writeback_issue_payload(),
+        cached_issue_payload(),
         fetched_at="2026-05-13T12:34:56Z",
     )
-    events: list[str] = []
 
     def runner(request: CommandRequest) -> CommandResult:
         if request.args == git_args(tmp_path, "remote", "get-url", "origin"):
@@ -563,66 +561,20 @@ def test_github_issue_update_from_cache_blocks_stale_projection_before_mutation(
                 returncode=0,
                 stdout="git@github.com:studykit/studykit-plugins.git\n",
             )
-        if request.args == gh_issue_view_args(39, "number,updatedAt,labels,state,stateReason"):
-            events.append("freshness")
-            return CommandResult(
-                request=request,
-                returncode=0,
-                stdout=json.dumps(
-                    {
-                        "number": 39,
-                        "updatedAt": "2026-05-13T13:00:00Z",
-                        "labels": [{"name": "task"}],
-                        "state": "OPEN",
-                        "stateReason": None,
-                    }
-                ),
-            )
-        if request.args == gh_issue_view_args(39, ",".join(DEFAULT_ISSUE_FIELDS)):
-            events.append("refresh")
-            return CommandResult(
-                request=request,
-                returncode=0,
-                stdout=json.dumps(cached_issue_payload(updated_at="2026-05-13T13:00:00Z")),
-            )
-        if request.args == gh_api_args("repos/studykit/studykit-plugins/issues/39"):
-            return CommandResult(
-                request=request,
-                returncode=0,
-                stdout=json.dumps({"id": 3900, "number": 39, "updated_at": "2026-05-13T13:00:00Z"}),
-            )
-        if request.args == gh_api_args("repos/studykit/studykit-plugins/issues/39/parent"):
-            return CommandResult(request=request, returncode=404, stderr="not found")
-        if request.args in {
-            gh_api_args("repos/studykit/studykit-plugins/issues/39/sub_issues", "--paginate"),
-            gh_api_args("repos/studykit/studykit-plugins/issues/39/dependencies/blocked_by", "--paginate"),
-            gh_api_args("repos/studykit/studykit-plugins/issues/39/dependencies/blocking", "--paginate"),
-        }:
-            return CommandResult(request=request, returncode=0, stdout="[]")
-        if request.args[:3] == ("gh", "issue", "edit"):
-            events.append("edit")
-            return CommandResult(request=request, returncode=0)
         return CommandResult(request=request, returncode=127, stderr="unexpected command")
 
     dispatcher = ProviderDispatcher(default_provider_registry(runner=runner))
 
-    response = dispatcher.dispatch(
-        ProviderRequest(
-            role="issue",
-            kind="github",
-            operation="update",
-            context=ProviderContext(project=tmp_path, artifact_type="task", session_id="s1"),
-            payload={"issue": 39, "from_cache": True},
+    with pytest.raises(ProviderOperationError, match="at least one of body, title, labels, state"):
+        dispatcher.dispatch(
+            ProviderRequest(
+                role="issue",
+                kind="github",
+                operation="update",
+                context=ProviderContext(project=tmp_path, artifact_type="task", session_id="s1"),
+                payload={"issue": 39},
+            )
         )
-    )
-
-    assert response.payload["operation"] == "update_issue_from_cache"
-    assert response.payload["status"] == "blocked"
-    assert response.payload["reason"] == "stale_cache"
-    assert response.payload["reread_required"] is True
-    assert response.payload["cache_refreshed"] is True
-    assert "issue.md" in "\n".join(response.payload["reread_paths"])
-    assert events == ["freshness", "refresh"]
 
 
 def test_github_issue_create_inline_refreshes_cache(

@@ -181,14 +181,23 @@ class GitHubIssueNativeProvider(IssueProvider):
 
     def update(self, request: ProviderRequest) -> Mapping[str, Any]:
         issue = _required_payload_value(request, "issue")
-        if _truthy(request.payload.get("from_cache")) or _truthy(request.payload.get("cache_write_back")):
-            return self._update_from_cache(request, issue)
-
         title = request.payload.get("title")
         body = request.payload.get("body")
         labels = request.payload.get("labels")
-        if title is None and body is None and labels is None:
-            raise ProviderOperationError("GitHub issue update requires from_cache or at least one of title, body, labels")
+        state = _optional_string(request.payload.get("state"))
+        state_reason = _optional_string(
+            request.payload.get("state_reason") or request.payload.get("stateReason")
+        )
+        normalized_state = state.lower() if state is not None else None
+        if normalized_state is not None and normalized_state not in {"open", "closed"}:
+            raise ProviderOperationError(
+                f"unsupported GitHub issue state for update: {state}"
+            )
+        if title is None and body is None and labels is None and normalized_state is None:
+            raise ProviderOperationError(
+                "GitHub issue update requires at least one of body, title, labels, state"
+            )
+
         issue_number = normalize_issue_number(issue)
         repo = resolve_github_repository(request.context.project, runner=self.runner)
         cache = GitHubIssueCache.for_project(request.context.project, configured_repo=repo)
@@ -222,70 +231,16 @@ class GitHubIssueNativeProvider(IssueProvider):
             project=request.context.project,
             runner=self.runner,
         )
-        refreshed = view_issue(issue_number, project=request.context.project, runner=self.runner)
-        write_result = cache.write_issue_bundle(
-            repo,
-            self._payload_with_relationship_projection(
-                request,
-                issue=issue_number,
-                payload=refreshed,
-            ),
-        )
-        return {
-            "operation": "update_issue",
-            "issue": issue_number,
-            "verified": bool(edited.get("verified")),
-            "edit": dict(edited),
-            "cache_refreshed": True,
-            "cache": write_result.to_json(),
-        }
-
-    def _update_from_cache(self, request: ProviderRequest, issue: Any) -> Mapping[str, Any]:
-        issue_number = normalize_issue_number(issue)
-        repo = resolve_github_repository(request.context.project, runner=self.runner)
-        cache = GitHubIssueCache.for_project(request.context.project, configured_repo=repo)
-        projection = cache.read_issue(
-            repo,
-            issue_number,
-            include_body=True,
-            include_comments=False,
-            include_relationships=False,
-        )
-        try:
-            provider_current = self._require_cached_issue_write_freshness(request, repo, cache, issue_number)
-        except ProviderFreshnessError as exc:
-            return self._stale_cache_block_payload(
-                request=request,
-                repo=repo,
-                cache=cache,
-                issue_number=issue_number,
-                operation="update_issue_from_cache",
-                target="issue",
-                error=exc,
-            )
-        current_labels = tuple(_string_list(provider_current.get("labels")))
-
-        edited = edit_issue(
-            issue_number,
-            title=str(projection.get("title") or ""),
-            body=str(projection.get("body") or ""),
-            labels=tuple(_string_list(projection.get("labels"))),
-            current_labels=current_labels,
-            project=request.context.project,
-            runner=self.runner,
-        )
 
         state_result: Mapping[str, Any] | None = None
-        desired_state = str(projection.get("state") or "").upper()
-        current_state = str(provider_current.get("state") or "").upper()
-        if desired_state == "CLOSED" and current_state != "CLOSED":
+        if normalized_state == "closed":
             state_result = close_issue(
                 issue_number,
                 project=request.context.project,
-                reason=_close_reason_from_state_reason(projection.get("stateReason")),
+                reason=_close_reason_from_state_reason(state_reason) if state_reason else "completed",
                 runner=self.runner,
             )
-        elif desired_state == "OPEN" and current_state != "OPEN":
+        elif normalized_state == "open":
             state_result = reopen_issue(
                 issue_number,
                 project=request.context.project,
@@ -302,10 +257,11 @@ class GitHubIssueNativeProvider(IssueProvider):
             ),
         )
         return {
-            "operation": "update_issue_from_cache",
+            "operation": "update_issue",
             "issue": issue_number,
             "verified": bool(edited.get("verified")) and (state_result is None or bool(state_result.get("verified"))),
             "edit": dict(edited),
+            "state_changed": state_result is not None,
             "state": dict(state_result) if state_result is not None else None,
             "cache_refreshed": True,
             "cache": write_result.to_json(),
@@ -910,40 +866,6 @@ class GitHubIssueNativeProvider(IssueProvider):
             )
         except WorkflowFreshnessConflict as exc:
             raise ProviderFreshnessError(str(exc), result=exc.result) from exc
-
-    def _require_cached_issue_write_freshness(
-        self,
-        request: ProviderRequest,
-        repo: GitHubRepository,
-        cache: GitHubIssueCache,
-        issue_number: str,
-    ) -> Mapping[str, Any]:
-        artifact = f"GitHub issue #{issue_number} issue"
-        try:
-            metadata = cache.read_freshness_metadata(repo, issue_number, target="issue")
-        except WorkflowCacheError:
-            metadata = FreshnessMetadata(
-                source_updated_at=None,
-                fetched_at=None,
-                path=cache.freshness_file(repo, issue_number, "issue"),
-                target="issue",
-            )
-
-        provider_current = view_issue(
-            issue_number,
-            project=request.context.project,
-            fields=("number", "updatedAt", "labels", "state", "stateReason"),
-            runner=self.runner,
-        )
-        try:
-            require_provider_freshness(
-                metadata,
-                provider_updated_at=_optional_string(provider_current.get("updatedAt")),
-                artifact=artifact,
-            )
-        except WorkflowFreshnessConflict as exc:
-            raise ProviderFreshnessError(str(exc), result=exc.result) from exc
-        return provider_current
 
     def _provider_freshness_timestamp(
         self,

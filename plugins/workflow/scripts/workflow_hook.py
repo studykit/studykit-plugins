@@ -251,48 +251,16 @@ def provider_cache_body_write_reason(target: EditTarget, config: WorkflowConfig)
     if target.content is None:
         return None
 
-    try:
-        current_content = target.path.read_text(encoding="utf-8")
-    except OSError as exc:
-        return (
-            "workflow cache protection blocked a provider cache issue body write "
-            "because the existing projection could not be read.\n\n"
-            f"Target: {target.path}\n"
-            f"Reason: {exc}"
-        )
-
-    current_frontmatter = leading_frontmatter_block(current_content)
-    proposed_frontmatter = leading_frontmatter_block(target.content)
-    if current_frontmatter is None:
-        return (
-            "workflow cache protection blocked a provider cache issue body write "
-            "because the existing projection is missing provider frontmatter.\n\n"
-            f"Target: {target.path}\n\n"
-            "Ask `workflow-operator` to refresh the cache projection before editing."
-        )
-    if proposed_frontmatter != current_frontmatter:
-        return (
-            "workflow cache protection blocked a provider cache issue body write "
-            "because provider frontmatter is projection-owned.\n\n"
-            f"Target: {target.path}\n\n"
-            "Keep the existing YAML frontmatter byte-for-byte and edit only the "
-            "Markdown body below it. Ask `workflow-operator` to prepare or refresh "
-            "the projection when provider metadata needs to change."
-        )
-
-    return None
-
-
-def leading_frontmatter_block(content: str) -> str | None:
-    """Return the leading YAML frontmatter block, including delimiters."""
-
-    lines = content.splitlines(keepends=True)
-    if not lines or lines[0].strip() != "---":
-        return None
-    for index, line in enumerate(lines[1:], start=1):
-        if line.strip() in {"---", "..."}:
-            return "".join(lines[: index + 1])
-    return None
+    return (
+        "workflow cache protection blocked a provider cache issue body write "
+        "because the projection is read-only; use the body-file flow.\n\n"
+        f"Target: {target.path}\n\n"
+        "Cache projections are owned by `workflow-operator`. Write the new body "
+        "or comment to a caller-chosen temp file and hand the path to the "
+        "matching workflow CLI (`$ISSUE_WRITEBACK update --body-file`, "
+        "`$ISSUE_COMMENTS append --body-file`) instead of editing the cached "
+        "file in place."
+    )
 
 
 def _ordered_issue_union(*groups: list[str], issue_id_format: str = "github") -> list[str]:
