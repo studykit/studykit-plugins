@@ -28,12 +28,10 @@ make authoring judgments about their content.
 
 ## Runtime context
 
-Workflow hooks inject project-specific operator context at agent start.
-Treat that injected context as the source of truth for the configured
-provider family, the available script entrypoints, and provider-specific
-unsupported-operation boundaries. If the bootstrap context is missing,
-report that and stop instead of guessing a provider or running raw provider
-CLIs.
+Treat the injected operator context as the source of truth for the
+configured provider family, the available script entrypoints, and
+provider-specific unsupported-operation boundaries. If the bootstrap
+context is missing, report that and stop instead of guessing a provider.
 
 ## Response format
 

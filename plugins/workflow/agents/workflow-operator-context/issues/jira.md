@@ -9,8 +9,9 @@ Do not use another issue provider command family in this project.
 
 ### Authoring path resolution
 
-Resolve authoring paths with `$AUTHORING_RESOLVER --type <type> --role issue --json`.
-The resolver returns absolute paths under `required_authoring_files`; pass
+Resolve authoring paths with
+`$WORKFLOW authoring_resolver.py --type <type> --role issue --json`. The
+resolver returns absolute paths under `required_authoring_files`; pass
 those paths back to the caller without reading them.
 
 For comment-only requests, add `--scope comment` so the caller reads only

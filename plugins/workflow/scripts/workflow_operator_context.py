@@ -23,8 +23,8 @@ _SUPPORTED_PROVIDER_FRAGMENTS = {
     "issues": {"github", "jira", "filesystem"},
     "knowledge": {"github", "confluence", "filesystem"},
 }
-_BOOTSTRAP_FRAGMENT_BY_RUNTIME = {
-    "claude": "bootstrap.md",
+_BOOTSTRAP_FRAGMENT_BY_RUNTIME: dict[str, str | None] = {
+    "claude": None,
     "codex": "bootstrap-codex.md",
 }
 
@@ -40,19 +40,19 @@ def agent_name_matches_operator(name: str | None) -> bool:
 def build_operator_session_context(config: Any, *, runtime: str) -> str:
     """Build project-specific operator bootstrap context for SessionStart."""
 
-    bootstrap_name = _BOOTSTRAP_FRAGMENT_BY_RUNTIME.get(runtime)
-    if bootstrap_name is None:
+    if runtime not in _BOOTSTRAP_FRAGMENT_BY_RUNTIME:
         raise WorkflowOperatorContextError(
             f"unsupported workflow operator runtime: {runtime!r}"
         )
+    bootstrap_name = _BOOTSTRAP_FRAGMENT_BY_RUNTIME[runtime]
     issue_kind = _provider_kind(config, "issues")
     knowledge_kind = _provider_kind(config, "knowledge")
-    fragments = [
-        _render_fragment(bootstrap_name),
-        _provider_fragment("issues", issue_kind),
-        _provider_fragment("knowledge", knowledge_kind),
-        _render_fragment("response-boundary.md"),
-    ]
+    fragments: list[str] = []
+    if bootstrap_name is not None:
+        fragments.append(_render_fragment(bootstrap_name))
+    fragments.append(_provider_fragment("issues", issue_kind))
+    fragments.append(_provider_fragment("knowledge", knowledge_kind))
+    fragments.append(_render_fragment("response-boundary.md"))
     return "\n\n".join(fragment.strip() for fragment in fragments if fragment.strip())
 
 
