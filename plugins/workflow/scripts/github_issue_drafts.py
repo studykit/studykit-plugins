@@ -32,15 +32,9 @@ def publish_issue(
     labels: tuple[str, ...] = (),
     state: str = "open",
     state_reason: str | None = None,
-    confirm_provider_create: bool = False,
     runner: CommandRunner | None = None,
 ) -> dict[str, object]:
     """Create a GitHub issue from an opaque caller-owned body file."""
-
-    if not confirm_provider_create:
-        raise GitHubIssueDraftError(
-            "provider issue creation requires --confirm-provider-create after explicit user approval"
-        )
 
     config = _load_github_issue_config(project)
     artifact_type = _required_text(artifact_type, "artifact type")
@@ -133,11 +127,6 @@ def build_parser() -> argparse.ArgumentParser:
         required=True,
         help="path to the opaque body content file (no frontmatter)",
     )
-    publish.add_argument(
-        "--confirm-provider-create",
-        action="store_true",
-        help="confirm that the user explicitly approved creating a provider issue",
-    )
 
     for child in subparsers.choices.values():
         child.add_argument("--json", action="store_true", help=argparse.SUPPRESS)
@@ -166,7 +155,6 @@ def main(
                 labels=tuple(args.label),
                 state=args.state,
                 state_reason=args.state_reason,
-                confirm_provider_create=args.confirm_provider_create,
                 runner=runner,
             )
         else:

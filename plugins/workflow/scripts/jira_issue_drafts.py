@@ -34,15 +34,9 @@ def publish_issue(
     issue_type: str | None = None,
     subtask_parent: str | None = None,
     project_key: str | None = None,
-    confirm_provider_create: bool = False,
     runner: CommandRunner | None = None,
 ) -> dict[str, object]:
     """Create a Jira issue from an opaque caller-owned body file."""
-
-    if not confirm_provider_create:
-        raise JiraIssueDraftError(
-            "provider issue creation requires --confirm-provider-create after explicit user approval"
-        )
 
     config = _load_jira_issue_config(project)
     artifact_type = _required_text(artifact_type, "artifact type")
@@ -153,11 +147,6 @@ def build_parser() -> argparse.ArgumentParser:
         required=True,
         help="path to the opaque body content file (no frontmatter)",
     )
-    publish.add_argument(
-        "--confirm-provider-create",
-        action="store_true",
-        help="confirm that the user explicitly approved creating a provider issue",
-    )
 
     for child in subparsers.choices.values():
         child.add_argument("--json", action="store_true", help=argparse.SUPPRESS)
@@ -187,7 +176,6 @@ def main(
                 issue_type=args.issue_type,
                 subtask_parent=args.subtask_parent,
                 project_key=args.project_key,
-                confirm_provider_create=args.confirm_provider_create,
                 runner=runner,
             )
         else:

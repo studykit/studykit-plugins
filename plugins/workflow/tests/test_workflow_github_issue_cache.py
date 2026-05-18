@@ -76,13 +76,30 @@ def external_repo() -> GitHubRepository:
     return GitHubRepository(host="github.com", owner="other", name="repo")
 
 
-def test_github_issue_cache_body_path_recognizer_matches_issue_body_layouts(tmp_path: Path) -> None:
+def test_github_issue_cache_body_path_recognizer_matches_issue_and_comment_layouts(tmp_path: Path) -> None:
     configured_issue = tmp_path / ".workflow-cache" / "issues" / "39" / "issue.md"
+    configured_comment = tmp_path / ".workflow-cache" / "issues" / "39" / "comment-2026-05-13T112053Z-4440388606.md"
     external_issue = tmp_path / ".workflow-cache" / "github.com" / "other" / "repo" / "issues" / "39" / "issue.md"
+    external_comment = (
+        tmp_path
+        / ".workflow-cache"
+        / "github.com"
+        / "other"
+        / "repo"
+        / "issues"
+        / "39"
+        / "comment-2026-05-13T112053Z-4440388606.md"
+    )
 
     assert is_github_issue_cache_body_path(configured_issue, tmp_path)
+    assert is_github_issue_cache_body_path(configured_comment, tmp_path)
     assert is_github_issue_cache_body_path(external_issue, tmp_path)
+    assert is_github_issue_cache_body_path(external_comment, tmp_path)
     assert not is_github_issue_cache_body_path(configured_issue.with_name("metadata.yml"), tmp_path)
+    assert not is_github_issue_cache_body_path(configured_issue.with_name("notes.md"), tmp_path)
+    assert not is_github_issue_cache_body_path(
+        tmp_path / ".workflow-cache" / "issues" / "39" / "comments" / "any.md", tmp_path
+    )
     assert not is_github_issue_cache_body_path(
         tmp_path / ".workflow-cache" / "issues-pending" / "draft-1" / "issue.md", tmp_path
     )
@@ -143,7 +160,7 @@ def test_gitignore_excludes_workflow_cache_root() -> None:
     assert "/.workflow-cache/" in (_REPO_ROOT / ".gitignore").read_text(encoding="utf-8")
 
 
-def test_github_issue_cache_writes_minimal_markdown_comment_index_and_relationships(tmp_path: Path) -> None:
+def test_github_issue_cache_writes_flat_layout_with_frontmatter_freshness(tmp_path: Path) -> None:
     cache = GitHubIssueCache.for_project(tmp_path)
 
     write = cache.write_issue_bundle(repo(), issue_payload(), fetched_at="2026-05-13T12:34:56Z")
@@ -151,32 +168,28 @@ def test_github_issue_cache_writes_minimal_markdown_comment_index_and_relationsh
     assert write.issue_dir == tmp_path / ".workflow-cache" / "issues" / "39"
     issue_text = write.issue_file.read_text(encoding="utf-8")
     assert "title: Add local cache for workflow provider reads" in issue_text
-    assert "source_updated_at:" in issue_text
-    assert "2026-05-13T12:00:00Z" in issue_text
-    assert "fetched_at:" not in issue_text
-    assert "provider:" not in issue_text
-    assert "# Issue" not in issue_text
-    assert "relationships:\n  current:\n    parent: 28" in issue_text
+    assert "source_updated_at: '2026-05-13T12:00:00Z'" in issue_text
+    assert "fetched_at: '2026-05-13T12:34:56Z'" in issue_text
+    assert "relationships:\n  source_updated_at:" in issue_text
+    assert "current:\n    parent: 28" in issue_text
     assert "children:\n    - 41" in issue_text
     assert "blocked_by:\n      - 32" in issue_text
-    assert "number:" not in issue_text
+    assert "comments:\n  source_updated_at:" in issue_text
+    assert "# Issue" not in issue_text
     assert issue_text.endswith("Raw issue body.")
 
-    metadata_text = write.metadata_file.read_text(encoding="utf-8")
-    assert "source_updated_at: 2026-05-13T12:00:00Z" in metadata_text
-    assert "fetched_at: 2026-05-13T12:34:56Z" in metadata_text
+    assert not (write.issue_dir / "metadata.yml").exists()
+    assert not (write.issue_dir / "comments").exists()
+    assert not (write.issue_dir / "comments-pending").exists()
 
-    index_text = write.comments_index.read_text(encoding="utf-8")
-    assert "provider_comment_id: 4440388606" in index_text
-    assert "provider_node_id: IC_kwDOQplzFM8AAAABCKrz_g" in index_text
-    assert "created_at:" not in index_text
-    assert "preview:" not in index_text
-
-    comment_file = write.comments_index.parent / "2026-05-13T112053Z-4440388606.md"
+    comment_file = write.issue_dir / "comment-2026-05-13T112053Z-4440388606.md"
+    assert comment_file.is_file()
     comment_text = comment_file.read_text(encoding="utf-8")
     assert "author: studykit" in comment_text
+    assert "provider_comment_id: '4440388606'" in comment_text
+    assert "provider_node_id: IC_kwDOQplzFM8AAAABCKrz_g" in comment_text
+    assert "created_at: '2026-05-13T11:20:53Z'" in comment_text
     assert "updated_at: '2026-05-13T11:21:00Z'" in comment_text
-    assert "provider_comment_id" not in comment_text
     assert comment_text.endswith("Raw provider comment body.")
 
     relationships = cache.read_relationships(repo(), 39)
@@ -189,18 +202,17 @@ def test_github_issue_cache_writes_minimal_markdown_comment_index_and_relationsh
 def test_github_issue_cache_preserves_comments_when_provider_payload_omits_comments(tmp_path: Path) -> None:
     cache = GitHubIssueCache.for_project(tmp_path)
     initial = cache.write_issue_bundle(repo(), issue_payload(), fetched_at="2026-05-13T12:34:56Z")
-    initial_index = initial.comments_index.read_text(encoding="utf-8")
-    comment_file = initial.comments_index.parent / "2026-05-13T112053Z-4440388606.md"
+    comment_file = initial.issue_dir / "comment-2026-05-13T112053Z-4440388606.md"
     assert comment_file.is_file()
+    initial_comment_text = comment_file.read_text(encoding="utf-8")
 
     payload = issue_payload(body="Body from targeted read.", updated_at="2026-05-13T13:00:00Z")
     payload.pop("comments")
     write = cache.write_issue_bundle(repo(), payload, fetched_at="2026-05-13T13:01:00Z")
 
-    assert write.comments_index == initial.comments_index
+    assert write.issue_dir == initial.issue_dir
     assert write.issue_file.read_text(encoding="utf-8").endswith("Body from targeted read.")
-    assert write.comments_index.read_text(encoding="utf-8") == initial_index
-    assert comment_file.read_text(encoding="utf-8").endswith("Raw provider comment body.")
+    assert comment_file.read_text(encoding="utf-8") == initial_comment_text
 
 
 def test_github_issue_cache_writes_project_membership_status_to_frontmatter(tmp_path: Path) -> None:
@@ -263,37 +275,6 @@ def test_configured_repo_cache_is_shallow_and_external_repo_cache_is_namespaced(
     )
 
 
-def test_pending_issue_comments_parse_frontmatter_and_raw_body(tmp_path: Path) -> None:
-    cache = GitHubIssueCache.for_project(tmp_path, configured_repo=repo())
-    pending_dir = cache.comments_pending_dir(repo(), 39)
-    pending_dir.mkdir(parents=True)
-    pending_path = pending_dir / "2026-05-14T000000Z-local.md"
-    pending_path.write_text(
-        """---
-schema_version: 1
-author: local
----
-
-Raw provider comment body.
-""",
-        encoding="utf-8",
-    )
-
-    comments = cache.read_pending_issue_comments(repo(), 39)
-
-    assert len(comments) == 1
-    assert comments[0].target_kind == "issue"
-    assert comments[0].target_id == "39"
-    assert comments[0].file_name == "2026-05-14T000000Z-local.md"
-    assert comments[0].body == "Raw provider comment body.\n"
-
-    removed = cache.remove_pending_issue_comments(repo(), 39, comments)
-
-    assert removed == [pending_path]
-    assert not pending_path.exists()
-    assert not pending_dir.exists()
-
-
 def test_pending_issue_relationships_parse_operations_and_remove_frontmatter(tmp_path: Path) -> None:
     cache = GitHubIssueCache.for_project(tmp_path, configured_repo=repo())
     cache.write_issue_bundle(repo(), issue_payload())
@@ -328,8 +309,8 @@ def test_pending_issue_relationships_parse_operations_and_remove_frontmatter(tmp
 def test_cache_read_can_skip_raw_markdown_bodies(tmp_path: Path) -> None:
     cache = GitHubIssueCache.for_project(tmp_path)
     write = cache.write_issue_bundle(repo(), issue_payload(), fetched_at="2026-05-13T12:34:56Z")
-    comment_file = write.comments_index.parent / "2026-05-13T112053Z-4440388606.md"
-    comment_file.unlink()
+    comment_file = write.issue_dir / "comment-2026-05-13T112053Z-4440388606.md"
+    assert comment_file.is_file()
 
     cached = cache.read_issue(repo(), 39, include_body=False, include_comments=True, include_relationships=False)
 
@@ -338,17 +319,25 @@ def test_cache_read_can_skip_raw_markdown_bodies(tmp_path: Path) -> None:
     assert cached["comments"][0]["id"] == "4440388606"
 
 
-def test_issue_freshness_metadata_is_read_from_internal_metadata_file(tmp_path: Path) -> None:
+def test_freshness_metadata_reads_from_issue_frontmatter(tmp_path: Path) -> None:
     cache = GitHubIssueCache.for_project(tmp_path)
     write = cache.write_issue_bundle(repo(), issue_payload(), fetched_at="2026-05-13T12:34:56Z")
 
-    metadata = cache.read_freshness_metadata(repo(), 39, target="issue")
+    issue_meta = cache.read_freshness_metadata(repo(), 39, target="issue")
+    comments_meta = cache.read_freshness_metadata(repo(), 39, target="comments")
+    relationships_meta = cache.read_freshness_metadata(repo(), 39, target="relationships")
     cached = cache.read_issue(repo(), 39, include_body=False, include_comments=False, include_relationships=False)
 
-    assert metadata.path == write.metadata_file
-    assert metadata.source_updated_at == "2026-05-13T12:00:00Z"
-    assert metadata.fetched_at == "2026-05-13T12:34:56Z"
-    assert cached["cache"]["metadata_file"] == str(write.metadata_file)
+    assert issue_meta.path == write.issue_file
+    assert issue_meta.source_updated_at == "2026-05-13T12:00:00Z"
+    assert issue_meta.fetched_at == "2026-05-13T12:34:56Z"
+    assert comments_meta.path == write.issue_file
+    assert comments_meta.fetched_at == "2026-05-13T12:34:56Z"
+    assert comments_meta.source_updated_at == "2026-05-13T11:21:00Z"
+    assert relationships_meta.path == write.issue_file
+    assert relationships_meta.fetched_at == "2026-05-13T12:34:56Z"
+    assert relationships_meta.source_updated_at == "2026-05-13T12:00:00Z"
+    assert cached["cache"]["issue_file"] == str(write.issue_file)
     assert cached["cache"]["fetchedAt"] == "2026-05-13T12:34:56Z"
 
 
