@@ -189,11 +189,15 @@ class JiraDataCenterIssueNativeProvider(IssueProvider):
             request.payload.get("pending_local_id") or request.payload.get("local_id")
         )
 
+        draft_issue_type = None
+        draft_subtask_parent = None
         if pending_local_id:
             draft = cache.read_pending_issue_draft(site, pending_local_id)
             title = draft.title
             body = draft.body
             labels = draft.labels
+            draft_issue_type = draft.issue_type
+            draft_subtask_parent = draft.subtask_parent
         else:
             title = str(_required_payload_value(request, "title"))
             body = str(_required_payload_value(request, "body"))
@@ -201,8 +205,13 @@ class JiraDataCenterIssueNativeProvider(IssueProvider):
 
         title = _jira_issue_title(request, title)
         project_key = _optional_string(request.payload.get("project") or request.payload.get("project_key")) or site.project
+        explicit_issue_type = _optional_string(
+            request.payload.get("jira_issue_type") or request.payload.get("provider_issue_type")
+        )
         issue_type = (
-            _jira_artifact_issue_type(request)
+            explicit_issue_type
+            or draft_issue_type
+            or _jira_artifact_issue_type(request)
             or _optional_string(request.payload.get("issue_type") or request.payload.get("issuetype"))
             or site.issue_type
         )
@@ -210,6 +219,9 @@ class JiraDataCenterIssueNativeProvider(IssueProvider):
             raise ProviderOperationError("Jira issue create requires provider project or payload.project")
         if not issue_type:
             raise ProviderOperationError("Jira issue create requires provider issue_type or payload.issue_type")
+        subtask_parent_key = _jira_create_subtask_parent_key(request, draft_subtask_parent)
+        if subtask_parent_key and not _is_jira_subtask_issue_type(issue_type):
+            raise ProviderOperationError("Jira subtask_parent can only be used when issue_type is Sub-task")
 
         created = create_issue(
             site,
@@ -218,14 +230,16 @@ class JiraDataCenterIssueNativeProvider(IssueProvider):
             title=title,
             body=body,
             labels=labels,
+            subtask_parent_key=subtask_parent_key,
             runner=self.runner,
         )
         issue_key = normalize_jira_issue_key(created.get("key") or created.get("issue") or "")
         write_result = self._refresh_cache(site, cache, issue_key)
+        parent_write_result = self._refresh_cache(site, cache, subtask_parent_key) if subtask_parent_key else None
         pending_result = None
         if pending_local_id:
             pending_result = cache.finalize_pending_issue_creation(site, pending_local_id, issue_key)
-        return {
+        payload: dict[str, Any] = {
             "operation": "create_issue",
             "issue": issue_key,
             "key": issue_key,
@@ -236,6 +250,11 @@ class JiraDataCenterIssueNativeProvider(IssueProvider):
             "pending_finalized": pending_result is not None,
             "pending": pending_result,
         }
+        if subtask_parent_key:
+            payload["subtask_parent"] = subtask_parent_key
+            payload["parent_cache_refreshed"] = True
+            payload["parent_cache"] = parent_write_result
+        return payload
 
     def update(self, request: ProviderRequest) -> Mapping[str, Any]:
         issue_key = normalize_jira_issue_key(_required_payload_value(request, "issue"))
@@ -658,6 +677,7 @@ def create_issue(
     title: str,
     body: str,
     labels: tuple[str, ...] = (),
+    subtask_parent_key: str | None = None,
     runner: CommandRunner | None = None,
 ) -> Mapping[str, Any]:
     payload: dict[str, Any] = {
@@ -670,6 +690,8 @@ def create_issue(
     }
     if labels:
         payload["fields"]["labels"] = list(labels)
+    if subtask_parent_key:
+        payload["fields"]["parent"] = {"key": subtask_parent_key}
     result = jira_send_json(site, "POST", f"/rest/api/{site.api_version}/issue", payload, runner=runner)
     if not isinstance(result, Mapping):
         raise JiraProviderError("Jira create issue response was not an object")
@@ -838,6 +860,26 @@ def _is_spike_request(request: ProviderRequest) -> bool:
 
 def _jira_artifact_issue_type(request: ProviderRequest) -> str | None:
     return JIRA_ARTIFACT_ISSUE_TYPES.get(request.context.artifact_type.strip().lower())
+
+
+def _jira_create_subtask_parent_key(request: ProviderRequest, draft_subtask_parent: str | None) -> str | None:
+    raw_parent = draft_subtask_parent
+    for key in ("subtask_parent", "subtask_parent_key", "subtaskParent", "subtaskParentKey"):
+        if request.payload.get(key) is not None:
+            raw_parent = str(request.payload[key])
+            break
+    parent = _optional_string(raw_parent)
+    if parent is None:
+        return None
+    try:
+        return normalize_jira_issue_key(parent)
+    except JiraProviderError as exc:
+        raise ProviderOperationError(f"invalid Jira subtask_parent: {exc}") from exc
+
+
+def _is_jira_subtask_issue_type(issue_type: str) -> bool:
+    normalized = issue_type.strip().lower().replace("-", "").replace("_", "").replace(" ", "")
+    return normalized in {"subtask", "subissue"}
 
 
 def _jira_issue_title(request: ProviderRequest, title: str) -> str:

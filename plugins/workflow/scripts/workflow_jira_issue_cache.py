@@ -40,7 +40,7 @@ from workflow_jira_issue_relationships import (
     filter_jira_payload,
     normalize_jira_data_center_issue,
 )
-from workflow_jira_issue_refs import normalize_jira_issue_key
+from workflow_jira_issue_refs import JiraProviderError, normalize_jira_issue_key
 from workflow_jira_issue_snapshot import render_jira_snapshot
 
 
@@ -144,6 +144,10 @@ class JiraDataCenterIssueCache:
             labels=tuple(_label_names(frontmatter.get("labels"))),
             state=str(frontmatter.get("state") or "open").strip().lower(),
             state_reason=_normalize_optional(frontmatter.get("state_reason") or frontmatter.get("stateReason")),
+            issue_type=_normalize_optional(
+                frontmatter.get("issue_type") or frontmatter.get("issueType") or frontmatter.get("issuetype")
+            ),
+            subtask_parent=_normalize_draft_subtask_parent(frontmatter, path),
         )
 
     def read_pending_issue_comments(self, site: JiraDataCenterSite, issue_key: str) -> list[PendingIssueComment]:
@@ -439,6 +443,22 @@ def _normalize_optional(value: Any) -> str | None:
         return None
     text = str(value).strip()
     return text or None
+
+
+def _normalize_draft_subtask_parent(frontmatter: Mapping[str, Any], path: Path) -> str | None:
+    raw_parent = (
+        frontmatter.get("subtask_parent")
+        or frontmatter.get("subtask_parent_key")
+        or frontmatter.get("subtaskParent")
+        or frontmatter.get("subtaskParentKey")
+    )
+    parent = _normalize_optional(raw_parent)
+    if parent is None:
+        return None
+    try:
+        return normalize_jira_issue_key(parent)
+    except JiraProviderError as exc:
+        raise WorkflowCacheCorrupt(f"Jira pending issue draft has invalid subtask_parent key: {path}: {exc}") from exc
 
 
 def _utc_now() -> str:

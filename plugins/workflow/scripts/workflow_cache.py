@@ -53,9 +53,11 @@ class PendingIssueDraft:
     labels: tuple[str, ...] = ()
     state: str = "open"
     state_reason: str | None = None
+    issue_type: str | None = None
+    subtask_parent: str | None = None
 
     def to_json(self) -> dict[str, Any]:
-        return {
+        result: dict[str, Any] = {
             "local_id": self.local_id,
             "path": str(self.path),
             "title": self.title,
@@ -63,6 +65,11 @@ class PendingIssueDraft:
             "state": self.state,
             "state_reason": self.state_reason,
         }
+        if self.issue_type is not None:
+            result["issue_type"] = self.issue_type
+        if self.subtask_parent is not None:
+            result["subtask_parent"] = self.subtask_parent
+        return result
 
 
 @dataclass(frozen=True)
