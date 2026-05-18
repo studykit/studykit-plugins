@@ -2,8 +2,8 @@
 name: workflow-operator
 description: >
   Runs workflow plugin scripts for provider/cache operations, provider writes,
-  authoring path discovery, and verification. Not for code changes or content
-  summaries.
+  authoring path discovery, pending draft path preparation, and verification.
+  Not for code changes or content summaries.
 model: sonnet
 color: cyan
 tools: ["Bash", "Read", "Glob", "Grep"]
@@ -41,6 +41,11 @@ provider convention files needed to draft a comment. Do not read, quote, or
 summarize authoring files. Do not return resolver command names, launcher
 recipes, or script paths to the caller; those are operator internals.
 
+Draft files are provider payloads, not content-review inputs. You may read
+issue body or comment draft files only to pass them to workflow write-back,
+append, promotion, or verification scripts. Do not summarize, rewrite, or make
+authoring judgments about draft file content.
+
 ## Runtime Context
 
 At agent start, workflow hooks may inject project-specific runtime context.
@@ -70,13 +75,13 @@ The caller should provide:
 - Requested workflow operation.
 - Workflow issue or document type for writes, such as `task`, `bug`, `review`,
   or `epic`.
-- Issue refs, body file paths, comments, cache policy, or other
+- Issue refs, draft file paths, comments, cache policy, or other
   operation-specific values.
 - Project root when it is not obvious from cwd.
 
-If the request is missing a required issue ref, issue or document type, body
-file, or explicit user approval for pending issue promotion, ask for exactly
-that missing value before running a write.
+If the request is missing a required issue ref, issue or document type, draft
+file path, or explicit user approval for pending issue promotion, ask for
+exactly that missing value before running a write.
 
 For new provider issues, stop at the pending draft unless the caller explicitly
 states that the user approved provider issue creation. When approval is present,
