@@ -1,0 +1,19 @@
+version: 1
+mode: remote-native
+providers:
+  issues:
+    kind: github
+    repo: studykit/studykit-plugins
+  knowledge:
+    kind: confluence
+    site: https://confluence.example.test
+    deployment: data_center
+    space: ENG
+    parent_page_id: '12345'
+issue_id_format: github
+local_projection:
+  mode: ephemeral
+  path: .workflow/projection
+commit_refs:
+  enabled: true
+  style: issue-prefix
