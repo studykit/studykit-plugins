@@ -785,23 +785,11 @@ def test_github_issue_lifecycle_close_checks_freshness_and_refreshes_cache(
     assert events == ["freshness", "close", "verify", "refresh"]
 
 
-def test_github_issue_add_comment_from_pending_files_dispatches_and_refreshes_cache(
+def test_github_issue_add_comment_inline_body_dispatches_and_refreshes_cache(
     tmp_path: Path,
 ) -> None:
     cache = GitHubIssueCache.for_project(tmp_path, configured_repo=github_repo())
     cache.write_issue_bundle(github_repo(), cached_issue_payload(), fetched_at="2026-05-14T00:00:00Z")
-    pending_dir = cache.comments_pending_dir(github_repo(), 39)
-    pending_dir.mkdir(parents=True)
-    pending_file = pending_dir / "2026-05-14T000000Z-local.md"
-    pending_file.write_text(
-        """---
-schema_version: 1
----
-
-Pending comment body.
-""",
-        encoding="utf-8",
-    )
     events: list[str] = []
 
     def runner(request: CommandRequest) -> CommandResult:
@@ -811,8 +799,15 @@ Pending comment body.
                 returncode=0,
                 stdout="git@github.com:studykit/studykit-plugins.git\n",
             )
+        if request.args == gh_issue_freshness_args(39):
+            events.append("freshness-issue")
+            return CommandResult(
+                request=request,
+                returncode=0,
+                stdout=json.dumps({"number": 39, "updatedAt": "2026-05-13T12:00:00Z"}),
+            )
         if request.args == gh_issue_view_args(39, "number,updatedAt,comments"):
-            events.append("freshness")
+            events.append("freshness-comments")
             return CommandResult(
                 request=request,
                 returncode=0,
@@ -821,13 +816,27 @@ Pending comment body.
         if request.args[:3] == ("gh", "issue", "comment"):
             events.append("comment")
             body_file = Path(request.args[request.args.index("--body-file") + 1])
-            assert body_file.read_text(encoding="utf-8") == "Pending comment body.\n"
-            assert events == ["freshness", "comment"]
+            assert body_file.read_text(encoding="utf-8") == "Inline comment body.\n"
+            assert events == ["freshness-issue", "freshness-comments", "comment"]
             return CommandResult(request=request, returncode=0)
         if request.args == gh_issue_view_args(39, ",".join(DEFAULT_ISSUE_FIELDS)):
             events.append("refresh")
             return CommandResult(request=request, returncode=0, stdout=json.dumps(commented_issue_payload()))
-        return CommandResult(request=request, returncode=127, stderr="unexpected command")
+        if request.args == gh_api_args("repos/studykit/studykit-plugins/issues/39"):
+            return CommandResult(
+                request=request,
+                returncode=0,
+                stdout=json.dumps({"id": 3900, "number": 39, "updated_at": "2026-05-14T00:10:00Z"}),
+            )
+        if request.args == gh_api_args("repos/studykit/studykit-plugins/issues/39/parent"):
+            return CommandResult(request=request, returncode=404, stderr="not found")
+        if request.args in {
+            gh_api_args("repos/studykit/studykit-plugins/issues/39/sub_issues", "--paginate"),
+            gh_api_args("repos/studykit/studykit-plugins/issues/39/dependencies/blocked_by", "--paginate"),
+            gh_api_args("repos/studykit/studykit-plugins/issues/39/dependencies/blocking", "--paginate"),
+        }:
+            return CommandResult(request=request, returncode=0, stdout="[]")
+        return CommandResult(request=request, returncode=127, stderr=f"unexpected command: {request.args}")
 
     dispatcher = ProviderDispatcher(default_provider_registry(runner=runner))
 
@@ -837,31 +846,25 @@ Pending comment body.
             kind="github",
             operation="add_comment",
             context=ProviderContext(project=tmp_path, artifact_type="task", session_id="s1"),
-            payload={"issue": 39, "from_pending": True},
+            payload={"issue": 39, "body": "Inline comment body.\n"},
         )
     )
 
-    assert response.payload["operation"] == "append_pending_comments"
+    assert response.payload["operation"] == "append_comment"
     assert response.payload["issue"] == "39"
-    assert response.payload["appended"] == 1
+    assert response.payload["state_changed"] is False
     assert response.payload["cache_refreshed"] is True
-    assert response.payload["pending_files"] == ["2026-05-14T000000Z-local.md"]
-    assert not pending_file.exists()
     cached = cache.read_comments(github_repo(), 39)
     assert cached["comments"][0]["id"] == "4440388606"
     assert cached["comments"][0]["body"] == "Pending comment body.\n"
-    assert events == ["freshness", "comment", "refresh"]
+    assert events == ["freshness-issue", "freshness-comments", "comment", "refresh"]
 
 
-def test_github_issue_pending_comment_stale_cache_blocks_and_refreshes_before_mutation(
+def test_github_issue_add_comment_inline_body_blocks_on_stale_issue_freshness(
     tmp_path: Path,
 ) -> None:
     cache = GitHubIssueCache.for_project(tmp_path, configured_repo=github_repo())
     cache.write_issue_bundle(github_repo(), cached_issue_payload(), fetched_at="2026-05-14T00:00:00Z")
-    pending_dir = cache.comments_pending_dir(github_repo(), 39)
-    pending_dir.mkdir(parents=True)
-    pending_file = pending_dir / "2026-05-14T000000Z-local.md"
-    pending_file.write_text("---\nschema_version: 1\n---\n\nPending comment body.\n", encoding="utf-8")
     events: list[str] = []
 
     def runner(request: CommandRequest) -> CommandResult:
@@ -871,27 +874,12 @@ def test_github_issue_pending_comment_stale_cache_blocks_and_refreshes_before_mu
                 returncode=0,
                 stdout="git@github.com:studykit/studykit-plugins.git\n",
             )
-        if request.args == gh_issue_view_args(39, "number,updatedAt,comments"):
-            events.append("freshness")
+        if request.args == gh_issue_freshness_args(39):
+            events.append("freshness-issue")
             return CommandResult(
                 request=request,
                 returncode=0,
-                stdout=json.dumps(
-                    {
-                        "number": 39,
-                        "updatedAt": "2026-05-14T00:10:00Z",
-                        "comments": [
-                            {
-                                "id": "IC_kwDOQplzFM8AAAABCKrz_g",
-                                "url": "https://github.com/studykit/studykit-plugins/issues/39#issuecomment-4440388606",
-                                "author": {"login": "studykit"},
-                                "body": "Provider comment.",
-                                "createdAt": "2026-05-14T00:00:00Z",
-                                "updatedAt": "2026-05-14T00:10:00Z",
-                            }
-                        ],
-                    }
-                ),
+                stdout=json.dumps({"number": 39, "updatedAt": "2026-05-14T00:10:00Z"}),
             )
         if request.args == gh_issue_view_args(39, ",".join(DEFAULT_ISSUE_FIELDS)):
             events.append("refresh")
@@ -913,7 +901,7 @@ def test_github_issue_pending_comment_stale_cache_blocks_and_refreshes_before_mu
         if request.args[:3] == ("gh", "issue", "comment"):
             events.append("comment")
             return CommandResult(request=request, returncode=0)
-        return CommandResult(request=request, returncode=127, stderr="unexpected command")
+        return CommandResult(request=request, returncode=127, stderr=f"unexpected command: {request.args}")
 
     dispatcher = ProviderDispatcher(default_provider_registry(runner=runner))
 
@@ -923,18 +911,16 @@ def test_github_issue_pending_comment_stale_cache_blocks_and_refreshes_before_mu
             kind="github",
             operation="add_comment",
             context=ProviderContext(project=tmp_path, artifact_type="task", session_id="s1"),
-            payload={"issue": 39, "from_pending": True},
+            payload={"issue": 39, "body": "Inline comment body.\n"},
         )
     )
 
-    assert response.payload["operation"] == "append_pending_comments"
+    assert response.payload["operation"] == "append_comment"
     assert response.payload["status"] == "blocked"
     assert response.payload["reason"] == "stale_cache"
-    assert response.payload["target"] == "comments"
-    assert response.payload["pending_files"] == ["2026-05-14T000000Z-local.md"]
+    assert response.payload["target"] == "issue"
     assert response.payload["reread_required"] is True
-    assert pending_file.exists()
-    assert events == ["freshness", "refresh"]
+    assert "comment" not in events
 
 
 def test_github_issue_apply_relationships_from_pending_file_dispatches_refreshes_and_cleans(

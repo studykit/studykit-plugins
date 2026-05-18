@@ -7,6 +7,8 @@ from collections.abc import Mapping
 from dataclasses import dataclass, replace
 from typing import Any
 
+from pathlib import Path
+
 from workflow_cache import (
     FreshnessMetadata,
     PendingIssueRelationshipOperation,
@@ -311,66 +313,71 @@ class GitHubIssueNativeProvider(IssueProvider):
 
     def add_comment(self, request: ProviderRequest) -> Mapping[str, Any]:
         issue = _required_payload_value(request, "issue")
-        if _truthy(request.payload.get("from_pending")) or _truthy(request.payload.get("pending_comments")):
-            return self._add_pending_comments(request, issue)
-
         body = _required_payload_value(request, "body")
-        self._require_write_freshness(request, issue, default_target="comments")
-        return comment_issue(
-            issue,
+        issue_number = normalize_issue_number(issue)
+        repo = resolve_github_repository(request.context.project, runner=self.runner)
+        cache = GitHubIssueCache.for_project(request.context.project, configured_repo=repo)
+
+        state = _optional_string(request.payload.get("state"))
+        state_reason = _optional_string(
+            request.payload.get("state_reason") or request.payload.get("stateReason")
+        )
+        normalized_state = state.lower() if state is not None else None
+        if normalized_state is not None and normalized_state not in {"open", "closed"}:
+            raise ProviderOperationError(
+                f"unsupported GitHub issue state for append_comment: {state}"
+            )
+
+        for target in ("issue", "comments"):
+            freshness_payload = dict(request.payload)
+            freshness_payload["freshness_check"] = True
+            freshness_payload["freshness_target"] = target
+            try:
+                self._require_write_freshness(
+                    replace(request, payload=freshness_payload),
+                    issue_number,
+                    default_target=target,
+                )
+            except ProviderFreshnessError as exc:
+                return self._stale_cache_block_payload(
+                    request=request,
+                    repo=repo,
+                    cache=cache,
+                    issue_number=issue_number,
+                    operation="append_comment",
+                    target=target,
+                    error=exc,
+                )
+
+        posted = comment_issue(
+            issue_number,
             body=str(body),
             project=request.context.project,
             runner=self.runner,
         )
 
-    def _add_pending_comments(self, request: ProviderRequest, issue: Any) -> Mapping[str, Any]:
-        issue_number = normalize_issue_number(issue)
-        repo = resolve_github_repository(request.context.project, runner=self.runner)
-        cache = GitHubIssueCache.for_project(request.context.project, configured_repo=repo)
-        pending_comments = cache.read_pending_issue_comments(repo, issue_number)
-        if not pending_comments:
-            raise ProviderOperationError(f"no pending comment files found for GitHub issue #{issue_number}")
-
-        freshness_payload = dict(request.payload)
-        freshness_payload.setdefault("freshness_check", True)
-        freshness_payload.setdefault("freshness_target", "comments")
-        try:
-            self._require_write_freshness(
-                replace(request, payload=freshness_payload),
+        state_result: Mapping[str, Any] | None = None
+        if normalized_state == "closed":
+            state_result = close_issue(
                 issue_number,
-                default_target="comments",
+                project=request.context.project,
+                reason=_close_reason_from_state_reason(state_reason) if state_reason else "completed",
+                runner=self.runner,
             )
-        except ProviderFreshnessError as exc:
-            return self._stale_cache_block_payload(
-                request=request,
-                repo=repo,
-                cache=cache,
-                issue_number=issue_number,
-                operation="append_pending_comments",
-                target="comments",
-                error=exc,
-                pending_files=[pending.file_name for pending in pending_comments],
-            )
-        appended = [
-            comment_issue(
+        elif normalized_state == "open":
+            state_result = reopen_issue(
                 issue_number,
-                body=pending.body,
                 project=request.context.project,
                 runner=self.runner,
             )
-            for pending in pending_comments
-        ]
-        refreshed = view_issue(issue_number, project=request.context.project, runner=self.runner)
-        write_result = cache.write_issue_bundle(repo, refreshed)
-        removed = cache.remove_pending_issue_comments(repo, issue_number, pending_comments)
 
+        write_result = self._refresh_issue_bundle(request, repo, cache, issue_number)
         return {
-            "operation": "append_pending_comments",
+            "operation": "append_comment",
             "issue": issue_number,
-            "appended": len(appended),
-            "pending_source": "issue",
-            "pending_files": [pending.file_name for pending in pending_comments],
-            "removed_pending_files": [str(path) for path in removed],
+            "comment": dict(posted),
+            "state_changed": state_result is not None,
+            "state": dict(state_result) if state_result is not None else None,
             "cache_refreshed": True,
             "cache": write_result.to_json(),
         }
@@ -621,14 +628,9 @@ class GitHubIssueNativeProvider(IssueProvider):
         *,
         target: str,
     ) -> list[str]:
-        paths = [
-            cache.issue_file(repo, issue_number),
-            cache.issue_metadata_file(repo, issue_number),
-        ]
+        paths: list[Path] = [cache.issue_file(repo, issue_number)]
         if target == "comments":
-            paths.append(cache.comments_index_file(repo, issue_number))
-        if target == "relationships":
-            paths.append(cache.issue_file(repo, issue_number))
+            paths.extend(cache.comment_files(repo, issue_number))
         return [str(path) for index, path in enumerate(paths) if path not in paths[:index]]
 
     def _validate_relationship_operations(self, operations: list[_ResolvedRelationshipOperation]) -> None:

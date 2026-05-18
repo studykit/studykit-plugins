@@ -2,7 +2,7 @@
 # /// script
 # dependencies = ["python-frontmatter", "PyYAML"]
 # ///
-"""GitHub Issues pending comment append entrypoint."""
+"""Append a GitHub-backed issue comment from an opaque caller-owned body file."""
 
 from __future__ import annotations
 
@@ -22,58 +22,129 @@ from workflow_providers import ProviderContext, ProviderRequest
 
 
 class GitHubIssueCommentsError(RuntimeError):
-    """Raised when pending GitHub issue comments cannot be appended."""
+    """Raised when a GitHub issue comment append cannot proceed."""
 
 
-def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--project", type=Path, default=workflow_project_dir_from_env(), help="project path")
-    parser.add_argument("--type", default="task", help="workflow artifact type")
-    parser.add_argument("--json", action="store_true", help="emit JSON")
-    parser.add_argument("issues", nargs="+", help="GitHub issue IDs or configured repository issue references")
-    return parser
-
-
-def append_pending_comments_payload(
+def append_comment(
     *,
     project: Path,
-    issues: list[str],
     artifact_type: str,
+    issue: str,
+    body_file: Path,
+    state: str | None = None,
+    state_reason: str | None = None,
     runner: CommandRunner | None = None,
 ) -> dict[str, object]:
-    """Append pending local comment files to GitHub issues."""
+    """Post one comment from an opaque body file to one GitHub issue."""
 
     config = _load_github_issue_config(project)
+    artifact_type = _required_text(artifact_type, "artifact type")
     try:
         repo = resolve_github_repository(config.root, runner=runner)
     except GitHubRepositoryError as exc:
         raise GitHubIssueCommentsError(str(exc)) from exc
 
-    issue_numbers = issue_numbers_from_references(issues, repo=repo, allow_bare_numbers=True)
-    if not issue_numbers:
-        raise GitHubIssueCommentsError("no configured GitHub issue references were found")
+    issue_numbers = issue_numbers_from_references([issue], repo=repo, allow_bare_numbers=True)
+    if len(issue_numbers) != 1:
+        raise GitHubIssueCommentsError(
+            f"expected exactly one configured GitHub issue reference, got {len(issue_numbers)}"
+        )
+    issue_number = issue_numbers[0]
+
+    body_path = body_file.expanduser()
+    if not body_path.is_file():
+        raise GitHubIssueCommentsError(f"body file does not exist: {body_path}")
+    body = body_path.read_text(encoding="utf-8")
+    _reject_body_with_frontmatter(body, body_path)
+
+    payload: dict[str, object] = {"issue": issue_number, "body": body}
+    if state:
+        payload["state"] = state.strip().lower()
+    if state_reason:
+        payload["state_reason"] = state_reason.strip()
 
     provider = GitHubIssueNativeProvider(runner=runner)
-    results = []
-    for issue in issue_numbers:
-        response = provider.call(
-            ProviderRequest(
-                role="issue",
-                kind="github",
-                operation="add_comment",
-                context=ProviderContext(project=config.root, artifact_type=artifact_type),
-                payload={"issue": issue, "from_pending": True},
-            )
+    response = provider.call(
+        ProviderRequest(
+            role="issue",
+            kind="github",
+            operation="add_comment",
+            context=ProviderContext(project=config.root, artifact_type=artifact_type),
+            payload=payload,
         )
-        results.append(dict(response.payload))
+    )
+
+    provider_payload = dict(response.payload)
+    if provider_payload.get("status") == "blocked":
+        provider_payload["body_file"] = str(body_path)
+        provider_payload["body_file_removed"] = False
+        return provider_payload
+
+    cache_payload = provider_payload.get("cache") if isinstance(provider_payload.get("cache"), dict) else {}
+    issue_file = cache_payload.get("issue_file") if isinstance(cache_payload, dict) else None
+    body_removed = False
+    try:
+        body_path.unlink()
+    except OSError:
+        body_removed = False
+    else:
+        body_removed = True
 
     return {
-        "operation": "cache_append_pending_comments",
-        "role": "issue",
+        "operation": "append_comment",
         "kind": "github",
-        "repository": repo.to_json(),
-        "issues": results,
+        "issue": provider_payload.get("issue"),
+        "comment": provider_payload.get("comment"),
+        "state_changed": bool(provider_payload.get("state_changed")),
+        "state": provider_payload.get("state"),
+        "issue_file": issue_file,
+        "body_file": str(body_path),
+        "body_file_removed": body_removed,
+        "cache_refreshed": bool(provider_payload.get("cache_refreshed")),
+        "cache": cache_payload,
     }
+
+
+def _reject_body_with_frontmatter(body: str, path: Path) -> None:
+    stripped = body.lstrip("﻿")
+    if stripped.startswith("---\n") or stripped.startswith("---\r\n") or stripped.strip() == "---":
+        raise GitHubIssueCommentsError(
+            f"body file must not contain frontmatter; remove the YAML delimiter: {path}"
+        )
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--project",
+        type=Path,
+        default=workflow_project_dir_from_env(),
+        help="project path",
+    )
+    parser.add_argument("--json", action="store_true", help="emit JSON")
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    append = subparsers.add_parser(
+        "append",
+        help="append a comment to one GitHub issue from a body file",
+    )
+    append.add_argument("--type", default="task", help="workflow artifact type")
+    append.add_argument("--issue", required=True, help="GitHub issue id or configured reference")
+    append.add_argument(
+        "--body-file",
+        type=Path,
+        required=True,
+        help="path to the opaque body content file (no frontmatter)",
+    )
+    append.add_argument("--state", choices=["open", "closed"])
+    append.add_argument(
+        "--state-reason",
+        choices=["completed", "not_planned", "reopened"],
+    )
+
+    for child in subparsers.choices.values():
+        child.add_argument("--json", action="store_true", help=argparse.SUPPRESS)
+    return parser
 
 
 def main(
@@ -89,30 +160,28 @@ def main(
     errors = stderr or sys.stderr
 
     try:
-        payload = append_pending_comments_payload(
-            project=args.project,
-            issues=list(args.issues),
-            artifact_type=args.type,
-            runner=runner,
-        )
+        if args.command == "append":
+            payload = append_comment(
+                project=args.project,
+                artifact_type=args.type,
+                issue=args.issue,
+                body_file=args.body_file,
+                state=args.state,
+                state_reason=args.state_reason,
+                runner=runner,
+            )
+        else:
+            raise GitHubIssueCommentsError(f"unsupported command: {args.command}")
     except Exception as exc:
-        print(f"GitHub issue pending comment append error: {exc}", file=errors)
+        print(f"GitHub issue comment append error: {exc}", file=errors)
         return 2
 
     if args.json:
         print(json.dumps(payload, indent=2, sort_keys=False), file=output)
-        return 0
-
-    for item in payload["issues"]:
-        if isinstance(item, dict):
-            if item.get("status") == "blocked":
-                print(
-                    f"#{item.get('issue')} blocked: {item.get('reason')} "
-                    f"reread_required={item.get('reread_required')}",
-                    file=output,
-                )
-            else:
-                print(f"#{item.get('issue')} appended={item.get('appended')}", file=output)
+    else:
+        _print_plain(payload, output)
+    if payload.get("status") == "blocked":
+        return 3
     return 0
 
 
@@ -128,6 +197,29 @@ def _load_github_issue_config(project: Path) -> WorkflowConfig:
             f"GitHub issue comment append requires configured issue provider kind github, found {config.issues.kind}"
         )
     return config
+
+
+def _required_text(value: str, name: str) -> str:
+    text = str(value or "").strip()
+    if not text:
+        raise GitHubIssueCommentsError(f"{name} is required")
+    return text
+
+
+def _print_plain(payload: dict[str, object], output: TextIO) -> None:
+    if payload.get("status") == "blocked":
+        print(
+            f"#{payload.get('issue')} blocked: {payload.get('reason')} "
+            f"reread_required={payload.get('reread_required')}",
+            file=output,
+        )
+        return
+    print(
+        f"appended comment to issue {payload.get('issue')} "
+        f"state_changed={payload.get('state_changed')} "
+        f"cache={payload.get('issue_file')}",
+        file=output,
+    )
 
 
 if __name__ == "__main__":

@@ -2027,6 +2027,43 @@ Current body.
     assert "edit only the Markdown body" in reason
 
 
+def test_claude_pre_write_blocks_github_cache_comment_create_when_no_projection(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _write_config(tmp_path)
+    monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(tmp_path))
+    monkeypatch.setenv("CLAUDE_PLUGIN_ROOT", str(_PLUGIN_ROOT))
+
+    comment_file = (
+        tmp_path
+        / ".workflow-cache"
+        / "issues"
+        / "39"
+        / "comment-2026-05-14T000000Z-7700001.md"
+    )
+
+    captured = io.StringIO()
+    assert claude_main(
+        payload={
+            "session_id": "comment-creation-protection",
+            "cwd": str(tmp_path),
+            "hook_event_name": "PreToolUse",
+            "tool_name": "Write",
+            "tool_input": {
+                "file_path": str(comment_file),
+                "content": "---\nauthor: me\n---\n\nLocal comment body.\n",
+            },
+        },
+        stdout=captured,
+    ) == 0
+
+    payload = json.loads(captured.getvalue())
+    reason = payload["reason"]
+    assert payload["decision"] == "block"
+    assert "projection has not been prepared" in reason
+
+
 def test_session_start_emits_nothing_for_invalid_config(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

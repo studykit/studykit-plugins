@@ -11,6 +11,7 @@ _SCRIPTS_DIR = Path(__file__).resolve().parent.parent / "scripts"
 if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
+from github_issue_comments import main as github_issue_comments_main  # noqa: E402
 from github_issue_drafts import main as github_issue_drafts_main  # noqa: E402
 from jira_issue_drafts import main as jira_issue_drafts_main  # noqa: E402
 from workflow_command import CommandRequest, CommandResult  # noqa: E402
@@ -176,7 +177,6 @@ def test_github_publish_creates_issue_and_deletes_body_file(tmp_path: Path) -> N
             "workflow",
             "--body-file",
             str(body_file),
-            "--confirm-provider-create",
             "--json",
         ],
         stdout=stdout,
@@ -194,38 +194,6 @@ def test_github_publish_creates_issue_and_deletes_body_file(tmp_path: Path) -> N
     assert cache.read_issue(_repo(), 51)["body"] == "Draft body.\n"
     assert not body_file.exists()
     assert runner.requests[0].args[:3] == ("gh", "issue", "create")
-
-
-def test_github_publish_requires_provider_create_confirmation(tmp_path: Path) -> None:
-    _write_config(tmp_path)
-    body_file = _write_body_file(tmp_path, "Draft body.\n")
-    runner = GitHubFakeRunner()
-    stdout = io.StringIO()
-    stderr = io.StringIO()
-
-    code = github_issue_drafts_main(
-        [
-            "--project",
-            str(tmp_path),
-            "publish",
-            "--type",
-            "task",
-            "--title",
-            "Draft issue",
-            "--body-file",
-            str(body_file),
-            "--json",
-        ],
-        stdout=stdout,
-        stderr=stderr,
-        runner=runner,
-    )
-
-    assert code == 2
-    assert stdout.getvalue() == ""
-    assert "--confirm-provider-create" in stderr.getvalue()
-    assert body_file.exists()
-    assert runner.requests == []
 
 
 def test_github_publish_rejects_body_file_with_frontmatter(tmp_path: Path) -> None:
@@ -246,7 +214,6 @@ def test_github_publish_rejects_body_file_with_frontmatter(tmp_path: Path) -> No
             "Draft issue",
             "--body-file",
             str(body_file),
-            "--confirm-provider-create",
             "--json",
         ],
         stdout=stdout,
@@ -277,7 +244,6 @@ def test_github_publish_missing_body_file_fails(tmp_path: Path) -> None:
             "Draft issue",
             "--body-file",
             str(tmp_path / "missing.md"),
-            "--confirm-provider-create",
             "--json",
         ],
         stdout=stdout,
@@ -288,6 +254,309 @@ def test_github_publish_missing_body_file_fails(tmp_path: Path) -> None:
     assert code == 2
     assert "body file does not exist" in stderr.getvalue()
     assert runner.requests == []
+
+
+class GitHubAppendCommentRunner:
+    """Fake runner for github_issue_comments append flow."""
+
+    def __init__(
+        self,
+        *,
+        provider_issue_updated_at: str = "2026-05-14T00:00:00Z",
+        provider_comments_updated_at: str = "2026-05-14T00:00:00Z",
+        state_after: str = "OPEN",
+        state_reason_after: object = None,
+    ) -> None:
+        self.requests: list[CommandRequest] = []
+        self.provider_issue_updated_at = provider_issue_updated_at
+        self.provider_comments_updated_at = provider_comments_updated_at
+        self.state_after = state_after
+        self.state_reason_after = state_reason_after
+        self.posted_bodies: list[str] = []
+        self.state_calls: list[str] = []
+
+    def __call__(self, request: CommandRequest) -> CommandResult:
+        self.requests.append(request)
+        if request.args == _gh_remote_args(_tmp_project_from_args(request)):
+            return CommandResult(
+                request=request,
+                returncode=0,
+                stdout="git@github.com:studykit/studykit-plugins.git\n",
+            )
+        if request.args == _gh_issue_view_args(72, "number,updatedAt"):
+            return CommandResult(
+                request=request,
+                returncode=0,
+                stdout=json.dumps({"number": 72, "updatedAt": self.provider_issue_updated_at}),
+            )
+        if request.args == _gh_issue_view_args(72, "number,updatedAt,comments"):
+            return CommandResult(
+                request=request,
+                returncode=0,
+                stdout=json.dumps(
+                    {
+                        "number": 72,
+                        "updatedAt": self.provider_comments_updated_at,
+                        "comments": [],
+                    }
+                ),
+            )
+        if request.args[:3] == ("gh", "issue", "comment"):
+            body_file = Path(request.args[request.args.index("--body-file") + 1])
+            self.posted_bodies.append(body_file.read_text(encoding="utf-8"))
+            return CommandResult(request=request, returncode=0)
+        if request.args[:3] == ("gh", "issue", "close"):
+            self.state_calls.append("close")
+            return CommandResult(request=request, returncode=0)
+        if request.args[:3] == ("gh", "issue", "reopen"):
+            self.state_calls.append("reopen")
+            return CommandResult(request=request, returncode=0)
+        if request.args == _gh_issue_view_args(72, "state,stateReason"):
+            return CommandResult(
+                request=request,
+                returncode=0,
+                stdout=json.dumps({"state": self.state_after, "stateReason": self.state_reason_after}),
+            )
+        if request.args == _gh_issue_view_args(72, ",".join(DEFAULT_ISSUE_FIELDS)):
+            return CommandResult(
+                request=request,
+                returncode=0,
+                stdout=json.dumps(
+                    {
+                        "number": 72,
+                        "title": "Issue with appended comment",
+                        "state": self.state_after,
+                        "stateReason": self.state_reason_after,
+                        "body": "Cached body.",
+                        "labels": [{"name": "task"}],
+                        "comments": [
+                            {
+                                "id": "IC_kwDOQplzFM8AAAABCKrz_g",
+                                "url": "https://github.com/studykit/studykit-plugins/issues/72#issuecomment-7700001",
+                                "author": {"login": "studykit"},
+                                "body": self.posted_bodies[-1] if self.posted_bodies else "Comment body.\n",
+                                "createdAt": "2026-05-14T00:01:00Z",
+                                "updatedAt": "2026-05-14T00:01:00Z",
+                            }
+                        ],
+                        "updatedAt": "2026-05-14T00:01:00Z",
+                    }
+                ),
+            )
+        if request.args == _gh_api_args("repos/studykit/studykit-plugins/issues/72"):
+            return CommandResult(
+                request=request,
+                returncode=0,
+                stdout=json.dumps({"id": 7200, "number": 72, "updated_at": "2026-05-14T00:01:00Z"}),
+            )
+        if request.args == _gh_api_args("repos/studykit/studykit-plugins/issues/72/parent"):
+            return CommandResult(request=request, returncode=404, stderr="not found")
+        if request.args in {
+            _gh_api_args("repos/studykit/studykit-plugins/issues/72/sub_issues", "--paginate"),
+            _gh_api_args("repos/studykit/studykit-plugins/issues/72/dependencies/blocked_by", "--paginate"),
+            _gh_api_args("repos/studykit/studykit-plugins/issues/72/dependencies/blocking", "--paginate"),
+        }:
+            return CommandResult(request=request, returncode=0, stdout="[]")
+        return CommandResult(request=request, returncode=127, stderr=f"unexpected command: {request.args}")
+
+
+def _gh_remote_args(project: Path) -> tuple[str, ...]:
+    return ("git", "-C", str(project.resolve(strict=False)), "remote", "get-url", "origin")
+
+
+def _tmp_project_from_args(request: CommandRequest) -> Path:
+    args = request.args
+    if len(args) >= 3 and args[0] == "git" and args[1] == "-C":
+        return Path(args[2])
+    return Path("/tmp")
+
+
+def _seed_cached_issue(project: Path, issue_number: int = 72, *, source_updated_at: str = "2026-05-14T00:00:00Z") -> None:
+    GitHubIssueCache.for_project(project, configured_repo=_repo()).write_issue_bundle(
+        _repo(),
+        {
+            "number": issue_number,
+            "title": "Issue with appended comment",
+            "state": "OPEN",
+            "stateReason": None,
+            "body": "Cached body.",
+            "labels": [{"name": "task"}],
+            "updatedAt": source_updated_at,
+            "comments": [],
+        },
+        fetched_at=source_updated_at,
+    )
+
+
+def test_github_append_posts_comment_and_deletes_body_file(tmp_path: Path) -> None:
+    _write_config(tmp_path)
+    _seed_cached_issue(tmp_path)
+    body_file = _write_body_file(tmp_path, "Comment body.\n", name="comment.md")
+    runner = GitHubAppendCommentRunner()
+    stdout = io.StringIO()
+
+    code = github_issue_comments_main(
+        [
+            "--project",
+            str(tmp_path),
+            "append",
+            "--type",
+            "task",
+            "--issue",
+            "72",
+            "--body-file",
+            str(body_file),
+            "--json",
+        ],
+        stdout=stdout,
+        runner=runner,
+    )
+
+    payload = json.loads(stdout.getvalue())
+    assert code == 0
+    assert payload["operation"] == "append_comment"
+    assert payload["kind"] == "github"
+    assert payload["issue"] == "72"
+    assert payload["state_changed"] is False
+    assert payload["body_file_removed"] is True
+    assert payload["cache_refreshed"] is True
+    assert payload["issue_file"].endswith("/issues/72/issue.md")
+    assert runner.posted_bodies == ["Comment body.\n"]
+    assert runner.state_calls == []
+    assert not body_file.exists()
+
+
+def test_github_append_rejects_body_file_with_frontmatter(tmp_path: Path) -> None:
+    _write_config(tmp_path)
+    _seed_cached_issue(tmp_path)
+    body_file = _write_body_file(
+        tmp_path, "---\ntitle: nope\n---\n\nBody.\n", name="comment.md"
+    )
+    runner = GitHubAppendCommentRunner()
+    stderr = io.StringIO()
+
+    code = github_issue_comments_main(
+        [
+            "--project",
+            str(tmp_path),
+            "append",
+            "--type",
+            "task",
+            "--issue",
+            "72",
+            "--body-file",
+            str(body_file),
+            "--json",
+        ],
+        stderr=stderr,
+        runner=runner,
+    )
+
+    assert code == 2
+    assert "frontmatter" in stderr.getvalue()
+    assert body_file.exists()
+    assert runner.requests == []
+
+
+def test_github_append_missing_body_file_fails(tmp_path: Path) -> None:
+    _write_config(tmp_path)
+    _seed_cached_issue(tmp_path)
+    runner = GitHubAppendCommentRunner()
+    stderr = io.StringIO()
+
+    code = github_issue_comments_main(
+        [
+            "--project",
+            str(tmp_path),
+            "append",
+            "--type",
+            "task",
+            "--issue",
+            "72",
+            "--body-file",
+            str(tmp_path / "missing.md"),
+            "--json",
+        ],
+        stderr=stderr,
+        runner=runner,
+    )
+
+    assert code == 2
+    assert "body file does not exist" in stderr.getvalue()
+    assert runner.requests == []
+
+
+def test_github_append_preserves_body_file_on_freshness_block(tmp_path: Path) -> None:
+    _write_config(tmp_path)
+    _seed_cached_issue(tmp_path)
+    body_file = _write_body_file(tmp_path, "Comment body.\n", name="comment.md")
+    runner = GitHubAppendCommentRunner(provider_issue_updated_at="2026-05-15T00:00:00Z")
+    stdout = io.StringIO()
+
+    code = github_issue_comments_main(
+        [
+            "--project",
+            str(tmp_path),
+            "append",
+            "--type",
+            "task",
+            "--issue",
+            "72",
+            "--body-file",
+            str(body_file),
+            "--json",
+        ],
+        stdout=stdout,
+        runner=runner,
+    )
+
+    payload = json.loads(stdout.getvalue())
+    assert code == 3
+    assert payload["status"] == "blocked"
+    assert payload["reason"] == "stale_cache"
+    assert payload["reread_required"] is True
+    assert payload["body_file_removed"] is False
+    assert payload["body_file"] == str(body_file)
+    assert body_file.exists()
+    assert runner.posted_bodies == []
+    assert runner.state_calls == []
+
+
+def test_github_append_applies_inline_state_change(tmp_path: Path) -> None:
+    _write_config(tmp_path)
+    _seed_cached_issue(tmp_path)
+    body_file = _write_body_file(tmp_path, "Closing comment.\n", name="comment.md")
+    runner = GitHubAppendCommentRunner(state_after="CLOSED", state_reason_after="COMPLETED")
+    stdout = io.StringIO()
+
+    code = github_issue_comments_main(
+        [
+            "--project",
+            str(tmp_path),
+            "append",
+            "--type",
+            "task",
+            "--issue",
+            "72",
+            "--body-file",
+            str(body_file),
+            "--state",
+            "closed",
+            "--state-reason",
+            "completed",
+            "--json",
+        ],
+        stdout=stdout,
+        runner=runner,
+    )
+
+    payload = json.loads(stdout.getvalue())
+    assert code == 0
+    assert payload["state_changed"] is True
+    assert payload["state"]["operation"] == "close_issue"
+    assert runner.state_calls == ["close"]
+    assert runner.posted_bodies == ["Closing comment.\n"]
+    assert not body_file.exists()
 
 
 class JiraFakeRunner:
@@ -390,7 +659,6 @@ def test_jira_publish_creates_issue_inline_and_deletes_body_file(tmp_path: Path)
             "workflow",
             "--body-file",
             str(body_file),
-            "--confirm-provider-create",
             "--json",
         ],
         stdout=stdout,
@@ -407,35 +675,3 @@ def test_jira_publish_creates_issue_inline_and_deletes_body_file(tmp_path: Path)
     assert cache.issue_json_file(site, "TEST-1234").is_file()
     assert not body_file.exists()
     assert runner.requests[0].args == _jira_write_args()
-
-
-def test_jira_publish_requires_provider_create_confirmation(tmp_path: Path) -> None:
-    _write_jira_config(tmp_path)
-    body_file = _write_body_file(tmp_path, "Body.\n")
-    runner = JiraFakeRunner({})
-    stdout = io.StringIO()
-    stderr = io.StringIO()
-
-    code = jira_issue_drafts_main(
-        [
-            "--project",
-            str(tmp_path),
-            "publish",
-            "--type",
-            "task",
-            "--title",
-            "Published Jira issue",
-            "--body-file",
-            str(body_file),
-            "--json",
-        ],
-        stdout=stdout,
-        stderr=stderr,
-        runner=runner,
-    )
-
-    assert code == 2
-    assert stdout.getvalue() == ""
-    assert "--confirm-provider-create" in stderr.getvalue()
-    assert body_file.exists()
-    assert runner.requests == []
