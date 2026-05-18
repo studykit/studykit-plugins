@@ -13,6 +13,7 @@ if str(_SCRIPTS_DIR) not in sys.path:
 
 from github_issue_comments import main as github_issue_comments_main  # noqa: E402
 from github_issue_drafts import main as github_issue_drafts_main  # noqa: E402
+from github_issue_writeback import main as github_issue_writeback_main  # noqa: E402
 from jira_issue_drafts import main as jira_issue_drafts_main  # noqa: E402
 from workflow_command import CommandRequest, CommandResult  # noqa: E402
 from workflow_github_issue_cache import GitHubIssueCache  # noqa: E402
@@ -556,6 +557,318 @@ def test_github_append_applies_inline_state_change(tmp_path: Path) -> None:
     assert payload["state"]["operation"] == "close_issue"
     assert runner.state_calls == ["close"]
     assert runner.posted_bodies == ["Closing comment.\n"]
+    assert not body_file.exists()
+
+
+class GitHubUpdateIssueRunner:
+    """Fake runner for github_issue_writeback update flow."""
+
+    def __init__(
+        self,
+        *,
+        provider_issue_updated_at: str = "2026-05-14T00:00:00Z",
+        state_after: str = "OPEN",
+        state_reason_after: object = None,
+        labels_after: tuple[str, ...] = ("task",),
+    ) -> None:
+        self.requests: list[CommandRequest] = []
+        self.provider_issue_updated_at = provider_issue_updated_at
+        self.state_after = state_after
+        self.state_reason_after = state_reason_after
+        self.labels_after = labels_after
+        self.edit_bodies: list[str] = []
+        self.edit_titles: list[str | None] = []
+        self.edit_label_args: list[tuple[str, ...]] = []
+        self.state_calls: list[str] = []
+
+    def __call__(self, request: CommandRequest) -> CommandResult:
+        self.requests.append(request)
+        if request.args == _gh_remote_args(_tmp_project_from_args(request)):
+            return CommandResult(
+                request=request,
+                returncode=0,
+                stdout="git@github.com:studykit/studykit-plugins.git\n",
+            )
+        if request.args == _gh_issue_view_args(72, "number,updatedAt"):
+            return CommandResult(
+                request=request,
+                returncode=0,
+                stdout=json.dumps({"number": 72, "updatedAt": self.provider_issue_updated_at}),
+            )
+        if request.args == _gh_issue_view_args(72, "number,labels"):
+            return CommandResult(
+                request=request,
+                returncode=0,
+                stdout=json.dumps({"number": 72, "labels": [{"name": "task"}]}),
+            )
+        if request.args[:3] == ("gh", "issue", "edit"):
+            body_file = Path(request.args[request.args.index("--body-file") + 1])
+            self.edit_bodies.append(body_file.read_text(encoding="utf-8"))
+            title = None
+            if "--title" in request.args:
+                title = request.args[request.args.index("--title") + 1]
+            self.edit_titles.append(title)
+            label_args = tuple(
+                arg for arg in request.args if arg.startswith("--add-label") or arg.startswith("--remove-label")
+            )
+            self.edit_label_args.append(label_args)
+            return CommandResult(request=request, returncode=0)
+        if request.args == _gh_issue_view_args(72, "body"):
+            return CommandResult(
+                request=request,
+                returncode=0,
+                stdout=json.dumps({"body": self.edit_bodies[-1] if self.edit_bodies else ""}),
+            )
+        if request.args == _gh_issue_view_args(72, "title,body"):
+            return CommandResult(
+                request=request,
+                returncode=0,
+                stdout=json.dumps(
+                    {
+                        "title": self.edit_titles[-1] if self.edit_titles else "",
+                        "body": self.edit_bodies[-1] if self.edit_bodies else "",
+                    }
+                ),
+            )
+        if request.args == _gh_issue_view_args(72, "body,labels"):
+            return CommandResult(
+                request=request,
+                returncode=0,
+                stdout=json.dumps(
+                    {
+                        "body": self.edit_bodies[-1] if self.edit_bodies else "",
+                        "labels": [{"name": name} for name in self.labels_after],
+                    }
+                ),
+            )
+        if request.args == _gh_issue_view_args(72, "title,body,labels"):
+            return CommandResult(
+                request=request,
+                returncode=0,
+                stdout=json.dumps(
+                    {
+                        "title": self.edit_titles[-1] if self.edit_titles else "",
+                        "body": self.edit_bodies[-1] if self.edit_bodies else "",
+                        "labels": [{"name": name} for name in self.labels_after],
+                    }
+                ),
+            )
+        if request.args[:3] == ("gh", "issue", "close"):
+            self.state_calls.append("close")
+            return CommandResult(request=request, returncode=0)
+        if request.args[:3] == ("gh", "issue", "reopen"):
+            self.state_calls.append("reopen")
+            return CommandResult(request=request, returncode=0)
+        if request.args == _gh_issue_view_args(72, "state,stateReason"):
+            return CommandResult(
+                request=request,
+                returncode=0,
+                stdout=json.dumps({"state": self.state_after, "stateReason": self.state_reason_after}),
+            )
+        if request.args == _gh_issue_view_args(72, ",".join(DEFAULT_ISSUE_FIELDS)):
+            return CommandResult(
+                request=request,
+                returncode=0,
+                stdout=json.dumps(
+                    {
+                        "number": 72,
+                        "title": self.edit_titles[-1] or "Issue title" if self.edit_titles else "Issue title",
+                        "state": self.state_after,
+                        "stateReason": self.state_reason_after,
+                        "body": self.edit_bodies[-1] if self.edit_bodies else "Updated body.",
+                        "labels": [{"name": name} for name in self.labels_after],
+                        "comments": [],
+                        "updatedAt": "2026-05-14T00:01:00Z",
+                    }
+                ),
+            )
+        if request.args == _gh_api_args("repos/studykit/studykit-plugins/issues/72"):
+            return CommandResult(
+                request=request,
+                returncode=0,
+                stdout=json.dumps({"id": 7200, "number": 72, "updated_at": "2026-05-14T00:01:00Z"}),
+            )
+        if request.args == _gh_api_args("repos/studykit/studykit-plugins/issues/72/parent"):
+            return CommandResult(request=request, returncode=404, stderr="not found")
+        if request.args in {
+            _gh_api_args("repos/studykit/studykit-plugins/issues/72/sub_issues", "--paginate"),
+            _gh_api_args("repos/studykit/studykit-plugins/issues/72/dependencies/blocked_by", "--paginate"),
+            _gh_api_args("repos/studykit/studykit-plugins/issues/72/dependencies/blocking", "--paginate"),
+        }:
+            return CommandResult(request=request, returncode=0, stdout="[]")
+        return CommandResult(request=request, returncode=127, stderr=f"unexpected command: {request.args}")
+
+
+def test_github_update_writes_body_and_deletes_body_file(tmp_path: Path) -> None:
+    _write_config(tmp_path)
+    _seed_cached_issue(tmp_path)
+    body_file = _write_body_file(tmp_path, "Updated body.\n", name="update.md")
+    runner = GitHubUpdateIssueRunner()
+    stdout = io.StringIO()
+
+    code = github_issue_writeback_main(
+        [
+            "--project",
+            str(tmp_path),
+            "update",
+            "--issue",
+            "72",
+            "--body-file",
+            str(body_file),
+            "--json",
+        ],
+        stdout=stdout,
+        runner=runner,
+    )
+
+    payload = json.loads(stdout.getvalue())
+    assert code == 0
+    assert payload["operation"] == "update_issue"
+    assert payload["kind"] == "github"
+    assert payload["issue"] == "72"
+    assert payload["verified"] is True
+    assert payload["state_changed"] is False
+    assert payload["body_file_removed"] is True
+    assert payload["cache_refreshed"] is True
+    assert payload["issue_file"].endswith("/issues/72/issue.md")
+    assert runner.edit_bodies == ["Updated body.\n"]
+    assert runner.edit_titles == [None]
+    assert runner.state_calls == []
+    assert not body_file.exists()
+
+
+def test_github_update_rejects_body_file_with_frontmatter(tmp_path: Path) -> None:
+    _write_config(tmp_path)
+    _seed_cached_issue(tmp_path)
+    body_file = _write_body_file(
+        tmp_path, "---\ntitle: nope\n---\n\nBody.\n", name="update.md"
+    )
+    runner = GitHubUpdateIssueRunner()
+    stderr = io.StringIO()
+
+    code = github_issue_writeback_main(
+        [
+            "--project",
+            str(tmp_path),
+            "update",
+            "--issue",
+            "72",
+            "--body-file",
+            str(body_file),
+            "--json",
+        ],
+        stderr=stderr,
+        runner=runner,
+    )
+
+    assert code == 2
+    assert "frontmatter" in stderr.getvalue()
+    assert body_file.exists()
+    assert runner.requests == []
+
+
+def test_github_update_missing_body_file_fails(tmp_path: Path) -> None:
+    _write_config(tmp_path)
+    _seed_cached_issue(tmp_path)
+    runner = GitHubUpdateIssueRunner()
+    stderr = io.StringIO()
+
+    code = github_issue_writeback_main(
+        [
+            "--project",
+            str(tmp_path),
+            "update",
+            "--issue",
+            "72",
+            "--body-file",
+            str(tmp_path / "missing.md"),
+            "--json",
+        ],
+        stderr=stderr,
+        runner=runner,
+    )
+
+    assert code == 2
+    assert "body file does not exist" in stderr.getvalue()
+    assert runner.requests == []
+
+
+def test_github_update_preserves_body_file_on_freshness_block(tmp_path: Path) -> None:
+    _write_config(tmp_path)
+    _seed_cached_issue(tmp_path)
+    body_file = _write_body_file(tmp_path, "Updated body.\n", name="update.md")
+    runner = GitHubUpdateIssueRunner(provider_issue_updated_at="2026-05-15T00:00:00Z")
+    stdout = io.StringIO()
+
+    code = github_issue_writeback_main(
+        [
+            "--project",
+            str(tmp_path),
+            "update",
+            "--issue",
+            "72",
+            "--body-file",
+            str(body_file),
+            "--json",
+        ],
+        stdout=stdout,
+        runner=runner,
+    )
+
+    payload = json.loads(stdout.getvalue())
+    assert code == 3
+    assert payload["status"] == "blocked"
+    assert payload["reason"] == "stale_cache"
+    assert payload["reread_required"] is True
+    assert payload["body_file_removed"] is False
+    assert payload["body_file"] == str(body_file)
+    assert body_file.exists()
+    assert runner.edit_bodies == []
+    assert runner.state_calls == []
+
+
+def test_github_update_applies_inline_state_change(tmp_path: Path) -> None:
+    _write_config(tmp_path)
+    _seed_cached_issue(tmp_path)
+    body_file = _write_body_file(tmp_path, "Final body.\n", name="update.md")
+    runner = GitHubUpdateIssueRunner(
+        state_after="CLOSED",
+        state_reason_after="COMPLETED",
+        labels_after=("workflow",),
+    )
+    stdout = io.StringIO()
+
+    code = github_issue_writeback_main(
+        [
+            "--project",
+            str(tmp_path),
+            "update",
+            "--issue",
+            "72",
+            "--body-file",
+            str(body_file),
+            "--title",
+            "Renamed issue",
+            "--label",
+            "workflow",
+            "--state",
+            "closed",
+            "--state-reason",
+            "completed",
+            "--json",
+        ],
+        stdout=stdout,
+        runner=runner,
+    )
+
+    payload = json.loads(stdout.getvalue())
+    assert code == 0
+    assert payload["state_changed"] is True
+    assert payload["state"]["operation"] == "close_issue"
+    assert runner.state_calls == ["close"]
+    assert runner.edit_bodies == ["Final body.\n"]
+    assert runner.edit_titles == ["Renamed issue"]
+    assert runner.edit_label_args[-1] == ("--add-label", "--remove-label")
     assert not body_file.exists()
 
 

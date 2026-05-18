@@ -1871,7 +1871,7 @@ def test_stop_does_not_carry_issue_refs_to_next_user_prompt(
     assert prompt_context.getvalue() == ""
 
 
-def test_claude_pre_write_allows_github_cache_issue_body_update(
+def test_claude_pre_write_blocks_github_cache_issue_body_update(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -1911,7 +1911,64 @@ Current body.
         stdout=captured,
     ) == 0
 
-    assert captured.getvalue() == ""
+    payload = json.loads(captured.getvalue())
+    reason = payload["reason"]
+    assert payload["decision"] == "block"
+    assert "projection is read-only" in reason
+    assert "body-file flow" in reason
+    assert f"Target: {issue_file}" in reason
+
+
+def test_claude_pre_write_blocks_github_cache_comment_body_edit(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _write_config(tmp_path)
+    monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(tmp_path))
+    monkeypatch.setenv("CLAUDE_PLUGIN_ROOT", str(_PLUGIN_ROOT))
+
+    comment_file = (
+        tmp_path
+        / ".workflow-cache"
+        / "issues"
+        / "39"
+        / "comment-2026-05-14T00-01-00Z-IC_kw.md"
+    )
+    comment_file.parent.mkdir(parents=True)
+    comment_file.write_text(
+        """---
+id: IC_kw
+author: studykit
+updated_at: 2026-05-14T00:01:00Z
+---
+
+Existing comment body.
+""",
+        encoding="utf-8",
+    )
+
+    captured = io.StringIO()
+    assert claude_main(
+        payload={
+            "session_id": "cache-comment-protection",
+            "cwd": str(tmp_path),
+            "hook_event_name": "PreToolUse",
+            "tool_name": "Edit",
+            "tool_input": {
+                "file_path": str(comment_file),
+                "old_string": "Existing comment body.",
+                "new_string": "Edited comment body.",
+            },
+        },
+        stdout=captured,
+    ) == 0
+
+    payload = json.loads(captured.getvalue())
+    reason = payload["reason"]
+    assert payload["decision"] == "block"
+    assert "projection is read-only" in reason
+    assert "body-file flow" in reason
+    assert f"Target: {comment_file}" in reason
 
 
 def test_claude_pre_write_blocks_creating_github_cache_issue_body(
@@ -2025,8 +2082,8 @@ Current body.
     payload = json.loads(captured.getvalue())
     reason = payload["reason"]
     assert payload["decision"] == "block"
-    assert "provider frontmatter is projection-owned" in reason
-    assert "edit only the Markdown body" in reason
+    assert "projection is read-only" in reason
+    assert "body-file flow" in reason
 
 
 def test_claude_pre_write_blocks_github_cache_comment_create_when_no_projection(
