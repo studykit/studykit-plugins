@@ -882,17 +882,12 @@ def test_session_start_injects_policy_for_configured_project(
     context = payload["hookSpecificOutput"]["additionalContext"]
     assert payload["hookSpecificOutput"]["hookEventName"] == "SessionStart"
     assert context == expected_session_start_context(runtime=runtime, knowledge_kind="github")
-    assert "Use `workflow-operator` for workflow operations" in context
-    assert "before reading local workflow\ncache snapshots or running provider commands yourself" in context
+    assert "workflow-operator" in context
     assert "issue status/completion checks" in context
-    assert "Main assistant responsibilities:" in context
-    assert "Operator responsibilities:" in context
+    assert "publish, append, or update" in context
     assert "relationship intent" in context
-    assert "Return operational paths, refs, relationship metadata, and verification results" in context
-    assert "New provider issue flow:" in context
-    assert "New comment flow:" in context
-    assert "Update existing issue body flow:" in context
-    assert "no frontmatter" in context
+    assert "frontmatter" in context
+    assert "read-only" in context
     assert "from_cache" not in context
     assert "pending draft" not in context.lower()
     assert "comments-pending" not in context
@@ -959,7 +954,7 @@ def test_claude_session_start_appends_workflow_env_file(
     assert f"export WORKFLOW_PLUGIN_ROOT={_PLUGIN_ROOT}" in content
     assert f"export WORKFLOW_PROJECT_DIR={tmp_path}" in content
     assert "export WORKFLOW_SESSION_ID=claude-shell-session" in content
-    assert f"export AUTHORING_RESOLVER={_PLUGIN_ROOT / 'scripts' / 'authoring_resolver.py'}" in content
+    assert "AUTHORING_RESOLVER" not in content
 
 
 def test_codex_session_start_writes_session_export_file(
@@ -980,7 +975,7 @@ def test_codex_session_start_writes_session_export_file(
     assert f"export WORKFLOW_PLUGIN_ROOT={_PLUGIN_ROOT}" in content
     assert f"export WORKFLOW_PROJECT_DIR={tmp_path}" in content
     assert "export WORKFLOW_SESSION_ID=codex-shell-session" in content
-    assert f"export AUTHORING_RESOLVER={_PLUGIN_ROOT / 'scripts' / 'authoring_resolver.py'}" in content
+    assert "AUTHORING_RESOLVER" not in content
 
 
 def test_codex_hook_state_uses_single_file_per_session(
@@ -1208,7 +1203,8 @@ def test_session_start_prepares_codex_operator_env_file_and_bootstrap_context(
     assert payload["hookSpecificOutput"]["hookEventName"] == "SessionStart"
     assert "## workflow operator bootstrap" in context
     assert "plugins/workflow/scripts/workflow" in context
-    assert "plugins/workflow/scripts/authoring_resolver.py" in context
+    assert "authoring_resolver.py" in context
+    assert "$AUTHORING_RESOLVER" not in context
     assert "$WORKFLOW github_issue_fetch.py" in context
     assert "$WORKFLOW github_issue_lifecycle.py close" in context
     assert "$WORKFLOW github_issue_drafts.py publish" in context
@@ -1216,11 +1212,11 @@ def test_session_start_prepares_codex_operator_env_file_and_bootstrap_context(
     assert "$WORKFLOW github_issue_writeback.py update" in context
     assert "$WORKFLOW github_issue_relationships.py" in context
     assert "$WORKFLOW github_issue_metadata.py" in context
+    assert "$WORKFLOW authoring_resolver.py --type" in context
     assert "ISSUE_FETCH=github_issue_fetch.py" not in context
     assert "$ISSUE_LIFECYCLE" not in context
     assert "Provider mutation scripts refresh affected cache projections internally." in context
     assert "reread_required=true" in context
-    assert "$AUTHORING_RESOLVER --type" in context
     assert "--scope comment" in context
     assert "jira_issue_fetch.py" not in context
     assert "GitHub knowledge documents are repository Markdown files under `wiki/`" in context
@@ -1229,7 +1225,7 @@ def test_session_start_prepares_codex_operator_env_file_and_bootstrap_context(
     content = codex_env_exports(tmp_path, "codex-session")
     assert f"export WORKFLOW={_PLUGIN_ROOT / 'scripts' / 'workflow'}" in content
     assert "export WORKFLOW_SESSION_ID=codex-main-thread" in content
-    assert f"export AUTHORING_RESOLVER={_PLUGIN_ROOT / 'scripts' / 'authoring_resolver.py'}" in content
+    assert "AUTHORING_RESOLVER" not in content
     subagent_state = session_state_path(tmp_path, "codex", "codex-session")
     assert subagent_state is not None
     assert subagent_state.is_file()
@@ -1317,25 +1313,24 @@ def test_operator_runtime_context_fragments_hold_provider_command_guidance() -> 
 
     github = (context_root / "issues" / "github.md").read_text(encoding="utf-8")
     jira = (context_root / "issues" / "jira.md").read_text(encoding="utf-8")
-    bootstrap = (context_root / "bootstrap.md").read_text(encoding="utf-8")
     bootstrap_codex = (context_root / "bootstrap-codex.md").read_text(encoding="utf-8")
 
-    assert "$WORKFLOW" in bootstrap
-    assert "{{WORKFLOW}}" not in bootstrap
-    assert "plugins/workflow/scripts/workflow" not in bootstrap
+    assert not (context_root / "bootstrap.md").exists()
     assert "plugins/workflow/scripts/workflow" in bootstrap_codex
-    assert "plugins/workflow/scripts/authoring_resolver.py" in bootstrap_codex
+    assert "$AUTHORING_RESOLVER" not in bootstrap_codex
     assert "$WORKFLOW github_issue_lifecycle.py" in github
+    assert "$WORKFLOW authoring_resolver.py --type" in github
+    assert "$AUTHORING_RESOLVER" not in github
     assert "ISSUE_LIFECYCLE=github_issue_lifecycle.py" not in github
     assert "$ISSUE_LIFECYCLE" not in github
     assert "workflow_github.py" not in github
     assert "Provider mutation scripts refresh affected cache projections internally." in github
-    assert "tell the main agent to decide whether to use a raw provider CLI" in github
     assert "$WORKFLOW jira_issue_fetch.py" in jira
+    assert "$WORKFLOW authoring_resolver.py --type" in jira
+    assert "$AUTHORING_RESOLVER" not in jira
     assert "ISSUE_FETCH=jira_issue_fetch.py" not in jira
     assert "$ISSUE_LIFECYCLE" not in jira
     assert "workflow_github.py" not in jira
-    assert "tell the main agent to decide whether to use a raw provider CLI" in jira
 
 
 def test_session_start_records_codex_subagent_when_not_operator(
@@ -1385,7 +1380,7 @@ def test_session_start_skips_claude_subagent_payload(
     content = env_file.read_text(encoding="utf-8")
     assert f"export WORKFLOW={_PLUGIN_ROOT / 'scripts' / 'workflow'}" in content
     assert "export WORKFLOW_SESSION_ID=claude-subagent-session" in content
-    assert f"export AUTHORING_RESOLVER={_PLUGIN_ROOT / 'scripts' / 'authoring_resolver.py'}" in content
+    assert "AUTHORING_RESOLVER" not in content
 
 
 def test_claude_subagent_start_injects_operator_bootstrap_context(
@@ -1412,11 +1407,12 @@ def test_claude_subagent_start_injects_operator_bootstrap_context(
     payload = json.loads(captured.getvalue())
     context = payload["hookSpecificOutput"]["additionalContext"]
     assert payload["hookSpecificOutput"]["hookEventName"] == "SubagentStart"
-    assert "## workflow operator bootstrap" in context
-    assert "$WORKFLOW" in context
+    assert "## workflow operator bootstrap" not in context
     assert "plugins/workflow/scripts/workflow" not in context
     assert "$WORKFLOW github_issue_lifecycle.py close" in context
     assert "$WORKFLOW github_issue_fetch.py" in context
+    assert "$WORKFLOW authoring_resolver.py --type" in context
+    assert "$AUTHORING_RESOLVER" not in context
     assert "ISSUE_LIFECYCLE=github_issue_lifecycle.py" not in context
     assert "$ISSUE_LIFECYCLE" not in context
     assert "Provider mutation scripts refresh affected cache projections internally." in context

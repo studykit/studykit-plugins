@@ -1,46 +1,44 @@
 ## workflow policy
 
-Use `workflow-operator` for workflow operations before reading local workflow
-cache snapshots or running provider commands yourself.
+Delegate workflow operations to `workflow-operator` before reading local
+workflow cache snapshots or running provider commands yourself.
 
-Workflow operations: issue status/completion checks, provider reads, comments,
-lifecycle changes, relationships, metadata updates, provider-backed issue
-writes, cache refreshes, write-back, and authoring path discovery.
+Workflow operations: issue status/completion checks, provider reads,
+comments, lifecycle changes, relationships, metadata updates,
+provider-backed issue writes, cache refreshes, write-back, and authoring
+path discovery.
 
-Main assistant responsibilities:
-- Ask `workflow-operator` for workflow operations and matching authoring paths. Specify the type, and the role (`issue` or `knowledge`) for dual-role or knowledge work; use the comment scope for comment-only updates.
+### Authoring path resolution
 
-New provider issue flow:
-1. Ask `workflow-operator` for matching authoring paths (specify type and, for dual-role types, role).
-2. Read the returned authoring paths.
-3. Write the issue body to a temp file you choose; body content only, no frontmatter.
-4. Present the metadata and the draft body to the user. Wait for explicit publish approval.
-5. After approval, hand `workflow-operator` the metadata (title, labels, issue type, role, relationship intent) and the temp file path with publish intent.
-6. `workflow-operator` publishes, refreshes the cache, deletes the temp file on success, and returns the cached issue file path with the issue ref and success/failure. On failure the temp file is preserved for retry.
+Ask `workflow-operator` for matching authoring paths. Specify the type
+(see Types) and, for dual-role types, the role (`issue` or `knowledge`).
+Use the comment scope for comment-only updates. Read the returned paths
+yourself before drafting a provider-backed change.
 
-New comment flow:
-1. Ask `workflow-operator` for matching authoring paths with the comment scope.
-2. Read the returned authoring paths.
-3. Write the comment body to a temp file you choose; body content only, no frontmatter.
-4. Present the issue ref, any optional state change, and the draft body to the user. Wait for explicit append approval.
-5. After approval, hand `workflow-operator` the issue ref, the temp file path, and any optional state and relationship intent with append intent.
-6. `workflow-operator` runs a freshness check against the issue body and comments, posts the comment, applies any optional state change, refreshes the cache, deletes the temp file on success, and returns the cached issue file path with the issue ref and success/failure. On freshness drift the operator returns blocked with the paths to reread; the temp file is preserved for retry. Relationship intent triggers a follow-up `$ISSUE_RELATIONSHIPS` step.
+### Provider writes
 
-Update existing issue body flow:
-1. Ask `workflow-operator` for matching authoring paths (specify type and, for dual-role types, role).
-2. Read the returned authoring paths and the current cached issue body when helpful.
-3. Write the new issue body to a temp file you choose; body content only, no frontmatter. The cached `issue.md` body is read-only; do not edit it in place.
-4. Present the issue ref, any optional metadata or state change, and the draft body to the user. Wait for explicit update approval.
-5. After approval, hand `workflow-operator` the issue ref, the temp file path, and any optional metadata (title, labels), state (`open`/`closed`), state reason, and relationship intent with update intent.
-6. `workflow-operator` runs a freshness check against the issue body, edits the issue, applies any optional state change, refreshes the cache, deletes the temp file on success, and returns the cached issue file path with the issue ref and success/failure. On freshness drift the operator returns blocked with the paths to reread; the temp file is preserved for retry. Relationship intent triggers a follow-up `$ISSUE_RELATIONSHIPS` step.
+The three provider-write intents — publish a new issue, append a comment,
+and update an existing issue body — share one shape:
 
-Operator responsibilities:
-- Resolve authoring paths.
-- Perform the workflow operations listed above and verify results.
-- Treat caller-provided temp body files as opaque provider payloads: read only to publish or verify; never summarize, rewrite, or make authoring judgments.
-- After a successful publish, refresh the cache, delete the temp file, and return the cached issue file path.
-- Return operational paths, refs, relationship metadata, and verification results without summarizing issue, comment, or knowledge content.
+1. Resolve and read the authoring paths.
+2. Write the body to a temp file you choose; body content only, no
+   frontmatter. The cached `issue.md` body is read-only — do not edit it
+   in place when updating.
+3. Present the metadata, issue ref (when applicable), and draft body to
+   the user and wait for explicit approval.
+4. Hand `workflow-operator` the temp file path with the write intent
+   (publish, append, or update), the required refs, and any optional
+   metadata, state change, or relationship intent.
+5. The operator runs the required freshness check, applies the mutation,
+   refreshes the cache, deletes the temp file on success, and returns the
+   cached `issue.md` path with the issue ref and verification result. On
+   freshness drift it returns `status=blocked` with the cache paths to
+   reread; reread them and retry. Relationship intent triggers a
+   follow-up relationship apply step.
 
-Types:
-- Issue: `task`, `bug`, `spike`, `epic`, `review`. Dual-role with the `issue` role: `research`, `usecase`.
-- Knowledge: `architecture`, `ci`, `context`, `domain`, `nfr`, `spec`. Dual-role with the `knowledge` role: `research`, `usecase`.
+### Types
+
+- Issue: `task`, `bug`, `spike`, `epic`, `review`. Dual-role with the
+  `issue` role: `research`, `usecase`.
+- Knowledge: `architecture`, `ci`, `context`, `domain`, `nfr`, `spec`.
+  Dual-role with the `knowledge` role: `research`, `usecase`.

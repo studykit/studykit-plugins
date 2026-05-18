@@ -57,7 +57,6 @@ apply_terminal_environment() {
   export WORKFLOW="$SCRIPT_DIR/workflow"
   export WORKFLOW_PLUGIN_ROOT="$PLUGIN_ROOT"
   export WORKFLOW_PROJECT_DIR="${WORKFLOW_PROJECT_DIR:-$(resolve_project_dir)}"
-  export AUTHORING_RESOLVER="$SCRIPT_DIR/authoring_resolver.py"
 }
 
 COMMAND="$1"
