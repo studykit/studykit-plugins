@@ -6,11 +6,10 @@ payload/env extraction. They call common plain functions from
 `../scripts/workflow_hook.py` for shared workflow behavior such as policy
 injection, provider cache projection protection, and issue-cache context.
 
-The Codex manifest registers only `SessionStart`, `UserPromptSubmit`, and
-`Stop`. Claude also registers `PreToolUse` for provider cache projection
-protection and repeated authoring-read notices, `PostToolUse` for main-session
-authoring read tracking, and `SubagentStart` for spawned subagent identity
-tracking.
+The Codex manifest registers only `SessionStart` and `UserPromptSubmit`. Claude
+also registers `PreToolUse` for provider cache projection protection and
+repeated authoring-read notices, `PostToolUse` for main-session authoring read
+tracking, and `SubagentStart` for spawned subagent identity tracking.
 
 When either runtime script writes hook output to stdout, it writes JSON only.
 Empty stdout is used for no-op hook runs.
@@ -104,13 +103,15 @@ Behavior:
 
 ## Stop
 
-`Stop` is intentionally silent.
+`Stop` is intentionally silent when invoked directly through a runtime adapter.
+Neither plugin manifest registers `Stop` because workflow has no stop-time
+behavior.
 
 Behavior:
 
 - Does not read providers or write issue cache projections.
 - Emits no JSON output; `Stop` output is reserved for host-supported block decisions.
-- Skips when `stop_hook_active` is true to avoid hook loops.
+- Does not continue or block the stop flow.
 - Emits nothing for clean no-op cases and never blocks the stop flow.
 
 ## Manifests
