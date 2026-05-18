@@ -27,6 +27,7 @@ Useful commands:
 "$WORKFLOW" workflow_setup.py jira-relationship-inspect --jira-site <url> --field-query <field-name-or-id> --json
 "$WORKFLOW" workflow_setup.py jira-relationship-mappings --issue-link blocked_by=Blocks:inward --field child=parent:target:key --json
 "$WORKFLOW" workflow_setup.py build-config --project <project-root> --issue-provider <provider> --knowledge-provider <provider> <options...> --json
+"$WORKFLOW" workflow_setup.py build-config --issue-provider jira --knowledge-provider <provider> --jira-snapshot-hidden-comment-marker '!git-event' <options...> --json
 "$WORKFLOW" workflow_setup.py write --project <project-root> --config <reviewed-yaml-file> --json
 "$WORKFLOW" workflow_config.py --project <project-root> --require --json
 ```
@@ -51,13 +52,17 @@ Useful commands:
    generate mapping YAML with `jira-relationship-mappings`. If the sample
    issues or confirmed mappings are unavailable, stop setup as incomplete; do
    not offer to defer Jira relationship setup until later.
-6. Collect local projection mode (`none`, `ephemeral`, or `persistent`), local
+6. For Jira issue providers, ask whether generated `snapshot.md` files should
+   hide automation comments by body marker. If the user gives markers such as
+   `!git-event`, pass each one with
+   `--jira-snapshot-hidden-comment-marker`.
+7. Collect local projection mode (`none`, `ephemeral`, or `persistent`), local
    projection path when applicable, and commit reference style.
-7. Run `capabilities` for the selected providers and show limitations before
+8. Run `capabilities` for the selected providers and show limitations before
    confirmation.
-8. Run `build-config --json`, show the generated YAML and warnings to the user,
+9. Run `build-config --json`, show the generated YAML and warnings to the user,
    and ask for explicit confirmation before writing.
-9. After confirmation, write with `write --config <reviewed-yaml-file>`. Then
+10. After confirmation, write with `write --config <reviewed-yaml-file>`. Then
    verify with `workflow_config.py --require --json`.
 
 ## Provider Rules
@@ -94,6 +99,11 @@ Useful commands:
 - When Jira setup needs site-specific field names, hierarchy semantics,
   issue-type rules, label policy, or body-renderer behavior, run the Jira site
   profiling flow in this skill before building the final config.
+- Jira snapshot comment hiding is opt-in. Use
+  `providers.issues.snapshot.hidden_comment_markers` only when the user or
+  provider profile supplies exact body markers. The markers hide matching
+  comments from generated `snapshot.md` files only; raw provider cache files
+  still retain the original comments.
 - Jira labels are opt-in. Do not copy local labels into Jira unless the user or
   provider profile explicitly asks for label writes.
 - Jira Data Center sites may not render Markdown. Report body-format uncertainty
@@ -124,9 +134,12 @@ confirmation, then use only the exact confirmed values in setup.
    provider profile says that is the right renderer.
 6. Determine label policy from the user or provider profile. Labels are opt-in;
    never copy local labels into Jira by default.
-7. Summarize observed link types, hierarchy surfaces, custom fields, body
-   format guidance, label policy, confirmed relationship mapping YAML, and open
-   questions before generating the final config.
+7. Determine whether automation comments should be hidden from generated Jira
+   snapshots, and record only exact user-confirmed markers.
+8. Summarize observed link types, hierarchy surfaces, custom fields, body
+   format guidance, label policy, snapshot-hidden comment markers, confirmed
+   relationship mapping YAML, and open questions before generating the final
+   config.
 
 Rules:
 

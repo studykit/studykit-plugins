@@ -244,6 +244,7 @@ def build_config(
     jira_project: str | None = None,
     jira_issue_type: str | None = None,
     jira_relationship_mappings: Mapping[str, Any] | None = None,
+    jira_snapshot_hidden_comment_markers: Sequence[str] | None = None,
     confluence_site: str | None = None,
     confluence_deployment: str | None = "data_center",
     confluence_space: str | None = None,
@@ -294,6 +295,7 @@ def build_config(
         jira_project=jira_project,
         jira_issue_type=jira_issue_type,
         jira_relationship_mappings=jira_relationship_mappings,
+        jira_snapshot_hidden_comment_markers=jira_snapshot_hidden_comment_markers,
         filesystem_path=filesystem_issues_path,
     )
     knowledge = _knowledge_provider_config(
@@ -636,6 +638,12 @@ def _add_config_build_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--jira-api-version", default="2", help="Jira REST API version")
     parser.add_argument("--jira-project", help="Jira project key")
     parser.add_argument("--jira-issue-type", help="Jira issue type")
+    parser.add_argument(
+        "--jira-snapshot-hidden-comment-marker",
+        action="append",
+        default=[],
+        help="repeatable comment body marker hidden from generated Jira snapshot.md files, e.g. !git-event",
+    )
     parser.add_argument("--jira-relationship-mappings-json", help="YAML/JSON mapping for Jira relationship writes")
     parser.add_argument("--jira-relationship-mappings-file", type=Path, help="file containing Jira relationship mappings")
     parser.add_argument(
@@ -676,6 +684,7 @@ def _config_from_args(args: argparse.Namespace) -> dict[str, Any]:
         jira_project=args.jira_project,
         jira_issue_type=args.jira_issue_type,
         jira_relationship_mappings=_relationship_mappings_from_args(args),
+        jira_snapshot_hidden_comment_markers=_jira_snapshot_hidden_comment_markers_from_args(args),
         confluence_site=args.confluence_site,
         confluence_deployment=args.confluence_deployment,
         confluence_space=args.confluence_space,
@@ -747,6 +756,7 @@ def _issue_provider_config(
     jira_project: str | None,
     jira_issue_type: str | None,
     jira_relationship_mappings: Mapping[str, Any] | None,
+    jira_snapshot_hidden_comment_markers: Sequence[str] | None,
     filesystem_path: str | None,
 ) -> dict[str, Any]:
     settings: dict[str, Any] = {"kind": provider}
@@ -759,6 +769,9 @@ def _issue_provider_config(
         _set_if_text(settings, "api_version", jira_api_version or "2")
         _set_if_text(settings, "project", jira_project.upper() if jira_project else None)
         _set_if_text(settings, "issue_type", jira_issue_type)
+        hidden_markers = _normalized_string_tuple(jira_snapshot_hidden_comment_markers)
+        if hidden_markers:
+            settings["snapshot"] = {"hidden_comment_markers": list(hidden_markers)}
         if jira_relationship_mappings:
             settings["relationship_mappings"] = dict(jira_relationship_mappings)
     elif provider == "filesystem":
@@ -1091,6 +1104,31 @@ def _relationship_mappings_from_args(args: argparse.Namespace) -> dict[str, Any]
         name, mapping = _parse_inline_relationship_mapping(item)
         mappings[name] = mapping
     return mappings or None
+
+
+def _jira_snapshot_hidden_comment_markers_from_args(args: argparse.Namespace) -> tuple[str, ...]:
+    return _normalized_string_tuple(getattr(args, "jira_snapshot_hidden_comment_marker", None))
+
+
+def _normalized_string_tuple(value: Any) -> tuple[str, ...]:
+    if value is None:
+        return ()
+    if isinstance(value, str):
+        return tuple(item.strip() for item in value.split(",") if item.strip())
+    if isinstance(value, Sequence):
+        result: list[str] = []
+        for item in value:
+            if item is None:
+                continue
+            if isinstance(item, str):
+                result.extend(part.strip() for part in item.split(",") if part.strip())
+            else:
+                text = str(item).strip()
+                if text:
+                    result.append(text)
+        return tuple(result)
+    text = str(value).strip()
+    return (text,) if text else ()
 
 
 def _load_relationship_mappings(text: str) -> dict[str, Any]:

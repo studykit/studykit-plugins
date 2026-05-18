@@ -3,10 +3,15 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from typing import Any
 
-def render_jira_snapshot(issue: Mapping[str, Any]) -> str:
+
+def render_jira_snapshot(
+    issue: Mapping[str, Any],
+    *,
+    hidden_comment_markers: Sequence[str] = (),
+) -> str:
     """Render an LLM-facing, generated Jira issue snapshot."""
 
     lines = [
@@ -29,10 +34,13 @@ def render_jira_snapshot(issue: Mapping[str, Any]) -> str:
     ]
 
     comments = issue.get("comments") if isinstance(issue.get("comments"), list) else []
-    if comments:
-        for comment in comments:
-            if not isinstance(comment, Mapping):
-                continue
+    visible_comments = [
+        comment
+        for comment in comments
+        if isinstance(comment, Mapping) and not _comment_has_hidden_marker(comment, hidden_comment_markers)
+    ]
+    if visible_comments:
+        for comment in visible_comments:
             author = _author_name(comment.get("author"))
             lines.extend(
                 [
@@ -94,8 +102,12 @@ def render_jira_snapshot(issue: Mapping[str, Any]) -> str:
                 continue
             lines.append(f"- {_format_issue_link(link)}")
 
-    lines.extend(["", "## Raw Cache", "", "- `issue.json`", "- `remote-links.json`", "- `metadata.yml`", ""])
     return "\n".join(lines)
+
+
+def _comment_has_hidden_marker(comment: Mapping[str, Any], markers: Sequence[str]) -> bool:
+    body = str(comment.get("body") or "")
+    return any(marker in body for marker in markers if marker)
 
 
 def _author_name(value: Any) -> str:

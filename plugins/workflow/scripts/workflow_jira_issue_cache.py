@@ -3,9 +3,9 @@
 
 from __future__ import annotations
 
-import os
 import json
-from collections.abc import Mapping
+import os
+from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -265,6 +265,7 @@ class JiraDataCenterIssueCache:
         *,
         remote_links: list[Mapping[str, Any]] | None = None,
         fetched_at: str | None = None,
+        snapshot_hidden_comment_markers: Sequence[str] = (),
     ) -> dict[str, str]:
         """Write native JSON, metadata, and generated Markdown snapshot."""
 
@@ -283,7 +284,10 @@ class JiraDataCenterIssueCache:
 
         _atomic_write_text(issue_path, _format_json(issue))
         _atomic_write_text(remote_links_path, _format_json(links))
-        _atomic_write_text(snapshot_path, render_jira_snapshot(normalized))
+        _atomic_write_text(
+            snapshot_path,
+            render_jira_snapshot(normalized, hidden_comment_markers=snapshot_hidden_comment_markers),
+        )
         _atomic_write_text(
             metadata_path,
             _dump_yaml(
