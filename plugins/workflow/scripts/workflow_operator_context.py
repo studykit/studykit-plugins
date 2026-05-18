@@ -23,6 +23,10 @@ _SUPPORTED_PROVIDER_FRAGMENTS = {
     "issues": {"github", "jira", "filesystem"},
     "knowledge": {"github", "confluence", "filesystem"},
 }
+_BOOTSTRAP_FRAGMENT_BY_RUNTIME = {
+    "claude": "bootstrap.md",
+    "codex": "bootstrap-codex.md",
+}
 
 
 class WorkflowOperatorContextError(RuntimeError):
@@ -33,23 +37,21 @@ def agent_name_matches_operator(name: str | None) -> bool:
     return bool(name) and name.strip() == WORKFLOW_OPERATOR_AGENT_NAME
 
 
-def build_operator_session_context(config: Any) -> str:
+def build_operator_session_context(config: Any, *, runtime: str) -> str:
     """Build project-specific operator bootstrap context for SessionStart."""
 
+    bootstrap_name = _BOOTSTRAP_FRAGMENT_BY_RUNTIME.get(runtime)
+    if bootstrap_name is None:
+        raise WorkflowOperatorContextError(
+            f"unsupported workflow operator runtime: {runtime!r}"
+        )
     issue_kind = _provider_kind(config, "issues")
     knowledge_kind = _provider_kind(config, "knowledge")
     fragments = [
-        _render_fragment("bootstrap.md", {}),
-        _render_fragment(
-            "configured-providers.md",
-            {
-                "ISSUE_KIND": issue_kind or "unknown",
-                "KNOWLEDGE_KIND": knowledge_kind or "unknown",
-            },
-        ),
+        _render_fragment(bootstrap_name),
         _provider_fragment("issues", issue_kind),
         _provider_fragment("knowledge", knowledge_kind),
-        _render_fragment("response-boundary.md", {}),
+        _render_fragment("response-boundary.md"),
     ]
     return "\n\n".join(fragment.strip() for fragment in fragments if fragment.strip())
 
@@ -57,23 +59,11 @@ def build_operator_session_context(config: Any) -> str:
 def _provider_fragment(section: str, provider_kind: str | None) -> str:
     supported = _SUPPORTED_PROVIDER_FRAGMENTS[section]
     fragment_name = provider_kind if provider_kind in supported else "unsupported"
-    return _render_fragment(f"{section}/{fragment_name}.md", {})
+    return _render_fragment(f"{section}/{fragment_name}.md")
 
 
-def _render_fragment(relative_path: str, values: dict[str, str]) -> str:
-    text = _read_fragment(relative_path)
-    for key, value in values.items():
-        text = text.replace(f"{{{{{key}}}}}", value)
-    unresolved = [
-        token
-        for token in ("{{ISSUE_KIND}}", "{{KNOWLEDGE_KIND}}")
-        if token in text
-    ]
-    if unresolved:
-        raise WorkflowOperatorContextError(
-            f"operator context fragment {relative_path} has unresolved placeholders: {', '.join(unresolved)}"
-        )
-    return text
+def _render_fragment(relative_path: str) -> str:
+    return _read_fragment(relative_path)
 
 
 def _read_fragment(relative_path: str) -> str:
