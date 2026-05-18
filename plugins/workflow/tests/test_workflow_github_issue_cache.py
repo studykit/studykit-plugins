@@ -174,7 +174,7 @@ def test_github_issue_cache_writes_flat_layout_with_frontmatter_freshness(tmp_pa
     assert "current:\n    parent: 28" in issue_text
     assert "children:\n    - 41" in issue_text
     assert "blocked_by:\n      - 32" in issue_text
-    assert "comments:\n  source_updated_at:" in issue_text
+    assert "\ncomments:\n" not in issue_text
     assert "# Issue" not in issue_text
     assert issue_text.endswith("Raw issue body.")
 

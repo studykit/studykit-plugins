@@ -268,10 +268,14 @@ class GitHubIssueCache:
 
         frontmatter, _body = _read_frontmatter_markdown(issue_path)
         _require_schema(frontmatter, issue_path)
-        source = fetched = None
+        issue_source = _normalize_optional(frontmatter.get("source_updated_at"))
+        issue_fetched = _normalize_optional(frontmatter.get("fetched_at"))
         if normalized == "issue":
-            source = _normalize_optional(frontmatter.get("source_updated_at"))
-            fetched = _normalize_optional(frontmatter.get("fetched_at"))
+            source: str | None = issue_source
+            fetched: str | None = issue_fetched
+        elif normalized == "comments":
+            source = self._latest_cached_comment_timestamp(repo, issue) or issue_source
+            fetched = issue_fetched
         else:
             block = frontmatter.get(normalized)
             if isinstance(block, Mapping):
@@ -281,12 +285,29 @@ class GitHubIssueCache:
                 raise WorkflowCacheCorrupt(
                     f"{normalized} freshness frontmatter must be a mapping: {issue_path}"
                 )
+            else:
+                source = None
+                fetched = None
         return FreshnessMetadata(
             source_updated_at=source,
             fetched_at=fetched,
             path=issue_path,
             target=normalized,
         )
+
+    def _latest_cached_comment_timestamp(self, repo: GitHubRepository, issue: int | str) -> str | None:
+        latest: str | None = None
+        for comment_path in self.comment_files(repo, issue):
+            try:
+                comment_frontmatter, _body = _read_frontmatter_markdown(comment_path)
+            except WorkflowCacheError:
+                continue
+            updated = _normalize_optional(comment_frontmatter.get("updated_at")) or _normalize_optional(
+                comment_frontmatter.get("created_at")
+            )
+            if updated is not None and (latest is None or updated > latest):
+                latest = updated
+        return latest
 
     def read_issue(
         self,
@@ -367,9 +388,6 @@ class GitHubIssueCache:
             raise WorkflowCacheMiss(f"comments cache does not exist: {issue_path}")
         frontmatter, _body = _read_frontmatter_markdown(issue_path)
         _require_schema(frontmatter, issue_path)
-        comments_block = frontmatter.get("comments")
-        if comments_block is not None and not isinstance(comments_block, Mapping):
-            raise WorkflowCacheCorrupt(f"comments freshness frontmatter must be a mapping: {issue_path}")
 
         result_comments: list[dict[str, Any]] = []
         for comment_path in self.comment_files(repo, issue):
@@ -403,11 +421,7 @@ class GitHubIssueCache:
                 comment["body"] = comment_body
             result_comments.append(comment)
 
-        block_source = block_fetched = None
-        if isinstance(comments_block, Mapping):
-            block_source = _normalize_optional(comments_block.get("source_updated_at"))
-            block_fetched = _normalize_optional(comments_block.get("fetched_at"))
-
+        comments_freshness = self.read_freshness_metadata(repo, issue, target="comments")
         return {
             "repository": repo.to_json(),
             "issue": normalize_issue_number(issue),
@@ -415,8 +429,8 @@ class GitHubIssueCache:
             "cache": {
                 "hit": True,
                 "issue_file": str(issue_path),
-                "fetchedAt": block_fetched,
-                "sourceUpdatedAt": block_source,
+                "fetchedAt": comments_freshness.fetched_at,
+                "sourceUpdatedAt": comments_freshness.source_updated_at,
             },
         }
 
@@ -483,9 +497,8 @@ class GitHubIssueCache:
             pending_relationships = []
         current_relationships = _relationships_from_issue(issue)
 
-        comments_freshness: tuple[str, str] | None = None
         if _has_comment_projection_payload(issue):
-            comments_freshness = self._write_comment_files(repo, issue_number, issue, fetched_at=now)
+            self._write_comment_files(repo, issue_number, issue, fetched_at=now)
 
         issue_frontmatter: dict[str, Any] = {
             "schema_version": SCHEMA_VERSION,
@@ -505,20 +518,6 @@ class GitHubIssueCache:
             source_updated_at=source_updated_at,
             fetched_at=now,
         )
-        if comments_freshness is not None:
-            comments_source, comments_fetched = comments_freshness
-        else:
-            existing_block = self._read_existing_frontmatter_block(repo, issue_number, "comments")
-            if existing_block is not None:
-                comments_source = _normalize_optional(existing_block.get("source_updated_at")) or source_updated_at
-                comments_fetched = _normalize_optional(existing_block.get("fetched_at")) or now
-            else:
-                comments_source = source_updated_at
-                comments_fetched = now
-        issue_frontmatter["comments"] = {
-            "source_updated_at": comments_source,
-            "fetched_at": comments_fetched,
-        }
 
         issue_path = self.issue_file(repo, issue_number)
         _atomic_write_text(issue_path, _format_markdown(issue_frontmatter, str(issue.get("body") or "")))
@@ -529,24 +528,6 @@ class GitHubIssueCache:
             relationship_location=issue_path,
         )
 
-    def _read_existing_frontmatter_block(
-        self,
-        repo: GitHubRepository,
-        issue_number: str,
-        key: str,
-    ) -> Mapping[str, Any] | None:
-        issue_path = self.issue_file(repo, issue_number)
-        if not issue_path.is_file():
-            return None
-        try:
-            frontmatter, _body = _read_frontmatter_markdown(issue_path)
-        except WorkflowCacheError:
-            return None
-        block = frontmatter.get(key)
-        if isinstance(block, Mapping):
-            return block
-        return None
-
     def _write_comment_files(
         self,
         repo: GitHubRepository,
@@ -554,8 +535,8 @@ class GitHubIssueCache:
         issue: Mapping[str, Any],
         *,
         fetched_at: str,
-    ) -> tuple[str, str]:
-        """Write flat ``comment-*.md`` files and return the comments freshness pair."""
+    ) -> None:
+        """Write flat ``comment-*.md`` files; comments freshness is derived on read."""
 
         issue_dir = self.issue_dir(repo, issue_number)
         issue_dir.mkdir(parents=True, exist_ok=True)
@@ -587,13 +568,6 @@ class GitHubIssueCache:
         for path in issue_dir.glob("comment-*.md"):
             if path.name not in expected_files:
                 path.unlink()
-
-        source_updated_at = (
-            _latest_comment_timestamp(raw_comments)
-            or _normalize_optional(issue.get("updatedAt") or issue.get("updated_at"))
-            or fetched_at
-        )
-        return source_updated_at, fetched_at
 
     def _update_issue_frontmatter(
         self,
