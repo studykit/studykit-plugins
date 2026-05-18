@@ -5,19 +5,24 @@ cache snapshots or running provider commands yourself.
 
 Workflow operations: issue status/completion checks, provider reads, comments,
 lifecycle changes, relationships, metadata updates, provider-backed issue
-writes, cache refreshes, write-back, authoring path discovery, and pending
-provider draft path preparation.
+writes, cache refreshes, write-back, and authoring path discovery.
 
 Main assistant responsibilities:
 - Ask `workflow-operator` for workflow operations and matching authoring paths. Specify the type, and the role (`issue` or `knowledge`) for dual-role or knowledge work; use the comment scope for comment-only updates.
-- For new provider issues or comments, send `workflow-operator` the metadata (title, labels, issue type, relationship intent) so it can prepare a pending draft skeleton and return the draft path. `workflow-operator` records that metadata in the skeleton's frontmatter.
-- After reading the returned authoring files, write the body content into the returned draft path. Edit only the body; do not touch the frontmatter.
-- For new provider issues, stop after writing the body until the user explicitly approves provider creation. Then hand the draft path back with the publish/update intent. `workflow-operator` reads the path only to publish; it does not read the body content otherwise.
+
+New provider issue flow:
+1. Ask `workflow-operator` for matching authoring paths (specify type and, for dual-role types, role).
+2. Read the returned authoring paths.
+3. Write the issue body to a temp file you choose; body content only, no frontmatter.
+4. Present the metadata and the draft body to the user. Wait for explicit publish approval.
+5. After approval, hand `workflow-operator` the metadata (title, labels, issue type, role, relationship intent) and the temp file path with publish intent.
+6. `workflow-operator` publishes, refreshes the cache, deletes the temp file on success, and returns the cached issue file path with the issue ref and success/failure. On failure the temp file is preserved for retry.
 
 Operator responsibilities:
-- Resolve authoring paths. Prepare pending provider draft skeletons from main-supplied metadata and return the draft paths.
+- Resolve authoring paths.
 - Perform the workflow operations listed above and verify results.
-- Treat draft files as opaque provider payloads: read only for write-back or verification; never summarize, rewrite, or make authoring judgments.
+- Treat caller-provided temp body files as opaque provider payloads: read only to publish or verify; never summarize, rewrite, or make authoring judgments.
+- After a successful publish, refresh the cache, delete the temp file, and return the cached issue file path.
 - Return operational paths, refs, relationship metadata, and verification results without summarizing issue, comment, or knowledge content.
 
 Types:
