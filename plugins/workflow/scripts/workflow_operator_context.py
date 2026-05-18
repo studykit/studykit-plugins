@@ -12,7 +12,6 @@ that match the active workflow configuration and renders small placeholders.
 
 from __future__ import annotations
 
-import shlex
 from pathlib import Path
 from typing import Any
 
@@ -34,13 +33,13 @@ def agent_name_matches_operator(name: str | None) -> bool:
     return bool(name) and name.strip() == WORKFLOW_OPERATOR_AGENT_NAME
 
 
-def build_operator_session_context(config: Any, *, launcher: Path) -> str:
+def build_operator_session_context(config: Any) -> str:
     """Build project-specific operator bootstrap context for SessionStart."""
 
     issue_kind = _provider_kind(config, "issues")
     knowledge_kind = _provider_kind(config, "knowledge")
     fragments = [
-        _render_fragment("bootstrap.md", {"WORKFLOW": shlex.quote(str(launcher))}),
+        _render_fragment("bootstrap.md", {}),
         _render_fragment(
             "configured-providers.md",
             {
@@ -67,7 +66,7 @@ def _render_fragment(relative_path: str, values: dict[str, str]) -> str:
         text = text.replace(f"{{{{{key}}}}}", value)
     unresolved = [
         token
-        for token in ("{{WORKFLOW}}", "{{ISSUE_KIND}}", "{{KNOWLEDGE_KIND}}")
+        for token in ("{{ISSUE_KIND}}", "{{KNOWLEDGE_KIND}}")
         if token in text
     ]
     if unresolved:

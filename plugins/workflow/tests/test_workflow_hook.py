@@ -959,6 +959,7 @@ def test_claude_session_start_appends_workflow_env_file(
     assert f"export WORKFLOW_PLUGIN_ROOT={_PLUGIN_ROOT}" in content
     assert f"export WORKFLOW_PROJECT_DIR={tmp_path}" in content
     assert "export WORKFLOW_SESSION_ID=claude-shell-session" in content
+    assert f"export AUTHORING_RESOLVER={_PLUGIN_ROOT / 'scripts' / 'authoring_resolver.py'}" in content
 
 
 def test_codex_session_start_writes_session_export_file(
@@ -979,6 +980,7 @@ def test_codex_session_start_writes_session_export_file(
     assert f"export WORKFLOW_PLUGIN_ROOT={_PLUGIN_ROOT}" in content
     assert f"export WORKFLOW_PROJECT_DIR={tmp_path}" in content
     assert "export WORKFLOW_SESSION_ID=codex-shell-session" in content
+    assert f"export AUTHORING_RESOLVER={_PLUGIN_ROOT / 'scripts' / 'authoring_resolver.py'}" in content
 
 
 def test_codex_hook_state_uses_single_file_per_session(
@@ -1205,7 +1207,8 @@ def test_session_start_prepares_codex_operator_env_file_and_bootstrap_context(
     context = payload["hookSpecificOutput"]["additionalContext"]
     assert payload["hookSpecificOutput"]["hookEventName"] == "SessionStart"
     assert "## workflow operator bootstrap" in context
-    assert f"WORKFLOW={_PLUGIN_ROOT / 'scripts' / 'workflow'}" in context
+    assert "Use `$WORKFLOW`" in context
+    assert "persisted by SessionStart" in context
     assert "Issues: github" in context
     assert "Knowledge: github" in context
     assert "ISSUE_FETCH=github_issue_fetch.py" in context
@@ -1218,6 +1221,8 @@ def test_session_start_prepares_codex_operator_env_file_and_bootstrap_context(
     assert "Use `$ISSUE_LIFECYCLE close` or `$ISSUE_LIFECYCLE reopen`" in context
     assert "Provider mutation scripts refresh affected cache projections internally." in context
     assert "reread_required=true" in context
+    assert "$AUTHORING_RESOLVER --type" in context
+    assert "--scope comment" in context
     assert "jira_issue_fetch.py" not in context
     assert "GitHub knowledge documents are repository Markdown files under `wiki/`" in context
     assert "hook-state" not in context
@@ -1225,6 +1230,7 @@ def test_session_start_prepares_codex_operator_env_file_and_bootstrap_context(
     content = codex_env_exports(tmp_path, "codex-session")
     assert f"export WORKFLOW={_PLUGIN_ROOT / 'scripts' / 'workflow'}" in content
     assert "export WORKFLOW_SESSION_ID=codex-main-thread" in content
+    assert f"export AUTHORING_RESOLVER={_PLUGIN_ROOT / 'scripts' / 'authoring_resolver.py'}" in content
     subagent_state = session_state_path(tmp_path, "codex", "codex-session")
     assert subagent_state is not None
     assert subagent_state.is_file()
@@ -1318,7 +1324,8 @@ def test_operator_runtime_context_fragments_hold_provider_command_guidance() -> 
     jira = (context_root / "issues" / "jira.md").read_text(encoding="utf-8")
     bootstrap = (context_root / "bootstrap.md").read_text(encoding="utf-8")
 
-    assert "WORKFLOW={{WORKFLOW}}" in bootstrap
+    assert "Use `$WORKFLOW`" in bootstrap
+    assert "{{WORKFLOW}}" not in bootstrap
     assert "ISSUE_LIFECYCLE=github_issue_lifecycle.py" in github
     assert "workflow_github.py" not in github
     assert "Use `$ISSUE_LIFECYCLE close` or `$ISSUE_LIFECYCLE reopen`" in github
@@ -1376,6 +1383,7 @@ def test_session_start_skips_claude_subagent_payload(
     content = env_file.read_text(encoding="utf-8")
     assert f"export WORKFLOW={_PLUGIN_ROOT / 'scripts' / 'workflow'}" in content
     assert "export WORKFLOW_SESSION_ID=claude-subagent-session" in content
+    assert f"export AUTHORING_RESOLVER={_PLUGIN_ROOT / 'scripts' / 'authoring_resolver.py'}" in content
 
 
 def test_claude_subagent_start_injects_operator_bootstrap_context(
@@ -1403,7 +1411,7 @@ def test_claude_subagent_start_injects_operator_bootstrap_context(
     context = payload["hookSpecificOutput"]["additionalContext"]
     assert payload["hookSpecificOutput"]["hookEventName"] == "SubagentStart"
     assert "## workflow operator bootstrap" in context
-    assert f"WORKFLOW={_PLUGIN_ROOT / 'scripts' / 'workflow'}" in context
+    assert "Use `$WORKFLOW`" in context
     assert "Issues: github" in context
     assert "ISSUE_LIFECYCLE=github_issue_lifecycle.py" in context
     assert "ISSUE_FETCH=github_issue_fetch.py" in context

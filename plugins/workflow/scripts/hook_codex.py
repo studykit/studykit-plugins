@@ -449,10 +449,7 @@ def _handle_agent_session_start(
         {
             "hookSpecificOutput": {
                 "hookEventName": "SessionStart",
-                "additionalContext": build_operator_session_context(
-                    config,
-                    launcher=_plugin_root() / "scripts" / "workflow",
-                ),
+                "additionalContext": build_operator_session_context(config),
             }
         },
         stdout=stdout,
