@@ -365,10 +365,14 @@ def default_provider_registry(*, runner: CommandRunner | None = None) -> Provide
 
     from workflow_github_issue_provider import GitHubIssueNativeProvider
     from workflow_jira_issue_provider import JiraDataCenterIssueNativeProvider
+    from workflow_confluence_knowledge_provider import (
+        ConfluenceDataCenterKnowledgeNativeProvider,
+    )
 
     registry = ProviderRegistry()
     registry.register(GitHubIssueNativeProvider(runner=runner))
     registry.register(JiraDataCenterIssueNativeProvider(runner=runner))
+    registry.register(ConfluenceDataCenterKnowledgeNativeProvider(runner=runner))
     return registry
 
 
