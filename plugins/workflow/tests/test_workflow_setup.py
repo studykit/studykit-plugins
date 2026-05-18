@@ -48,6 +48,16 @@ def _github_github_config(project: Path) -> dict[str, Any]:
     )
 
 
+def _jira_relationship_mappings() -> dict[str, Any]:
+    return {
+        "blocked_by": {
+            "surface": "issue_link",
+            "link_type": "Blocks",
+            "direction": "inward",
+        }
+    }
+
+
 def _curl_get_args(url: str) -> tuple[str, ...]:
     return ("curl", "--silent", "--show-error", "--fail", "--request", "GET", "--config", "-", url)
 
@@ -100,10 +110,22 @@ def test_build_config_defaults_issue_id_format_to_provider_native(tmp_path: Path
         issue_provider="jira",
         knowledge_provider="confluence",
         jira_site="https://jira.example.test",
+        jira_relationship_mappings=_jira_relationship_mappings(),
         confluence_site="https://confluence.example.test",
     )
 
     assert raw["issue_id_format"] == "jira"
+
+
+def test_build_config_requires_jira_relationship_mappings(tmp_path: Path) -> None:
+    with pytest.raises(WorkflowSetupError, match="relationship_mappings"):
+        build_config(
+            project=tmp_path,
+            issue_provider="jira",
+            knowledge_provider="confluence",
+            jira_site="https://jira.example.test",
+            confluence_site="https://confluence.example.test",
+        )
 
 
 def test_build_config_rejects_invalid_provider_for_role(tmp_path: Path) -> None:
@@ -146,21 +168,17 @@ def test_build_config_rejects_cloud_deployments(
         build_config(project=tmp_path, **kwargs)
 
 
-def test_capabilities_warn_when_jira_relationship_mappings_are_missing() -> None:
+def test_capabilities_mark_jira_setup_incomplete_when_relationship_mappings_are_missing() -> None:
     payload = provider_capabilities(issue_provider="jira", knowledge_provider="confluence")
 
     assert payload["issues"]["relationship_writes"] is False
-    assert any("relationship writes remain unavailable" in item for item in payload["warnings"])
+    assert any("setup is incomplete" in item for item in payload["warnings"])
+    assert any("jira-relationship-inspect" in item for item in payload["warnings"])
+    assert not any("remain unavailable" in item for item in payload["warnings"])
 
 
 def test_build_config_accepts_explicit_jira_relationship_mappings(tmp_path: Path) -> None:
-    mappings = {
-        "blocked_by": {
-            "surface": "issue_link",
-            "link_type": "Blocks",
-            "direction": "inward",
-        }
-    }
+    mappings = _jira_relationship_mappings()
 
     raw = build_config(
         project=tmp_path,
@@ -310,6 +328,34 @@ def test_write_refuses_overwrite_and_force_rewrites(tmp_path: Path) -> None:
     written = yaml.safe_load((tmp_path / ".workflow" / "config.yml").read_text(encoding="utf-8"))
     assert result["verified"] is True
     assert written["providers"]["issues"]["kind"] == "filesystem"
+
+
+def test_write_rejects_jira_config_without_relationship_mappings(tmp_path: Path) -> None:
+    raw = {
+        "version": 1,
+        "mode": "remote-native",
+        "providers": {
+            "issues": {
+                "kind": "jira",
+                "site": "https://jira.example.test",
+                "deployment": "data_center",
+                "api_version": "2",
+            },
+            "knowledge": {
+                "kind": "confluence",
+                "site": "https://confluence.example.test",
+                "deployment": "data_center",
+            },
+        },
+        "issue_id_format": "jira",
+        "local_projection": {"mode": "none"},
+        "commit_refs": {"enabled": True, "style": "provider-native"},
+    }
+
+    with pytest.raises(WorkflowSetupError, match="relationship_mappings"):
+        write_config(tmp_path, raw)
+
+    assert not (tmp_path / ".workflow" / "config.yml").exists()
 
 
 def test_write_is_atomic_when_replace_fails(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -478,6 +524,32 @@ def test_main_build_config_outputs_yaml(tmp_path: Path) -> None:
     assert yaml.safe_load(stdout.getvalue())["providers"]["issues"]["kind"] == "github"
 
 
+@pytest.mark.parametrize(
+    ("argv", "message"),
+    [
+        (["build-config"], "--issue-provider is required"),
+        (["build-config", "--issue-provider", "github"], "--knowledge-provider is required"),
+    ],
+)
+def test_main_build_config_requires_explicit_providers(
+    tmp_path: Path,
+    argv: list[str],
+    message: str,
+) -> None:
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+
+    code = workflow_setup.main(
+        [*argv, "--project", str(tmp_path)],
+        stdout=stdout,
+        stderr=stderr,
+    )
+
+    assert code == 2
+    assert stdout.getvalue() == ""
+    assert message in stderr.getvalue()
+
+
 def test_main_write_outputs_json(tmp_path: Path) -> None:
     config_file = tmp_path / "candidate.yml"
     config_file.write_text(format_config_yaml(_github_github_config(tmp_path)), encoding="utf-8")
@@ -516,6 +588,16 @@ def test_setup_skill_uses_short_install_name() -> None:
     assert (_PLUGIN_ROOT / "skills" / "setup" / "agents" / "openai.yaml").exists()
     assert skill_dirs == ["setup"]
     assert yaml.safe_load(skill.read_text(encoding="utf-8").split("---", 2)[1])["name"] == "setup"
+
+
+def test_setup_skill_requires_jira_relationship_profiling_before_config_generation() -> None:
+    text = (_PLUGIN_ROOT / "skills" / "setup" / "SKILL.md").read_text(encoding="utf-8")
+    normalized = " ".join(text.split())
+
+    assert "This flow is required whenever the issue provider is `jira`" in normalized
+    assert "do not offer to defer Jira relationship setup until later" in normalized
+    assert "do not build or write a Jira issue config" in normalized
+    assert "warn that relationship writes remain unavailable" not in text
 
 
 def _marketplace_entry(marketplace: dict[str, Any], name: str) -> dict[str, Any]:
