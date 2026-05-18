@@ -18,6 +18,7 @@ For comment-only requests, resolve authoring paths with the resolver's comment
 scope so the caller reads only the Markdown and Jira issue convention files.
 Fetch or refresh issues with `$ISSUE_FETCH`.
 Prepare new issues as pending drafts with `$ISSUE_DRAFTS prepare`.
+Return the `issue_file` path from prepare as the caller-editable draft path.
 Create provider issues from drafts only after explicit user approval and
 `--confirm-provider-create`.
 Use `$ISSUE_WRITEBACK`, `$ISSUE_COMMENTS`, `$ISSUE_RELATIONSHIPS`, and

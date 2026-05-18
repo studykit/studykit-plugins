@@ -21,6 +21,7 @@ Fetch or refresh issues with `$ISSUE_FETCH`.
 Use `$ISSUE_LIFECYCLE close` or `$ISSUE_LIFECYCLE reopen` for supported provider
 lifecycle mutations.
 Prepare new issues as pending drafts with `$ISSUE_DRAFTS prepare`.
+Return the `issue_file` path from prepare as the caller-editable draft path.
 Create provider issues from drafts only after explicit user approval and
 `--confirm-provider-create`.
 Use `$ISSUE_WRITEBACK`, `$ISSUE_COMMENTS`, `$ISSUE_LIFECYCLE`,
