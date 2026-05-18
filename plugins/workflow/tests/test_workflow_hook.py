@@ -1304,13 +1304,12 @@ def test_codex_operator_bootstrap_uses_configured_filesystem_context(
 def test_static_workflow_operator_prompt_omits_provider_command_catalog() -> None:
     text = (_PLUGIN_ROOT / "agents" / "workflow-operator.md").read_text(encoding="utf-8")
 
-    assert "## Runtime Context" in text
     assert "github_issue_fetch.py" not in text
     assert "jira_issue_fetch.py" not in text
     assert "workflow_github.py" not in text
     assert "$ISSUE_FETCH" not in text
-    assert "Do not use raw provider CLIs directly." in text
-    assert "tell the main agent that it must decide whether to" in text
+    assert "ISSUE_LIFECYCLE=" not in text
+    assert "--confirm-provider-create" not in text
 
 
 def test_operator_runtime_context_fragments_hold_provider_command_guidance() -> None:
