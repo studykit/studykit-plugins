@@ -108,7 +108,7 @@ def jira_issue_payload(*, body: str = "Data Center description.") -> dict[str, o
                 "comments": [
                     {
                         "id": "20001",
-                        "author": {"displayName": "Hong Gil-dong", "name": "hong"},
+                        "author": {"displayName": "Example User", "name": "example"},
                         "body": "Please keep Data Center first.",
                         "created": "2026-05-15T09:30:00.000+0900",
                         "updated": "2026-05-15T09:30:00.000+0900",
@@ -173,6 +173,48 @@ def jira_issue_payload(*, body: str = "Data Center description.") -> dict[str, o
             ],
         },
     }
+
+
+def jira_subtask_payload() -> dict[str, object]:
+    payload = jira_issue_payload(body="Pending body.")
+    payload["id"] = "10005"
+    payload["key"] = "TEST-1237"
+    fields = payload["fields"]
+    assert isinstance(fields, dict)
+    fields["summary"] = "Pending Jira sub-task"
+    fields["issuetype"] = {"name": "Sub-task"}
+    fields["parent"] = {
+        "id": "9999",
+        "key": "TEST-1200",
+        "fields": {
+            "summary": "Parent task",
+            "status": {"name": "Open"},
+        },
+    }
+    fields["subtasks"] = []
+    return payload
+
+
+def jira_parent_payload() -> dict[str, object]:
+    payload = jira_issue_payload(body="Parent body.")
+    payload["id"] = "9999"
+    payload["key"] = "TEST-1200"
+    fields = payload["fields"]
+    assert isinstance(fields, dict)
+    fields["summary"] = "Parent task"
+    fields["issuetype"] = {"name": "Task"}
+    fields.pop("parent", None)
+    fields["subtasks"] = [
+        {
+            "id": "10005",
+            "key": "TEST-1237",
+            "fields": {
+                "summary": "Pending Jira sub-task",
+                "status": {"name": "To Do"},
+            },
+        }
+    ]
+    return payload
 
 
 def remote_links_payload() -> list[dict[str, object]]:
@@ -429,11 +471,81 @@ Pending body.
     assert 'url = "https://jira.example.test/rest/api/2/issue"' in str(write_request.input_text)
     assert '\\"summary\\":\\"Pending Jira issue\\"' in str(write_request.input_text)
     assert '\\"issuetype\\":{\\"name\\":\\"Task\\"}' in str(write_request.input_text)
+    assert '\\"parent\\"' not in str(write_request.input_text)
     assert cache.issue_json_file(site, "TEST-1234").is_file()
     assert not draft.exists()
     assert cache.created_issue_archive_dir(site, "local-1", "TEST-1234").joinpath("issue.md").is_file()
     assert not relationships_pending.exists()
     assert cache.relationships_pending_file(site, "TEST-1234").is_file()
+
+
+def test_data_center_subtask_create_uses_pending_parent_and_refreshes_parent_cache(tmp_path: Path) -> None:
+    write_jira_config(tmp_path)
+    site = jira_site(tmp_path)
+    cache = JiraDataCenterIssueCache.for_project(tmp_path)
+    draft = cache.pending_issue_file(site, "subtask-1")
+    draft.parent.mkdir(parents=True, exist_ok=True)
+    draft.write_text(
+        """---
+title: Pending Jira sub-task
+issue_type: Sub-task
+subtask_parent: TEST-1200
+---
+
+Pending body.
+""",
+        encoding="utf-8",
+    )
+    runner = FakeRunner(
+        {
+            curl_write_args(): result(curl_write_args(), stdout=json.dumps({"id": "10005", "key": "TEST-1237"})),
+            curl_args(issue_url("TEST-1237")): result(
+                curl_args(issue_url("TEST-1237")),
+                stdout=json.dumps(jira_subtask_payload()),
+            ),
+            curl_args(remote_links_url("TEST-1237")): result(
+                curl_args(remote_links_url("TEST-1237")),
+                stdout=json.dumps([]),
+            ),
+            curl_args(issue_url("TEST-1200")): result(
+                curl_args(issue_url("TEST-1200")),
+                stdout=json.dumps(jira_parent_payload()),
+            ),
+            curl_args(remote_links_url("TEST-1200")): result(
+                curl_args(remote_links_url("TEST-1200")),
+                stdout=json.dumps([]),
+            ),
+        }
+    )
+
+    response = dispatch_write(tmp_path, runner, "create", pending_local_id="subtask-1")
+
+    assert response.payload["operation"] == "create_issue"
+    assert response.payload["issue"] == "TEST-1237"
+    assert response.payload["subtask_parent"] == "TEST-1200"
+    assert response.payload["pending_finalized"] is True
+    assert response.payload["parent_cache_refreshed"] is True
+    write_request = runner.requests[0]
+    assert write_request.args == curl_write_args()
+    payload_text = str(write_request.input_text)
+    assert '\\"issuetype\\":{\\"name\\":\\"Sub-task\\"}' in payload_text
+    assert '\\"parent\\":{\\"key\\":\\"TEST-1200\\"}' in payload_text
+    assert [request.args for request in runner.requests[1:]] == [
+        curl_args(issue_url("TEST-1237")),
+        curl_args(remote_links_url("TEST-1237")),
+        curl_args(issue_url("TEST-1200")),
+        curl_args(remote_links_url("TEST-1200")),
+    ]
+    subtask = cache.read_issue_json(site, "TEST-1237")
+    subtask_fields = subtask["fields"]
+    assert isinstance(subtask_fields, dict)
+    assert subtask_fields["parent"]["key"] == "TEST-1200"
+    parent = cache.read_issue_json(site, "TEST-1200")
+    parent_fields = parent["fields"]
+    assert isinstance(parent_fields, dict)
+    assert parent_fields["subtasks"][0]["key"] == "TEST-1237"
+    assert not draft.exists()
+    assert cache.created_issue_archive_dir(site, "subtask-1", "TEST-1237").joinpath("issue.md").is_file()
 
 
 def test_data_center_review_create_uses_task_type_and_review_summary_prefix(tmp_path: Path) -> None:

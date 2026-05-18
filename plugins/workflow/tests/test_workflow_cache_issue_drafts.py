@@ -235,6 +235,29 @@ def test_prepare_jira_spike_pending_issue_draft_prefixes_summary(tmp_path: Path)
     assert draft.title == "[Spike] Probe Jira issue type"
 
 
+def test_prepare_jira_pending_subtask_draft_records_parent_and_issue_type(tmp_path: Path) -> None:
+    _write_jira_config(tmp_path)
+
+    payload = prepare_jira_pending_issue_draft(
+        project=tmp_path,
+        local_id="subtask-1",
+        artifact_type="task",
+        title="Create child work item",
+        subtask_parent="test-1200",
+    )
+
+    site = resolve_jira_data_center_site(tmp_path)
+    cache = JiraDataCenterIssueCache.for_project(tmp_path)
+    draft = cache.read_pending_issue_draft(site, "subtask-1")
+
+    assert payload["artifact_type"] == "task"
+    assert payload["issue_type"] == "Sub-task"
+    assert payload["subtask_parent"] == "TEST-1200"
+    assert draft.title == "Create child work item"
+    assert draft.issue_type == "Sub-task"
+    assert draft.subtask_parent == "TEST-1200"
+
+
 def test_stage_pending_issue_relationships_writes_operator_owned_file(tmp_path: Path) -> None:
     _write_config(tmp_path)
     prepare_github_pending_issue_draft(

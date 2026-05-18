@@ -19,11 +19,12 @@ from workflow_env import workflow_project_dir_from_env
 from workflow_jira_data_center_client import resolve_jira_data_center_site
 from workflow_jira_issue_cache import JiraDataCenterIssueCache
 from workflow_jira_issue_provider import JiraDataCenterIssueNativeProvider
-from workflow_jira_issue_refs import JiraProviderError
+from workflow_jira_issue_refs import JiraProviderError, normalize_jira_issue_key
 from workflow_providers import ProviderContext, ProviderRequest
 
 JIRA_REVIEW_TITLE_PREFIX = "[Review] "
 JIRA_RESEARCH_TITLE_PREFIX = "[Research] "
+JIRA_SUBTASK_ISSUE_TYPE = "Sub-task"
 JIRA_SPIKE_TITLE_PREFIX = "[Spike] "
 
 
@@ -38,6 +39,8 @@ def prepare_pending_issue_draft(
     artifact_type: str,
     title: str,
     labels: tuple[str, ...] = (),
+    issue_type: str | None = None,
+    subtask_parent: str | None = None,
     state: str = "open",
     state_reason: str | None = None,
     replace: bool = False,
@@ -52,6 +55,10 @@ def prepare_pending_issue_draft(
     title = _jira_issue_title(artifact_type, _required_text(title, "title"))
     normalized_state = (state or "open").strip().lower()
     normalized_labels = tuple(label.strip() for label in labels if label.strip())
+    normalized_subtask_parent = _jira_issue_key(subtask_parent, "subtask parent")
+    normalized_issue_type = _optional_text(issue_type)
+    if normalized_subtask_parent and normalized_issue_type is None:
+        normalized_issue_type = JIRA_SUBTASK_ISSUE_TYPE
 
     try:
         site = resolve_jira_data_center_site(config.root)
@@ -71,6 +78,10 @@ def prepare_pending_issue_draft(
         "labels": list(normalized_labels),
         "state": normalized_state,
     }
+    if normalized_issue_type:
+        frontmatter["issue_type"] = normalized_issue_type
+    if normalized_subtask_parent:
+        frontmatter["subtask_parent"] = normalized_subtask_parent
     if state_reason:
         frontmatter["state_reason"] = state_reason.strip()
 
@@ -86,6 +97,8 @@ def prepare_pending_issue_draft(
         "artifact_type": artifact_type,
         "title": title,
         "labels": list(normalized_labels),
+        "issue_type": normalized_issue_type,
+        "subtask_parent": normalized_subtask_parent,
         "state": normalized_state,
         "body_empty": True,
         "site": site.to_json(),
@@ -182,6 +195,8 @@ def build_parser() -> argparse.ArgumentParser:
     prepare.add_argument("--type", required=True, help="workflow artifact type for the draft")
     prepare.add_argument("--title", required=True)
     prepare.add_argument("--label", action="append", default=[])
+    prepare.add_argument("--issue-type", help="Jira issue type name for create-time provider payload")
+    prepare.add_argument("--subtask-parent", help="Jira parent issue key for create-time Sub-task creation")
     prepare.add_argument("--state", default="open")
     prepare.add_argument("--state-reason")
     prepare.add_argument("--replace", action="store_true")
@@ -230,6 +245,8 @@ def main(
                 artifact_type=args.type,
                 title=args.title,
                 labels=tuple(args.label),
+                issue_type=args.issue_type,
+                subtask_parent=args.subtask_parent,
                 state=args.state,
                 state_reason=args.state_reason,
                 replace=args.replace,
@@ -318,6 +335,23 @@ def _required_text(value: str, name: str) -> str:
     if not text:
         raise JiraIssueDraftError(f"{name} is required")
     return text
+
+
+def _optional_text(value: str | None) -> str | None:
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None
+
+
+def _jira_issue_key(value: str | None, name: str) -> str | None:
+    parent = _optional_text(value)
+    if parent is None:
+        return None
+    try:
+        return normalize_jira_issue_key(parent)
+    except JiraProviderError as exc:
+        raise JiraIssueDraftError(f"invalid {name}: {exc}") from exc
 
 
 def _jira_issue_title(artifact_type: str, title: str) -> str:
