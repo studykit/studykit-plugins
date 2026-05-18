@@ -26,6 +26,14 @@ New comment flow:
 5. After approval, hand `workflow-operator` the issue ref, the temp file path, and any optional state and relationship intent with append intent.
 6. `workflow-operator` runs a freshness check against the issue body and comments, posts the comment, applies any optional state change, refreshes the cache, deletes the temp file on success, and returns the cached issue file path with the issue ref and success/failure. On freshness drift the operator returns blocked with the paths to reread; the temp file is preserved for retry. Relationship intent triggers a follow-up `$ISSUE_RELATIONSHIPS` step.
 
+Update existing issue body flow:
+1. Ask `workflow-operator` for matching authoring paths (specify type and, for dual-role types, role).
+2. Read the returned authoring paths and the current cached issue body when helpful.
+3. Write the new issue body to a temp file you choose; body content only, no frontmatter. The cached `issue.md` body is read-only; do not edit it in place.
+4. Present the issue ref, any optional metadata or state change, and the draft body to the user. Wait for explicit update approval.
+5. After approval, hand `workflow-operator` the issue ref, the temp file path, and any optional metadata (title, labels), state (`open`/`closed`), state reason, and relationship intent with update intent.
+6. `workflow-operator` runs a freshness check against the issue body, edits the issue, applies any optional state change, refreshes the cache, deletes the temp file on success, and returns the cached issue file path with the issue ref and success/failure. On freshness drift the operator returns blocked with the paths to reread; the temp file is preserved for retry. Relationship intent triggers a follow-up `$ISSUE_RELATIONSHIPS` step.
+
 Operator responsibilities:
 - Resolve authoring paths.
 - Perform the workflow operations listed above and verify results.

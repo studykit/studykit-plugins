@@ -44,9 +44,24 @@ comment, and whether state changed. On freshness drift it returns
 applies no state change — tell the main agent to reread the listed cache
 paths before retrying. Apply relationship intent separately through
 `$ISSUE_RELATIONSHIPS`.
-Use `$ISSUE_WRITEBACK`, `$ISSUE_COMMENTS`, `$ISSUE_LIFECYCLE`,
-`$ISSUE_RELATIONSHIPS`, and `$ISSUE_METADATA` for provider/cache mutations they
-support.
+Update an existing issue body with `$ISSUE_WRITEBACK update`. The caller
+supplies the issue ref (`--issue`) and an opaque body file path
+(`--body-file`); the file must not contain frontmatter. Optional `--title`,
+repeatable `--label`, `--state open|closed`, and `--state-reason
+completed|not_planned|reopened` ride along on the same call to update
+metadata or change state inline. Update only after explicit user approval.
+The script runs a freshness check on the issue body before mutation. On
+success it edits the issue, applies any requested state change, refreshes
+the cache, deletes the body file, and returns the cached `issue.md` path
+along with the issue ref, the verified flag, and whether state changed. On
+freshness drift it returns `status=blocked` with `reread_required=true`,
+preserves the body file, and applies no metadata or state change — tell the
+main agent to reread the listed cache paths before retrying. The cached
+`issue.md` body is projection-owned and read-only; do not edit it in place
+and do not source the new body from the cache. Apply relationship intent
+separately through `$ISSUE_RELATIONSHIPS`.
+Use `$ISSUE_LIFECYCLE`, `$ISSUE_RELATIONSHIPS`, and `$ISSUE_METADATA` for
+the remaining provider/cache mutations they support.
 Provider mutation scripts refresh affected cache projections internally.
 If a mutation response has `status=blocked` and `reread_required=true`, stop and
 tell the main agent to reread the listed cache paths before retrying.
