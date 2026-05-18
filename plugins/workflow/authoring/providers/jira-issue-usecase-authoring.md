@@ -15,17 +15,17 @@ Use this binding for Jira `usecase` issues. The final body structure is listed b
 
 ## Final body structure
 
-Use this final Jira body structure for `usecase` issues.
+Use this final Jira body structure for `usecase` issues. Emit each section in wiki markup (`h2. Name`); see `./jira-issue-convention.md` for the markup mapping.
 
 Common required sections are defined by `../common/usecase-authoring.md`:
 
-- `## Description`
-- `## Actors`
-- `## Current Draft`
-- `## Open Questions`
+- `h2. Description`
+- `h2. Actors`
+- `h2. Current Draft`
+- `h2. Open Questions`
 
 Common optional sections are defined by `../common/usecase-authoring.md` and `../common/issue-body.md`:
 
-- `## Resume`
+- `h2. Resume`
 
 Issue type is automatically set to `Story`.

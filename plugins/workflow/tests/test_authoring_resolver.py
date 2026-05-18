@@ -37,8 +37,7 @@ def test_review_github_issue_resolution_uses_absolute_authoring_files() -> None:
     assert resolution.role == "issue"
     assert resolution.provider == "github"
     assert _rel_paths(resolution.files) == [
-        "common/markdown-authoring.md",
-        "common/issue-body.md",
+"common/issue-body.md",
         "common/issue-authoring.md",
         "common/review-authoring.md",
         "providers/github-issue-convention.md",
@@ -69,8 +68,7 @@ def test_spec_confluence_knowledge_resolution() -> None:
 
     assert resolution.role == "knowledge"
     assert _rel_paths(resolution.files) == [
-        "common/markdown-authoring.md",
-        "common/knowledge-body.md",
+"common/knowledge-body.md",
         "common/prd-authoring.md",
         "common/spec-authoring.md",
         "providers/confluence-page-convention.md",
@@ -171,8 +169,7 @@ providers:
     assert "providers/jira-issue-anti-patterns.md" in _rel_paths(issue_resolution.files)
     assert knowledge_resolution.provider == "github"
     assert _rel_paths(knowledge_resolution.files) == [
-        "common/markdown-authoring.md",
-        "common/knowledge-body.md",
+"common/knowledge-body.md",
         "common/architecture-authoring.md",
         "providers/github-knowledge-convention.md",
         "providers/github-knowledge-architecture-authoring.md",
@@ -185,8 +182,7 @@ def test_comment_scope_github_issue_resolution_uses_only_comment_relevant_files(
     assert resolution.role == "issue"
     assert resolution.provider == "github"
     assert _rel_paths(resolution.files) == [
-        "common/markdown-authoring.md",
-        "providers/github-issue-convention.md",
+"providers/github-issue-convention.md",
     ]
 
 
@@ -196,8 +192,7 @@ def test_comment_scope_jira_issue_resolution_uses_only_comment_relevant_files() 
     assert resolution.role == "issue"
     assert resolution.provider == "jira"
     assert _rel_paths(resolution.files) == [
-        "common/markdown-authoring.md",
-        "providers/jira-issue-convention.md",
+"providers/jira-issue-convention.md",
     ]
 
 

@@ -15,20 +15,20 @@ Use this binding for Jira `research` issues. The final body structure is listed 
 
 ## Final body structure
 
-Use this final Jira body structure for `research` issues.
+Use this final Jira body structure for `research` issues. Emit each section in wiki markup (`h2. Name`); see `./jira-issue-convention.md` for the markup mapping.
 
 Common required sections are defined by `../common/research-authoring.md`:
 
-- `## Description`
-- `## Research Question`
-- `## Mode`
-- `## Options`
+- `h2. Description`
+- `h2. Research Question`
+- `h2. Mode`
+- `h2. Options`
 
 Common optional sections are defined by `../common/research-authoring.md` and `../common/issue-body.md`:
 
-- `## Scope`
-- `## Sources To Check`
-- `## Resume`
+- `h2. Scope`
+- `h2. Sources To Check`
+- `h2. Resume`
 
 Issue type is automatically set to `Task`.
 

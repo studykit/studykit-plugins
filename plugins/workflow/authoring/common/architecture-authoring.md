@@ -37,34 +37,21 @@ Do not use it for:
 
 ## Body shape
 
-Required:
+Required sections:
 
-```markdown
-## Overview
+- `Overview` — high-level architectural narrative.
+- `Components` — component definitions, responsibilities, interfaces, and dependencies.
+- `Technology Stack` — chosen runtime, framework, libraries, persistence, and build tooling.
+- `Test Strategy` — unit/integration/e2e split, isolation strategy, fixtures, and test boundaries.
 
-<high-level architectural narrative>
+Optional sections:
 
-## Components
+- `Component Diagram` — diagram or link to external diagram artifact.
+- `External Dependencies` — third-party services, vendor APIs, upstream systems.
+- `Related Work` — issues, specs, reviews, use cases, or research that inform the architecture.
+- `Change Log` — required for material updates. See `./knowledge-body.md`.
 
-<component definitions, responsibilities, interfaces, and dependencies>
-
-## Technology Stack
-
-<chosen runtime, framework, libraries, persistence, build tooling>
-
-## Test Strategy
-
-<unit/integration/e2e split, isolation strategy, fixtures, and test boundaries>
-```
-
-Optional:
-
-- `## Component Diagram` — Mermaid, ASCII, or link to external diagram artifact.
-- `## External Dependencies` — third-party services, vendor APIs, upstream systems.
-- `## Related Work` — issues, specs, reviews, use cases, or research that inform the architecture.
-- `## Change Log` — required for material updates. See `./knowledge-body.md`.
-
-Unknown Title Case H2 headings are tolerated when they clarify current architecture.
+Unknown well-named sections are tolerated when they clarify current architecture.
 
 ## Component anchors
 
@@ -73,28 +60,20 @@ Component headings are reference targets for tasks, bugs, specs, and reviews.
 Keep component names stable. If a component is renamed:
 
 1. Update the architecture page.
-2. Add a `## Change Log` entry with the causing work item.
+2. Add a `Change Log` entry with the causing work item.
 3. Update affected specs/tasks/reviews or create review items for deferred updates.
 
 Do not silently rename component headings.
 
 ## Decision rationale
 
-Architecture records the current shape. Durable rationale belongs in specs, especially `## Decision Log` or `## Rejected Alternatives`.
+Architecture records the current shape. Durable rationale belongs in specs, especially the spec's `Decision Log` or `Rejected Alternatives` sections.
 
 A short rationale sentence is acceptable when it helps readers understand the current shape. Long comparisons and rejected options belong in a spec or research report.
 
 ## Change log
 
-Every material architecture change should include a `## Change Log` entry linking to the causing work item.
-
-```markdown
-## Change Log
-
-- 2026-05-13 — PROJ-123 — Split AuthService and SessionService responsibilities.
-```
-
-Do not duplicate the issue discussion in the page.
+Every material architecture change should include a `Change Log` entry linking to the causing work item. Do not duplicate the issue discussion in the page.
 
 ## Content boundaries
 
@@ -108,15 +87,9 @@ Use these boundaries to place architecture content. Do not encode these as metad
 
 ## Common mistakes
 
-- Missing `## Overview`, `## Components`, `## Technology Stack`, or `## Test Strategy`.
+- Missing the `Overview`, `Components`, `Technology Stack`, or `Test Strategy` section.
 - Writing executable test commands here instead of `ci`.
 - Using architecture as a roadmap or milestone plan.
-- Listing considered options in `## Technology Stack` instead of recording chosen stack only.
-- Packing long decision rationale into `## Overview` instead of a spec.
+- Listing considered options in `Technology Stack` instead of recording chosen stack only.
+- Packing long decision rationale into `Overview` instead of a spec.
 - Renaming component headings without updating references or creating review items.
-- Using local projection paths or local file identity as canonical identity.
-
-## Do not
-
-- Do not store architecture as an issue.
-- Do not use page comments as a substitute for review items when feedback needs workflow tracking.

@@ -24,7 +24,7 @@ Do not require a legacy local CI file path or workflow-local numeric ID.
 
 ## Required body sections
 
-### `## How To Run Tests`
+### `How To Run Tests`
 
 Required.
 
@@ -38,21 +38,11 @@ Include:
 - Multi-tier verification command, if available.
 - Required environment variables or setup steps that are safe to document.
 
-Example:
-
-```markdown
-## How To Run Tests
-
-| Layer | Command | Notes |
-| --- | --- | --- |
-| Unit | `npm test -- --runInBand` | No external services. |
-| Integration | `npm run test:integration` | Requires local PostgreSQL. |
-| All | `npm test` | Smoke check before implementation handoff. |
-```
+Use a table with columns for layer, command, and notes. The provider convention defines the literal table form.
 
 Do not record speculative commands as verified commands. If a command is unverified, label it clearly or move the investigation to a research item.
 
-### `## Test Layout`
+### `Test Layout`
 
 Required.
 
@@ -65,7 +55,7 @@ Include:
 - Runner configuration files.
 - Shared fixtures or test utilities.
 
-### `## CI Pipeline`
+### `CI Pipeline`
 
 Required when the project has remote CI.
 
@@ -86,25 +76,25 @@ Pipeline examples:
 
 ## Optional body sections
 
-### `## Smoke Scenario`
+### `Smoke Scenario`
 
 Use for one minimal user-observable interaction that proves the system starts and performs the core behavior.
 
-### `## Fixtures And Environment`
+### `Fixtures And Environment`
 
 Use for test databases, service emulators, seed data, secrets handling, or container setup.
 
 Do not store secrets.
 
-### `## Troubleshooting`
+### `Troubleshooting`
 
 Use for known local failure modes and fixes.
 
-### `## Related Work`
+### `Related Work`
 
 Use for work items that changed the CI contract.
 
-### `## Change Log`
+### `Change Log`
 
 Required for material updates. See `./knowledge-body.md`.
 
@@ -120,33 +110,25 @@ Examples:
 - An architecture decision changes test isolation.
 - A review item identifies missing verification guidance.
 
-Every material update should add a `## Change Log` entry linking to the causing work item.
-
-Example:
-
-```markdown
-## Change Log
-
-- 2026-05-13 — #456 — Added browser smoke check for the checkout flow.
-```
+Every material update should add a `Change Log` entry linking to the causing work item.
 
 ## Content boundaries
 
-- Architecture `## Test Strategy` explains why the test layers exist.
-- CI `## How To Run Tests` records how to run them.
-- Task `## Unit Test Strategy` records task-specific verification.
-- Bug `## Unit Test Strategy` records regression coverage for that bug.
+- Architecture's `Test Strategy` section explains why the test layers exist.
+- CI's `How To Run Tests` section records how to run them.
+- Task's `Unit Test Strategy` section records task-specific verification.
+- Bug's `Unit Test Strategy` section records regression coverage for that bug.
 
 Do not duplicate the full CI command table into task or architecture bodies. Link to the CI page instead.
 
-## Done criteria
+## Completion criteria
 
 A CI page update is done when:
 
 - Required sections are present.
 - Commands are verified or explicitly marked as unverified.
 - Remote CI links are current when applicable.
-- The update has a `## Change Log` entry for the causing work item.
+- The update has a `Change Log` entry for the causing work item.
 
 ## Common mistakes
 

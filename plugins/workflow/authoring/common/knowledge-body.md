@@ -10,56 +10,47 @@ Knowledge pages contain curated, current, durable content.
 
 They should not contain raw discussion, transient questions, or detailed work logs. Those belong in the issue backend.
 
-## Section heading form
+The literal markup form for headings, lists, inline emphasis, links, code, tables, and checklists is defined by the matching provider convention file (`../providers/<provider>-<knowledge-form>-convention.md`). This file uses canonical section names only and does not embed provider markup.
 
-A knowledge body section is an H2 Markdown heading in Title Case with spaces, followed by free-form Markdown until the next H2 or end of body.
+## Section structure
 
-```markdown
-## Context
-
-The current implementation contract depends on the provider boundary.
-
-## Specification
-
-The provider writes the canonical field and the page body records the durable meaning.
-```
+A knowledge page is organized as a sequence of named sections.
 
 Rules:
 
-- Section boundary is `## Heading` at column 0, on its own line.
-- Heading text is Title Case with single spaces.
-- Do not put an H1 in the body when the page title is stored separately.
-- Use H3 and deeper headings only inside an H2 section.
-- Unknown H2 headings are tolerated when they are useful and well-formed.
-- Avoid stray content above the first H2 unless the selected type template requires a short summary block.
+- Each section has a canonical Title Case name (`Context`, `Specification`, `Change Log`, etc.).
+- Each section starts with a level-2 heading rendered in the provider's heading form. Subsections may appear inside a section using deeper heading levels.
+- Do not put a top-level title heading inside the body when the page title is stored separately.
+- Avoid stray content above the first section unless the selected type template requires a short summary block.
+- Unknown sections are tolerated when they are useful, well-named, and well-formed.
 
-Common knowledge H2 names:
+Common reusable section names for knowledge pages:
 
-- `## Context`
-- `## Specification`
-- `## Sources`
-- `## Change Log`
-- `## Decision Log`
-- `## Open Questions`
-- `## Rejected Alternatives`
-- `## Supersedes`
-- `## Related Work`
+- `Context`
+- `Specification`
+- `Sources`
+- `Change Log`
+- `Decision Log`
+- `Open Questions`
+- `Rejected Alternatives`
+- `Supersedes`
+- `Related Work`
 
 ## Reference form
 
-Use stable, readable references in knowledge body text.
+Use stable, readable references in body text.
 
 | Target | Preferred body form |
 | --- | --- |
 | Issue-backed item | Issue reference from the selected issue backend |
 | Knowledge page | Page, document, or file reference from the selected knowledge backend |
-| External source | Standard Markdown link |
+| External source | Provider-native link form |
 
 Rules:
 
 - Prefer the shortest reference that is unambiguous in the configured project.
 - Use full URLs when a short reference would be ambiguous outside its source system.
-- Do not require local Markdown paths for targets whose canonical identity is not a local file.
+- Do not require local file paths for targets whose canonical identity is not a local file.
 - Do not introduce workflow-local numeric IDs when canonical identity already exists.
 
 ## Curated content only
@@ -82,80 +73,41 @@ Avoid:
 - Raw scratch work.
 - Routine progress logs.
 
-## `## Change Log`
+## `Change Log` section
 
-Every material knowledge-page change should include a concise semantic cause entry.
+Every material knowledge-page change should add a concise semantic cause entry to the `Change Log` section.
 
-Version history records who changed what and when. `## Change Log` records why the page changed and which work item caused it.
+Version history records who changed what and when. The `Change Log` section records why the page changed and which work item caused it.
 
-```markdown
-## Change Log
+Each entry should:
 
-- 2026-05-13 — #456 — Clarified async retry boundary.
-- 2026-05-14 — PROJ-123 — Updated latency target.
-```
-
-Rules:
-
-- One bullet per material change.
-- Keep entries concise.
-- Link to the causing issue, review, task, use case workflow issue, or research workflow issue.
-- Do not duplicate the discussion from the causing issue.
-- Append new entries; do not rewrite history except for obvious formatting errors.
+- Be one bullet per material change.
+- Stay concise.
+- Identify the date, the causing work item, and the reason.
+- Use the date format `YYYY-MM-DD`.
+- Link to the causing issue, review, task, use case workflow issue, or research workflow issue in the provider's link form.
+- Avoid duplicating discussion from the causing issue.
+- Be appended; do not rewrite history except for obvious formatting errors.
 
 ## Links back to work items
 
-When a knowledge page is created or materially updated because of an issue-backed item, include a visible link back to that work item.
-
-Examples:
-
-```markdown
-## Change Log
-
-- 2026-05-13 — [PROJ-123](https://example.com/issues/PROJ-123) — Published initial OAuth integration evaluation.
-```
-
-```markdown
-## Related Work
-
-- #123
-- PROJ-456
-```
+When a knowledge page is created or materially updated because of an issue-backed item, include a visible link back to that work item in `Change Log`, `Related Work`, or another relevant section.
 
 ## Relationship sections
 
 Use visible relationship sections when relevant.
 
-### `## Supersedes`
+### `Supersedes` section
 
-For specs or curated documents that replace older documents.
+For specs or curated documents that replace older documents. Each entry should reference the prior page in the provider's link form.
 
-```markdown
-## Supersedes
+### `Related Work` section
 
-- [Auth Session v1](https://example.com/pages/auth-session-v1)
-```
+For issue-backed items that informed or currently depend on this page. Use issue references in the configured issue backend's reference form.
 
-### `## Related Work`
+### `Sources` section
 
-For issue-backed items that informed or currently depend on this page.
-
-```markdown
-## Related Work
-
-- PROJ-123
-- #456
-```
-
-### `## Sources`
-
-For research reports or decisions that rely on external evidence.
-
-```markdown
-## Sources
-
-- [Vendor API documentation](https://example.com/docs)
-```
+For research reports or decisions that rely on external evidence. Use the provider's link form for external citations.
 
 ## Page comments
 
@@ -173,19 +125,22 @@ Provider and cache metadata are operational state, not authoring content. Use pr
 
 The visible body remains the durable reading surface for humans and agents.
 
-## Relationship Lists And Change Logs
+## Relationship lists and change-log entries
 
 Relationship lists should keep one referenced item per bullet.
 
-Change-log entries should use this shape:
-
-```markdown
-- YYYY-MM-DD — <work-item-ref-or-link> — <concise reason>
-```
+`Change Log` entries should record date, causing work item, and reason in that order. The provider convention defines the literal bullet, date, and link form.
 
 ## Filesystem projections
 
-If workflow tooling creates local Markdown files as projections of external knowledge pages, do not treat projection paths as canonical identity.
+If workflow tooling creates local files as projections of external knowledge pages, do not treat projection paths as canonical identity.
 
 - Do not use projection paths in commits, branches, or comments unless the local path itself is the topic.
 - Do not edit projection metadata as authoring state. Use provider workflows or cache sidecars for provider state, and keep canonical references in visible body text.
+
+## Common mistakes (all knowledge types)
+
+Mistakes that apply to every knowledge page, regardless of type. Type-specific authoring files list additional mistakes that apply to one type only.
+
+- Using local projection paths or local file identity as canonical page identity. Canonical identity comes from the configured knowledge backend.
+- Using page comments as a substitute for review items when feedback needs workflow tracking. Create a `review` item when feedback requires triage, ownership, priority, or durable resolution tracking.

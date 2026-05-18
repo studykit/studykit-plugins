@@ -31,13 +31,9 @@ Do not use domain for runtime components, framework constructs, or implementatio
 
 ## Body shape
 
-Required:
+Required sections:
 
-```markdown
-## Concepts
-
-<glossary of entities, value objects, and significant domain terms>
-```
+- `Concepts` — glossary of entities, value objects, and significant domain terms.
 
 Each concept should include:
 
@@ -46,14 +42,14 @@ Each concept should include:
 - Examples when useful.
 - Invariants or constraints when important.
 
-Optional:
+Optional sections:
 
-- `## Relationships` — associations, compositions, aggregates, ownership, cardinality.
-- `## State Transitions` — named lifecycle states, allowed next states, and triggers.
-- `## Related Work` — workflow issues, specs, use cases, research, reviews, or architecture pages that inform the vocabulary.
-- `## Change Log` — required for material updates. See `./knowledge-body.md`.
+- `Relationships` — associations, compositions, aggregates, ownership, cardinality.
+- `State Transitions` — named lifecycle states, allowed next states, and triggers.
+- `Related Work` — workflow issues, specs, use cases, research, reviews, or architecture pages that inform the vocabulary.
+- `Change Log` — required for material updates. See `./knowledge-body.md`.
 
-Unknown Title Case H2 headings are tolerated when they clarify the domain model.
+Unknown well-named sections are tolerated when they clarify the domain model.
 
 ## Concept stability
 
@@ -62,7 +58,7 @@ Domain terms are reference targets for use cases, specs, architecture, and code.
 Do not rename a concept silently. If a rename is needed:
 
 1. Update the domain page.
-2. Add a `## Change Log` entry with the causing work item.
+2. Add a `Change Log` entry with the causing work item.
 3. Update affected use cases, specs, architecture, tasks, and reviews, or create review items for deferred updates.
 
 ## Relationship and state notation
@@ -94,26 +90,12 @@ If architecture uses a domain term differently from this page, create a `review`
 
 ## Change log
 
-Every material domain change should include a `## Change Log` entry linking to the causing work item.
-
-```markdown
-## Change Log
-
-- 2026-05-13 — PROJ-123 — Added Workspace as distinct from Organization.
-```
-
-Do not duplicate the issue discussion in the page.
+Every material domain change should include a `Change Log` entry linking to the causing work item. Do not duplicate the issue discussion in the page.
 
 ## Common mistakes
 
-- Missing `## Concepts`.
+- Missing the `Concepts` section.
 - Putting architecture components or framework constructs in domain.
 - Renaming concepts without managing downstream references.
 - Defining the same concept with different names.
 - Writing relationship/state diagrams as long prose.
-- Using local projection paths or local file identity as canonical identity.
-
-## Do not
-
-- Do not store domain as an issue.
-- Do not use page comments as a substitute for review items when terminology feedback needs workflow tracking.

@@ -14,7 +14,7 @@ Use Jira-native relationships when configured:
 - Dependencies and related issues come from configured Jira issue links.
 - Cross-provider references use remote links.
 
-Relationship writes must use explicit `.workflow/config.yml` mappings. Do not infer Jira link type names, directions, remote-link surfaces, or parent fields from issue body prose.
+Do not infer Jira link type names, directions, remote-link surfaces, or parent fields from issue body prose.
 
 ## Relationship intents
 
@@ -29,8 +29,6 @@ Use these canonical intents:
 If the natural wording is "source has child target", invert the source and target and use `parent`. If the natural wording is "source blocks target", invert the source and target and use `blocked_by`.
 
 Use Jira issue keys such as `PROJ-123` for Jira issue targets. Use absolute URLs for remote-link targets.
-
-Jira issue links are site-specific. The selected project configuration must define the link type, direction, hierarchy field, or remote-link binding before `workflow-operator` can apply the relationship.
 
 ## Body boundary
 

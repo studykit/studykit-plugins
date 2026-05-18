@@ -32,7 +32,7 @@ Each review item should contain one concern only. Do not pack multiple findings,
 
 A review item must identify the specific issue, knowledge page, or small set of
 reviewed content that must change or answer the concern. If the concern is truly
-cross-cutting, say so explicitly in `## Description`.
+cross-cutting, say so explicitly in the `Description` section.
 
 Choose the narrowest useful target:
 
@@ -46,7 +46,7 @@ Do not list every related item. Do not invent placeholder targets.
 
 Treat a review as complete only when every target item reflects the resolution.
 
-For knowledge targets, the target page should include a `## Change Log` entry that links back to the review item or to the causing issue that resolved the review.
+For knowledge targets, the target page should include a `Change Log` entry that links back to the review item or to the causing issue that resolved the review.
 
 For issue targets, the target issue should include the relevant body change or an explicit comment explaining why no content change was needed.
 
@@ -56,23 +56,19 @@ If the fix is deferred, do not treat the review as complete merely because a fol
 
 Review bodies are deliberately compact.
 
-Required:
+Required sections:
 
-```markdown
-## Description
+- `Description` — one concern, why it matters, and what would resolve it.
 
-<one concern, why it matters, and what would resolve it>
-```
-
-Target-specific reviews must identify the target according to the selected authoring files. For truly cross-cutting reviews, `## Description` must explain why there is no specific target.
+Target-specific reviews must identify the target according to the selected authoring files. For truly cross-cutting reviews, the `Description` section must explain why there is no specific target.
 
 Optional sections:
 
-- `## Resume` — current-state snapshot while the review is being resolved. See `./issue-body.md`.
-- `## Suggested Fix` — concise proposed action when useful.
-- `## Evidence` — short links, snippets, or reproduction notes.
+- `Resume` — current-state snapshot while the review is being resolved. See `./issue-body.md`.
+- `Suggested Fix` — concise proposed action when useful.
+- `Evidence` — short links, snippets, or reproduction notes.
 
-Unknown Title Case H2 headings are tolerated, but keep reviews short.
+Unknown well-named sections are tolerated, but keep reviews short.
 
 ## Description guidance
 
@@ -81,17 +77,6 @@ For each concern:
 - `finding`: explain what is wrong, where it appears, and why it matters.
 - `gap`: explain what is missing, why it should exist, and what item should receive it.
 - `question`: state the unresolved question and what answer would allow progress.
-
-## Comments and discussion
-
-Use comments for:
-
-- Back-and-forth discussion.
-- Reviewer clarification.
-- Resolution notes.
-- Evidence discovered after creation.
-
-Keep the issue body as the current compact summary.
 
 ## Common mistakes
 

@@ -28,27 +28,20 @@ Do not use context for detailed use case flows, domain glossary, implementation 
 
 ## Body shape
 
-Required:
+Required sections:
 
-```markdown
-## Original Idea
+- `Original Idea` — verbatim original user input or imported project brief.
+- `Problem Framing` — who has the problem, what is failing, and what success looks like at a coarse level.
 
-<verbatim original user input or imported project brief>
+Optional sections:
 
-## Problem Framing
+- `Scope` — explicit in-scope and out-of-scope boundaries.
+- `Screens` — UI screen/navigation grouping when the project has UI flows.
+- `Success Criteria` — coarse project-level success definition.
+- `Related Work` — use cases, epics, specs, research, or reviews related to framing.
+- `Change Log` — required for material updates. See `./knowledge-body.md`.
 
-<who has the problem, what is failing, and what success looks like at a coarse level>
-```
-
-Optional:
-
-- `## Scope` — explicit in-scope and out-of-scope boundaries.
-- `## Screens` — UI screen/navigation grouping when the project has UI flows.
-- `## Success Criteria` — coarse project-level success definition.
-- `## Related Work` — use cases, epics, specs, research, or reviews related to framing.
-- `## Change Log` — required for material updates. See `./knowledge-body.md`.
-
-Unknown Title Case H2 headings are tolerated when they clarify project framing.
+Unknown well-named sections are tolerated when they clarify project framing.
 
 ## Original idea rule
 
@@ -60,7 +53,7 @@ If importing an existing project, use the imported project brief or source link 
 
 ## Problem framing rule
 
-`## Problem Framing` should answer:
+The `Problem Framing` section should answer:
 
 - Who has the problem?
 - What current situation or solution is failing?
@@ -71,7 +64,7 @@ Keep this section at framing level. Detailed flows belong in use case pages. Imp
 
 ## Screens
 
-Use `## Screens` only for UI-heavy projects where navigation framing helps organize use cases.
+Use the `Screens` section only for UI-heavy projects where navigation framing helps organize use cases.
 
 Each screen entry should include:
 
@@ -84,15 +77,7 @@ Do not embed large mockups inline. Link to design artifacts or generated preview
 
 ## Change log
 
-Every material context change should include a `## Change Log` entry linking to the causing work item.
-
-```markdown
-## Change Log
-
-- 2026-05-13 — PROJ-123 — Narrowed initial scope to admin onboarding.
-```
-
-Do not duplicate issue discussion in the page.
+Every material context change should include a `Change Log` entry linking to the causing work item. Do not duplicate issue discussion in the page.
 
 ## Content boundaries
 
@@ -106,14 +91,8 @@ Use these boundaries to place framing content. Do not encode these as metadata r
 
 ## Common mistakes
 
-- Missing `## Original Idea` or `## Problem Framing`.
+- Missing the `Original Idea` or `Problem Framing` section.
 - Rewriting the original idea until the starting point is lost.
 - Putting detailed use case flows in context.
 - Putting domain concepts or actor rosters in context.
 - Using context as a roadmap or task list.
-- Using local projection paths or local file identity as canonical identity.
-
-## Do not
-
-- Do not store context as an issue.
-- Do not use page comments as a substitute for review items when framing feedback needs workflow tracking.
