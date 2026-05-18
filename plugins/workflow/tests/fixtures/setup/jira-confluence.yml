@@ -1,0 +1,36 @@
+version: 1
+mode: remote-native
+providers:
+  issues:
+    kind: jira
+    site: https://jira.example.test
+    deployment: data_center
+    api_version: '2'
+    project: PROJ
+    issue_type: Task
+    relationship_mappings:
+      blocked_by:
+        surface: issue_link
+        link_type: Blocks
+        direction: inward
+      blocking:
+        surface: issue_link
+        link_type: Blocks
+        direction: outward
+      related:
+        surface: remote_link
+        relationship_label: relates to
+        application_type: studykit.workflow
+        application_name: Workflow
+  knowledge:
+    kind: confluence
+    site: https://confluence.example.test
+    deployment: data_center
+    space: ENG
+issue_id_format: jira
+local_projection:
+  mode: persistent
+  path: workflow
+commit_refs:
+  enabled: true
+  style: issue-suffix

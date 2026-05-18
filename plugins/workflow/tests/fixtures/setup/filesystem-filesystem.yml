@@ -1,0 +1,16 @@
+version: 1
+mode: remote-native
+providers:
+  issues:
+    kind: filesystem
+    path: workflow/issues
+  knowledge:
+    kind: filesystem
+    path: workflow/knowledge
+issue_id_format: number
+local_projection:
+  mode: persistent
+  path: workflow
+commit_refs:
+  enabled: false
+  style: disabled
