@@ -1917,7 +1917,7 @@ def test_claude_pre_write_blocks_creating_github_cache_issue_body(
     monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(tmp_path))
     monkeypatch.setenv("CLAUDE_PLUGIN_ROOT", str(_PLUGIN_ROOT))
 
-    issue_file = tmp_path / ".workflow-cache" / "issues-pending" / "draft-1" / "issue.md"
+    issue_file = tmp_path / ".workflow-cache" / "issues" / "40" / "issue.md"
     issue_text = """---
 title: New issue
 labels:

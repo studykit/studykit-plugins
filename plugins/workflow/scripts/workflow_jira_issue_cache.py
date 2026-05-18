@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import json
-import os
 from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
@@ -15,7 +14,6 @@ from workflow_cache import (
     SCHEMA_VERSION,
     FreshnessMetadata,
     PendingIssueComment,
-    PendingIssueDraft,
     PendingIssueRelationshipOperation,
     WorkflowCacheCorrupt,
     WorkflowCacheError,
@@ -23,8 +21,6 @@ from workflow_cache import (
     _atomic_write_text,
     _dump_yaml,
     _label_names,
-    _move_path_if_exists,
-    _read_frontmatter_markdown,
     _read_pending_comments,
     _read_pending_relationships,
     _read_yaml_mapping,
@@ -40,23 +36,19 @@ from workflow_jira_issue_relationships import (
     filter_jira_payload,
     normalize_jira_data_center_issue,
 )
-from workflow_jira_issue_refs import JiraProviderError, normalize_jira_issue_key
+from workflow_jira_issue_refs import normalize_jira_issue_key
 from workflow_jira_issue_snapshot import render_jira_snapshot
 
 
 def is_jira_issue_cache_body_path(path: Path, project: Path) -> bool:
-    """Return whether ``path`` is a Jira issue body cache projection."""
+    """Return whether ``path`` is a Jira issue body cache projection.
 
-    if path.name != "issue.md":
-        return False
-    try:
-        parts = path.expanduser().resolve(strict=False).relative_to(
-            project.expanduser().resolve(strict=False) / CACHE_ROOT_NAME
-        ).parts
-    except ValueError:
-        return False
+    Jira projections render to ``snapshot.md`` (a Markdown view of the issue) and
+    do not produce ``issue.md`` files. No Jira-side cache path currently maps to
+    a body file that the main agent edits, so the recognizer never matches.
+    """
 
-    return len(parts) == 5 and parts[0] == "jira" and parts[2] == "issues-pending"
+    return False
 
 
 class JiraDataCenterIssueCache:
@@ -90,65 +82,14 @@ class JiraDataCenterIssueCache:
     def remote_links_json_file(self, site: JiraDataCenterSite, issue_key: str) -> Path:
         return self.issue_dir(site, issue_key) / "remote-links.json"
 
-    def pending_issue_dir(self, site: JiraDataCenterSite, local_id: str) -> Path:
-        return (
-            self.root
-            / "jira"
-            / _safe_path_segment(site.cache_site_segment)
-            / "issues-pending"
-            / _safe_path_segment(local_id)
-        )
-
-    def pending_issue_file(self, site: JiraDataCenterSite, local_id: str) -> Path:
-        return self.pending_issue_dir(site, local_id) / "issue.md"
-
-    def created_issue_archive_dir(self, site: JiraDataCenterSite, local_id: str, issue_key: str) -> Path:
-        key = normalize_jira_issue_key(issue_key)
-        return (
-            self.root
-            / "jira"
-            / _safe_path_segment(site.cache_site_segment)
-            / "issues-created"
-            / f"{_safe_path_segment(key)}-{_safe_path_segment(local_id)}"
-        )
-
     def comments_pending_dir(self, site: JiraDataCenterSite, issue_key: str) -> Path:
         return self.issue_dir(site, issue_key) / "comments-pending"
 
     def relationships_pending_file(self, site: JiraDataCenterSite, issue_key: str) -> Path:
         return self.issue_dir(site, issue_key) / "relationships-pending.yml"
 
-    def pending_issue_relationships_pending_file(self, site: JiraDataCenterSite, local_id: str) -> Path:
-        return self.pending_issue_dir(site, local_id) / "relationships-pending.yml"
-
     def has_issue_projection(self, site: JiraDataCenterSite, issue_key: str) -> bool:
         return self.issue_json_file(site, issue_key).is_file()
-
-    def read_pending_issue_draft(self, site: JiraDataCenterSite, local_id: str) -> PendingIssueDraft:
-        path = self.pending_issue_file(site, local_id)
-        if not path.is_file():
-            raise WorkflowCacheMiss(f"Jira pending issue draft does not exist: {path}")
-
-        frontmatter, body = _read_frontmatter_markdown(path)
-        if frontmatter.get("schema_version") is not None:
-            _require_schema(frontmatter, path)
-
-        title = str(frontmatter.get("title") or "").strip()
-        if not title:
-            raise WorkflowCacheCorrupt(f"Jira pending issue draft is missing title: {path}")
-        return PendingIssueDraft(
-            local_id=_safe_path_segment(local_id),
-            path=path,
-            title=title,
-            body=body,
-            labels=tuple(_label_names(frontmatter.get("labels"))),
-            state=str(frontmatter.get("state") or "open").strip().lower(),
-            state_reason=_normalize_optional(frontmatter.get("state_reason") or frontmatter.get("stateReason")),
-            issue_type=_normalize_optional(
-                frontmatter.get("issue_type") or frontmatter.get("issueType") or frontmatter.get("issuetype")
-            ),
-            subtask_parent=_normalize_draft_subtask_parent(frontmatter, path),
-        )
 
     def read_pending_issue_comments(self, site: JiraDataCenterSite, issue_key: str) -> list[PendingIssueComment]:
         key = normalize_jira_issue_key(issue_key)
@@ -170,20 +111,6 @@ class JiraDataCenterIssueCache:
             self.relationships_pending_file(site, key),
             target_kind="issue",
             target_id=key,
-        )
-
-    def read_pending_draft_relationships(
-        self,
-        site: JiraDataCenterSite,
-        local_id: str,
-    ) -> list[PendingIssueRelationshipOperation]:
-        """Read pending relationship operations for a pending Jira issue projection."""
-
-        safe_local_id = _safe_path_segment(local_id)
-        return _read_pending_relationships(
-            self.pending_issue_relationships_pending_file(site, safe_local_id),
-            target_kind="pending_issue",
-            target_id=safe_local_id,
         )
 
     def read_freshness_metadata(
@@ -347,22 +274,6 @@ class JiraDataCenterIssueCache:
         path = self.relationships_pending_file(site, key)
         return self._remove_pending_relationship_file(path, operations, stop_at=self.issue_dir(site, key))
 
-    def remove_pending_draft_relationships(
-        self,
-        site: JiraDataCenterSite,
-        local_id: str,
-        operations: list[PendingIssueRelationshipOperation],
-    ) -> list[Path]:
-        """Remove a consumed pending relationship file from a pending Jira issue projection."""
-
-        safe_local_id = _safe_path_segment(local_id)
-        path = self.pending_issue_relationships_pending_file(site, safe_local_id)
-        return self._remove_pending_relationship_file(
-            path,
-            operations,
-            stop_at=self.pending_issue_dir(site, safe_local_id),
-        )
-
     def _remove_pending_relationship_file(
         self,
         path: Path,
@@ -381,36 +292,6 @@ class JiraDataCenterIssueCache:
         path.unlink()
         _remove_empty_parents(path.parent, stop_at=stop_at)
         return [path]
-
-    def finalize_pending_issue_creation(
-        self,
-        site: JiraDataCenterSite,
-        local_id: str,
-        issue_key: str,
-    ) -> dict[str, str | None]:
-        pending_dir = self.pending_issue_dir(site, local_id)
-        draft_path = pending_dir / "issue.md"
-        archive_dir = self.created_issue_archive_dir(site, local_id, issue_key)
-        archived_issue: Path | None = None
-        if draft_path.exists():
-            archive_dir.mkdir(parents=True, exist_ok=True)
-            archived_issue = archive_dir / "issue.md"
-            os.replace(draft_path, archived_issue)
-
-        issue_dir = self.issue_dir(site, issue_key)
-        issue_dir.mkdir(parents=True, exist_ok=True)
-        moved_comments = _move_path_if_exists(pending_dir / "comments-pending", issue_dir / "comments-pending")
-        moved_relationships = _move_path_if_exists(
-            pending_dir / "relationships-pending.yml",
-            issue_dir / "relationships-pending.yml",
-        )
-        _remove_empty_parents(pending_dir, stop_at=self.root / "jira" / _safe_path_segment(site.cache_site_segment))
-        return {
-            "archived_issue": str(archived_issue) if archived_issue is not None else None,
-            "comments_pending": str(moved_comments) if moved_comments is not None else None,
-            "relationships_pending": str(moved_relationships) if moved_relationships is not None else None,
-        }
-
 
 def _read_json_mapping(path: Path) -> Mapping[str, Any]:
     try:
@@ -447,22 +328,6 @@ def _normalize_optional(value: Any) -> str | None:
         return None
     text = str(value).strip()
     return text or None
-
-
-def _normalize_draft_subtask_parent(frontmatter: Mapping[str, Any], path: Path) -> str | None:
-    raw_parent = (
-        frontmatter.get("subtask_parent")
-        or frontmatter.get("subtask_parent_key")
-        or frontmatter.get("subtaskParent")
-        or frontmatter.get("subtaskParentKey")
-    )
-    parent = _normalize_optional(raw_parent)
-    if parent is None:
-        return None
-    try:
-        return normalize_jira_issue_key(parent)
-    except JiraProviderError as exc:
-        raise WorkflowCacheCorrupt(f"Jira pending issue draft has invalid subtask_parent key: {path}: {exc}") from exc
 
 
 def _utc_now() -> str:

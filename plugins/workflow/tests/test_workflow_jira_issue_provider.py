@@ -494,27 +494,10 @@ def test_cloud_deployment_is_rejected_for_now(tmp_path: Path) -> None:
         dispatch_get(tmp_path, runner)
 
 
-def test_data_center_create_uses_pending_draft_and_refreshes_cache(tmp_path: Path) -> None:
+def test_data_center_create_inline_refreshes_cache(tmp_path: Path) -> None:
     write_jira_config(tmp_path)
     site = jira_site(tmp_path)
     cache = JiraDataCenterIssueCache.for_project(tmp_path)
-    draft = cache.pending_issue_file(site, "local-1")
-    draft.parent.mkdir(parents=True, exist_ok=True)
-    draft.write_text(
-        """---
-title: Pending Jira issue
-labels:
-- workflow
----
-
-Pending body.
-""",
-        encoding="utf-8",
-    )
-    relationships_pending = cache.pending_issue_relationships_pending_file(site, "local-1")
-    relationships_pending.write_text("related:\n  - TEST-1235\n", encoding="utf-8")
-    draft_relationships = cache.read_pending_draft_relationships(site, "local-1")
-    assert [(item.relationship, item.target_ref) for item in draft_relationships] == [("related", "TEST-1235")]
     runner = FakeRunner(
         {
             curl_write_args(): result(curl_write_args(), stdout=json.dumps({"id": "10001", "key": "TEST-1234"})),
@@ -523,11 +506,17 @@ Pending body.
         }
     )
 
-    response = dispatch_write(tmp_path, runner, "create", pending_local_id="local-1")
+    response = dispatch_write(
+        tmp_path,
+        runner,
+        "create",
+        title="Pending Jira issue",
+        body="Pending body.\n",
+        labels=["workflow"],
+    )
 
     assert response.payload["operation"] == "create_issue"
     assert response.payload["issue"] == "TEST-1234"
-    assert response.payload["pending_finalized"] is True
     write_request = runner.requests[0]
     assert write_request.args == curl_write_args()
     assert 'request = "POST"' in str(write_request.input_text)
@@ -536,29 +525,12 @@ Pending body.
     assert '\\"issuetype\\":{\\"name\\":\\"Task\\"}' in str(write_request.input_text)
     assert '\\"parent\\"' not in str(write_request.input_text)
     assert cache.issue_json_file(site, "TEST-1234").is_file()
-    assert not draft.exists()
-    assert cache.created_issue_archive_dir(site, "local-1", "TEST-1234").joinpath("issue.md").is_file()
-    assert not relationships_pending.exists()
-    assert cache.relationships_pending_file(site, "TEST-1234").is_file()
 
 
-def test_data_center_subtask_create_uses_pending_parent_and_refreshes_parent_cache(tmp_path: Path) -> None:
+def test_data_center_subtask_create_inline_refreshes_parent_cache(tmp_path: Path) -> None:
     write_jira_config(tmp_path)
     site = jira_site(tmp_path)
     cache = JiraDataCenterIssueCache.for_project(tmp_path)
-    draft = cache.pending_issue_file(site, "subtask-1")
-    draft.parent.mkdir(parents=True, exist_ok=True)
-    draft.write_text(
-        """---
-title: Pending Jira sub-task
-issue_type: Sub-task
-subtask_parent: TEST-1200
----
-
-Pending body.
-""",
-        encoding="utf-8",
-    )
     runner = FakeRunner(
         {
             curl_write_args(): result(curl_write_args(), stdout=json.dumps({"id": "10005", "key": "TEST-1237"})),
@@ -581,12 +553,19 @@ Pending body.
         }
     )
 
-    response = dispatch_write(tmp_path, runner, "create", pending_local_id="subtask-1")
+    response = dispatch_write(
+        tmp_path,
+        runner,
+        "create",
+        title="Pending Jira sub-task",
+        body="Pending body.\n",
+        jira_issue_type="Sub-task",
+        subtask_parent_key="TEST-1200",
+    )
 
     assert response.payload["operation"] == "create_issue"
     assert response.payload["issue"] == "TEST-1237"
     assert response.payload["subtask_parent"] == "TEST-1200"
-    assert response.payload["pending_finalized"] is True
     assert response.payload["parent_cache_refreshed"] is True
     write_request = runner.requests[0]
     assert write_request.args == curl_write_args()
@@ -607,8 +586,6 @@ Pending body.
     parent_fields = parent["fields"]
     assert isinstance(parent_fields, dict)
     assert parent_fields["subtasks"][0]["key"] == "TEST-1237"
-    assert not draft.exists()
-    assert cache.created_issue_archive_dir(site, "subtask-1", "TEST-1237").joinpath("issue.md").is_file()
 
 
 def test_data_center_review_create_uses_task_type_and_review_summary_prefix(tmp_path: Path) -> None:

@@ -142,23 +142,14 @@ class GitHubIssueNativeProvider(IssueProvider):
     def create(self, request: ProviderRequest) -> Mapping[str, Any]:
         repo = resolve_github_repository(request.context.project, runner=self.runner)
         cache = GitHubIssueCache.for_project(request.context.project, configured_repo=repo)
-        pending_local_id = _optional_string(
-            request.payload.get("pending_local_id") or request.payload.get("local_id")
-        )
 
-        if pending_local_id:
-            draft = cache.read_pending_issue_draft(repo, pending_local_id)
-            title = draft.title
-            body = draft.body
-            labels = draft.labels
-            state = draft.state
-            state_reason = draft.state_reason
-        else:
-            title = str(_required_payload_value(request, "title"))
-            body = str(_required_payload_value(request, "body"))
-            labels = tuple(_string_list(request.payload.get("labels")))
-            state = str(request.payload.get("state") or "open")
-            state_reason = _optional_string(request.payload.get("state_reason") or request.payload.get("stateReason"))
+        title = str(_required_payload_value(request, "title"))
+        body = str(_required_payload_value(request, "body"))
+        labels = tuple(_string_list(request.payload.get("labels")))
+        state = str(request.payload.get("state") or "open")
+        state_reason = _optional_string(
+            request.payload.get("state_reason") or request.payload.get("stateReason")
+        )
 
         created = create_issue(
             title=title,
@@ -180,17 +171,10 @@ class GitHubIssueNativeProvider(IssueProvider):
             ),
         )
 
-        pending_result: dict[str, str | None] | None = None
-        if pending_local_id:
-            pending_result = cache.finalize_pending_issue_creation(repo, pending_local_id, issue_number)
-
         return {
             **created,
             "cache_refreshed": True,
             "cache": write_result.to_json(),
-            "pending_local_id": pending_local_id,
-            "pending_finalized": pending_result is not None,
-            "pending": pending_result,
         }
 
     def update(self, request: ProviderRequest) -> Mapping[str, Any]:
@@ -343,21 +327,8 @@ class GitHubIssueNativeProvider(IssueProvider):
         issue_number = normalize_issue_number(issue)
         repo = resolve_github_repository(request.context.project, runner=self.runner)
         cache = GitHubIssueCache.for_project(request.context.project, configured_repo=repo)
-        pending_local_id = _optional_string(
-            request.payload.get("pending_local_id") or request.payload.get("local_id")
-        )
-        if pending_local_id:
-            pending_comments = cache.read_pending_draft_comments(repo, pending_local_id)
-            pending_source = "pending_issue"
-        else:
-            pending_comments = cache.read_pending_issue_comments(repo, issue_number)
-            pending_source = "issue"
-
+        pending_comments = cache.read_pending_issue_comments(repo, issue_number)
         if not pending_comments:
-            if pending_local_id:
-                raise ProviderOperationError(
-                    f"no pending comment files found for GitHub pending issue {pending_local_id}"
-                )
             raise ProviderOperationError(f"no pending comment files found for GitHub issue #{issue_number}")
 
         freshness_payload = dict(request.payload)
@@ -391,16 +362,13 @@ class GitHubIssueNativeProvider(IssueProvider):
         ]
         refreshed = view_issue(issue_number, project=request.context.project, runner=self.runner)
         write_result = cache.write_issue_bundle(repo, refreshed)
-        if pending_local_id:
-            removed = cache.remove_pending_draft_comments(repo, pending_local_id, pending_comments)
-        else:
-            removed = cache.remove_pending_issue_comments(repo, issue_number, pending_comments)
+        removed = cache.remove_pending_issue_comments(repo, issue_number, pending_comments)
 
         return {
             "operation": "append_pending_comments",
             "issue": issue_number,
             "appended": len(appended),
-            "pending_source": pending_source,
+            "pending_source": "issue",
             "pending_files": [pending.file_name for pending in pending_comments],
             "removed_pending_files": [str(path) for path in removed],
             "cache_refreshed": True,
@@ -456,21 +424,8 @@ class GitHubIssueNativeProvider(IssueProvider):
         issue_number = normalize_issue_number(issue)
         repo = resolve_github_repository(request.context.project, runner=self.runner)
         cache = GitHubIssueCache.for_project(request.context.project, configured_repo=repo)
-        pending_local_id = _optional_string(
-            request.payload.get("pending_local_id") or request.payload.get("local_id")
-        )
-        if pending_local_id:
-            pending_operations = cache.read_pending_draft_relationships(repo, pending_local_id)
-            pending_source = "pending_issue"
-        else:
-            pending_operations = cache.read_pending_issue_relationships(repo, issue_number)
-            pending_source = "issue"
-
+        pending_operations = cache.read_pending_issue_relationships(repo, issue_number)
         if not pending_operations:
-            if pending_local_id:
-                raise ProviderOperationError(
-                    f"no pending relationship frontmatter found for GitHub pending issue {pending_local_id}"
-                )
             raise ProviderOperationError(f"no pending relationship frontmatter found for GitHub issue #{issue_number}")
 
         operations = [
@@ -507,7 +462,6 @@ class GitHubIssueNativeProvider(IssueProvider):
                 cache,
                 repo,
                 issue_number,
-                pending_local_id=pending_local_id,
                 consumed_pending=consumed_pending,
             )
             refresh_error: str | None = None
@@ -529,7 +483,6 @@ class GitHubIssueNativeProvider(IssueProvider):
             cache,
             repo,
             issue_number,
-            pending_local_id=pending_local_id,
             consumed_pending=consumed_pending,
         )
         return {
@@ -542,7 +495,7 @@ class GitHubIssueNativeProvider(IssueProvider):
             "consumed_operations": [operation.to_json() for operation in consumed_resolved],
             "cache_refreshed": True,
             "relationship_location": str(relationship_location),
-            "pending_source": pending_source,
+            "pending_source": "issue",
             "pending_file": pending_operations[0].file_name,
             "removed_pending_files": [str(path) for path in removed],
         }
@@ -553,13 +506,10 @@ class GitHubIssueNativeProvider(IssueProvider):
         repo: Any,
         issue_number: str,
         *,
-        pending_local_id: str | None,
         consumed_pending: list[PendingIssueRelationshipOperation],
     ) -> list[Path]:
         if not consumed_pending:
             return []
-        if pending_local_id:
-            return cache.remove_pending_draft_relationships(repo, pending_local_id, consumed_pending)
         return cache.remove_pending_issue_relationships(repo, issue_number, consumed_pending)
 
     def _apply_relationship_operations(

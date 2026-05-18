@@ -43,36 +43,6 @@ class WorkflowFreshnessConflict(WorkflowCacheError):
 
 
 @dataclass(frozen=True)
-class PendingIssueDraft:
-    """Parsed pending provider issue draft."""
-
-    local_id: str
-    path: Path
-    title: str
-    body: str
-    labels: tuple[str, ...] = ()
-    state: str = "open"
-    state_reason: str | None = None
-    issue_type: str | None = None
-    subtask_parent: str | None = None
-
-    def to_json(self) -> dict[str, Any]:
-        result: dict[str, Any] = {
-            "local_id": self.local_id,
-            "path": str(self.path),
-            "title": self.title,
-            "labels": list(self.labels),
-            "state": self.state,
-            "state_reason": self.state_reason,
-        }
-        if self.issue_type is not None:
-            result["issue_type"] = self.issue_type
-        if self.subtask_parent is not None:
-            result["subtask_parent"] = self.subtask_parent
-        return result
-
-
-@dataclass(frozen=True)
 class PendingIssueComment:
     """Parsed pending provider issue comment body."""
 
@@ -945,21 +915,6 @@ def _atomic_write_text(path: Path, text: str) -> None:
         except OSError:
             pass
         raise
-
-
-def _move_path_if_exists(source: Path, destination: Path) -> Path | None:
-    if not source.exists():
-        return None
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    if destination.exists():
-        if destination.is_dir():
-            for child in source.iterdir():
-                os.replace(child, destination / child.name)
-            source.rmdir()
-            return destination
-        destination.unlink()
-    os.replace(source, destination)
-    return destination
 
 
 def _remove_empty_parents(path: Path, *, stop_at: Path) -> None:

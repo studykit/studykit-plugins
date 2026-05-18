@@ -625,25 +625,10 @@ def test_github_issue_update_from_cache_blocks_stale_projection_before_mutation(
     assert events == ["freshness", "refresh"]
 
 
-def test_github_issue_create_from_pending_draft_refreshes_cache_and_finalizes_pending(
+def test_github_issue_create_inline_refreshes_cache(
     tmp_path: Path,
 ) -> None:
     cache = GitHubIssueCache.for_project(tmp_path, configured_repo=github_repo())
-    draft_path = cache.pending_issue_file(github_repo(), "draft-1")
-    draft_path.parent.mkdir(parents=True)
-    draft_path.write_text(
-        """---
-title: "Draft issue"
-labels:
-  - task
-  - workflow
-state: open
----
-
-Draft body.
-""",
-        encoding="utf-8",
-    )
     events: list[str] = []
 
     def runner(request: CommandRequest) -> CommandResult:
@@ -707,7 +692,11 @@ Draft body.
             kind="github",
             operation="create",
             context=ProviderContext(project=tmp_path, artifact_type="task", session_id="s1"),
-            payload={"pending_local_id": "draft-1"},
+            payload={
+                "title": "Draft issue",
+                "body": "Draft body.\n",
+                "labels": ["task", "workflow"],
+            },
         )
     )
 
@@ -715,10 +704,7 @@ Draft body.
     assert response.payload["issue"] == "51"
     assert response.payload["verified"] is True
     assert response.payload["cache_refreshed"] is True
-    assert response.payload["pending_finalized"] is True
     assert cache.read_issue(github_repo(), 51)["body"] == "Draft body.\n"
-    assert not draft_path.exists()
-    assert Path(response.payload["pending"]["archived_issue"]).is_file()
     assert events == ["create", "verify", "refresh"]
 
 

@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import os
 import re
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, replace
@@ -15,7 +14,6 @@ from workflow_cache import (
     SCHEMA_VERSION,
     FreshnessMetadata,
     PendingIssueComment,
-    PendingIssueDraft,
     PendingIssueRelationshipOperation,
     WorkflowCacheCorrupt,
     WorkflowCacheError,
@@ -24,7 +22,6 @@ from workflow_cache import (
     _dump_yaml,
     _format_markdown,
     _label_names,
-    _move_path_if_exists,
     _normalize_freshness_target,
     _normalize_optional,
     _normalize_state,
@@ -55,9 +52,9 @@ def is_github_issue_cache_body_path(path: Path, project: Path) -> bool:
         return False
 
     if len(parts) == 3:
-        return parts[0] in {"issues", "issues-pending"}
+        return parts[0] == "issues"
     if len(parts) == 6:
-        return parts[3] in {"issues", "issues-pending"}
+        return parts[3] == "issues"
     return False
 
 
@@ -112,41 +109,6 @@ class GitHubIssueCache:
             / normalize_issue_number(issue)
         )
 
-    def pending_issue_dir(self, repo: GitHubRepository, local_id: str) -> Path:
-        safe_local_id = _safe_path_segment(local_id)
-        if self.configured_repo is None or _same_github_repo(repo, self.configured_repo):
-            return self.root / "issues-pending" / safe_local_id
-        return (
-            self.root
-            / _safe_path_segment(repo.host)
-            / _safe_path_segment(repo.owner)
-            / _safe_path_segment(repo.name)
-            / "issues-pending"
-            / safe_local_id
-        )
-
-    def pending_issue_file(self, repo: GitHubRepository, local_id: str) -> Path:
-        return self.pending_issue_dir(repo, local_id) / "issue.md"
-
-    def created_issue_archive_dir(
-        self,
-        repo: GitHubRepository,
-        local_id: str,
-        issue: int | str,
-    ) -> Path:
-        safe_local_id = _safe_path_segment(local_id)
-        issue_number = normalize_issue_number(issue)
-        if self.configured_repo is None or _same_github_repo(repo, self.configured_repo):
-            return self.root / "issues-created" / f"{issue_number}-{safe_local_id}"
-        return (
-            self.root
-            / _safe_path_segment(repo.host)
-            / _safe_path_segment(repo.owner)
-            / _safe_path_segment(repo.name)
-            / "issues-created"
-            / f"{issue_number}-{safe_local_id}"
-        )
-
     def issue_file(self, repo: GitHubRepository, issue: int | str) -> Path:
         return self.issue_dir(repo, issue) / "issue.md"
 
@@ -162,9 +124,6 @@ class GitHubIssueCache:
     def comments_pending_dir(self, repo: GitHubRepository, issue: int | str) -> Path:
         return self.issue_dir(repo, issue) / "comments-pending"
 
-    def pending_issue_comments_pending_dir(self, repo: GitHubRepository, local_id: str) -> Path:
-        return self.pending_issue_dir(repo, local_id) / "comments-pending"
-
     def freshness_file(self, repo: GitHubRepository, issue: int | str, target: str) -> Path:
         normalized = _normalize_freshness_target(target)
         if normalized == "issue":
@@ -177,37 +136,6 @@ class GitHubIssueCache:
 
     def has_issue_projection(self, repo: GitHubRepository, issue: int | str) -> bool:
         return self.issue_file(repo, issue).is_file()
-
-    def read_pending_issue_draft(self, repo: GitHubRepository, local_id: str) -> PendingIssueDraft:
-        """Read a pending issue draft from ``issues-pending/<local-id>/issue.md``."""
-
-        path = self.pending_issue_file(repo, local_id)
-        if not path.is_file():
-            raise WorkflowCacheMiss(f"pending issue draft does not exist: {path}")
-
-        frontmatter, body = _read_frontmatter_markdown(path)
-        schema_version = frontmatter.get("schema_version")
-        if schema_version is not None:
-            _require_schema(frontmatter, path)
-
-        title = str(frontmatter.get("title") or "").strip()
-        if not title:
-            raise WorkflowCacheCorrupt(f"pending issue draft is missing title: {path}")
-
-        labels = tuple(_label_names(frontmatter.get("labels")))
-        state = _normalize_state(frontmatter.get("state"))
-        if state not in {"open", "closed"}:
-            raise WorkflowCacheCorrupt(f"unsupported pending issue state: {state}: {path}")
-        state_reason = _normalize_state_reason(frontmatter.get("state_reason") or frontmatter.get("stateReason"))
-        return PendingIssueDraft(
-            local_id=_safe_path_segment(local_id),
-            path=path,
-            title=title,
-            body=body,
-            labels=labels,
-            state=state,
-            state_reason=state_reason,
-        )
 
     def read_pending_issue_comments(
         self,
@@ -223,20 +151,6 @@ class GitHubIssueCache:
             target_id=issue_number,
         )
 
-    def read_pending_draft_comments(
-        self,
-        repo: GitHubRepository,
-        local_id: str,
-    ) -> list[PendingIssueComment]:
-        """Read pending comment files for a pending issue projection."""
-
-        safe_local_id = _safe_path_segment(local_id)
-        return _read_pending_comments(
-            self.pending_issue_comments_pending_dir(repo, safe_local_id),
-            target_kind="pending_issue",
-            target_id=safe_local_id,
-        )
-
     def read_pending_issue_relationships(
         self,
         repo: GitHubRepository,
@@ -250,22 +164,6 @@ class GitHubIssueCache:
             issue_path,
             target_kind="issue",
             target_id=issue_number,
-        )
-        return operations
-
-    def read_pending_draft_relationships(
-        self,
-        repo: GitHubRepository,
-        local_id: str,
-    ) -> list[PendingIssueRelationshipOperation]:
-        """Read pending relationship operations for a pending issue projection."""
-
-        safe_local_id = _safe_path_segment(local_id)
-        issue_path = self.pending_issue_file(repo, safe_local_id)
-        _found, operations = _read_frontmatter_pending_relationships(
-            issue_path,
-            target_kind="pending_issue",
-            target_id=safe_local_id,
         )
         return operations
 
@@ -293,33 +191,6 @@ class GitHubIssueCache:
         )
         if not normalized:
             raise WorkflowCacheError(f"no pending relationship operations for GitHub issue #{issue_number}")
-        self._write_frontmatter_pending_relationships(issue_path, normalized)
-        return issue_path
-
-    def write_pending_draft_relationships(
-        self,
-        repo: GitHubRepository,
-        local_id: str,
-        operations: Iterable[PendingIssueRelationshipOperation],
-        *,
-        replace_existing: bool = False,
-    ) -> Path:
-        """Write canonical pending relationship operations into draft frontmatter."""
-
-        safe_local_id = _safe_path_segment(local_id)
-        issue_path = self.pending_issue_file(repo, safe_local_id)
-        if not issue_path.is_file():
-            raise WorkflowCacheMiss(f"pending issue draft does not exist: {issue_path}")
-        if not replace_existing and self.read_pending_draft_relationships(repo, safe_local_id):
-            raise WorkflowCacheError(f"pending relationship operations already exist for GitHub pending issue {safe_local_id}")
-        normalized = _retarget_relationship_operations(
-            operations,
-            path=issue_path,
-            target_kind="pending_issue",
-            target_id=safe_local_id,
-        )
-        if not normalized:
-            raise WorkflowCacheError(f"no pending relationship operations for GitHub pending issue {safe_local_id}")
         self._write_frontmatter_pending_relationships(issue_path, normalized)
         return issue_path
 
@@ -356,27 +227,6 @@ class GitHubIssueCache:
         _remove_empty_parents(pending_dir, stop_at=self.issue_dir(repo, issue_number))
         return removed
 
-    def remove_pending_draft_comments(
-        self,
-        repo: GitHubRepository,
-        local_id: str,
-        comments: Iterable[PendingIssueComment],
-    ) -> list[Path]:
-        """Remove successfully consumed pending comment files from a draft."""
-
-        safe_local_id = _safe_path_segment(local_id)
-        pending_dir = self.pending_issue_comments_pending_dir(repo, safe_local_id)
-        removed: list[Path] = []
-        for comment in comments:
-            path = comment.path
-            if path.parent.resolve(strict=False) != pending_dir.resolve(strict=False):
-                raise WorkflowCacheError(f"pending comment is outside draft pending directory: {path}")
-            if path.exists():
-                path.unlink()
-                removed.append(path)
-        _remove_empty_parents(pending_dir, stop_at=self.pending_issue_dir(repo, safe_local_id))
-        return removed
-
     def remove_pending_issue_relationships(
         self,
         repo: GitHubRepository,
@@ -392,24 +242,6 @@ class GitHubIssueCache:
             return []
         if not all(operation.path.resolve(strict=False) == issue_path.resolve(strict=False) for operation in operation_list):
             raise WorkflowCacheError(f"pending relationship operation is outside issue frontmatter: {issue_path}")
-        changed = self._remove_frontmatter_pending_relationships(issue_path, operation_list)
-        return [issue_path] if changed else []
-
-    def remove_pending_draft_relationships(
-        self,
-        repo: GitHubRepository,
-        local_id: str,
-        operations: Iterable[PendingIssueRelationshipOperation],
-    ) -> list[Path]:
-        """Remove consumed pending relationship operations from draft frontmatter."""
-
-        safe_local_id = _safe_path_segment(local_id)
-        issue_path = self.pending_issue_file(repo, safe_local_id)
-        operation_list = list(operations)
-        if not operation_list:
-            return []
-        if not all(operation.path.resolve(strict=False) == issue_path.resolve(strict=False) for operation in operation_list):
-            raise WorkflowCacheError(f"pending relationship operation is outside draft frontmatter: {issue_path}")
         changed = self._remove_frontmatter_pending_relationships(issue_path, operation_list)
         return [issue_path] if changed else []
 
@@ -460,44 +292,6 @@ class GitHubIssueCache:
             frontmatter.pop("relationships", None)
         _atomic_write_text(issue_path, _format_markdown(frontmatter, body))
         return True
-
-    def finalize_pending_issue_creation(
-        self,
-        repo: GitHubRepository,
-        local_id: str,
-        issue: int | str,
-    ) -> dict[str, str | None]:
-        """Archive the consumed draft and move pending frontmatter intent to the new issue."""
-
-        safe_local_id = _safe_path_segment(local_id)
-        issue_number = normalize_issue_number(issue)
-        pending_operations = self.read_pending_draft_relationships(repo, safe_local_id)
-        pending_dir = self.pending_issue_dir(repo, local_id)
-        draft_path = pending_dir / "issue.md"
-        archive_dir = self.created_issue_archive_dir(repo, local_id, issue)
-        archived_issue: Path | None = None
-        if draft_path.exists():
-            archive_dir.mkdir(parents=True, exist_ok=True)
-            archived_issue = archive_dir / "issue.md"
-            os.replace(draft_path, archived_issue)
-
-        issue_dir = self.issue_dir(repo, issue_number)
-        issue_dir.mkdir(parents=True, exist_ok=True)
-        moved_comments = _move_path_if_exists(pending_dir / "comments-pending", issue_dir / "comments-pending")
-        relationships_pending: Path | None = None
-        if pending_operations:
-            relationships_pending = self.write_pending_issue_relationships(
-                repo,
-                issue_number,
-                pending_operations,
-                replace_existing=True,
-            )
-        _remove_empty_parents(pending_dir, stop_at=self.root)
-        return {
-            "archived_issue": str(archived_issue) if archived_issue is not None else None,
-            "comments_pending": str(moved_comments) if moved_comments is not None else None,
-            "relationships_pending": str(relationships_pending) if relationships_pending is not None else None,
-        }
 
     def read_freshness_metadata(
         self,
