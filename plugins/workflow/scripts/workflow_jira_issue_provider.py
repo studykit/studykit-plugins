@@ -203,6 +203,7 @@ class JiraDataCenterIssueNativeProvider(IssueProvider):
             body = str(_required_payload_value(request, "body"))
             labels = tuple(_string_list(request.payload.get("labels")))
 
+        settings = _jira_issue_provider_settings(request.context.project)
         title = _jira_issue_title(request, title)
         project_key = _optional_string(request.payload.get("project") or request.payload.get("project_key")) or site.project
         explicit_issue_type = _optional_string(
@@ -211,7 +212,7 @@ class JiraDataCenterIssueNativeProvider(IssueProvider):
         issue_type = (
             explicit_issue_type
             or draft_issue_type
-            or _jira_artifact_issue_type(request)
+            or _jira_artifact_issue_type(request, settings=settings)
             or _optional_string(request.payload.get("issue_type") or request.payload.get("issuetype"))
             or site.issue_type
         )
@@ -858,8 +859,30 @@ def _is_spike_request(request: ProviderRequest) -> bool:
     return request.context.artifact_type.strip().lower() == "spike"
 
 
-def _jira_artifact_issue_type(request: ProviderRequest) -> str | None:
-    return JIRA_ARTIFACT_ISSUE_TYPES.get(request.context.artifact_type.strip().lower())
+def _jira_artifact_issue_type(request: ProviderRequest, *, settings: Mapping[str, Any]) -> str | None:
+    artifact = request.context.artifact_type.strip().lower()
+    configured = _jira_configured_artifact_issue_types(settings).get(artifact)
+    return configured or JIRA_ARTIFACT_ISSUE_TYPES.get(artifact)
+
+
+def _jira_configured_artifact_issue_types(settings: Mapping[str, Any]) -> Mapping[str, str]:
+    raw = (
+        settings.get("artifact_issue_types")
+        or settings.get("artifactIssueTypes")
+        or settings.get("issue_types")
+        or settings.get("issueTypes")
+    )
+    if raw is None:
+        return {}
+    if not isinstance(raw, Mapping):
+        raise ProviderOperationError("providers.issues.artifact_issue_types must be a mapping")
+    result: dict[str, str] = {}
+    for key, value in raw.items():
+        artifact = str(key).strip().lower()
+        issue_type = _optional_string(value)
+        if artifact and issue_type:
+            result[artifact] = issue_type
+    return result
 
 
 def _jira_create_subtask_parent_key(request: ProviderRequest, draft_subtask_parent: str | None) -> str | None:

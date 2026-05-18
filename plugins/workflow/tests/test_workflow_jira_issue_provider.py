@@ -697,6 +697,36 @@ def test_data_center_create_uses_artifact_issue_type(
     assert f'\\"issuetype\\":{{\\"name\\":\\"{expected_issue_type}\\"}}' in payload_text
 
 
+def test_data_center_create_uses_configured_epic_issue_type(tmp_path: Path) -> None:
+    write_jira_config(
+        tmp_path,
+        relationship_mappings="""
+    artifact_issue_types:
+      epic: Initiative
+""",
+    )
+    runner = FakeRunner(
+        {
+            curl_write_args(): result(curl_write_args(), stdout=json.dumps({"id": "10001", "key": "TEST-1234"})),
+            curl_args(issue_url()): result(curl_args(issue_url()), stdout=json.dumps(jira_issue_payload())),
+            curl_args(remote_links_url()): result(curl_args(remote_links_url()), stdout=json.dumps(remote_links_payload())),
+        }
+    )
+
+    response = dispatch_write(
+        tmp_path,
+        runner,
+        "create",
+        artifact_type="epic",
+        title="Coordinate a larger batch",
+        body="## Description\n\nCoordinate the batch.",
+    )
+
+    assert response.payload["operation"] == "create_issue"
+    payload_text = str(runner.requests[0].input_text)
+    assert '\\"issuetype\\":{\\"name\\":\\"Initiative\\"}' in payload_text
+
+
 def test_data_center_update_from_cache_checks_freshness_and_refreshes(tmp_path: Path) -> None:
     write_jira_config(tmp_path)
     site = jira_site(tmp_path)
