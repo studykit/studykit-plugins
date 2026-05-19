@@ -37,21 +37,9 @@ The source of truth is the provider that owns canonical persistence for an artif
 
 Examples:
 
-- Filesystem: local Markdown files under a configured projection path.
+- Filesystem: local Markdown files under a configured path.
 - GitHub: GitHub Issues, Projects, and a repository `wiki/` directory for knowledge.
 - Atlassian: Jira issues and Confluence pages.
-
-### Local Projection
-
-A local projection is a local representation of remote data.
-
-Projection modes:
-
-- `none`: no local files are generated.
-- `ephemeral`: temporary session cache only.
-- `persistent`: a local mirror is kept, possibly committed to git.
-
-For GitHub or Jira source-of-truth mode, the default should be `none` or `ephemeral`, not persistent local workflow files.
 
 ## Configuration Location
 
@@ -577,9 +565,6 @@ providers:
     space: ENG
 
 issue_id_format: github
-
-local_projection:
-  mode: none # none | ephemeral | persistent
 
 commit_refs:
   enabled: true

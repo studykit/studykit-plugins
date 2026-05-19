@@ -22,7 +22,7 @@ from workflow_cache import (  # noqa: E402
 
 
 def test_gitignore_excludes_workflow_cache_root() -> None:
-    assert "/.workflow-cache/" in (_REPO_ROOT / ".gitignore").read_text(encoding="utf-8")
+    assert ".workflow-cache/" in (_REPO_ROOT / ".gitignore").read_text(encoding="utf-8")
 
 
 def test_provider_freshness_allows_clean_cache_metadata() -> None:

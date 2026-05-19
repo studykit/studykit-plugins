@@ -185,15 +185,11 @@ def issue_payload(number: int, *, title: str = "Implement workflow hook cache co
     }
 
 
-def _write_config(project: Path, *, projection_path: str | None = None) -> None:
-    projection = "  mode: none\n"
-    if projection_path is not None:
-        projection = f"  mode: persistent\n  path: {projection_path}\n"
-
+def _write_config(project: Path) -> None:
     config_path = project / ".workflow" / "config.yml"
     config_path.parent.mkdir(parents=True, exist_ok=True)
     config_path.write_text(
-        f"""
+        """
 version: 1
 providers:
   issues:
@@ -203,8 +199,6 @@ providers:
     kind: github
     path: wiki/workflow
 issue_id_format: github
-local_projection:
-{projection.rstrip()}
 commit_refs:
   enabled: true
   style: provider-native
@@ -227,9 +221,6 @@ providers:
     kind: filesystem
     path: workflow/knowledge
 issue_id_format: number
-local_projection:
-  mode: persistent
-  path: workflow
 commit_refs:
   enabled: false
 """.lstrip(),
@@ -254,8 +245,6 @@ providers:
   knowledge:
     kind: github
 issue_id_format: jira
-local_projection:
-  mode: none
 commit_refs:
   enabled: true
   style: provider-native
@@ -1091,7 +1080,7 @@ def test_non_empty_hook_stdout_is_json_only(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    _write_config(tmp_path, projection_path="workflow")
+    _write_config(tmp_path)
 
     codex_session = _run_session_start(
         tmp_path,

@@ -28,9 +28,6 @@ providers:
     deployment: data_center
     space: ENG
 issue_id_format: jira
-local_projection:
-  mode: persistent
-  path: workflow
 commit_refs:
   enabled: true
   style: issue-suffix

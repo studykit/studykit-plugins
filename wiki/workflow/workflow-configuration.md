@@ -6,7 +6,7 @@ Date: 2026-05-13
 
 Provider-backed workflow still needs a small repository-local configuration file.
 
-The file declares where issue-backed artifacts and knowledge-backed artifacts live, how optional local projection behaves, and how commit messages should reference provider work items.
+The file declares where issue-backed artifacts and knowledge-backed artifacts live and how commit messages should reference provider work items.
 
 The configuration file is:
 
@@ -23,7 +23,6 @@ Schema version 1 supports:
 - Issue provider.
 - Knowledge provider.
 - Issue ID format.
-- Local projection mode.
 - Commit reference style.
 
 Example:
@@ -42,9 +41,6 @@ providers:
     path: wiki/workflow
 
 issue_id_format: github
-
-local_projection:
-  mode: none
 
 commit_refs:
   enabled: true
@@ -136,16 +132,6 @@ The default is `provider-native`. The loader resolves `provider-native` to the c
 
 For GitHub-backed projects, hooks use `issue_id_format: github` to scan prompts and stop payloads for same-repository issue references such as `#123`, `owner/repo#123`, and matching GitHub issue URLs.
 
-### Local Projection
-
-Supported local projection modes:
-
-- `none`
-- `ephemeral`
-- `persistent`
-
-The default is `none`.
-
 ### Commit References
 
 Supported commit reference styles:
@@ -170,7 +156,7 @@ Provider kind values are:
 - `confluence`
 - `filesystem`
 
-Use the values documented in each enum section exactly. Aliases such as `github-issues`, `repo-wiki`, `jira-issues`, `confluence-page`, `fs`, `local`, `temporary`, `mirror`, or `provider_native` are invalid.
+Use the values documented in each enum section exactly. Aliases such as `github-issues`, `repo-wiki`, `jira-issues`, `confluence-page`, `fs`, or `provider_native` are invalid.
 
 Provider values are still checked against the provider role. `confluence` is invalid for the issue provider, and `jira` is invalid for the knowledge provider.
 
@@ -202,7 +188,6 @@ It validates:
 
 - Missing provider slots.
 - Provider-role compatibility.
-- Local projection mode.
 - Commit reference style.
 - Issue ID format compatibility with the configured issue provider.
 - Schema version.

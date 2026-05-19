@@ -30,8 +30,6 @@ CONFIG_RELATIVE_PATH = Path(CONFIG_DIR_NAME) / CONFIG_FILE_NAME
 ISSUE_PROVIDERS = {"github", "jira", "filesystem"}
 KNOWLEDGE_PROVIDERS = {"github", "confluence", "filesystem"}
 
-LOCAL_PROJECTION_MODES = {"none", "ephemeral", "persistent"}
-
 COMMIT_REF_STYLES = {"provider-native", "issue-prefix", "issue-suffix", "disabled"}
 
 ISSUE_ID_FORMATS = {"github", "jira", "number"}
@@ -63,21 +61,6 @@ class ProviderConfig:
 
 
 @dataclass(frozen=True)
-class LocalProjectionConfig:
-    """Local projection configuration."""
-
-    mode: str = "none"
-    path: str | None = None
-    settings: Mapping[str, Any] = field(default_factory=dict)
-
-    def to_json(self) -> dict[str, Any]:
-        result = {"mode": self.mode, "path": self.path}
-        if self.settings:
-            result["settings"] = dict(self.settings)
-        return result
-
-
-@dataclass(frozen=True)
 class CommitRefsConfig:
     """Commit reference configuration."""
 
@@ -103,7 +86,6 @@ class WorkflowConfig:
     issues: ProviderConfig
     knowledge: ProviderConfig
     issue_id_format: str
-    local_projection: LocalProjectionConfig
     commit_refs: CommitRefsConfig
     raw: Mapping[str, Any] = field(default_factory=dict)
 
@@ -124,7 +106,6 @@ class WorkflowConfig:
                 "knowledge": self.knowledge.to_json(),
             },
             "issue_id_format": self.issue_id_format,
-            "local_projection": self.local_projection.to_json(),
             "commit_refs": self.commit_refs.to_json(),
         }
 
@@ -173,7 +154,6 @@ def parse_workflow_config(raw: Mapping[str, Any], *, path: Path) -> WorkflowConf
         issue_provider=issues.kind,
         path=path,
     )
-    local_projection = _parse_local_projection(raw.get("local_projection"), path=path)
     commit_refs = _parse_commit_refs(raw.get("commit_refs"), path=path)
 
     return WorkflowConfig(
@@ -184,7 +164,6 @@ def parse_workflow_config(raw: Mapping[str, Any], *, path: Path) -> WorkflowConf
         issues=issues,
         knowledge=knowledge,
         issue_id_format=issue_id_format,
-        local_projection=local_projection,
         commit_refs=commit_refs,
         raw=dict(raw),
     )
@@ -258,32 +237,6 @@ def _provider_mapping(raw: Mapping[str, Any], slot: str) -> Mapping[str, Any] | 
     if not isinstance(provider, Mapping):
         raise WorkflowConfigError(f"providers.{slot} must be a mapping or provider name")
     return provider
-
-
-def _parse_local_projection(value: Any, *, path: Path) -> LocalProjectionConfig:
-    if value is None:
-        return LocalProjectionConfig()
-    if isinstance(value, str):
-        return LocalProjectionConfig(mode=_normalize_local_projection_mode(value, path=path))
-    if not isinstance(value, Mapping):
-        raise WorkflowConfigError(f"local_projection must be a mapping in {path}")
-
-    mode = _normalize_local_projection_mode(_scalar_string(value.get("mode", "none")), path=path)
-    projection_path = _scalar_string(value.get("path"))
-    settings = {key: item for key, item in value.items() if key not in {"mode", "path"}}
-    return LocalProjectionConfig(mode=mode, path=projection_path, settings=settings)
-
-
-def _normalize_local_projection_mode(value: str | None, *, path: Path) -> str:
-    if value is None:
-        return "none"
-    normalized = value.strip()
-    if normalized not in LOCAL_PROJECTION_MODES:
-        choices = ", ".join(sorted(LOCAL_PROJECTION_MODES))
-        raise WorkflowConfigError(
-            f"local_projection.mode '{value}' is invalid in {path}. Use one of: {choices}"
-        )
-    return normalized
 
 
 def _parse_commit_refs(value: Any, *, path: Path) -> CommitRefsConfig:

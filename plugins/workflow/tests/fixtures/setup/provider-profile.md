@@ -20,9 +20,6 @@ providers:
     site: https://confluence.example.test
     deployment: data_center
     space: ENG
-local_projection:
-  mode: persistent
-  path: workflow
 commit_refs:
   style: issue-prefix
 ```
