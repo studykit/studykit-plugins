@@ -35,6 +35,7 @@ def update_issue(
     labels: tuple[str, ...] = (),
     state: str | None = None,
     state_reason: str | None = None,
+    relationship_intent: dict[str, object] | None = None,
     runner: CommandRunner | None = None,
 ) -> dict[str, object]:
     """Update one GitHub issue body from an opaque caller-owned body file."""
@@ -102,7 +103,7 @@ def update_issue(
     else:
         body_removed = True
 
-    return {
+    result: dict[str, object] = {
         "operation": "update_issue",
         "kind": "github",
         "issue": provider_payload.get("issue"),
@@ -115,6 +116,23 @@ def update_issue(
         "cache_refreshed": bool(provider_payload.get("cache_refreshed")),
         "cache": cache_payload,
     }
+
+    if relationship_intent:
+        relationships_response = provider.call(
+            ProviderRequest(
+                role="issue",
+                kind="github",
+                operation="apply_relationships",
+                context=ProviderContext(project=config.root, artifact_type=artifact_type),
+                payload={
+                    "issue": provider_payload.get("issue"),
+                    "relationship_intent": relationship_intent,
+                },
+            )
+        )
+        result["relationships"] = dict(relationships_response.payload)
+
+    return result
 
 
 def _reject_body_with_frontmatter(body: str, path: Path) -> None:
@@ -155,10 +173,92 @@ def build_parser() -> argparse.ArgumentParser:
         "--state-reason",
         choices=["completed", "not_planned", "reopened"],
     )
+    parent_group = update.add_mutually_exclusive_group()
+    parent_group.add_argument("--parent", help="add parent (errors if a parent already exists)")
+    parent_group.add_argument(
+        "--replace-parent",
+        dest="replace_parent",
+        help="set parent, replacing any existing parent",
+    )
+    parent_group.add_argument(
+        "--remove-parent",
+        dest="remove_parent",
+        action="store_true",
+        help="remove the current parent (no-op when no parent exists)",
+    )
+    update.add_argument("--child", action="append", default=[], help="add a sub-issue (repeatable)")
+    update.add_argument(
+        "--remove-child",
+        dest="remove_child",
+        action="append",
+        default=[],
+        help="remove a sub-issue (repeatable)",
+    )
+    update.add_argument(
+        "--blocked-by",
+        action="append",
+        default=[],
+        help="add a blocked-by dependency (repeatable)",
+    )
+    update.add_argument(
+        "--remove-blocked-by",
+        dest="remove_blocked_by",
+        action="append",
+        default=[],
+        help="remove a blocked-by dependency (repeatable)",
+    )
+    update.add_argument(
+        "--blocking",
+        action="append",
+        default=[],
+        help="add a blocking dependency (repeatable)",
+    )
+    update.add_argument(
+        "--remove-blocking",
+        dest="remove_blocking",
+        action="append",
+        default=[],
+        help="remove a blocking dependency (repeatable)",
+    )
+    update.add_argument("--related", action="append", default=[], help="add a related ref (repeatable)")
+    update.add_argument(
+        "--remove-related",
+        dest="remove_related",
+        action="append",
+        default=[],
+        help="remove a related ref (repeatable)",
+    )
 
     for child in subparsers.choices.values():
         child.add_argument("--json", action="store_true", help=argparse.SUPPRESS)
     return parser
+
+
+def _update_relationship_intent(args: argparse.Namespace) -> dict[str, object]:
+    intent: dict[str, object] = {}
+    if getattr(args, "parent", None):
+        intent["parent_add"] = args.parent
+    if getattr(args, "replace_parent", None):
+        intent["parent_replace"] = args.replace_parent
+    if getattr(args, "remove_parent", False):
+        intent["parent_remove"] = True
+    if getattr(args, "blocked_by", None):
+        intent["blocked_by_add"] = list(args.blocked_by)
+    if getattr(args, "remove_blocked_by", None):
+        intent["blocked_by_remove"] = list(args.remove_blocked_by)
+    if getattr(args, "blocking", None):
+        intent["blocking_add"] = list(args.blocking)
+    if getattr(args, "remove_blocking", None):
+        intent["blocking_remove"] = list(args.remove_blocking)
+    if getattr(args, "child", None):
+        intent["child_add"] = list(args.child)
+    if getattr(args, "remove_child", None):
+        intent["child_remove"] = list(args.remove_child)
+    if getattr(args, "related", None):
+        intent["related_add"] = list(args.related)
+    if getattr(args, "remove_related", None):
+        intent["related_remove"] = list(args.remove_related)
+    return intent
 
 
 def main(
@@ -184,6 +284,7 @@ def main(
                 labels=tuple(args.label),
                 state=args.state,
                 state_reason=args.state_reason,
+                relationship_intent=_update_relationship_intent(args),
                 runner=runner,
             )
         else:

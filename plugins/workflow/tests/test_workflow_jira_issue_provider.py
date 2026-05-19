@@ -14,7 +14,6 @@ if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
 from workflow_command import CommandRequest, CommandResult  # noqa: E402
-from jira_issue_relationships import stage_relationships_payload  # noqa: E402
 from workflow_jira_issue_cache import JiraDataCenterIssueCache  # noqa: E402
 from workflow_jira_data_center_client import jira_data_center_site_from_provider_config  # noqa: E402
 from workflow_providers import (  # noqa: E402
@@ -835,37 +834,7 @@ def test_data_center_pending_comments_are_appended_and_removed(tmp_path: Path) -
     assert '\\"body\\":\\"Pending comment body.\\\\n\\"' in str(write_request.input_text)
 
 
-def test_cache_relationships_stages_existing_jira_issue_relationship_intent(tmp_path: Path) -> None:
-    write_jira_config(tmp_path)
-    site = jira_site(tmp_path)
-    cache = JiraDataCenterIssueCache.for_project(tmp_path)
-    cache.write_issue_bundle(
-        site,
-        jira_issue_payload(),
-        remote_links=remote_links_payload(),
-        fetched_at="2026-05-15T10:00:00.000+0900",
-    )
-
-    payload = stage_relationships_payload(
-        project=tmp_path,
-        issues=["TEST-1234"],
-        blocked_by=("TEST-1233",),
-        related=("https://github.com/studykit/studykit-plugins/issues/57",),
-    )
-
-    pending_path = cache.relationships_pending_file(site, "TEST-1234")
-    operations = cache.read_pending_issue_relationships(site, "TEST-1234")
-    assert payload["operation"] == "cache_stage_pending_relationships"
-    assert payload["kind"] == "jira"
-    assert payload["issue"] == "TEST-1234"
-    assert payload["relationships_file"] == str(pending_path)
-    assert [(item.relationship, item.target_ref) for item in operations] == [
-        ("blocked_by", "TEST-1233"),
-        ("related", "https://github.com/studykit/studykit-plugins/issues/57"),
-    ]
-
-
-def test_data_center_issue_link_relationships_are_applied_and_removed_from_pending_cache(tmp_path: Path) -> None:
+def test_data_center_issue_link_relationships_are_applied_from_inline_intent(tmp_path: Path) -> None:
     write_jira_config(tmp_path, relationship_mappings=issue_link_relationship_mappings())
     site = jira_site(tmp_path)
     cache = JiraDataCenterIssueCache.for_project(tmp_path)
@@ -874,20 +843,6 @@ def test_data_center_issue_link_relationships_are_applied_and_removed_from_pendi
         jira_issue_payload(),
         remote_links=remote_links_payload(),
         fetched_at="2026-05-15T10:00:00.000+0900",
-    )
-    pending = cache.relationships_pending_file(site, "TEST-1234")
-    pending.write_text(
-        """
-schema_version: 1
-dependencies:
-  blocked_by:
-    - TEST-1233
-  blocking:
-    - TEST-1235
-related:
-  - TEST-1236
-""".lstrip(),
-        encoding="utf-8",
     )
     runner = FakeRunner(
         {
@@ -904,12 +859,21 @@ related:
         }
     )
 
-    response = dispatch_write(tmp_path, runner, "apply_relationships", issue="TEST-1234", pending_relationships=True)
+    response = dispatch_write(
+        tmp_path,
+        runner,
+        "apply_relationships",
+        issue="TEST-1234",
+        relationship_intent={
+            "blocked_by_add": ["TEST-1233"],
+            "blocking_add": ["TEST-1235"],
+            "related_add": ["TEST-1236"],
+        },
+    )
 
     assert response.payload["operation"] == "apply_relationships"
     assert response.payload["applied"] == 3
     assert response.payload["cache_refreshed"] is True
-    assert not pending.exists()
     write_requests = [request for request in runner.requests if request.args == curl_write_args()]
     assert len(write_requests) == 3
     blocked_by_request = str(write_requests[0].input_text)
@@ -936,15 +900,6 @@ def test_data_center_remote_link_relationships_are_applied_with_stable_global_id
         remote_links=remote_links_payload(),
         fetched_at="2026-05-15T10:00:00.000+0900",
     )
-    pending = cache.relationships_pending_file(site, "TEST-1234")
-    pending.write_text(
-        """
-schema_version: 1
-related:
-  - https://github.com/studykit/studykit-plugins/issues/57
-""".lstrip(),
-        encoding="utf-8",
-    )
     runner = FakeRunner(
         {
             curl_args(issue_url()): [
@@ -956,10 +911,17 @@ related:
         }
     )
 
-    response = dispatch_write(tmp_path, runner, "apply_relationships", issue="TEST-1234", pending_relationships=True)
+    response = dispatch_write(
+        tmp_path,
+        runner,
+        "apply_relationships",
+        issue="TEST-1234",
+        relationship_intent={
+            "related_add": ["https://github.com/studykit/studykit-plugins/issues/57"],
+        },
+    )
 
     assert response.payload["applied"] == 1
-    assert not pending.exists()
     write_request = next(request for request in runner.requests if request.args == curl_write_args())
     body = str(write_request.input_text)
     assert 'request = "POST"' in body
@@ -980,11 +942,16 @@ def test_data_center_missing_relationship_mapping_fails_before_mutation(tmp_path
         remote_links=remote_links_payload(),
         fetched_at="2026-05-15T10:00:00.000+0900",
     )
-    cache.relationships_pending_file(site, "TEST-1234").write_text("blocking:\n  - TEST-1235\n", encoding="utf-8")
     runner = FakeRunner({})
 
     with pytest.raises(ProviderOperationError, match="Jira relationship 'blocking' is not configured"):
-        dispatch_write(tmp_path, runner, "apply_relationships", issue="TEST-1234", pending_relationships=True)
+        dispatch_write(
+            tmp_path,
+            runner,
+            "apply_relationships",
+            issue="TEST-1234",
+            relationship_intent={"blocking_add": ["TEST-1235"]},
+        )
 
     assert runner.requests == []
 
@@ -1008,11 +975,16 @@ def test_data_center_bad_relationship_direction_fails_before_mutation(tmp_path: 
         remote_links=remote_links_payload(),
         fetched_at="2026-05-15T10:00:00.000+0900",
     )
-    cache.relationships_pending_file(site, "TEST-1234").write_text("blocking:\n  - TEST-1235\n", encoding="utf-8")
     runner = FakeRunner({})
 
     with pytest.raises(ProviderOperationError, match="requires direction"):
-        dispatch_write(tmp_path, runner, "apply_relationships", issue="TEST-1234", pending_relationships=True)
+        dispatch_write(
+            tmp_path,
+            runner,
+            "apply_relationships",
+            issue="TEST-1234",
+            relationship_intent={"blocking_add": ["TEST-1235"]},
+        )
 
     assert runner.requests == []
 

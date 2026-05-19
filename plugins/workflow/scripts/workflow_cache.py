@@ -294,28 +294,6 @@ def _read_pending_comments(
     return comments
 
 
-def _read_pending_relationships(
-    path: Path,
-    *,
-    target_kind: str,
-    target_id: str,
-) -> list[PendingIssueRelationshipOperation]:
-    if not path.exists():
-        return []
-    if not path.is_file():
-        raise WorkflowCacheCorrupt(f"pending relationships path is not a file: {path}")
-
-    data = _read_yaml_mapping(path)
-    if data.get("schema_version") is not None:
-        _require_schema(data, path)
-    return pending_relationship_operations_from_mapping(
-        data,
-        path=path,
-        target_kind=target_kind,
-        target_id=target_id,
-    )
-
-
 def pending_relationship_operations_from_mapping(
     data: Mapping[str, Any],
     *,
@@ -530,6 +508,154 @@ def _declarative_relationship_values(
             replace_parent=replace_parent,
         )
     ]
+
+
+_INLINE_RELATIONSHIP_SOURCE = Path("<inline>")
+_LIST_RELATIONSHIPS = ("blocked_by", "blocking", "child", "related")
+
+
+def relationship_operations_from_intent(
+    intent: Mapping[str, Any],
+    *,
+    target_kind: str,
+    target_id: str,
+    source_path: Path | None = None,
+) -> list[PendingIssueRelationshipOperation]:
+    """Build relationship operations from a CLI-style flat intent dict.
+
+    Recognized keys (all optional):
+
+    - ``parent_add``: ref — add parent (errors at provider if a parent already
+      exists; use ``parent_replace`` to overwrite).
+    - ``parent_replace``: ref — set parent, replacing any existing parent.
+    - ``parent_remove``: True — detach the current parent. The provider
+      resolves the current parent from cache; if no parent exists, the
+      operation is dropped (idempotent no-op).
+    - ``blocked_by_add`` / ``blocked_by_remove``: list of refs.
+    - ``blocking_add`` / ``blocking_remove``: list of refs.
+    - ``child_add`` / ``child_remove``: list of refs.
+    - ``related_add`` / ``related_remove``: list of refs.
+
+    Parent intents are mutually exclusive. For list relationships, the same
+    ref cannot appear in both add and remove. Returns an empty list when the
+    intent has no actionable entries.
+    """
+
+    path = source_path if source_path is not None else _INLINE_RELATIONSHIP_SOURCE
+    operations: list[PendingIssueRelationshipOperation] = []
+
+    parent_add = _intent_scalar(intent.get("parent_add"))
+    parent_replace = _intent_scalar(intent.get("parent_replace"))
+    parent_remove = bool(intent.get("parent_remove"))
+    parent_flags = [
+        name
+        for name, present in (
+            ("parent_add", bool(parent_add)),
+            ("parent_replace", bool(parent_replace)),
+            ("parent_remove", parent_remove),
+        )
+        if present
+    ]
+    if len(parent_flags) > 1:
+        raise WorkflowCacheError(
+            f"conflicting parent relationship flags: {', '.join(parent_flags)}"
+        )
+    if parent_add:
+        operations.append(
+            PendingIssueRelationshipOperation(
+                target_kind=target_kind,
+                target_id=target_id,
+                path=path,
+                action="add",
+                relationship="parent",
+                target_ref=parent_add,
+                replace_parent=False,
+            )
+        )
+    elif parent_replace:
+        operations.append(
+            PendingIssueRelationshipOperation(
+                target_kind=target_kind,
+                target_id=target_id,
+                path=path,
+                action="add",
+                relationship="parent",
+                target_ref=parent_replace,
+                replace_parent=True,
+            )
+        )
+    elif parent_remove:
+        operations.append(
+            PendingIssueRelationshipOperation(
+                target_kind=target_kind,
+                target_id=target_id,
+                path=path,
+                action="remove",
+                relationship="parent",
+                target_ref="",
+                replace_parent=False,
+            )
+        )
+
+    for relationship in _LIST_RELATIONSHIPS:
+        add_refs = _intent_list(intent.get(f"{relationship}_add"))
+        remove_refs = _intent_list(intent.get(f"{relationship}_remove"))
+        overlap = sorted(set(add_refs) & set(remove_refs))
+        if overlap:
+            raise WorkflowCacheError(
+                f"{relationship} ref(s) cannot be in both add and remove: {overlap}"
+            )
+        for ref in add_refs:
+            operations.append(
+                PendingIssueRelationshipOperation(
+                    target_kind=target_kind,
+                    target_id=target_id,
+                    path=path,
+                    action="add",
+                    relationship=relationship,
+                    target_ref=ref,
+                    replace_parent=False,
+                )
+            )
+        for ref in remove_refs:
+            operations.append(
+                PendingIssueRelationshipOperation(
+                    target_kind=target_kind,
+                    target_id=target_id,
+                    path=path,
+                    action="remove",
+                    relationship=relationship,
+                    target_ref=ref,
+                    replace_parent=False,
+                )
+            )
+
+    return operations
+
+
+def _intent_scalar(value: Any) -> str:
+    if value in (None, "", False):
+        return ""
+    return str(value).strip()
+
+
+def _intent_list(value: Any) -> list[str]:
+    if value in (None, "", False):
+        return []
+    if isinstance(value, str):
+        text = value.strip()
+        return [text] if text else []
+    if isinstance(value, Iterable):
+        result: list[str] = []
+        for item in value:
+            if item in (None, "", False):
+                continue
+            text = str(item).strip()
+            if text:
+                result.append(text)
+        return result
+    text = str(value).strip()
+    return [text] if text else []
 
 
 def _required_relationship_value(item: Mapping[str, Any], path: Path, *keys: str) -> Any:

@@ -1,4 +1,4 @@
-"""Tests for the agent-facing workflow pending relationship apply entrypoint."""
+"""Tests for the GitHub issue relationships CLI (inline-intent flow)."""
 
 from __future__ import annotations
 
@@ -12,10 +12,9 @@ _SCRIPTS_DIR = _PLUGIN_ROOT / "scripts"
 if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
-from workflow_cache import pending_relationship_operations_from_mapping  # noqa: E402
+from workflow_cache import relationship_operations_from_intent  # noqa: E402
 from workflow_github_issue_cache import GitHubIssueCache  # noqa: E402
 from github_issue_relationships import main as github_issue_relationships_main  # noqa: E402
-from github_issue_relationships import stage_relationships_payload  # noqa: E402
 from workflow_command import CommandRequest, CommandResult  # noqa: E402
 from workflow_github import GitHubRepository  # noqa: E402
 
@@ -83,21 +82,92 @@ issue_id_format: github
     )
 
 
-def test_cache_relationships_script_dispatches_pending_relationship_apply(tmp_path: Path) -> None:
+def test_relationship_intent_helper_builds_add_remove_operations() -> None:
+    operations = relationship_operations_from_intent(
+        {
+            "parent_add": "#28",
+            "blocked_by_add": ["#33", "#34"],
+            "blocked_by_remove": ["#60"],
+            "blocking_add": ["#45"],
+        },
+        target_kind="issue",
+        target_id="44",
+    )
+    assert [(op.action, op.relationship, op.target_ref, op.replace_parent) for op in operations] == [
+        ("add", "parent", "#28", False),
+        ("add", "blocked_by", "#33", False),
+        ("add", "blocked_by", "#34", False),
+        ("remove", "blocked_by", "#60", False),
+        ("add", "blocking", "#45", False),
+    ]
+
+
+def test_relationship_intent_helper_supports_replace_and_remove_parent() -> None:
+    replace_ops = relationship_operations_from_intent(
+        {"parent_replace": "#28"}, target_kind="issue", target_id="44",
+    )
+    assert len(replace_ops) == 1
+    assert replace_ops[0].relationship == "parent"
+    assert replace_ops[0].action == "add"
+    assert replace_ops[0].replace_parent is True
+
+    remove_ops = relationship_operations_from_intent(
+        {"parent_remove": True}, target_kind="issue", target_id="44",
+    )
+    assert len(remove_ops) == 1
+    assert remove_ops[0].relationship == "parent"
+    assert remove_ops[0].action == "remove"
+    assert remove_ops[0].target_ref == ""
+
+
+def test_relationship_intent_helper_rejects_conflicting_parent_flags() -> None:
+    import pytest
+
+    with pytest.raises(Exception):
+        relationship_operations_from_intent(
+            {"parent_add": "#28", "parent_replace": "#29"},
+            target_kind="issue",
+            target_id="44",
+        )
+
+
+def test_relationship_intent_helper_rejects_add_remove_overlap() -> None:
+    import pytest
+
+    with pytest.raises(Exception):
+        relationship_operations_from_intent(
+            {"blocked_by_add": ["#33"], "blocked_by_remove": ["#33"]},
+            target_kind="issue",
+            target_id="44",
+        )
+
+
+def test_relationships_cli_no_flag_returns_no_op(tmp_path: Path) -> None:
     write_config(tmp_path)
     cache = GitHubIssueCache.for_project(tmp_path, configured_repo=repo())
     cache.write_issue_bundle(repo(), issue_payload(), fetched_at="2026-05-14T00:10:00Z")
-    pending_path = cache.issue_file(repo(), 44)
-    cache.write_pending_issue_relationships(
-        repo(),
-        44,
-        pending_relationship_operations_from_mapping(
-            {"children": ["#45"]},
-            path=pending_path,
-            target_kind="issue",
-            target_id="44",
-        ),
+
+    def runner(request: CommandRequest) -> CommandResult:
+        raise AssertionError(f"unexpected command in no-op call: {request.args}")
+
+    stdout = io.StringIO()
+    code = github_issue_relationships_main(
+        ["--project", str(tmp_path), "--json", "#44"],
+        stdout=stdout,
+        runner=runner,
     )
+    payload = json.loads(stdout.getvalue())
+    assert code == 0
+    assert payload["operation"] == "apply_relationships"
+    assert payload["applied"] == 0
+    assert payload.get("no_changes") is True
+
+
+def test_relationships_cli_dispatches_inline_intent(tmp_path: Path) -> None:
+    write_config(tmp_path)
+    cache = GitHubIssueCache.for_project(tmp_path, configured_repo=repo())
+    cache.write_issue_bundle(repo(), issue_payload(), fetched_at="2026-05-14T00:10:00Z")
+
     def runner(request: CommandRequest) -> CommandResult:
         if request.args == gh_issue_view_args(44, "number,updatedAt"):
             return CommandResult(request=request, returncode=0, stdout=json.dumps({"number": 44, "updatedAt": "2026-05-14T00:00:00Z"}))
@@ -124,72 +194,22 @@ def test_cache_relationships_script_dispatches_pending_relationship_apply(tmp_pa
         return CommandResult(request=request, returncode=127, stderr=f"unexpected command: {request.args}")
 
     stdout = io.StringIO()
-
-    code = github_issue_relationships_main(
-        ["--project", str(tmp_path), "--type", "task", "--json", "44"],
-        stdout=stdout,
-        runner=runner,
-    )
-
-    payload = json.loads(stdout.getvalue())
-    assert code == 0
-    assert payload["operation"] == "cache_apply_pending_relationships"
-    assert payload["issues"][0]["operation"] == "apply_relationships"
-    assert payload["issues"][0]["issue"] == "44"
-    assert payload["issues"][0]["applied"] == 1
-    assert "pending:" not in pending_path.read_text(encoding="utf-8")
-
-
-def test_cache_relationships_stages_existing_issue_relationship_intent(tmp_path: Path) -> None:
-    write_config(tmp_path)
-    cache = GitHubIssueCache.for_project(tmp_path, configured_repo=repo())
-    cache.write_issue_bundle(repo(), issue_payload(), fetched_at="2026-05-14T00:10:00Z")
-
-    payload = stage_relationships_payload(
-        project=tmp_path,
-        issues=["#44"],
-        parent="#28",
-        blocked_by=("#33",),
-        blocking=("#45",),
-    )
-
-    pending_path = cache.issue_file(repo(), 44)
-    operations = cache.read_pending_issue_relationships(repo(), 44)
-    assert payload["operation"] == "cache_stage_pending_relationships"
-    assert payload["issue"] == "44"
-    assert payload["pending_location"] == str(pending_path)
-    assert "relationships_file" not in payload
-    assert [(item.relationship, item.target_ref) for item in operations] == [
-        ("parent", "#28"),
-        ("blocked_by", "#33"),
-        ("blocking", "#45"),
-    ]
-    assert all(item.path == pending_path for item in operations)
-
-
-def test_cache_relationships_script_stages_existing_issue_relationship_intent(tmp_path: Path) -> None:
-    write_config(tmp_path)
-    cache = GitHubIssueCache.for_project(tmp_path, configured_repo=repo())
-    cache.write_issue_bundle(repo(), issue_payload(), fetched_at="2026-05-14T00:10:00Z")
-
-    stdout = io.StringIO()
     code = github_issue_relationships_main(
         [
             "--project",
             str(tmp_path),
-            "--stage",
-            "--parent",
-            "#28",
-            "--blocked-by",
-            "#33",
+            "--type",
+            "task",
+            "--child",
+            "#45",
             "--json",
             "#44",
         ],
         stdout=stdout,
+        runner=runner,
     )
-
     payload = json.loads(stdout.getvalue())
     assert code == 0
-    assert payload["operation"] == "cache_stage_pending_relationships"
+    assert payload["operation"] == "apply_relationships"
     assert payload["issue"] == "44"
-    assert cache.read_pending_issue_relationships(repo(), 44)[0].path == cache.issue_file(repo(), 44)
+    assert payload["applied"] == 1

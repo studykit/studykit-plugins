@@ -14,6 +14,7 @@ from workflow_cache import (
     PendingIssueRelationshipOperation,
     WorkflowCacheError,
     WorkflowFreshnessConflict,
+    relationship_operations_from_intent,
     require_provider_freshness,
 )
 from workflow_command import CommandRunner
@@ -340,9 +341,70 @@ class GitHubIssueNativeProvider(IssueProvider):
 
     def apply_relationships(self, request: ProviderRequest) -> Mapping[str, Any]:
         issue = _required_payload_value(request, "issue")
-        if _truthy(request.payload.get("from_pending")) or _truthy(request.payload.get("pending_relationships")):
-            return self._apply_pending_relationships(request, issue)
-        raise ProviderOperationError("GitHub issue apply_relationships currently requires pending_relationships")
+        issue_number = normalize_issue_number(issue)
+        intent = request.payload.get("relationship_intent") or {}
+        if not isinstance(intent, Mapping):
+            raise ProviderOperationError("relationship_intent must be a mapping")
+
+        operations_raw = relationship_operations_from_intent(
+            intent,
+            target_kind="issue",
+            target_id=issue_number,
+        )
+        operations_raw = self._resolve_parent_remove_target(request, issue_number, operations_raw)
+
+        if not operations_raw:
+            return {
+                "operation": "apply_relationships",
+                "issue": issue_number,
+                "applied": 0,
+                "operations": [],
+                "provider_results": [],
+                "cache_refreshed": False,
+                "no_changes": True,
+            }
+
+        operations = [
+            _ResolvedRelationshipOperation(
+                action=op.action,
+                relationship=op.relationship,
+                target_issue=self._resolve_github_issue_reference(request, op.target_ref),
+                replace_parent=op.replace_parent,
+            )
+            for op in operations_raw
+        ]
+        return self._apply_relationship_operations(request, issue_number, operations)
+
+    def _resolve_parent_remove_target(
+        self,
+        request: ProviderRequest,
+        issue_number: str,
+        operations: list[PendingIssueRelationshipOperation],
+    ) -> list[PendingIssueRelationshipOperation]:
+        if not any(
+            op.action == "remove" and op.relationship == "parent" and not op.target_ref
+            for op in operations
+        ):
+            return operations
+        repo = resolve_github_repository(request.context.project, runner=self.runner)
+        cache = GitHubIssueCache.for_project(request.context.project, configured_repo=repo)
+        current_parent = ""
+        try:
+            relationships = cache.read_relationships(repo, issue_number)
+        except WorkflowCacheError:
+            relationships = {}
+        parent_ref = relationships.get("parent")
+        if parent_ref not in (None, "", 0):
+            current_parent = str(parent_ref)
+        resolved: list[PendingIssueRelationshipOperation] = []
+        for op in operations:
+            if op.action == "remove" and op.relationship == "parent" and not op.target_ref:
+                if not current_parent:
+                    continue
+                resolved.append(replace(op, target_ref=current_parent))
+            else:
+                resolved.append(op)
+        return resolved
 
     def set_parent(self, request: ProviderRequest) -> Mapping[str, Any]:
         issue = normalize_issue_number(_required_payload_value(request, "issue"))
@@ -356,7 +418,7 @@ class GitHubIssueNativeProvider(IssueProvider):
                 replace_parent=_truthy(request.payload.get("replace_parent") or request.payload.get("replaceParent")),
             )
         ]
-        return self._apply_relationship_operations(request, issue, operations, pending_operations=None)
+        return self._apply_relationship_operations(request, issue, operations)
 
     def set_dependency(self, request: ProviderRequest) -> Mapping[str, Any]:
         issue = normalize_issue_number(_required_payload_value(request, "issue"))
@@ -381,107 +443,13 @@ class GitHubIssueNativeProvider(IssueProvider):
                     target_issue=self._resolve_github_issue_reference(request, target),
                 )
             )
-        return self._apply_relationship_operations(request, issue, operations, pending_operations=None)
-
-    def _apply_pending_relationships(self, request: ProviderRequest, issue: Any) -> Mapping[str, Any]:
-        issue_number = normalize_issue_number(issue)
-        repo = resolve_github_repository(request.context.project, runner=self.runner)
-        cache = GitHubIssueCache.for_project(request.context.project, configured_repo=repo)
-        pending_operations = cache.read_pending_issue_relationships(repo, issue_number)
-        if not pending_operations:
-            raise ProviderOperationError(f"no pending relationship frontmatter found for GitHub issue #{issue_number}")
-
-        operations = [
-            _ResolvedRelationshipOperation(
-                action=operation.action,
-                relationship=operation.relationship,
-                target_issue=self._resolve_github_issue_reference(request, operation.target_ref),
-                replace_parent=operation.replace_parent,
-            )
-            for operation in pending_operations
-        ]
-        if not operations:
-            raise ProviderOperationError(f"no GitHub relationship operations found for issue #{issue_number}")
-        self._validate_relationship_operations(operations)
-        freshness_payload = dict(request.payload)
-        freshness_payload.setdefault("freshness_check", True)
-        freshness_payload.setdefault("freshness_target", "relationships")
-        self._require_write_freshness(
-            replace(request, payload=freshness_payload),
-            issue_number,
-            default_target="relationships",
-        )
-
-        applied: list[Mapping[str, Any]] = []
-        consumed_pending: list[PendingIssueRelationshipOperation] = []
-        consumed_resolved: list[_ResolvedRelationshipOperation] = []
-        try:
-            for resolved, pending in zip(operations, pending_operations):
-                applied.append(self._dispatch_relationship_operation(issue_number, resolved, request=request))
-                consumed_pending.append(pending)
-                consumed_resolved.append(resolved)
-        except Exception as exc:
-            removed = self._remove_consumed_pending_relationships(
-                cache,
-                repo,
-                issue_number,
-                consumed_pending=consumed_pending,
-            )
-            refresh_error: str | None = None
-            relationship_location: Path | None = None
-            try:
-                relationship_location = self._refresh_relationship_projection(request, issue_number)
-            except Exception as refresh_exc:  # pragma: no cover - defensive reporting path
-                refresh_error = str(refresh_exc)
-            details = (
-                f"GitHub relationship apply failed after {len(applied)} provider operation(s); "
-                "provider state may have partially changed. Refresh relationships and re-stage before retry."
-            )
-            if refresh_error:
-                details += f" Relationship refresh also failed: {refresh_error}"
-            raise ProviderOperationError(details) from exc
-
-        relationship_location = self._refresh_relationship_projection(request, issue_number)
-        removed = self._remove_consumed_pending_relationships(
-            cache,
-            repo,
-            issue_number,
-            consumed_pending=consumed_pending,
-        )
-        return {
-            "operation": "apply_relationships",
-            "issue": issue_number,
-            "applied": len(applied),
-            "operations": [operation.to_json() for operation in operations],
-            "provider_results": [dict(item) for item in applied],
-            "pending_operations": [operation.to_json() for operation in pending_operations],
-            "consumed_operations": [operation.to_json() for operation in consumed_resolved],
-            "cache_refreshed": True,
-            "relationship_location": str(relationship_location),
-            "pending_source": "issue",
-            "pending_file": pending_operations[0].file_name,
-            "removed_pending_files": [str(path) for path in removed],
-        }
-
-    def _remove_consumed_pending_relationships(
-        self,
-        cache: GitHubIssueCache,
-        repo: Any,
-        issue_number: str,
-        *,
-        consumed_pending: list[PendingIssueRelationshipOperation],
-    ) -> list[Path]:
-        if not consumed_pending:
-            return []
-        return cache.remove_pending_issue_relationships(repo, issue_number, consumed_pending)
+        return self._apply_relationship_operations(request, issue, operations)
 
     def _apply_relationship_operations(
         self,
         request: ProviderRequest,
         issue_number: str,
         operations: list[_ResolvedRelationshipOperation],
-        *,
-        pending_operations: list[PendingIssueRelationshipOperation] | None,
     ) -> dict[str, Any]:
         if not operations:
             raise ProviderOperationError(f"no GitHub relationship operations found for issue #{issue_number}")
@@ -506,7 +474,6 @@ class GitHubIssueNativeProvider(IssueProvider):
             "applied": len(applied),
             "operations": [operation.to_json() for operation in operations],
             "provider_results": [dict(item) for item in applied],
-            "pending_operations": [operation.to_json() for operation in pending_operations or []],
             "cache_refreshed": True,
             "relationship_location": str(relationship_location),
         }

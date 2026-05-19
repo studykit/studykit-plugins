@@ -34,6 +34,7 @@ def publish_issue(
     issue_type: str | None = None,
     subtask_parent: str | None = None,
     project_key: str | None = None,
+    relationship_intent: dict[str, object] | None = None,
     runner: CommandRunner | None = None,
 ) -> dict[str, object]:
     """Create a Jira issue from an opaque caller-owned body file."""
@@ -91,7 +92,7 @@ def publish_issue(
     else:
         body_removed = True
 
-    return {
+    result: dict[str, object] = {
         "operation": "publish_issue",
         "kind": "jira",
         "issue": provider_payload.get("issue") or provider_payload.get("key"),
@@ -104,6 +105,21 @@ def publish_issue(
         "cache": cache_payload,
         "subtask_parent": provider_payload.get("subtask_parent"),
     }
+
+    if relationship_intent:
+        new_key = provider_payload.get("key") or provider_payload.get("issue")
+        relationships_response = provider.call(
+            ProviderRequest(
+                role="issue",
+                kind="jira",
+                operation="apply_relationships",
+                context=ProviderContext(project=config.root, artifact_type=artifact_type),
+                payload={"issue": new_key, "relationship_intent": relationship_intent},
+            )
+        )
+        result["relationships"] = dict(relationships_response.payload)
+
+    return result
 
 
 def _reject_body_with_frontmatter(body: str, path: Path) -> None:
@@ -147,10 +163,50 @@ def build_parser() -> argparse.ArgumentParser:
         required=True,
         help="path to the opaque body content file (no frontmatter)",
     )
+    publish.add_argument("--parent", help="add parent relationship after publish")
+    publish.add_argument(
+        "--blocked-by",
+        action="append",
+        default=[],
+        help="add blocked-by dependency after publish (repeatable)",
+    )
+    publish.add_argument(
+        "--blocking",
+        action="append",
+        default=[],
+        help="add blocking dependency after publish (repeatable)",
+    )
+    publish.add_argument(
+        "--child",
+        action="append",
+        default=[],
+        help="add child after publish (repeatable)",
+    )
+    publish.add_argument(
+        "--related",
+        action="append",
+        default=[],
+        help="add related ref after publish (repeatable)",
+    )
 
     for child in subparsers.choices.values():
         child.add_argument("--json", action="store_true", help=argparse.SUPPRESS)
     return parser
+
+
+def _publish_relationship_intent(args: argparse.Namespace) -> dict[str, object]:
+    intent: dict[str, object] = {}
+    if getattr(args, "parent", None):
+        intent["parent_add"] = args.parent
+    if getattr(args, "blocked_by", None):
+        intent["blocked_by_add"] = list(args.blocked_by)
+    if getattr(args, "blocking", None):
+        intent["blocking_add"] = list(args.blocking)
+    if getattr(args, "child", None):
+        intent["child_add"] = list(args.child)
+    if getattr(args, "related", None):
+        intent["related_add"] = list(args.related)
+    return intent
 
 
 def main(
@@ -176,6 +232,7 @@ def main(
                 issue_type=args.issue_type,
                 subtask_parent=args.subtask_parent,
                 project_key=args.project_key,
+                relationship_intent=_publish_relationship_intent(args),
                 runner=runner,
             )
         else:
