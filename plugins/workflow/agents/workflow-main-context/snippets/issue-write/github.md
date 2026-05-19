@@ -7,8 +7,7 @@ handling. Pick the script by intent:
 - `github_issue_comments.py append` — add a comment
 - `github_issue_writeback.py update` — change body, title, labels, or state
 - `github_issue_relationships.py` — add / remove / replace links
-- `github_issue_metadata.py` — metadata-only change
-- `github_issue_lifecycle.py close|reopen` — state-only change
+- `github_issue_fields.py {close|reopen|assign|unassign|set-type}` — body-less change
 
 Common shapes (resolver prereq is required for any body-file flow):
 
@@ -26,6 +25,8 @@ Common shapes (resolver prereq is required for any body-file flow):
 # Add a relationship (also: --blocked-by, --blocking, --child, --related, --remove-*)
 "$WORKFLOW" github_issue_relationships.py <ref> --parent <ref> --json
 
-# Close or reopen
-"$WORKFLOW" github_issue_lifecycle.py close <ref> --json
+# Close, reopen, assign, unassign, or change the workflow-type label
+"$WORKFLOW" github_issue_fields.py close <ref> --json
+"$WORKFLOW" github_issue_fields.py assign <ref> me --json
+"$WORKFLOW" github_issue_fields.py set-type <ref> bug --json
 ```

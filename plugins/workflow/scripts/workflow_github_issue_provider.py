@@ -27,6 +27,7 @@ from workflow_github import (
     comment_issue,
     create_issue,
     edit_issue,
+    issue_assignees,
     issue_relationships,
     issue_body_edit_history,
     issue_events,
@@ -184,7 +185,21 @@ class GitHubIssueNativeProvider(IssueProvider):
         issue = _required_payload_value(request, "issue")
         title = request.payload.get("title")
         body = request.payload.get("body")
-        labels = request.payload.get("labels")
+        label_set = request.payload.get("label_set")
+        if label_set is None:
+            label_set = request.payload.get("labels")
+        label_add = request.payload.get("label_add")
+        label_remove = request.payload.get("label_remove")
+        if label_set is not None and (label_add or label_remove):
+            raise ProviderOperationError(
+                "GitHub issue update cannot combine label_set with label_add or label_remove"
+            )
+        assignee = _optional_string(request.payload.get("assignee"))
+        unassign = bool(request.payload.get("unassign"))
+        if assignee is not None and unassign:
+            raise ProviderOperationError(
+                "GitHub issue update cannot combine assignee with unassign"
+            )
         state = _optional_string(request.payload.get("state"))
         state_reason = _optional_string(
             request.payload.get("state_reason") or request.payload.get("stateReason")
@@ -194,9 +209,19 @@ class GitHubIssueNativeProvider(IssueProvider):
             raise ProviderOperationError(
                 f"unsupported GitHub issue state for update: {state}"
             )
-        if title is None and body is None and labels is None and normalized_state is None:
+        if (
+            title is None
+            and body is None
+            and label_set is None
+            and not label_add
+            and not label_remove
+            and assignee is None
+            and not unassign
+            and normalized_state is None
+        ):
             raise ProviderOperationError(
-                "GitHub issue update requires at least one of body, title, labels, state"
+                "GitHub issue update requires at least one of body, title, labels, "
+                "assignee, state"
             )
 
         issue_number = normalize_issue_number(issue)
@@ -215,7 +240,7 @@ class GitHubIssueNativeProvider(IssueProvider):
                 error=exc,
             )
         current_labels: tuple[str, ...] | None = None
-        if labels is not None:
+        if label_set is not None:
             current = view_issue(
                 issue_number,
                 project=request.context.project,
@@ -223,12 +248,23 @@ class GitHubIssueNativeProvider(IssueProvider):
                 runner=self.runner,
             )
             current_labels = tuple(_string_list(current.get("labels")))
+        remove_assignees: tuple[str, ...] | None = None
+        if unassign:
+            remove_assignees = issue_assignees(
+                issue_number,
+                project=request.context.project,
+                runner=self.runner,
+            )
         edited = edit_issue(
             issue_number,
             title=str(title) if title is not None else None,
             body=str(body) if body is not None else None,
-            labels=tuple(_string_list(labels)) if labels is not None else None,
+            labels=tuple(_string_list(label_set)) if label_set is not None else None,
             current_labels=current_labels,
+            add_labels=tuple(_string_list(label_add)) if label_add else None,
+            remove_labels=tuple(_string_list(label_remove)) if label_remove else None,
+            assignees=(assignee,) if assignee is not None else None,
+            remove_assignees=remove_assignees,
             project=request.context.project,
             runner=self.runner,
         )

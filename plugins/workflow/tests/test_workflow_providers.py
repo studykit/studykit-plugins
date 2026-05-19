@@ -14,7 +14,7 @@ _SCRIPTS_DIR = _PLUGIN_ROOT / "scripts"
 if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
-from github_issue_lifecycle import lifecycle_payload  # noqa: E402
+from github_issue_fields import fields_payload  # noqa: E402
 from workflow_github_issue_cache import GitHubIssueCache  # noqa: E402
 from workflow_command import CommandRequest, CommandResult  # noqa: E402
 from workflow_config import parse_workflow_config  # noqa: E402
@@ -564,7 +564,7 @@ def test_github_issue_update_rejects_payload_without_any_writable_field(tmp_path
 
     dispatcher = ProviderDispatcher(default_provider_registry(runner=runner))
 
-    with pytest.raises(ProviderOperationError, match="at least one of body, title, labels, state"):
+    with pytest.raises(ProviderOperationError, match="at least one of body, title, labels"):
         dispatcher.dispatch(
             ProviderRequest(
                 role="issue",
@@ -659,7 +659,7 @@ def test_github_issue_create_inline_refreshes_cache(
     assert events == ["create", "verify", "refresh"]
 
 
-def test_github_issue_lifecycle_close_checks_freshness_and_refreshes_cache(
+def test_github_issue_fields_close_checks_freshness_and_refreshes_cache(
     tmp_path: Path,
 ) -> None:
     write_config(tmp_path)
@@ -719,19 +719,20 @@ def test_github_issue_lifecycle_close_checks_freshness_and_refreshes_cache(
             return CommandResult(request=request, returncode=0, stdout="[]")
         return CommandResult(request=request, returncode=127, stderr="unexpected command")
 
-    payload = lifecycle_payload(
+    payload = fields_payload(
         project=tmp_path,
-        operation="close",
-        issues=["#39"],
         artifact_type="task",
+        verb="close",
+        issue="#39",
+        reason="completed",
         runner=runner,
     )
 
     assert payload["operation"] == "lifecycle_close"
-    issue_payload_result = payload["issues"][0]
-    assert issue_payload_result["operation"] == "close_issue"
-    assert issue_payload_result["verified"] is True
-    assert issue_payload_result["cache_refreshed"] is True
+    provider_payload = payload["provider"]
+    assert provider_payload["operation"] == "close_issue"
+    assert provider_payload["verified"] is True
+    assert provider_payload["cache_refreshed"] is True
     assert cache.read_issue(github_repo(), 39)["state"] == "closed"
     assert events == ["freshness", "close", "verify", "refresh"]
 

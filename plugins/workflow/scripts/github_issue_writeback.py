@@ -37,7 +37,9 @@ def update_issue(
     issue: str,
     body_file: Path,
     title: str | None = None,
-    labels: tuple[str, ...] = (),
+    add_labels: tuple[str, ...] = (),
+    remove_labels: tuple[str, ...] = (),
+    set_labels: tuple[str, ...] | None = None,
     state: str | None = None,
     state_reason: str | None = None,
     relationship_intent: dict[str, object] | None = None,
@@ -64,7 +66,17 @@ def update_issue(
         raise GitHubIssueWritebackError(f"body file does not exist: {body_path}")
     body = _strip_body_frontmatter(body_path.read_text(encoding="utf-8"))
 
-    normalized_labels = tuple(label.strip() for label in labels if label.strip())
+    normalized_add = tuple(label.strip() for label in add_labels if label.strip())
+    normalized_remove = tuple(label.strip() for label in remove_labels if label.strip())
+    normalized_set: tuple[str, ...] | None
+    if set_labels is None:
+        normalized_set = None
+    else:
+        normalized_set = tuple(label.strip() for label in set_labels if label.strip())
+    if normalized_set is not None and (normalized_add or normalized_remove):
+        raise GitHubIssueWritebackError(
+            "--set-labels cannot be combined with --add-label or --remove-label"
+        )
 
     payload: dict[str, object] = {
         "issue": issue_number,
@@ -73,8 +85,12 @@ def update_issue(
     }
     if title is not None:
         payload["title"] = title
-    if normalized_labels:
-        payload["labels"] = list(normalized_labels)
+    if normalized_set is not None:
+        payload["label_set"] = list(normalized_set)
+    if normalized_add:
+        payload["label_add"] = list(normalized_add)
+    if normalized_remove:
+        payload["label_remove"] = list(normalized_remove)
     if state:
         payload["state"] = state.strip().lower()
     if state_reason:
@@ -173,7 +189,25 @@ def build_parser() -> argparse.ArgumentParser:
         help="path to the opaque body content file (leading YAML frontmatter is stripped)",
     )
     update.add_argument("--title")
-    update.add_argument("--label", action="append", default=[])
+    update.add_argument(
+        "--add-label",
+        dest="add_label",
+        action="append",
+        default=[],
+        help="add a label (repeatable; cannot be combined with --set-labels)",
+    )
+    update.add_argument(
+        "--remove-label",
+        dest="remove_label",
+        action="append",
+        default=[],
+        help="remove a label (repeatable; cannot be combined with --set-labels)",
+    )
+    update.add_argument(
+        "--set-labels",
+        dest="set_labels",
+        help="replace the label set with a comma-separated list",
+    )
     update.add_argument("--state", choices=["open", "closed"])
     update.add_argument(
         "--state-reason",
@@ -281,13 +315,18 @@ def main(
 
     try:
         if args.command == "update":
+            set_labels: tuple[str, ...] | None = None
+            if args.set_labels is not None:
+                set_labels = tuple(part for part in args.set_labels.split(","))
             payload = update_issue(
                 project=args.project,
                 artifact_type=args.type,
                 issue=args.issue,
                 body_file=args.body_file,
                 title=args.title,
-                labels=tuple(args.label),
+                add_labels=tuple(args.add_label),
+                remove_labels=tuple(args.remove_label),
+                set_labels=set_labels,
                 state=args.state,
                 state_reason=args.state_reason,
                 relationship_intent=_update_relationship_intent(args),

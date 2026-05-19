@@ -235,11 +235,15 @@ def edit_issue(
     body: str | None = None,
     labels: tuple[str, ...] | None = None,
     current_labels: tuple[str, ...] | None = None,
+    add_labels: tuple[str, ...] | None = None,
+    remove_labels: tuple[str, ...] | None = None,
+    assignees: tuple[str, ...] | None = None,
+    remove_assignees: tuple[str, ...] | None = None,
     operation: str = "edit_issue",
     verify: bool = True,
     runner: CommandRunner | None = None,
 ) -> dict[str, Any]:
-    """Edit issue title, body, and labels."""
+    """Edit issue title, body, labels, and assignees."""
 
     repo = resolve_github_repository(project, runner=runner)
     issue_number = normalize_issue_number(issue)
@@ -248,16 +252,28 @@ def edit_issue(
         issue_number,
         labels=labels,
         current_labels=current_labels,
+        add_labels=add_labels,
+        remove_labels=remove_labels,
         project=project,
         runner=runner,
     )
-    if title is None and body is None and not label_edits:
+    assignee_edits: list[str] = []
+    if assignees:
+        for user in assignees:
+            if user:
+                assignee_edits.extend(["--add-assignee", user])
+    if remove_assignees:
+        for user in remove_assignees:
+            if user:
+                assignee_edits.extend(["--remove-assignee", user])
+    if title is None and body is None and not label_edits and not assignee_edits:
         return {"operation": operation, "issue": issue_number, "verified": verify}
 
     args = ["issue", "edit", issue_number, "--repo", repo.slug]
     if title is not None:
         args.extend(["--title", title])
     args.extend(label_edits)
+    args.extend(assignee_edits)
     if body is None:
         _gh(args, project=project, runner=runner)
     else:
@@ -277,6 +293,52 @@ def edit_issue(
             runner=runner,
         )
     return {"operation": operation, "issue": issue_number, "verified": verify}
+
+
+def get_github_login(
+    *,
+    project: Path,
+    runner: CommandRunner | None = None,
+) -> str:
+    """Return the authenticated GitHub user's login via ``gh api user``."""
+
+    result = _gh(
+        ["api", "user", "--jq", ".login"],
+        project=project,
+        runner=runner,
+    )
+    login = (result.stdout or "").strip()
+    if not login:
+        raise GitHubParseError("could not resolve authenticated GitHub user login")
+    return login
+
+
+def issue_assignees(
+    issue: int | str,
+    *,
+    project: Path,
+    runner: CommandRunner | None = None,
+) -> tuple[str, ...]:
+    """Return the current assignee logins for an issue."""
+
+    data = view_issue(
+        issue,
+        project=project,
+        fields=("assignees",),
+        runner=runner,
+    )
+    raw = data.get("assignees")
+    if not isinstance(raw, list):
+        return ()
+    logins: list[str] = []
+    for entry in raw:
+        if isinstance(entry, Mapping):
+            login = entry.get("login")
+            if isinstance(login, str) and login:
+                logins.append(login)
+        elif isinstance(entry, str) and entry:
+            logins.append(entry)
+    return tuple(logins)
 
 
 def edit_issue_body(
@@ -750,9 +812,18 @@ def _label_edit_args(
     current_labels: tuple[str, ...] | None,
     project: Path,
     runner: CommandRunner | None = None,
+    add_labels: tuple[str, ...] | None = None,
+    remove_labels: tuple[str, ...] | None = None,
 ) -> list[str]:
+    args: list[str] = []
+    if add_labels:
+        for label in sorted({label for label in add_labels if label}):
+            args.extend(["--add-label", label])
+    if remove_labels:
+        for label in sorted({label for label in remove_labels if label}):
+            args.extend(["--remove-label", label])
     if labels is None:
-        return []
+        return args
 
     desired = {label for label in labels if label}
     if current_labels is None:
@@ -767,7 +838,6 @@ def _label_edit_args(
     else:
         current = {label for label in current_labels if label}
 
-    args: list[str] = []
     for label in sorted(desired - current):
         args.extend(["--add-label", label])
     for label in sorted(current - desired):

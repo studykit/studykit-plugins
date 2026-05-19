@@ -269,17 +269,54 @@ class JiraDataCenterIssueNativeProvider(IssueProvider):
                 f"unsupported Jira issue state for update: {state}"
             )
 
+        label_set = request.payload.get("label_set")
+        if label_set is None:
+            label_set = request.payload.get("labels")
+        label_add = request.payload.get("label_add")
+        label_remove = request.payload.get("label_remove")
+        if label_set is not None and (label_add or label_remove):
+            raise ProviderOperationError(
+                "Jira issue update cannot combine label_set with label_add or label_remove"
+            )
+        assignee = _optional_string(request.payload.get("assignee"))
+        unassign = bool(request.payload.get("unassign"))
+        if assignee is not None and unassign:
+            raise ProviderOperationError(
+                "Jira issue update cannot combine assignee with unassign"
+            )
+        issuetype = _optional_string(request.payload.get("issuetype"))
+
         fields: dict[str, Any] = {}
         if request.payload.get("title") is not None:
             title = str(request.payload["title"])
             fields["summary"] = _jira_issue_title(request, title)
         if request.payload.get("body") is not None:
             fields["description"] = str(request.payload["body"])
-        if request.payload.get("labels") is not None:
-            fields["labels"] = _string_list(request.payload.get("labels"))
-        if not fields and normalized_state is None:
+        if label_set is not None:
+            fields["labels"] = _string_list(label_set)
+        if assignee is not None:
+            fields["assignee"] = {"name": assignee}
+        elif unassign:
+            fields["assignee"] = None
+        if issuetype is not None:
+            fields["issuetype"] = {"name": issuetype}
+
+        update_payload: dict[str, list[dict[str, Any]]] = {}
+        if label_add or label_remove:
+            label_ops: list[dict[str, Any]] = []
+            for label in _string_list(label_add) if label_add else ():
+                if label:
+                    label_ops.append({"add": label})
+            for label in _string_list(label_remove) if label_remove else ():
+                if label:
+                    label_ops.append({"remove": label})
+            if label_ops:
+                update_payload["labels"] = label_ops
+
+        if not fields and not update_payload and normalized_state is None:
             raise ProviderOperationError(
-                "Jira issue update requires at least one of body, title, labels, state"
+                "Jira issue update requires at least one of body, title, labels, "
+                "assignee, issuetype, state"
             )
 
         site = resolve_jira_data_center_site(request.context.project)
@@ -296,8 +333,14 @@ class JiraDataCenterIssueNativeProvider(IssueProvider):
                 target="issue",
                 error=exc,
             )
-        if fields:
-            update_issue(site, issue_key, fields=fields, runner=self.runner)
+        if fields or update_payload:
+            update_issue(
+                site,
+                issue_key,
+                fields=fields if fields else None,
+                update=update_payload if update_payload else None,
+                runner=self.runner,
+            )
 
         state_result: Mapping[str, Any] | None = None
         if normalized_state is not None:
@@ -451,7 +494,10 @@ class JiraDataCenterIssueNativeProvider(IssueProvider):
         transition_id = _find_transition_id(transitions, transition_name)
         if transition_id is None:
             raise ProviderOperationError(
-                f"Jira issue {issue_key} does not expose a '{transition_name}' transition right now"
+                f"Jira issue {issue_key} does not expose a '{transition_name}' transition right now. "
+                f"If this workflow uses a different name for the '{state}' transition, run "
+                f"`workflow_setup.py jira-state-transition-inspect --jira-site <url> --issue <KEY>` and "
+                f"configure providers.issues.state_transitions.{state} in .workflow/config.yml."
             )
         transition_issue(site, issue_key, transition_id, runner=self.runner)
         return {
@@ -746,19 +792,43 @@ def update_issue(
     site: Any,
     issue_key: str,
     *,
-    fields: Mapping[str, Any],
+    fields: Mapping[str, Any] | None = None,
+    update: Mapping[str, Any] | None = None,
     runner: CommandRunner | None = None,
 ) -> Mapping[str, Any]:
+    payload: dict[str, Any] = {}
+    if fields:
+        payload["fields"] = dict(fields)
+    if update:
+        payload["update"] = dict(update)
+    if not payload:
+        return {}
     result = jira_send_json(
         site,
         "PUT",
         jira_data_center_issue_path(site, issue_key),
-        {"fields": dict(fields)},
+        payload,
         runner=runner,
     )
     if not isinstance(result, Mapping):
         return {}
     return result
+
+
+def get_jira_myself(
+    site: Any,
+    *,
+    runner: CommandRunner | None = None,
+) -> str:
+    """Return the authenticated Jira user's name via ``/rest/api/<v>/myself``."""
+
+    path = f"/rest/api/{site.api_version}/myself"
+    result = jira_get_json(site, path, runner=runner)
+    if isinstance(result, Mapping):
+        name = result.get("name")
+        if isinstance(name, str) and name.strip():
+            return name.strip()
+    raise ProviderOperationError("could not resolve Jira authenticated user (missing 'name')")
 
 
 def create_issue_link(
@@ -934,15 +1004,18 @@ def _find_transition_id(
     return None
 
 
+_JIRA_DEFAULT_STATE_TRANSITIONS = {"open": "Reopen"}
+
+
 def _jira_state_transition_name(state: str, settings: Mapping[str, Any]) -> str | None:
     raw = settings.get("state_transitions") or settings.get("stateTransitions")
-    if not isinstance(raw, Mapping):
-        return None
-    value = raw.get(state)
-    if value is None:
-        return None
-    text = str(value).strip()
-    return text or None
+    if isinstance(raw, Mapping):
+        value = raw.get(state)
+        if value is not None:
+            text = str(value).strip()
+            if text:
+                return text
+    return _JIRA_DEFAULT_STATE_TRANSITIONS.get(state)
 
 
 def _required_payload_value(request: ProviderRequest, key: str) -> Any:
