@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import hashlib
-from collections.abc import Mapping, Sequence
+from collections.abc import Mapping
 from dataclasses import dataclass, replace
 from typing import Any
 from urllib.parse import urlparse
@@ -28,6 +28,7 @@ from workflow_jira_data_center_client import (
     jira_data_center_remote_link_global_id_path,
     jira_data_center_remote_link_path,
     jira_data_center_remote_links_path,
+    jira_data_center_transitions_path,
     jira_delete,
     jira_get_json,
     jira_send_json,
@@ -253,8 +254,12 @@ class JiraDataCenterIssueNativeProvider(IssueProvider):
 
     def update(self, request: ProviderRequest) -> Mapping[str, Any]:
         issue_key = normalize_jira_issue_key(_required_payload_value(request, "issue"))
-        if _truthy(request.payload.get("from_cache")) or _truthy(request.payload.get("cache_write_back")):
-            return self._update_from_cache(request, issue_key)
+        state = _optional_string(request.payload.get("state"))
+        normalized_state = state.lower() if state is not None else None
+        if normalized_state is not None and normalized_state not in {"open", "closed"}:
+            raise ProviderOperationError(
+                f"unsupported Jira issue state for update: {state}"
+            )
 
         fields: dict[str, Any] = {}
         if request.payload.get("title") is not None:
@@ -264,36 +269,11 @@ class JiraDataCenterIssueNativeProvider(IssueProvider):
             fields["description"] = str(request.payload["body"])
         if request.payload.get("labels") is not None:
             fields["labels"] = _string_list(request.payload.get("labels"))
-        if not fields:
-            raise ProviderOperationError("Jira issue update requires from_cache or at least one of title, body, labels")
-        return self._update_fields(request, issue_key, fields, operation="update_issue")
+        if not fields and normalized_state is None:
+            raise ProviderOperationError(
+                "Jira issue update requires at least one of body, title, labels, state"
+            )
 
-    def _update_from_cache(self, request: ProviderRequest, issue_key: str) -> Mapping[str, Any]:
-        site = resolve_jira_data_center_site(request.context.project)
-        cache = JiraDataCenterIssueCache.for_project(request.context.project)
-        raw_issue = cache.read_issue_json(site, issue_key)
-        raw_fields = raw_issue.get("fields") if isinstance(raw_issue.get("fields"), Mapping) else {}
-        assert isinstance(raw_fields, Mapping)
-        fields: dict[str, Any] = {}
-        if raw_fields.get("summary") is not None:
-            title = str(raw_fields.get("summary") or "")
-            fields["summary"] = _jira_issue_title(request, title)
-        if raw_fields.get("description") is not None:
-            fields["description"] = str(raw_fields.get("description") or "")
-        if raw_fields.get("labels") is not None:
-            fields["labels"] = _string_list(raw_fields.get("labels"))
-        if not fields:
-            raise ProviderOperationError(f"cached Jira issue {issue_key} has no writable fields")
-        return self._update_fields(request, issue_key, fields, operation="update_issue_from_cache")
-
-    def _update_fields(
-        self,
-        request: ProviderRequest,
-        issue_key: str,
-        fields: Mapping[str, Any],
-        *,
-        operation: str,
-    ) -> Mapping[str, Any]:
         site = resolve_jira_data_center_site(request.context.project)
         cache = JiraDataCenterIssueCache.for_project(request.context.project)
         try:
@@ -304,28 +284,39 @@ class JiraDataCenterIssueNativeProvider(IssueProvider):
                 cache=cache,
                 project=request.context.project,
                 issue_key=issue_key,
-                operation=operation,
+                operation="update_issue",
                 target="issue",
                 error=exc,
             )
-        update_issue(site, issue_key, fields=fields, runner=self.runner)
+        if fields:
+            update_issue(site, issue_key, fields=fields, runner=self.runner)
+
+        state_result: Mapping[str, Any] | None = None
+        if normalized_state is not None:
+            state_result = self._apply_state_transition(request, site, issue_key, normalized_state)
+
         write_result = self._refresh_cache(request.context.project, site, cache, issue_key)
         return {
-            "operation": operation,
+            "operation": "update_issue",
             "issue": issue_key,
             "key": issue_key,
             "verified": True,
+            "state_changed": state_result is not None,
+            "state": dict(state_result) if state_result is not None else None,
             "cache_refreshed": True,
             "cache": write_result,
         }
 
     def add_comment(self, request: ProviderRequest) -> Mapping[str, Any]:
         issue_key = normalize_jira_issue_key(_required_payload_value(request, "issue"))
-        if _truthy(request.payload.get("from_pending")) or _truthy(request.payload.get("pending_comments")):
-            return self._add_pending_comments(request, issue_key)
-
         body = str(_required_payload_value(request, "body"))
-        return self._append_comment(request, issue_key, body)
+        state = _optional_string(request.payload.get("state"))
+        normalized_state = state.lower() if state is not None else None
+        if normalized_state is not None and normalized_state not in {"open", "closed"}:
+            raise ProviderOperationError(
+                f"unsupported Jira issue state for add_comment: {state}"
+            )
+        return self._append_comment(request, issue_key, body, state=normalized_state)
 
     def apply_relationships(self, request: ProviderRequest) -> Mapping[str, Any]:
         issue_key = normalize_jira_issue_key(_required_payload_value(request, "issue"))
@@ -393,65 +384,71 @@ class JiraDataCenterIssueNativeProvider(IssueProvider):
                 resolved.append(op)
         return resolved
 
-    def _add_pending_comments(self, request: ProviderRequest, issue_key: str) -> Mapping[str, Any]:
+    def _append_comment(
+        self,
+        request: ProviderRequest,
+        issue_key: str,
+        body: str,
+        *,
+        state: str | None = None,
+    ) -> Mapping[str, Any]:
         site = resolve_jira_data_center_site(request.context.project)
         cache = JiraDataCenterIssueCache.for_project(request.context.project)
-        pending_comments = cache.read_pending_issue_comments(site, issue_key)
-        if not pending_comments:
-            raise ProviderOperationError(f"no pending comment files found for Jira issue {issue_key}")
-
-        try:
-            self._require_write_freshness(request, site, cache, issue_key, target="comments")
-        except ProviderFreshnessError as exc:
-            return self._stale_cache_block_payload(
-                site=site,
-                cache=cache,
-                project=request.context.project,
-                issue_key=issue_key,
-                operation="append_pending_comments",
-                target="comments",
-                error=exc,
-                pending_files=[pending.file_name for pending in pending_comments],
-            )
-        appended = [add_comment(site, issue_key, body=pending.body, runner=self.runner) for pending in pending_comments]
-        write_result = self._refresh_cache(request.context.project, site, cache, issue_key)
-        removed = cache.remove_pending_issue_comments(site, issue_key, pending_comments)
-        return {
-            "operation": "append_pending_comments",
-            "issue": issue_key,
-            "key": issue_key,
-            "appended": len(appended),
-            "pending_source": "issue",
-            "pending_files": [pending.file_name for pending in pending_comments],
-            "removed_pending_files": [str(path) for path in removed],
-            "cache_refreshed": True,
-            "cache": write_result,
-        }
-
-    def _append_comment(self, request: ProviderRequest, issue_key: str, body: str) -> Mapping[str, Any]:
-        site = resolve_jira_data_center_site(request.context.project)
-        cache = JiraDataCenterIssueCache.for_project(request.context.project)
-        try:
-            self._require_write_freshness(request, site, cache, issue_key, target="comments")
-        except ProviderFreshnessError as exc:
-            return self._stale_cache_block_payload(
-                site=site,
-                cache=cache,
-                project=request.context.project,
-                issue_key=issue_key,
-                operation="add_comment",
-                target="comments",
-                error=exc,
-            )
+        for target in ("issue", "comments"):
+            try:
+                self._require_write_freshness(request, site, cache, issue_key, target=target)
+            except ProviderFreshnessError as exc:
+                return self._stale_cache_block_payload(
+                    site=site,
+                    cache=cache,
+                    project=request.context.project,
+                    issue_key=issue_key,
+                    operation="add_comment",
+                    target=target,
+                    error=exc,
+                )
         created = add_comment(site, issue_key, body=body, runner=self.runner)
+        state_result: Mapping[str, Any] | None = None
+        if state is not None:
+            state_result = self._apply_state_transition(request, site, issue_key, state)
         write_result = self._refresh_cache(request.context.project, site, cache, issue_key)
         return {
             "operation": "add_comment",
             "issue": issue_key,
             "key": issue_key,
             "comment": dict(created) if isinstance(created, Mapping) else {},
+            "state_changed": state_result is not None,
+            "state": dict(state_result) if state_result is not None else None,
             "cache_refreshed": True,
             "cache": write_result,
+        }
+
+    def _apply_state_transition(
+        self,
+        request: ProviderRequest,
+        site: Any,
+        issue_key: str,
+        state: str,
+    ) -> Mapping[str, Any]:
+        settings = _jira_issue_provider_settings(request.context.project)
+        transition_name = _jira_state_transition_name(state, settings)
+        if not transition_name:
+            raise ProviderOperationError(
+                f"Jira state '{state}' has no configured transition; "
+                f"set providers.issues.state_transitions.{state} = '<transition name>'"
+            )
+        transitions = get_transitions(site, issue_key, runner=self.runner)
+        transition_id = _find_transition_id(transitions, transition_name)
+        if transition_id is None:
+            raise ProviderOperationError(
+                f"Jira issue {issue_key} does not expose a '{transition_name}' transition right now"
+            )
+        transition_issue(site, issue_key, transition_id, runner=self.runner)
+        return {
+            "operation": "transition_issue",
+            "state": state,
+            "transition_name": transition_name,
+            "transition_id": transition_id,
         }
 
     def _apply_relationship_operations(
@@ -870,6 +867,68 @@ def add_comment(
     if not isinstance(result, Mapping):
         return {}
     return result
+
+
+def get_transitions(
+    site: Any,
+    issue_key: str,
+    *,
+    runner: CommandRunner | None = None,
+) -> list[Mapping[str, Any]]:
+    """Read available transitions for one Jira issue."""
+
+    raw = jira_get_json(site, jira_data_center_transitions_path(site, issue_key), runner=runner)
+    if isinstance(raw, Mapping):
+        value = raw.get("transitions")
+    else:
+        value = raw
+    if not isinstance(value, list):
+        return []
+    return [item for item in value if isinstance(item, Mapping)]
+
+
+def transition_issue(
+    site: Any,
+    issue_key: str,
+    transition_id: str,
+    *,
+    runner: CommandRunner | None = None,
+) -> Mapping[str, Any]:
+    """POST a Jira transition to change issue state."""
+
+    result = jira_send_json(
+        site,
+        "POST",
+        jira_data_center_transitions_path(site, issue_key),
+        {"transition": {"id": str(transition_id)}},
+        runner=runner,
+    )
+    if not isinstance(result, Mapping):
+        return {}
+    return result
+
+
+def _find_transition_id(
+    transitions: list[Mapping[str, Any]],
+    transition_name: str,
+) -> str | None:
+    target = transition_name.strip().lower()
+    for transition in transitions:
+        name = str(transition.get("name") or "").strip().lower()
+        if name == target and transition.get("id") is not None:
+            return str(transition["id"])
+    return None
+
+
+def _jira_state_transition_name(state: str, settings: Mapping[str, Any]) -> str | None:
+    raw = settings.get("state_transitions") or settings.get("stateTransitions")
+    if not isinstance(raw, Mapping):
+        return None
+    value = raw.get(state)
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None
 
 
 def _required_payload_value(request: ProviderRequest, key: str) -> Any:

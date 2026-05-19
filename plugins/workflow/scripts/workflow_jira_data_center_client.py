@@ -127,6 +127,11 @@ def jira_data_center_comments_path(site: JiraDataCenterSite, issue_key: str) -> 
     return f"/rest/api/{site.api_version}/issue/{escaped_key}/comment"
 
 
+def jira_data_center_transitions_path(site: JiraDataCenterSite, issue_key: str) -> str:
+    escaped_key = quote(normalize_jira_issue_key(issue_key), safe="")
+    return f"/rest/api/{site.api_version}/issue/{escaped_key}/transitions"
+
+
 def jira_get_json(
     site: JiraDataCenterSite,
     path: str,

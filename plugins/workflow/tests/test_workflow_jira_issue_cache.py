@@ -18,13 +18,16 @@ def jira_site() -> JiraDataCenterSite:
     return JiraDataCenterSite(base_url="https://jira.example.test", authority="jira.example.test")
 
 
-def test_jira_issue_cache_body_path_recognizer_never_matches(tmp_path: Path) -> None:
+def test_jira_issue_cache_body_path_recognizer_matches_snapshot_only(tmp_path: Path) -> None:
     snapshot = tmp_path / ".workflow-cache" / "jira" / "jira.example.test" / "issues" / "TEST-1234" / "snapshot.md"
     issue_json = tmp_path / ".workflow-cache" / "jira" / "jira.example.test" / "issues" / "TEST-1234" / "issue.json"
 
-    assert not is_jira_issue_cache_body_path(snapshot, tmp_path)
+    assert is_jira_issue_cache_body_path(snapshot, tmp_path)
     assert not is_jira_issue_cache_body_path(issue_json, tmp_path)
     assert not is_jira_issue_cache_body_path(tmp_path / "issue.md", tmp_path)
+    assert not is_jira_issue_cache_body_path(
+        tmp_path / ".workflow-cache" / "issues" / "39" / "snapshot.md", tmp_path
+    )
 
 
 def test_jira_issue_cache_paths_are_provider_specific(tmp_path: Path) -> None:

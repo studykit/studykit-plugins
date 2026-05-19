@@ -43,28 +43,6 @@ class WorkflowFreshnessConflict(WorkflowCacheError):
 
 
 @dataclass(frozen=True)
-class PendingIssueComment:
-    """Parsed pending provider issue comment body."""
-
-    target_kind: str
-    target_id: str
-    path: Path
-    body: str
-
-    @property
-    def file_name(self) -> str:
-        return self.path.name
-
-    def to_json(self) -> dict[str, Any]:
-        return {
-            "target_kind": self.target_kind,
-            "target_id": self.target_id,
-            "file": self.file_name,
-            "path": str(self.path),
-        }
-
-
-@dataclass(frozen=True)
 class PendingIssueRelationshipOperation:
     """Parsed pending provider-native relationship operation."""
 
@@ -263,35 +241,6 @@ def _read_frontmatter_markdown(path: Path) -> tuple[dict[str, Any], str]:
     return data, body
 
 
-
-
-def _read_pending_comments(
-    pending_dir: Path,
-    *,
-    target_kind: str,
-    target_id: str,
-) -> list[PendingIssueComment]:
-    if not pending_dir.exists():
-        return []
-    if not pending_dir.is_dir():
-        raise WorkflowCacheCorrupt(f"pending comments path is not a directory: {pending_dir}")
-
-    comments: list[PendingIssueComment] = []
-    for path in sorted(pending_dir.glob("*.md")):
-        frontmatter, body = _read_frontmatter_markdown(path)
-        if frontmatter.get("schema_version") is not None:
-            _require_schema(frontmatter, path)
-        if not body.strip():
-            raise WorkflowCacheCorrupt(f"pending comment body is empty: {path}")
-        comments.append(
-            PendingIssueComment(
-                target_kind=target_kind,
-                target_id=target_id,
-                path=path,
-                body=body,
-            )
-        )
-    return comments
 
 
 def pending_relationship_operations_from_mapping(
@@ -1041,17 +990,6 @@ def _atomic_write_text(path: Path, text: str) -> None:
         except OSError:
             pass
         raise
-
-
-def _remove_empty_parents(path: Path, *, stop_at: Path) -> None:
-    current = path
-    stop = stop_at.resolve(strict=False)
-    while current.resolve(strict=False) != stop:
-        try:
-            current.rmdir()
-        except OSError:
-            return
-        current = current.parent
 
 
 def _normalize_state(value: Any) -> str:

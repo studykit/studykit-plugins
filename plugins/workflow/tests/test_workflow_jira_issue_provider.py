@@ -766,39 +766,46 @@ def test_data_center_create_uses_configured_epic_issue_type(tmp_path: Path) -> N
     assert '\\"issuetype\\":{\\"name\\":\\"Initiative\\"}' in payload_text
 
 
-def test_data_center_update_from_cache_checks_freshness_and_refreshes(tmp_path: Path) -> None:
+def test_data_center_update_writes_body_and_refreshes_cache(tmp_path: Path) -> None:
     write_jira_config(tmp_path)
     site = jira_site(tmp_path)
     cache = JiraDataCenterIssueCache.for_project(tmp_path)
     cache.write_issue_bundle(
         site,
-        jira_issue_payload(body="Cached write-back body."),
+        jira_issue_payload(body="Cached body."),
         remote_links=remote_links_payload(),
         fetched_at="2026-05-15T10:00:00.000+0900",
     )
     runner = FakeRunner(
         {
             curl_args(issue_url()): [
-                result(curl_args(issue_url()), stdout=json.dumps(jira_issue_payload(body="Provider current."))),
-                result(curl_args(issue_url()), stdout=json.dumps(jira_issue_payload(body="Cached write-back body."))),
+                result(curl_args(issue_url()), stdout=json.dumps(jira_issue_payload(body="Cached body."))),
+                result(curl_args(issue_url()), stdout=json.dumps(jira_issue_payload(body="Updated body."))),
             ],
             curl_write_args(): result(curl_write_args(), stdout=""),
             curl_args(remote_links_url()): result(curl_args(remote_links_url()), stdout=json.dumps(remote_links_payload())),
         }
     )
 
-    response = dispatch_write(tmp_path, runner, "update", issue="TEST-1234", from_cache=True)
+    response = dispatch_write(
+        tmp_path,
+        runner,
+        "update",
+        issue="TEST-1234",
+        body="Updated body.",
+        freshness_check=True,
+    )
 
-    assert response.payload["operation"] == "update_issue_from_cache"
+    assert response.payload["operation"] == "update_issue"
+    assert response.payload["state_changed"] is False
     write_request = runner.requests[1]
     assert write_request.args == curl_write_args()
     assert 'request = "PUT"' in str(write_request.input_text)
     assert 'url = "https://jira.example.test/rest/api/2/issue/TEST-1234"' in str(write_request.input_text)
-    assert '\\"description\\":\\"Cached write-back body.\\"' in str(write_request.input_text)
-    assert cache.read_issue(site, "TEST-1234")["body"] == "Cached write-back body."
+    assert '\\"description\\":\\"Updated body.\\"' in str(write_request.input_text)
 
 
-def test_data_center_pending_comments_are_appended_and_removed(tmp_path: Path) -> None:
+def test_data_center_update_rejects_empty_payload(tmp_path: Path) -> None:
     write_jira_config(tmp_path)
     site = jira_site(tmp_path)
     cache = JiraDataCenterIssueCache.for_project(tmp_path)
@@ -808,30 +815,145 @@ def test_data_center_pending_comments_are_appended_and_removed(tmp_path: Path) -
         remote_links=remote_links_payload(),
         fetched_at="2026-05-15T10:00:00.000+0900",
     )
-    pending = cache.comments_pending_dir(site, "TEST-1234") / "001.md"
-    pending.parent.mkdir(parents=True, exist_ok=True)
-    pending.write_text("---\n---\n\nPending comment body.\n", encoding="utf-8")
+    runner = FakeRunner({})
+
+    with pytest.raises(ProviderOperationError, match="at least one of body, title, labels, state"):
+        dispatch_write(tmp_path, runner, "update", issue="TEST-1234")
+
+    assert runner.requests == []
+
+
+def test_data_center_update_applies_state_transition(tmp_path: Path) -> None:
+    write_jira_config(
+        tmp_path,
+        relationship_mappings="""
+    state_transitions:
+      closed: Done
+      open: Reopen
+""",
+    )
+    site = jira_site(tmp_path)
+    cache = JiraDataCenterIssueCache.for_project(tmp_path)
+    cache.write_issue_bundle(
+        site,
+        jira_issue_payload(body="Cached body."),
+        remote_links=remote_links_payload(),
+        fetched_at="2026-05-15T10:00:00.000+0900",
+    )
+    transitions_url = f"https://jira.example.test/rest/api/2/issue/TEST-1234/transitions"
+    runner = FakeRunner(
+        {
+            curl_args(issue_url()): [
+                result(curl_args(issue_url()), stdout=json.dumps(jira_issue_payload(body="Cached body."))),
+                result(curl_args(issue_url()), stdout=json.dumps(jira_issue_payload(body="Closing body."))),
+            ],
+            curl_args(transitions_url): result(
+                curl_args(transitions_url),
+                stdout=json.dumps({"transitions": [{"id": "31", "name": "Done"}]}),
+            ),
+            curl_write_args(): [
+                result(curl_write_args(), stdout=""),
+                result(curl_write_args(), stdout=""),
+            ],
+            curl_args(remote_links_url()): result(
+                curl_args(remote_links_url()),
+                stdout=json.dumps(remote_links_payload()),
+            ),
+        }
+    )
+
+    response = dispatch_write(
+        tmp_path,
+        runner,
+        "update",
+        issue="TEST-1234",
+        body="Closing body.",
+        state="closed",
+        state_reason="completed",
+        freshness_check=True,
+    )
+
+    assert response.payload["state_changed"] is True
+    assert response.payload["state"]["transition_name"] == "Done"
+    assert response.payload["state"]["transition_id"] == "31"
+    write_requests = [request for request in runner.requests if request.args == curl_write_args()]
+    assert any('\\"transition\\":{\\"id\\":\\"31\\"}' in str(request.input_text) for request in write_requests)
+
+
+def test_data_center_update_state_without_configured_transition_errors(tmp_path: Path) -> None:
+    write_jira_config(tmp_path)
+    site = jira_site(tmp_path)
+    cache = JiraDataCenterIssueCache.for_project(tmp_path)
+    cache.write_issue_bundle(
+        site,
+        jira_issue_payload(),
+        remote_links=remote_links_payload(),
+        fetched_at="2026-05-15T10:00:00.000+0900",
+    )
+    runner = FakeRunner(
+        {
+            curl_args(issue_url()): [
+                result(curl_args(issue_url()), stdout=json.dumps(jira_issue_payload())),
+            ],
+            curl_write_args(): result(curl_write_args(), stdout=""),
+        }
+    )
+
+    with pytest.raises(ProviderOperationError, match="state_transitions.closed"):
+        dispatch_write(
+            tmp_path,
+            runner,
+            "update",
+            issue="TEST-1234",
+            body="Body.",
+            state="closed",
+            freshness_check=True,
+        )
+
+
+def test_data_center_add_comment_posts_body_and_refreshes_cache(tmp_path: Path) -> None:
+    write_jira_config(tmp_path)
+    site = jira_site(tmp_path)
+    cache = JiraDataCenterIssueCache.for_project(tmp_path)
+    cache.write_issue_bundle(
+        site,
+        jira_issue_payload(),
+        remote_links=remote_links_payload(),
+        fetched_at="2026-05-15T10:00:00.000+0900",
+    )
     runner = FakeRunner(
         {
             curl_args(issue_url()): [
                 result(curl_args(issue_url()), stdout=json.dumps(jira_issue_payload())),
                 result(curl_args(issue_url()), stdout=json.dumps(jira_issue_payload())),
+                result(curl_args(issue_url()), stdout=json.dumps(jira_issue_payload())),
             ],
-            curl_write_args(): result(curl_write_args(), stdout=json.dumps({"id": "30001", "body": "Pending comment body."})),
-            curl_args(remote_links_url()): result(curl_args(remote_links_url()), stdout=json.dumps(remote_links_payload())),
+            curl_write_args(): result(
+                curl_write_args(),
+                stdout=json.dumps({"id": "30001", "body": "Inline comment body.\n"}),
+            ),
+            curl_args(remote_links_url()): result(
+                curl_args(remote_links_url()),
+                stdout=json.dumps(remote_links_payload()),
+            ),
         }
     )
 
-    response = dispatch_write(tmp_path, runner, "add_comment", issue="TEST-1234", pending_comments=True)
+    response = dispatch_write(
+        tmp_path,
+        runner,
+        "add_comment",
+        issue="TEST-1234",
+        body="Inline comment body.\n",
+        freshness_check=True,
+    )
 
-    assert response.payload["operation"] == "append_pending_comments"
-    assert response.payload["appended"] == 1
-    assert response.payload["pending_files"] == ["001.md"]
-    assert not pending.exists()
-    write_request = runner.requests[1]
+    assert response.payload["operation"] == "add_comment"
+    assert response.payload["state_changed"] is False
+    write_request = next(request for request in runner.requests if request.args == curl_write_args())
     assert 'request = "POST"' in str(write_request.input_text)
     assert 'url = "https://jira.example.test/rest/api/2/issue/TEST-1234/comment"' in str(write_request.input_text)
-    assert '\\"body\\":\\"Pending comment body.\\\\n\\"' in str(write_request.input_text)
+    assert '\\"body\\":\\"Inline comment body.\\\\n\\"' in str(write_request.input_text)
 
 
 def test_data_center_issue_link_relationships_are_applied_from_inline_intent(tmp_path: Path) -> None:
@@ -1011,9 +1133,16 @@ def test_data_center_stale_cache_blocks_write_before_put(tmp_path: Path) -> None
         }
     )
 
-    response = dispatch_write(tmp_path, runner, "update", issue="TEST-1234", from_cache=True)
+    response = dispatch_write(
+        tmp_path,
+        runner,
+        "update",
+        issue="TEST-1234",
+        body="Updated body.",
+        freshness_check=True,
+    )
 
-    assert response.payload["operation"] == "update_issue_from_cache"
+    assert response.payload["operation"] == "update_issue"
     assert response.payload["status"] == "blocked"
     assert response.payload["reason"] == "stale_cache"
     assert response.payload["reread_required"] is True
@@ -1023,7 +1152,7 @@ def test_data_center_stale_cache_blocks_write_before_put(tmp_path: Path) -> None
     assert all(request.args != curl_write_args() for request in runner.requests)
 
 
-def test_data_center_pending_comment_stale_cache_blocks_and_refreshes_before_post(tmp_path: Path) -> None:
+def test_data_center_comment_stale_cache_blocks_and_refreshes_before_post(tmp_path: Path) -> None:
     write_jira_config(tmp_path)
     site = jira_site(tmp_path)
     cache = JiraDataCenterIssueCache.for_project(tmp_path)
@@ -1033,9 +1162,6 @@ def test_data_center_pending_comment_stale_cache_blocks_and_refreshes_before_pos
         remote_links=remote_links_payload(),
         fetched_at="2026-05-15T10:00:00.000+0900",
     )
-    pending = cache.comments_pending_dir(site, "TEST-1234") / "001.md"
-    pending.parent.mkdir(parents=True, exist_ok=True)
-    pending.write_text("---\n---\n\nPending comment body.\n", encoding="utf-8")
     newer = jira_issue_payload(body="Newer provider body.")
     newer["fields"]["updated"] = "2026-05-15T11:00:00.000+0900"  # type: ignore[index]
     runner = FakeRunner(
@@ -1048,12 +1174,16 @@ def test_data_center_pending_comment_stale_cache_blocks_and_refreshes_before_pos
         }
     )
 
-    response = dispatch_write(tmp_path, runner, "add_comment", issue="TEST-1234", pending_comments=True)
+    response = dispatch_write(
+        tmp_path,
+        runner,
+        "add_comment",
+        issue="TEST-1234",
+        body="New comment.",
+        freshness_check=True,
+    )
 
-    assert response.payload["operation"] == "append_pending_comments"
+    assert response.payload["operation"] == "add_comment"
     assert response.payload["status"] == "blocked"
-    assert response.payload["target"] == "comments"
-    assert response.payload["pending_files"] == ["001.md"]
     assert response.payload["reread_required"] is True
-    assert pending.exists()
     assert all(request.args != curl_write_args() for request in runner.requests)

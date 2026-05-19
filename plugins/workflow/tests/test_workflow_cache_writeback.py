@@ -1,4 +1,4 @@
-"""Tests for the agent-facing workflow cache write-back entrypoint."""
+"""Tests for the agent-facing Jira issue body-file writeback CLI."""
 
 from __future__ import annotations
 
@@ -40,11 +40,12 @@ def result(args: tuple[str, ...], stdout: str = "", stderr: str = "", returncode
     return CommandResult(request=CommandRequest(args=args), returncode=returncode, stdout=stdout, stderr=stderr)
 
 
-def write_jira_config(project: Path) -> None:
+def write_jira_config(project: Path, *, extra_settings: str = "") -> None:
     path = project / ".workflow" / "config.yml"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
-        """
+        (
+            """
 version: 1
 providers:
   issues:
@@ -54,10 +55,14 @@ providers:
     api_version: 2
     project: TEST
     issue_type: Task
+"""
+            + extra_settings
+            + """
   knowledge:
     kind: github
 issue_id_format: jira
-""".lstrip(),
+"""
+        ).lstrip(),
         encoding="utf-8",
     )
 
@@ -68,7 +73,7 @@ def jira_site(project: Path):
     return jira_data_center_site_from_provider_config(config.issues)
 
 
-def jira_issue_payload(*, body: str = "Data Center description.") -> dict[str, object]:
+def jira_issue_payload(*, body: str = "Cached body.") -> dict[str, object]:
     return {
         "id": "10001",
         "key": "TEST-1234",
@@ -111,24 +116,36 @@ def jira_remote_links_url(issue: str = "TEST-1234") -> str:
     return f"https://jira.example.test/rest/api/2/issue/{issue}/remotelink"
 
 
-def test_cache_writeback_script_dispatches_jira_provider_update(tmp_path: Path) -> None:
-    write_jira_config(tmp_path)
-    site = jira_site(tmp_path)
-    cache = JiraDataCenterIssueCache.for_project(tmp_path)
+def jira_transitions_url(issue: str = "TEST-1234") -> str:
+    return f"https://jira.example.test/rest/api/2/issue/{issue}/transitions"
+
+
+def _seed_cached_issue(project: Path) -> None:
+    site = jira_site(project)
+    cache = JiraDataCenterIssueCache.for_project(project)
     cache.write_issue_bundle(
         site,
-        jira_issue_payload(body="Cached Jira write-back body."),
+        jira_issue_payload(),
         remote_links=remote_links_payload(),
         fetched_at="2026-05-15T10:00:00.000+0900",
     )
+
+
+def _write_body_file(project: Path, body: str, *, name: str = "update.md") -> Path:
+    path = project / name
+    path.write_text(body, encoding="utf-8")
+    return path
+
+
+def test_jira_update_writes_body_and_deletes_body_file(tmp_path: Path) -> None:
+    write_jira_config(tmp_path)
+    _seed_cached_issue(tmp_path)
+    body_file = _write_body_file(tmp_path, "Updated body.\n")
     runner = FakeRunner(
         {
             curl_args(jira_issue_url()): [
-                result(curl_args(jira_issue_url()), stdout=json.dumps(jira_issue_payload(body="Provider current."))),
-                result(
-                    curl_args(jira_issue_url()),
-                    stdout=json.dumps(jira_issue_payload(body="Cached Jira write-back body.")),
-                ),
+                result(curl_args(jira_issue_url()), stdout=json.dumps(jira_issue_payload())),
+                result(curl_args(jira_issue_url()), stdout=json.dumps(jira_issue_payload(body="Updated body.\n"))),
             ],
             curl_write_args(): result(curl_write_args(), stdout=""),
             curl_args(jira_remote_links_url()): result(
@@ -140,22 +157,189 @@ def test_cache_writeback_script_dispatches_jira_provider_update(tmp_path: Path) 
     stdout = io.StringIO()
 
     code = jira_issue_writeback_main(
-        ["--project", str(tmp_path), "--type", "task", "--json", "test-1234"],
+        [
+            "--project",
+            str(tmp_path),
+            "update",
+            "--issue",
+            "test-1234",
+            "--body-file",
+            str(body_file),
+            "--json",
+        ],
         stdout=stdout,
         runner=runner,
     )
 
     payload = json.loads(stdout.getvalue())
     assert code == 0
-    assert payload["operation"] == "cache_writeback"
+    assert payload["operation"] == "update_issue"
     assert payload["kind"] == "jira"
-    assert "repository" not in payload
-    assert payload["issues"][0]["operation"] == "update_issue_from_cache"
-    assert payload["issues"][0]["issue"] == "TEST-1234"
-    assert payload["issues"][0]["verified"] is True
-    write_request = runner.requests[1]
-    assert write_request.args == curl_write_args()
+    assert payload["issue"] == "TEST-1234"
+    assert payload["body_file_removed"] is True
+    assert payload["state_changed"] is False
+    assert payload["issue_file"].endswith("/issues/TEST-1234/snapshot.md")
+    assert not body_file.exists()
+    write_request = next(request for request in runner.requests if request.args == curl_write_args())
     assert 'request = "PUT"' in str(write_request.input_text)
-    assert 'url = "https://jira.example.test/rest/api/2/issue/TEST-1234"' in str(write_request.input_text)
-    assert '\\"description\\":\\"Cached Jira write-back body.\\"' in str(write_request.input_text)
-    assert cache.read_issue(site, "TEST-1234")["body"] == "Cached Jira write-back body."
+    assert '\\"description\\":\\"Updated body.\\\\n\\"' in str(write_request.input_text)
+
+
+def test_jira_update_rejects_body_file_with_frontmatter(tmp_path: Path) -> None:
+    write_jira_config(tmp_path)
+    _seed_cached_issue(tmp_path)
+    body_file = _write_body_file(tmp_path, "---\ntitle: nope\n---\n\nBody.\n")
+    runner = FakeRunner({})
+    stderr = io.StringIO()
+
+    code = jira_issue_writeback_main(
+        [
+            "--project",
+            str(tmp_path),
+            "update",
+            "--issue",
+            "TEST-1234",
+            "--body-file",
+            str(body_file),
+            "--json",
+        ],
+        stderr=stderr,
+        runner=runner,
+    )
+
+    assert code == 2
+    assert "frontmatter" in stderr.getvalue()
+    assert body_file.exists()
+    assert runner.requests == []
+
+
+def test_jira_update_missing_body_file_fails(tmp_path: Path) -> None:
+    write_jira_config(tmp_path)
+    _seed_cached_issue(tmp_path)
+    runner = FakeRunner({})
+    stderr = io.StringIO()
+
+    code = jira_issue_writeback_main(
+        [
+            "--project",
+            str(tmp_path),
+            "update",
+            "--issue",
+            "TEST-1234",
+            "--body-file",
+            str(tmp_path / "missing.md"),
+            "--json",
+        ],
+        stderr=stderr,
+        runner=runner,
+    )
+
+    assert code == 2
+    assert "body file does not exist" in stderr.getvalue()
+    assert runner.requests == []
+
+
+def test_jira_update_preserves_body_file_on_freshness_block(tmp_path: Path) -> None:
+    write_jira_config(tmp_path)
+    _seed_cached_issue(tmp_path)
+    body_file = _write_body_file(tmp_path, "Updated body.\n")
+    newer = jira_issue_payload(body="Newer provider body.")
+    newer["fields"]["updated"] = "2026-05-15T11:00:00.000+0900"  # type: ignore[index]
+    runner = FakeRunner(
+        {
+            curl_args(jira_issue_url()): [
+                result(curl_args(jira_issue_url()), stdout=json.dumps(newer)),
+                result(curl_args(jira_issue_url()), stdout=json.dumps(newer)),
+            ],
+            curl_args(jira_remote_links_url()): result(
+                curl_args(jira_remote_links_url()),
+                stdout=json.dumps(remote_links_payload()),
+            ),
+        }
+    )
+    stdout = io.StringIO()
+
+    code = jira_issue_writeback_main(
+        [
+            "--project",
+            str(tmp_path),
+            "update",
+            "--issue",
+            "TEST-1234",
+            "--body-file",
+            str(body_file),
+            "--json",
+        ],
+        stdout=stdout,
+        runner=runner,
+    )
+
+    payload = json.loads(stdout.getvalue())
+    assert code == 3
+    assert payload["status"] == "blocked"
+    assert payload["reason"] == "stale_cache"
+    assert payload["body_file_removed"] is False
+    assert payload["body_file"] == str(body_file)
+    assert body_file.exists()
+    assert all(request.args != curl_write_args() for request in runner.requests)
+
+
+def test_jira_update_applies_inline_state_transition(tmp_path: Path) -> None:
+    write_jira_config(
+        tmp_path,
+        extra_settings="""
+    state_transitions:
+      closed: Done
+      open: Reopen
+""",
+    )
+    _seed_cached_issue(tmp_path)
+    body_file = _write_body_file(tmp_path, "Closing body.\n")
+    runner = FakeRunner(
+        {
+            curl_args(jira_issue_url()): [
+                result(curl_args(jira_issue_url()), stdout=json.dumps(jira_issue_payload())),
+                result(curl_args(jira_issue_url()), stdout=json.dumps(jira_issue_payload(body="Closing body.\n"))),
+            ],
+            curl_args(jira_transitions_url()): result(
+                curl_args(jira_transitions_url()),
+                stdout=json.dumps({"transitions": [{"id": "31", "name": "Done"}]}),
+            ),
+            curl_write_args(): [
+                result(curl_write_args(), stdout=""),
+                result(curl_write_args(), stdout=""),
+            ],
+            curl_args(jira_remote_links_url()): result(
+                curl_args(jira_remote_links_url()),
+                stdout=json.dumps(remote_links_payload()),
+            ),
+        }
+    )
+    stdout = io.StringIO()
+
+    code = jira_issue_writeback_main(
+        [
+            "--project",
+            str(tmp_path),
+            "update",
+            "--issue",
+            "TEST-1234",
+            "--body-file",
+            str(body_file),
+            "--state",
+            "closed",
+            "--state-reason",
+            "completed",
+            "--json",
+        ],
+        stdout=stdout,
+        runner=runner,
+    )
+
+    payload = json.loads(stdout.getvalue())
+    assert code == 0
+    assert payload["state_changed"] is True
+    assert payload["state"]["transition_name"] == "Done"
+    write_requests = [request for request in runner.requests if request.args == curl_write_args()]
+    assert any('\\"transition\\":{\\"id\\":\\"31\\"}' in str(request.input_text) for request in write_requests)
+    assert not body_file.exists()
