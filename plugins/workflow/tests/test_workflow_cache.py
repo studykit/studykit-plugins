@@ -16,6 +16,7 @@ if str(_SCRIPTS_DIR) not in sys.path:
 from workflow_cache import (  # noqa: E402
     FreshnessMetadata,
     WorkflowFreshnessConflict,
+    _utc_now,
     check_provider_freshness,
     require_provider_freshness,
 )
@@ -89,3 +90,38 @@ def test_provider_freshness_skips_pending_new_artifact() -> None:
 
     assert result.ok is True
     assert result.status == "pending_new"
+
+
+def test_utc_now_preserves_subsecond_precision() -> None:
+    """Regression: `_utc_now()` must keep sub-second precision so cache
+    `fetched_at` is comparable to provider timestamps that carry milliseconds.
+    Truncating to whole seconds previously caused a false stale-cache flip
+    on in-flight publish when provider and cache referred to the same instant
+    (see issue #97)."""
+
+    stamp = _utc_now()
+
+    assert stamp.endswith("Z")
+    # ISO-8601 fractional component after the seconds field is the signal that
+    # microsecond/millisecond precision survived.
+    seconds_segment = stamp.split("T", 1)[1][: -1]
+    assert "." in seconds_segment, stamp
+
+
+def test_provider_freshness_allows_subsecond_precision_match() -> None:
+    """Regression for issue #97: in-flight publish writes the cache and then
+    re-asks the provider for the same instant. The provider returns a
+    timestamp with milliseconds; `fetched_at` must keep enough precision that
+    the strict `>` comparison does not flip on a truncation boundary."""
+
+    result = require_provider_freshness(
+        FreshnessMetadata(
+            source_updated_at="2026-05-19T09:44:23.314000+00:00",
+            fetched_at="2026-05-19T09:44:23.314000+00:00",
+        ),
+        provider_updated_at="2026-05-19T18:44:23.314+0900",
+        artifact="Jira issue TEST-1 relationships",
+    )
+
+    assert result.ok is True
+    assert result.status == "fresh"
