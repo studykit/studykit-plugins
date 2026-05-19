@@ -94,6 +94,25 @@ def expected_session_start_context(
     )
 
 
+def expected_subagent_start_context(
+    *,
+    runtime: str = "claude",
+    issue_kind: str = "github",
+) -> str:
+    text = main_context_fragment("subagent-policy.md")
+    issue_fetch_block = main_context_fragment(f"snippets/issue-fetch/{issue_kind}.md")
+    launcher_block = main_context_fragment(f"snippets/launcher/{runtime}.md")
+    if runtime == "codex":
+        launcher_block = launcher_block.replace(
+            "{{WORKFLOW_PLUGIN_ROOT}}", str(_PLUGIN_ROOT)
+        )
+    return (
+        text
+        .replace("{{WORKFLOW_LAUNCHER_BLOCK}}", launcher_block)
+        .replace("{{WORKFLOW_ISSUE_FETCH_BLOCK}}", issue_fetch_block)
+    )
+
+
 def default_github_relationship_response(request: CommandRequest) -> CommandResult | None:
     args = request.args
     if len(args) < 3 or args[:2] != ("gh", "api"):
@@ -1200,7 +1219,7 @@ def test_session_start_skips_claude_subagent_payload(
     assert "AUTHORING_RESOLVER" not in content
 
 
-def test_claude_subagent_start_records_subagent_identity_and_emits_nothing(
+def test_claude_subagent_start_records_subagent_identity_and_injects_workflow_context(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -1221,13 +1240,41 @@ def test_claude_subagent_start_records_subagent_identity_and_emits_nothing(
         stdout=captured,
     ) == 0
 
-    assert captured.getvalue() == ""
+    payload = json.loads(captured.getvalue())
+    assert payload["hookSpecificOutput"]["hookEventName"] == "SubagentStart"
+    assert payload["hookSpecificOutput"]["additionalContext"] == (
+        expected_subagent_start_context(issue_kind="github")
+    )
+
     state_file = session_state_path(tmp_path, "claude", "claude-session")
     assert state_file is not None
     state = json.loads(state_file.read_text(encoding="utf-8"))
     assert state["subagents"]["started"] == [
         {"agent_id": "agent-123", "agent_type": "general-purpose"}
     ]
+
+
+def test_claude_subagent_start_emits_nothing_for_non_workflow_projects(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(tmp_path))
+    monkeypatch.setenv("CLAUDE_PLUGIN_ROOT", str(_PLUGIN_ROOT))
+
+    captured = io.StringIO()
+    assert claude_main(
+        payload={
+            "session_id": "claude-session",
+            "transcript_path": "/tmp/transcript.jsonl",
+            "cwd": str(tmp_path),
+            "hook_event_name": "SubagentStart",
+            "agent_id": "agent-123",
+            "agent_type": "general-purpose",
+        },
+        stdout=captured,
+    ) == 0
+
+    assert captured.getvalue() == ""
 
 
 def test_claude_subagent_start_deduplicates_agent_identity_records(

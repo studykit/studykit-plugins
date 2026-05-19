@@ -14,16 +14,16 @@ Audit the spec **before** it is implemented. Push back on the issue itself: an u
 ## Workflow
 
 1. **Read the target issue.**
-   - Fetch via the workflow launcher: `"$WORKFLOW" <provider>_issue_fetch.py $ARGUMENTS --cache-policy default`.
-   - Read the resulting `issue.md` / `snapshot.md`. Extract Description, Root Cause (if present), Change Plan, Unit Test Strategy, Acceptance Criteria, any other named sections.
+   - Fetch with the workflow issue-fetch command and `$ARGUMENTS` as the ref, default cache policy.
+   - Extract Description, Root Cause (if present), Change Plan, Unit Test Strategy, Acceptance Criteria, any other named sections.
    - Read the frontmatter `relationships` block: capture parent, children, blocked-by, blocking, related refs.
 
 2. **Walk the related issue graph (one hop).**
-   - For each related ref, fetch via the same launcher and read the resulting cache projection.
+   - For each related ref, fetch with the same command and read the resulting cache projection.
    - Note state (open/closed), purpose, and any constraint each related issue places on this work (parent direction, blocked-by deliverable, sibling overlap, prior decision in `related`).
 
 3. **Ground the plan in current code.**
-   - For every file path, symbol, or line number cited in Description / Root Cause / Change Plan, verify it exists in the current working tree (file paths via `ls`/`Read`; symbols via `grep -n`/`Grep`; line numbers must reasonably match the named symbol).
+   - For every file path, symbol, or line number cited in Description / Root Cause / Change Plan, verify it exists in the current working tree; line numbers should reasonably match the named symbol (allow small drift).
    - For every behavioral claim ("the helper truncates microseconds", "Y calls Z"), open the cited code and verify the claim is true today.
 
 ## Audit dimensions
@@ -106,8 +106,12 @@ A well-scoped issue should map cleanly to one PR with one coherent rationale.
 
 ## Output
 
+Write the audit report to `${WORKFLOW_PROJECT_DIR}/issue-audit-<ref>.md`, where `<ref>` is `$ARGUMENTS` with any leading `#` stripped. Overwrite any existing file at that path.
+
+Report file structure:
+
 ```
-# Audit: $ARGUMENTS
+# Issue audit: $ARGUMENTS
 
 Related issues read: <list of refs, or "none">
 
@@ -134,3 +138,5 @@ Related issues read: <list of refs, or "none">
 ## Verdict
 <one of: ready-to-implement | needs-revision | mixed (some dimensions clean, others need work)>
 ```
+
+After writing the file, return exactly one line: `Audit report saved to <absolute-path>. Verdict: <verdict>.`

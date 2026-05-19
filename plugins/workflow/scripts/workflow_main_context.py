@@ -10,7 +10,10 @@ text. The always-loaded entry point at ``session-policy.md`` uses
 ``{{WORKFLOW_KNOWLEDGE_PROVIDER}}``, ``{{WORKFLOW_ISSUE_FETCH_BLOCK}}``,
 ``{{WORKFLOW_ISSUE_WRITE_BLOCK}}``, and ``{{WORKFLOW_LAUNCHER_BLOCK}}``
 placeholders that this module substitutes at SessionStart based on the
-active workflow configuration and runtime.
+active workflow configuration and runtime. The SubagentStart entry point at
+``subagent-policy.md`` reuses ``{{WORKFLOW_LAUNCHER_BLOCK}}`` and
+``{{WORKFLOW_ISSUE_FETCH_BLOCK}}`` to give forked subagents the same
+launcher contract and provider-specific issue-fetch usage.
 Provider- and runtime-specific inline snippets live under
 ``agents/workflow-main-context/snippets/<group>/<key>.md``. The Codex launcher
 snippet additionally has ``{{WORKFLOW_PLUGIN_ROOT}}`` resolved to the absolute
@@ -61,6 +64,28 @@ def build_session_policy_context(
         .replace("{{WORKFLOW_POLICY_DIR}}", str(policy_dir))
         .replace("{{WORKFLOW_ISSUE_PROVIDER}}", issue_provider)
         .replace("{{WORKFLOW_KNOWLEDGE_PROVIDER}}", knowledge_provider)
+    )
+
+
+def build_subagent_policy_context(
+    config: Any,
+    *,
+    plugin_root: Path | None = None,
+    runtime: str | None = None,
+) -> str:
+    """Return SubagentStart context guidance injected into subagent prompts."""
+
+    text = _read_fragment("subagent-policy.md").strip()
+    if plugin_root is None:
+        return text
+    resolved_plugin_root = plugin_root.expanduser().resolve()
+    issue_provider = _provider_segment(config, "issues", _KNOWN_ISSUE_PROVIDERS)
+    issue_fetch_block = _read_snippet("issue-fetch", issue_provider)
+    launcher_block = _build_launcher_block(runtime, resolved_plugin_root)
+    return (
+        text
+        .replace("{{WORKFLOW_LAUNCHER_BLOCK}}", launcher_block)
+        .replace("{{WORKFLOW_ISSUE_FETCH_BLOCK}}", issue_fetch_block)
     )
 
 

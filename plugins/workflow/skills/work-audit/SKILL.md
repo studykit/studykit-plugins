@@ -18,12 +18,12 @@ Inputs from `$ARGUMENTS`:
 ## Workflow
 
 1. **Read the issue.**
-   - Fetch via the workflow launcher: `"$WORKFLOW" <provider>_issue_fetch.py $0 --cache-policy default`. Then read the resulting `issue.md` / `snapshot.md`.
+   - Fetch with the workflow issue-fetch command and `$0` as the ref, default cache policy.
    - Extract: Description, Change Plan, Unit Test Strategy, Acceptance Criteria, any other named sections. Note explicit deferrals (e.g. "follow-up issue", "out of scope").
 
 2. **Read the work.**
-   - `git log --oneline <range>` to enumerate commits attributable to this issue (subjects prefixed with the issue ref per repo convention).
-   - `git diff <range>` and `git show <sha>` for each commit. Inspect added tests, touched scripts, manifest bumps, doc updates.
+   - Enumerate commits in the range attributable to this issue (subjects prefixed with the issue ref per repo convention).
+   - Read the diff of the range and inspect each commit individually: added tests, touched scripts, manifest bumps, doc updates.
    - For each file touched, open it to understand the change in context — do not audit from the diff alone.
 
 ## Audit dimensions
@@ -84,8 +84,12 @@ Identify surfaces that obviously needed to be touched but were not. Heuristics:
 
 ## Output
 
+Write the audit report to `${WORKFLOW_PROJECT_DIR}/work-audit-<ref>.md`, where `<ref>` is `$0` with any leading `#` stripped. Overwrite any existing file at that path.
+
+Report file structure:
+
 ```
-# Audit: $0
+# Work audit: $0
 
 ## 1. AC compliance
 - [fail|concern|pass] <one-line summary>
@@ -104,3 +108,5 @@ Identify surfaces that obviously needed to be touched but were not. Heuristics:
 ## Verdict
 <one of: ready-to-close | needs-work | mixed (some AC verified, others not)>
 ```
+
+After writing the file, return exactly one line: `Audit report saved to <absolute-path>. Verdict: <verdict>.`
