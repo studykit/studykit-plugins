@@ -1319,7 +1319,7 @@ def test_user_prompt_caches_issue_and_injects_project_relative_path(
     payload = json.loads(captured.getvalue())
     context = payload["hookSpecificOutput"]["additionalContext"]
     assert payload["hookSpecificOutput"]["hookEventName"] == "UserPromptSubmit"
-    assert "- #45 → `.workflow-cache/issues/45/issue.md`" in context
+    assert "- #45 → `.workflow-cache/issues/45/issue.md` (refreshed)" in context
     assert "open" not in context
     assert "Write-back freshness checks" not in context
     assert (
@@ -1467,7 +1467,7 @@ def test_user_prompt_caches_jira_issue_and_injects_snapshot_path(
     payload = json.loads(captured.getvalue())
     context = payload["hookSpecificOutput"]["additionalContext"]
     assert payload["hookSpecificOutput"]["hookEventName"] == "UserPromptSubmit"
-    assert "- TEST-1234 → `.workflow-cache/jira/jira.example.test/issues/TEST-1234/snapshot.md`" in context
+    assert "- TEST-1234 → `.workflow-cache/jira/jira.example.test/issues/TEST-1234/snapshot.md` (refreshed)" in context
     assert "#TEST-1234" not in context
     assert "Jira hook cache context" not in context
     assert [request.args for request in runner.requests] == [
