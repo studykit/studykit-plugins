@@ -14,6 +14,7 @@ from workflow_cache import (
     PendingIssueRelationshipOperation,
     WorkflowCacheError,
     WorkflowFreshnessConflict,
+    relationship_operations_from_intent,
     require_provider_freshness,
 )
 from workflow_jira_issue_cache import JiraDataCenterIssueCache
@@ -328,9 +329,69 @@ class JiraDataCenterIssueNativeProvider(IssueProvider):
 
     def apply_relationships(self, request: ProviderRequest) -> Mapping[str, Any]:
         issue_key = normalize_jira_issue_key(_required_payload_value(request, "issue"))
-        if _truthy(request.payload.get("from_pending")) or _truthy(request.payload.get("pending_relationships")):
-            return self._apply_pending_relationships(request, issue_key)
-        raise ProviderOperationError("Jira issue apply_relationships currently requires pending_relationships")
+        intent = request.payload.get("relationship_intent") or {}
+        if not isinstance(intent, Mapping):
+            raise ProviderOperationError("relationship_intent must be a mapping")
+
+        operations = relationship_operations_from_intent(
+            intent,
+            target_kind="issue",
+            target_id=issue_key,
+        )
+        operations = self._resolve_parent_remove_target(request, issue_key, operations)
+
+        if not operations:
+            return {
+                "operation": "apply_relationships",
+                "issue": issue_key,
+                "key": issue_key,
+                "applied": 0,
+                "operations": [],
+                "provider_results": [],
+                "cache_refreshed": False,
+                "no_changes": True,
+            }
+
+        site = resolve_jira_data_center_site(request.context.project)
+        cache = JiraDataCenterIssueCache.for_project(request.context.project)
+        return self._apply_relationship_operations(request, site, cache, issue_key, operations)
+
+    def _resolve_parent_remove_target(
+        self,
+        request: ProviderRequest,
+        issue_key: str,
+        operations: list[PendingIssueRelationshipOperation],
+    ) -> list[PendingIssueRelationshipOperation]:
+        if not any(
+            op.action == "remove" and op.relationship == "parent" and not op.target_ref
+            for op in operations
+        ):
+            return operations
+        cache = JiraDataCenterIssueCache.for_project(request.context.project)
+        site = resolve_jira_data_center_site(request.context.project)
+        current_parent = ""
+        try:
+            cached = cache.read_issue(site, issue_key, include_body=False, include_comments=False)
+        except WorkflowCacheError:
+            cached = {}
+        parent_value = (
+            cached.get("parent")
+            or cached.get("parentKey")
+            or cached.get("parent_key")
+        )
+        if isinstance(parent_value, Mapping):
+            parent_value = parent_value.get("key") or parent_value.get("ref") or parent_value.get("id")
+        if parent_value not in (None, "", 0):
+            current_parent = str(parent_value)
+        resolved: list[PendingIssueRelationshipOperation] = []
+        for op in operations:
+            if op.action == "remove" and op.relationship == "parent" and not op.target_ref:
+                if not current_parent:
+                    continue
+                resolved.append(replace(op, target_ref=current_parent))
+            else:
+                resolved.append(op)
+        return resolved
 
     def _add_pending_comments(self, request: ProviderRequest, issue_key: str) -> Mapping[str, Any]:
         site = resolve_jira_data_center_site(request.context.project)
@@ -393,37 +454,21 @@ class JiraDataCenterIssueNativeProvider(IssueProvider):
             "cache": write_result,
         }
 
-    def _apply_pending_relationships(self, request: ProviderRequest, issue_key: str) -> Mapping[str, Any]:
-        site = resolve_jira_data_center_site(request.context.project)
-        cache = JiraDataCenterIssueCache.for_project(request.context.project)
-        pending_operations = cache.read_pending_issue_relationships(site, issue_key)
-        if not pending_operations:
-            raise ProviderOperationError(f"no pending relationship file found for Jira issue {issue_key}")
-
-        result = self._apply_relationship_operations(request, site, cache, issue_key, pending_operations)
-        removed = cache.remove_pending_issue_relationships(site, issue_key, pending_operations)
-        return {
-            **result,
-            "pending_source": "issue",
-            "pending_file": pending_operations[0].file_name,
-            "removed_pending_files": [str(path) for path in removed],
-        }
-
     def _apply_relationship_operations(
         self,
         request: ProviderRequest,
         site: Any,
         cache: JiraDataCenterIssueCache,
         issue_key: str,
-        pending_operations: list[PendingIssueRelationshipOperation],
+        operations: list[PendingIssueRelationshipOperation],
     ) -> Mapping[str, Any]:
-        if not pending_operations:
+        if not operations:
             raise ProviderOperationError(f"no Jira relationship operations found for issue {issue_key}")
 
         settings = _jira_issue_provider_settings(request.context.project)
         resolved = [
             _resolve_jira_relationship_operation(issue_key, operation, settings=settings)
-            for operation in pending_operations
+            for operation in operations
         ]
         provider_current = self._require_write_freshness(request, site, cache, issue_key, target="relationships")
         prepared = self._prepare_relationship_removals(site, issue_key, provider_current, resolved)
@@ -440,7 +485,6 @@ class JiraDataCenterIssueNativeProvider(IssueProvider):
             "applied": len(applied),
             "operations": [operation.to_json() for operation in prepared],
             "provider_results": [dict(item) for item in applied],
-            "pending_operations": [operation.to_json() for operation in pending_operations],
             "cache_refreshed": True,
             "cache": dict(write_result),
         }

@@ -2,7 +2,11 @@
 # /// script
 # dependencies = ["python-frontmatter", "PyYAML"]
 # ///
-"""Jira issue pending relationship stage/apply entrypoint."""
+"""Jira issue relationship apply entrypoint.
+
+Builds add/remove/replace relationship intent from CLI flags and asks the
+provider to apply it directly. No flag means no provider call (no-op).
+"""
 
 from __future__ import annotations
 
@@ -12,19 +16,17 @@ import sys
 from pathlib import Path
 from typing import TextIO
 
-from workflow_cache import SCHEMA_VERSION, _atomic_write_text, _dump_yaml
 from workflow_command import CommandRunner
 from workflow_config import WorkflowConfig, WorkflowConfigError, load_workflow_config
 from workflow_env import workflow_project_dir_from_env
 from workflow_jira_data_center_client import resolve_jira_data_center_site
-from workflow_jira_issue_cache import JiraDataCenterIssueCache
 from workflow_jira_issue_provider import JiraDataCenterIssueNativeProvider
 from workflow_jira_issue_refs import JiraProviderError, jira_issue_keys_from_references, normalize_jira_issue_key
 from workflow_providers import ProviderContext, ProviderRequest
 
 
 class JiraIssueRelationshipsError(RuntimeError):
-    """Raised when pending Jira issue relationships cannot be applied."""
+    """Raised when Jira issue relationships cannot be applied."""
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -32,100 +34,76 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--project", type=Path, default=workflow_project_dir_from_env(), help="project path")
     parser.add_argument("--type", default="task", help="workflow artifact type")
     parser.add_argument("--json", action="store_true", help="emit JSON")
-    parser.add_argument("--stage", action="store_true", help="stage relationship intent instead of applying pending files")
-    parser.add_argument("--parent")
-    parser.add_argument("--child", action="append", default=[])
-    parser.add_argument("--blocked-by", action="append", default=[])
-    parser.add_argument("--blocking", action="append", default=[])
-    parser.add_argument("--related", action="append", default=[])
-    parser.add_argument("--replace", action="store_true", help="replace an existing pending relationship file when staging")
-    parser.add_argument("issues", nargs="+", help="Jira issue keys or text containing Jira issue keys")
+    parent_group = parser.add_mutually_exclusive_group()
+    parent_group.add_argument("--parent", help="add parent (errors if a parent already exists)")
+    parent_group.add_argument("--replace-parent", dest="replace_parent", help="set parent, replacing any existing parent")
+    parent_group.add_argument(
+        "--remove-parent",
+        dest="remove_parent",
+        action="store_true",
+        help="remove the current parent (no-op when no parent exists)",
+    )
+    parser.add_argument("--child", action="append", default=[], help="add a child (repeatable)")
+    parser.add_argument("--remove-child", dest="remove_child", action="append", default=[], help="remove a child (repeatable)")
+    parser.add_argument("--blocked-by", action="append", default=[], help="add a blocked-by dependency (repeatable)")
+    parser.add_argument(
+        "--remove-blocked-by",
+        dest="remove_blocked_by",
+        action="append",
+        default=[],
+        help="remove a blocked-by dependency (repeatable)",
+    )
+    parser.add_argument("--blocking", action="append", default=[], help="add a blocking dependency (repeatable)")
+    parser.add_argument(
+        "--remove-blocking",
+        dest="remove_blocking",
+        action="append",
+        default=[],
+        help="remove a blocking dependency (repeatable)",
+    )
+    parser.add_argument("--related", action="append", default=[], help="add a related ref (repeatable)")
+    parser.add_argument(
+        "--remove-related",
+        dest="remove_related",
+        action="append",
+        default=[],
+        help="remove a related ref (repeatable)",
+    )
+    parser.add_argument("issue", help="Jira issue key")
     return parser
 
 
-def stage_relationships_payload(
+def apply_relationships_payload(
     *,
     project: Path,
-    issues: list[str],
-    parent: str | None = None,
-    children: tuple[str, ...] = (),
-    blocked_by: tuple[str, ...] = (),
-    blocking: tuple[str, ...] = (),
-    related: tuple[str, ...] = (),
-    replace: bool = False,
-    runner: CommandRunner | None = None,
-) -> dict[str, object]:
-    """Stage relationship intent for an existing Jira issue."""
-
-    _ = runner
-    config = _load_jira_issue_config(project)
-    site, issue_keys = _jira_relationship_context(config, issues)
-    if len(issue_keys) != 1:
-        raise JiraIssueRelationshipsError("relationship staging requires exactly one issue ref")
-
-    issue_key = issue_keys[0]
-    cache = JiraDataCenterIssueCache.for_project(config.root)
-    if not cache.has_issue_projection(site, issue_key):
-        raise JiraIssueRelationshipsError(f"Jira issue cache projection is missing for {issue_key}; refresh the issue cache first")
-
-    relationships_file = cache.relationships_pending_file(site, issue_key)
-    if relationships_file.exists() and not replace:
-        raise JiraIssueRelationshipsError(f"pending relationship file already exists: {relationships_file}")
-
-    payload = _relationship_payload(
-        parent=parent,
-        children=children,
-        blocked_by=blocked_by,
-        blocking=blocking,
-        related=related,
-    )
-    relationships_file.parent.mkdir(parents=True, exist_ok=True)
-    _atomic_write_text(relationships_file, _dump_yaml(payload))
-    operations = cache.read_pending_issue_relationships(site, issue_key)
-    return {
-        "operation": "cache_stage_pending_relationships",
-        "role": "issue",
-        "kind": "jira",
-        "site": site.to_json(),
-        "issue": issue_key,
-        "key": issue_key,
-        "pending_location": str(relationships_file),
-        "relationships_file": str(relationships_file),
-        "operations": [operation.to_json() for operation in operations],
-    }
-
-
-def apply_pending_relationships_payload(
-    *,
-    project: Path,
-    issues: list[str],
+    issue_ref: str,
     artifact_type: str,
+    intent: dict[str, object],
     runner: CommandRunner | None = None,
 ) -> dict[str, object]:
-    """Apply pending local relationship files to Jira issues."""
+    """Apply a single Jira issue's relationship intent directly."""
 
     config = _load_jira_issue_config(project)
-    site, issue_keys = _jira_relationship_context(config, issues)
+    site, issue_keys = _jira_relationship_context(config, [issue_ref])
+    if len(issue_keys) != 1:
+        raise JiraIssueRelationshipsError("relationship apply requires exactly one issue ref")
+    issue_key = issue_keys[0]
+
     provider = JiraDataCenterIssueNativeProvider(runner=runner)
-    results = []
-    for issue_key in issue_keys:
-        response = provider.call(
-            ProviderRequest(
-                role="issue",
-                kind="jira",
-                operation="apply_relationships",
-                context=ProviderContext(project=config.root, artifact_type=artifact_type),
-                payload={"issue": issue_key, "from_pending": True},
-            )
+    response = provider.call(
+        ProviderRequest(
+            role="issue",
+            kind="jira",
+            operation="apply_relationships",
+            context=ProviderContext(project=config.root, artifact_type=artifact_type),
+            payload={"issue": issue_key, "relationship_intent": intent},
         )
-        results.append(dict(response.payload))
-    return {
-        "operation": "cache_apply_pending_relationships",
-        "role": "issue",
-        "kind": "jira",
-        "site": site.to_json(),
-        "issues": results,
-    }
+    )
+    payload = dict(response.payload)
+    payload.setdefault("role", "issue")
+    payload.setdefault("kind", "jira")
+    payload.setdefault("site", site.to_json())
+    return payload
 
 
 def main(
@@ -140,26 +118,15 @@ def main(
     output = stdout or sys.stdout
     errors = stderr or sys.stderr
 
+    intent = _intent_from_args(args)
     try:
-        if args.stage:
-            payload = stage_relationships_payload(
-                project=args.project,
-                issues=list(args.issues),
-                parent=args.parent,
-                children=tuple(args.child),
-                blocked_by=tuple(args.blocked_by),
-                blocking=tuple(args.blocking),
-                related=tuple(args.related),
-                replace=args.replace,
-                runner=runner,
-            )
-        else:
-            payload = apply_pending_relationships_payload(
-                project=args.project,
-                issues=list(args.issues),
-                artifact_type=args.type,
-                runner=runner,
-            )
+        payload = apply_relationships_payload(
+            project=args.project,
+            issue_ref=args.issue,
+            artifact_type=args.type,
+            intent=intent,
+            runner=runner,
+        )
     except Exception as exc:
         print(f"Jira issue relationship error: {exc}", file=errors)
         return 2
@@ -168,14 +135,39 @@ def main(
         print(json.dumps(payload, indent=2, sort_keys=False), file=output)
         return 0
 
-    if payload.get("operation") == "cache_stage_pending_relationships":
-        print(f"{payload.get('issue')} staged: {payload.get('pending_location')}", file=output)
+    issue = payload.get("issue")
+    if payload.get("no_changes"):
+        print(f"{issue} no relationship changes", file=output)
         return 0
-
-    for item in payload.get("issues", []):
-        if isinstance(item, dict):
-            print(f"{item.get('issue')} applied={item.get('applied')}", file=output)
+    print(f"{issue} applied={payload.get('applied')}", file=output)
     return 0
+
+
+def _intent_from_args(args: argparse.Namespace) -> dict[str, object]:
+    intent: dict[str, object] = {}
+    if args.parent:
+        intent["parent_add"] = args.parent
+    if args.replace_parent:
+        intent["parent_replace"] = args.replace_parent
+    if args.remove_parent:
+        intent["parent_remove"] = True
+    if args.blocked_by:
+        intent["blocked_by_add"] = list(args.blocked_by)
+    if args.remove_blocked_by:
+        intent["blocked_by_remove"] = list(args.remove_blocked_by)
+    if args.blocking:
+        intent["blocking_add"] = list(args.blocking)
+    if args.remove_blocking:
+        intent["blocking_remove"] = list(args.remove_blocking)
+    if args.child:
+        intent["child_add"] = list(args.child)
+    if args.remove_child:
+        intent["child_remove"] = list(args.remove_child)
+    if args.related:
+        intent["related_add"] = list(args.related)
+    if args.remove_related:
+        intent["related_remove"] = list(args.remove_related)
+    return intent
 
 
 def _jira_relationship_context(config: WorkflowConfig, issues: list[str]):
@@ -206,48 +198,6 @@ def _load_jira_issue_config(project: Path) -> WorkflowConfig:
             f"Jira issue relationship commands require configured issue provider kind jira, found {config.issues.kind}"
         )
     return config
-
-
-def _relationship_payload(
-    *,
-    parent: str | None,
-    children: tuple[str, ...],
-    blocked_by: tuple[str, ...],
-    blocking: tuple[str, ...],
-    related: tuple[str, ...],
-) -> dict[str, object]:
-    payload: dict[str, object] = {"schema_version": SCHEMA_VERSION}
-    if parent:
-        payload["parent"] = _required_ref(parent, "parent")
-    normalized_children = _normalized_refs(children)
-    normalized_blocked_by = _normalized_refs(blocked_by)
-    normalized_blocking = _normalized_refs(blocking)
-    normalized_related = _normalized_refs(related)
-    if normalized_children:
-        payload["children"] = normalized_children
-    dependencies: dict[str, object] = {}
-    if normalized_blocked_by:
-        dependencies["blocked_by"] = normalized_blocked_by
-    if normalized_blocking:
-        dependencies["blocking"] = normalized_blocking
-    if dependencies:
-        payload["dependencies"] = dependencies
-    if normalized_related:
-        payload["related"] = normalized_related
-    if len(payload) == 1:
-        raise JiraIssueRelationshipsError("at least one relationship value is required")
-    return payload
-
-
-def _required_ref(value: str, name: str) -> str:
-    text = str(value or "").strip()
-    if not text:
-        raise JiraIssueRelationshipsError(f"{name} relationship ref is required")
-    return text
-
-
-def _normalized_refs(values: tuple[str, ...]) -> list[str]:
-    return [value.strip() for value in values if value.strip()]
 
 
 if __name__ == "__main__":

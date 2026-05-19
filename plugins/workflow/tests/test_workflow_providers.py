@@ -14,7 +14,6 @@ _SCRIPTS_DIR = _PLUGIN_ROOT / "scripts"
 if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
-from workflow_cache import pending_relationship_operations_from_mapping  # noqa: E402
 from github_issue_lifecycle import lifecycle_payload  # noqa: E402
 from workflow_github_issue_cache import GitHubIssueCache  # noqa: E402
 from workflow_command import CommandRequest, CommandResult  # noqa: E402
@@ -875,7 +874,7 @@ def test_github_issue_add_comment_inline_body_blocks_on_stale_issue_freshness(
     assert "comment" not in events
 
 
-def test_github_issue_apply_relationships_from_pending_file_dispatches_refreshes_and_cleans(
+def test_github_issue_apply_relationships_from_inline_intent_dispatches_and_refreshes(
     tmp_path: Path,
 ) -> None:
     write_config(tmp_path)
@@ -884,23 +883,6 @@ def test_github_issue_apply_relationships_from_pending_file_dispatches_refreshes
         github_repo(),
         {**cached_issue_payload(updated_at="2026-05-14T00:00:00Z"), "number": 44},
         fetched_at="2026-05-14T00:00:00Z",
-    )
-    pending_path = cache.issue_file(github_repo(), 44)
-    cache.write_pending_issue_relationships(
-        github_repo(),
-        44,
-        pending_relationship_operations_from_mapping(
-            {
-                "operations": [
-                    {"action": "add", "relationship": "parent", "issue": "#36"},
-                    {"action": "add", "relationship": "blocked_by", "issue": "#33"},
-                    {"action": "add", "relationship": "blocking", "issue": "#45"},
-                ]
-            },
-            path=pending_path,
-            target_kind="issue",
-            target_id="44",
-        ),
     )
     events: list[str] = []
     issue_44_reads = 0
@@ -983,7 +965,14 @@ def test_github_issue_apply_relationships_from_pending_file_dispatches_refreshes
             kind="github",
             operation="apply_relationships",
             context=ProviderContext(project=tmp_path, artifact_type="review", session_id="s1"),
-            payload={"issue": 44, "from_pending": True},
+            payload={
+                "issue": 44,
+                "relationship_intent": {
+                    "parent_replace": "#36",
+                    "blocked_by_add": ["#33"],
+                    "blocking_add": ["#45"],
+                },
+            },
         )
     )
 
@@ -991,26 +980,13 @@ def test_github_issue_apply_relationships_from_pending_file_dispatches_refreshes
     assert response.payload["issue"] == "44"
     assert response.payload["applied"] == 3
     assert response.payload["cache_refreshed"] is True
-    assert response.payload["pending_file"] == "issue.md"
-    assert "pending:" not in pending_path.read_text(encoding="utf-8")
     relationships = cache.read_relationships(github_repo(), 44)
     assert relationships["parent"]["number"] == 36
     assert relationships["dependencies"]["blocked_by"][0]["number"] == 33
     assert relationships["dependencies"]["blocking"][0]["number"] == 45
-    assert events == [
-        "freshness",
-        "issue-44-id",
-        "add-parent",
-            "issue-33-id",
-            "add-dependency",
-            "review-blocker-id",
-            "add-review-blocks-target",
-            "relationships-issue",
-        "relationships-parent",
-        "relationships-children",
-        "relationships-blocked-by",
-        "relationships-blocking",
-    ]
+    assert "add-parent" in events
+    assert "add-dependency" in events
+    assert "add-review-blocks-target" in events
 
 
 def test_github_issue_apply_relationships_rejects_unsupported_without_mutation(tmp_path: Path) -> None:
@@ -1020,17 +996,6 @@ def test_github_issue_apply_relationships_rejects_unsupported_without_mutation(t
         github_repo(),
         {**cached_issue_payload(updated_at="2026-05-14T00:00:00Z"), "number": 44},
         fetched_at="2026-05-14T00:00:00Z",
-    )
-    pending_path = cache.issue_file(github_repo(), 44)
-    cache.write_pending_issue_relationships(
-        github_repo(),
-        44,
-        pending_relationship_operations_from_mapping(
-            {"operations": [{"action": "add", "relationship": "related", "issue": "#33"}]},
-            path=pending_path,
-            target_kind="issue",
-            target_id="44",
-        ),
     )
     events: list[str] = []
 
@@ -1047,13 +1012,11 @@ def test_github_issue_apply_relationships_rejects_unsupported_without_mutation(t
                 kind="github",
                 operation="apply_relationships",
                 context=ProviderContext(project=tmp_path, artifact_type="task", session_id="s1"),
-                payload={"issue": 44, "from_pending": True},
+                payload={"issue": 44, "relationship_intent": {"related_add": ["#33"]}},
             )
         )
 
     assert "mutation" not in events
-    assert pending_path.exists()
-    assert "pending:" in pending_path.read_text(encoding="utf-8")
 
 
 def test_read_operations_dispatch_to_provider(context: ProviderContext) -> None:

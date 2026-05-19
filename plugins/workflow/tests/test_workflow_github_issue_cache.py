@@ -18,7 +18,6 @@ from workflow_cache import (  # noqa: E402
     FreshnessMetadata,
     WorkflowFreshnessConflict,
     check_provider_freshness,
-    pending_relationship_operations_from_mapping,
     require_provider_freshness,
 )
 from workflow_github_issue_cache import GitHubIssueCache, is_github_issue_cache_body_path  # noqa: E402
@@ -275,35 +274,13 @@ def test_configured_repo_cache_is_shallow_and_external_repo_cache_is_namespaced(
     )
 
 
-def test_pending_issue_relationships_parse_operations_and_remove_frontmatter(tmp_path: Path) -> None:
+def test_cache_relationship_frontmatter_omits_pending_block(tmp_path: Path) -> None:
     cache = GitHubIssueCache.for_project(tmp_path, configured_repo=repo())
     cache.write_issue_bundle(repo(), issue_payload())
     issue_path = cache.issue_file(repo(), 39)
-    cache.write_pending_issue_relationships(
-        repo(),
-        39,
-        pending_relationship_operations_from_mapping(
-            {
-                "operations": [
-                    {"action": "add", "relationship": "parent", "issue": "#28"},
-                    {"action": "remove", "relationship": "blocked_by", "target": "#32"},
-                ]
-            },
-            path=issue_path,
-            target_kind="issue",
-            target_id="39",
-        ),
-    )
 
-    operations = cache.read_pending_issue_relationships(repo(), 39)
-
-    assert [operation.action for operation in operations] == ["add", "remove"]
-    assert [operation.relationship for operation in operations] == ["parent", "blocked_by"]
-    assert [operation.target_ref for operation in operations] == ["#28", "#32"]
-    assert operations[0].replace_parent is True
-    removed = cache.remove_pending_issue_relationships(repo(), 39, operations)
-    assert removed == [issue_path]
-    assert "pending:" not in issue_path.read_text(encoding="utf-8")
+    text = issue_path.read_text(encoding="utf-8")
+    assert "pending:" not in text
 
 
 def test_cache_read_can_skip_raw_markdown_bodies(tmp_path: Path) -> None:

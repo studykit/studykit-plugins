@@ -14,7 +14,6 @@ from workflow_cache import (
     SCHEMA_VERSION,
     FreshnessMetadata,
     PendingIssueComment,
-    PendingIssueRelationshipOperation,
     WorkflowCacheCorrupt,
     WorkflowCacheError,
     WorkflowCacheMiss,
@@ -22,7 +21,6 @@ from workflow_cache import (
     _dump_yaml,
     _label_names,
     _read_pending_comments,
-    _read_pending_relationships,
     _read_yaml_mapping,
     _remove_empty_parents,
     _require_schema,
@@ -85,9 +83,6 @@ class JiraDataCenterIssueCache:
     def comments_pending_dir(self, site: JiraDataCenterSite, issue_key: str) -> Path:
         return self.issue_dir(site, issue_key) / "comments-pending"
 
-    def relationships_pending_file(self, site: JiraDataCenterSite, issue_key: str) -> Path:
-        return self.issue_dir(site, issue_key) / "relationships-pending.yml"
-
     def has_issue_projection(self, site: JiraDataCenterSite, issue_key: str) -> bool:
         return self.issue_json_file(site, issue_key).is_file()
 
@@ -95,20 +90,6 @@ class JiraDataCenterIssueCache:
         key = normalize_jira_issue_key(issue_key)
         return _read_pending_comments(
             self.comments_pending_dir(site, key),
-            target_kind="issue",
-            target_id=key,
-        )
-
-    def read_pending_issue_relationships(
-        self,
-        site: JiraDataCenterSite,
-        issue_key: str,
-    ) -> list[PendingIssueRelationshipOperation]:
-        """Read pending relationship operations for an existing Jira issue projection."""
-
-        key = normalize_jira_issue_key(issue_key)
-        return _read_pending_relationships(
-            self.relationships_pending_file(site, key),
             target_kind="issue",
             target_id=key,
         )
@@ -261,37 +242,6 @@ class JiraDataCenterIssueCache:
                 removed.append(comment.path)
         _remove_empty_parents(pending_dir, stop_at=self.issue_dir(site, key))
         return removed
-
-    def remove_pending_issue_relationships(
-        self,
-        site: JiraDataCenterSite,
-        issue_key: str,
-        operations: list[PendingIssueRelationshipOperation],
-    ) -> list[Path]:
-        """Remove a successfully consumed Jira pending relationship file."""
-
-        key = normalize_jira_issue_key(issue_key)
-        path = self.relationships_pending_file(site, key)
-        return self._remove_pending_relationship_file(path, operations, stop_at=self.issue_dir(site, key))
-
-    def _remove_pending_relationship_file(
-        self,
-        path: Path,
-        operations: list[PendingIssueRelationshipOperation],
-        *,
-        stop_at: Path,
-    ) -> list[Path]:
-        expected = path.resolve(strict=False)
-        seen = False
-        for operation in operations:
-            seen = True
-            if operation.path.resolve(strict=False) != expected:
-                raise WorkflowCacheError(f"pending relationship operation is outside Jira pending file: {operation.path}")
-        if not seen or not path.exists():
-            return []
-        path.unlink()
-        _remove_empty_parents(path.parent, stop_at=stop_at)
-        return [path]
 
 def _read_json_mapping(path: Path) -> Mapping[str, Any]:
     try:

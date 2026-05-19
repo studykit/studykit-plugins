@@ -4,8 +4,8 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Iterable, Mapping
-from dataclasses import dataclass, replace
+from collections.abc import Mapping
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -13,7 +13,6 @@ from workflow_cache import (
     CACHE_ROOT_NAME,
     SCHEMA_VERSION,
     FreshnessMetadata,
-    PendingIssueRelationshipOperation,
     WorkflowCacheCorrupt,
     WorkflowCacheError,
     WorkflowCacheMiss,
@@ -24,7 +23,6 @@ from workflow_cache import (
     _normalize_optional,
     _normalize_state,
     _normalize_state_reason,
-    _pending_relationship_operation_from_mapping,
     _read_frontmatter_markdown,
     _require_schema,
     _safe_file_segment,
@@ -129,125 +127,6 @@ class GitHubIssueCache:
         if not issue_dir.is_dir():
             return []
         return sorted(path for path in issue_dir.glob("comment-*.md") if path.is_file())
-
-    def read_pending_issue_relationships(
-        self,
-        repo: GitHubRepository,
-        issue: int | str,
-    ) -> list[PendingIssueRelationshipOperation]:
-        """Read pending relationship operations for an existing issue projection."""
-
-        issue_number = normalize_issue_number(issue)
-        issue_path = self.issue_file(repo, issue_number)
-        _found, operations = _read_frontmatter_pending_relationships(
-            issue_path,
-            target_kind="issue",
-            target_id=issue_number,
-        )
-        return operations
-
-    def write_pending_issue_relationships(
-        self,
-        repo: GitHubRepository,
-        issue: int | str,
-        operations: Iterable[PendingIssueRelationshipOperation],
-        *,
-        replace_existing: bool = False,
-    ) -> Path:
-        """Write canonical pending relationship operations into issue frontmatter."""
-
-        issue_number = normalize_issue_number(issue)
-        issue_path = self.issue_file(repo, issue_number)
-        if not issue_path.is_file():
-            raise WorkflowCacheMiss(f"issue cache does not exist: {issue_path}")
-        if not replace_existing and self.read_pending_issue_relationships(repo, issue_number):
-            raise WorkflowCacheError(f"pending relationship operations already exist for GitHub issue #{issue_number}")
-        normalized = _retarget_relationship_operations(
-            operations,
-            path=issue_path,
-            target_kind="issue",
-            target_id=issue_number,
-        )
-        if not normalized:
-            raise WorkflowCacheError(f"no pending relationship operations for GitHub issue #{issue_number}")
-        self._write_frontmatter_pending_relationships(issue_path, normalized)
-        return issue_path
-
-    def _write_frontmatter_pending_relationships(
-        self,
-        issue_path: Path,
-        operations: list[PendingIssueRelationshipOperation],
-    ) -> None:
-        frontmatter, body = _read_frontmatter_markdown(issue_path)
-        relationships = _frontmatter_relationship_block(frontmatter, issue_path, create=True)
-        relationships["pending"] = {
-            "operations": [_pending_relationship_operation_to_frontmatter(operation) for operation in operations]
-        }
-        _atomic_write_text(issue_path, _format_markdown(frontmatter, body))
-
-    def remove_pending_issue_relationships(
-        self,
-        repo: GitHubRepository,
-        issue: int | str,
-        operations: Iterable[PendingIssueRelationshipOperation],
-    ) -> list[Path]:
-        """Remove successfully consumed pending relationship operations from frontmatter."""
-
-        issue_number = normalize_issue_number(issue)
-        issue_path = self.issue_file(repo, issue_number)
-        operation_list = list(operations)
-        if not operation_list:
-            return []
-        if not all(operation.path.resolve(strict=False) == issue_path.resolve(strict=False) for operation in operation_list):
-            raise WorkflowCacheError(f"pending relationship operation is outside issue frontmatter: {issue_path}")
-        changed = self._remove_frontmatter_pending_relationships(issue_path, operation_list)
-        return [issue_path] if changed else []
-
-    def _remove_frontmatter_pending_relationships(
-        self,
-        issue_path: Path,
-        consumed: list[PendingIssueRelationshipOperation],
-    ) -> bool:
-        frontmatter, body = _read_frontmatter_markdown(issue_path)
-        relationships = _frontmatter_relationship_block(frontmatter, issue_path, create=False)
-        if relationships is None:
-            return False
-        pending = relationships.get("pending")
-        if pending is None:
-            return False
-        if not isinstance(pending, Mapping):
-            raise WorkflowCacheCorrupt(f"issue relationship pending frontmatter must be a mapping: {issue_path}")
-        raw_operations = pending.get("operations")
-        if raw_operations is None:
-            return False
-        if not isinstance(raw_operations, list):
-            raise WorkflowCacheCorrupt(f"issue relationship pending operations must be a list: {issue_path}")
-
-        consumed_keys = [_pending_relationship_key(operation) for operation in consumed]
-        remaining: list[Any] = []
-        changed = False
-        for item in raw_operations:
-            operation = _pending_relationship_operation_from_mapping(
-                item,
-                path=issue_path,
-                target_kind=consumed[0].target_kind,
-                target_id=consumed[0].target_id,
-            )
-            key = _pending_relationship_key(operation)
-            try:
-                consumed_keys.remove(key)
-                changed = True
-            except ValueError:
-                remaining.append(item)
-
-        if not changed:
-            return False
-        if remaining:
-            relationships["pending"] = {"operations": remaining}
-        else:
-            relationships.pop("pending", None)
-        _atomic_write_text(issue_path, _format_markdown(frontmatter, body))
-        return True
 
     def read_freshness_metadata(
         self,
@@ -491,10 +370,6 @@ class GitHubIssueCache:
         issue_dir = self.issue_dir(repo, issue_number)
         issue_dir.mkdir(parents=True, exist_ok=True)
         source_updated_at = _normalize_optional(issue.get("updatedAt") or issue.get("updated_at")) or now
-        try:
-            pending_relationships = self.read_pending_issue_relationships(repo, issue_number)
-        except WorkflowCacheCorrupt:
-            pending_relationships = []
         current_relationships = _relationships_from_issue(issue)
 
         if _has_comment_projection_payload(issue):
@@ -514,7 +389,6 @@ class GitHubIssueCache:
             issue_frontmatter["projects"] = projects
         issue_frontmatter["relationships"] = _relationship_frontmatter_block(
             current=current_relationships,
-            pending=pending_relationships,
             source_updated_at=source_updated_at,
             fetched_at=now,
         )
@@ -579,12 +453,6 @@ class GitHubIssueCache:
     ) -> None:
         frontmatter, body = _read_frontmatter_markdown(issue_path)
         existing_relationships = _frontmatter_relationship_block(frontmatter, issue_path, create=True)
-        pending = existing_relationships.get("pending")
-        if pending is not None and not isinstance(pending, Mapping):
-            raise WorkflowCacheCorrupt(f"issue relationship pending frontmatter must be a mapping: {issue_path}")
-        pending_operations = pending.get("operations") if isinstance(pending, Mapping) else None
-        if pending_operations is not None and not isinstance(pending_operations, list):
-            raise WorkflowCacheCorrupt(f"issue relationship pending operations must be a list: {issue_path}")
         if relationships_current is None:
             current_block = existing_relationships.get("current")
             relationships_current = current_block if isinstance(current_block, Mapping) else {}
@@ -594,15 +462,11 @@ class GitHubIssueCache:
             )
         if relationships_fetched_at is None:
             relationships_fetched_at = _normalize_optional(existing_relationships.get("fetched_at"))
-        new_block = _relationship_frontmatter_block(
+        frontmatter["relationships"] = _relationship_frontmatter_block(
             current=relationships_current,
-            pending=[],
             source_updated_at=relationships_source_updated_at,
             fetched_at=relationships_fetched_at,
         )
-        if pending_operations:
-            new_block["pending"] = {"operations": pending_operations}
-        frontmatter["relationships"] = new_block
         _atomic_write_text(issue_path, _format_markdown(frontmatter, body))
 
 
@@ -638,46 +502,9 @@ def _read_frontmatter_current_relationships(path: Path) -> dict[str, Any] | None
     return _relationships_from_issue(current)
 
 
-def _read_frontmatter_pending_relationships(
-    path: Path,
-    *,
-    target_kind: str,
-    target_id: str,
-) -> tuple[bool, list[PendingIssueRelationshipOperation]]:
-    if not path.is_file():
-        return False, []
-    frontmatter, _body = _read_frontmatter_markdown(path)
-    relationships = _frontmatter_relationship_block(frontmatter, path, create=False)
-    if relationships is None or "pending" not in relationships:
-        return False, []
-    pending = relationships.get("pending")
-    if pending is None:
-        return True, []
-    if not isinstance(pending, Mapping):
-        raise WorkflowCacheCorrupt(f"issue relationship pending frontmatter must be a mapping: {path}")
-    unknown = sorted(str(key) for key in pending if key != "operations")
-    if unknown:
-        raise WorkflowCacheCorrupt(f"unsupported pending relationship frontmatter fields in {path}: {', '.join(unknown)}")
-    raw_operations = pending.get("operations")
-    if raw_operations is None:
-        return True, []
-    if not isinstance(raw_operations, list):
-        raise WorkflowCacheCorrupt(f"issue relationship pending operations must be a list: {path}")
-    return True, [
-        _pending_relationship_operation_from_mapping(
-            item,
-            path=path,
-            target_kind=target_kind,
-            target_id=target_id,
-        )
-        for item in raw_operations
-    ]
-
-
 def _relationship_frontmatter_block(
     *,
     current: Mapping[str, Any],
-    pending: Iterable[PendingIssueRelationshipOperation],
     source_updated_at: str | None,
     fetched_at: str | None,
 ) -> dict[str, Any]:
@@ -687,9 +514,6 @@ def _relationship_frontmatter_block(
     if fetched_at is not None:
         block["fetched_at"] = fetched_at
     block["current"] = _compact_relationships_for_frontmatter(current)
-    pending_operations = [_pending_relationship_operation_to_frontmatter(operation) for operation in pending]
-    if pending_operations:
-        block["pending"] = {"operations": pending_operations}
     return block
 
 
@@ -764,42 +588,6 @@ def _compact_relationship_ref(value: Any) -> int | str | None:
         return text or None
 
 
-def _pending_relationship_operation_to_frontmatter(
-    operation: PendingIssueRelationshipOperation,
-) -> dict[str, Any]:
-    return {
-        "action": operation.action,
-        "relationship": operation.relationship,
-        "target_ref": operation.target_ref,
-        "replace_parent": operation.replace_parent,
-    }
-
-
-def _retarget_relationship_operations(
-    operations: Iterable[PendingIssueRelationshipOperation],
-    *,
-    path: Path,
-    target_kind: str,
-    target_id: str,
-) -> list[PendingIssueRelationshipOperation]:
-    return [
-        replace(
-            operation,
-            target_kind=target_kind,
-            target_id=target_id,
-            path=path,
-        )
-        for operation in operations
-    ]
-
-
-def _pending_relationship_key(operation: PendingIssueRelationshipOperation) -> tuple[str, str, str, bool]:
-    return (
-        operation.action,
-        operation.relationship,
-        operation.target_ref,
-        operation.replace_parent,
-    )
 
 
 def _project_items_for_frontmatter(value: Any) -> list[dict[str, Any]]:
