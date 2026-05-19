@@ -81,12 +81,9 @@ class Resolution:
     role: str
     provider: str | None
     files: tuple[Path, ...]
-    config_path: Path | None = None
 
     def to_json(self) -> dict[str, Any]:
         return {
-            "configured": self.config_path is not None,
-            "config_path": str(self.config_path) if self.config_path else None,
             "artifact": {
                 "type": self.artifact_type,
                 "role": self.role,
@@ -188,7 +185,6 @@ def resolve_authoring(
     normalized_role = normalize_role(role, normalized_type)
     normalized_scope = normalize_scope(scope)
 
-    config_path: Path | None = None
     config_provider: str | None = None
     if project is not None or require_config:
         try:
@@ -196,7 +192,6 @@ def resolve_authoring(
         except WorkflowConfigError as exc:
             raise ResolverError(str(exc)) from exc
         if config is not None:
-            config_path = config.path
             config_provider = config.provider_for_role(normalized_role)
 
     normalized_provider = normalize_provider(provider) or config_provider
@@ -217,7 +212,6 @@ def resolve_authoring(
             role=normalized_role,
             provider=normalized_provider,
             files=absolute_authoring_paths(parts),
-            config_path=config_path.resolve() if config_path else None,
         )
 
     if normalized_role == "issue":
@@ -257,7 +251,6 @@ def resolve_authoring(
         role=normalized_role,
         provider=normalized_provider,
         files=absolute_authoring_paths(parts),
-        config_path=config_path.resolve() if config_path else None,
     )
 
 
