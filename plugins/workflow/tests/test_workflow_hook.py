@@ -77,8 +77,10 @@ def expected_session_start_context(
     _ = runtime  # Codex and Claude share the same main-session policy now.
     text = main_context_fragment("session-policy.md")
     policy_dir = _PLUGIN_ROOT / "agents" / "workflow-main-context" / "policy"
+    issue_fetch_block = main_context_fragment(f"snippets/issue-fetch/{issue_kind}.md")
     return (
         text
+        .replace("$WORKFLOW_ISSUE_FETCH_BLOCK", issue_fetch_block)
         .replace("$WORKFLOW_POLICY_DIR", str(policy_dir))
         .replace("$WORKFLOW_ISSUE_PROVIDER", issue_kind)
         .replace("$WORKFLOW_KNOWLEDGE_PROVIDER", knowledge_kind)

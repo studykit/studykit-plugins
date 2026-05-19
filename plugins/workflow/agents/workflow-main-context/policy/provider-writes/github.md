@@ -122,7 +122,6 @@ update.
 | Intent          | Script                                    |
 |-----------------|-------------------------------------------|
 | Metadata only   | `github_issue_metadata.py`                |
-| Fetch / refresh | `github_issue_fetch.py`                   |
 | Lifecycle       | `github_issue_lifecycle.py close|reopen`  |
 
 Run `"$WORKFLOW" <script>.py --help` only when you need a flag not listed
