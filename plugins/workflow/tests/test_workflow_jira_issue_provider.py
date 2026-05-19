@@ -712,7 +712,15 @@ def test_data_center_create_uses_artifact_issue_type(
     artifact_type: str,
     expected_issue_type: str,
 ) -> None:
-    write_jira_config(tmp_path)
+    extra = (
+        """
+    epic_fields:
+      name: customfield_12345
+"""
+        if artifact_type == "epic"
+        else ""
+    )
+    write_jira_config(tmp_path, relationship_mappings=extra)
     runner = FakeRunner(
         {
             curl_write_args(): result(curl_write_args(), stdout=json.dumps({"id": "10001", "key": "TEST-1234"})),
@@ -742,6 +750,8 @@ def test_data_center_create_uses_configured_epic_issue_type(tmp_path: Path) -> N
         relationship_mappings="""
     artifact_issue_types:
       epic: Initiative
+    epic_fields:
+      name: customfield_12345
 """,
     )
     runner = FakeRunner(
@@ -764,6 +774,155 @@ def test_data_center_create_uses_configured_epic_issue_type(tmp_path: Path) -> N
     assert response.payload["operation"] == "create_issue"
     payload_text = str(runner.requests[0].input_text)
     assert '\\"issuetype\\":{\\"name\\":\\"Initiative\\"}' in payload_text
+
+
+def test_data_center_epic_create_injects_epic_name_default_from_title(tmp_path: Path) -> None:
+    write_jira_config(
+        tmp_path,
+        relationship_mappings="""
+    epic_fields:
+      name: customfield_12345
+""",
+    )
+    runner = FakeRunner(
+        {
+            curl_write_args(): result(curl_write_args(), stdout=json.dumps({"id": "10001", "key": "TEST-1234"})),
+            curl_args(issue_url()): result(curl_args(issue_url()), stdout=json.dumps(jira_issue_payload())),
+            curl_args(remote_links_url()): result(curl_args(remote_links_url()), stdout=json.dumps(remote_links_payload())),
+        }
+    )
+
+    response = dispatch_write(
+        tmp_path,
+        runner,
+        "create",
+        artifact_type="epic",
+        title="Coordinate a larger batch",
+        body="## Description\n\nCoordinate the batch.",
+    )
+
+    assert response.payload["operation"] == "create_issue"
+    payload_text = str(runner.requests[0].input_text)
+    assert '\\"customfield_12345\\":\\"Coordinate a larger batch\\"' in payload_text
+
+
+def test_data_center_epic_create_overrides_epic_name_when_provided(tmp_path: Path) -> None:
+    write_jira_config(
+        tmp_path,
+        relationship_mappings="""
+    epic_fields:
+      name: customfield_12345
+""",
+    )
+    runner = FakeRunner(
+        {
+            curl_write_args(): result(curl_write_args(), stdout=json.dumps({"id": "10001", "key": "TEST-1234"})),
+            curl_args(issue_url()): result(curl_args(issue_url()), stdout=json.dumps(jira_issue_payload())),
+            curl_args(remote_links_url()): result(curl_args(remote_links_url()), stdout=json.dumps(remote_links_payload())),
+        }
+    )
+
+    response = dispatch_write(
+        tmp_path,
+        runner,
+        "create",
+        artifact_type="epic",
+        title="Coordinate a larger batch",
+        body="## Description\n\nCoordinate the batch.",
+        epic_name="Initiative codename",
+    )
+
+    assert response.payload["operation"] == "create_issue"
+    payload_text = str(runner.requests[0].input_text)
+    assert '\\"customfield_12345\\":\\"Initiative codename\\"' in payload_text
+
+
+def test_data_center_epic_create_without_epic_name_field_raises(tmp_path: Path) -> None:
+    write_jira_config(tmp_path)
+    runner = FakeRunner({})
+
+    with pytest.raises(ProviderOperationError, match="epic_fields.name"):
+        dispatch_write(
+            tmp_path,
+            runner,
+            "create",
+            artifact_type="epic",
+            title="Coordinate",
+            body="Body.",
+        )
+
+
+def test_data_center_epic_name_rejected_for_non_epic_artifact(tmp_path: Path) -> None:
+    write_jira_config(
+        tmp_path,
+        relationship_mappings="""
+    epic_fields:
+      name: customfield_12345
+""",
+    )
+    runner = FakeRunner({})
+
+    with pytest.raises(ProviderOperationError, match="epic_name is only valid"):
+        dispatch_write(
+            tmp_path,
+            runner,
+            "create",
+            artifact_type="task",
+            title="Task title",
+            body="Body.",
+            epic_name="Stray epic name",
+        )
+
+
+def test_data_center_non_epic_create_payload_is_byte_identical_with_epic_fields(tmp_path: Path) -> None:
+    """Regression: configured epic_fields must not leak into non-Epic create payload."""
+
+    write_jira_config(tmp_path)
+    runner_a = FakeRunner(
+        {
+            curl_write_args(): result(curl_write_args(), stdout=json.dumps({"id": "10001", "key": "TEST-1234"})),
+            curl_args(issue_url()): result(curl_args(issue_url()), stdout=json.dumps(jira_issue_payload())),
+            curl_args(remote_links_url()): result(curl_args(remote_links_url()), stdout=json.dumps(remote_links_payload())),
+        }
+    )
+    dispatch_write(
+        tmp_path,
+        runner_a,
+        "create",
+        artifact_type="task",
+        title="Plain task",
+        body="Plain body.\n",
+        labels=["workflow"],
+    )
+    plain_payload = runner_a.requests[0].input_text
+
+    write_jira_config(
+        tmp_path,
+        relationship_mappings="""
+    epic_fields:
+      name: customfield_12345
+      link: customfield_12346
+      status: customfield_12347
+""",
+    )
+    runner_b = FakeRunner(
+        {
+            curl_write_args(): result(curl_write_args(), stdout=json.dumps({"id": "10001", "key": "TEST-1234"})),
+            curl_args(issue_url()): result(curl_args(issue_url()), stdout=json.dumps(jira_issue_payload())),
+            curl_args(remote_links_url()): result(curl_args(remote_links_url()), stdout=json.dumps(remote_links_payload())),
+        }
+    )
+    dispatch_write(
+        tmp_path,
+        runner_b,
+        "create",
+        artifact_type="task",
+        title="Plain task",
+        body="Plain body.\n",
+        labels=["workflow"],
+    )
+
+    assert runner_b.requests[0].input_text == plain_payload
 
 
 def test_data_center_update_writes_body_and_refreshes_cache(tmp_path: Path) -> None:
@@ -1010,6 +1169,123 @@ def test_data_center_issue_link_relationships_are_applied_from_inline_intent(tmp
     related_request = str(write_requests[2].input_text)
     assert '\\"type\\":{\\"name\\":\\"Relates\\"}' in related_request
     assert '\\"inwardIssue\\":{\\"key\\":\\"TEST-1236\\"}' in related_request
+
+
+def test_data_center_epic_link_relationship_writes_bare_key_string(tmp_path: Path) -> None:
+    write_jira_config(
+        tmp_path,
+        relationship_mappings="""
+    epic_fields:
+      name: customfield_12345
+      link: customfield_12346
+    relationship_mappings:
+      epic:
+        surface: field
+        field: customfield_12346
+        write_to: source
+        value: string
+""",
+    )
+    site = jira_site(tmp_path)
+    cache = JiraDataCenterIssueCache.for_project(tmp_path)
+    cache.write_issue_bundle(
+        site,
+        jira_issue_payload(),
+        remote_links=remote_links_payload(),
+        fetched_at="2026-05-15T10:00:00.000+0900",
+    )
+    runner = FakeRunner(
+        {
+            curl_args(issue_url()): [
+                result(curl_args(issue_url()), stdout=json.dumps(jira_issue_payload())),
+                result(curl_args(issue_url()), stdout=json.dumps(jira_issue_payload())),
+            ],
+            curl_write_args(): result(curl_write_args(), stdout=""),
+            curl_args(remote_links_url()): result(curl_args(remote_links_url()), stdout=json.dumps(remote_links_payload())),
+        }
+    )
+
+    response = dispatch_write(
+        tmp_path,
+        runner,
+        "apply_relationships",
+        issue="TEST-1234",
+        relationship_intent={"epic_add": "TEST-10"},
+    )
+
+    assert response.payload["applied"] == 1
+    write_request = next(request for request in runner.requests if request.args == curl_write_args())
+    body = str(write_request.input_text)
+    assert 'request = "PUT"' in body
+    assert 'url = "https://jira.example.test/rest/api/2/issue/TEST-1234"' in body
+    assert '\\"customfield_12346\\":\\"TEST-10\\"' in body
+    assert '\\"key\\":\\"TEST-10\\"' not in body
+
+
+def test_data_center_combined_parent_and_epic_relationships_write_independently(tmp_path: Path) -> None:
+    write_jira_config(
+        tmp_path,
+        relationship_mappings="""
+    epic_fields:
+      link: customfield_12346
+    relationship_mappings:
+      child:
+        surface: field
+        field: parent
+        write_to: target
+        value: key
+      epic:
+        surface: field
+        field: customfield_12346
+        write_to: source
+        value: string
+""",
+    )
+    site = jira_site(tmp_path)
+    cache = JiraDataCenterIssueCache.for_project(tmp_path)
+    cache.write_issue_bundle(
+        site,
+        jira_subtask_payload(),
+        remote_links=[],
+        fetched_at="2026-05-15T10:00:00.000+0900",
+    )
+    runner = FakeRunner(
+        {
+            curl_args(issue_url("TEST-1237")): [
+                result(curl_args(issue_url("TEST-1237")), stdout=json.dumps(jira_subtask_payload())),
+                result(curl_args(issue_url("TEST-1237")), stdout=json.dumps(jira_subtask_payload())),
+            ],
+            curl_args(issue_url("TEST-50")): result(
+                curl_args(issue_url("TEST-50")),
+                stdout=json.dumps({"key": "TEST-50", "fields": {"summary": "Story", "issuetype": {"name": "Story"}}}),
+            ),
+            curl_write_args(): [
+                result(curl_write_args(), stdout=""),
+                result(curl_write_args(), stdout=""),
+            ],
+            curl_args(remote_links_url("TEST-1237")): result(curl_args(remote_links_url("TEST-1237")), stdout=json.dumps([])),
+        }
+    )
+
+    response = dispatch_write(
+        tmp_path,
+        runner,
+        "apply_relationships",
+        issue="TEST-1237",
+        relationship_intent={
+            "child_add": ["TEST-50"],
+            "epic_add": "TEST-10",
+        },
+    )
+
+    assert response.payload["applied"] == 2
+    write_requests = [request for request in runner.requests if request.args == curl_write_args()]
+    assert len(write_requests) == 2
+    bodies = [str(req.input_text) for req in write_requests]
+    epic_body = next(body for body in bodies if "customfield_12346" in body)
+    child_body = next(body for body in bodies if 'url = "https://jira.example.test/rest/api/2/issue/TEST-50"' in body)
+    assert '\\"customfield_12346\\":\\"TEST-10\\"' in epic_body
+    assert '\\"parent\\":{\\"key\\":\\"TEST-1237\\"}' in child_body
 
 
 def test_data_center_remote_link_relationships_are_applied_with_stable_global_id(tmp_path: Path) -> None:

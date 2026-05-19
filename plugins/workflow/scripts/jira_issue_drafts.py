@@ -34,6 +34,7 @@ def publish_issue(
     issue_type: str | None = None,
     subtask_parent: str | None = None,
     project_key: str | None = None,
+    epic_name: str | None = None,
     relationship_intent: dict[str, object] | None = None,
     runner: CommandRunner | None = None,
 ) -> dict[str, object]:
@@ -45,6 +46,7 @@ def publish_issue(
     normalized_labels = tuple(label.strip() for label in labels if label.strip())
     normalized_subtask_parent = _jira_issue_key(subtask_parent, "subtask parent")
     normalized_issue_type = _optional_text(issue_type)
+    normalized_epic_name = _optional_text(epic_name)
 
     body_path = body_file.expanduser()
     if not body_path.is_file():
@@ -64,6 +66,8 @@ def publish_issue(
     normalized_project_key = _optional_text(project_key)
     if normalized_project_key:
         payload["project_key"] = normalized_project_key
+    if normalized_epic_name is not None:
+        payload["epic_name"] = normalized_epic_name
 
     provider = JiraDataCenterIssueNativeProvider(runner=runner)
     response = provider.call(
@@ -163,7 +167,15 @@ def build_parser() -> argparse.ArgumentParser:
         required=True,
         help="path to the opaque body content file (no frontmatter)",
     )
+    publish.add_argument(
+        "--epic-name",
+        help="Epic Name customfield value (epic only; defaults to --title)",
+    )
     publish.add_argument("--parent", help="add parent relationship after publish")
+    publish.add_argument(
+        "--epic",
+        help="add Epic Link after publish (rejected when --type epic)",
+    )
     publish.add_argument(
         "--blocked-by",
         action="append",
@@ -198,6 +210,10 @@ def _publish_relationship_intent(args: argparse.Namespace) -> dict[str, object]:
     intent: dict[str, object] = {}
     if getattr(args, "parent", None):
         intent["parent_add"] = args.parent
+    if getattr(args, "epic", None):
+        if getattr(args, "type", None) and args.type.strip().lower() == "epic":
+            raise JiraIssueDraftError("publish --epic cannot be combined with --type epic")
+        intent["epic_add"] = args.epic
     if getattr(args, "blocked_by", None):
         intent["blocked_by_add"] = list(args.blocked_by)
     if getattr(args, "blocking", None):
@@ -232,6 +248,7 @@ def main(
                 issue_type=args.issue_type,
                 subtask_parent=args.subtask_parent,
                 project_key=args.project_key,
+                epic_name=args.epic_name,
                 relationship_intent=_publish_relationship_intent(args),
                 runner=runner,
             )
