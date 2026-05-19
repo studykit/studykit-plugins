@@ -1,6 +1,6 @@
 ---
 name: setup
-description: Initialize the workflow plugin in a repository by generating and writing .workflow/config.yml, including GitHub, Jira Data Center or Server, filesystem issues, GitHub repository wiki, Confluence Data Center or Server, filesystem knowledge, and Jira site profiling for relationship mappings, fields, labels, and body format.
+description: Initialize the workflow plugin in a repository by generating and writing .workflow/config.yml, including GitHub, Jira Data Center or Server, filesystem issues, GitHub repository wiki, Confluence Data Center or Server, filesystem knowledge, and Jira site profiling for relationship mappings, fields, Epic configuration, labels, and body format.
 disable-model-invocation: true
 ---
 
@@ -28,6 +28,7 @@ Useful commands:
 "$WORKFLOW" workflow_setup.py jira-relationship-mappings --issue-link blocked_by=Blocks:inward --field child=parent:target:key --json
 "$WORKFLOW" workflow_setup.py build-config --project <project-root> --issue-provider <provider> --knowledge-provider <provider> <options...> --json
 "$WORKFLOW" workflow_setup.py build-config --issue-provider jira --knowledge-provider <provider> --jira-snapshot-hidden-comment-marker '!git-event' <options...> --json
+"$WORKFLOW" workflow_setup.py build-config --issue-provider jira --knowledge-provider <provider> --jira-epic-field-name <id> --jira-epic-field-link <id> --jira-epic-field-status <id> [--jira-epic-issue-type <NAME>] <options...> --json
 "$WORKFLOW" workflow_setup.py write --project <project-root> --config <reviewed-yaml-file> --json
 "$WORKFLOW" workflow_config.py --project <project-root> --require --json
 ```
@@ -106,6 +107,14 @@ Useful commands:
   still retain the original comments.
 - Jira labels are opt-in. Do not copy local labels into Jira unless the user or
   provider profile explicitly asks for label writes.
+- Jira Epic configuration (`providers.issues.epic_fields.{name,link,status}`
+  and `artifact_issue_types.epic`) is opt-in and site-dependent. When the user
+  plans Epic creation or Epic Link writes, source the values from
+  `jira-relationship-inspect` (run with `--jira-project` so createmeta is
+  available) and pass confirmed ids to `build-config` via
+  `--jira-epic-field-name|link|status` and `--jira-epic-issue-type`. Do not
+  assume values; if the site lacks Jira Software or returns non-default field
+  schema, ask the user for explicit ids.
 - Jira Data Center sites may not render Markdown. Report body-format uncertainty
   during setup when users plan Jira issue creation; prefer site-confirmed Jira
   wiki/plain text authoring over Markdown assumptions.
@@ -125,21 +134,32 @@ confirmation, then use only the exact confirmed values in setup.
 2. Collect sample issue keys for each relationship surface the user cares about:
    an issue with dependencies or related links, a parent issue with sub-tasks, a
    sub-task, and any site-specific hierarchy example.
-3. Run `jira-relationship-inspect` for link types, native `parent/subtasks`, and
-   requested field queries.
-4. If issue creation behavior matters, inspect issue type metadata and ask
+3. Run `jira-relationship-inspect` for link types, native `parent/subtasks`,
+   and requested field queries. When `--jira-project` is supplied, the same
+   call returns an `epic` block: Epic Name / Link / Status customfield ids
+   discovered by Greenhopper schema or name heuristic, candidate Epic issue
+   types from createmeta, per-issue-type Epic Link availability, and warnings.
+4. When the user plans Epic creation or Epic Link writes on the site, extract
+   `epic.fields.{name,link,status}.id`, `epic.issue_types`, and any
+   `epic.warnings` from the inspect output and confirm with the user. When
+   `epic.issue_types` returns zero or two-or-more candidates, ask the user for
+   the exact Epic issue-type name. If `epic.fields` are missing or
+   `epic.warnings` indicate a non-default schema, ask for explicit field ids
+   before continuing. Skip this step when the site lacks Jira Software or the
+   user has no Epic intent.
+5. If issue creation behavior matters, inspect issue type metadata and ask
    before running any create/update test. Sub-task creation is a mutation.
-5. Ask the user for the issue body format when it is not already documented.
+6. Ask the user for the issue body format when it is not already documented.
    Default to `jira_wiki`; use `plain` or `markdown` only when the user or a
    provider profile says that is the right renderer.
-6. Determine label policy from the user or provider profile. Labels are opt-in;
+7. Determine label policy from the user or provider profile. Labels are opt-in;
    never copy local labels into Jira by default.
-7. Determine whether automation comments should be hidden from generated Jira
+8. Determine whether automation comments should be hidden from generated Jira
    snapshots, and record only exact user-confirmed markers.
-8. Summarize observed link types, hierarchy surfaces, custom fields, body
-   format guidance, label policy, snapshot-hidden comment markers, confirmed
-   relationship mapping YAML, and open questions before generating the final
-   config.
+9. Summarize observed link types, hierarchy surfaces, custom fields, confirmed
+   Epic field ids and Epic issue-type, body format guidance, label policy,
+   snapshot-hidden comment markers, confirmed relationship mapping YAML, and
+   open questions before generating the final config.
 
 Rules:
 
@@ -152,6 +172,14 @@ Rules:
   Report what Jira returned; do not assign global semantics.
 - Treat `parent` and `child` as Jira native parent/subtask or explicitly
   confirmed hierarchy mappings only.
+- Do not assume Epic field ids or Epic issue-type names. Use only values
+  confirmed against the `epic` block in `jira-relationship-inspect` output and
+  explicit user confirmation. Pass confirmed ids to `build-config` via
+  `--jira-epic-field-name|link|status` (and `--jira-epic-issue-type` when the
+  Epic issue-type name differs from the default `Epic`).
+  `relationship_mappings.epic` is auto-injected by `build-config` when
+  `epic_fields.link` is supplied; do not write it manually in
+  `--jira-relationship-mappings-file` or `--jira-relationship-mappings-json`.
 - Do not create, update, delete, or link Jira issues without explicit user
   approval for that mutation.
 
