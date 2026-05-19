@@ -976,7 +976,7 @@ def test_data_center_update_rejects_empty_payload(tmp_path: Path) -> None:
     )
     runner = FakeRunner({})
 
-    with pytest.raises(ProviderOperationError, match="at least one of body, title, labels, state"):
+    with pytest.raises(ProviderOperationError, match="at least one of body, title, labels"):
         dispatch_write(tmp_path, runner, "update", issue="TEST-1234")
 
     assert runner.requests == []
@@ -1070,6 +1070,7 @@ def test_data_center_update_state_without_configured_transition_errors(tmp_path:
         )
 
     message = str(excinfo.value)
+    # `closed` has no default; setup-skill discovery is required.
     assert "state_transitions.closed" in message
     assert "jira-state-transition-inspect" in message
     assert "setup skill" in message

@@ -7,10 +7,7 @@ handling. Pick the script by intent:
 - `jira_issue_comments.py append` — add a comment
 - `jira_issue_writeback.py update` — change body, title, labels, or state
 - `jira_issue_relationships.py` — add / remove / replace links, parent, or Epic Link
-- `jira_issue_metadata.py` — metadata-only change
-
-State-only changes go through `jira_issue_writeback.py` / `jira_issue_comments.py`
-with `--state`; Jira has no separate lifecycle script.
+- `jira_issue_fields.py {close|reopen|assign|unassign|set-type}` — body-less change
 
 Common shapes (resolver prereq is required for any body-file flow):
 
@@ -31,4 +28,9 @@ Common shapes (resolver prereq is required for any body-file flow):
 
 # Add a relationship (also: --epic, --blocked-by, --blocking, --child, --related, --remove-*)
 "$WORKFLOW" jira_issue_relationships.py <KEY> --parent <KEY> --json
+
+# Close, reopen, assign, unassign, or change the issuetype
+"$WORKFLOW" jira_issue_fields.py close <KEY> --json
+"$WORKFLOW" jira_issue_fields.py assign <KEY> me --json
+"$WORKFLOW" jira_issue_fields.py set-type <KEY> bug --json
 ```

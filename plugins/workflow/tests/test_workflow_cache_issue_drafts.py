@@ -892,7 +892,7 @@ def test_github_update_applies_inline_state_change(tmp_path: Path) -> None:
             str(body_file),
             "--title",
             "Renamed issue",
-            "--label",
+            "--set-labels",
             "workflow",
             "--state",
             "closed",

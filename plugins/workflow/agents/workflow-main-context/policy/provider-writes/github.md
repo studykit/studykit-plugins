@@ -62,7 +62,8 @@ and `--state-reason` apply an inline state change on the same call.
   --body-file <path> \
   [--type <type>] \
   [--title <title>] \
-  [--label <label> ...] \
+  [--add-label <label> ...] [--remove-label <label> ...] \
+  [--set-labels <label,label,...>] \
   [--state open|closed] \
   [--state-reason completed|not_planned|reopened] \
   [--parent <ref> | --replace-parent <ref> | --remove-parent] \
@@ -74,7 +75,10 @@ and `--state-reason` apply an inline state change on the same call.
 ```
 
 Required: `--issue`, `--body-file`. Optional metadata flags apply on the
-same call. Relationship flags (full add/remove/replace set) apply the
+same call. `--add-label` / `--remove-label` are repeatable; `--set-labels`
+takes a single comma-separated list and replaces the entire label set.
+Combining `--set-labels` with `--add-label` or `--remove-label` exits with
+a clear error. Relationship flags (full add/remove/replace set) apply the
 relationships against the same issue after the update succeeds. No
 relationship flag means no relationship change.
 
@@ -120,10 +124,15 @@ update.
 
 ## Other scripts
 
-| Intent          | Script                                    |
-|-----------------|-------------------------------------------|
-| Metadata only   | `github_issue_metadata.py`                |
-| Lifecycle       | `github_issue_lifecycle.py close|reopen`  |
+| Intent          | Script                                                            |
+|-----------------|-------------------------------------------------------------------|
+| Body-less change | `github_issue_fields.py {close|reopen|assign|unassign|set-type}` |
+
+`github_issue_fields.py` covers state transitions, assignee changes, and
+workflow-type label swaps. `assign me` resolves the current GitHub login
+via `gh api user`. `set-type` preserves non-type labels and swaps only the
+workflow-type label. Use `github_issue_writeback.py update` when the change
+must also rewrite the body or title.
 
 Run `"$WORKFLOW" <script>.py --help` only when you need a flag not listed
 above.

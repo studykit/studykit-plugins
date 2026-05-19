@@ -77,17 +77,21 @@ config raises `ProviderOperationError`.
   --body-file <path> \
   [--type <task|bug|...>] \
   [--title <title>] \
-  [--label <label> ...] \
+  [--add-label <label> ...] [--remove-label <label> ...] \
+  [--set-labels <label,label,...>] \
   [--state open|closed] [--state-reason completed|not_planned|reopened] \
   --json
 ```
 
 Required: `--issue`, `--body-file`. At least one of body, title, labels,
-or state must change. Optional `--title`, repeatable `--label`, and
-`--state` / `--state-reason` ride along on the same call. `--state`
-requires the configured transition mapping (see comment append) — discover
-and confirm it through the setup skill's State Transition Profiling step
-before relying on `--state` writes.
+or state must change. `--add-label` / `--remove-label` are repeatable;
+`--set-labels` takes a single comma-separated list and replaces the entire
+label set. Combining `--set-labels` with `--add-label` or `--remove-label`
+exits with a clear error. Optional `--title` and `--state` /
+`--state-reason` ride along on the same call. `--state` requires the
+configured transition mapping (see comment append) — discover and confirm
+it through the setup skill's State Transition Profiling step before
+relying on `--state` writes.
 
 ## Relationships: add, remove, or replace
 
@@ -139,10 +143,17 @@ relationships in one call after the issue create.
 
 ## Other scripts
 
-| Intent          | Script                                |
-|-----------------|---------------------------------------|
-| Metadata only   | `jira_issue_metadata.py`              |
-| Lifecycle       | (state via writeback flags)           |
+| Intent           | Script                                                          |
+|------------------|-----------------------------------------------------------------|
+| Body-less change | `jira_issue_fields.py {close|reopen|assign|unassign|set-type}` |
+
+`jira_issue_fields.py` covers state transitions (consuming the configured
+`providers.issues.state_transitions` mapping), assignee changes, and
+issuetype swaps. `assign me` resolves the current Jira user via
+`/rest/api/<v>/myself`. `set-type` PUTs `fields.issuetype` using the
+`artifact_issue_types` mapping (built-in defaults plus
+`.workflow/config.yml` overrides). Use `jira_issue_writeback.py update`
+when the change must also rewrite the body or title.
 
 Run `"$WORKFLOW" <script>.py --help` only when you need a flag not listed
 above.
