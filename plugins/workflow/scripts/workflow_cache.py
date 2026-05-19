@@ -1070,7 +1070,7 @@ def _label_names(value: Any) -> list[str]:
 
 
 def _utc_now() -> str:
-    return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    return datetime.now(UTC).isoformat().replace("+00:00", "Z")
 
 
 

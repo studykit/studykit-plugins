@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping, Sequence
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -22,6 +21,7 @@ from workflow_cache import (
     _read_yaml_mapping,
     _require_schema,
     _safe_path_segment,
+    _utc_now,
 )
 from workflow_jira_data_center_client import (
     DEPLOYMENT_DATA_CENTER,
@@ -253,7 +253,3 @@ def _normalize_optional(value: Any) -> str | None:
         return None
     text = str(value).strip()
     return text or None
-
-
-def _utc_now() -> str:
-    return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
