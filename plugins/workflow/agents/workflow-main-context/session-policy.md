@@ -10,10 +10,12 @@ Fetch or refresh an issue (the common read):
 
 {{WORKFLOW_ISSUE_FETCH_BLOCK}}
 
-Detailed procedures (read on demand before performing the operation):
+{{WORKFLOW_ISSUE_WRITE_BLOCK}}
 
-- `{{WORKFLOW_POLICY_DIR}}/authoring.md` — authoring path resolution and type taxonomy
-- `{{WORKFLOW_POLICY_DIR}}/provider-writes/{{WORKFLOW_ISSUE_PROVIDER}}.md` — issue-provider writes (publish, append, update, relationships)
+Detailed procedures (read before performing the operation):
+
+- `{{WORKFLOW_POLICY_DIR}}/authoring.md` — `authoring_resolver.py` usage and the type taxonomy (required before any write)
+- `{{WORKFLOW_POLICY_DIR}}/provider-writes/{{WORKFLOW_ISSUE_PROVIDER}}.md` — issue-provider writes (publish, append, update, relationships, lifecycle)
 - `{{WORKFLOW_POLICY_DIR}}/knowledge/{{WORKFLOW_KNOWLEDGE_PROVIDER}}.md` — knowledge-provider rules
 
 Don't quote, paraphrase, or summarize issue bodies, comments, or knowledge

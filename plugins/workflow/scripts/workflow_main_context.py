@@ -7,9 +7,10 @@ editing hook logic. Template placeholders use ``{{NAME}}`` (double braces) so
 they stay visually distinct from real ``$NAME`` shell variables in the same
 text. The always-loaded entry point at ``session-policy.md`` uses
 ``{{WORKFLOW_POLICY_DIR}}``, ``{{WORKFLOW_ISSUE_PROVIDER}}``,
-``{{WORKFLOW_KNOWLEDGE_PROVIDER}}``, ``{{WORKFLOW_ISSUE_FETCH_BLOCK}}``, and
-``{{WORKFLOW_LAUNCHER_BLOCK}}`` placeholders that this module substitutes at
-SessionStart based on the active workflow configuration and runtime.
+``{{WORKFLOW_KNOWLEDGE_PROVIDER}}``, ``{{WORKFLOW_ISSUE_FETCH_BLOCK}}``,
+``{{WORKFLOW_ISSUE_WRITE_BLOCK}}``, and ``{{WORKFLOW_LAUNCHER_BLOCK}}``
+placeholders that this module substitutes at SessionStart based on the
+active workflow configuration and runtime.
 Provider- and runtime-specific inline snippets live under
 ``agents/workflow-main-context/snippets/<group>/<key>.md``. The Codex launcher
 snippet additionally has ``{{WORKFLOW_PLUGIN_ROOT}}`` resolved to the absolute
@@ -50,11 +51,13 @@ def build_session_policy_context(
     issue_provider = _provider_segment(config, "issues", _KNOWN_ISSUE_PROVIDERS)
     knowledge_provider = _provider_segment(config, "knowledge", _KNOWN_KNOWLEDGE_PROVIDERS)
     issue_fetch_block = _read_snippet("issue-fetch", issue_provider)
+    issue_write_block = _read_snippet("issue-write", issue_provider)
     launcher_block = _build_launcher_block(runtime, resolved_plugin_root)
     return (
         text
         .replace("{{WORKFLOW_LAUNCHER_BLOCK}}", launcher_block)
         .replace("{{WORKFLOW_ISSUE_FETCH_BLOCK}}", issue_fetch_block)
+        .replace("{{WORKFLOW_ISSUE_WRITE_BLOCK}}", issue_write_block)
         .replace("{{WORKFLOW_POLICY_DIR}}", str(policy_dir))
         .replace("{{WORKFLOW_ISSUE_PROVIDER}}", issue_provider)
         .replace("{{WORKFLOW_KNOWLEDGE_PROVIDER}}", knowledge_provider)

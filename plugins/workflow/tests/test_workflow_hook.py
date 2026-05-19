@@ -77,6 +77,7 @@ def expected_session_start_context(
     text = main_context_fragment("session-policy.md")
     policy_dir = _PLUGIN_ROOT / "agents" / "workflow-main-context" / "policy"
     issue_fetch_block = main_context_fragment(f"snippets/issue-fetch/{issue_kind}.md")
+    issue_write_block = main_context_fragment(f"snippets/issue-write/{issue_kind}.md")
     launcher_block = main_context_fragment(f"snippets/launcher/{runtime}.md")
     if runtime == "codex":
         launcher_block = launcher_block.replace(
@@ -86,6 +87,7 @@ def expected_session_start_context(
         text
         .replace("{{WORKFLOW_LAUNCHER_BLOCK}}", launcher_block)
         .replace("{{WORKFLOW_ISSUE_FETCH_BLOCK}}", issue_fetch_block)
+        .replace("{{WORKFLOW_ISSUE_WRITE_BLOCK}}", issue_write_block)
         .replace("{{WORKFLOW_POLICY_DIR}}", str(policy_dir))
         .replace("{{WORKFLOW_ISSUE_PROVIDER}}", issue_kind)
         .replace("{{WORKFLOW_KNOWLEDGE_PROVIDER}}", knowledge_kind)
@@ -901,6 +903,7 @@ def test_session_start_injects_policy_for_configured_project(
     assert "{{WORKFLOW_POLICY_DIR}}" not in context
     assert "{{WORKFLOW_LAUNCHER_BLOCK}}" not in context
     assert "{{WORKFLOW_ISSUE_FETCH_BLOCK}}" not in context
+    assert "{{WORKFLOW_ISSUE_WRITE_BLOCK}}" not in context
     assert "{{WORKFLOW_ISSUE_PROVIDER}}" not in context
     assert "{{WORKFLOW_KNOWLEDGE_PROVIDER}}" not in context
     assert "provider-writes/jira.md" not in context
