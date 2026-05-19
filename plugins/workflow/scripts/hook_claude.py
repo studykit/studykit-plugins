@@ -413,7 +413,7 @@ def emit_session_start_policy(
         {
             "hookSpecificOutput": {
                 "hookEventName": "SessionStart",
-                "additionalContext": build_session_start_context(config, _plugin_root()),
+                "additionalContext": build_session_start_context(config, _plugin_root(), runtime="claude"),
             }
         },
         stdout=stdout,
