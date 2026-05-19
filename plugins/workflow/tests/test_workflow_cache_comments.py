@@ -190,12 +190,30 @@ def test_jira_append_posts_comment_and_deletes_body_file(tmp_path: Path) -> None
     assert not body_file.exists()
 
 
-def test_jira_append_rejects_body_file_with_frontmatter(tmp_path: Path) -> None:
+def test_jira_append_strips_body_file_frontmatter(tmp_path: Path) -> None:
     write_jira_config(tmp_path)
     _seed_cached_issue(tmp_path)
-    body_file = _write_body_file(tmp_path, "---\nschema_version: 1\n---\n\nBody.\n")
-    runner = FakeRunner({})
-    stderr = io.StringIO()
+    body_file = _write_body_file(
+        tmp_path, "---\nschema_version: 1\n---\nInline comment body.\n"
+    )
+    runner = FakeRunner(
+        {
+            curl_args(jira_issue_url()): [
+                result(curl_args(jira_issue_url()), stdout=json.dumps(jira_issue_payload())),
+                result(curl_args(jira_issue_url()), stdout=json.dumps(jira_issue_payload())),
+                result(curl_args(jira_issue_url()), stdout=json.dumps(jira_issue_payload())),
+            ],
+            curl_write_args(): result(
+                curl_write_args(),
+                stdout=json.dumps({"id": "30001", "body": "Inline comment body.\n"}),
+            ),
+            curl_args(jira_remote_links_url()): result(
+                curl_args(jira_remote_links_url()),
+                stdout=json.dumps(remote_links_payload()),
+            ),
+        }
+    )
+    stdout = io.StringIO()
 
     code = jira_issue_comments_main(
         [
@@ -208,14 +226,16 @@ def test_jira_append_rejects_body_file_with_frontmatter(tmp_path: Path) -> None:
             str(body_file),
             "--json",
         ],
-        stderr=stderr,
+        stdout=stdout,
         runner=runner,
     )
 
-    assert code == 2
-    assert "frontmatter" in stderr.getvalue()
-    assert body_file.exists()
-    assert runner.requests == []
+    payload = json.loads(stdout.getvalue())
+    assert code == 0
+    assert payload["body_file_removed"] is True
+    assert not body_file.exists()
+    write_request = next(request for request in runner.requests if request.args == curl_write_args())
+    assert '\\"body\\":\\"Inline comment body.\\\\n\\"' in str(write_request.input_text)
 
 
 def test_jira_append_missing_body_file_fails(tmp_path: Path) -> None:

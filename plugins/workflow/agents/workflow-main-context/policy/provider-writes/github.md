@@ -5,8 +5,9 @@ and update an existing issue body — share one shape:
 
 1. Resolve and read the authoring paths
    (`"$WORKFLOW" authoring_resolver.py ...`; see `../authoring.md`).
-2. Write the body to a temp file you choose; body content only, no YAML
-   frontmatter delimiter at the top. The cached `issue.md` body is
+2. Write the body to a temp file you choose. Body content is what gets
+   sent; if the file happens to start with a YAML frontmatter block, the
+   script strips it before posting. The cached `issue.md` body is
    read-only — do not edit it in place when updating.
 3. Present the metadata, issue ref (when applicable), and draft body to
    the user and wait for explicit approval.
@@ -132,7 +133,7 @@ above.
 - The script deletes the body file on success.
 - The body file is preserved on `status=blocked` (freshness drift) and on
   any other failure, so the caller can retry without redrafting.
-- Body files must not start with a YAML frontmatter delimiter (`---`).
+- A leading YAML frontmatter block is stripped before the body is sent.
 
 ## On freshness drift
 
