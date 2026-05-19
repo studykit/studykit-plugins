@@ -4,8 +4,7 @@ Provider-backed workflow over GitHub Issues, Jira, GitHub repository `wiki/`
 files, and Confluence.
 
 The plugin keeps issue-backed work tracking separate from knowledge-backed
-documentation. In provider-backed mode, local files are optional projections;
-the provider remains the source of truth.
+documentation. The provider is the source of truth.
 
 ## Runtime Surface
 
@@ -41,9 +40,6 @@ providers:
     kind: github
 
 issue_id_format: github
-
-local_projection:
-  mode: none
 
 commit_refs:
   enabled: true
@@ -105,7 +101,6 @@ Scripts cover:
 - Cache-aware provider reads and refresh.
 - GitHub and Jira issue writes through `*_drafts.py`, `*_writeback.py`,
   `*_comments.py`, `*_relationships.py`, and `*_metadata.py`.
-- Local issue projection write-back via the same scripts.
 - Authoring path discovery via `authoring_resolver.py`.
 - Provider mutation verification and freshness-checked cache refresh.
 

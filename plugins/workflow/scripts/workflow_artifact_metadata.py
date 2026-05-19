@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Workflow artifact metadata inference for local projection writes.
+"""Workflow artifact metadata inference for Markdown writes.
 
 The ``pre_write`` hook runs before any Markdown edit and asks: is this file a
 workflow artifact, and if so which type/role/provider? The answer steers the
@@ -35,7 +35,7 @@ _FRONTMATTER_HANDLER = frontmatter_lib.YAMLHandler()
 
 @dataclass(frozen=True)
 class ArtifactMetadata:
-    """Workflow artifact metadata inferred from local projection content."""
+    """Workflow artifact metadata inferred from Markdown content."""
 
     artifact_type: str
     role: str | None = None

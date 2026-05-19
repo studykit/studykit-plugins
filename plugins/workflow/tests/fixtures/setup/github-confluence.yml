@@ -11,9 +11,6 @@ providers:
     space: ENG
     parent_page_id: '12345'
 issue_id_format: github
-local_projection:
-  mode: ephemeral
-  path: .workflow/projection
 commit_refs:
   enabled: true
   style: issue-prefix

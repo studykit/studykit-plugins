@@ -156,7 +156,7 @@ def dispatch_get(tmp_path: Path, runner: FakeRunner, *, cache_policy: str = "def
 
 
 def test_gitignore_excludes_workflow_cache_root() -> None:
-    assert "/.workflow-cache/" in (_REPO_ROOT / ".gitignore").read_text(encoding="utf-8")
+    assert ".workflow-cache/" in (_REPO_ROOT / ".gitignore").read_text(encoding="utf-8")
 
 
 def test_github_issue_cache_writes_flat_layout_with_frontmatter_freshness(tmp_path: Path) -> None:

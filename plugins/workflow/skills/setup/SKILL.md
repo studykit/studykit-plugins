@@ -1,6 +1,6 @@
 ---
 name: setup
-description: Initialize the workflow plugin in a repository by generating and writing .workflow/config.yml, including GitHub, Jira Data Center or Server, filesystem issues, GitHub repository wiki, Confluence Data Center or Server, filesystem knowledge, and Jira site profiling for relationship mappings, fields, Epic configuration, labels, and body format.
+description: Initialize the workflow plugin in a repository by generating and writing .workflow/config.yml, including GitHub, Jira Data Center or Server, filesystem issues, GitHub repository wiki, Confluence Data Center or Server, filesystem knowledge, and Jira site profiling for relationship mappings, fields, Epic configuration, and labels.
 disable-model-invocation: true
 ---
 
@@ -38,9 +38,9 @@ Useful commands:
 1. Resolve the repository root. Prefer `git rev-parse --show-toplevel`; if the
    project is not a Git repository, use the user's explicit target directory.
 2. If `.workflow/config.yml` already exists, summarize its issue provider,
-   knowledge provider, local projection mode, and commit reference style. Do not
-   overwrite it unless the user explicitly requests overwrite; pass `--force`
-   only after that confirmation.
+   knowledge provider, and commit reference style. Do not overwrite it unless
+   the user explicitly requests overwrite; pass `--force` only after that
+   confirmation.
 3. Collect the issue provider: `github`, `jira`, or `filesystem`. Ask the user
    when it was not already named explicitly by the user or a provider profile;
    do not infer it from a Git remote or assume GitHub.
@@ -57,8 +57,7 @@ Useful commands:
    hide automation comments by body marker. If the user gives markers such as
    `!git-event`, pass each one with
    `--jira-snapshot-hidden-comment-marker`.
-7. Collect local projection mode (`none`, `ephemeral`, or `persistent`), local
-   projection path when applicable, and commit reference style.
+7. Collect the commit reference style.
 8. Run `capabilities` for the selected providers and show limitations before
    confirmation.
 9. Run `build-config --json`, show the generated YAML and warnings to the user,
@@ -115,17 +114,14 @@ Useful commands:
   `--jira-epic-field-name|link|status` and `--jira-epic-issue-type`. Do not
   assume values; if the site lacks Jira Software or returns non-default field
   schema, ask the user for explicit ids.
-- Jira Data Center sites may not render Markdown. Report body-format uncertainty
-  during setup when users plan Jira issue creation; prefer site-confirmed Jira
-  wiki/plain text authoring over Markdown assumptions.
 - Provider profile documents may seed defaults only when they explicitly discuss
   workflow providers. Ignore unrelated Git remote or commit-history documents.
 
 ## Jira Site Profiling
 
 This flow is required whenever the issue provider is `jira`. Also use it when
-Jira setup needs custom fields, issue type rules, label policy, body formatting,
-or sub-task behavior. Keep a hard boundary between observed Jira data and
+Jira setup needs custom fields, issue type rules, label policy, or sub-task
+behavior. Keep a hard boundary between observed Jira data and
 confirmed workflow config: inspect the site, show the evidence, ask for
 confirmation, then use only the exact confirmed values in setup.
 
@@ -149,17 +145,14 @@ confirmation, then use only the exact confirmed values in setup.
    user has no Epic intent.
 5. If issue creation behavior matters, inspect issue type metadata and ask
    before running any create/update test. Sub-task creation is a mutation.
-6. Ask the user for the issue body format when it is not already documented.
-   Default to `jira_wiki`; use `plain` or `markdown` only when the user or a
-   provider profile says that is the right renderer.
-7. Determine label policy from the user or provider profile. Labels are opt-in;
+6. Determine label policy from the user or provider profile. Labels are opt-in;
    never copy local labels into Jira by default.
-8. Determine whether automation comments should be hidden from generated Jira
+7. Determine whether automation comments should be hidden from generated Jira
    snapshots, and record only exact user-confirmed markers.
-9. Summarize observed link types, hierarchy surfaces, custom fields, confirmed
-   Epic field ids and Epic issue-type, body format guidance, label policy,
-   snapshot-hidden comment markers, confirmed relationship mapping YAML, and
-   open questions before generating the final config.
+8. Summarize observed link types, hierarchy surfaces, custom fields, confirmed
+   Epic field ids and Epic issue-type, label policy, snapshot-hidden comment
+   markers, confirmed relationship mapping YAML, and open questions before
+   generating the final config.
 
 Rules:
 

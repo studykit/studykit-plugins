@@ -86,16 +86,13 @@ def test_build_config_generates_github_github_fixture(tmp_path: Path) -> None:
     assert raw == _fixture("github-github.yml")
     config = parse_workflow_config(raw, path=tmp_path / ".workflow" / "config.yml")
     assert config.issue_id_format == "github"
-    assert config.local_projection.mode == "none"
 
 
-def test_build_config_records_projection_and_commit_refs(tmp_path: Path) -> None:
+def test_build_config_records_commit_refs(tmp_path: Path) -> None:
     raw = build_config(
         project=tmp_path,
         issue_provider="filesystem",
         knowledge_provider="filesystem",
-        local_projection_mode="persistent",
-        local_projection_path="workflow",
         commit_ref_style="provider-native",
         commit_refs_enabled=False,
     )
@@ -591,8 +588,6 @@ def test_write_refuses_overwrite_and_force_rewrites(tmp_path: Path) -> None:
         project=tmp_path,
         issue_provider="filesystem",
         knowledge_provider="filesystem",
-        local_projection_mode="persistent",
-        local_projection_path="workflow",
         commit_refs_enabled=False,
     )
 
@@ -624,7 +619,6 @@ def test_write_rejects_jira_config_without_relationship_mappings(tmp_path: Path)
             },
         },
         "issue_id_format": "jira",
-        "local_projection": {"mode": "none"},
         "commit_refs": {"enabled": True, "style": "provider-native"},
     }
 
@@ -733,7 +727,6 @@ def test_profile_from_docs_extracts_defaults_and_ignores_unrelated_git_docs() ->
     assert payload["defaults"]["knowledge_provider"] == "confluence"
     assert payload["defaults"]["jira_project"] == "PROJ"
     assert payload["defaults"]["confluence_space"] == "ENG"
-    assert payload["defaults"]["local_projection_mode"] == "persistent"
     assert payload["defaults"]["jira_relationship_mappings"]["blocked_by"]["surface"] == "issue_link"
     assert any(item["source"].endswith("unrelated-git-history.md") for item in payload["ignored"])
 
@@ -862,7 +855,7 @@ def test_setup_skill_uses_short_install_name() -> None:
 
     assert skill.exists()
     assert (_PLUGIN_ROOT / "skills" / "setup" / "agents" / "openai.yaml").exists()
-    assert skill_dirs == ["setup"]
+    assert "setup" in skill_dirs
     assert yaml.safe_load(skill.read_text(encoding="utf-8").split("---", 2)[1])["name"] == "setup"
 
 

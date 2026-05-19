@@ -100,8 +100,6 @@ providers:
     kind: github
     path: wiki/workflow
 issue_id_format: github
-local_projection:
-  mode: none
 commit_refs:
   enabled: true
   style: provider-native

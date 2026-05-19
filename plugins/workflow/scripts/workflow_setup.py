@@ -36,7 +36,6 @@ from workflow_config import (  # noqa: E402
     CONFIG_RELATIVE_PATH,
     ISSUE_PROVIDERS,
     KNOWLEDGE_PROVIDERS,
-    LOCAL_PROJECTION_MODES,
     PROVIDER_NATIVE_ISSUE_ID_FORMATS,
     ProviderConfig,
     WorkflowConfigError,
@@ -274,8 +273,6 @@ def build_config(
     confluence_parent_page_id: str | None = None,
     filesystem_issues_path: str | None = None,
     filesystem_knowledge_path: str | None = None,
-    local_projection_mode: str = "none",
-    local_projection_path: str | None = None,
     commit_ref_style: str = "provider-native",
     commit_refs_enabled: bool = True,
     mode: str = "remote-native",
@@ -288,9 +285,6 @@ def build_config(
     validate_provider_for_role("issue", issue_provider)
     validate_provider_for_role("knowledge", knowledge_provider)
 
-    if local_projection_mode not in LOCAL_PROJECTION_MODES:
-        choices = ", ".join(sorted(LOCAL_PROJECTION_MODES))
-        raise WorkflowSetupError(f"invalid local projection mode: {local_projection_mode}. Use one of: {choices}")
     if commit_ref_style not in COMMIT_REF_STYLES:
         choices = ", ".join(sorted(COMMIT_REF_STYLES))
         raise WorkflowSetupError(f"invalid commit reference style: {commit_ref_style}. Use one of: {choices}")
@@ -357,7 +351,6 @@ def build_config(
             "knowledge": knowledge,
         },
         "issue_id_format": PROVIDER_NATIVE_ISSUE_ID_FORMATS[issue_provider],
-        "local_projection": _local_projection_config(local_projection_mode, local_projection_path),
         "commit_refs": {
             "enabled": commit_refs_enabled,
             "style": effective_commit_style,
@@ -444,7 +437,6 @@ def existing_config_summary(project: Path) -> dict[str, Any]:
             "valid": True,
             "issues": config.issues.kind,
             "knowledge": config.knowledge.kind,
-            "local_projection": config.local_projection.mode,
             "commit_refs": config.commit_refs.style,
         }
     )
@@ -705,8 +697,6 @@ def _add_config_build_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--confluence-parent-page-id", help="Confluence parent page id")
     parser.add_argument("--filesystem-issues-path", default="workflow/issues", help="filesystem issue provider path")
     parser.add_argument("--filesystem-knowledge-path", default="workflow/knowledge", help="filesystem knowledge provider path")
-    parser.add_argument("--local-projection-mode", choices=sorted(LOCAL_PROJECTION_MODES), default="none")
-    parser.add_argument("--local-projection-path", help="local projection path when mode is ephemeral or persistent")
     parser.add_argument("--commit-ref-style", choices=sorted(COMMIT_REF_STYLES), default="provider-native")
     parser.add_argument("--disable-commit-refs", action="store_true", help="disable commit references")
 
@@ -740,8 +730,6 @@ def _config_from_args(args: argparse.Namespace) -> dict[str, Any]:
         confluence_parent_page_id=args.confluence_parent_page_id,
         filesystem_issues_path=args.filesystem_issues_path,
         filesystem_knowledge_path=args.filesystem_knowledge_path,
-        local_projection_mode=args.local_projection_mode,
-        local_projection_path=args.local_projection_path,
         commit_ref_style=args.commit_ref_style,
         commit_refs_enabled=not args.disable_commit_refs,
         mode=args.mode,
@@ -860,13 +848,6 @@ def _knowledge_provider_config(
     elif provider == "filesystem":
         _set_if_text(settings, "path", filesystem_path or "workflow/knowledge")
     return settings
-
-
-def _local_projection_config(mode: str, path: str | None) -> dict[str, Any]:
-    result: dict[str, Any] = {"mode": mode}
-    if mode != "none" and path:
-        result["path"] = path
-    return result
 
 
 def _issue_capabilities(provider: str, has_jira_mappings: bool) -> dict[str, Any]:
@@ -1568,8 +1549,6 @@ def _merge_profile_mapping(defaults: dict[str, Any], mapping: Mapping[str, Any])
         _set_default(defaults, "confluence_space_id", _text(knowledge.get("space_id") or knowledge.get("spaceId")))
         _set_default(defaults, "confluence_parent_page_id", _text(knowledge.get("parent_page_id") or knowledge.get("parentPageId")))
 
-    _set_default(defaults, "local_projection_mode", _dig_text(mapping, ("local_projection", "mode")))
-    _set_default(defaults, "local_projection_path", _dig_text(mapping, ("local_projection", "path")))
     _set_default(defaults, "commit_ref_style", _dig_text(mapping, ("commit_refs", "style")))
 
 

@@ -39,8 +39,6 @@ providers:
     kind: github
     path: wiki/workflow
 issue_id_format: github
-local_projection:
-  mode: none
 commit_refs:
   enabled: true
   style: provider-native
@@ -58,7 +56,6 @@ commit_refs:
     assert config.issue_id_format == "github"
     assert config.knowledge.kind == "github"
     assert config.knowledge.settings["path"] == "wiki/workflow"
-    assert config.local_projection.mode == "none"
     assert config.commit_refs.enabled is True
     assert config.commit_refs.style == "provider-native"
 
@@ -78,8 +75,6 @@ source_of_truth:
     provider: confluence
     site: acme.atlassian.net
     space: ENG
-local_projection:
-  mode: ephemeral
 commit_refs:
   style: issue-prefix
 """.lstrip(),
@@ -94,7 +89,6 @@ commit_refs:
     assert config.issues.settings["site"] == "acme.atlassian.net"
     assert config.knowledge.kind == "confluence"
     assert config.knowledge.settings["space"] == "ENG"
-    assert config.local_projection.mode == "ephemeral"
     assert config.commit_refs.style == "issue-prefix"
 
 
@@ -109,9 +103,6 @@ providers:
   knowledge:
     kind: filesystem
     path: workflow/knowledge
-local_projection:
-  mode: persistent
-  path: workflow
 commit_refs:
   enabled: false
 """.lstrip(),
@@ -124,8 +115,6 @@ commit_refs:
     assert config.issues.kind == "filesystem"
     assert config.issue_id_format == "number"
     assert config.knowledge.kind == "filesystem"
-    assert config.local_projection.mode == "persistent"
-    assert config.local_projection.path == "workflow"
     assert config.commit_refs.enabled is False
     assert config.commit_refs.style == "disabled"
 
@@ -173,7 +162,6 @@ providers:
         ("providers.issues.kind", "github-issues", "not valid for role 'issue'"),
         ("providers.knowledge.kind", "repo-wiki", "not valid for role 'knowledge'"),
         ("providers.issues.kind", "fs", "not valid for role 'issue'"),
-        ("local_projection.mode", "temporary", "local_projection.mode"),
         ("commit_refs.style", "provider_native", "commit_refs.style"),
         ("issue_id_format", "gh", "issue_id_format"),
     ],
@@ -190,7 +178,6 @@ def test_non_canonical_config_enum_values_are_rejected(
             "knowledge": {"kind": "github"},
         },
         "issue_id_format": "github",
-        "local_projection": {"mode": "none"},
         "commit_refs": {"style": "provider-native"},
     }
     target: dict[str, Any] = config
@@ -216,25 +203,6 @@ providers:
     )
 
     with pytest.raises(WorkflowConfigError, match="providers.knowledge is required"):
-        load_workflow_config(tmp_path)
-
-
-def test_invalid_local_projection_mode_is_rejected(tmp_path: Path) -> None:
-    _config_path(tmp_path).write_text(
-        """
-version: 1
-providers:
-  issues:
-    kind: github
-  knowledge:
-    kind: github
-local_projection:
-  mode: archive
-""".lstrip(),
-        encoding="utf-8",
-    )
-
-    with pytest.raises(WorkflowConfigError, match="local_projection.mode"):
         load_workflow_config(tmp_path)
 
 
