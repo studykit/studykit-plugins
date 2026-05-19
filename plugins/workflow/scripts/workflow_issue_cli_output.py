@@ -58,7 +58,8 @@ def format_issue_cache_context(
     for context in contexts:
         issue_path = issue_file_relative_to_base(context, shared_base)
         issue_ref = f"#{context.number}" if context.provider_kind == "github" else context.number
-        lines.append(f"- {issue_ref} → `{issue_path}`")
+        suffix = " (refreshed)" if context.cache_hit is False else ""
+        lines.append(f"- {issue_ref} → `{issue_path}`{suffix}")
     return "\n".join(lines)
 
 
