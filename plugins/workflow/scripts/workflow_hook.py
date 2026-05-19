@@ -38,7 +38,7 @@ from workflow_jira_issue_context import cache_jira_issue_references  # noqa: E40
 from workflow_jira_issue_refs import jira_issue_keys_from_references  # noqa: E402
 from workflow_jira_issue_refs import normalize_jira_issue_key  # noqa: E402
 from workflow_main_context import build_commit_prefix_context  # noqa: E402
-from workflow_main_context import build_session_policy_context  # noqa: E402
+from workflow_main_context import build_session_policy_context, build_subagent_policy_context  # noqa: E402
 from workflow_session_state import (  # noqa: E402
     commit_prefix_was_announced,
     read_session_issues,
@@ -184,6 +184,17 @@ def build_session_start_context(
     """Build the context block injected for configured workflow projects."""
 
     return build_session_policy_context(config, plugin_root=plugin_root, runtime=runtime)
+
+
+def build_subagent_start_context(
+    config: WorkflowConfig,
+    plugin_root: Path,
+    *,
+    runtime: str,
+) -> str:
+    """Build the SubagentStart context block for configured workflow projects."""
+
+    return build_subagent_policy_context(config, plugin_root=plugin_root, runtime=runtime)
 
 
 def build_prompt_commit_context(config: WorkflowConfig, prompt_text: str) -> str:

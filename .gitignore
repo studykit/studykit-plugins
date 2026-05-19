@@ -217,6 +217,10 @@ session-tree.lock
 .obsidian/plugins/*/data.json
 .obsidian/backlink.json
 *.lock
+# Workflow audit reports (written to project root by default)
+/issue-audit-*.md
+/work-audit-*.md
+
 # Workflow provider read cache
 .workflow-cache/
 .cache/

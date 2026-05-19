@@ -35,6 +35,7 @@ from workflow_hook import (  # noqa: E402
     EditTarget,
     block_provider_cache_body_write,
     build_session_start_context,
+    build_subagent_start_context,
     inject_prompt_issue_context,
     record_stop_issue_references,
     workflow_config_for_project,
@@ -373,7 +374,6 @@ def subagent_start(
 ) -> int:
     """Handle a Claude ``SubagentStart`` hook invocation."""
 
-    _ = stdout
     config = workflow_config_for_project(_project_dir())
     if config is None:
         return 0
@@ -384,6 +384,18 @@ def subagent_start(
         event_payload.session_id,
         agent_id=event_payload.agent_id,
         agent_type=event_payload.agent_type,
+    )
+
+    emit_json(
+        {
+            "hookSpecificOutput": {
+                "hookEventName": "SubagentStart",
+                "additionalContext": build_subagent_start_context(
+                    config, _plugin_root(), runtime="claude"
+                ),
+            }
+        },
+        stdout=stdout,
     )
     return 0
 
