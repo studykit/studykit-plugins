@@ -131,6 +131,79 @@ def test_relationship_intent_helper_rejects_conflicting_parent_flags() -> None:
         )
 
 
+def test_relationship_intent_helper_supports_epic_scalar_handlers() -> None:
+    add_ops = relationship_operations_from_intent(
+        {"epic_add": "TEST-10"}, target_kind="issue", target_id="TEST-5",
+    )
+    assert [(op.action, op.relationship, op.target_ref) for op in add_ops] == [
+        ("add", "epic", "TEST-10"),
+    ]
+
+    replace_ops = relationship_operations_from_intent(
+        {"epic_replace": "TEST-11"}, target_kind="issue", target_id="TEST-5",
+    )
+    assert replace_ops[0].relationship == "epic"
+    assert replace_ops[0].action == "add"
+    assert replace_ops[0].replace_parent is False
+
+    remove_ops = relationship_operations_from_intent(
+        {"epic_remove": True}, target_kind="issue", target_id="TEST-5",
+    )
+    assert remove_ops[0].relationship == "epic"
+    assert remove_ops[0].action == "remove"
+    assert remove_ops[0].target_ref == ""
+
+
+def test_relationship_intent_helper_rejects_conflicting_epic_flags() -> None:
+    import pytest
+
+    with pytest.raises(Exception, match="conflicting epic"):
+        relationship_operations_from_intent(
+            {"epic_add": "TEST-10", "epic_replace": "TEST-11"},
+            target_kind="issue",
+            target_id="TEST-5",
+        )
+
+
+def test_relationship_intent_helper_combines_parent_and_epic_independently() -> None:
+    operations = relationship_operations_from_intent(
+        {"parent_add": "TEST-50", "epic_add": "TEST-10"},
+        target_kind="issue",
+        target_id="TEST-5",
+    )
+    by_relationship = {op.relationship: op for op in operations}
+    assert by_relationship["parent"].target_ref == "TEST-50"
+    assert by_relationship["epic"].target_ref == "TEST-10"
+
+
+def test_github_provider_rejects_epic_relationship_operation(tmp_path: Path) -> None:
+    """epic_* intent reaching the GitHub provider must error with a clear message."""
+
+    import pytest
+
+    from workflow_github_issue_provider import GitHubIssueNativeProvider
+    from workflow_providers import ProviderContext, ProviderOperationError, ProviderRequest
+
+    write_config(tmp_path)
+    cache = GitHubIssueCache.for_project(tmp_path, configured_repo=repo())
+    cache.write_issue_bundle(repo(), issue_payload(), fetched_at="2026-05-14T00:10:00Z")
+
+    def runner(request: CommandRequest) -> CommandResult:
+        return CommandResult(request=request, returncode=127, stderr=f"unexpected: {request.args}")
+
+    provider = GitHubIssueNativeProvider(runner=runner)
+    with pytest.raises(ProviderOperationError, match="unsupported GitHub relationship operation: epic"):
+        provider.call(
+            ProviderRequest(
+                role="issue",
+                kind="github",
+                operation="apply_relationships",
+                context=ProviderContext(project=tmp_path, artifact_type="task"),
+                payload={"issue": "44", "relationship_intent": {"epic_add": "#10"}},
+            )
+        )
+
+
 def test_relationship_intent_helper_rejects_add_remove_overlap() -> None:
     import pytest
 

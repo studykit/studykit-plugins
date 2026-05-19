@@ -43,6 +43,22 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="remove the current parent (no-op when no parent exists)",
     )
+    epic_group = parser.add_mutually_exclusive_group()
+    epic_group.add_argument(
+        "--epic",
+        help="add Epic Link (errors if an Epic Link already exists)",
+    )
+    epic_group.add_argument(
+        "--replace-epic",
+        dest="replace_epic",
+        help="set Epic Link, replacing any existing Epic Link",
+    )
+    epic_group.add_argument(
+        "--remove-epic",
+        dest="remove_epic",
+        action="store_true",
+        help="remove the current Epic Link (no-op when no Epic Link exists)",
+    )
     parser.add_argument("--child", action="append", default=[], help="add a child (repeatable)")
     parser.add_argument("--remove-child", dest="remove_child", action="append", default=[], help="remove a child (repeatable)")
     parser.add_argument("--blocked-by", action="append", default=[], help="add a blocked-by dependency (repeatable)")
@@ -151,6 +167,12 @@ def _intent_from_args(args: argparse.Namespace) -> dict[str, object]:
         intent["parent_replace"] = args.replace_parent
     if args.remove_parent:
         intent["parent_remove"] = True
+    if args.epic:
+        intent["epic_add"] = args.epic
+    if args.replace_epic:
+        intent["epic_replace"] = args.replace_epic
+    if args.remove_epic:
+        intent["epic_remove"] = True
     if args.blocked_by:
         intent["blocked_by_add"] = list(args.blocked_by)
     if args.remove_blocked_by:

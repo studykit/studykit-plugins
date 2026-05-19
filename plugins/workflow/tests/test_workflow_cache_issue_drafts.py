@@ -988,3 +988,35 @@ def test_jira_publish_creates_issue_inline_and_deletes_body_file(tmp_path: Path)
     assert cache.issue_json_file(site, "TEST-1234").is_file()
     assert not body_file.exists()
     assert runner.requests[0].args == _jira_write_args()
+
+
+def test_jira_publish_epic_with_post_create_epic_link_is_rejected(tmp_path: Path) -> None:
+    _write_jira_config(tmp_path)
+    body_file = _write_body_file(tmp_path, "Body.\n")
+    runner = JiraFakeRunner({})
+    stderr = io.StringIO()
+
+    code = jira_issue_drafts_main(
+        [
+            "--project",
+            str(tmp_path),
+            "publish",
+            "--type",
+            "epic",
+            "--title",
+            "New Epic",
+            "--body-file",
+            str(body_file),
+            "--epic",
+            "TEST-99",
+            "--json",
+        ],
+        stdout=io.StringIO(),
+        stderr=stderr,
+        runner=runner,
+    )
+
+    assert code != 0
+    assert "publish --epic cannot be combined with --type epic" in stderr.getvalue()
+    assert runner.requests == []
+    assert body_file.exists()

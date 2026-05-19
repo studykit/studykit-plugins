@@ -311,6 +311,268 @@ def test_jira_relationship_inspect_reports_observed_surfaces() -> None:
     assert any("observed Jira data only" in warning for warning in payload["warnings"])
 
 
+def _epic_field_response() -> list[dict[str, Any]]:
+    return [
+        {
+            "id": "customfield_12345",
+            "name": "Epic Name",
+            "schema": {"custom": "com.pyxis.greenhopper.jira:gh-epic-label"},
+        },
+        {
+            "id": "customfield_12346",
+            "name": "Epic Link",
+            "schema": {"custom": "com.pyxis.greenhopper.jira:gh-epic-link"},
+        },
+        {
+            "id": "customfield_12347",
+            "name": "Epic Status",
+            "schema": {"custom": "com.pyxis.greenhopper.jira:gh-epic-status"},
+        },
+        {"id": "summary", "name": "Summary"},
+    ]
+
+
+def _epic_createmeta_response() -> dict[str, Any]:
+    return {
+        "projects": [
+            {
+                "key": "TEST",
+                "issuetypes": [
+                    {
+                        "id": "10000",
+                        "name": "Task",
+                        "fields": {"summary": {}, "customfield_12346": {}},
+                    },
+                    {
+                        "id": "10001",
+                        "name": "Story",
+                        "fields": {"summary": {}, "customfield_12346": {}},
+                    },
+                    {
+                        "id": "10100",
+                        "name": "Epic",
+                        "fields": {
+                            "summary": {},
+                            "customfield_12345": {},
+                            "customfield_12347": {},
+                        },
+                    },
+                    {
+                        "id": "10200",
+                        "name": "Sub-task",
+                        "fields": {"summary": {}, "customfield_12346": {}},
+                    },
+                ],
+            }
+        ]
+    }
+
+
+def _jira_inspect_runner(
+    *,
+    fields: list[dict[str, Any]] | None = None,
+    createmeta: dict[str, Any] | None = None,
+    project: str | None = "TEST",
+):
+    raw_fields = fields if fields is not None else _epic_field_response()
+    raw_createmeta = createmeta if createmeta is not None else _epic_createmeta_response()
+    createmeta_url = (
+        f"https://jira.example.test/rest/api/2/issue/createmeta?projectKeys={project}"
+        "&expand=projects.issuetypes.fields"
+    ) if project else None
+
+    def runner(request: CommandRequest) -> CommandResult:
+        responses: dict[tuple[str, ...], Any] = {
+            _curl_get_args("https://jira.example.test/rest/api/2/issueLinkType"): {"issueLinkTypes": []},
+            _curl_get_args("https://jira.example.test/rest/api/2/field"): raw_fields,
+        }
+        if createmeta_url is not None:
+            responses[_curl_get_args(createmeta_url)] = raw_createmeta
+        payload = responses.get(request.args)
+        if payload is None:
+            return CommandResult(request=request, returncode=127, stderr=f"unexpected command: {request.args}")
+        return CommandResult(request=request, returncode=0, stdout=json.dumps(payload))
+
+    return runner
+
+
+def test_jira_relationship_inspect_discovers_epic_fields_by_schema() -> None:
+    payload = inspect_jira_relationships(
+        jira_site="https://jira.example.test",
+        jira_project="TEST",
+        runner=_jira_inspect_runner(),
+    )
+
+    epic = payload["epic"]
+    assert epic["fields"]["name"]["id"] == "customfield_12345"
+    assert epic["fields"]["name"]["matched_by"] == "schema"
+    assert epic["fields"]["link"]["id"] == "customfield_12346"
+    assert epic["fields"]["status"]["id"] == "customfield_12347"
+
+
+def test_jira_relationship_inspect_falls_back_to_name_match_for_epic_fields() -> None:
+    fields = [
+        {"id": "customfield_22001", "name": "Epic Name"},
+        {"id": "customfield_22002", "name": "Epic Link"},
+        {"id": "customfield_22003", "name": "Epic Status"},
+    ]
+    payload = inspect_jira_relationships(
+        jira_site="https://jira.example.test",
+        jira_project="TEST",
+        runner=_jira_inspect_runner(fields=fields),
+    )
+
+    epic = payload["epic"]
+    assert epic["fields"]["name"] == {
+        "id": "customfield_22001",
+        "name": "Epic Name",
+        "matched_by": "name",
+    }
+    assert epic["fields"]["link"]["matched_by"] == "name"
+
+
+def test_jira_relationship_inspect_warns_when_epic_fields_missing() -> None:
+    payload = inspect_jira_relationships(
+        jira_site="https://jira.example.test",
+        jira_project="TEST",
+        runner=_jira_inspect_runner(fields=[{"id": "summary", "name": "Summary"}]),
+    )
+
+    epic = payload["epic"]
+    assert epic["fields"]["name"] is None
+    assert epic["fields"]["link"] is None
+    assert any("Epic name customfield" in warning for warning in epic["warnings"])
+
+
+def test_jira_relationship_inspect_surfaces_epic_issue_type_candidates() -> None:
+    payload = inspect_jira_relationships(
+        jira_site="https://jira.example.test",
+        jira_project="TEST",
+        runner=_jira_inspect_runner(),
+    )
+
+    epic = payload["epic"]
+    assert epic["issue_types"] == [{"id": "10100", "name": "Epic"}]
+
+
+def test_jira_relationship_inspect_reports_per_issue_type_epic_link_support() -> None:
+    payload = inspect_jira_relationships(
+        jira_site="https://jira.example.test",
+        jira_project="TEST",
+        runner=_jira_inspect_runner(),
+    )
+
+    support = {
+        entry["name"]: entry["supports_epic_link"]
+        for entry in payload["epic"]["issue_type_epic_link_support"]
+    }
+    assert support == {
+        "Task": True,
+        "Story": True,
+        "Epic": False,
+        "Sub-task": True,
+    }
+
+
+def test_jira_relationship_inspect_warns_when_project_missing_for_createmeta() -> None:
+    payload = inspect_jira_relationships(
+        jira_site="https://jira.example.test",
+        runner=_jira_inspect_runner(project=None),
+    )
+
+    epic = payload["epic"]
+    assert epic["issue_types"] == []
+    assert epic["issue_type_epic_link_support"] == []
+    assert any("supply --jira-project" in warning for warning in epic["warnings"])
+
+
+def test_build_config_writes_epic_fields_when_provided(tmp_path: Path) -> None:
+    raw = build_config(
+        project=tmp_path,
+        issue_provider="jira",
+        knowledge_provider="confluence",
+        jira_site="https://jira.example.test",
+        jira_relationship_mappings=_jira_relationship_mappings(),
+        jira_epic_fields={
+            "name": "customfield_12345",
+            "link": "customfield_12346",
+            "status": "customfield_12347",
+        },
+        confluence_site="https://confluence.example.test",
+    )
+
+    issues = raw["providers"]["issues"]
+    assert issues["epic_fields"] == {
+        "name": "customfield_12345",
+        "link": "customfield_12346",
+        "status": "customfield_12347",
+    }
+    assert issues["relationship_mappings"]["epic"] == {
+        "surface": "field",
+        "field": "customfield_12346",
+        "write_to": "source",
+        "value": "string",
+    }
+
+
+def test_build_config_keeps_explicit_epic_mapping_when_provided(tmp_path: Path) -> None:
+    mappings = dict(_jira_relationship_mappings())
+    mappings["epic"] = {
+        "surface": "field",
+        "field": "customfield_99999",
+        "write_to": "source",
+        "value": "string",
+    }
+    raw = build_config(
+        project=tmp_path,
+        issue_provider="jira",
+        knowledge_provider="confluence",
+        jira_site="https://jira.example.test",
+        jira_relationship_mappings=mappings,
+        jira_epic_fields={"link": "customfield_12346"},
+        confluence_site="https://confluence.example.test",
+    )
+
+    assert raw["providers"]["issues"]["relationship_mappings"]["epic"]["field"] == "customfield_99999"
+
+
+def test_build_config_writes_epic_issue_type_only_when_non_default(tmp_path: Path) -> None:
+    raw_default = build_config(
+        project=tmp_path,
+        issue_provider="jira",
+        knowledge_provider="confluence",
+        jira_site="https://jira.example.test",
+        jira_relationship_mappings=_jira_relationship_mappings(),
+        jira_epic_issue_type="Epic",
+        confluence_site="https://confluence.example.test",
+    )
+    raw_override = build_config(
+        project=tmp_path,
+        issue_provider="jira",
+        knowledge_provider="confluence",
+        jira_site="https://jira.example.test",
+        jira_relationship_mappings=_jira_relationship_mappings(),
+        jira_epic_issue_type="Initiative",
+        confluence_site="https://confluence.example.test",
+    )
+
+    assert "artifact_issue_types" not in raw_default["providers"]["issues"]
+    assert raw_override["providers"]["issues"]["artifact_issue_types"] == {"epic": "Initiative"}
+
+
+def test_build_config_rejects_unknown_epic_fields_key(tmp_path: Path) -> None:
+    with pytest.raises(WorkflowSetupError, match="unknown Jira epic_fields entry"):
+        build_config(
+            project=tmp_path,
+            issue_provider="jira",
+            knowledge_provider="confluence",
+            jira_site="https://jira.example.test",
+            jira_relationship_mappings=_jira_relationship_mappings(),
+            jira_epic_fields={"unknown": "customfield_12345"},
+            confluence_site="https://confluence.example.test",
+        )
+
+
 def test_jira_relationship_mappings_require_explicit_surface(tmp_path: Path) -> None:
     with pytest.raises(WorkflowSetupError, match="requires explicit surface"):
         build_config(

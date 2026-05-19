@@ -132,6 +132,17 @@ def jira_data_center_transitions_path(site: JiraDataCenterSite, issue_key: str) 
     return f"/rest/api/{site.api_version}/issue/{escaped_key}/transitions"
 
 
+def jira_data_center_createmeta_path(
+    site: JiraDataCenterSite,
+    *,
+    project_key: str,
+    expand_fields: bool = False,
+) -> str:
+    escaped_project = quote(project_key.strip().upper(), safe="")
+    suffix = "&expand=projects.issuetypes.fields" if expand_fields else ""
+    return f"/rest/api/{site.api_version}/issue/createmeta?projectKeys={escaped_project}{suffix}"
+
+
 def jira_get_json(
     site: JiraDataCenterSite,
     path: str,

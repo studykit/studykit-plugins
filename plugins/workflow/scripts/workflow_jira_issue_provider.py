@@ -220,6 +220,12 @@ class JiraDataCenterIssueNativeProvider(IssueProvider):
         subtask_parent_key = _jira_create_subtask_parent_key(request)
         if subtask_parent_key and not _is_jira_subtask_issue_type(issue_type):
             raise ProviderOperationError("Jira subtask_parent can only be used when issue_type is Sub-task")
+        epic_name, epic_name_field = _jira_create_epic_name(
+            request,
+            settings=settings,
+            issue_type=issue_type,
+            title=title,
+        )
 
         created = create_issue(
             site,
@@ -229,6 +235,8 @@ class JiraDataCenterIssueNativeProvider(IssueProvider):
             body=body,
             labels=labels,
             subtask_parent_key=subtask_parent_key,
+            epic_name=epic_name,
+            epic_name_field=epic_name_field,
             runner=self.runner,
         )
         issue_key = normalize_jira_issue_key(created.get("key") or created.get("issue") or "")
@@ -708,6 +716,8 @@ def create_issue(
     body: str,
     labels: tuple[str, ...] = (),
     subtask_parent_key: str | None = None,
+    epic_name: str | None = None,
+    epic_name_field: str | None = None,
     runner: CommandRunner | None = None,
 ) -> Mapping[str, Any]:
     payload: dict[str, Any] = {
@@ -722,6 +732,8 @@ def create_issue(
         payload["fields"]["labels"] = list(labels)
     if subtask_parent_key:
         payload["fields"]["parent"] = {"key": subtask_parent_key}
+    if epic_name is not None and epic_name_field is not None:
+        payload["fields"][epic_name_field] = epic_name
     result = jira_send_json(site, "POST", f"/rest/api/{site.api_version}/issue", payload, runner=runner)
     if not isinstance(result, Mapping):
         raise JiraProviderError("Jira create issue response was not an object")
@@ -974,6 +986,63 @@ def _jira_configured_artifact_issue_types(settings: Mapping[str, Any]) -> Mappin
         if artifact and issue_type:
             result[artifact] = issue_type
     return result
+
+
+def _jira_create_epic_name(
+    request: ProviderRequest,
+    *,
+    settings: Mapping[str, Any],
+    issue_type: str,
+    title: str,
+) -> tuple[str | None, str | None]:
+    """Resolve Epic Name payload for create requests.
+
+    Returns ``(epic_name, epic_name_field)`` when the request targets the
+    configured Epic issue type; ``(None, None)`` otherwise. Raises when
+    ``epic_name`` is set for a non-Epic create (typo guard) or when the
+    Epic issue type is selected without ``epic_fields.name`` configured.
+    """
+
+    raw_epic_name = _optional_string(
+        request.payload.get("epic_name") or request.payload.get("epicName")
+    )
+    epic_type_name = _jira_epic_issue_type_name(settings)
+    if not _is_jira_epic_issue_type(issue_type, epic_type_name=epic_type_name):
+        if raw_epic_name is not None:
+            raise ProviderOperationError(
+                "Jira epic_name is only valid when issue_type matches the configured Epic"
+            )
+        return None, None
+    epic_name_field = _jira_epic_field_id(settings, "name")
+    if not epic_name_field:
+        raise ProviderOperationError(
+            "Jira Epic create requires providers.issues.epic_fields.name; "
+            f"got mapped issue_type={issue_type} but the field is unconfigured"
+        )
+    return raw_epic_name or title, epic_name_field
+
+
+def _jira_epic_issue_type_name(settings: Mapping[str, Any]) -> str:
+    configured = _jira_configured_artifact_issue_types(settings).get("epic")
+    return configured or JIRA_ARTIFACT_ISSUE_TYPES["epic"]
+
+
+def _is_jira_epic_issue_type(issue_type: str, *, epic_type_name: str) -> bool:
+    return issue_type.strip().lower() == epic_type_name.strip().lower()
+
+
+def _jira_epic_fields(settings: Mapping[str, Any]) -> Mapping[str, Any]:
+    raw = settings.get("epic_fields") or settings.get("epicFields")
+    if raw is None:
+        return {}
+    if not isinstance(raw, Mapping):
+        raise ProviderOperationError("providers.issues.epic_fields must be a mapping")
+    return raw
+
+
+def _jira_epic_field_id(settings: Mapping[str, Any], kind: str) -> str | None:
+    raw = _jira_epic_fields(settings).get(kind)
+    return _optional_string(raw)
 
 
 def _jira_create_subtask_parent_key(request: ProviderRequest) -> str | None:

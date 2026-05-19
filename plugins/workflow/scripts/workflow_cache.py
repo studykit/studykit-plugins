@@ -480,71 +480,40 @@ def relationship_operations_from_intent(
     - ``parent_remove``: True — detach the current parent. The provider
       resolves the current parent from cache; if no parent exists, the
       operation is dropped (idempotent no-op).
+    - ``epic_add`` / ``epic_replace`` / ``epic_remove``: parallel scalar
+      semantics for the Epic Link customfield (Jira only).
     - ``blocked_by_add`` / ``blocked_by_remove``: list of refs.
     - ``blocking_add`` / ``blocking_remove``: list of refs.
     - ``child_add`` / ``child_remove``: list of refs.
     - ``related_add`` / ``related_remove``: list of refs.
 
-    Parent intents are mutually exclusive. For list relationships, the same
-    ref cannot appear in both add and remove. Returns an empty list when the
-    intent has no actionable entries.
+    Parent and epic intents are each mutually exclusive within their own
+    group, but a parent_* flag may coexist with an epic_* flag. For list
+    relationships, the same ref cannot appear in both add and remove.
+    Returns an empty list when the intent has no actionable entries.
     """
 
     path = source_path if source_path is not None else _INLINE_RELATIONSHIP_SOURCE
     operations: list[PendingIssueRelationshipOperation] = []
 
-    parent_add = _intent_scalar(intent.get("parent_add"))
-    parent_replace = _intent_scalar(intent.get("parent_replace"))
-    parent_remove = bool(intent.get("parent_remove"))
-    parent_flags = [
-        name
-        for name, present in (
-            ("parent_add", bool(parent_add)),
-            ("parent_replace", bool(parent_replace)),
-            ("parent_remove", parent_remove),
+    operations.extend(
+        _scalar_relationship_operations(
+            intent,
+            relationship="parent",
+            target_kind=target_kind,
+            target_id=target_id,
+            path=path,
         )
-        if present
-    ]
-    if len(parent_flags) > 1:
-        raise WorkflowCacheError(
-            f"conflicting parent relationship flags: {', '.join(parent_flags)}"
+    )
+    operations.extend(
+        _scalar_relationship_operations(
+            intent,
+            relationship="epic",
+            target_kind=target_kind,
+            target_id=target_id,
+            path=path,
         )
-    if parent_add:
-        operations.append(
-            PendingIssueRelationshipOperation(
-                target_kind=target_kind,
-                target_id=target_id,
-                path=path,
-                action="add",
-                relationship="parent",
-                target_ref=parent_add,
-                replace_parent=False,
-            )
-        )
-    elif parent_replace:
-        operations.append(
-            PendingIssueRelationshipOperation(
-                target_kind=target_kind,
-                target_id=target_id,
-                path=path,
-                action="add",
-                relationship="parent",
-                target_ref=parent_replace,
-                replace_parent=True,
-            )
-        )
-    elif parent_remove:
-        operations.append(
-            PendingIssueRelationshipOperation(
-                target_kind=target_kind,
-                target_id=target_id,
-                path=path,
-                action="remove",
-                relationship="parent",
-                target_ref="",
-                replace_parent=False,
-            )
-        )
+    )
 
     for relationship in _LIST_RELATIONSHIPS:
         add_refs = _intent_list(intent.get(f"{relationship}_add"))
@@ -579,6 +548,70 @@ def relationship_operations_from_intent(
                 )
             )
 
+    return operations
+
+
+def _scalar_relationship_operations(
+    intent: Mapping[str, Any],
+    *,
+    relationship: str,
+    target_kind: str,
+    target_id: str,
+    path: Path,
+) -> list[PendingIssueRelationshipOperation]:
+    add = _intent_scalar(intent.get(f"{relationship}_add"))
+    replace = _intent_scalar(intent.get(f"{relationship}_replace"))
+    remove = bool(intent.get(f"{relationship}_remove"))
+    flags = [
+        name
+        for name, present in (
+            (f"{relationship}_add", bool(add)),
+            (f"{relationship}_replace", bool(replace)),
+            (f"{relationship}_remove", remove),
+        )
+        if present
+    ]
+    if len(flags) > 1:
+        raise WorkflowCacheError(
+            f"conflicting {relationship} relationship flags: {', '.join(flags)}"
+        )
+    operations: list[PendingIssueRelationshipOperation] = []
+    if add:
+        operations.append(
+            PendingIssueRelationshipOperation(
+                target_kind=target_kind,
+                target_id=target_id,
+                path=path,
+                action="add",
+                relationship=relationship,
+                target_ref=add,
+                replace_parent=False,
+            )
+        )
+    elif replace:
+        operations.append(
+            PendingIssueRelationshipOperation(
+                target_kind=target_kind,
+                target_id=target_id,
+                path=path,
+                action="add",
+                relationship=relationship,
+                target_ref=replace,
+                replace_parent=relationship == "parent",
+            )
+        )
+    elif remove:
+        operations.append(
+            PendingIssueRelationshipOperation(
+                target_kind=target_kind,
+                target_id=target_id,
+                path=path,
+                action="remove",
+                relationship=relationship,
+                target_ref="",
+                replace_parent=False,
+            )
+        )
     return operations
 
 

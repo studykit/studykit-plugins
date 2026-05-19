@@ -47,6 +47,7 @@ from workflow_config import (  # noqa: E402
 from workflow_env import workflow_project_dir_from_env  # noqa: E402
 from workflow_github import GitHubRepositoryError, parse_github_remote_url  # noqa: E402
 from workflow_jira_data_center_client import (  # noqa: E402
+    jira_data_center_createmeta_path,
     jira_data_center_issue_path,
     jira_data_center_site_from_provider_config,
     jira_get_json,
@@ -63,6 +64,18 @@ ISSUE_LINK_DIRECTIONS = {"inward", "outward"}
 FIELD_WRITE_TARGETS = {"source", "target"}
 FIELD_VALUE_KINDS = {"key", "key_object", "string"}
 DEFAULT_JIRA_RELATIONSHIP_FIELD_QUERIES = ("parent",)
+
+EPIC_FIELD_SCHEMA_CUSTOM_IDS: Mapping[str, str] = {
+    "name": "com.pyxis.greenhopper.jira:gh-epic-label",
+    "link": "com.pyxis.greenhopper.jira:gh-epic-link",
+    "status": "com.pyxis.greenhopper.jira:gh-epic-status",
+}
+EPIC_FIELD_NAME_HINTS: Mapping[str, tuple[str, ...]] = {
+    "name": ("epic name",),
+    "link": ("epic link",),
+    "status": ("epic status",),
+}
+EPIC_ISSUE_TYPE_NAME = "epic"
 
 
 def probe_git_remote(
@@ -214,12 +227,19 @@ def inspect_jira_relationships(
         _inspect_jira_issue(site, issue, field_ids=field_ids, runner=runner)
         for issue in issues
     ]
+    epic = _discover_jira_epic_metadata(
+        site,
+        raw_fields=raw_fields,
+        project_key=site.project,
+        runner=runner,
+    )
 
     return {
         "operation": "jira_relationship_inspect",
         "site": site.to_json(),
         "link_types": link_types,
         "fields": fields,
+        "epic": epic,
         "sample_issues": sample_issues,
         "warnings": [
             "Inspection reports observed Jira data only; choose relationship mappings explicitly before writing config"
@@ -243,6 +263,8 @@ def build_config(
     jira_api_version: str | None = "2",
     jira_project: str | None = None,
     jira_issue_type: str | None = None,
+    jira_epic_fields: Mapping[str, str] | None = None,
+    jira_epic_issue_type: str | None = None,
     jira_relationship_mappings: Mapping[str, Any] | None = None,
     jira_snapshot_hidden_comment_markers: Sequence[str] | None = None,
     confluence_site: str | None = None,
@@ -285,6 +307,12 @@ def build_config(
     issue_github_host = github_issue_host or github_host or probed_non_default_host
     knowledge_github_host = github_wiki_host or github_host or probed_non_default_host
 
+    normalized_epic_fields = _normalize_epic_fields(jira_epic_fields)
+    normalized_epic_issue_type = _text(jira_epic_issue_type)
+    effective_relationship_mappings = _augment_jira_relationship_mappings_with_epic(
+        jira_relationship_mappings,
+        epic_fields=normalized_epic_fields,
+    )
     issues = _issue_provider_config(
         issue_provider,
         github_repo=github_repo or probed_repo,
@@ -294,7 +322,9 @@ def build_config(
         jira_api_version=jira_api_version,
         jira_project=jira_project,
         jira_issue_type=jira_issue_type,
-        jira_relationship_mappings=jira_relationship_mappings,
+        jira_epic_fields=normalized_epic_fields,
+        jira_epic_issue_type=normalized_epic_issue_type,
+        jira_relationship_mappings=effective_relationship_mappings,
         jira_snapshot_hidden_comment_markers=jira_snapshot_hidden_comment_markers,
         filesystem_path=filesystem_issues_path,
     )
@@ -639,6 +669,22 @@ def _add_config_build_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--jira-project", help="Jira project key")
     parser.add_argument("--jira-issue-type", help="Jira issue type")
     parser.add_argument(
+        "--jira-epic-issue-type",
+        help="Jira Epic issue type name when it differs from the built-in default 'Epic'",
+    )
+    parser.add_argument(
+        "--jira-epic-field-name",
+        help="Jira Epic Name customfield id (writes providers.issues.epic_fields.name)",
+    )
+    parser.add_argument(
+        "--jira-epic-field-link",
+        help="Jira Epic Link customfield id (writes providers.issues.epic_fields.link)",
+    )
+    parser.add_argument(
+        "--jira-epic-field-status",
+        help="Jira Epic Status customfield id (writes providers.issues.epic_fields.status)",
+    )
+    parser.add_argument(
         "--jira-snapshot-hidden-comment-marker",
         action="append",
         default=[],
@@ -683,6 +729,8 @@ def _config_from_args(args: argparse.Namespace) -> dict[str, Any]:
         jira_api_version=args.jira_api_version,
         jira_project=args.jira_project,
         jira_issue_type=args.jira_issue_type,
+        jira_epic_issue_type=args.jira_epic_issue_type,
+        jira_epic_fields=_jira_epic_fields_from_args(args),
         jira_relationship_mappings=_relationship_mappings_from_args(args),
         jira_snapshot_hidden_comment_markers=_jira_snapshot_hidden_comment_markers_from_args(args),
         confluence_site=args.confluence_site,
@@ -755,6 +803,8 @@ def _issue_provider_config(
     jira_api_version: str | None,
     jira_project: str | None,
     jira_issue_type: str | None,
+    jira_epic_fields: Mapping[str, str] | None,
+    jira_epic_issue_type: str | None,
     jira_relationship_mappings: Mapping[str, Any] | None,
     jira_snapshot_hidden_comment_markers: Sequence[str] | None,
     filesystem_path: str | None,
@@ -769,6 +819,10 @@ def _issue_provider_config(
         _set_if_text(settings, "api_version", jira_api_version or "2")
         _set_if_text(settings, "project", jira_project.upper() if jira_project else None)
         _set_if_text(settings, "issue_type", jira_issue_type)
+        if jira_epic_issue_type and jira_epic_issue_type != "Epic":
+            settings["artifact_issue_types"] = {"epic": jira_epic_issue_type}
+        if jira_epic_fields:
+            settings["epic_fields"] = dict(jira_epic_fields)
         hidden_markers = _normalized_string_tuple(jira_snapshot_hidden_comment_markers)
         if hidden_markers:
             settings["snapshot"] = {"hidden_comment_markers": list(hidden_markers)}
@@ -966,6 +1020,174 @@ def _normalize_jira_link_types(raw_link_types: Any) -> list[dict[str, str]]:
     return result
 
 
+def _discover_jira_epic_metadata(
+    site: Any,
+    *,
+    raw_fields: Any,
+    project_key: str | None,
+    runner: CommandRunner | None,
+) -> dict[str, Any]:
+    """Discover Jira Software Epic field ids and issue-type Epic Link support."""
+
+    fields = _discover_epic_field_ids(raw_fields)
+    field_warnings: list[str] = []
+    for kind in EPIC_FIELD_SCHEMA_CUSTOM_IDS:
+        if fields.get(kind) is None:
+            field_warnings.append(
+                f"Epic {kind} customfield was not discovered; the site may not have Jira Software installed or uses non-default field schema"
+            )
+
+    issue_types: list[dict[str, str]] = []
+    issue_type_epic_link_support: list[dict[str, Any]] = []
+    createmeta_warnings: list[str] = []
+    if not project_key:
+        createmeta_warnings.append(
+            "Epic issue-type discovery skipped; supply --jira-project to fetch createmeta"
+        )
+    else:
+        try:
+            raw_createmeta = jira_get_json(
+                site,
+                jira_data_center_createmeta_path(
+                    site, project_key=project_key, expand_fields=True
+                ),
+                runner=runner,
+            )
+        except (JiraProviderError, WorkflowCommandError) as exc:
+            createmeta_warnings.append(f"createmeta fetch failed: {exc}")
+        else:
+            link_field_id = fields["link"]["id"] if fields.get("link") else None
+            issue_types, issue_type_epic_link_support = _parse_jira_createmeta_epic_support(
+                raw_createmeta,
+                project_key=project_key,
+                epic_link_field_id=link_field_id,
+            )
+            if not issue_types:
+                createmeta_warnings.append(
+                    "No candidate Epic issue type found in createmeta; pass --jira-epic-issue-type to override"
+                )
+
+    return {
+        "fields": fields,
+        "issue_types": issue_types,
+        "issue_type_epic_link_support": issue_type_epic_link_support,
+        "warnings": [*field_warnings, *createmeta_warnings],
+    }
+
+
+def _discover_epic_field_ids(raw_fields: Any) -> dict[str, dict[str, str] | None]:
+    """Locate Epic Name / Link / Status field ids by Greenhopper schema or name."""
+
+    items = raw_fields if isinstance(raw_fields, list) else []
+    schema_matches: dict[str, dict[str, str]] = {}
+    name_matches: dict[str, dict[str, str]] = {}
+    for item in items:
+        if not isinstance(item, Mapping):
+            continue
+        field_id = _text(item.get("id"))
+        name = _text(item.get("name"))
+        if not field_id:
+            continue
+        schema_custom = _text(_dig_text_path(item, ("schema", "custom")))
+        for kind, schema_id in EPIC_FIELD_SCHEMA_CUSTOM_IDS.items():
+            if schema_custom and schema_custom == schema_id and kind not in schema_matches:
+                schema_matches[kind] = {
+                    "id": field_id,
+                    "name": name or "",
+                    "matched_by": "schema",
+                }
+        if name:
+            normalized_name = name.strip().lower()
+            for kind, hints in EPIC_FIELD_NAME_HINTS.items():
+                if kind in schema_matches or kind in name_matches:
+                    continue
+                if normalized_name in hints:
+                    name_matches[kind] = {
+                        "id": field_id,
+                        "name": name,
+                        "matched_by": "name",
+                    }
+
+    discovered: dict[str, dict[str, str] | None] = {}
+    for kind in EPIC_FIELD_SCHEMA_CUSTOM_IDS:
+        match = schema_matches.get(kind) or name_matches.get(kind)
+        discovered[kind] = {key: value for key, value in match.items() if value} if match else None
+    return discovered
+
+
+def _parse_jira_createmeta_epic_support(
+    raw_createmeta: Any,
+    *,
+    project_key: str,
+    epic_link_field_id: str | None,
+) -> tuple[list[dict[str, str]], list[dict[str, Any]]]:
+    if not isinstance(raw_createmeta, Mapping):
+        return [], []
+    projects = raw_createmeta.get("projects")
+    if not isinstance(projects, list):
+        return [], []
+    normalized_key = project_key.strip().upper()
+    selected: Mapping[str, Any] | None = None
+    for entry in projects:
+        if not isinstance(entry, Mapping):
+            continue
+        key = _text(entry.get("key"))
+        if key and key.upper() == normalized_key:
+            selected = entry
+            break
+    if selected is None and projects:
+        first = projects[0]
+        if isinstance(first, Mapping):
+            selected = first
+    if selected is None:
+        return [], []
+
+    issue_types_raw = selected.get("issuetypes")
+    if not isinstance(issue_types_raw, list):
+        return [], []
+
+    epic_issue_types: list[dict[str, str]] = []
+    epic_link_support: list[dict[str, Any]] = []
+    for entry in issue_types_raw:
+        if not isinstance(entry, Mapping):
+            continue
+        type_id = _text(entry.get("id"))
+        type_name = _text(entry.get("name"))
+        if not type_name:
+            continue
+        normalized = type_name.lower()
+        record: dict[str, str] = {"name": type_name}
+        if type_id:
+            record["id"] = type_id
+        if normalized == EPIC_ISSUE_TYPE_NAME:
+            epic_issue_types.append(record)
+        supports = _issue_type_supports_epic_link(entry, epic_link_field_id)
+        if supports is not None:
+            epic_link_support.append({**record, "supports_epic_link": supports})
+    return epic_issue_types, epic_link_support
+
+
+def _issue_type_supports_epic_link(
+    issue_type_entry: Mapping[str, Any],
+    epic_link_field_id: str | None,
+) -> bool | None:
+    fields = issue_type_entry.get("fields")
+    if not isinstance(fields, Mapping):
+        return None
+    if not epic_link_field_id:
+        return None
+    return epic_link_field_id in fields
+
+
+def _dig_text_path(mapping: Mapping[str, Any], path: Sequence[str]) -> Any:
+    current: Any = mapping
+    for key in path:
+        if not isinstance(current, Mapping):
+            return None
+        current = current.get(key)
+    return current
+
+
 def _matching_jira_fields(raw_fields: Any, queries: Sequence[str]) -> list[dict[str, str]]:
     if not isinstance(raw_fields, list):
         return []
@@ -1106,6 +1328,19 @@ def _relationship_mappings_from_args(args: argparse.Namespace) -> dict[str, Any]
     return mappings or None
 
 
+def _jira_epic_fields_from_args(args: argparse.Namespace) -> dict[str, str] | None:
+    fields: dict[str, str] = {}
+    for kind, attr in (
+        ("name", "jira_epic_field_name"),
+        ("link", "jira_epic_field_link"),
+        ("status", "jira_epic_field_status"),
+    ):
+        text = _text(getattr(args, attr, None))
+        if text:
+            fields[kind] = text
+    return fields or None
+
+
 def _jira_snapshot_hidden_comment_markers_from_args(args: argparse.Namespace) -> tuple[str, ...]:
     return _normalized_string_tuple(getattr(args, "jira_snapshot_hidden_comment_marker", None))
 
@@ -1194,6 +1429,48 @@ def _validate_relationship_mappings(mappings: Mapping[str, Any] | None) -> None:
             value = _normalize_token(raw_mapping.get("value") or raw_mapping.get("value_kind") or raw_mapping.get("valueKind"))
             if value not in FIELD_VALUE_KINDS:
                 raise WorkflowSetupError(f"Jira field relationship mapping for '{name}' requires value key, key_object, or string")
+
+
+def _normalize_epic_fields(value: Mapping[str, Any] | None) -> dict[str, str] | None:
+    """Coerce epic_fields input into the canonical {name/link/status: id} shape."""
+
+    if value is None:
+        return None
+    if not isinstance(value, Mapping):
+        raise WorkflowSetupError("Jira epic_fields must be a mapping of {name, link, status} to field ids")
+    allowed = set(EPIC_FIELD_SCHEMA_CUSTOM_IDS)
+    normalized: dict[str, str] = {}
+    for raw_kind, raw_id in value.items():
+        kind = str(raw_kind).strip().lower()
+        if kind not in allowed:
+            raise WorkflowSetupError(
+                f"unknown Jira epic_fields entry '{raw_kind}'; expected one of: {sorted(allowed)}"
+            )
+        text = _text(raw_id)
+        if text:
+            normalized[kind] = text
+    return normalized or None
+
+
+def _augment_jira_relationship_mappings_with_epic(
+    mappings: Mapping[str, Any] | None,
+    *,
+    epic_fields: Mapping[str, str] | None,
+) -> Mapping[str, Any] | None:
+    """Auto-add the standard ``epic`` field mapping when the Epic Link id is known."""
+
+    if not epic_fields or "link" not in epic_fields:
+        return mappings
+    if mappings and "epic" in mappings:
+        return mappings
+    augmented = dict(mappings or {})
+    augmented["epic"] = {
+        "surface": "field",
+        "field": epic_fields["link"],
+        "write_to": "source",
+        "value": "string",
+    }
+    return augmented
 
 
 def _require_jira_relationship_mappings(mappings: Mapping[str, Any] | None) -> None:
