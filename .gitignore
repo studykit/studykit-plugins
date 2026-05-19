@@ -218,6 +218,6 @@ session-tree.lock
 .obsidian/backlink.json
 *.lock
 # Workflow provider read cache
-/.workflow-cache/
+.workflow-cache/
 .cache/
 .handoff/
