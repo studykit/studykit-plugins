@@ -442,8 +442,10 @@ class JiraDataCenterIssueNativeProvider(IssueProvider):
         transition_name = _jira_state_transition_name(state, settings)
         if not transition_name:
             raise ProviderOperationError(
-                f"Jira state '{state}' has no configured transition; "
-                f"set providers.issues.state_transitions.{state} = '<transition name>'"
+                f"Jira state '{state}' has no configured transition. "
+                f"Run `workflow_setup.py jira-state-transition-inspect --jira-site <url> --issue <KEY>` "
+                f"to list the workflow's transitions, then re-run the setup skill so "
+                f"providers.issues.state_transitions.{state} is confirmed into .workflow/config.yml."
             )
         transitions = get_transitions(site, issue_key, runner=self.runner)
         transition_id = _find_transition_id(transitions, transition_name)

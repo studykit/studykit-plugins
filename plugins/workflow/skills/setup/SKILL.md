@@ -25,10 +25,12 @@ Useful commands:
 "$WORKFLOW" workflow_setup.py jira-relationship-inspect --jira-site <url> --issue <KEY> --json
 "$WORKFLOW" workflow_setup.py jira-relationship-inspect --jira-site <url> --jira-project <PROJECT> --issue <ISSUE-123> --json
 "$WORKFLOW" workflow_setup.py jira-relationship-inspect --jira-site <url> --field-query <field-name-or-id> --json
+"$WORKFLOW" workflow_setup.py jira-state-transition-inspect --jira-site <url> --issue <OPEN-KEY> --issue <CLOSED-KEY> --json
 "$WORKFLOW" workflow_setup.py jira-relationship-mappings --issue-link blocked_by=Blocks:inward --field child=parent:target:key --json
 "$WORKFLOW" workflow_setup.py build-config --project <project-root> --issue-provider <provider> --knowledge-provider <provider> <options...> --json
 "$WORKFLOW" workflow_setup.py build-config --issue-provider jira --knowledge-provider <provider> --jira-snapshot-hidden-comment-marker '!git-event' <options...> --json
 "$WORKFLOW" workflow_setup.py build-config --issue-provider jira --knowledge-provider <provider> --jira-epic-field-name <id> --jira-epic-field-link <id> --jira-epic-field-status <id> [--jira-epic-issue-type <NAME>] <options...> --json
+"$WORKFLOW" workflow_setup.py build-config --issue-provider jira --knowledge-provider <provider> --jira-state-transition closed=<name> [--jira-state-transition open=<name>] <options...> --json
 "$WORKFLOW" workflow_setup.py write --project <project-root> --config <reviewed-yaml-file> --json
 "$WORKFLOW" workflow_config.py --project <project-root> --require --json
 ```
@@ -53,16 +55,22 @@ Useful commands:
    generate mapping YAML with `jira-relationship-mappings`. If the sample
    issues or confirmed mappings are unavailable, stop setup as incomplete; do
    not offer to defer Jira relationship setup until later.
-6. For Jira issue providers, ask whether generated `snapshot.md` files should
+6. For Jira issue providers, ask whether the user plans to drive `--state`
+   close/reopen through the workflow. If yes, run the State Transition
+   Profiling step inside Jira Site Profiling, confirm the canonical-state
+   transition names, and pass them to `build-config` via
+   `--jira-state-transition closed=<name>` (repeatable). Skip when the user
+   does not intend to use `--state`.
+7. For Jira issue providers, ask whether generated `snapshot.md` files should
    hide automation comments by body marker. If the user gives markers such as
    `!git-event`, pass each one with
    `--jira-snapshot-hidden-comment-marker`.
-7. Collect the commit reference style.
-8. Run `capabilities` for the selected providers and show limitations before
+8. Collect the commit reference style.
+9. Run `capabilities` for the selected providers and show limitations before
    confirmation.
-9. Run `build-config --json`, show the generated YAML and warnings to the user,
+10. Run `build-config --json`, show the generated YAML and warnings to the user,
    and ask for explicit confirmation before writing.
-10. After confirmation, write with `write --config <reviewed-yaml-file>`. Then
+11. After confirmation, write with `write --config <reviewed-yaml-file>`. Then
    verify with `workflow_config.py --require --json`.
 
 ## Provider Rules
@@ -114,6 +122,16 @@ Useful commands:
   `--jira-epic-field-name|link|status` and `--jira-epic-issue-type`. Do not
   assume values; if the site lacks Jira Software or returns non-default field
   schema, ask the user for explicit ids.
+- Jira state transitions (`providers.issues.state_transitions.{open,closed}`)
+  are opt-in and workflow-dependent. When the user plans `--state`
+  close/reopen through `jira_issue_writeback.py`, `jira_issue_comments.py`,
+  or `jira_issue_lifecycle.py`, source the transition names from
+  `jira-state-transition-inspect` (run against sample issues that sit on each
+  side of the workflow so both close- and reopen-direction transitions are
+  visible), confirm the canonical-state mapping with the user, and pass it
+  to `build-config` via `--jira-state-transition closed=<name>` (repeatable).
+  Do not assume transition names; the Jira API only returns transitions
+  reachable from the issue's current state.
 - Provider profile documents may seed defaults only when they explicitly discuss
   workflow providers. Ignore unrelated Git remote or commit-history documents.
 
@@ -143,15 +161,27 @@ confirmation, then use only the exact confirmed values in setup.
    `epic.warnings` indicate a non-default schema, ask for explicit field ids
    before continuing. Skip this step when the site lacks Jira Software or the
    user has no Epic intent.
-5. If issue creation behavior matters, inspect issue type metadata and ask
+5. When the user plans `--state` close/reopen through the workflow, collect
+   sample issue keys reachable on each side of the workflow (an open-state
+   issue and a closed-state issue, at minimum) and run
+   `jira-state-transition-inspect --jira-site <url> --issue <OPEN-KEY> --issue
+   <CLOSED-KEY>`. Show the observed transition names per sample issue and the
+   `observed_transition_names` union. Ask the user to confirm which transition
+   maps to `closed` (and `open` when reopen is also needed). The Jira API only
+   returns transitions reachable from each issue's current state, so both sides
+   are typically required. Pass the confirmed mapping to `build-config` via
+   `--jira-state-transition closed=<name>` (repeatable). Skip this step when
+   the user does not intend to drive close/reopen through `--state`.
+6. If issue creation behavior matters, inspect issue type metadata and ask
    before running any create/update test. Sub-task creation is a mutation.
-6. Determine label policy from the user or provider profile. Labels are opt-in;
+7. Determine label policy from the user or provider profile. Labels are opt-in;
    never copy local labels into Jira by default.
-7. Determine whether automation comments should be hidden from generated Jira
+8. Determine whether automation comments should be hidden from generated Jira
    snapshots, and record only exact user-confirmed markers.
-8. Summarize observed link types, hierarchy surfaces, custom fields, confirmed
-   Epic field ids and Epic issue-type, label policy, snapshot-hidden comment
-   markers, confirmed relationship mapping YAML, and open questions before
+9. Summarize observed link types, hierarchy surfaces, custom fields, confirmed
+   Epic field ids and Epic issue-type, confirmed state-transition mapping,
+   label policy, snapshot-hidden comment markers, confirmed relationship
+   mapping YAML, and open questions before
    generating the final config.
 
 Rules:
