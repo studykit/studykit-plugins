@@ -232,6 +232,43 @@ def test_github_publish_strips_body_file_frontmatter(tmp_path: Path) -> None:
     assert not body_file.exists()
 
 
+def test_github_publish_surfaces_unsupported_relationship_intent(tmp_path: Path) -> None:
+    _write_config(tmp_path)
+    body_file = _write_body_file(tmp_path, "Draft body.\n")
+    runner = GitHubFakeRunner()
+    stdout = io.StringIO()
+
+    code = github_issue_drafts_main(
+        [
+            "--project",
+            str(tmp_path),
+            "publish",
+            "--type",
+            "task",
+            "--title",
+            "Draft issue",
+            "--body-file",
+            str(body_file),
+            "--related",
+            "100",
+            "--json",
+        ],
+        stdout=stdout,
+        runner=runner,
+    )
+
+    payload = json.loads(stdout.getvalue())
+    assert code == 0
+    assert payload["issue"] == "51"
+    assert payload["verified"] is True
+    assert payload["body_file_removed"] is True
+    assert not body_file.exists()
+    relationships = payload["relationships"]
+    assert relationships["status"] == "failed"
+    assert "related" in relationships["error"]
+    assert relationships["intent"] == {"related_add": ["100"]}
+
+
 def test_github_publish_missing_body_file_fails(tmp_path: Path) -> None:
     _write_config(tmp_path)
     runner = GitHubFakeRunner()
