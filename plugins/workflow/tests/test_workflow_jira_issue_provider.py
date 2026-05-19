@@ -1058,7 +1058,7 @@ def test_data_center_update_state_without_configured_transition_errors(tmp_path:
         }
     )
 
-    with pytest.raises(ProviderOperationError, match="state_transitions.closed"):
+    with pytest.raises(ProviderOperationError) as excinfo:
         dispatch_write(
             tmp_path,
             runner,
@@ -1068,6 +1068,11 @@ def test_data_center_update_state_without_configured_transition_errors(tmp_path:
             state="closed",
             freshness_check=True,
         )
+
+    message = str(excinfo.value)
+    assert "state_transitions.closed" in message
+    assert "jira-state-transition-inspect" in message
+    assert "setup skill" in message
 
 
 def test_data_center_add_comment_posts_body_and_refreshes_cache(tmp_path: Path) -> None:

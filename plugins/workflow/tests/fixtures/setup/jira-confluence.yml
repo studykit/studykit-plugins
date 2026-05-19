@@ -22,6 +22,9 @@ providers:
         relationship_label: relates to
         application_type: studykit.workflow
         application_name: Workflow
+    state_transitions:
+      closed: Done
+      open: Reopen
   knowledge:
     kind: confluence
     site: https://confluence.example.test

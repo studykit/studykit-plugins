@@ -63,7 +63,11 @@ setup skill); missing config raises `ProviderOperationError`.
 
 Required: `--issue`, `--body-file`. `--state` requires a configured
 `providers.issues.state_transitions.<open|closed>` transition name; the
-script POSTs that transition after the comment is added.
+script POSTs that transition after the comment is added. State-transition
+mappings are a setup-time prereq — discover the workflow's transitions with
+`workflow_setup.py jira-state-transition-inspect` and confirm them into the
+config through the setup skill's State Transition Profiling step; missing
+config raises `ProviderOperationError`.
 
 ## Update an existing issue body
 
@@ -81,7 +85,9 @@ script POSTs that transition after the comment is added.
 Required: `--issue`, `--body-file`. At least one of body, title, labels,
 or state must change. Optional `--title`, repeatable `--label`, and
 `--state` / `--state-reason` ride along on the same call. `--state`
-requires the configured transition mapping (see comment append).
+requires the configured transition mapping (see comment append) — discover
+and confirm it through the setup skill's State Transition Profiling step
+before relying on `--state` writes.
 
 ## Relationships: add, remove, or replace
 

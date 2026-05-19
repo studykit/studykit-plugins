@@ -27,6 +27,7 @@ from workflow_setup import (  # noqa: E402
     build_jira_relationship_mappings,
     format_config_yaml,
     inspect_jira_relationships,
+    inspect_jira_state_transitions,
     probe_git_remote,
     profile_from_docs,
     provider_capabilities,
@@ -568,6 +569,186 @@ def test_build_config_rejects_unknown_epic_fields_key(tmp_path: Path) -> None:
             jira_epic_fields={"unknown": "customfield_12345"},
             confluence_site="https://confluence.example.test",
         )
+
+
+def _jira_state_transition_runner(
+    transitions_by_issue: dict[str, list[dict[str, Any]]],
+):
+    def runner(request: CommandRequest) -> CommandResult:
+        for key, transitions in transitions_by_issue.items():
+            url = f"https://jira.example.test/rest/api/2/issue/{key}/transitions"
+            if request.args == _curl_get_args(url):
+                return CommandResult(
+                    request=request,
+                    returncode=0,
+                    stdout=json.dumps({"transitions": transitions}),
+                )
+        return CommandResult(
+            request=request,
+            returncode=127,
+            stderr=f"unexpected command: {request.args}",
+        )
+
+    return runner
+
+
+def test_jira_state_transition_inspect_reports_per_issue_transitions() -> None:
+    runner = _jira_state_transition_runner(
+        {
+            "PROJ-1": [
+                {"id": "31", "name": "Done", "to": {"name": "Closed", "id": "6", "statusCategory": {"key": "done"}}},
+            ],
+            "PROJ-2": [
+                {"id": "41", "name": "Reopen", "to": {"name": "Open", "id": "1", "statusCategory": {"key": "new"}}},
+            ],
+        }
+    )
+    payload = inspect_jira_state_transitions(
+        jira_site="https://jira.example.test",
+        issues=("PROJ-1", "PROJ-2"),
+        runner=runner,
+    )
+
+    assert payload["operation"] == "jira_state_transition_inspect"
+    issue_keys = [sample["issue"] for sample in payload["sample_issues"]]
+    assert issue_keys == ["PROJ-1", "PROJ-2"]
+    sample_one, sample_two = payload["sample_issues"]
+    assert sample_one["transitions"] == [
+        {
+            "id": "31",
+            "name": "Done",
+            "to_status_name": "Closed",
+            "to_status_id": "6",
+            "to_status_category": "done",
+        }
+    ]
+    assert sample_two["transitions"][0]["name"] == "Reopen"
+    assert set(payload["observed_transition_names"]) == {"Done", "Reopen"}
+    assert payload["warnings"] != []  # transitions differ between issues
+
+
+def test_jira_state_transition_inspect_silent_when_all_samples_match() -> None:
+    transitions = [
+        {"id": "31", "name": "Done", "to": {"name": "Closed"}},
+    ]
+    runner = _jira_state_transition_runner({"PROJ-1": transitions, "PROJ-2": transitions})
+
+    payload = inspect_jira_state_transitions(
+        jira_site="https://jira.example.test",
+        issues=("PROJ-1", "PROJ-2"),
+        runner=runner,
+    )
+
+    assert payload["warnings"] == []
+    assert payload["observed_transition_names"] == ["Done"]
+
+
+def test_jira_state_transition_inspect_requires_at_least_one_issue() -> None:
+    with pytest.raises(WorkflowSetupError, match="requires at least one --issue"):
+        inspect_jira_state_transitions(
+            jira_site="https://jira.example.test",
+            issues=(),
+        )
+
+
+def test_build_config_writes_state_transitions_when_provided(tmp_path: Path) -> None:
+    raw = build_config(
+        project=tmp_path,
+        issue_provider="jira",
+        knowledge_provider="confluence",
+        jira_site="https://jira.example.test",
+        jira_relationship_mappings=_jira_relationship_mappings(),
+        jira_state_transitions={"closed": "Done", "open": "Reopen"},
+        confluence_site="https://confluence.example.test",
+    )
+
+    assert raw["providers"]["issues"]["state_transitions"] == {
+        "closed": "Done",
+        "open": "Reopen",
+    }
+
+
+def test_build_config_omits_state_transitions_when_not_provided(tmp_path: Path) -> None:
+    raw = build_config(
+        project=tmp_path,
+        issue_provider="jira",
+        knowledge_provider="confluence",
+        jira_site="https://jira.example.test",
+        jira_relationship_mappings=_jira_relationship_mappings(),
+        confluence_site="https://confluence.example.test",
+    )
+
+    assert "state_transitions" not in raw["providers"]["issues"]
+
+
+def _build_config_cli(args: list[str]) -> int:
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+    return workflow_setup.main(args, stdout=stdout, stderr=stderr)
+
+
+@pytest.mark.parametrize(
+    "value, message",
+    [
+        ("closedDone", "must be <state>=<transition name>"),
+        ("draft=Done", "state must be one of"),
+        ("closed=", "must include a non-empty transition name"),
+    ],
+)
+def test_build_config_state_transition_flag_rejects_malformed_input(
+    tmp_path: Path, value: str, message: str
+) -> None:
+    args = [
+        "build-config",
+        "--project",
+        str(tmp_path),
+        "--issue-provider",
+        "jira",
+        "--knowledge-provider",
+        "confluence",
+        "--jira-site",
+        "https://jira.example.test",
+        "--jira-relationship-mapping",
+        "blocked_by:surface=issue_link,link_type=Blocks,direction=inward",
+        "--jira-state-transition",
+        value,
+        "--confluence-site",
+        "https://confluence.example.test",
+        "--json",
+    ]
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+    rc = workflow_setup.main(args, stdout=stdout, stderr=stderr)
+    assert rc == 2
+    assert message in stderr.getvalue()
+
+
+def test_build_config_state_transition_flag_rejects_duplicate_state(tmp_path: Path) -> None:
+    args = [
+        "build-config",
+        "--project",
+        str(tmp_path),
+        "--issue-provider",
+        "jira",
+        "--knowledge-provider",
+        "confluence",
+        "--jira-site",
+        "https://jira.example.test",
+        "--jira-relationship-mapping",
+        "blocked_by:surface=issue_link,link_type=Blocks,direction=inward",
+        "--jira-state-transition",
+        "closed=Done",
+        "--jira-state-transition",
+        "closed=Resolve",
+        "--confluence-site",
+        "https://confluence.example.test",
+        "--json",
+    ]
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+    rc = workflow_setup.main(args, stdout=stdout, stderr=stderr)
+    assert rc == 2
+    assert "specified more than once" in stderr.getvalue()
 
 
 def test_jira_relationship_mappings_require_explicit_surface(tmp_path: Path) -> None:

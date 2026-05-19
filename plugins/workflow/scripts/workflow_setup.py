@@ -49,6 +49,7 @@ from workflow_jira_data_center_client import (  # noqa: E402
     jira_data_center_createmeta_path,
     jira_data_center_issue_path,
     jira_data_center_site_from_provider_config,
+    jira_data_center_transitions_path,
     jira_get_json,
 )
 from workflow_jira_issue_refs import JiraProviderError, normalize_jira_issue_key  # noqa: E402
@@ -246,6 +247,75 @@ def inspect_jira_relationships(
     }
 
 
+def inspect_jira_state_transitions(
+    *,
+    jira_site: str,
+    jira_deployment: str | None = "data_center",
+    jira_api_version: str | None = "2",
+    issues: Sequence[str],
+    runner: CommandRunner | None = None,
+) -> dict[str, Any]:
+    """Inspect Jira workflow transitions reachable from one or more sample issues."""
+
+    if not issues:
+        raise WorkflowSetupError("jira-state-transition-inspect requires at least one --issue")
+
+    settings: dict[str, Any] = {
+        "site": jira_site,
+        "deployment": jira_deployment or "data_center",
+        "api_version": jira_api_version or "2",
+    }
+    _reject_cloud_provider("Jira", settings)
+    site = jira_data_center_site_from_provider_config(
+        ProviderConfig(role="issue", kind="jira", settings=settings)
+    )
+
+    sample_issues: list[dict[str, Any]] = []
+    observed_names: list[str] = []
+    seen_names: set[str] = set()
+    seen_signatures: set[tuple[tuple[str, str], ...]] = set()
+    warnings: list[str] = []
+
+    for issue_key in issues:
+        normalized_key = normalize_jira_issue_key(issue_key)
+        raw = jira_get_json(
+            site,
+            jira_data_center_transitions_path(site, normalized_key),
+            runner=runner,
+        )
+        if isinstance(raw, Mapping):
+            raw_transitions = raw.get("transitions")
+        else:
+            raw_transitions = raw
+        normalized_transitions = _normalize_jira_transitions(raw_transitions)
+        signature = tuple(
+            sorted(
+                (t.get("name", ""), t.get("to_status_name", ""))
+                for t in normalized_transitions
+            )
+        )
+        seen_signatures.add(signature)
+        for transition in normalized_transitions:
+            name = transition.get("name") or ""
+            if name and name not in seen_names:
+                seen_names.add(name)
+                observed_names.append(name)
+        sample_issues.append({"issue": normalized_key, "transitions": normalized_transitions})
+
+    if len(seen_signatures) > 1:
+        warnings.append(
+            "Sample issues exposed different transition sets; confirm each canonical state against the matching workflow"
+        )
+
+    return {
+        "operation": "jira_state_transition_inspect",
+        "site": site.to_json(),
+        "sample_issues": sample_issues,
+        "observed_transition_names": observed_names,
+        "warnings": warnings,
+    }
+
+
 def build_config(
     *,
     project: Path,
@@ -265,6 +335,7 @@ def build_config(
     jira_epic_fields: Mapping[str, str] | None = None,
     jira_epic_issue_type: str | None = None,
     jira_relationship_mappings: Mapping[str, Any] | None = None,
+    jira_state_transitions: Mapping[str, str] | None = None,
     jira_snapshot_hidden_comment_markers: Sequence[str] | None = None,
     confluence_site: str | None = None,
     confluence_deployment: str | None = "data_center",
@@ -319,6 +390,7 @@ def build_config(
         jira_epic_fields=normalized_epic_fields,
         jira_epic_issue_type=normalized_epic_issue_type,
         jira_relationship_mappings=effective_relationship_mappings,
+        jira_state_transitions=jira_state_transitions,
         jira_snapshot_hidden_comment_markers=jira_snapshot_hidden_comment_markers,
         filesystem_path=filesystem_issues_path,
     )
@@ -540,6 +612,22 @@ def build_parser() -> argparse.ArgumentParser:
     )
     jira_inspect.add_argument("--json", action="store_true", help="emit JSON")
 
+    jira_state_inspect = subparsers.add_parser(
+        "jira-state-transition-inspect",
+        help="inspect Jira workflow transitions reachable from sample issues",
+    )
+    jira_state_inspect.add_argument("--jira-site", required=True, help="Jira Data Center or Server base URL")
+    jira_state_inspect.add_argument("--jira-deployment", default="data_center", help="Jira deployment; Cloud is unsupported")
+    jira_state_inspect.add_argument("--jira-api-version", default="2", help="Jira REST API version")
+    jira_state_inspect.add_argument(
+        "--issue",
+        action="append",
+        default=[],
+        required=True,
+        help="sample Jira issue key to inspect; supply open- and closed-side keys to see both directions",
+    )
+    jira_state_inspect.add_argument("--json", action="store_true", help="emit JSON")
+
     jira_mappings = subparsers.add_parser(
         "jira-relationship-mappings",
         help="build explicit Jira relationship mapping YAML from compact specs",
@@ -624,6 +712,13 @@ def _dispatch(args: argparse.Namespace) -> dict[str, Any]:
             issues=args.issue,
             field_queries=args.field_query,
         )
+    if args.command == "jira-state-transition-inspect":
+        return inspect_jira_state_transitions(
+            jira_site=args.jira_site,
+            jira_deployment=args.jira_deployment,
+            jira_api_version=args.jira_api_version,
+            issues=args.issue,
+        )
     if args.command == "jira-relationship-mappings":
         return build_jira_relationship_mappings(
             issue_links=args.issue_link,
@@ -677,6 +772,12 @@ def _add_config_build_args(parser: argparse.ArgumentParser) -> None:
         help="Jira Epic Status customfield id (writes providers.issues.epic_fields.status)",
     )
     parser.add_argument(
+        "--jira-state-transition",
+        action="append",
+        default=[],
+        help="repeatable canonical-state to transition-name mapping, e.g. closed=Done or open=Reopen (writes providers.issues.state_transitions.<state>)",
+    )
+    parser.add_argument(
         "--jira-snapshot-hidden-comment-marker",
         action="append",
         default=[],
@@ -722,6 +823,7 @@ def _config_from_args(args: argparse.Namespace) -> dict[str, Any]:
         jira_epic_issue_type=args.jira_epic_issue_type,
         jira_epic_fields=_jira_epic_fields_from_args(args),
         jira_relationship_mappings=_relationship_mappings_from_args(args),
+        jira_state_transitions=_jira_state_transitions_from_args(args),
         jira_snapshot_hidden_comment_markers=_jira_snapshot_hidden_comment_markers_from_args(args),
         confluence_site=args.confluence_site,
         confluence_deployment=args.confluence_deployment,
@@ -771,6 +873,21 @@ def _emit_payload(payload: Mapping[str, Any], *, json_output: bool, stdout: Any)
     if operation == "jira_relationship_mappings":
         print(payload["yaml"], end="", file=stdout)
         return
+    if operation == "jira_state_transition_inspect":
+        for sample in payload.get("sample_issues", []):
+            issue_key = sample.get("issue") or "<unknown>"
+            transitions = sample.get("transitions") or []
+            if not transitions:
+                print(f"{issue_key}: (no transitions reachable)", file=stdout)
+                continue
+            print(f"{issue_key}:", file=stdout)
+            for transition in transitions:
+                name = transition.get("name") or "<unnamed>"
+                target = transition.get("to_status_name") or "<unknown>"
+                print(f"  - {name} -> {target}", file=stdout)
+        for warning in payload.get("warnings", []):
+            print(f"warning: {warning}", file=stdout)
+        return
     if operation == "capabilities":
         for warning in payload.get("warnings", []):
             print(f"- {warning}", file=stdout)
@@ -794,6 +911,7 @@ def _issue_provider_config(
     jira_epic_fields: Mapping[str, str] | None,
     jira_epic_issue_type: str | None,
     jira_relationship_mappings: Mapping[str, Any] | None,
+    jira_state_transitions: Mapping[str, str] | None,
     jira_snapshot_hidden_comment_markers: Sequence[str] | None,
     filesystem_path: str | None,
 ) -> dict[str, Any]:
@@ -816,6 +934,8 @@ def _issue_provider_config(
             settings["snapshot"] = {"hidden_comment_markers": list(hidden_markers)}
         if jira_relationship_mappings:
             settings["relationship_mappings"] = dict(jira_relationship_mappings)
+        if jira_state_transitions:
+            settings["state_transitions"] = dict(jira_state_transitions)
     elif provider == "filesystem":
         _set_if_text(settings, "path", filesystem_path or "workflow/issues")
     return settings
@@ -979,6 +1099,28 @@ def _split_relationship_assignment(value: str, kind: str) -> tuple[str, str]:
     if not raw:
         raise WorkflowSetupError(f"{kind} mapping requires a value")
     return relationship, raw
+
+
+def _normalize_jira_transitions(raw_transitions: Any) -> list[dict[str, str]]:
+    result: list[dict[str, str]] = []
+    if not isinstance(raw_transitions, list):
+        return result
+    for item in raw_transitions:
+        if not isinstance(item, Mapping):
+            continue
+        entry: dict[str, str] = {}
+        _set_if_text(entry, "id", _text(item.get("id")))
+        _set_if_text(entry, "name", _text(item.get("name")))
+        to_block = item.get("to")
+        if isinstance(to_block, Mapping):
+            _set_if_text(entry, "to_status_name", _text(to_block.get("name")))
+            _set_if_text(entry, "to_status_id", _text(to_block.get("id")))
+            category = to_block.get("statusCategory")
+            if isinstance(category, Mapping):
+                _set_if_text(entry, "to_status_category", _text(category.get("key")))
+        if entry:
+            result.append(entry)
+    return result
 
 
 def _normalize_jira_link_types(raw_link_types: Any) -> list[dict[str, str]]:
@@ -1307,6 +1449,36 @@ def _relationship_mappings_from_args(args: argparse.Namespace) -> dict[str, Any]
         name, mapping = _parse_inline_relationship_mapping(item)
         mappings[name] = mapping
     return mappings or None
+
+
+_JIRA_STATE_TRANSITION_STATES = ("open", "closed")
+
+
+def _jira_state_transitions_from_args(args: argparse.Namespace) -> dict[str, str] | None:
+    transitions: dict[str, str] = {}
+    for item in getattr(args, "jira_state_transition", []) or []:
+        if not isinstance(item, str) or "=" not in item:
+            raise WorkflowSetupError(
+                f"--jira-state-transition must be <state>=<transition name>, got {item!r}"
+            )
+        state, _, transition_name = item.partition("=")
+        state = state.strip().lower()
+        transition_name = transition_name.strip()
+        if state not in _JIRA_STATE_TRANSITION_STATES:
+            allowed = ", ".join(_JIRA_STATE_TRANSITION_STATES)
+            raise WorkflowSetupError(
+                f"--jira-state-transition state must be one of {allowed}; got {state!r}"
+            )
+        if not transition_name:
+            raise WorkflowSetupError(
+                f"--jira-state-transition for {state!r} must include a non-empty transition name"
+            )
+        if state in transitions:
+            raise WorkflowSetupError(
+                f"--jira-state-transition specified more than once for state {state!r}"
+            )
+        transitions[state] = transition_name
+    return transitions or None
 
 
 def _jira_epic_fields_from_args(args: argparse.Namespace) -> dict[str, str] | None:
