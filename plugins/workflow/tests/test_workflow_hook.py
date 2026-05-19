@@ -603,6 +603,89 @@ def test_claude_pre_read_emits_nothing_for_first_authoring_read(
     assert captured.getvalue() == ""
 
 
+def test_claude_pre_read_skips_subagent_authoring_reread(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _write_config(tmp_path)
+    _hook_env(monkeypatch, tmp_path, runtime="claude")
+    authoring_file = _PLUGIN_ROOT / "authoring" / "common" / "task-authoring.md"
+    session_id = "claude-pre-read-subagent"
+
+    assert claude_main(
+        payload={
+            "session_id": session_id,
+            "cwd": str(tmp_path),
+            "hook_event_name": "PostToolUse",
+            "tool_name": "Read",
+            "tool_input": {"file_path": str(authoring_file)},
+            "tool_response": {"filePath": str(authoring_file)},
+        },
+        stdout=io.StringIO(),
+    ) == 0
+
+    captured = io.StringIO()
+    assert claude_main(
+        payload={
+            "session_id": session_id,
+            "cwd": str(tmp_path),
+            "hook_event_name": "PreToolUse",
+            "agent_type": "workflow-operator",
+            "tool_name": "Read",
+            "tool_input": {"file_path": str(authoring_file)},
+        },
+        stdout=captured,
+    ) == 0
+
+    assert captured.getvalue() == ""
+
+
+def test_claude_pre_read_skips_non_authoring_reads(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _write_config(tmp_path)
+    _hook_env(monkeypatch, tmp_path, runtime="claude")
+    readme = tmp_path / "README.md"
+    readme.write_text("# Project\n", encoding="utf-8")
+
+    captured = io.StringIO()
+    assert claude_main(
+        payload={
+            "session_id": "claude-pre-read-non-authoring",
+            "cwd": str(tmp_path),
+            "hook_event_name": "PreToolUse",
+            "tool_name": "Read",
+            "tool_input": {"file_path": str(readme)},
+        },
+        stdout=captured,
+    ) == 0
+
+    assert captured.getvalue() == ""
+
+
+def test_claude_pre_read_skips_non_workflow_project(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _hook_env(monkeypatch, tmp_path, runtime="claude")
+    authoring_file = _PLUGIN_ROOT / "authoring" / "common" / "task-authoring.md"
+
+    captured = io.StringIO()
+    assert claude_main(
+        payload={
+            "session_id": "claude-pre-read-non-workflow",
+            "cwd": str(tmp_path),
+            "hook_event_name": "PreToolUse",
+            "tool_name": "Read",
+            "tool_input": {"file_path": str(authoring_file)},
+        },
+        stdout=captured,
+    ) == 0
+
+    assert captured.getvalue() == ""
+
+
 def test_claude_post_read_skips_non_authoring_reads(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
