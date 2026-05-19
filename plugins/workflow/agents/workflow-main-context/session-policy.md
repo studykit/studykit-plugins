@@ -5,11 +5,15 @@ relationships, metadata, provider writes, write-back, freshness checks, and
 authoring path discovery — run as direct `$WORKFLOW <script>.py` invocations
 in your shell.
 
+Fetch or refresh an issue (the common read):
+
+$WORKFLOW_ISSUE_FETCH_BLOCK
+
 Detailed procedures (read on demand before performing the operation):
 
 - `$WORKFLOW_POLICY_DIR/launcher.md` — launcher path, script discovery, shell env
 - `$WORKFLOW_POLICY_DIR/authoring.md` — authoring path resolution and type taxonomy
-- `$WORKFLOW_POLICY_DIR/provider-writes/$WORKFLOW_ISSUE_PROVIDER.md` — issue-provider writes (publish, append, update)
+- `$WORKFLOW_POLICY_DIR/provider-writes/$WORKFLOW_ISSUE_PROVIDER.md` — issue-provider writes (publish, append, update, relationships)
 - `$WORKFLOW_POLICY_DIR/knowledge/$WORKFLOW_KNOWLEDGE_PROVIDER.md` — knowledge-provider rules
 
 Don't quote, paraphrase, or summarize issue bodies, comments, or knowledge

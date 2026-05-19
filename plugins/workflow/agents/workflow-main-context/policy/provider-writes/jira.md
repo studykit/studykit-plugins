@@ -98,7 +98,6 @@ relationships in one call after the issue create.
 | Intent          | Script                                |
 |-----------------|---------------------------------------|
 | Metadata only   | `jira_issue_metadata.py`              |
-| Fetch / refresh | `jira_issue_fetch.py`                 |
 | Lifecycle       | (state via writeback flags)           |
 
 Run `"$WORKFLOW" <script>.py --help` only when you need a flag not listed
