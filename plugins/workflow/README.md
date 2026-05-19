@@ -89,10 +89,12 @@ returns `NONE`.
 ## Workflow Scripts
 
 The main assistant runs all workflow provider, cache, and authoring
-operations directly through the `$WORKFLOW` launcher
-(`agents/workflow-main-context/policy/launcher.md`). Detailed procedures —
-launcher invocation, authoring path resolution, and the publish/append/
-update body-file contract — live as on-demand files under
+operations through the workflow launcher, with runtime-specific guidance
+under `agents/workflow-main-context/policy/launcher/<runtime>.md`
+(Claude uses the persisted `$WORKFLOW` contract; Codex invokes the
+launcher by absolute path). Detailed procedures — launcher invocation,
+authoring path resolution, and the publish/append/update body-file
+contract — live as on-demand files under
 `agents/workflow-main-context/policy/`. The always-loaded entry point at
 `agents/workflow-main-context/session-policy.md` carries only the role
 boundary and pointers to those detail files.

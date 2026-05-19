@@ -175,10 +175,15 @@ def record_stop_issue_references(
 # =============================================================================
 
 
-def build_session_start_context(config: WorkflowConfig, plugin_root: Path) -> str:
+def build_session_start_context(
+    config: WorkflowConfig,
+    plugin_root: Path,
+    *,
+    runtime: str,
+) -> str:
     """Build the context block injected for configured workflow projects."""
 
-    return build_session_policy_context(config, plugin_root=plugin_root)
+    return build_session_policy_context(config, plugin_root=plugin_root, runtime=runtime)
 
 
 def build_prompt_commit_context(config: WorkflowConfig, prompt_text: str) -> str:

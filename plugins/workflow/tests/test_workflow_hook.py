@@ -74,16 +74,21 @@ def expected_session_start_context(
     knowledge_kind: str,
     issue_kind: str = "github",
 ) -> str:
-    _ = runtime  # Codex and Claude share the same main-session policy now.
     text = main_context_fragment("session-policy.md")
     policy_dir = _PLUGIN_ROOT / "agents" / "workflow-main-context" / "policy"
     issue_fetch_block = main_context_fragment(f"snippets/issue-fetch/{issue_kind}.md")
+    launcher_block = main_context_fragment(f"snippets/launcher/{runtime}.md")
+    if runtime == "codex":
+        launcher_block = launcher_block.replace(
+            "{{WORKFLOW_PLUGIN_ROOT}}", str(_PLUGIN_ROOT)
+        )
     return (
         text
-        .replace("$WORKFLOW_ISSUE_FETCH_BLOCK", issue_fetch_block)
-        .replace("$WORKFLOW_POLICY_DIR", str(policy_dir))
-        .replace("$WORKFLOW_ISSUE_PROVIDER", issue_kind)
-        .replace("$WORKFLOW_KNOWLEDGE_PROVIDER", knowledge_kind)
+        .replace("{{WORKFLOW_LAUNCHER_BLOCK}}", launcher_block)
+        .replace("{{WORKFLOW_ISSUE_FETCH_BLOCK}}", issue_fetch_block)
+        .replace("{{WORKFLOW_POLICY_DIR}}", str(policy_dir))
+        .replace("{{WORKFLOW_ISSUE_PROVIDER}}", issue_kind)
+        .replace("{{WORKFLOW_KNOWLEDGE_PROVIDER}}", knowledge_kind)
     )
 
 
@@ -895,15 +900,20 @@ def test_session_start_injects_policy_for_configured_project(
     )
     policy_dir = _PLUGIN_ROOT / "agents" / "workflow-main-context" / "policy"
     assert "## workflow policy" in context
-    assert "$WORKFLOW <script>.py" in context
+    if runtime == "claude":
+        assert "\"$WORKFLOW\" <script>.py" in context
+    else:
+        assert f"\"{_PLUGIN_ROOT}/scripts/workflow\" <script>.py" in context
+        assert "{{WORKFLOW_PLUGIN_ROOT}}" not in context
     assert "read-only" in context
-    assert str(policy_dir / "launcher.md") in context
     assert str(policy_dir / "authoring.md") in context
     assert str(policy_dir / "provider-writes" / "github.md") in context
     assert str(policy_dir / "knowledge" / "github.md") in context
-    assert "$WORKFLOW_POLICY_DIR" not in context
-    assert "$WORKFLOW_ISSUE_PROVIDER" not in context
-    assert "$WORKFLOW_KNOWLEDGE_PROVIDER" not in context
+    assert "{{WORKFLOW_POLICY_DIR}}" not in context
+    assert "{{WORKFLOW_LAUNCHER_BLOCK}}" not in context
+    assert "{{WORKFLOW_ISSUE_FETCH_BLOCK}}" not in context
+    assert "{{WORKFLOW_ISSUE_PROVIDER}}" not in context
+    assert "{{WORKFLOW_KNOWLEDGE_PROVIDER}}" not in context
     assert "provider-writes/jira.md" not in context
     assert "provider-writes/filesystem.md" not in context
     assert "workflow-operator" not in context
@@ -1074,7 +1084,7 @@ def test_session_start_discovers_config_from_nested_project_path(
     payload = json.loads(out)
     context = payload["hookSpecificOutput"]["additionalContext"]
     assert "## workflow policy" in context
-    assert "$WORKFLOW <script>.py" in context
+    assert f"\"{_PLUGIN_ROOT}/scripts/workflow\" <script>.py" in context
 
 
 def test_non_empty_hook_stdout_is_json_only(
