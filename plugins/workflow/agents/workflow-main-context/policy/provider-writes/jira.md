@@ -43,15 +43,36 @@ relationships against the newly created issue after the create succeeds.
 
 ## Append a comment
 
-Body-file flow for Jira comment append is being migrated; the current CLI
-still uses the legacy bare-refs shape. Run
-`"$WORKFLOW" jira_issue_comments.py --help` for current usage.
+```bash
+"$WORKFLOW" jira_issue_comments.py append \
+  --issue <KEY> \
+  --body-file <path> \
+  [--type <task|bug|...>] \
+  [--state open|closed] [--state-reason completed|not_planned|reopened] \
+  --json
+```
+
+Required: `--issue`, `--body-file`. `--state` requires a configured
+`providers.issues.state_transitions.<open|closed>` transition name; the
+script POSTs that transition after the comment is added.
 
 ## Update an existing issue body
 
-Body-file flow for Jira body update is being migrated; the current CLI
-still uses the legacy bare-refs shape. Run
-`"$WORKFLOW" jira_issue_writeback.py --help` for current usage.
+```bash
+"$WORKFLOW" jira_issue_writeback.py update \
+  --issue <KEY> \
+  --body-file <path> \
+  [--type <task|bug|...>] \
+  [--title <title>] \
+  [--label <label> ...] \
+  [--state open|closed] [--state-reason completed|not_planned|reopened] \
+  --json
+```
+
+Required: `--issue`, `--body-file`. At least one of body, title, labels,
+or state must change. Optional `--title`, repeatable `--label`, and
+`--state` / `--state-reason` ride along on the same call. `--state`
+requires the configured transition mapping (see comment append).
 
 ## Relationships: add, remove, or replace
 
@@ -103,7 +124,7 @@ relationships in one call after the issue create.
 Run `"$WORKFLOW" <script>.py --help` only when you need a flag not listed
 above.
 
-## Body-file lifecycle (publish only, until migration)
+## Body-file lifecycle
 
 - The script deletes the body file on success.
 - The body file is preserved on `status=blocked` (freshness drift) and on

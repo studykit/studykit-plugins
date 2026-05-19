@@ -13,16 +13,13 @@ from workflow_cache import (
     CACHE_ROOT_NAME,
     SCHEMA_VERSION,
     FreshnessMetadata,
-    PendingIssueComment,
     WorkflowCacheCorrupt,
     WorkflowCacheError,
     WorkflowCacheMiss,
     _atomic_write_text,
     _dump_yaml,
     _label_names,
-    _read_pending_comments,
     _read_yaml_mapping,
-    _remove_empty_parents,
     _require_schema,
     _safe_path_segment,
 )
@@ -41,12 +38,19 @@ from workflow_jira_issue_snapshot import render_jira_snapshot
 def is_jira_issue_cache_body_path(path: Path, project: Path) -> bool:
     """Return whether ``path`` is a Jira issue body cache projection.
 
-    Jira projections render to ``snapshot.md`` (a Markdown view of the issue) and
-    do not produce ``issue.md`` files. No Jira-side cache path currently maps to
-    a body file that the main agent edits, so the recognizer never matches.
+    Recognizes ``snapshot.md`` files under the Jira issue cache directory layout
+    ``<project>/.workflow-cache/jira/<site>/issues/<key>/snapshot.md``.
     """
 
-    return False
+    if path.name != "snapshot.md":
+        return False
+    try:
+        parts = path.expanduser().resolve(strict=False).relative_to(
+            project.expanduser().resolve(strict=False) / CACHE_ROOT_NAME
+        ).parts
+    except ValueError:
+        return False
+    return len(parts) == 5 and parts[0] == "jira" and parts[2] == "issues"
 
 
 class JiraDataCenterIssueCache:
@@ -80,19 +84,8 @@ class JiraDataCenterIssueCache:
     def remote_links_json_file(self, site: JiraDataCenterSite, issue_key: str) -> Path:
         return self.issue_dir(site, issue_key) / "remote-links.json"
 
-    def comments_pending_dir(self, site: JiraDataCenterSite, issue_key: str) -> Path:
-        return self.issue_dir(site, issue_key) / "comments-pending"
-
     def has_issue_projection(self, site: JiraDataCenterSite, issue_key: str) -> bool:
         return self.issue_json_file(site, issue_key).is_file()
-
-    def read_pending_issue_comments(self, site: JiraDataCenterSite, issue_key: str) -> list[PendingIssueComment]:
-        key = normalize_jira_issue_key(issue_key)
-        return _read_pending_comments(
-            self.comments_pending_dir(site, key),
-            target_kind="issue",
-            target_id=key,
-        )
 
     def read_freshness_metadata(
         self,
@@ -224,24 +217,6 @@ class JiraDataCenterIssueCache:
             "issue_json": str(issue_path),
             "remote_links_json": str(remote_links_path),
         }
-
-    def remove_pending_issue_comments(
-        self,
-        site: JiraDataCenterSite,
-        issue_key: str,
-        comments: list[PendingIssueComment],
-    ) -> list[Path]:
-        key = normalize_jira_issue_key(issue_key)
-        pending_dir = self.comments_pending_dir(site, key)
-        removed: list[Path] = []
-        for comment in comments:
-            if comment.path.parent.resolve(strict=False) != pending_dir.resolve(strict=False):
-                raise WorkflowCacheError(f"pending comment is outside Jira issue pending directory: {comment.path}")
-            if comment.path.exists():
-                comment.path.unlink()
-                removed.append(comment.path)
-        _remove_empty_parents(pending_dir, stop_at=self.issue_dir(site, key))
-        return removed
 
 def _read_json_mapping(path: Path) -> Mapping[str, Any]:
     try:

@@ -1,4 +1,4 @@
-"""Tests for the agent-facing workflow pending comment append entrypoint."""
+"""Tests for the agent-facing Jira issue body-file comment append CLI."""
 
 from __future__ import annotations
 
@@ -19,11 +19,33 @@ from workflow_jira_issue_cache import JiraDataCenterIssueCache  # noqa: E402
 from workflow_jira_data_center_client import jira_data_center_site_from_provider_config  # noqa: E402
 
 
-def write_jira_config(project: Path) -> None:
+class FakeRunner:
+    def __init__(self, responses: dict[tuple[str, ...], CommandResult | list[CommandResult]]):
+        self.responses = responses
+        self.requests: list[CommandRequest] = []
+
+    def __call__(self, request: CommandRequest) -> CommandResult:
+        self.requests.append(request)
+        response = self.responses.get(request.args)
+        if response is None:
+            return CommandResult(request=request, returncode=127, stderr="unexpected command")
+        if isinstance(response, list):
+            if not response:
+                return CommandResult(request=request, returncode=127, stderr="unexpected command")
+            return response.pop(0)
+        return response
+
+
+def result(args: tuple[str, ...], stdout: str = "", stderr: str = "", returncode: int = 0) -> CommandResult:
+    return CommandResult(request=CommandRequest(args=args), returncode=returncode, stdout=stdout, stderr=stderr)
+
+
+def write_jira_config(project: Path, *, extra_settings: str = "") -> None:
     path = project / ".workflow" / "config.yml"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
-        """
+        (
+            """
 version: 1
 providers:
   issues:
@@ -33,10 +55,14 @@ providers:
     api_version: 2
     project: TEST
     issue_type: Task
+"""
+            + extra_settings
+            + """
   knowledge:
     kind: github
 issue_id_format: jira
-""".lstrip(),
+"""
+        ).lstrip(),
         encoding="utf-8",
     )
 
@@ -47,7 +73,7 @@ def jira_site(project: Path):
     return jira_data_center_site_from_provider_config(config.issues)
 
 
-def jira_issue_payload(*, body: str = "Data Center description.") -> dict[str, object]:
+def jira_issue_payload(*, body: str = "Cached body.") -> dict[str, object]:
     return {
         "id": "10001",
         "key": "TEST-1234",
@@ -90,68 +116,234 @@ def jira_remote_links_url(issue: str = "TEST-1234") -> str:
     return f"https://jira.example.test/rest/api/2/issue/{issue}/remotelink"
 
 
-def test_cache_comments_script_dispatches_jira_pending_comment_append(tmp_path: Path) -> None:
-    write_jira_config(tmp_path)
-    site = jira_site(tmp_path)
-    cache = JiraDataCenterIssueCache.for_project(tmp_path)
+def jira_transitions_url(issue: str = "TEST-1234") -> str:
+    return f"https://jira.example.test/rest/api/2/issue/{issue}/transitions"
+
+
+def _seed_cached_issue(project: Path) -> None:
+    site = jira_site(project)
+    cache = JiraDataCenterIssueCache.for_project(project)
     cache.write_issue_bundle(
         site,
         jira_issue_payload(),
         remote_links=remote_links_payload(),
         fetched_at="2026-05-15T10:00:00.000+0900",
     )
-    pending_dir = cache.comments_pending_dir(site, "TEST-1234")
-    pending_dir.mkdir(parents=True)
-    pending_file = pending_dir / "001.md"
-    pending_file.write_text("---\nschema_version: 1\n---\n\nPending Jira comment body.\n", encoding="utf-8")
-    responses: dict[tuple[str, ...], CommandResult | list[CommandResult]] = {
-        curl_args(jira_issue_url()): [
-            CommandResult(request=CommandRequest(args=curl_args(jira_issue_url())), returncode=0, stdout=json.dumps(jira_issue_payload())),
-            CommandResult(request=CommandRequest(args=curl_args(jira_issue_url())), returncode=0, stdout=json.dumps(jira_issue_payload())),
-        ],
-        curl_write_args(): CommandResult(
-            request=CommandRequest(args=curl_write_args()),
-            returncode=0,
-            stdout=json.dumps({"id": "30001", "body": "Pending Jira comment body."}),
-        ),
-        curl_args(jira_remote_links_url()): CommandResult(
-            request=CommandRequest(args=curl_args(jira_remote_links_url())),
-            returncode=0,
-            stdout=json.dumps(remote_links_payload()),
-        ),
-    }
-    runner_requests: list[CommandRequest] = []
 
-    def runner(request: CommandRequest) -> CommandResult:
-        runner_requests.append(request)
-        response = responses.get(request.args)
-        if response is None:
-            return CommandResult(request=request, returncode=127, stderr="unexpected command")
-        if isinstance(response, list):
-            if not response:
-                return CommandResult(request=request, returncode=127, stderr="unexpected command")
-            return response.pop(0)
-        return response
 
+def _write_body_file(project: Path, body: str, *, name: str = "comment.md") -> Path:
+    path = project / name
+    path.write_text(body, encoding="utf-8")
+    return path
+
+
+def test_jira_append_posts_comment_and_deletes_body_file(tmp_path: Path) -> None:
+    write_jira_config(tmp_path)
+    _seed_cached_issue(tmp_path)
+    body_file = _write_body_file(tmp_path, "Inline comment body.\n")
+    runner = FakeRunner(
+        {
+            curl_args(jira_issue_url()): [
+                result(curl_args(jira_issue_url()), stdout=json.dumps(jira_issue_payload())),
+                result(curl_args(jira_issue_url()), stdout=json.dumps(jira_issue_payload())),
+                result(curl_args(jira_issue_url()), stdout=json.dumps(jira_issue_payload())),
+            ],
+            curl_write_args(): result(
+                curl_write_args(),
+                stdout=json.dumps({"id": "30001", "body": "Inline comment body.\n"}),
+            ),
+            curl_args(jira_remote_links_url()): result(
+                curl_args(jira_remote_links_url()),
+                stdout=json.dumps(remote_links_payload()),
+            ),
+        }
+    )
     stdout = io.StringIO()
 
     code = jira_issue_comments_main(
-        ["--project", str(tmp_path), "--type", "task", "--json", "test-1234"],
+        [
+            "--project",
+            str(tmp_path),
+            "append",
+            "--issue",
+            "test-1234",
+            "--body-file",
+            str(body_file),
+            "--json",
+        ],
         stdout=stdout,
         runner=runner,
     )
 
     payload = json.loads(stdout.getvalue())
     assert code == 0
-    assert payload["operation"] == "cache_append_pending_comments"
+    assert payload["operation"] == "append_comment"
     assert payload["kind"] == "jira"
-    assert "repository" not in payload
-    assert payload["issues"][0]["operation"] == "append_pending_comments"
-    assert payload["issues"][0]["issue"] == "TEST-1234"
-    assert payload["issues"][0]["appended"] == 1
-    assert not pending_file.exists()
-    write_request = runner_requests[1]
-    assert write_request.args == curl_write_args()
+    assert payload["issue"] == "TEST-1234"
+    assert payload["state_changed"] is False
+    assert payload["body_file_removed"] is True
+    assert payload["issue_file"].endswith("/issues/TEST-1234/snapshot.md")
+    write_request = next(request for request in runner.requests if request.args == curl_write_args())
     assert 'request = "POST"' in str(write_request.input_text)
     assert 'url = "https://jira.example.test/rest/api/2/issue/TEST-1234/comment"' in str(write_request.input_text)
-    assert '\\"body\\":\\"Pending Jira comment body.\\\\n\\"' in str(write_request.input_text)
+    assert '\\"body\\":\\"Inline comment body.\\\\n\\"' in str(write_request.input_text)
+    assert not body_file.exists()
+
+
+def test_jira_append_rejects_body_file_with_frontmatter(tmp_path: Path) -> None:
+    write_jira_config(tmp_path)
+    _seed_cached_issue(tmp_path)
+    body_file = _write_body_file(tmp_path, "---\nschema_version: 1\n---\n\nBody.\n")
+    runner = FakeRunner({})
+    stderr = io.StringIO()
+
+    code = jira_issue_comments_main(
+        [
+            "--project",
+            str(tmp_path),
+            "append",
+            "--issue",
+            "TEST-1234",
+            "--body-file",
+            str(body_file),
+            "--json",
+        ],
+        stderr=stderr,
+        runner=runner,
+    )
+
+    assert code == 2
+    assert "frontmatter" in stderr.getvalue()
+    assert body_file.exists()
+    assert runner.requests == []
+
+
+def test_jira_append_missing_body_file_fails(tmp_path: Path) -> None:
+    write_jira_config(tmp_path)
+    _seed_cached_issue(tmp_path)
+    runner = FakeRunner({})
+    stderr = io.StringIO()
+
+    code = jira_issue_comments_main(
+        [
+            "--project",
+            str(tmp_path),
+            "append",
+            "--issue",
+            "TEST-1234",
+            "--body-file",
+            str(tmp_path / "missing.md"),
+            "--json",
+        ],
+        stderr=stderr,
+        runner=runner,
+    )
+
+    assert code == 2
+    assert "body file does not exist" in stderr.getvalue()
+    assert runner.requests == []
+
+
+def test_jira_append_preserves_body_file_on_freshness_block(tmp_path: Path) -> None:
+    write_jira_config(tmp_path)
+    _seed_cached_issue(tmp_path)
+    body_file = _write_body_file(tmp_path, "Inline comment body.\n")
+    newer = jira_issue_payload()
+    newer["fields"]["updated"] = "2026-05-15T11:00:00.000+0900"  # type: ignore[index]
+    runner = FakeRunner(
+        {
+            curl_args(jira_issue_url()): [
+                result(curl_args(jira_issue_url()), stdout=json.dumps(newer)),
+                result(curl_args(jira_issue_url()), stdout=json.dumps(newer)),
+            ],
+            curl_args(jira_remote_links_url()): result(
+                curl_args(jira_remote_links_url()),
+                stdout=json.dumps(remote_links_payload()),
+            ),
+        }
+    )
+    stdout = io.StringIO()
+
+    code = jira_issue_comments_main(
+        [
+            "--project",
+            str(tmp_path),
+            "append",
+            "--issue",
+            "TEST-1234",
+            "--body-file",
+            str(body_file),
+            "--json",
+        ],
+        stdout=stdout,
+        runner=runner,
+    )
+
+    payload = json.loads(stdout.getvalue())
+    assert code == 3
+    assert payload["status"] == "blocked"
+    assert payload["body_file_removed"] is False
+    assert body_file.exists()
+    assert all(request.args != curl_write_args() for request in runner.requests)
+
+
+def test_jira_append_applies_inline_state_transition(tmp_path: Path) -> None:
+    write_jira_config(
+        tmp_path,
+        extra_settings="""
+    state_transitions:
+      closed: Done
+      open: Reopen
+""",
+    )
+    _seed_cached_issue(tmp_path)
+    body_file = _write_body_file(tmp_path, "Closing comment.\n")
+    runner = FakeRunner(
+        {
+            curl_args(jira_issue_url()): [
+                result(curl_args(jira_issue_url()), stdout=json.dumps(jira_issue_payload())),
+                result(curl_args(jira_issue_url()), stdout=json.dumps(jira_issue_payload())),
+                result(curl_args(jira_issue_url()), stdout=json.dumps(jira_issue_payload())),
+            ],
+            curl_args(jira_transitions_url()): result(
+                curl_args(jira_transitions_url()),
+                stdout=json.dumps({"transitions": [{"id": "31", "name": "Done"}]}),
+            ),
+            curl_write_args(): [
+                result(curl_write_args(), stdout=json.dumps({"id": "30001"})),
+                result(curl_write_args(), stdout=""),
+            ],
+            curl_args(jira_remote_links_url()): result(
+                curl_args(jira_remote_links_url()),
+                stdout=json.dumps(remote_links_payload()),
+            ),
+        }
+    )
+    stdout = io.StringIO()
+
+    code = jira_issue_comments_main(
+        [
+            "--project",
+            str(tmp_path),
+            "append",
+            "--issue",
+            "TEST-1234",
+            "--body-file",
+            str(body_file),
+            "--state",
+            "closed",
+            "--state-reason",
+            "completed",
+            "--json",
+        ],
+        stdout=stdout,
+        runner=runner,
+    )
+
+    payload = json.loads(stdout.getvalue())
+    assert code == 0
+    assert payload["state_changed"] is True
+    assert payload["state"]["transition_name"] == "Done"
+    write_requests = [request for request in runner.requests if request.args == curl_write_args()]
+    assert any('\\"transition\\":{\\"id\\":\\"31\\"}' in str(request.input_text) for request in write_requests)
+    assert not body_file.exists()

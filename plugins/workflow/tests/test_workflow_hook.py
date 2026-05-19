@@ -1864,6 +1864,52 @@ Current body.
     assert "body-file flow" in reason
 
 
+def test_claude_pre_write_blocks_jira_cache_snapshot_edits(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _write_jira_config(tmp_path)
+    monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(tmp_path))
+    monkeypatch.setenv("CLAUDE_PLUGIN_ROOT", str(_PLUGIN_ROOT))
+
+    snapshot = (
+        tmp_path
+        / ".workflow-cache"
+        / "jira"
+        / "jira.example.test"
+        / "issues"
+        / "TEST-1234"
+        / "snapshot.md"
+    )
+    snapshot.parent.mkdir(parents=True)
+    snapshot.write_text(
+        "# TEST-1234: Cached Jira issue\n\nCached body.\n",
+        encoding="utf-8",
+    )
+
+    captured = io.StringIO()
+    assert claude_main(
+        payload={
+            "session_id": "jira-projection-protection",
+            "cwd": str(tmp_path),
+            "hook_event_name": "PreToolUse",
+            "tool_name": "Edit",
+            "tool_input": {
+                "file_path": str(snapshot),
+                "old_string": "Cached body.",
+                "new_string": "Edited body.",
+            },
+        },
+        stdout=captured,
+    ) == 0
+
+    payload = json.loads(captured.getvalue())
+    reason = payload["reason"]
+    assert payload["decision"] == "block"
+    assert "projection is read-only" in reason
+    assert "body-file flow" in reason
+
+
 def test_claude_pre_write_blocks_github_cache_comment_create_when_no_projection(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
