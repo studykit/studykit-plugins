@@ -98,19 +98,27 @@ def publish_issue(
     }
 
     if relationship_intent:
-        relationships_response = provider.call(
-            ProviderRequest(
-                role="issue",
-                kind="github",
-                operation="apply_relationships",
-                context=ProviderContext(project=config.root, artifact_type=artifact_type),
-                payload={
-                    "issue": provider_payload.get("issue"),
-                    "relationship_intent": relationship_intent,
-                },
+        try:
+            relationships_response = provider.call(
+                ProviderRequest(
+                    role="issue",
+                    kind="github",
+                    operation="apply_relationships",
+                    context=ProviderContext(project=config.root, artifact_type=artifact_type),
+                    payload={
+                        "issue": provider_payload.get("issue"),
+                        "relationship_intent": relationship_intent,
+                    },
+                )
             )
-        )
-        result["relationships"] = dict(relationships_response.payload)
+            result["relationships"] = dict(relationships_response.payload)
+        except Exception as exc:
+            result["relationships"] = {
+                "operation": "apply_relationships",
+                "status": "failed",
+                "error": str(exc),
+                "intent": dict(relationship_intent),
+            }
 
     return result
 
@@ -262,6 +270,12 @@ def _print_plain(payload: dict[str, object], output: TextIO) -> None:
         f"published issue {issue} verified={payload.get('verified')} cache={payload.get('issue_file')}",
         file=output,
     )
+    relationships = payload.get("relationships")
+    if isinstance(relationships, dict) and relationships.get("status") == "failed":
+        print(
+            f"  relationships not applied: {relationships.get('error')}",
+            file=output,
+        )
 
 
 if __name__ == "__main__":
