@@ -56,8 +56,9 @@ When used:
 
 ## Provider update intent
 
-When asking `workflow-operator` to update provider-owned GitHub issue fields,
-provide only the values needed for the requested update.
+When running `$WORKFLOW github_issue_writeback.py update` or
+`$WORKFLOW github_issue_metadata.py` to update provider-owned GitHub issue
+fields, supply only the values needed for the requested update.
 
 Generic supported update intents:
 

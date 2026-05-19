@@ -44,10 +44,6 @@ from workflow_env import (  # noqa: E402
     CLAUDE_ENV_FILE_ENV,
     append_claude_env_file,
 )
-from workflow_operator_context import (  # noqa: E402
-    agent_name_matches_operator,
-    build_operator_session_context,
-)
 from workflow_session_state import (  # noqa: E402
     read_authoring_file_reads,
     record_authoring_file_read,
@@ -377,6 +373,7 @@ def subagent_start(
 ) -> int:
     """Handle a Claude ``SubagentStart`` hook invocation."""
 
+    _ = stdout
     config = workflow_config_for_project(_project_dir())
     if config is None:
         return 0
@@ -387,19 +384,6 @@ def subagent_start(
         event_payload.session_id,
         agent_id=event_payload.agent_id,
         agent_type=event_payload.agent_type,
-    )
-
-    if not agent_name_matches_operator(event_payload.agent_type):
-        return 0
-
-    emit_json(
-        {
-            "hookSpecificOutput": {
-                "hookEventName": "SubagentStart",
-                "additionalContext": build_operator_session_context(config, runtime="claude"),
-            }
-        },
-        stdout=stdout,
     )
     return 0
 

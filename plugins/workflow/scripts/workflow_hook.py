@@ -178,8 +178,7 @@ def record_stop_issue_references(
 def build_session_start_context(config: WorkflowConfig, plugin_root: Path) -> str:
     """Build the context block injected for configured workflow projects."""
 
-    _ = plugin_root  # plugin_root reserved for future template extensions
-    return build_session_policy_context(config)
+    return build_session_policy_context(config, plugin_root=plugin_root)
 
 
 def build_prompt_commit_context(config: WorkflowConfig, prompt_text: str) -> str:
@@ -244,7 +243,8 @@ def provider_cache_body_write_reason(target: EditTarget, config: WorkflowConfig)
             "workflow cache protection blocked a provider cache issue body write "
             "because the projection has not been prepared yet.\n\n"
             f"Target: {target.path}\n\n"
-            "Ask `workflow-operator` to prepare or refresh the cache projection, "
+            "Refresh the cache projection with the matching workflow fetch script "
+            "(`$WORKFLOW github_issue_fetch.py` or `$WORKFLOW jira_issue_fetch.py`), "
             "then edit only the Markdown body below the existing YAML frontmatter."
         )
 
@@ -255,11 +255,11 @@ def provider_cache_body_write_reason(target: EditTarget, config: WorkflowConfig)
         "workflow cache protection blocked a provider cache issue body write "
         "because the projection is read-only; use the body-file flow.\n\n"
         f"Target: {target.path}\n\n"
-        "Cache projections are owned by `workflow-operator`. Write the new body "
-        "or comment to a caller-chosen temp file and hand the path to the "
-        "matching workflow CLI (`$ISSUE_WRITEBACK update --body-file`, "
-        "`$ISSUE_COMMENTS append --body-file`) instead of editing the cached "
-        "file in place."
+        "Write the new body or comment to a caller-chosen temp file and run the "
+        "matching workflow script with `--body-file <path>` "
+        "(`$WORKFLOW github_issue_writeback.py update`, "
+        "`$WORKFLOW github_issue_comments.py append`, or the `jira_*` equivalents) "
+        "instead of editing the cached file in place."
     )
 
 

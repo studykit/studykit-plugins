@@ -15,9 +15,9 @@ Key files:
 - `.codex-plugin/plugin.json` — Codex plugin metadata.
 - `hooks/hooks.json` — Claude hook declarations.
 - `hooks/hooks.codex.json` — Codex hook declarations.
-- `agents/workflow-operator.md` — operator role-boundary instructions.
-- `agents/workflow-main-context/` — main-assistant injection fragments.
-- `scripts/` — internal provider, cache, and hook entrypoints.
+- `agents/workflow-main-context/` — main-assistant policy fragments
+  (always-loaded entry point + on-demand `policy/` detail files).
+- `scripts/` — provider, cache, and hook entrypoints.
 - `authoring/` — workflow artifact authoring contracts.
 
 Use `hooks/README.md` for hook-specific behavior. Use
@@ -79,33 +79,36 @@ Workflow authoring contracts apply only to workflow artifact types:
   `ci`.
 - Dual-role: `usecase` and `research`.
 
-Before editing a workflow artifact, ask `workflow-operator` for the required
-authoring paths, then read the returned files from `authoring/`. For
-non-workflow artifacts, such as `AGENTS.md`, `CLAUDE.md`, plugin README files,
-ordinary docs outside configured workflow knowledge, or host configuration
-files, the workflow operator returns `NONE`.
+Before editing a workflow artifact, resolve the required authoring paths via
+`"$WORKFLOW" authoring_resolver.py --type <type> --role <role> --json`, then
+read the returned files from `authoring/`. For non-workflow artifacts, such
+as `AGENTS.md`, `CLAUDE.md`, plugin README files, ordinary docs outside
+configured workflow knowledge, or host configuration files, the resolver
+returns `NONE`.
 
-## Workflow Operator
+## Workflow Scripts
 
-The main assistant delegates workflow provider/cache operations to
-`agents/workflow-operator.md` instead of carrying script recipes in context.
-The static operator prompt keeps durable role boundaries only. Operator runtime
-context snippets live under `agents/workflow-operator-context/`; hooks load only
-the fragments that match the active providers and inject them into the operator
-subagent.
+The main assistant runs all workflow provider, cache, and authoring
+operations directly through the `$WORKFLOW` launcher
+(`agents/workflow-main-context/policy/launcher.md`). Detailed procedures —
+launcher invocation, authoring path resolution, and the publish/append/
+update body-file contract — live as on-demand files under
+`agents/workflow-main-context/policy/`. The always-loaded entry point at
+`agents/workflow-main-context/session-policy.md` carries only the role
+boundary and pointers to those detail files.
 
-Use the operator for:
+Scripts cover:
 
 - Status and completion checks for provider-backed workflow issues.
-- Cache-aware provider reads.
-- GitHub issue writes through workflow commands.
-- Local issue projection write-back.
-- Pending local comment or relationship apply.
-- Authoring path discovery.
-- Provider mutation verification and cache refresh.
+- Cache-aware provider reads and refresh.
+- GitHub and Jira issue writes through `*_drafts.py`, `*_writeback.py`,
+  `*_comments.py`, `*_relationships.py`, and `*_metadata.py`.
+- Local issue projection write-back via the same scripts.
+- Authoring path discovery via `authoring_resolver.py`.
+- Provider mutation verification and freshness-checked cache refresh.
 
-The operator returns operational metadata, paths, relationship metadata, and
-verification details only. It does not summarize issue bodies, comments, or
+Scripts return operational metadata, paths, relationship metadata, and
+verification details. They do not summarize issue bodies, comments, or
 knowledge page content; the main assistant reads and interprets content
 directly.
 
@@ -128,12 +131,13 @@ Non-workflow projects receive no workflow hook output.
 GitHub issue reads may be cached under `.workflow-cache/`, which is ignored by
 Git.
 
-Treat cache layout and projection schemas as `workflow-operator` internals. The
-operator returns the editable cache path when a cached issue body edit is
-requested and performs provider/cache refresh and write-back operations.
-
-Ask `workflow-operator` for explicit fetch, refresh, write-back, comment, or
-relationship operations.
+Treat cache layout and projection schemas as workflow-script internals.
+Provider mutation scripts return the editable cache path and refresh the
+projection after every successful write; do not edit `issue.md` /
+`snapshot.md` files in place. Use the matching fetch / writeback / comments
+/ relationships script for explicit refresh, write-back, comment, or
+relationship operations (see
+`agents/workflow-main-context/policy/provider-writes.md`).
 
 ## Validation
 

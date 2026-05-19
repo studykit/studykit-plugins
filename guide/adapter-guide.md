@@ -459,9 +459,9 @@ Rules:
 - Read `PLUGIN_ROOT` for the plugin root from the Codex hook process environment used by this repository.
 - Resolve the project from payload `cwd` using git root fallback.
 - Keep Codex-only agent detection in `hook_codex.py`; do not move generic agent marker heuristics into shared workflow code.
-- Keep transcript metadata parsing in `hook_codex.py`. For workflow operator subagents, `CODEX_THREAD_ID` is the subagent thread id, so the adapter must extract the parent thread id from transcript metadata before writing the subagent export file.
+- Keep transcript metadata parsing in `hook_codex.py`. For Codex spawned subagents, `CODEX_THREAD_ID` is the subagent thread id, so the adapter must extract the parent thread id from transcript metadata before recording the subagent under the parent session state.
 - Keep Codex `apply_patch` target parsing in `hook_codex.py`.
-- Codex operator subagent environment is prepared from the Codex `SessionStart` path when transcript metadata identifies `workflow-operator`. The hook should inject only the absolute workflow launcher path as bootstrap context; the operator instructions should not need plugin-root, env-file, or parent-thread implementation details.
+- Codex subagent sessions detected through transcript metadata are recorded under the parent session state but do not receive the main-session workflow policy injection; subagent shells should not be wired with workflow shell env.
 
 Hook entrypoints and workflow launcher-invoked Python scripts should use inline
 script dependencies when shared modules require third-party libraries. The
