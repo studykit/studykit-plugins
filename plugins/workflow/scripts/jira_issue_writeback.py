@@ -12,12 +12,17 @@ import sys
 from pathlib import Path
 from typing import TextIO
 
+import frontmatter as frontmatter_lib
+
 from workflow_command import CommandRunner
 from workflow_config import WorkflowConfig, WorkflowConfigError, load_workflow_config
 from workflow_env import workflow_project_dir_from_env
 from workflow_jira_issue_provider import JiraDataCenterIssueNativeProvider
 from workflow_jira_issue_refs import normalize_jira_issue_key
 from workflow_providers import ProviderContext, ProviderRequest
+
+
+_FRONTMATTER_HANDLER = frontmatter_lib.YAMLHandler()
 
 
 class JiraIssueWritebackError(RuntimeError):
@@ -45,8 +50,7 @@ def update_issue(
     body_path = body_file.expanduser()
     if not body_path.is_file():
         raise JiraIssueWritebackError(f"body file does not exist: {body_path}")
-    body = body_path.read_text(encoding="utf-8")
-    _reject_body_with_frontmatter(body, body_path)
+    body = _strip_body_frontmatter(body_path.read_text(encoding="utf-8"))
 
     normalized_labels = tuple(label.strip() for label in labels if label.strip())
 
@@ -109,12 +113,14 @@ def update_issue(
     }
 
 
-def _reject_body_with_frontmatter(body: str, path: Path) -> None:
-    stripped = body.lstrip("﻿")
-    if stripped.startswith("---\n") or stripped.startswith("---\r\n") or stripped.strip() == "---":
-        raise JiraIssueWritebackError(
-            f"body file must not contain frontmatter; remove the YAML delimiter: {path}"
-        )
+def _strip_body_frontmatter(body: str) -> str:
+    if not _FRONTMATTER_HANDLER.detect(body):
+        return body
+    try:
+        _frontmatter_text, remainder = _FRONTMATTER_HANDLER.split(body)
+    except Exception:
+        return body
+    return remainder.lstrip("\n")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -138,7 +144,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--body-file",
         type=Path,
         required=True,
-        help="path to the opaque body content file (no frontmatter)",
+        help="path to the opaque body content file (leading YAML frontmatter is stripped)",
     )
     update.add_argument("--title")
     update.add_argument("--label", action="append", default=[])

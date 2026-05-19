@@ -197,12 +197,13 @@ def test_github_publish_creates_issue_and_deletes_body_file(tmp_path: Path) -> N
     assert runner.requests[0].args[:3] == ("gh", "issue", "create")
 
 
-def test_github_publish_rejects_body_file_with_frontmatter(tmp_path: Path) -> None:
+def test_github_publish_strips_body_file_frontmatter(tmp_path: Path) -> None:
     _write_config(tmp_path)
-    body_file = _write_body_file(tmp_path, "---\ntitle: nope\n---\n\nBody.\n")
+    body_file = _write_body_file(
+        tmp_path, "---\ntitle: nope\n---\nDraft body.\n", name="draft.md"
+    )
     runner = GitHubFakeRunner()
     stdout = io.StringIO()
-    stderr = io.StringIO()
 
     code = github_issue_drafts_main(
         [
@@ -211,6 +212,8 @@ def test_github_publish_rejects_body_file_with_frontmatter(tmp_path: Path) -> No
             "publish",
             "--type",
             "task",
+            "--label",
+            "workflow",
             "--title",
             "Draft issue",
             "--body-file",
@@ -218,14 +221,17 @@ def test_github_publish_rejects_body_file_with_frontmatter(tmp_path: Path) -> No
             "--json",
         ],
         stdout=stdout,
-        stderr=stderr,
         runner=runner,
     )
 
-    assert code == 2
-    assert "frontmatter" in stderr.getvalue()
-    assert body_file.exists()
-    assert runner.requests == []
+    payload = json.loads(stdout.getvalue())
+    assert code == 0
+    assert payload["issue"] == "51"
+    assert payload["verified"] is True
+    assert payload["body_file_removed"] is True
+    cache = GitHubIssueCache.for_project(tmp_path, configured_repo=_repo())
+    assert cache.read_issue(_repo(), 51)["body"] == "Draft body.\n"
+    assert not body_file.exists()
 
 
 def test_github_publish_missing_body_file_fails(tmp_path: Path) -> None:
@@ -427,14 +433,14 @@ def test_github_append_posts_comment_and_deletes_body_file(tmp_path: Path) -> No
     assert not body_file.exists()
 
 
-def test_github_append_rejects_body_file_with_frontmatter(tmp_path: Path) -> None:
+def test_github_append_strips_body_file_frontmatter(tmp_path: Path) -> None:
     _write_config(tmp_path)
     _seed_cached_issue(tmp_path)
     body_file = _write_body_file(
-        tmp_path, "---\ntitle: nope\n---\n\nBody.\n", name="comment.md"
+        tmp_path, "---\ntitle: nope\n---\nComment body.\n", name="comment.md"
     )
     runner = GitHubAppendCommentRunner()
-    stderr = io.StringIO()
+    stdout = io.StringIO()
 
     code = github_issue_comments_main(
         [
@@ -449,14 +455,15 @@ def test_github_append_rejects_body_file_with_frontmatter(tmp_path: Path) -> Non
             str(body_file),
             "--json",
         ],
-        stderr=stderr,
+        stdout=stdout,
         runner=runner,
     )
 
-    assert code == 2
-    assert "frontmatter" in stderr.getvalue()
-    assert body_file.exists()
-    assert runner.requests == []
+    payload = json.loads(stdout.getvalue())
+    assert code == 0
+    assert payload["body_file_removed"] is True
+    assert runner.posted_bodies == ["Comment body.\n"]
+    assert not body_file.exists()
 
 
 def test_github_append_missing_body_file_fails(tmp_path: Path) -> None:
@@ -737,14 +744,14 @@ def test_github_update_writes_body_and_deletes_body_file(tmp_path: Path) -> None
     assert not body_file.exists()
 
 
-def test_github_update_rejects_body_file_with_frontmatter(tmp_path: Path) -> None:
+def test_github_update_strips_body_file_frontmatter(tmp_path: Path) -> None:
     _write_config(tmp_path)
     _seed_cached_issue(tmp_path)
     body_file = _write_body_file(
-        tmp_path, "---\ntitle: nope\n---\n\nBody.\n", name="update.md"
+        tmp_path, "---\ntitle: nope\n---\nUpdated body.\n", name="update.md"
     )
     runner = GitHubUpdateIssueRunner()
-    stderr = io.StringIO()
+    stdout = io.StringIO()
 
     code = github_issue_writeback_main(
         [
@@ -757,14 +764,15 @@ def test_github_update_rejects_body_file_with_frontmatter(tmp_path: Path) -> Non
             str(body_file),
             "--json",
         ],
-        stderr=stderr,
+        stdout=stdout,
         runner=runner,
     )
 
-    assert code == 2
-    assert "frontmatter" in stderr.getvalue()
-    assert body_file.exists()
-    assert runner.requests == []
+    payload = json.loads(stdout.getvalue())
+    assert code == 0
+    assert payload["body_file_removed"] is True
+    assert runner.edit_bodies == ["Updated body.\n"]
+    assert not body_file.exists()
 
 
 def test_github_update_missing_body_file_fails(tmp_path: Path) -> None:
