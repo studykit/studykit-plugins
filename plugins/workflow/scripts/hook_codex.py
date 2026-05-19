@@ -12,12 +12,10 @@ The workflow Codex manifest registers ``SessionStart`` and
 protection and other write checks stay explicit in workflow scripts rather than
 using hidden authoring read tracking.
 
-Codex has no native ``SubagentStart`` event, so subagent identity tracking and
-the operator-subagent environment file are prepared from the Codex
-``SessionStart`` path when transcript metadata identifies a spawned agent. The
-operator path injects a config-specific bootstrap context with the absolute
-workflow launcher path, because the static Codex agent instructions cannot know
-the plugin root or the active project providers.
+Codex has no native ``SubagentStart`` event, so subagent identity tracking is
+prepared from the Codex ``SessionStart`` path when transcript metadata
+identifies a spawned agent. Subagent sessions skip the main-session workflow
+authoring policy injection.
 
 The script is the executable entry point for Codex's hook manifest
 (``plugins/workflow/hooks/hooks.codex.json``). Each hook command invokes this
@@ -51,11 +49,6 @@ from workflow_hook import (  # noqa: E402
 )
 from util import as_string, emit_json, read_payload_or_stdin, scan_text_values  # noqa: E402
 from workflow_env import write_codex_env_file  # noqa: E402
-from workflow_operator_context import (  # noqa: E402
-    agent_name_matches_operator,
-    build_operator_session_context,
-)
-from workflow_main_context import build_codex_operator_reuse_context  # noqa: E402
 from workflow_session_state import (  # noqa: E402
     record_session_policy_announced,
     record_subagent_start,
@@ -187,15 +180,6 @@ def _user_prompt_text(payload: dict[str, Any]) -> str:
 
 def _stop_scan_text(payload: dict[str, Any]) -> str:
     return scan_text_values(as_string(payload.get("last_assistant_message")))
-
-
-def _codex_session_start_context(config: Any) -> str:
-    return "\n\n".join(
-        [
-            build_session_start_context(config, _plugin_root()),
-            build_codex_operator_reuse_context(),
-        ]
-    )
 
 
 def _event_marks_agent(event_payload: CodexCommonPayload) -> bool:
@@ -415,8 +399,9 @@ def _handle_agent_session_start(
     *,
     stdout: TextIO | None = None,
 ) -> int:
-    """Codex subagent SessionStart: track identity and prepare operator env."""
+    """Codex subagent SessionStart: track identity; skip main-session policy."""
 
+    _ = stdout
     if metadata is None:
         return 0
     parent_thread_id = _parent_thread_id_from_metadata(metadata)
@@ -434,25 +419,6 @@ def _handle_agent_session_start(
         parent_thread_id,
         agent_id=_agent_id_from_metadata(metadata) or event_payload.session_id,
         agent_type=agent_name or "subagent",
-    )
-
-    if not agent_name_matches_operator(agent_name):
-        return 0
-
-    _persist_codex_shell_env(
-        project_dir=config.root,
-        codex_session_id=event_payload.session_id,
-        workflow_session_id=parent_thread_id,
-    )
-
-    emit_json(
-        {
-            "hookSpecificOutput": {
-                "hookEventName": "SessionStart",
-                "additionalContext": build_operator_session_context(config, runtime="codex"),
-            }
-        },
-        stdout=stdout,
     )
     return 0
 
@@ -483,7 +449,7 @@ def emit_session_start_policy(
         {
             "hookSpecificOutput": {
                 "hookEventName": "SessionStart",
-                "additionalContext": _codex_session_start_context(config),
+                "additionalContext": build_session_start_context(config, _plugin_root()),
             }
         },
         stdout=stdout,

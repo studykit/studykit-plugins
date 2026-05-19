@@ -1,5 +1,5 @@
 {
-  "description": "Workflow hooks. SessionStart persists workflow shell environment exports when .workflow/config.yml exists and injects provider-backed workflow authoring policy only for main sessions. SubagentStart records spawned Claude subagent identities and injects operator bootstrap context for workflow-operator. PreToolUse protects provider cache issue body projections and tells Claude when an authoring file was already read in the session. PostToolUse records main-session authoring file reads in session state. UserPromptSubmit reads mentioned GitHub issue references through cache-aware provider reads and injects project-relative issue cache paths as additionalContext.",
+  "description": "Workflow hooks. SessionStart persists workflow shell environment exports when .workflow/config.yml exists and injects provider-backed workflow authoring policy only for main sessions. SubagentStart records spawned Claude subagent identities in session state. PreToolUse protects provider cache issue body projections and tells Claude when an authoring file was already read in the session. PostToolUse records main-session authoring file reads in session state. UserPromptSubmit reads mentioned GitHub issue references through cache-aware provider reads and injects project-relative issue cache paths as additionalContext.",
   "hooks": {
     "PreToolUse": [
       {
@@ -45,7 +45,7 @@
             "type": "command",
             "command": "uv run --script \"${CLAUDE_PLUGIN_ROOT}/scripts/hook_claude.py\"",
             "timeout": 5,
-            "description": "Record spawned subagent identity and inject workflow operator bootstrap context when applicable"
+            "description": "Record spawned subagent identity in workflow session state"
           }
         ]
       }

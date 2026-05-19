@@ -1,5 +1,5 @@
 {
-  "description": "Workflow hooks for Codex. SessionStart records unified session-scoped workflow state, uses transcript metadata for workflow-operator subagents, injects config-specific operator bootstrap context for the operator, and injects provider-backed workflow authoring policy only for main sessions when .workflow/config.yml exists in the active project. UserPromptSubmit reads mentioned GitHub issue references through cache-aware provider reads and injects project-relative issue cache paths as additionalContext.",
+  "description": "Workflow hooks for Codex. SessionStart records unified session-scoped workflow state, tracks spawned subagent identities via transcript metadata, and injects provider-backed workflow authoring policy only for main sessions when .workflow/config.yml exists in the active project. UserPromptSubmit reads mentioned GitHub issue references through cache-aware provider reads and injects project-relative issue cache paths as additionalContext.",
   "hooks": {
     "SessionStart": [
       {

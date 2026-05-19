@@ -63,8 +63,9 @@ When used:
 
 ## Provider update intent
 
-When asking `workflow-operator` to update provider-owned Jira issue fields,
-provide only the values needed for the requested update.
+When running `$WORKFLOW jira_issue_writeback.py update` or
+`$WORKFLOW jira_issue_metadata.py` to update provider-owned Jira issue
+fields, supply only the values needed for the requested update.
 
 Generic supported update intents:
 

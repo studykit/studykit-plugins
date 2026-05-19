@@ -68,14 +68,21 @@ def main_context_fragment(name: str) -> str:
     return (_MAIN_CONTEXT_ROOT / name).read_text(encoding="utf-8").strip()
 
 
-def expected_session_start_context(*, runtime: str, knowledge_kind: str) -> str:
-    policy_fragments = [main_context_fragment("session-policy.md")]
-    if knowledge_kind == "github":
-        policy_fragments.append(main_context_fragment("knowledge/github.md"))
-    sections = ["\n".join(policy_fragments)]
-    if runtime == "codex":
-        sections.append(main_context_fragment("codex-operator-reuse.md"))
-    return "\n\n".join(sections)
+def expected_session_start_context(
+    *,
+    runtime: str,
+    knowledge_kind: str,
+    issue_kind: str = "github",
+) -> str:
+    _ = runtime  # Codex and Claude share the same main-session policy now.
+    text = main_context_fragment("session-policy.md")
+    policy_dir = _PLUGIN_ROOT / "agents" / "workflow-main-context" / "policy"
+    return (
+        text
+        .replace("$WORKFLOW_POLICY_DIR", str(policy_dir))
+        .replace("$WORKFLOW_ISSUE_PROVIDER", issue_kind)
+        .replace("$WORKFLOW_KNOWLEDGE_PROVIDER", knowledge_kind)
+    )
 
 
 def default_github_relationship_response(request: CommandRequest) -> CommandResult | None:
@@ -881,57 +888,27 @@ def test_session_start_injects_policy_for_configured_project(
     payload = json.loads(out)
     context = payload["hookSpecificOutput"]["additionalContext"]
     assert payload["hookSpecificOutput"]["hookEventName"] == "SessionStart"
-    assert context == expected_session_start_context(runtime=runtime, knowledge_kind="github")
-    assert "workflow-operator" in context
-    assert "issue status/completion checks" in context
-    assert "publish, append, or update" in context
-    assert "relationship intent" in context
-    assert "frontmatter" in context
+    assert context == expected_session_start_context(
+        runtime=runtime, knowledge_kind="github", issue_kind="github"
+    )
+    policy_dir = _PLUGIN_ROOT / "agents" / "workflow-main-context" / "policy"
+    assert "## workflow policy" in context
+    assert "$WORKFLOW <script>.py" in context
     assert "read-only" in context
+    assert str(policy_dir / "launcher.md") in context
+    assert str(policy_dir / "authoring.md") in context
+    assert str(policy_dir / "provider-writes" / "github.md") in context
+    assert str(policy_dir / "knowledge" / "github.md") in context
+    assert "$WORKFLOW_POLICY_DIR" not in context
+    assert "$WORKFLOW_ISSUE_PROVIDER" not in context
+    assert "$WORKFLOW_KNOWLEDGE_PROVIDER" not in context
+    assert "provider-writes/jira.md" not in context
+    assert "provider-writes/filesystem.md" not in context
+    assert "workflow-operator" not in context
+    assert "Delegate workflow operations" not in context
+    assert "codex-operator-reuse" not in context
     assert "from_cache" not in context
-    assert "pending draft" not in context.lower()
     assert "comments-pending" not in context
-    assert ", and session id" not in context
-    assert "session id" not in context
-    assert "script recipes" not in context
-    assert "hook" not in context.lower()
-    assert "wrapper" not in context
-    assert "WORKFLOW_*" not in context
-    assert "provider/cache metadata, issue relationship metadata, and paths" not in context
-    assert "The operator does not interpret content" not in context
-    assert "Read and summarize issue, comment, knowledge, or authoring file content directly" not in context
-    assert "Workflow issues live in GitHub" not in context
-    assert "raw `gh` as its own fallback" not in context
-    assert "raw provider CLIs" not in context
-    assert "For cached issue body edits, edit `issue.md` in the cache projection first" not in context
-    assert "Configured workflow project:" not in context
-    assert "Config file:" not in context
-    assert "Workflow plugin root:" not in context
-    assert "Issue ID format:" not in context
-    assert "Knowledge provider:" not in context
-    assert "Local projection:" not in context
-    assert "Commit references:" not in context
-    assert "artifact" not in context.lower()
-    assert "Before workflow artifact edits" not in context
-    assert "operator should return `NONE`" not in context
-    assert "treat `NONE`" not in context
-    assert "Use the workflow operator only for workflow operations" not in context
-    assert "Workflow script command recipes are intentionally not injected here" not in context
-    assert "does not auto-trigger workflow skills or agents" not in context
-    assert "WORKFLOW_PLUGIN_ROOT=" not in context
-    assert "$WORKFLOW_PLUGIN_ROOT/scripts/" not in context
-    assert "scripts/authoring_resolver.py" not in context
-    assert "scripts/workflow_github.py" not in context
-    assert "## workflow provider cache context" not in context
-    assert "Do not inspect `.workflow-cache`" not in context
-    assert "UserPromptSubmit may pre-read" not in context
-    assert "Stop may record session-mentioned issue references" not in context
-    assert "scripts/github_issue_fetch.py" not in context
-    assert "scripts/jira_issue_fetch.py" not in context
-    assert "scripts/github_issue_writeback.py" not in context
-    assert "scripts/jira_issue_writeback.py" not in context
-    assert "scripts/github_issue_comments.py" not in context
-    assert "scripts/jira_issue_comments.py" not in context
 
 
 def test_claude_session_start_appends_workflow_env_file(
@@ -1071,20 +1048,15 @@ def test_session_start_uses_filesystem_issue_policy_for_local_artifacts(
 
     payload = json.loads(out)
     context = payload["hookSpecificOutput"]["additionalContext"]
-    assert context == expected_session_start_context(runtime=runtime, knowledge_kind="filesystem")
-    assert "issue provider: `filesystem`" not in context
-    assert "Workflow issues are filesystem-backed local Markdown artifacts" not in context
-    assert "The operator does not interpret content" not in context
-    assert "Issue ID format:" not in context
-    assert "Local projection:" not in context
-    assert "GitHub-backed knowledge documents" not in context
-    assert "artifact" not in context.lower()
-    assert "Before workflow artifact edits" not in context
-    assert "operator should return `NONE`" not in context
-    assert "Use the workflow operator only for workflow operations" not in context
-    assert "raw GitHub CLI (`gh`)" not in context
-    assert "should not run raw `gh`" not in context
-    assert "raw provider CLIs" not in context
+    assert context == expected_session_start_context(
+        runtime=runtime, knowledge_kind="filesystem", issue_kind="filesystem"
+    )
+    policy_dir = _PLUGIN_ROOT / "agents" / "workflow-main-context" / "policy"
+    assert str(policy_dir / "provider-writes" / "filesystem.md") in context
+    assert str(policy_dir / "knowledge" / "filesystem.md") in context
+    assert "provider-writes/github.md" not in context
+    assert "provider-writes/jira.md" not in context
+    assert "knowledge/github.md" not in context
 
 
 def test_session_start_discovers_config_from_nested_project_path(
@@ -1100,7 +1072,7 @@ def test_session_start_discovers_config_from_nested_project_path(
     payload = json.loads(out)
     context = payload["hookSpecificOutput"]["additionalContext"]
     assert "## workflow policy" in context
-    assert "workflow-operator" in context
+    assert "$WORKFLOW <script>.py" in context
 
 
 def test_non_empty_hook_stdout_is_json_only(
@@ -1158,182 +1130,7 @@ def test_non_empty_hook_stdout_is_json_only(
         _json_object(output)
 
 
-def _write_operator_subagent_transcript(path: Path) -> None:
-    path.write_text(
-        json.dumps(
-            {
-                "type": "session_meta",
-                "payload": {
-                    "thread_source": "subagent",
-                    "agent_role": "workflow-operator",
-                    "source": {
-                        "subagent": {
-                            "agent_name": "workflow-operator",
-                            "thread_spawn": {
-                                "parent_thread_id": "codex-main-thread",
-                                "agent_role": "workflow-operator",
-                            },
-                        }
-                    },
-                },
-            }
-        )
-        + "\n",
-        encoding="utf-8",
-    )
-
-
-def test_session_start_prepares_codex_operator_env_file_and_bootstrap_context(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    _write_config(tmp_path)
-    transcript = tmp_path / "subagent-rollout.jsonl"
-    _write_operator_subagent_transcript(transcript)
-
-    out = _run_session_start(
-        tmp_path,
-        monkeypatch,
-        runtime="codex",
-        payload_update={"source": "startup", "transcript_path": str(transcript)},
-    )
-
-    payload = json.loads(out)
-    context = payload["hookSpecificOutput"]["additionalContext"]
-    assert payload["hookSpecificOutput"]["hookEventName"] == "SessionStart"
-    assert "## workflow operator bootstrap" in context
-    assert "plugins/workflow/scripts/workflow" in context
-    assert "authoring_resolver.py" in context
-    assert "$AUTHORING_RESOLVER" not in context
-    assert "$WORKFLOW github_issue_fetch.py" in context
-    assert "$WORKFLOW github_issue_lifecycle.py close" in context
-    assert "$WORKFLOW github_issue_drafts.py publish" in context
-    assert "$WORKFLOW github_issue_comments.py append" in context
-    assert "$WORKFLOW github_issue_writeback.py update" in context
-    assert "$WORKFLOW github_issue_relationships.py" in context
-    assert "$WORKFLOW github_issue_metadata.py" in context
-    assert "$WORKFLOW authoring_resolver.py --type" in context
-    assert "ISSUE_FETCH=github_issue_fetch.py" not in context
-    assert "$ISSUE_LIFECYCLE" not in context
-    assert "Provider mutation scripts refresh affected cache projections internally." in context
-    assert "reread_required=true" in context
-    assert "--scope comment" in context
-    assert "jira_issue_fetch.py" not in context
-    assert "GitHub knowledge documents are repository Markdown files under `wiki/`" in context
-    assert "hook-state" not in context
-    assert "parent_thread_id" not in context
-    content = codex_env_exports(tmp_path, "codex-session")
-    assert f"export WORKFLOW={_PLUGIN_ROOT / 'scripts' / 'workflow'}" in content
-    assert "export WORKFLOW_SESSION_ID=codex-main-thread" in content
-    assert "AUTHORING_RESOLVER" not in content
-    subagent_state = session_state_path(tmp_path, "codex", "codex-session")
-    assert subagent_state is not None
-    assert subagent_state.is_file()
-    state = json.loads(subagent_state.read_text(encoding="utf-8"))
-    assert state["session_id"] == "codex-session"
-    assert state["parent_session_id"] == "codex-main-thread"
-    assert state["env"]["WORKFLOW_SESSION_ID"] == "codex-main-thread"
-    parent_state = session_state_path(tmp_path, "codex", "codex-main-thread")
-    assert parent_state is not None
-    parent_state_payload = json.loads(parent_state.read_text(encoding="utf-8"))
-    assert parent_state_payload["subagents"]["started"] == [
-        {"agent_id": "codex-session", "agent_type": "workflow-operator"}
-    ]
-
-
-def test_codex_operator_bootstrap_uses_configured_jira_issue_aliases(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    _write_jira_config(tmp_path)
-    transcript = tmp_path / "subagent-rollout.jsonl"
-    _write_operator_subagent_transcript(transcript)
-
-    out = _run_session_start(
-        tmp_path,
-        monkeypatch,
-        runtime="codex",
-        payload_update={"source": "startup", "transcript_path": str(transcript)},
-    )
-
-    payload = json.loads(out)
-    context = payload["hookSpecificOutput"]["additionalContext"]
-    assert "$WORKFLOW jira_issue_fetch.py" in context
-    assert "$WORKFLOW jira_issue_drafts.py publish" in context
-    assert "$WORKFLOW jira_issue_writeback.py" in context
-    assert "$WORKFLOW jira_issue_comments.py" in context
-    assert "$WORKFLOW jira_issue_relationships.py" in context
-    assert "$WORKFLOW jira_issue_metadata.py" in context
-    assert "ISSUE_FETCH=jira_issue_fetch.py" not in context
-    assert "$ISSUE_LIFECYCLE" not in context
-    assert "github_issue_fetch.py" not in context
-    assert "workflow_github.py" not in context
-    assert "Provider mutation scripts refresh affected cache projections internally." in context
-    assert "reread_required=true" in context
-    assert "Do not use another issue provider command family in this project." in context
-
-
-def test_codex_operator_bootstrap_uses_configured_filesystem_context(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    _write_filesystem_config(tmp_path)
-    transcript = tmp_path / "subagent-rollout.jsonl"
-    _write_operator_subagent_transcript(transcript)
-
-    out = _run_session_start(
-        tmp_path,
-        monkeypatch,
-        runtime="codex",
-        payload_update={"source": "startup", "transcript_path": str(transcript)},
-    )
-
-    payload = json.loads(out)
-    context = payload["hookSpecificOutput"]["additionalContext"]
-    assert "github_issue_fetch.py" not in context
-    assert "jira_issue_fetch.py" not in context
-    assert "No provider issue command family is configured for filesystem issues." in context
-    assert "Filesystem knowledge documents use configured local repository paths." in context
-    assert "GitHub knowledge documents are repository Markdown files under `wiki/`" not in context
-
-
-def test_static_workflow_operator_prompt_omits_provider_command_catalog() -> None:
-    text = (_PLUGIN_ROOT / "agents" / "workflow-operator.md").read_text(encoding="utf-8")
-
-    assert "github_issue_fetch.py" not in text
-    assert "jira_issue_fetch.py" not in text
-    assert "workflow_github.py" not in text
-    assert "$ISSUE_FETCH" not in text
-    assert "ISSUE_LIFECYCLE=" not in text
-    assert "--confirm-provider-create" not in text
-
-
-def test_operator_runtime_context_fragments_hold_provider_command_guidance() -> None:
-    context_root = _PLUGIN_ROOT / "agents" / "workflow-operator-context"
-
-    github = (context_root / "issues" / "github.md").read_text(encoding="utf-8")
-    jira = (context_root / "issues" / "jira.md").read_text(encoding="utf-8")
-    bootstrap_codex = (context_root / "bootstrap-codex.md").read_text(encoding="utf-8")
-
-    assert not (context_root / "bootstrap.md").exists()
-    assert "plugins/workflow/scripts/workflow" in bootstrap_codex
-    assert "$AUTHORING_RESOLVER" not in bootstrap_codex
-    assert "$WORKFLOW github_issue_lifecycle.py" in github
-    assert "$WORKFLOW authoring_resolver.py --type" in github
-    assert "$AUTHORING_RESOLVER" not in github
-    assert "ISSUE_LIFECYCLE=github_issue_lifecycle.py" not in github
-    assert "$ISSUE_LIFECYCLE" not in github
-    assert "workflow_github.py" not in github
-    assert "Provider mutation scripts refresh affected cache projections internally." in github
-    assert "$WORKFLOW jira_issue_fetch.py" in jira
-    assert "$WORKFLOW authoring_resolver.py --type" in jira
-    assert "$AUTHORING_RESOLVER" not in jira
-    assert "ISSUE_FETCH=jira_issue_fetch.py" not in jira
-    assert "$ISSUE_LIFECYCLE" not in jira
-    assert "workflow_github.py" not in jira
-
-
-def test_session_start_records_codex_subagent_when_not_operator(
+def test_session_start_records_codex_subagent_identity_and_emits_nothing(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -1360,6 +1157,22 @@ def test_session_start_records_codex_subagent_when_not_operator(
     assert not subagent_state.exists()
 
 
+def test_session_start_uses_jira_provider_writes_pointer_for_jira_config(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _write_jira_config(tmp_path)
+
+    out = _run_session_start(tmp_path, monkeypatch, runtime="codex")
+
+    payload = json.loads(out)
+    context = payload["hookSpecificOutput"]["additionalContext"]
+    policy_dir = _PLUGIN_ROOT / "agents" / "workflow-main-context" / "policy"
+    assert str(policy_dir / "provider-writes" / "jira.md") in context
+    assert "provider-writes/github.md" not in context
+    assert "provider-writes/filesystem.md" not in context
+
+
 def test_session_start_skips_claude_subagent_payload(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -1373,7 +1186,7 @@ def test_session_start_skips_claude_subagent_payload(
         tmp_path,
         monkeypatch,
         runtime="claude",
-        payload_update={"agent_type": "workflow-operator", "session_id": "claude-subagent-session"},
+        payload_update={"agent_type": "general-purpose", "session_id": "claude-subagent-session"},
     )
 
     assert out == ""
@@ -1383,50 +1196,7 @@ def test_session_start_skips_claude_subagent_payload(
     assert "AUTHORING_RESOLVER" not in content
 
 
-def test_claude_subagent_start_injects_operator_bootstrap_context(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    _write_config(tmp_path)
-    monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(tmp_path))
-    monkeypatch.setenv("CLAUDE_PLUGIN_ROOT", str(_PLUGIN_ROOT))
-
-    captured = io.StringIO()
-    assert claude_main(
-        payload={
-            "session_id": "claude-session",
-            "transcript_path": "/tmp/transcript.jsonl",
-            "cwd": str(tmp_path),
-            "hook_event_name": "SubagentStart",
-            "agent_id": "agent-123",
-            "agent_type": "workflow-operator",
-        },
-        stdout=captured,
-    ) == 0
-
-    payload = json.loads(captured.getvalue())
-    context = payload["hookSpecificOutput"]["additionalContext"]
-    assert payload["hookSpecificOutput"]["hookEventName"] == "SubagentStart"
-    assert "## workflow operator bootstrap" not in context
-    assert "plugins/workflow/scripts/workflow" not in context
-    assert "$WORKFLOW github_issue_lifecycle.py close" in context
-    assert "$WORKFLOW github_issue_fetch.py" in context
-    assert "$WORKFLOW authoring_resolver.py --type" in context
-    assert "$AUTHORING_RESOLVER" not in context
-    assert "ISSUE_LIFECYCLE=github_issue_lifecycle.py" not in context
-    assert "$ISSUE_LIFECYCLE" not in context
-    assert "Provider mutation scripts refresh affected cache projections internally." in context
-    assert "jira_issue_fetch.py" not in context
-
-    state_file = session_state_path(tmp_path, "claude", "claude-session")
-    assert state_file is not None
-    state = json.loads(state_file.read_text(encoding="utf-8"))
-    assert state["subagents"]["started"] == [
-        {"agent_id": "agent-123", "agent_type": "workflow-operator"}
-    ]
-
-
-def test_claude_subagent_start_records_non_operator_and_emits_nothing(
+def test_claude_subagent_start_records_subagent_identity_and_emits_nothing(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -1491,16 +1261,12 @@ def test_claude_subagent_start_deduplicates_agent_identity_records(
 
 def test_static_claude_manifest_registers_global_subagent_start_hook() -> None:
     manifest = json.loads((_PLUGIN_ROOT / "hooks" / "hooks.json").read_text(encoding="utf-8"))
-    operator_text = (_PLUGIN_ROOT / "agents" / "workflow-operator.md").read_text(
-        encoding="utf-8"
-    )
 
     assert "SubagentStart" in manifest["hooks"]
     assert "matcher" not in manifest["hooks"]["SubagentStart"][0]
     assert manifest["hooks"]["SubagentStart"][0]["hooks"][0]["command"] == (
         'uv run --script "${CLAUDE_PLUGIN_ROOT}/scripts/hook_claude.py"'
     )
-    assert "SubagentStart:" not in operator_text
 
 
 def test_static_claude_manifest_does_not_register_stop_hook() -> None:
@@ -2019,7 +1785,7 @@ Updated body.
     assert payload["decision"] == "block"
     assert "projection has not been prepared yet" in reason
     assert f"Target: {issue_file}" in reason
-    assert "Ask `workflow-operator` to prepare or refresh the cache projection" in reason
+    assert "$WORKFLOW github_issue_fetch.py" in reason
 
 
 def test_provider_issue_cache_body_recognition_dispatches_to_provider_module(

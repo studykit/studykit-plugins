@@ -16,7 +16,7 @@ Use GitHub-native relationships when available:
 
 ## Relationship intents
 
-When asking `workflow-operator` to apply a GitHub Issue relationship, provide the source issue, canonical relationship intent, and target issue reference.
+When running `$WORKFLOW github_issue_relationships.py` to apply a GitHub Issue relationship, supply the source issue, canonical relationship intent, and target issue reference.
 
 Use these canonical intents:
 
@@ -33,4 +33,4 @@ GitHub provider-native writes do not support a generic `related` relationship. U
 
 Do not duplicate GitHub-native parent, child, or dependency relationships in issue body sections. Read `./github-issue-anti-patterns.md` for forbidden body sections.
 
-Ask `workflow-operator` to apply provider relationship changes. The main assistant should provide relationship intent and target references, not operator internals.
+Apply provider relationship changes through `$WORKFLOW github_issue_relationships.py`. The main assistant supplies the relationship intent and target references; the script owns provider invocation and cache refresh.

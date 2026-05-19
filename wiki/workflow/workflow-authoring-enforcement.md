@@ -16,23 +16,29 @@ required_authoring_files are read before a workflow artifact write
 
 ### Main assistant
 
-The main assistant asks `workflow-operator` for required authoring paths, reads
-the returned files directly, drafts content, and asks the operator to perform
-provider/cache writes and verification.
+The main assistant resolves required authoring paths through the workflow
+launcher (`$WORKFLOW authoring_resolver.py --type <type> --role <role> --json`),
+reads the returned files directly, drafts content, and runs the matching
+provider/cache scripts (`$WORKFLOW github_issue_drafts.py publish`,
+`*_writeback.py update`, `*_comments.py append`, `*_relationships.py`, etc.)
+for writes and verification.
 
-The main assistant should not need workflow resolver script names, launcher
-recipes, hook internals, or cache implementation details.
+Detailed launcher usage, authoring path resolution, and the body-file write
+contract live in on-demand main-context policy files under
+`plugins/workflow/agents/workflow-main-context/policy/`.
 
-### Workflow operator
+### Workflow scripts
 
-`workflow-operator` resolves required authoring paths and returns only:
+The bundled workflow scripts under `plugins/workflow/scripts/` resolve
+authoring paths and perform provider/cache writes. The authoring resolver
+returns:
 
 - Required authoring file paths.
 - Artifact type, role, and provider context when relevant.
-- Operational provider/cache metadata for requested workflow operations.
 
-The operator may use workflow internals to perform the request, but command
-names and script paths are not part of the caller-facing response.
+Provider mutation scripts return operational metadata, the cached
+`issue.md` / `snapshot.md` path, the issue ref, and verification details.
+They do not summarize provider body content.
 
 ### Plugin contributors
 
@@ -67,16 +73,19 @@ operator handoff expectations.
 
 ## Intended Flow
 
-1. SessionStart injects only concise workflow policy when `.workflow/config.yml`
-   exists.
-2. Before a workflow artifact write, the main assistant asks
-   `workflow-operator` for required authoring paths.
-3. If the operator returns `NONE`, the target is not a workflow artifact for
+1. SessionStart injects only the concise workflow policy entry point when
+   `.workflow/config.yml` exists; detail files under
+   `plugins/workflow/agents/workflow-main-context/policy/` are loaded on demand.
+2. Before a workflow artifact write, the main assistant runs
+   `$WORKFLOW authoring_resolver.py --type <type> --role <role> --json` for
+   required authoring paths.
+3. If the resolver returns `NONE`, the target is not a workflow artifact for
    authoring-policy purposes.
 4. The main assistant reads every returned authoring file and drafts the
    content.
-5. The operator performs provider/cache writes, write-back, comments,
-   relationship operations, cache refresh, and verification.
+5. The main assistant runs the matching workflow script (publish/append/
+   update/relationships/metadata/fetch) for provider/cache writes, freshness
+   checks, cache refresh, and verification, following the body-file flow.
 
 ## Scope
 
@@ -87,7 +96,7 @@ This policy applies to:
 - Dual artifacts such as `usecase` and `research`.
 - Local cache projections.
 - Native provider writes.
-- Provider/cache fallback paths handled by `workflow-operator`.
+- Provider/cache fallback paths handled by workflow scripts.
 
 ## Current Limitations
 
