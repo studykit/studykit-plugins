@@ -32,7 +32,8 @@ The provider-write intents share one shape:
   [--issue-type <jira-issue-type>] \
   [--subtask-parent <PARENT-KEY>] \
   [--project-key <PROJECT>] \
-  [--parent <KEY>] [--blocked-by <KEY> ...] [--blocking <KEY> ...] \
+  [--epic-name <X>] \
+  [--parent <KEY>] [--epic <KEY>] [--blocked-by <KEY> ...] [--blocking <KEY> ...] \
   [--child <KEY> ...] [--related <KEY-or-URL> ...] \
   --json
 ```
@@ -41,6 +42,13 @@ Required: `--type`, `--title`, `--body-file`. Use `--issue-type` when the
 Jira issue type must be set at create time. Use `--subtask-parent` when
 publishing a Sub-task. Relationship flags (add-only on publish) apply the
 relationships against the newly created issue after the create succeeds.
+
+`--epic-name` overrides the Epic Name customfield at create time and is
+valid only with `--type epic` (defaults to `--title`); supplying it for any
+other type errors. `--epic <KEY>` adds an Epic Link from the newly created
+issue to that Epic after publish; rejected when `--type epic`. Epic create
+also requires `providers.issues.epic_fields.name` to be configured (see the
+setup skill); missing config raises `ProviderOperationError`.
 
 ## Append a comment
 
@@ -85,6 +93,7 @@ link surfaces, and refreshes the cache. No flag means no provider call
 ```bash
 "$WORKFLOW" jira_issue_relationships.py <source-issue> \
   [--parent <KEY> | --replace-parent <KEY> | --remove-parent] \
+  [--epic <KEY> | --replace-epic <KEY> | --remove-epic] \
   [--blocked-by <KEY> ...] [--remove-blocked-by <KEY> ...] \
   [--blocking <KEY> ...]  [--remove-blocking <KEY> ...] \
   [--child <KEY> ...]     [--remove-child <KEY> ...] \
@@ -97,6 +106,9 @@ Flag semantics:
 - `--parent <KEY>` — add parent; errors if a parent already exists.
 - `--replace-parent <KEY>` — set parent, replacing any existing parent.
 - `--remove-parent` — detach the current parent; no-op when none exists.
+- `--epic <KEY>` — set Epic Link; errors if an Epic Link already exists.
+- `--replace-epic <KEY>` — set Epic Link, replacing the current value.
+- `--remove-epic` — clear the Epic Link; no-op when none exists.
 - `--blocked-by`, `--blocking`, `--child`, `--related` (repeatable) — add
   the link. `--related` uses the configured remote-link mapping and
   accepts a Jira key or absolute URL.
@@ -107,6 +119,10 @@ Flag semantics:
 - Idempotent: adding an existing link is a no-op; removing a missing link
   is a no-op.
 - `--parent`, `--replace-parent`, `--remove-parent` are mutually exclusive.
+- `--epic`, `--replace-epic`, `--remove-epic` are mutually exclusive among
+  themselves but independent of the parent group; `parent` and `epic` may
+  both appear in a single call against the same issue (Epic Link is a
+  separate customfield from `parent`).
 
 See `../../../../authoring/providers/jira-issue-relationships.md` for
 canonical intent usage (`parent`, `blocked_by`, `related`; invert
