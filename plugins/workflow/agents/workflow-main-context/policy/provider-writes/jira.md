@@ -57,17 +57,18 @@ setup skill); missing config raises `ProviderOperationError`.
   --issue <KEY> \
   --body-file <path> \
   [--type <task|bug|...>] \
-  [--state open|closed] [--state-reason completed|not_planned|reopened] \
+  [--state <verb>] \
   --json
 ```
 
-Required: `--issue`, `--body-file`. `--state` requires a configured
-`providers.issues.state_transitions.<open|closed>` transition name; the
-script POSTs that transition after the comment is added. State-transition
-mappings are a setup-time prereq — discover the workflow's transitions with
-`workflow_setup.py jira-state-transition-inspect` and confirm them into the
-config through the setup skill's State Transition Profiling step; missing
-config raises `ProviderOperationError`.
+Required: `--issue`, `--body-file`. `--state` is a free-form verb keyed in
+`providers.issues.state_transitions.<verb>`; the script looks up the
+configured transition name and POSTs that transition after the comment is
+added. State-transition mappings are a setup-time prereq — discover the
+workflow's transitions with `workflow_setup.py jira-state-transition-inspect`
+and confirm them into the config through the setup skill's State Transition
+Profiling step; an unknown verb (or a config with no `state_transitions`
+section) raises `ProviderOperationError`.
 
 ## Update an existing issue body
 
@@ -79,7 +80,7 @@ config raises `ProviderOperationError`.
   [--title <title>] \
   [--add-label <label> ...] [--remove-label <label> ...] \
   [--set-labels <label,label,...>] \
-  [--state open|closed] [--state-reason completed|not_planned|reopened] \
+  [--state <verb>] \
   --json
 ```
 
@@ -87,11 +88,11 @@ Required: `--issue`, `--body-file`. At least one of body, title, labels,
 or state must change. `--add-label` / `--remove-label` are repeatable;
 `--set-labels` takes a single comma-separated list and replaces the entire
 label set. Combining `--set-labels` with `--add-label` or `--remove-label`
-exits with a clear error. Optional `--title` and `--state` /
-`--state-reason` ride along on the same call. `--state` requires the
-configured transition mapping (see comment append) — discover and confirm
-it through the setup skill's State Transition Profiling step before
-relying on `--state` writes.
+exits with a clear error. Optional `--title` and `--state` ride along on
+the same call. `--state` is a free-form verb keyed in
+`providers.issues.state_transitions.<verb>` (see comment append) — discover
+and confirm verbs through the setup skill's State Transition Profiling step
+before relying on `--state` writes.
 
 ## Relationships: add, remove, or replace
 
@@ -145,11 +146,17 @@ relationships in one call after the issue create.
 
 | Intent           | Script                                                          |
 |------------------|-----------------------------------------------------------------|
-| Body-less change | `jira_issue_fields.py {close|reopen|assign|unassign|set-type}` |
+| Body-less change | `jira_issue_fields.py {<verb> ...|assign|unassign|set-type}`   |
 
-`jira_issue_fields.py` covers state transitions (consuming the configured
-`providers.issues.state_transitions` mapping), assignee changes, and
-issuetype swaps. `assign me` resolves the current Jira user via
+`jira_issue_fields.py` covers state transitions, assignee changes, and
+issuetype swaps. Lifecycle subcommands are dynamic: one subcommand per
+`<verb>` key in `providers.issues.state_transitions`. Each takes
+`<issue> [--comment <text>]` and POSTs the configured transition.
+`assign` / `unassign` / `set-type` are reserved static subcommands and
+cannot be overridden by a verb of the same name (setup rejects those
+verbs at config time). Invoking an unknown verb prints the configured
+verb list, the reserved verbs, and the config path on stderr and exits
+non-zero. `assign me` resolves the current Jira user via
 `/rest/api/<v>/myself`. `set-type` PUTs `fields.issuetype` using the
 `artifact_issue_types` mapping (built-in defaults plus
 `.workflow/config.yml` overrides). Use `jira_issue_writeback.py update`

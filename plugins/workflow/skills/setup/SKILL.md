@@ -25,12 +25,12 @@ Useful commands:
 "$WORKFLOW" workflow_setup.py jira-relationship-inspect --jira-site <url> --issue <KEY> --json
 "$WORKFLOW" workflow_setup.py jira-relationship-inspect --jira-site <url> --jira-project <PROJECT> --issue <ISSUE-123> --json
 "$WORKFLOW" workflow_setup.py jira-relationship-inspect --jira-site <url> --field-query <field-name-or-id> --json
-"$WORKFLOW" workflow_setup.py jira-state-transition-inspect --jira-site <url> --issue <OPEN-KEY> --issue <CLOSED-KEY> --json
+"$WORKFLOW" workflow_setup.py jira-state-transition-inspect --jira-site <url> --issue <KEY-A> --issue <KEY-B> --json
 "$WORKFLOW" workflow_setup.py jira-relationship-mappings --issue-link blocked_by=Blocks:inward --field child=parent:target:key --json
 "$WORKFLOW" workflow_setup.py build-config --project <project-root> --issue-provider <provider> --knowledge-provider <provider> <options...> --json
 "$WORKFLOW" workflow_setup.py build-config --issue-provider jira --knowledge-provider <provider> --jira-snapshot-hidden-comment-marker '!git-event' <options...> --json
 "$WORKFLOW" workflow_setup.py build-config --issue-provider jira --knowledge-provider <provider> --jira-epic-field-name <id> --jira-epic-field-link <id> --jira-epic-field-status <id> [--jira-epic-issue-type <NAME>] <options...> --json
-"$WORKFLOW" workflow_setup.py build-config --issue-provider jira --knowledge-provider <provider> --jira-state-transition closed=<name> [--jira-state-transition open=<name>] <options...> --json
+"$WORKFLOW" workflow_setup.py build-config --issue-provider jira --knowledge-provider <provider> --jira-state-transition <verb>=<transition> [--jira-state-transition <verb>=<transition> ...] <options...> --json
 "$WORKFLOW" workflow_setup.py write --project <project-root> --config <reviewed-yaml-file> --json
 "$WORKFLOW" workflow_config.py --project <project-root> --require --json
 ```
@@ -55,12 +55,14 @@ Useful commands:
    generate mapping YAML with `jira-relationship-mappings`. If the sample
    issues or confirmed mappings are unavailable, stop setup as incomplete; do
    not offer to defer Jira relationship setup until later.
-6. For Jira issue providers, ask whether the user plans to drive `--state`
-   close/reopen through the workflow. If yes, run the State Transition
-   Profiling step inside Jira Site Profiling, confirm the canonical-state
-   transition names, and pass them to `build-config` via
-   `--jira-state-transition closed=<name>` (repeatable). Skip when the user
-   does not intend to use `--state`.
+6. For Jira issue providers, ask whether the user plans to drive workflow
+   state transitions through `--state` or the dynamic `jira_issue_fields.py
+   <verb>` subcommands. If yes, run the State Transition Profiling step
+   inside Jira Site Profiling, accept the `auto_verbs` defaults derived by
+   `jira-state-transition-inspect`, collect any verb overrides, and pass
+   the confirmed mapping to `build-config` via
+   `--jira-state-transition <verb>=<transition>` (repeatable). Skip when
+   the user does not intend to drive transitions through the workflow.
 7. For Jira issue providers, ask whether generated `snapshot.md` files should
    hide automation comments by body marker. If the user gives markers such as
    `!git-event`, pass each one with
@@ -122,15 +124,22 @@ Useful commands:
   `--jira-epic-field-name|link|status` and `--jira-epic-issue-type`. Do not
   assume values; if the site lacks Jira Software or returns non-default field
   schema, ask the user for explicit ids.
-- Jira state transitions (`providers.issues.state_transitions.{open,closed}`)
-  are opt-in and workflow-dependent. When the user plans `--state`
-  close/reopen through `jira_issue_writeback.py`, `jira_issue_comments.py`,
-  or `jira_issue_lifecycle.py`, source the transition names from
-  `jira-state-transition-inspect` (run against sample issues that sit on each
-  side of the workflow so both close- and reopen-direction transitions are
-  visible), confirm the canonical-state mapping with the user, and pass it
-  to `build-config` via `--jira-state-transition closed=<name>` (repeatable).
-  Do not assume transition names; the Jira API only returns transitions
+- Jira state transitions (`providers.issues.state_transitions.<verb>`) are
+  opt-in and workflow-dependent, and the verb space is free-form except
+  for the reserved CLI verbs (`assign` / `unassign` / `set-type`). When
+  the user plans to drive transitions through `--state <verb>` on
+  `jira_issue_writeback.py` / `jira_issue_comments.py`, or through
+  `jira_issue_fields.py <verb>`, source the transition names from
+  `jira-state-transition-inspect` (run against sample issues that sit on
+  each side of the workflow so transitions in both directions are visible).
+  The inspect output includes an `auto_verbs` map derived from each
+  observed transition name (lowercase + non-alphanumeric → hyphen), with
+  collisions against reserved verbs or duplicate slugs skipped + warned.
+  Confirm the verb-to-transition mapping with the user, accepting the
+  derived verbs by default and overriding only when the slug is awkward
+  or was skipped, then pass each confirmed pair to `build-config` via
+  `--jira-state-transition <verb>=<transition>` (repeatable). Do not
+  assume transition names; the Jira API only returns transitions
   reachable from the issue's current state.
 - Provider profile documents may seed defaults only when they explicitly discuss
   workflow providers. Ignore unrelated Git remote or commit-history documents.
@@ -161,17 +170,23 @@ confirmation, then use only the exact confirmed values in setup.
    `epic.warnings` indicate a non-default schema, ask for explicit field ids
    before continuing. Skip this step when the site lacks Jira Software or the
    user has no Epic intent.
-5. When the user plans `--state` close/reopen through the workflow, collect
-   sample issue keys reachable on each side of the workflow (an open-state
-   issue and a closed-state issue, at minimum) and run
-   `jira-state-transition-inspect --jira-site <url> --issue <OPEN-KEY> --issue
-   <CLOSED-KEY>`. Show the observed transition names per sample issue and the
-   `observed_transition_names` union. Ask the user to confirm which transition
-   maps to `closed` (and `open` when reopen is also needed). The Jira API only
-   returns transitions reachable from each issue's current state, so both sides
-   are typically required. Pass the confirmed mapping to `build-config` via
-   `--jira-state-transition closed=<name>` (repeatable). Skip this step when
-   the user does not intend to drive close/reopen through `--state`.
+5. When the user plans to drive workflow state transitions, collect sample
+   issue keys reachable on each side of the workflow (typical: one issue
+   in an early state and one in a terminal state) and run
+   `jira-state-transition-inspect --jira-site <url> --issue <KEY-A> --issue
+   <KEY-B>`. Show the observed transition names per sample issue, the
+   `observed_transition_names` union, the `auto_verbs` mapping
+   (lowercase + non-alphanumeric → hyphen of each transition name), and
+   any `warnings` (transitions whose derived verb collided with a reserved
+   CLI verb or with another transition's slug are listed there). Ask the
+   user to confirm each verb-to-transition pair, accepting the
+   `auto_verbs` default when the slug is fine or overriding to a custom
+   verb when the default was skipped or is awkward. The Jira API only
+   returns transitions reachable from each issue's current state, so
+   sampling both sides is typically required. Pass the confirmed mapping
+   to `build-config` via `--jira-state-transition <verb>=<transition>`
+   (repeatable). Skip this step when the user does not intend to drive
+   transitions through the workflow.
 6. If issue creation behavior matters, inspect issue type metadata and ask
    before running any create/update test. Sub-task creation is a mutation.
 7. Determine label policy from the user or provider profile. Labels are opt-in;
