@@ -58,9 +58,7 @@ Non-triggers on their own (do not publish a review for these):
 
 - Timestamp: !`date +"%Y-%m-%d_%H%M"`
 - Timezone: !`date +"%Z %z"`
-- Resolved workflow config: !`"$WORKFLOW" workflow_config.py --require --json 2>/dev/null | head -40`
 - Git status preview: !`git status --short | head -10`
-- Recent issue-prefixed commits: !`git log --oneline -20 origin/main..HEAD 2>/dev/null || git log --oneline -20`
 
 ## Task
 
