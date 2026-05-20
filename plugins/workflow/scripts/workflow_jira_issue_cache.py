@@ -200,6 +200,7 @@ class JiraDataCenterIssueCache:
                     "api_version": site.api_version,
                     "key": key,
                     "project": key.split("-", 1)[0],
+                    "state": _normalize_optional(normalized.get("state")),
                     "source_updated_at": source_updated_at,
                     "created_at": _normalize_optional(normalized.get("createdAt")),
                     "fetched_at": now,
