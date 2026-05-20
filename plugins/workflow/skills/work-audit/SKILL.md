@@ -19,7 +19,7 @@ Inputs from `$ARGUMENTS`:
 
 1. **Read the issue.**
    - Fetch with the workflow issue-fetch command and `$0` as the ref, default cache policy.
-   - Extract: Description, Change Plan, Unit Test Strategy, Acceptance Criteria, any other named sections. Note explicit deferrals (e.g. "follow-up issue", "out of scope").
+   - Extract: Description, Affected Paths, Unit Test Strategy, Acceptance Criteria, any other named sections. Note explicit deferrals (e.g. "follow-up issue", "out of scope").
 
 2. **Read the work.**
    - Enumerate commits in the range attributable to this issue (subjects prefixed with the issue ref per repo convention).
@@ -36,15 +36,15 @@ Walk each Acceptance Criteria bullet. For each, identify the concrete artifact t
 - An observable code path in the diff that the AC names.
 - A command output, smoke run, or provider-side state change captured in commit messages or comments.
 
-A bullet is `verified` only when the evidence names the same surface the AC names. Symmetry ("the shared helper covers both providers, so the GitHub publish AC is satisfied") is `unverified` — the AC named the publish boundary, so the evidence must exercise the publish boundary. A bullet satisfied via a different mechanism than the Change Plan proposed still needs its own evidence.
+A bullet is `verified` only when the evidence names the same surface the AC names. Symmetry ("the shared helper covers both providers, so the GitHub publish AC is satisfied") is `unverified` — the AC named the publish boundary, so the evidence must exercise the publish boundary. A bullet satisfied via a different mechanism than the Affected Paths proposed still needs its own evidence.
 
 ### 2. Skipped obvious work
 
-Read the issue body's actionable sections (Change Plan, Unit Test Strategy, explicit bullet lists). For each named action item:
+Read the issue body's actionable sections (Affected Paths, Unit Test Strategy, explicit bullet lists). For each named action item:
 
 - Locate it in the diff.
 - If a strategy section names tests (e.g. "Regression test for X"), each named test must be present.
-- If the Change Plan names a code change (e.g. "consolidate helper Y"), that change must be in the diff.
+- If Affected Paths names a code change (e.g. "consolidate helper Y"), that change must be in the diff.
 
 Items that are merely *implied* by the surrounding work (e.g. "obviously you'd also touch Z") count too — flag them, then let the user judge.
 

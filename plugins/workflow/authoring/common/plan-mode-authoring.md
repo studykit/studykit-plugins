@@ -40,7 +40,8 @@ section through conversation. Add optional sections from `./issue-body.md`
 `task` required sections (`./task-authoring.md`):
 
 - `Description`
-- `Change Plan` (when expected scope is known)
+- `Approach` (when implementation strategy is non-obvious)
+- `Affected Paths` (when expected scope is known)
 - `Unit Test Strategy`
 - `Acceptance Criteria`
 
@@ -59,8 +60,8 @@ into `Description`:
 | Plan-mode content | Target section |
 | --- | --- |
 | Motivation, problem, why now | `Description` |
-| High-level approach | `Description` |
-| Files, packages, APIs to touch | `Change Plan` |
+| High-level approach | `Approach` |
+| Files, packages, APIs to touch | `Affected Paths` |
 | Test scenarios, isolation, locations | `Unit Test Strategy` |
 | Observable completion conditions | `Acceptance Criteria` |
 | Reproduction steps (bug) | `Reproduction` |

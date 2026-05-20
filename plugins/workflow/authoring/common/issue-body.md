@@ -93,7 +93,7 @@ Purpose: name what the issue explicitly does not cover.
 
 Use when the issue title or `Description` could be read as covering broader work, or when a related concern was deliberately deferred to a follow-up.
 
-Do not use when the body is small enough that scope is obvious from `Description` and `Change Plan`, or when the only deferred item is a generic disclaimer with no concrete follow-up.
+Do not use when the body is small enough that scope is obvious from `Description` and `Affected Paths`, or when the only deferred item is a generic disclaimer with no concrete follow-up.
 
 List one deferred item per bullet with a short reason or link to the follow-up.
 

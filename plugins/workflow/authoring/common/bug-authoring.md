@@ -38,7 +38,8 @@ The `Acceptance Criteria` section must exist even when the bug is linked to a us
 Optional sections:
 
 - `Environment` — version, browser, OS, tenant, data shape, feature flags, or deployment context.
-- `Change Plan` — forward-looking scope fence naming files, packages, APIs, or migration steps expected to change.
+- `Approach` — fix strategy: how the bug will be addressed, including diagnosis sequencing and architectural choices.
+- `Affected Paths` — forward-looking scope fence naming files, packages, APIs, or migration steps expected to change.
 - `Interface Contracts` — contracts the fix consumes or restores.
 - `Out of Scope` — work explicitly excluded from this issue. See `./issue-body.md`.
 - `Alternatives Considered` — design options evaluated but not chosen. See `./issue-body.md`.
@@ -72,7 +73,7 @@ Use linked external evidence only when evidence has lasting value, such as:
 - Minimal repro repositories.
 - Problematic input files.
 
-Production source paths are recorded by git history. Mention planned source changes in the `Change Plan` section when they help scope the fix.
+Production source paths are recorded by git history. Mention planned source changes in the `Affected Paths` section when they help scope the fix.
 
 ## Completion criteria
 

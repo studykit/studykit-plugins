@@ -27,7 +27,8 @@ Common required sections are defined by `../common/bug-authoring.md`:
 Common optional sections are defined by `../common/bug-authoring.md` and `../common/issue-body.md`:
 
 - `h2. Environment`
-- `h2. Change Plan`
+- `h2. Approach`
+- `h2. Affected Paths`
 - `h2. Interface Contracts`
 - `h2. Out of Scope`
 - `h2. Alternatives Considered`
