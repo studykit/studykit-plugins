@@ -95,6 +95,9 @@ def fetch_cache_payload(
             )
         )
         issue_dir = cache.issue_dir(site, issue_key)
+        comment_paths = tuple(
+            display_project_path(path, config.root) for path in cache.comment_files(site, issue_key)
+        )
         contexts.append(
             IssueFetchContext(
                 number=issue_key,
@@ -103,7 +106,7 @@ def fetch_cache_payload(
                 state=str(response.payload.get("state") or "").upper(),
                 cache_hit=cache_hit_from_payload(response.payload, default=False),
                 provider_kind="jira",
-                issue_file="snapshot.md",
+                comments=comment_paths,
             )
         )
 

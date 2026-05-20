@@ -1599,7 +1599,7 @@ def test_user_prompt_caches_jira_issue_and_injects_snapshot_path(
     payload = json.loads(captured.getvalue())
     context = payload["hookSpecificOutput"]["additionalContext"]
     assert payload["hookSpecificOutput"]["hookEventName"] == "UserPromptSubmit"
-    assert "- TEST-1234 → `.workflow-cache/jira/jira.example.test/issues/TEST-1234/snapshot.md` (refreshed)" in context
+    assert "- TEST-1234 → `.workflow-cache/issues/TEST-1234/issue.md` (refreshed)" in context
     assert "#TEST-1234" not in context
     assert "Jira hook cache context" not in context
     assert [request.args for request in runner.requests] == [
@@ -1609,11 +1609,9 @@ def test_user_prompt_caches_jira_issue_and_injects_snapshot_path(
     assert (
         tmp_path
         / ".workflow-cache"
-        / "jira"
-        / "jira.example.test"
         / "issues"
         / "TEST-1234"
-        / "snapshot.md"
+        / "issue.md"
     ).is_file()
 
 
@@ -2007,11 +2005,9 @@ def test_claude_pre_write_blocks_jira_cache_snapshot_edits(
     snapshot = (
         tmp_path
         / ".workflow-cache"
-        / "jira"
-        / "jira.example.test"
         / "issues"
         / "TEST-1234"
-        / "snapshot.md"
+        / "issue.md"
     )
     snapshot.parent.mkdir(parents=True)
     snapshot.write_text(

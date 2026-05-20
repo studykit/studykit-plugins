@@ -807,7 +807,7 @@ def _add_config_build_args(parser: argparse.ArgumentParser) -> None:
         "--jira-snapshot-hidden-comment-marker",
         action="append",
         default=[],
-        help="repeatable comment body marker hidden from generated Jira snapshot.md files, e.g. !git-event",
+        help="repeatable comment body marker excluded from cached Jira comment-*.md files, e.g. !git-event",
     )
     parser.add_argument("--jira-relationship-mappings-json", help="YAML/JSON mapping for Jira relationship writes")
     parser.add_argument("--jira-relationship-mappings-file", type=Path, help="file containing Jira relationship mappings")

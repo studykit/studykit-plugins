@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 
 import pytest
+import yaml
 
 _PLUGIN_ROOT = Path(__file__).resolve().parent.parent
 _SCRIPTS_DIR = _PLUGIN_ROOT / "scripts"
@@ -317,6 +318,13 @@ def jira_site(project: Path):
     return jira_data_center_site_from_provider_config(config.issues)
 
 
+def _split_issue_md(text: str) -> tuple[str, str]:
+    if not text.startswith("---"):
+        raise AssertionError("issue.md missing YAML frontmatter")
+    _opening, frontmatter, body = text.split("---", 2)
+    return frontmatter, body
+
+
 def test_data_center_provider_fetches_issue_remote_links_and_writes_llm_snapshot(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -353,21 +361,50 @@ def test_data_center_provider_fetches_issue_remote_links_and_writes_llm_snapshot
     cache = JiraDataCenterIssueCache.for_project(tmp_path)
     site = jira_site(tmp_path)
     issue_dir = cache.issue_dir(site, "TEST-1234")
-    assert issue_dir == tmp_path / ".workflow-cache" / "jira" / "jira.example.test" / "issues" / "TEST-1234"
+    assert issue_dir == tmp_path / ".workflow-cache" / "issues" / "TEST-1234"
     assert (issue_dir / "issue.json").is_file()
     assert (issue_dir / "remote-links.json").is_file()
-    snapshot = (issue_dir / "snapshot.md").read_text(encoding="utf-8")
-    assert "# TEST-1234: Support Jira Data Center" in snapshot
-    assert "Data Center description." in snapshot
-    assert "Please keep Data Center first." in snapshot
-    assert "https://example.com/design" in snapshot
-    assert "Parent: TEST-1200 (Parent task)" in snapshot
-    assert "Blocked by: TEST-1233 (Blocking predecessor)" in snapshot
-    assert "Blocking: TEST-1235 (Follow-up)" in snapshot
-    assert "## Raw Cache" not in snapshot
-    assert "issue.json" not in snapshot
-    assert "remote-links.json" not in snapshot
-    assert "metadata.yml" not in snapshot
+
+    issue_md_text = (issue_dir / "issue.md").read_text(encoding="utf-8")
+    frontmatter_text, body = _split_issue_md(issue_md_text)
+    issue_md_frontmatter = yaml.safe_load(frontmatter_text)
+    assert "key" not in issue_md_frontmatter
+    assert issue_md_frontmatter["title"] == "Support Jira Data Center"
+    assert issue_md_frontmatter["state"] == "In Progress"
+    assert issue_md_frontmatter["labels"] == ["workflow", "jira"]
+    assert issue_md_frontmatter["remote_links"] == [
+        {"title": "Design note", "url": "https://example.com/design", "relationship": "mentioned in"}
+    ]
+    current_relationships = issue_md_frontmatter["relationships"]["current"]
+    assert current_relationships["parent"] == "TEST-1200"
+    assert current_relationships["children"] == ["TEST-1237"]
+    assert current_relationships["dependencies"] == {
+        "blocked_by": ["TEST-1233"],
+        "blocking": ["TEST-1235"],
+    }
+    assert current_relationships["related"] == ["TEST-1236"]
+    assert {(entry["type"], entry["direction"], entry["target"]) for entry in current_relationships["issue_links"]} == {
+        ("Blocks", "outward", "TEST-1235"),
+        ("Blocks", "inward", "TEST-1233"),
+        ("Relates", "outward", "TEST-1236"),
+    }
+    assert body.strip() == "Data Center description."
+    assert "Please keep Data Center first." not in issue_md_text
+    assert "## Description" not in issue_md_text
+    assert "## Comments" not in issue_md_text
+    assert "## Remote Links" not in issue_md_text
+    assert "## Workflow Relationships" not in issue_md_text
+    assert "## Issue Links" not in issue_md_text
+    assert not (issue_dir / "metadata.yml").exists()
+
+    comment_files = cache.comment_files(site, "TEST-1234")
+    assert [path.name for path in comment_files] == [
+        "comment-2026-05-15T093000Z-20001.md",
+    ]
+    comment_text = comment_files[0].read_text(encoding="utf-8")
+    assert "Please keep Data Center first." in comment_text
+    assert "provider_comment_id: '20001'" in comment_text
+    assert "author: Example User" in comment_text
 
 
 def test_data_center_snapshot_hides_comments_with_configured_markers(
@@ -420,11 +457,19 @@ def test_data_center_snapshot_hides_comments_with_configured_markers(
     site = jira_site(tmp_path)
     issue_dir = cache.issue_dir(site, "TEST-1234")
     assert "!git-event" in (issue_dir / "issue.json").read_text(encoding="utf-8")
-    snapshot = (issue_dir / "snapshot.md").read_text(encoding="utf-8")
-    assert "Please keep Data Center first." in snapshot
-    assert "Human follow-up remains visible." in snapshot
-    assert "!git-event" not in snapshot
-    assert "pushed commit abc123" not in snapshot
+
+    comment_file_names = {path.name for path in cache.comment_files(site, "TEST-1234")}
+    assert comment_file_names == {
+        "comment-2026-05-15T093000Z-20001.md",
+        "comment-2026-05-15T094500Z-20003.md",
+    }
+    visible_bodies = "\n".join(
+        path.read_text(encoding="utf-8") for path in cache.comment_files(site, "TEST-1234")
+    )
+    assert "Please keep Data Center first." in visible_bodies
+    assert "Human follow-up remains visible." in visible_bodies
+    assert "!git-event" not in visible_bodies
+    assert "pushed commit abc123" not in visible_bodies
 
 
 def test_default_cache_policy_uses_data_center_cache_hit_without_curl(tmp_path: Path) -> None:
@@ -443,7 +488,9 @@ def test_default_cache_policy_uses_data_center_cache_hit_without_curl(tmp_path: 
 
     assert response.payload["body"] == "Cached Jira body."
     assert response.payload["cache"]["hit"] is True
-    assert response.payload["cache"]["snapshot"].endswith("/snapshot.md")
+    assert response.payload["cache"]["issue_file"].endswith("/issue.md")
+    assert "issue_json" not in response.payload["cache"]
+    assert "remote_links_json" not in response.payload["cache"]
     assert runner.requests == []
 
 
@@ -1432,7 +1479,7 @@ def test_data_center_stale_cache_blocks_write_before_put(tmp_path: Path) -> None
     assert response.payload["reread_required"] is True
     assert response.payload["cache_refreshed"] is True
     assert response.payload["freshness"]["status"] == "stale"
-    assert "snapshot.md" in "\n".join(response.payload["reread_paths"])
+    assert "issue.md" in "\n".join(response.payload["reread_paths"])
     assert all(request.args != curl_write_args() for request in runner.requests)
 
 

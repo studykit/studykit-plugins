@@ -174,7 +174,7 @@ class JiraDataCenterIssueNativeProvider(IssueProvider):
                     site,
                     raw_issue,
                     remote_links=remote_links,
-                    snapshot_hidden_comment_markers=_jira_snapshot_hidden_comment_markers(settings),
+                    hidden_comment_markers=_jira_snapshot_hidden_comment_markers(settings),
                 )
 
             return filter_jira_payload(
@@ -640,7 +640,7 @@ class JiraDataCenterIssueNativeProvider(IssueProvider):
             metadata = FreshnessMetadata(
                 source_updated_at=None,
                 fetched_at=None,
-                path=cache.metadata_file(site, issue_key),
+                path=cache.issue_file(site, issue_key),
                 target=target,
             )
         provider_current = get_issue(site, issue_key, runner=self.runner)
@@ -665,7 +665,7 @@ class JiraDataCenterIssueNativeProvider(IssueProvider):
             site,
             raw_issue,
             remote_links=remote_links,
-            snapshot_hidden_comment_markers=_jira_snapshot_hidden_comment_markers(settings),
+            hidden_comment_markers=_jira_snapshot_hidden_comment_markers(settings),
         )
 
     def _stale_cache_block_payload(
@@ -713,12 +713,9 @@ class JiraDataCenterIssueNativeProvider(IssueProvider):
         site: Any,
         issue_key: str,
     ) -> list[str]:
-        return [
-            str(cache.snapshot_file(site, issue_key)),
-            str(cache.metadata_file(site, issue_key)),
-            str(cache.issue_json_file(site, issue_key)),
-            str(cache.remote_links_json_file(site, issue_key)),
-        ]
+        paths = [str(cache.issue_file(site, issue_key))]
+        paths.extend(str(path) for path in cache.comment_files(site, issue_key))
+        return paths
 
 
 def get_issue(

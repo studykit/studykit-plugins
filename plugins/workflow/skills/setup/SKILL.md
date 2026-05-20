@@ -63,9 +63,9 @@ Useful commands:
    the confirmed mapping to `build-config` via
    `--jira-state-transition <verb>=<transition>` (repeatable). Skip when
    the user does not intend to drive transitions through the workflow.
-7. For Jira issue providers, ask whether generated `snapshot.md` files should
-   hide automation comments by body marker. If the user gives markers such as
-   `!git-event`, pass each one with
+7. For Jira issue providers, ask whether cached `comment-*.md` projections
+   should hide automation comments by body marker. If the user gives markers
+   such as `!git-event`, pass each one with
    `--jira-snapshot-hidden-comment-marker`.
 8. Collect the commit reference style.
 9. Run `capabilities` for the selected providers and show limitations before
@@ -109,11 +109,11 @@ Useful commands:
 - When Jira setup needs site-specific field names, hierarchy semantics,
   issue-type rules, label policy, or body-renderer behavior, run the Jira site
   profiling flow in this skill before building the final config.
-- Jira snapshot comment hiding is opt-in. Use
+- Jira comment hiding is opt-in. Use
   `providers.issues.snapshot.hidden_comment_markers` only when the user or
-  provider profile supplies exact body markers. The markers hide matching
-  comments from generated `snapshot.md` files only; raw provider cache files
-  still retain the original comments.
+  provider profile supplies exact body markers. The markers skip writing
+  matching comments as cached `comment-*.md` projections; the raw provider
+  `issue.json` cache still retains the original comments.
 - Jira labels are opt-in. Do not copy local labels into Jira unless the user or
   provider profile explicitly asks for label writes.
 - Jira Epic configuration (`providers.issues.epic_fields.{name,link,status}`
