@@ -12,7 +12,7 @@ Leave durable continuation context for a fresh session that cannot see this conv
 ## Core rules
 
 - Refresh in-issue resume context first: for every touched mid-flight issue, rewrite the `Resume` section in the issue body so the issue alone shows current approach, who/what it is waiting for, open questions, and the next step. Append a comment only for narrative-worthy events: decision pivots, blocker resolutions, or approach changes. Follow `${CLAUDE_PLUGIN_ROOT}/authoring/common/issue-body.md` for `Resume` slot meaning and reference form.
-- The cached `issue.md` and `comment-*.md` projections are read-only. Resume rewrites and comments must go through the configured provider write scripts via `$WORKFLOW` per `${CLAUDE_PLUGIN_ROOT}/agents/workflow-main-context/policy/provider-writes/`. Mutations require a temp body file, user approval, and the freshness-check flow.
+- The cached `issue.md` and `comment-*.md` projections are read-only. Resume rewrites and comments must go through the configured provider write scripts via `$WORKFLOW` per `${CLAUDE_PLUGIN_ROOT}/main-context/policy/provider-writes/`. Mutations require a temp body file, user approval, and the freshness-check flow.
 - Session-level residual that does not fit any in-flight issue's body lands in `review`-type issues. Each review item holds one concern only (`finding` / `gap` / `question`) per `${CLAUDE_PLUGIN_ROOT}/authoring/common/review-authoring.md`. Do not pack multiple concerns into one review; do not create a review item when an existing in-flight issue's `Resume` or a comment can hold it.
 
 ## Handoff gate
@@ -28,7 +28,7 @@ Try each candidate's natural anchor before treating it as session-level residual
 | **In-flight issue state** — approach, blocker, open questions, next step on a single issue (including failing validation, which lands in the `Waiting for` slot) | That issue's `Resume` section via the configured provider's `*_issue_writeback.py update --body-file` flow | None when the section captures it cleanly |
 | **Narrative-worthy event** — decision pivot, blocker resolution, approach change on one issue | A comment on that issue via `*_issue_comments.py append --body-file`. Per project memory, do not list commit SHAs in the comment by default — the timeline already links commits whose subjects carry the `<ref>` prefix | None; sequencing across multiple issues is recoverable from the timeline |
 | **Cross-cutting decision across siblings** — same parent, multiple in-flight issues | A comment on the common parent (epic, where applicable), with each affected child's `Resume` Open-questions slot updated to cite the parent's decision. Create an `epic` only when sibling issues need a shared narrative home | An unresolved finding / gap / question exposed by the decision → one review item per concern |
-| **Anchorless work** — production source, build, tooling, config with no clean single-issue anchor | Parent issue's `Resume` / a comment when cleanly anchored; otherwise the commit message, prefixed with the issue ref per `${CLAUDE_PLUGIN_ROOT}/agents/workflow-main-context/commit-prefix.md` | Unanchored change whose rationale still matters beyond the commit body → one review item describing the gap or question |
+| **Anchorless work** — production source, build, tooling, config with no clean single-issue anchor | Parent issue's `Resume` / a comment when cleanly anchored; otherwise the commit message, prefixed with the issue ref per `${CLAUDE_PLUGIN_ROOT}/main-context/commit-prefix.md` | Unanchored change whose rationale still matters beyond the commit body → one review item describing the gap or question |
 | **Branch / commit state** | Nothing when obvious from `git status` and `git log --oneline origin/main..HEAD` | Non-obvious state (mid-merge, mid-rebase, divergence, opaque commits, commits whose `<ref>` prefix does not match the in-flight issue set) → one review item describing the gap |
 
 Long-lived user or project preferences belong in durable project guidance (`CLAUDE.md`, or project memory only when explicitly requested), not a review issue.
@@ -61,7 +61,7 @@ Non-triggers on their own (do not publish a review for these):
 1. **Refresh touched mid-flight issues before anything else.**
    - Scope: every issue touched, opened, advanced, blocked, or relied on this session, excluding ones already closed / discarded / superseded at the provider.
    - For each, draft the new `Resume` section as a current snapshot per `${CLAUDE_PLUGIN_ROOT}/authoring/common/issue-body.md`: Approach / Waiting for / Open questions / Next. Remove stale items; the `Resume` section is rewritten in place and does not preserve history.
-   - Resolve authoring paths first: `"$WORKFLOW" authoring_resolver.py --type <type> --json` and read the returned files. The provider-write contract (publish / append / update body-file flow, freshness handling) lives at `${CLAUDE_PLUGIN_ROOT}/agents/workflow-main-context/policy/provider-writes/<provider>.md` — open it before drafting.
+   - Resolve authoring paths first: `"$WORKFLOW" authoring_resolver.py --type <type> --json` and read the returned files. The provider-write contract (publish / append / update body-file flow, freshness handling) lives at `${CLAUDE_PLUGIN_ROOT}/main-context/policy/provider-writes/<provider>.md` — open it before drafting.
    - Apply the rewrite via `*_issue_writeback.py update --issue <ref> --body-file <path>`. Present the draft body to the user for approval before invoking the script. On `status=blocked` (freshness drift), reread the listed cache paths and retry; never bypass the freshness check.
    - For narrative-worthy events (decision pivot, blocker resolution, approach change), add a comment via `*_issue_comments.py append --issue <ref> --body-file <path>`. Do not log routine status changes. Do not list commit SHAs in the comment body by default; the timeline already links commits whose subjects carry the issue ref prefix.
    - For cross-cutting decisions across siblings sharing a parent, leave the parent's comment as the durable record and update each affected child's `Resume` Open-questions slot to cite the parent.
@@ -70,7 +70,7 @@ Non-triggers on their own (do not publish a review for these):
    - Inspect `git status --short` and `git diff --stat` before deciding.
    - Stage only changes that clearly belong to this session; leave unrelated user changes untouched and mention them in the report. Ask only if ownership is unclear.
    - Split commits by coherent meaning: implementation source, tests, scaffolding, tooling, build, config, or unrelated cleanup.
-   - Prefix each commit subject with the related issue ref per `${CLAUDE_PLUGIN_ROOT}/agents/workflow-main-context/commit-prefix.md`. Ask the user if the prefix is unclear.
+   - Prefix each commit subject with the related issue ref per `${CLAUDE_PLUGIN_ROOT}/main-context/commit-prefix.md`. Ask the user if the prefix is unclear.
    - Skip this step if there are no relevant non-handoff changes.
 
 3. **Run the Stage 2 residual check.**
