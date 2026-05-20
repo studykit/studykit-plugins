@@ -84,7 +84,7 @@ def fields_payload(
     context = ProviderContext(project=config.root, artifact_type=artifact_type)
 
     if verb in {"close", "reopen"}:
-        state = "closed" if verb == "close" else "open"
+        state = verb
         if comment:
             payload: dict[str, Any] = {
                 "issue": issue_key,

@@ -182,7 +182,10 @@ def build_parser() -> argparse.ArgumentParser:
         dest="set_labels",
         help="replace the label set with a comma-separated list",
     )
-    update.add_argument("--state", choices=["open", "closed"])
+    update.add_argument(
+        "--state",
+        help="workflow verb keyed in providers.issues.state_transitions (free-form)",
+    )
     update.add_argument(
         "--state-reason",
         choices=["completed", "not_planned", "reopened"],
