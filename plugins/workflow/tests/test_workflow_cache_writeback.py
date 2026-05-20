@@ -357,3 +357,62 @@ def test_jira_update_applies_inline_state_transition(tmp_path: Path) -> None:
     write_requests = [request for request in runner.requests if request.args == curl_write_args()]
     assert any('\\"transition\\":{\\"id\\":\\"31\\"}' in str(request.input_text) for request in write_requests)
     assert not body_file.exists()
+
+
+def test_jira_update_accepts_free_form_state_verb(tmp_path: Path) -> None:
+    write_jira_config(
+        tmp_path,
+        extra_settings="""
+    state_transitions:
+      in-progress: In Progress
+""",
+    )
+    _seed_cached_issue(tmp_path)
+    body_file = _write_body_file(tmp_path, "Picking this up.\n")
+    runner = FakeRunner(
+        {
+            curl_args(jira_issue_url()): [
+                result(curl_args(jira_issue_url()), stdout=json.dumps(jira_issue_payload())),
+                result(curl_args(jira_issue_url()), stdout=json.dumps(jira_issue_payload(body="Picking this up.\n"))),
+            ],
+            curl_args(jira_transitions_url()): result(
+                curl_args(jira_transitions_url()),
+                stdout=json.dumps({"transitions": [{"id": "21", "name": "In Progress"}]}),
+            ),
+            curl_write_args(): [
+                result(curl_write_args(), stdout=""),
+                result(curl_write_args(), stdout=""),
+            ],
+            curl_args(jira_remote_links_url()): result(
+                curl_args(jira_remote_links_url()),
+                stdout=json.dumps(remote_links_payload()),
+            ),
+        }
+    )
+    stdout = io.StringIO()
+
+    code = jira_issue_writeback_main(
+        [
+            "--project",
+            str(tmp_path),
+            "update",
+            "--issue",
+            "TEST-1234",
+            "--body-file",
+            str(body_file),
+            "--state",
+            "in-progress",
+            "--json",
+        ],
+        stdout=stdout,
+        runner=runner,
+    )
+
+    payload = json.loads(stdout.getvalue())
+    assert code == 0
+    assert payload["state_changed"] is True
+    assert payload["state"]["verb"] == "in-progress"
+    assert payload["state"]["transition_name"] == "In Progress"
+    write_requests = [request for request in runner.requests if request.args == curl_write_args()]
+    assert any('\\"transition\\":{\\"id\\":\\"21\\"}' in str(request.input_text) for request in write_requests)
+    assert not body_file.exists()
