@@ -3,6 +3,12 @@ name: handoff
 description: "Wrap a workflow session: refresh in-flight issue Resume sections and capture residual session findings, gaps, or questions as review issues."
 argument-hint: "[additional requirements]"
 disable-model-invocation: true
+allowed-tools:
+  - 'Bash("$WORKFLOW":*)'
+  - 'Bash(date:*)'
+  - 'Bash(git status:*)'
+  - 'Bash(git log:*)'
+  - 'Bash(git diff:*)'
 ---
 
 # Workflow Session Handoff
