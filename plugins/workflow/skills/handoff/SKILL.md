@@ -65,7 +65,7 @@ Non-triggers on their own (do not publish a review for these):
 1. **Refresh touched mid-flight issues before anything else.**
    - Scope: every issue touched, opened, advanced, blocked, or relied on this session, excluding ones already closed / discarded / superseded at the provider.
    - For each, draft the new `Resume` section as a current snapshot per `${CLAUDE_PLUGIN_ROOT}/authoring/common/issue-body.md`: Approach / Waiting for / Open questions / Next. Remove stale items; the `Resume` section is rewritten in place and does not preserve history.
-   - Resolve authoring paths first: `"$WORKFLOW" authoring_resolver.py --type <type> --json` and read the returned files. The provider-write contract (publish / append / update body-file flow, freshness handling) lives at `${CLAUDE_PLUGIN_ROOT}/main-context/policy/provider-writes/<provider>.md` — open it before drafting.
+   - Resolve authoring paths first: `"$WORKFLOW" authoring_resolver.py --type <type>` and read the returned files. The provider-write contract (publish / append / update body-file flow, freshness handling) lives at `${CLAUDE_PLUGIN_ROOT}/main-context/policy/provider-writes/<provider>.md` — open it before drafting.
    - Apply the rewrite via `*_issue_writeback.py update --issue <ref> --body-file <path>`. Present the draft body to the user for approval before invoking the script. On `status=blocked` (freshness drift), reread the listed cache paths and retry; never bypass the freshness check.
    - For narrative-worthy events (decision pivot, blocker resolution, approach change), add a comment via `*_issue_comments.py append --issue <ref> --body-file <path>`. Do not log routine status changes. Do not list commit SHAs in the comment body by default; the timeline already links commits whose subjects carry the issue ref prefix.
    - For cross-cutting decisions across siblings sharing a parent, leave the parent's comment as the durable record and update each affected child's `Resume` Open-questions slot to cite the parent.
@@ -82,7 +82,7 @@ Non-triggers on their own (do not publish a review for these):
    - Otherwise, list each residual concern atomically. One concern per review item. The concern type is one of `finding`, `gap`, or `question` per `${CLAUDE_PLUGIN_ROOT}/authoring/common/review-authoring.md`.
 
 4. **Publish one `review` issue per residual concern.**
-   - Resolve authoring paths: `"$WORKFLOW" authoring_resolver.py --type review --json` and read the returned files.
+   - Resolve authoring paths: `"$WORKFLOW" authoring_resolver.py --type review` and read the returned files.
    - Draft each review body per `${CLAUDE_PLUGIN_ROOT}/authoring/common/review-authoring.md`: a `Description` that states the single concern, why it matters, and what would resolve it; optional `Suggested Fix`, `Evidence`, `Resume`. Identify the target issue or content per the review-target rules; if truly cross-cutting, say so explicitly in `Description`.
    - Reference related in-flight issues by provider-native ref (`#NNN` for GitHub Issues, `KEY-NNN` for Jira). Do not use cache projection paths as identity. Do not paste issue body or comment content; link instead.
    - Publish via `*_issue_drafts.py publish --type review --title <title> --body-file <path>` after presenting the draft and obtaining user approval. Link siblings or the parent using relationship flags when appropriate.

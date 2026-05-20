@@ -19,7 +19,6 @@ from workflow_issue_cli_output import (
     IssueFetchContext,
     cache_hit_from_payload,
     display_project_path,
-    format_issue_cache_context_from_payload,
     format_issue_cache_json,
 )
 from workflow_jira_data_center_client import resolve_jira_data_center_site
@@ -44,7 +43,6 @@ def build_parser() -> argparse.ArgumentParser:
         default=CACHE_POLICY_DEFAULT,
         help="provider cache policy",
     )
-    parser.add_argument("--json", action="store_true", help="emit JSON")
     parser.add_argument("references", nargs="+", help="Jira issue keys or text containing configured Jira issue keys")
     return parser
 
@@ -140,11 +138,7 @@ def main(
         print(f"Jira issue fetch error: {exc}", file=errors)
         return 2
 
-    if args.json:
-        print(json.dumps(payload, indent=2, sort_keys=False), file=output)
-        return 0
-
-    print(format_issue_cache_context_from_payload(payload), file=output)
+    print(json.dumps(payload, indent=2, sort_keys=False), file=output)
     return 0
 
 

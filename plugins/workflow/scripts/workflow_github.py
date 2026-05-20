@@ -1191,7 +1191,6 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--project", type=Path, default=workflow_project_dir_from_env(), help="project path")
     parser.add_argument("--remote", default="origin", help="Git remote fallback name")
-    parser.add_argument("--json", action="store_true", help="emit JSON")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     subparsers.add_parser("repo", help="resolve GitHub repository context")
@@ -1228,9 +1227,6 @@ def build_parser() -> argparse.ArgumentParser:
     reopen_parser.add_argument("issue")
     reopen_parser.add_argument("--comment")
 
-    for child in subparsers.choices.values():
-        child.add_argument("--json", action="store_true", help=argparse.SUPPRESS)
-
     return parser
 
 
@@ -1253,10 +1249,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"workflow github error: {exc}", file=sys.stderr)
         return 2
 
-    if args.json:
-        print(json.dumps(payload, indent=2, sort_keys=False))
-    else:
-        _print_plain(payload)
+    print(json.dumps(payload, indent=2, sort_keys=False))
     return 0
 
 
@@ -1307,17 +1300,6 @@ def _run_cli(args: argparse.Namespace) -> Any:
     if args.command == "reopen":
         return reopen_issue(args.issue, project=project, comment=args.comment)
     raise GitHubParseError(f"unsupported command: {args.command}")
-
-
-def _print_plain(payload: Any) -> None:
-    if isinstance(payload, dict):
-        print(json.dumps(payload, sort_keys=False))
-        return
-    if isinstance(payload, list):
-        for item in payload:
-            print(json.dumps(item, sort_keys=False) if isinstance(item, dict) else item)
-        return
-    print(payload)
 
 
 if __name__ == "__main__":

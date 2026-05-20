@@ -33,7 +33,6 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--project", type=Path, default=workflow_project_dir_from_env(), help="project path")
     parser.add_argument("--type", default="task", help="workflow artifact type")
-    parser.add_argument("--json", action="store_true", help="emit JSON")
     parent_group = parser.add_mutually_exclusive_group()
     parent_group.add_argument("--parent", help="add parent (errors if a parent already exists)")
     parent_group.add_argument("--replace-parent", dest="replace_parent", help="set parent, replacing any existing parent")
@@ -147,15 +146,7 @@ def main(
         print(f"Jira issue relationship error: {exc}", file=errors)
         return 2
 
-    if args.json:
-        print(json.dumps(payload, indent=2, sort_keys=False), file=output)
-        return 0
-
-    issue = payload.get("issue")
-    if payload.get("no_changes"):
-        print(f"{issue} no relationship changes", file=output)
-        return 0
-    print(f"{issue} applied={payload.get('applied')}", file=output)
+    print(json.dumps(payload, indent=2, sort_keys=False), file=output)
     return 0
 
 

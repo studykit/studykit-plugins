@@ -51,7 +51,6 @@ Inspect resolved configuration:
 ```bash
 "./plugins/workflow/scripts/workflow" workflow_config.py \
   --require \
-  --json
 ```
 
 The `scripts/workflow` launcher is the shell-tool entrypoint. It executes the
@@ -76,7 +75,7 @@ Workflow authoring contracts apply only to workflow artifact types:
 - Dual-role: `usecase` and `research`.
 
 Before editing a workflow artifact, resolve the required authoring paths via
-`"$WORKFLOW" authoring_resolver.py --type <type> --role <role> --json`, then
+`"$WORKFLOW" authoring_resolver.py --type <type> --role <role>`, then
 read the returned files from `authoring/`. For non-workflow artifacts, such
 as `AGENTS.md`, `CLAUDE.md`, plugin README files, ordinary docs outside
 configured workflow knowledge, or host configuration files, the resolver

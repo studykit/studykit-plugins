@@ -776,7 +776,6 @@ def test_build_config_state_transition_flag_rejects_malformed_input(
         value,
         "--confluence-site",
         "https://confluence.example.test",
-        "--json",
     ]
     stdout = io.StringIO()
     stderr = io.StringIO()
@@ -804,7 +803,6 @@ def test_build_config_state_transition_flag_rejects_duplicate_verb(tmp_path: Pat
         "close=Resolved",
         "--confluence-site",
         "https://confluence.example.test",
-        "--json",
     ]
     stdout = io.StringIO()
     stderr = io.StringIO()
@@ -1014,28 +1012,6 @@ Confluence site: https://acme.atlassian.net/wiki
     assert any("Cloud" in item for item in payload["warnings"])
 
 
-def test_main_build_config_outputs_yaml(tmp_path: Path) -> None:
-    stdout = io.StringIO()
-
-    code = workflow_setup.main(
-        [
-            "build-config",
-            "--project",
-            str(tmp_path),
-            "--issue-provider",
-            "github",
-            "--knowledge-provider",
-            "github",
-            "--github-repo",
-            "studykit/studykit-plugins",
-        ],
-        stdout=stdout,
-    )
-
-    assert code == 0
-    assert yaml.safe_load(stdout.getvalue())["providers"]["issues"]["kind"] == "github"
-
-
 @pytest.mark.parametrize(
     ("argv", "message"),
     [
@@ -1068,7 +1044,7 @@ def test_main_write_outputs_json(tmp_path: Path) -> None:
     stdout = io.StringIO()
 
     code = workflow_setup.main(
-        ["write", "--project", str(tmp_path), "--config", str(config_file), "--json"],
+        ["write", "--project", str(tmp_path), "--config", str(config_file)],
         stdout=stdout,
     )
 
