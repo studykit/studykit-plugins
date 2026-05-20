@@ -57,7 +57,7 @@ Behavior:
 
 - Records `agent_id` and `agent_type` for each spawned Claude subagent under `subagents.started` in the unified session state file.
 - Deduplicates repeated records by `agent_id`.
-- For workflow-configured projects, emits `additionalContext` built from `../agents/workflow-main-context/subagent-policy.md`. The block tells the subagent that the main-session workflow shell environment is inherited and inlines the runtime launcher snippet from `../agents/workflow-main-context/snippets/launcher/claude.md` plus the provider-specific issue-fetch snippet so the subagent knows which `*_issue_fetch.py` script to call.
+- For workflow-configured projects, emits `additionalContext` built from `../main-context/subagent-policy.md`. The block tells the subagent that the main-session workflow shell environment is inherited and inlines the runtime launcher snippet from `../main-context/snippets/launcher/claude.md` plus the provider-specific issue-fetch snippet so the subagent knows which `*_issue_fetch.py` script to call.
 - Does not inject the full main-session policy. Provider writes, knowledge-provider rules, and the on-demand `policy/` detail files stay main-session-only.
 - Emits nothing for non-workflow projects.
 
@@ -68,11 +68,11 @@ Behavior:
 Behavior:
 
 - If the active project has no `.workflow/config.yml`, the hook emits nothing.
-- Main-assistant SessionStart wording lives under `../agents/workflow-main-context/`: the always-loaded entry point in `session-policy.md`, GitHub knowledge guidance in `knowledge/github.md`, and on-demand detail files under `policy/` (launcher, authoring, provider writes).
+- Main-assistant SessionStart wording lives under `../main-context/`: the always-loaded entry point in `session-policy.md`, GitHub knowledge guidance in `knowledge/github.md`, and on-demand detail files under `policy/` (launcher, authoring, provider writes).
 - The hook prepares a normalized shell environment contract for workflow shell commands: `WORKFLOW`, `WORKFLOW_PLUGIN_ROOT`, `WORKFLOW_PROJECT_DIR`, and `WORKFLOW_SESSION_ID`.
 - Claude writes that contract to `CLAUDE_ENV_FILE` when Claude provides it for `SessionStart`, so the main session shell exports `$WORKFLOW` directly.
 - Codex cannot persist environment variables from `SessionStart`; `hook_codex.py` records a unified session state file under `.workflow-cache/hook-state/`, keyed by the Codex hook `session_id`. The `../scripts/workflow` wrapper later reads that state and evaluates the generated exports from the shell-visible `CODEX_THREAD_ID`.
-- If the active project has a valid `.workflow/config.yml`, the hook injects the main-session policy as `additionalContext`. The policy tells the main assistant to run workflow operations through the bundled launcher (Claude uses the persisted `$WORKFLOW` env contract; Codex uses the absolute launcher path inlined at SessionStart) and points at the on-demand `policy/` detail files. Template placeholders use `{{NAME}}` so they stay visually distinct from real shell variables. The hook resolves `{{WORKFLOW_POLICY_DIR}}` to the absolute path of `../agents/workflow-main-context/policy/`, inlines the runtime-specific launcher snippet from `../agents/workflow-main-context/snippets/launcher/<runtime>.md` as `{{WORKFLOW_LAUNCHER_BLOCK}}` (resolving `{{WORKFLOW_PLUGIN_ROOT}}` to the absolute plugin root in the Codex snippet), and inlines the provider-specific issue-fetch snippet as `{{WORKFLOW_ISSUE_FETCH_BLOCK}}`.
+- If the active project has a valid `.workflow/config.yml`, the hook injects the main-session policy as `additionalContext`. The policy tells the main assistant to run workflow operations through the bundled launcher (Claude uses the persisted `$WORKFLOW` env contract; Codex uses the absolute launcher path inlined at SessionStart) and points at the on-demand `policy/` detail files. Template placeholders use `{{NAME}}` so they stay visually distinct from real shell variables. The hook resolves `{{WORKFLOW_POLICY_DIR}}` to the absolute path of `../main-context/policy/`, inlines the runtime-specific launcher snippet from `../main-context/snippets/launcher/<runtime>.md` as `{{WORKFLOW_LAUNCHER_BLOCK}}` (resolving `{{WORKFLOW_PLUGIN_ROOT}}` to the absolute plugin root in the Codex snippet), and inlines the provider-specific issue-fetch snippet as `{{WORKFLOW_ISSUE_FETCH_BLOCK}}`.
 - In Codex subagent shells, `CODEX_THREAD_ID` is the subagent's own thread id and no parent-thread environment variable is available. For Codex subagent `SessionStart` payloads, `hook_codex.py` checks `transcript_path` for `session_meta` records that identify the spawned agent. When the hook can extract a parent thread id, it records the spawned subagent under the parent session state's `subagents.started` list and emits no `additionalContext`. If transcript metadata does not provide a distinct agent id, the subagent session id is used as `agent_id`.
 - For Codex subagent SessionStart payloads without an extractable parent id, the hook emits nothing.
 - Claude subagents do not receive the main-session policy; if Claude sends an agent-tagged `SessionStart` payload, the hook records environment and exits without injecting policy.
@@ -90,7 +90,7 @@ Behavior:
 - Reads each detected issue through the workflow provider read path with the default cache policy.
 - Uses existing cache projections on cache hits; fetches provider data and writes the cache on misses.
 - Emits concise `additionalContext` only for issue numbers not already announced in the current session.
-- When the prompt asks for a commit, injects the main-assistant commit guidance from `../agents/workflow-main-context/commit-prefix.md` at most once per session.
+- When the prompt asks for a commit, injects the main-assistant commit guidance from `../main-context/commit-prefix.md` at most once per session.
 - For Codex subagent sessions, emits nothing. The main session owns workflow prompt context.
 - Reports project-relative issue cache paths, for example `.workflow-cache/issues/45/`.
 - For issue-cache context, emits nothing for missing issue references or provider read failures.

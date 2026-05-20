@@ -14,7 +14,7 @@ Key files:
 - `.codex-plugin/plugin.json` — Codex plugin metadata.
 - `hooks/hooks.json` — Claude hook declarations.
 - `hooks/hooks.codex.json` — Codex hook declarations.
-- `agents/workflow-main-context/` — main-assistant policy fragments
+- `main-context/` — main-assistant policy fragments
   (always-loaded entry point + on-demand `policy/` detail files).
 - `scripts/` — provider, cache, and hook entrypoints.
 - `authoring/` — workflow artifact authoring contracts.
@@ -86,13 +86,13 @@ returns `NONE`.
 
 The main assistant runs all workflow provider, cache, and authoring
 operations through the workflow launcher, with runtime-specific guidance
-under `agents/workflow-main-context/policy/launcher/<runtime>.md`
+under `main-context/policy/launcher/<runtime>.md`
 (Claude uses the persisted `$WORKFLOW` contract; Codex invokes the
 launcher by absolute path). Detailed procedures — launcher invocation,
 authoring path resolution, and the publish/append/update body-file
 contract — live as on-demand files under
-`agents/workflow-main-context/policy/`. The always-loaded entry point at
-`agents/workflow-main-context/session-policy.md` carries only the role
+`main-context/policy/`. The always-loaded entry point at
+`main-context/session-policy.md` carries only the role
 boundary and pointers to those detail files.
 
 Scripts cover:
@@ -134,7 +134,7 @@ projection after every successful write; do not edit `issue.md` or
 `comment-*.md` files in place. Use the matching fetch / writeback /
 comments / relationships script for explicit refresh, write-back,
 comment, or relationship operations (see
-`agents/workflow-main-context/policy/provider-writes.md`).
+`main-context/policy/provider-writes.md`).
 
 ## Validation
 

@@ -25,7 +25,7 @@ for writes and verification.
 
 Detailed launcher usage, authoring path resolution, and the body-file write
 contract live in on-demand main-context policy files under
-`plugins/workflow/agents/workflow-main-context/policy/`.
+`plugins/workflow/main-context/policy/`.
 
 ### Workflow scripts
 
@@ -75,7 +75,7 @@ operator handoff expectations.
 
 1. SessionStart injects only the concise workflow policy entry point when
    `.workflow/config.yml` exists; detail files under
-   `plugins/workflow/agents/workflow-main-context/policy/` are loaded on demand.
+   `plugins/workflow/main-context/policy/` are loaded on demand.
 2. Before a workflow artifact write, the main assistant runs
    `$WORKFLOW authoring_resolver.py --type <type> --role <role> --json` for
    required authoring paths.

@@ -1,23 +1,24 @@
 #!/usr/bin/env python3
 """Workflow main-assistant context helpers.
 
-Main-session prompt fragments live in Markdown files under
-``agents/workflow-main-context/`` so injected wording can be maintained without
-editing hook logic. Template placeholders use ``{{NAME}}`` (double braces) so
-they stay visually distinct from real ``$NAME`` shell variables in the same
-text. The always-loaded entry point at ``session-policy.md`` uses
-``{{WORKFLOW_POLICY_DIR}}``, ``{{WORKFLOW_ISSUE_PROVIDER}}``,
-``{{WORKFLOW_KNOWLEDGE_PROVIDER}}``, ``{{WORKFLOW_ISSUE_FETCH_BLOCK}}``,
-``{{WORKFLOW_ISSUE_WRITE_BLOCK}}``, and ``{{WORKFLOW_LAUNCHER_BLOCK}}``
-placeholders that this module substitutes at SessionStart based on the
-active workflow configuration and runtime. The SubagentStart entry point at
-``subagent-policy.md`` reuses ``{{WORKFLOW_LAUNCHER_BLOCK}}`` and
-``{{WORKFLOW_ISSUE_FETCH_BLOCK}}`` to give forked subagents the same
-launcher contract and provider-specific issue-fetch usage.
-Provider- and runtime-specific inline snippets live under
-``agents/workflow-main-context/snippets/<group>/<key>.md``. The Codex launcher
-snippet additionally has ``{{WORKFLOW_PLUGIN_ROOT}}`` resolved to the absolute
-plugin root before injection so Codex shell tool calls can use literal paths.
+Main-session prompt fragments live in Markdown files under ``main-context/``
+so injected wording can be maintained without editing hook logic. The
+directory sits at the plugin root (not under ``agents/``) so the Claude Code
+plugin runtime does not register each fragment as a fake agent. Template
+placeholders use ``{{NAME}}`` (double braces) so they stay visually distinct
+from real ``$NAME`` shell variables in the same text. The always-loaded entry
+point at ``session-policy.md`` uses ``{{WORKFLOW_POLICY_DIR}}``,
+``{{WORKFLOW_ISSUE_PROVIDER}}``, ``{{WORKFLOW_KNOWLEDGE_PROVIDER}}``,
+``{{WORKFLOW_ISSUE_FETCH_BLOCK}}``, ``{{WORKFLOW_ISSUE_WRITE_BLOCK}}``, and
+``{{WORKFLOW_LAUNCHER_BLOCK}}`` placeholders that this module substitutes at
+SessionStart based on the active workflow configuration and runtime. The
+SubagentStart entry point at ``subagent-policy.md`` reuses
+``{{WORKFLOW_LAUNCHER_BLOCK}}`` and ``{{WORKFLOW_ISSUE_FETCH_BLOCK}}`` to give
+forked subagents the same launcher contract and provider-specific issue-fetch
+usage. Provider- and runtime-specific inline snippets live under
+``main-context/snippets/<group>/<key>.md``. The Codex launcher snippet
+additionally has ``{{WORKFLOW_PLUGIN_ROOT}}`` resolved to the absolute plugin
+root before injection so Codex shell tool calls can use literal paths.
 """
 
 from __future__ import annotations
@@ -26,7 +27,7 @@ from pathlib import Path
 from typing import Any
 
 _PLUGIN_ROOT = Path(__file__).resolve().parents[1]
-_CONTEXT_ROOT = _PLUGIN_ROOT / "agents" / "workflow-main-context"
+_CONTEXT_ROOT = _PLUGIN_ROOT / "main-context"
 _KNOWN_ISSUE_PROVIDERS = {"github", "jira", "filesystem"}
 _KNOWN_KNOWLEDGE_PROVIDERS = {"github", "confluence", "filesystem"}
 _KNOWN_RUNTIMES = {"claude", "codex"}
@@ -50,7 +51,7 @@ def build_session_policy_context(
     if plugin_root is None:
         return text
     resolved_plugin_root = plugin_root.expanduser().resolve()
-    policy_dir = resolved_plugin_root / "agents" / "workflow-main-context" / "policy"
+    policy_dir = resolved_plugin_root / "main-context" / "policy"
     issue_provider = _provider_segment(config, "issues", _KNOWN_ISSUE_PROVIDERS)
     knowledge_provider = _provider_segment(config, "knowledge", _KNOWN_KNOWLEDGE_PROVIDERS)
     issue_fetch_block = _read_snippet("issue-fetch", issue_provider)

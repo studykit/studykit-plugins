@@ -8,7 +8,7 @@ frontmatter fields, or pending-write shapes.
 
 - Main-facing authoring docs describe only semantic authoring behavior that a
   content-writing assistant needs.
-- Main-session policy detail files under `agents/workflow-main-context/policy/`
+- Main-session policy detail files under `main-context/policy/`
   describe script selection, required inputs, result handoff, and the rule that
   provider/cache mutations go through workflow scripts.
 - Contributor implementation work uses provider/cache code and tests as the
