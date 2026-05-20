@@ -29,6 +29,9 @@ Common reusable section names for issue-backed items:
 - `Description`
 - `Acceptance Criteria`
 - `Unit Test Strategy`
+- `Out of Scope`
+- `Alternatives Considered`
+- `Risks`
 - `Open Questions`
 - `Related`
 - `Resume`
@@ -83,6 +86,36 @@ Rewrite the `Resume` section in place. Do not preserve history there.
 Use when an issue is intentionally abandoned and provider status alone does not explain why.
 
 The section should hold one dated bullet per reason, citing the cause when relevant. Provider files define the exact list and link form.
+
+## `Out of Scope` section
+
+Purpose: name what the issue explicitly does not cover.
+
+Use when the issue title or `Description` could be read as covering broader work, or when a related concern was deliberately deferred to a follow-up.
+
+Do not use when the body is small enough that scope is obvious from `Description` and `Change Plan`, or when the only deferred item is a generic disclaimer with no concrete follow-up.
+
+List one deferred item per bullet with a short reason or link to the follow-up.
+
+## `Alternatives Considered` section
+
+Purpose: record design or implementation options that were evaluated but not chosen, with the rejection reason.
+
+Use when the chosen approach is non-obvious and a reviewer is likely to suggest one of the rejected options.
+
+Do not use when no real alternatives were considered, or when the reasoning belongs in a curated knowledge page (create or update that page instead).
+
+List one alternative per bullet with the rejection reason. Do not re-litigate the accepted decision here.
+
+## `Risks` section
+
+Purpose: name technical risks, regression hazards, or operational concerns specific to this issue.
+
+Use when the change touches load-bearing code, migrations, contracts, or behavior with non-trivial blast radius, and the risk is not already covered by `Acceptance Criteria` or the test strategy.
+
+Do not use when the change is small and routine, or when the risk is already represented by an `Open Questions` entry or test scenario.
+
+List one risk per bullet with the mitigation or detection plan when known.
 
 ## Relationship lists
 
