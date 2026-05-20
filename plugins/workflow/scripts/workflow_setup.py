@@ -304,7 +304,32 @@ def inspect_jira_state_transitions(
 
     if len(seen_signatures) > 1:
         warnings.append(
-            "Sample issues exposed different transition sets; confirm each canonical state against the matching workflow"
+            "Sample issues exposed different transition sets; confirm each verb against the matching workflow"
+        )
+
+    verb_owners: dict[str, list[str]] = {}
+    for name in observed_names:
+        verb = derive_state_transition_verb(name)
+        if not verb:
+            warnings.append(
+                f"Transition {name!r} derives to an empty verb; specify it explicitly with --jira-state-transition"
+            )
+            continue
+        if verb in RESERVED_STATE_TRANSITION_VERBS:
+            warnings.append(
+                f"Transition {name!r} derives to reserved verb {verb!r}; "
+                "specify a different verb explicitly with --jira-state-transition"
+            )
+            continue
+        verb_owners.setdefault(verb, []).append(name)
+    auto_verbs: dict[str, str] = {}
+    for verb, owners in verb_owners.items():
+        if len(owners) == 1:
+            auto_verbs[verb] = owners[0]
+            continue
+        joined = ", ".join(repr(name) for name in owners)
+        warnings.append(
+            f"Transitions {joined} all derive to verb {verb!r}; specify each explicitly with --jira-state-transition"
         )
 
     return {
@@ -312,6 +337,7 @@ def inspect_jira_state_transitions(
         "site": site.to_json(),
         "sample_issues": sample_issues,
         "observed_transition_names": observed_names,
+        "auto_verbs": auto_verbs,
         "warnings": warnings,
     }
 
@@ -775,7 +801,7 @@ def _add_config_build_args(parser: argparse.ArgumentParser) -> None:
         "--jira-state-transition",
         action="append",
         default=[],
-        help="repeatable canonical-state to transition-name mapping, e.g. closed=Done or open=Reopen (writes providers.issues.state_transitions.<state>)",
+        help="repeatable verb to transition-name mapping, e.g. close=Closed or in-progress='In Progress' (writes providers.issues.state_transitions.<verb>; overrides auto-derived verbs from jira-state-transition-inspect)",
     )
     parser.add_argument(
         "--jira-snapshot-hidden-comment-marker",
@@ -885,6 +911,11 @@ def _emit_payload(payload: Mapping[str, Any], *, json_output: bool, stdout: Any)
                 name = transition.get("name") or "<unnamed>"
                 target = transition.get("to_status_name") or "<unknown>"
                 print(f"  - {name} -> {target}", file=stdout)
+        auto_verbs = payload.get("auto_verbs") or {}
+        if auto_verbs:
+            print("auto_verbs:", file=stdout)
+            for verb, transition_name in auto_verbs.items():
+                print(f"  {verb} -> {transition_name}", file=stdout)
         for warning in payload.get("warnings", []):
             print(f"warning: {warning}", file=stdout)
         return
@@ -1451,7 +1482,21 @@ def _relationship_mappings_from_args(args: argparse.Namespace) -> dict[str, Any]
     return mappings or None
 
 
-_JIRA_STATE_TRANSITION_STATES = ("open", "closed")
+RESERVED_STATE_TRANSITION_VERBS: frozenset[str] = frozenset({"assign", "unassign", "set-type"})
+
+_VERB_INVALID_CHARS = re.compile(r"[^a-z0-9]+")
+
+
+def derive_state_transition_verb(transition_name: str) -> str:
+    """Derive a CLI-friendly verb from a Jira transition name.
+
+    Lowercase, then collapse non-alphanumeric runs to a single hyphen.
+    """
+
+    text = (transition_name or "").strip().lower()
+    if not text:
+        return ""
+    return _VERB_INVALID_CHARS.sub("-", text).strip("-")
 
 
 def _jira_state_transitions_from_args(args: argparse.Namespace) -> dict[str, str] | None:
@@ -1459,25 +1504,29 @@ def _jira_state_transitions_from_args(args: argparse.Namespace) -> dict[str, str
     for item in getattr(args, "jira_state_transition", []) or []:
         if not isinstance(item, str) or "=" not in item:
             raise WorkflowSetupError(
-                f"--jira-state-transition must be <state>=<transition name>, got {item!r}"
+                f"--jira-state-transition must be <verb>=<transition name>, got {item!r}"
             )
-        state, _, transition_name = item.partition("=")
-        state = state.strip().lower()
+        verb, _, transition_name = item.partition("=")
+        verb = verb.strip().lower()
         transition_name = transition_name.strip()
-        if state not in _JIRA_STATE_TRANSITION_STATES:
-            allowed = ", ".join(_JIRA_STATE_TRANSITION_STATES)
+        if not verb:
             raise WorkflowSetupError(
-                f"--jira-state-transition state must be one of {allowed}; got {state!r}"
+                f"--jira-state-transition must be <verb>=<transition name>, got {item!r}"
+            )
+        if verb in RESERVED_STATE_TRANSITION_VERBS:
+            reserved = ", ".join(sorted(RESERVED_STATE_TRANSITION_VERBS))
+            raise WorkflowSetupError(
+                f"--jira-state-transition verb {verb!r} collides with a reserved jira_issue_fields verb ({reserved})"
             )
         if not transition_name:
             raise WorkflowSetupError(
-                f"--jira-state-transition for {state!r} must include a non-empty transition name"
+                f"--jira-state-transition for {verb!r} must include a non-empty transition name"
             )
-        if state in transitions:
+        if verb in transitions:
             raise WorkflowSetupError(
-                f"--jira-state-transition specified more than once for state {state!r}"
+                f"--jira-state-transition specified more than once for verb {verb!r}"
             )
-        transitions[state] = transition_name
+        transitions[verb] = transition_name
     return transitions or None
 
 

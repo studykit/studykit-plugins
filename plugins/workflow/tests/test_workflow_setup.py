@@ -25,6 +25,7 @@ from workflow_setup import (  # noqa: E402
     build_config,
     build_config_payload,
     build_jira_relationship_mappings,
+    derive_state_transition_verb,
     format_config_yaml,
     inspect_jira_relationships,
     inspect_jira_state_transitions,
@@ -624,6 +625,7 @@ def test_jira_state_transition_inspect_reports_per_issue_transitions() -> None:
     ]
     assert sample_two["transitions"][0]["name"] == "Reopen"
     assert set(payload["observed_transition_names"]) == {"Done", "Reopen"}
+    assert payload["auto_verbs"] == {"done": "Done", "reopen": "Reopen"}
     assert payload["warnings"] != []  # transitions differ between issues
 
 
@@ -641,6 +643,66 @@ def test_jira_state_transition_inspect_silent_when_all_samples_match() -> None:
 
     assert payload["warnings"] == []
     assert payload["observed_transition_names"] == ["Done"]
+    assert payload["auto_verbs"] == {"done": "Done"}
+
+
+@pytest.mark.parametrize(
+    "transition_name, expected_verb",
+    [
+        ("Done", "done"),
+        ("Reopen", "reopen"),
+        ("In Progress", "in-progress"),
+        ("Ready to Review", "ready-to-review"),
+        ("Resolve Issue", "resolve-issue"),
+        ("  Spaced  ", "spaced"),
+        ("Multi   space", "multi-space"),
+        ("", ""),
+        ("   ", ""),
+    ],
+)
+def test_derive_state_transition_verb(transition_name: str, expected_verb: str) -> None:
+    assert derive_state_transition_verb(transition_name) == expected_verb
+
+
+def test_jira_state_transition_inspect_skips_reserved_auto_verb() -> None:
+    runner = _jira_state_transition_runner(
+        {
+            "PROJ-1": [
+                {"id": "31", "name": "Assign", "to": {"name": "Assigned"}},
+                {"id": "32", "name": "Done", "to": {"name": "Closed"}},
+            ],
+        }
+    )
+
+    payload = inspect_jira_state_transitions(
+        jira_site="https://jira.example.test",
+        issues=("PROJ-1",),
+        runner=runner,
+    )
+
+    assert payload["auto_verbs"] == {"done": "Done"}
+    assert any("reserved verb 'assign'" in w for w in payload["warnings"])
+
+
+def test_jira_state_transition_inspect_skips_colliding_auto_verbs() -> None:
+    runner = _jira_state_transition_runner(
+        {
+            "PROJ-1": [
+                {"id": "31", "name": "Resolve", "to": {"name": "Resolved"}},
+                {"id": "32", "name": "Resolve!", "to": {"name": "Resolved"}},
+                {"id": "33", "name": "Done", "to": {"name": "Closed"}},
+            ],
+        }
+    )
+
+    payload = inspect_jira_state_transitions(
+        jira_site="https://jira.example.test",
+        issues=("PROJ-1",),
+        runner=runner,
+    )
+
+    assert payload["auto_verbs"] == {"done": "Done"}
+    assert any("derive to verb 'resolve'" in w for w in payload["warnings"])
 
 
 def test_jira_state_transition_inspect_requires_at_least_one_issue() -> None:
@@ -658,13 +720,13 @@ def test_build_config_writes_state_transitions_when_provided(tmp_path: Path) -> 
         knowledge_provider="confluence",
         jira_site="https://jira.example.test",
         jira_relationship_mappings=_jira_relationship_mappings(),
-        jira_state_transitions={"closed": "Done", "open": "Reopen"},
+        jira_state_transitions={"close": "Closed", "reopen": "Reopened"},
         confluence_site="https://confluence.example.test",
     )
 
     assert raw["providers"]["issues"]["state_transitions"] == {
-        "closed": "Done",
-        "open": "Reopen",
+        "close": "Closed",
+        "reopen": "Reopened",
     }
 
 
@@ -690,9 +752,9 @@ def _build_config_cli(args: list[str]) -> int:
 @pytest.mark.parametrize(
     "value, message",
     [
-        ("closedDone", "must be <state>=<transition name>"),
-        ("draft=Done", "state must be one of"),
-        ("closed=", "must include a non-empty transition name"),
+        ("closedDone", "must be <verb>=<transition name>"),
+        ("assign=Done", "collides with a reserved jira_issue_fields verb"),
+        ("close=", "must include a non-empty transition name"),
     ],
 )
 def test_build_config_state_transition_flag_rejects_malformed_input(
@@ -723,7 +785,7 @@ def test_build_config_state_transition_flag_rejects_malformed_input(
     assert message in stderr.getvalue()
 
 
-def test_build_config_state_transition_flag_rejects_duplicate_state(tmp_path: Path) -> None:
+def test_build_config_state_transition_flag_rejects_duplicate_verb(tmp_path: Path) -> None:
     args = [
         "build-config",
         "--project",
@@ -737,9 +799,9 @@ def test_build_config_state_transition_flag_rejects_duplicate_state(tmp_path: Pa
         "--jira-relationship-mapping",
         "blocked_by:surface=issue_link,link_type=Blocks,direction=inward",
         "--jira-state-transition",
-        "closed=Done",
+        "close=Closed",
         "--jira-state-transition",
-        "closed=Resolve",
+        "close=Resolved",
         "--confluence-site",
         "https://confluence.example.test",
         "--json",
@@ -748,7 +810,7 @@ def test_build_config_state_transition_flag_rejects_duplicate_state(tmp_path: Pa
     stderr = io.StringIO()
     rc = workflow_setup.main(args, stdout=stdout, stderr=stderr)
     assert rc == 2
-    assert "specified more than once" in stderr.getvalue()
+    assert "specified more than once for verb" in stderr.getvalue()
 
 
 def test_jira_relationship_mappings_require_explicit_surface(tmp_path: Path) -> None:
