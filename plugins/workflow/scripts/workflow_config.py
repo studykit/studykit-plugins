@@ -367,7 +367,6 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--project", type=Path, default=workflow_project_dir_from_env(), help="project path")
     parser.add_argument("--require", action="store_true", help=f"fail when {CONFIG_NAME} is absent")
-    parser.add_argument("--json", action="store_true", help="emit JSON")
     return parser
 
 
@@ -382,15 +381,11 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     if config is None:
-        if args.json:
-            print(json.dumps({"configured": False, "config_path": None}, indent=2))
+        print(json.dumps({"configured": False, "config_path": None}, indent=2))
         return 1
 
-    if args.json:
-        result = {"configured": True, **config.to_json()}
-        print(json.dumps(result, indent=2, sort_keys=False))
-    else:
-        print(config.path)
+    result = {"configured": True, **config.to_json()}
+    print(json.dumps(result, indent=2, sort_keys=False))
     return 0
 
 

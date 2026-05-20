@@ -259,7 +259,7 @@ def test_cache_fetch_uses_cache_hit_without_remote_issue_view(tmp_path: Path) ->
     stdout = io.StringIO()
 
     code = github_issue_fetch_main(
-        ["--project", str(tmp_path), "--json", "42"],
+        ["--project", str(tmp_path), "42"],
         stdout=stdout,
         runner=runner,
     )
@@ -273,62 +273,6 @@ def test_cache_fetch_uses_cache_hit_without_remote_issue_view(tmp_path: Path) ->
     assert payload["issues"][0]["issue_dir"] == ".workflow-cache/issues/42/"
     assert payload["issues"][0]["cache_hit"] is True
     assert runner.requests == []
-
-
-def test_cache_fetch_plain_output_uses_project_relative_issue_path(tmp_path: Path) -> None:
-    write_config(tmp_path)
-    cache = GitHubIssueCache.for_project(tmp_path, configured_repo=repo())
-    cache.write_issue_bundle(repo(), issue_payload(42, body="Cached body."))
-    stdout = io.StringIO()
-
-    code = github_issue_fetch_main(
-        ["--project", str(tmp_path), "42"],
-        stdout=stdout,
-        runner=FakeRunner({}),
-    )
-
-    assert code == 0
-    assert "- #42 → `.workflow-cache/issues/42/issue.md`" in stdout.getvalue()
-
-
-def test_cache_fetch_plain_output_uses_shared_prefix_for_multiple_issues(tmp_path: Path) -> None:
-    write_config(tmp_path)
-    cache = GitHubIssueCache.for_project(tmp_path, configured_repo=repo())
-    cache.write_issue_bundle(repo(), issue_payload(42, body="Cached body."))
-    cache.write_issue_bundle(repo(), issue_payload(43, body="Cached body."))
-    cache.write_relationships_projection(
-        repo(),
-        42,
-        {
-            "updatedAt": "2026-05-14T00:00:00Z",
-            "parent": {"number": 40},
-            "children": [{"number": 44}, {"number": 45}],
-            "dependencies": {
-                "blocked_by": [{"number": 41}],
-                "blocking": [{"number": 46}],
-            },
-        },
-        fetched_at="2026-05-14T00:00:00Z",
-    )
-    stdout = io.StringIO()
-
-    code = github_issue_fetch_main(
-        ["--project", str(tmp_path), "42", "43"],
-        stdout=stdout,
-        runner=FakeRunner({}),
-    )
-
-    assert code == 0
-    assert stdout.getvalue() == "\n".join(
-        [
-            "## Workflow issue cache",
-            "",
-            "Base: `.workflow-cache/issues/`",
-            "- #42 → `42/issue.md`",
-            "- #43 → `43/issue.md`",
-            "",
-        ]
-    )
 
 
 def issue_payload_with_comment(
@@ -358,7 +302,7 @@ def test_cache_fetch_lists_comment_paths_in_json(tmp_path: Path) -> None:
     stdout = io.StringIO()
 
     code = github_issue_fetch_main(
-        ["--project", str(tmp_path), "--json", "42"],
+        ["--project", str(tmp_path), "42"],
         stdout=stdout,
         runner=FakeRunner({}),
     )
@@ -377,7 +321,7 @@ def test_cache_fetch_omits_comments_key_when_no_cached_comments(tmp_path: Path) 
     stdout = io.StringIO()
 
     code = github_issue_fetch_main(
-        ["--project", str(tmp_path), "--json", "42"],
+        ["--project", str(tmp_path), "42"],
         stdout=stdout,
         runner=FakeRunner({}),
     )
@@ -385,50 +329,6 @@ def test_cache_fetch_omits_comments_key_when_no_cached_comments(tmp_path: Path) 
     payload = json.loads(stdout.getvalue())
     assert code == 0
     assert "comments" not in payload["issues"][0]
-
-
-def test_cache_fetch_plain_output_renders_comment_sub_bullets(tmp_path: Path) -> None:
-    write_config(tmp_path)
-    cache = GitHubIssueCache.for_project(tmp_path, configured_repo=repo())
-    cache.write_issue_bundle(repo(), issue_payload_with_comment(42))
-    stdout = io.StringIO()
-
-    code = github_issue_fetch_main(
-        ["--project", str(tmp_path), "42"],
-        stdout=stdout,
-        runner=FakeRunner({}),
-    )
-
-    assert code == 0
-    assert "- #42 → `.workflow-cache/issues/42/issue.md`" in stdout.getvalue()
-    assert "  - `.workflow-cache/issues/42/comment-2026-05-13T112053Z-4440388606.md`" in stdout.getvalue()
-
-
-def test_cache_fetch_plain_output_strips_shared_base_from_comment_paths(tmp_path: Path) -> None:
-    write_config(tmp_path)
-    cache = GitHubIssueCache.for_project(tmp_path, configured_repo=repo())
-    cache.write_issue_bundle(repo(), issue_payload(42, body="Cached body."))
-    cache.write_issue_bundle(repo(), issue_payload_with_comment(43))
-    stdout = io.StringIO()
-
-    code = github_issue_fetch_main(
-        ["--project", str(tmp_path), "42", "43"],
-        stdout=stdout,
-        runner=FakeRunner({}),
-    )
-
-    assert code == 0
-    assert stdout.getvalue() == "\n".join(
-        [
-            "## Workflow issue cache",
-            "",
-            "Base: `.workflow-cache/issues/`",
-            "- #42 → `42/issue.md`",
-            "- #43 → `43/issue.md`",
-            "  - `43/comment-2026-05-13T112053Z-4440388606.md`",
-            "",
-        ]
-    )
 
 
 def test_cache_fetch_refresh_reads_remote_and_updates_cache(tmp_path: Path) -> None:
@@ -443,7 +343,7 @@ def test_cache_fetch_refresh_reads_remote_and_updates_cache(tmp_path: Path) -> N
     stdout = io.StringIO()
 
     code = github_issue_fetch_main(
-        ["--project", str(tmp_path), "--json", "--cache-policy", "refresh", "42"],
+        ["--project", str(tmp_path), "--cache-policy", "refresh", "42"],
         stdout=stdout,
         runner=runner,
     )
@@ -483,7 +383,7 @@ def test_cache_fetch_uses_jira_cache_hit_without_remote_read(tmp_path: Path) -> 
     stdout = io.StringIO()
 
     code = jira_issue_fetch_main(
-        ["--project", str(tmp_path), "--json", "test-1234"],
+        ["--project", str(tmp_path), "test-1234"],
         stdout=stdout,
         runner=runner,
     )
@@ -498,24 +398,6 @@ def test_cache_fetch_uses_jira_cache_hit_without_remote_read(tmp_path: Path) -> 
     assert payload["issues"][0]["cache_hit"] is True
     assert "relationships" not in payload["issues"][0]
     assert runner.requests == []
-
-
-def test_cache_fetch_plain_output_uses_jira_issue_md_path(tmp_path: Path) -> None:
-    write_jira_config(tmp_path)
-    site = jira_site(tmp_path)
-    cache = JiraDataCenterIssueCache.for_project(tmp_path)
-    cache.write_issue_bundle(site, jira_issue_payload(), remote_links=[])
-    stdout = io.StringIO()
-
-    code = jira_issue_fetch_main(
-        ["--project", str(tmp_path), "test-1234"],
-        stdout=stdout,
-        runner=FakeRunner({}),
-    )
-
-    assert code == 0
-    assert "- TEST-1234 → `.workflow-cache/issues/TEST-1234/issue.md`" in stdout.getvalue()
-    assert "#TEST-1234" not in stdout.getvalue()
 
 
 def test_cache_fetch_refresh_reads_remote_jira_and_updates_cache(tmp_path: Path) -> None:
@@ -535,7 +417,7 @@ def test_cache_fetch_refresh_reads_remote_jira_and_updates_cache(tmp_path: Path)
     stdout = io.StringIO()
 
     code = jira_issue_fetch_main(
-        ["--project", str(tmp_path), "--json", "--cache-policy", "refresh", "TEST-1234"],
+        ["--project", str(tmp_path), "--cache-policy", "refresh", "TEST-1234"],
         stdout=stdout,
         runner=runner,
     )

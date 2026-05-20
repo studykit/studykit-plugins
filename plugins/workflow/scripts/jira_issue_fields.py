@@ -75,7 +75,6 @@ def build_base_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(add_help=False)
     parser.add_argument("--project", type=Path, default=workflow_project_dir_from_env())
     parser.add_argument("--type", default="task")
-    parser.add_argument("--json", action="store_true")
     return parser
 
 
@@ -87,7 +86,6 @@ def build_parser(state_verbs: Iterable[str] = ()) -> argparse.ArgumentParser:
     )
     parser.add_argument("--project", type=Path, default=workflow_project_dir_from_env(), help="project path")
     parser.add_argument("--type", default="task", help="workflow artifact type")
-    parser.add_argument("--json", action="store_true", help="emit JSON")
     subparsers = parser.add_subparsers(dest="verb", required=True)
 
     p_assign = subparsers.add_parser("assign", help="assign an issue to a user")
@@ -279,23 +277,7 @@ def main(
         print(f"Jira issue fields error: {exc}", file=errors)
         return 2
 
-    if args.json:
-        print(json.dumps(payload, indent=2, sort_keys=False), file=output)
-    else:
-        provider_payload = payload.get("provider") or {}
-        status = provider_payload.get("status")
-        if status == "blocked":
-            print(
-                f"{payload.get('key')} blocked: {provider_payload.get('reason')} "
-                f"reread_required={provider_payload.get('reread_required')}",
-                file=output,
-            )
-        else:
-            print(
-                f"{payload.get('key')} {payload.get('operation')} "
-                f"verified={provider_payload.get('verified')}",
-                file=output,
-            )
+    print(json.dumps(payload, indent=2, sort_keys=False), file=output)
     if (payload.get("provider") or {}).get("status") == "blocked":
         return 3
     return 0

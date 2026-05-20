@@ -90,34 +90,6 @@ def format_issue_cache_json(
     return payload
 
 
-def format_issue_cache_context_from_payload(payload: dict[str, object]) -> str:
-    """Render plain output from the JSON payload without re-reading cache files."""
-
-    contexts: list[IssueFetchContext] = []
-    for item in payload.get("issues", []):
-        if not isinstance(item, dict):
-            continue
-        cache_hit = item.get("cache_hit")
-        raw_comments = item.get("comments")
-        comments: tuple[str, ...] = ()
-        if isinstance(raw_comments, list):
-            comments = tuple(str(entry) for entry in raw_comments if isinstance(entry, str))
-        contexts.append(
-            IssueFetchContext(
-                number=str(item.get("issue") or ""),
-                issue_dir=str(item.get("issue_dir") or ""),
-                title=str(item.get("title") or ""),
-                state=str(item.get("state") or ""),
-                cache_hit=cache_hit if isinstance(cache_hit, bool) else None,
-                provider_kind=str(payload.get("kind") or "github"),
-                issue_file=str(item.get("issue_file") or "issue.md"),
-                comments=comments,
-            )
-        )
-
-    return format_issue_cache_context(contexts)
-
-
 def display_project_path(path: Path, project: Path, *, trailing_slash: bool = False) -> str:
     resolved = path.expanduser().resolve(strict=False)
     try:

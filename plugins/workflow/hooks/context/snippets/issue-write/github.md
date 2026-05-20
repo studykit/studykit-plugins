@@ -13,20 +13,20 @@ Common shapes (resolver prereq is required for any body-file flow):
 
 ```bash
 # Publish a new issue
-"$WORKFLOW" authoring_resolver.py --type task --json
+"$WORKFLOW" authoring_resolver.py --type task
 # Read the returned paths, draft the body to <body-path>, get user approval.
 "$WORKFLOW" github_issue_drafts.py publish \
-  --type task --title "<title>" --body-file <body-path> --json
+  --type task --title "<title>" --body-file <body-path>
 
 # Update an existing issue body
 "$WORKFLOW" github_issue_writeback.py update \
-  --type task --issue <ref> --body-file <body-path> --json
+  --type task --issue <ref> --body-file <body-path>
 
 # Add a relationship (also: --blocked-by, --blocking, --child, --related, --remove-*)
-"$WORKFLOW" github_issue_relationships.py <ref> --parent <ref> --json
+"$WORKFLOW" github_issue_relationships.py <ref> --parent <ref>
 
 # Close, reopen, assign, unassign, or change the workflow-type label
-"$WORKFLOW" github_issue_fields.py close <ref> --json
-"$WORKFLOW" github_issue_fields.py assign <ref> me --json
-"$WORKFLOW" github_issue_fields.py set-type <ref> bug --json
+"$WORKFLOW" github_issue_fields.py close <ref>
+"$WORKFLOW" github_issue_fields.py assign <ref> me
+"$WORKFLOW" github_issue_fields.py set-type <ref> bug
 ```

@@ -12,7 +12,7 @@ import pytest
 
 _PLUGIN_ROOT = Path(__file__).resolve().parent.parent
 _SCRIPTS_DIR = _PLUGIN_ROOT / "scripts"
-_MAIN_CONTEXT_ROOT = _PLUGIN_ROOT / "main-context"
+_MAIN_CONTEXT_ROOT = _PLUGIN_ROOT / "hooks" / "context"
 if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
@@ -74,8 +74,8 @@ def expected_session_start_context(
     knowledge_kind: str,
     issue_kind: str = "github",
 ) -> str:
-    text = main_context_fragment("session-policy.md")
-    policy_dir = _PLUGIN_ROOT / "main-context" / "policy"
+    text = main_context_fragment("main/session-policy.md")
+    policy_dir = _PLUGIN_ROOT / "hooks" / "context" / "main" / "policy"
     issue_fetch_block = main_context_fragment(f"snippets/issue-fetch/{issue_kind}.md")
     issue_write_block = main_context_fragment(f"snippets/issue-write/{issue_kind}.md")
     launcher_block = main_context_fragment(f"snippets/launcher/{runtime}.md")
@@ -99,7 +99,7 @@ def expected_subagent_start_context(
     runtime: str = "claude",
     issue_kind: str = "github",
 ) -> str:
-    text = main_context_fragment("subagent-policy.md")
+    text = main_context_fragment("subagent/policy.md")
     issue_fetch_block = main_context_fragment(f"snippets/issue-fetch/{issue_kind}.md")
     launcher_block = main_context_fragment(f"snippets/launcher/{runtime}.md")
     if runtime == "codex":
@@ -991,7 +991,7 @@ def test_session_start_injects_policy_for_configured_project(
     assert context == expected_session_start_context(
         runtime=runtime, knowledge_kind="github", issue_kind="github"
     )
-    policy_dir = _PLUGIN_ROOT / "main-context" / "policy"
+    policy_dir = _PLUGIN_ROOT / "hooks" / "context" / "main" / "policy"
     assert "## workflow policy" in context
     if runtime == "claude":
         assert "\"$WORKFLOW\" <script>.py" in context
@@ -1157,7 +1157,7 @@ def test_session_start_uses_filesystem_issue_policy_for_local_artifacts(
     assert context == expected_session_start_context(
         runtime=runtime, knowledge_kind="filesystem", issue_kind="filesystem"
     )
-    policy_dir = _PLUGIN_ROOT / "main-context" / "policy"
+    policy_dir = _PLUGIN_ROOT / "hooks" / "context" / "main" / "policy"
     assert str(policy_dir / "provider-writes" / "filesystem.md") in context
     assert str(policy_dir / "knowledge" / "filesystem.md") in context
     assert "provider-writes/github.md" not in context
@@ -1273,7 +1273,7 @@ def test_session_start_uses_jira_provider_writes_pointer_for_jira_config(
 
     payload = json.loads(out)
     context = payload["hookSpecificOutput"]["additionalContext"]
-    policy_dir = _PLUGIN_ROOT / "main-context" / "policy"
+    policy_dir = _PLUGIN_ROOT / "hooks" / "context" / "main" / "policy"
     assert str(policy_dir / "provider-writes" / "jira.md") in context
     assert "provider-writes/github.md" not in context
     assert "provider-writes/filesystem.md" not in context
@@ -1485,7 +1485,7 @@ def test_user_prompt_injects_github_commit_prefix_hint_without_issue_fetch(
 
     payload = json.loads(captured.getvalue())
     context = payload["hookSpecificOutput"]["additionalContext"]
-    assert context == main_context_fragment("commit-prefix.md")
+    assert context == main_context_fragment("main/commit-prefix.md")
 
     repeated = io.StringIO()
     repeated_event = parse_codex_event_payload(raw_payload)
@@ -1638,7 +1638,7 @@ def test_user_prompt_injects_jira_commit_prefix_hint_without_issue_fetch(
 
     payload = json.loads(captured.getvalue())
     context = payload["hookSpecificOutput"]["additionalContext"]
-    assert context == main_context_fragment("commit-prefix.md")
+    assert context == main_context_fragment("main/commit-prefix.md")
     assert runner.requests == []
 
 

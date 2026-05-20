@@ -1,24 +1,26 @@
 #!/usr/bin/env python3
 """Workflow main-assistant context helpers.
 
-Main-session prompt fragments live in Markdown files under ``main-context/``
-so injected wording can be maintained without editing hook logic. The
-directory sits at the plugin root (not under ``agents/``) so the Claude Code
-plugin runtime does not register each fragment as a fake agent. Template
-placeholders use ``{{NAME}}`` (double braces) so they stay visually distinct
-from real ``$NAME`` shell variables in the same text. The always-loaded entry
-point at ``session-policy.md`` uses ``{{WORKFLOW_POLICY_DIR}}``,
+Prompt fragments live in Markdown files under ``hooks/context/`` so injected
+wording can be maintained without editing hook logic. The directory sits beside
+the hook scripts that consume it (not under ``agents/``) so the Claude Code
+plugin runtime does not register each fragment as a fake agent. Main-session
+fragments live under ``hooks/context/main/``; subagent fragments live under
+``hooks/context/subagent/``; shared inline snippets live under
+``hooks/context/snippets/<group>/<key>.md``. Template placeholders use
+``{{NAME}}`` (double braces) so they stay visually distinct from real
+``$NAME`` shell variables in the same text. The always-loaded main-session
+entry point at ``main/session-policy.md`` uses ``{{WORKFLOW_POLICY_DIR}}``,
 ``{{WORKFLOW_ISSUE_PROVIDER}}``, ``{{WORKFLOW_KNOWLEDGE_PROVIDER}}``,
 ``{{WORKFLOW_ISSUE_FETCH_BLOCK}}``, ``{{WORKFLOW_ISSUE_WRITE_BLOCK}}``, and
 ``{{WORKFLOW_LAUNCHER_BLOCK}}`` placeholders that this module substitutes at
 SessionStart based on the active workflow configuration and runtime. The
-SubagentStart entry point at ``subagent-policy.md`` reuses
+SubagentStart entry point at ``subagent/policy.md`` reuses
 ``{{WORKFLOW_LAUNCHER_BLOCK}}`` and ``{{WORKFLOW_ISSUE_FETCH_BLOCK}}`` to give
 forked subagents the same launcher contract and provider-specific issue-fetch
-usage. Provider- and runtime-specific inline snippets live under
-``main-context/snippets/<group>/<key>.md``. The Codex launcher snippet
-additionally has ``{{WORKFLOW_PLUGIN_ROOT}}`` resolved to the absolute plugin
-root before injection so Codex shell tool calls can use literal paths.
+usage. The Codex launcher snippet additionally has ``{{WORKFLOW_PLUGIN_ROOT}}``
+resolved to the absolute plugin root before injection so Codex shell tool calls
+can use literal paths.
 """
 
 from __future__ import annotations
@@ -27,7 +29,7 @@ from pathlib import Path
 from typing import Any
 
 _PLUGIN_ROOT = Path(__file__).resolve().parents[1]
-_CONTEXT_ROOT = _PLUGIN_ROOT / "main-context"
+_CONTEXT_ROOT = _PLUGIN_ROOT / "hooks" / "context"
 _KNOWN_ISSUE_PROVIDERS = {"github", "jira", "filesystem"}
 _KNOWN_KNOWLEDGE_PROVIDERS = {"github", "confluence", "filesystem"}
 _KNOWN_RUNTIMES = {"claude", "codex"}
@@ -36,7 +38,7 @@ _KNOWN_RUNTIMES = {"claude", "codex"}
 def build_commit_prefix_context() -> str:
     """Return commit-prefix guidance injected into main assistant prompts."""
 
-    return _read_fragment("commit-prefix.md").strip()
+    return _read_fragment("main/commit-prefix.md").strip()
 
 
 def build_session_policy_context(
@@ -47,11 +49,11 @@ def build_session_policy_context(
 ) -> str:
     """Return SessionStart policy guidance injected into main assistant sessions."""
 
-    text = _read_fragment("session-policy.md").strip()
+    text = _read_fragment("main/session-policy.md").strip()
     if plugin_root is None:
         return text
     resolved_plugin_root = plugin_root.expanduser().resolve()
-    policy_dir = resolved_plugin_root / "main-context" / "policy"
+    policy_dir = resolved_plugin_root / "hooks" / "context" / "main" / "policy"
     issue_provider = _provider_segment(config, "issues", _KNOWN_ISSUE_PROVIDERS)
     knowledge_provider = _provider_segment(config, "knowledge", _KNOWN_KNOWLEDGE_PROVIDERS)
     issue_fetch_block = _read_snippet("issue-fetch", issue_provider)
@@ -76,7 +78,7 @@ def build_subagent_policy_context(
 ) -> str:
     """Return SubagentStart context guidance injected into subagent prompts."""
 
-    text = _read_fragment("subagent-policy.md").strip()
+    text = _read_fragment("subagent/policy.md").strip()
     if plugin_root is None:
         return text
     resolved_plugin_root = plugin_root.expanduser().resolve()

@@ -13,25 +13,25 @@ Common shapes (resolver prereq is required for any body-file flow):
 
 ```bash
 # Publish a new issue
-"$WORKFLOW" authoring_resolver.py --type task --json
+"$WORKFLOW" authoring_resolver.py --type task
 # Read the returned paths, draft the body to <body-path>, get user approval.
 "$WORKFLOW" jira_issue_drafts.py publish \
-  --type task --title "<title>" --body-file <body-path> --json
+  --type task --title "<title>" --body-file <body-path>
 
 # Publish a new Epic (--epic-name optional; defaults to --title)
 "$WORKFLOW" jira_issue_drafts.py publish \
-  --type epic --title "<title>" --body-file <body-path> --json
+  --type epic --title "<title>" --body-file <body-path>
 
 # Update an existing issue body (add --state <verb> for a state change too)
 "$WORKFLOW" jira_issue_writeback.py update \
-  --type task --issue <KEY> --body-file <body-path> --json
+  --type task --issue <KEY> --body-file <body-path>
 
 # Add a relationship (also: --epic, --blocked-by, --blocking, --child, --related, --remove-*)
-"$WORKFLOW" jira_issue_relationships.py <KEY> --parent <KEY> --json
+"$WORKFLOW" jira_issue_relationships.py <KEY> --parent <KEY>
 
 # Run a configured state transition, assign, unassign, or change the issuetype.
 # <verb> is one of the keys configured in providers.issues.state_transitions.
-"$WORKFLOW" jira_issue_fields.py <verb> <KEY> --json
-"$WORKFLOW" jira_issue_fields.py assign <KEY> me --json
-"$WORKFLOW" jira_issue_fields.py set-type <KEY> bug --json
+"$WORKFLOW" jira_issue_fields.py <verb> <KEY>
+"$WORKFLOW" jira_issue_fields.py assign <KEY> me
+"$WORKFLOW" jira_issue_fields.py set-type <KEY> bug
 ```

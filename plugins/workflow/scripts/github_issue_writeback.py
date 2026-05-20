@@ -172,7 +172,6 @@ def build_parser() -> argparse.ArgumentParser:
         default=workflow_project_dir_from_env(),
         help="project path",
     )
-    parser.add_argument("--json", action="store_true", help="emit JSON")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     update = subparsers.add_parser(
@@ -268,8 +267,6 @@ def build_parser() -> argparse.ArgumentParser:
         help="remove a related ref (repeatable)",
     )
 
-    for child in subparsers.choices.values():
-        child.add_argument("--json", action="store_true", help=argparse.SUPPRESS)
     return parser
 
 
@@ -337,10 +334,7 @@ def main(
         print(f"GitHub issue update error: {exc}", file=errors)
         return 2
 
-    if args.json:
-        print(json.dumps(payload, indent=2, sort_keys=False), file=output)
-    else:
-        _print_plain(payload, output)
+    print(json.dumps(payload, indent=2, sort_keys=False), file=output)
     if payload.get("status") == "blocked":
         return 3
     return 0
@@ -365,22 +359,6 @@ def _required_text(value: str, name: str) -> str:
     if not text:
         raise GitHubIssueWritebackError(f"{name} is required")
     return text
-
-
-def _print_plain(payload: dict[str, object], output: TextIO) -> None:
-    if payload.get("status") == "blocked":
-        print(
-            f"#{payload.get('issue')} blocked: {payload.get('reason')} "
-            f"reread_required={payload.get('reread_required')}",
-            file=output,
-        )
-        return
-    print(
-        f"updated issue {payload.get('issue')} "
-        f"state_changed={payload.get('state_changed')} "
-        f"cache={payload.get('issue_file')}",
-        file=output,
-    )
 
 
 if __name__ == "__main__":

@@ -144,7 +144,6 @@ def build_parser() -> argparse.ArgumentParser:
         default=workflow_project_dir_from_env(),
         help="project path",
     )
-    parser.add_argument("--json", action="store_true", help="emit JSON")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     publish = subparsers.add_parser(
@@ -203,8 +202,6 @@ def build_parser() -> argparse.ArgumentParser:
         help="add related ref after publish (repeatable)",
     )
 
-    for child in subparsers.choices.values():
-        child.add_argument("--json", action="store_true", help=argparse.SUPPRESS)
     return parser
 
 
@@ -260,10 +257,7 @@ def main(
         print(f"Jira issue draft error: {exc}", file=errors)
         return 2
 
-    if args.json:
-        print(json.dumps(payload, indent=2, sort_keys=False), file=output)
-    else:
-        _print_plain(payload, output)
+    print(json.dumps(payload, indent=2, sort_keys=False), file=output)
     return 0
 
 
@@ -303,14 +297,6 @@ def _jira_issue_key(value: str | None, name: str) -> str | None:
         return normalize_jira_issue_key(parent)
     except JiraProviderError as exc:
         raise JiraIssueDraftError(f"invalid {name}: {exc}") from exc
-
-
-def _print_plain(payload: dict[str, object], output: TextIO) -> None:
-    issue = payload.get("issue") or payload.get("key")
-    print(
-        f"published issue {issue} verified={payload.get('verified')} cache={payload.get('issue_file')}",
-        file=output,
-    )
 
 
 if __name__ == "__main__":

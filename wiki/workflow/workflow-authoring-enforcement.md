@@ -24,8 +24,8 @@ provider/cache scripts (`$WORKFLOW github_issue_drafts.py publish`,
 for writes and verification.
 
 Detailed launcher usage, authoring path resolution, and the body-file write
-contract live in on-demand main-context policy files under
-`plugins/workflow/main-context/policy/`.
+contract live in on-demand main-assistant context policy files under
+`plugins/workflow/hooks/context/main/policy/`.
 
 ### Workflow scripts
 
@@ -75,7 +75,7 @@ operator handoff expectations.
 
 1. SessionStart injects only the concise workflow policy entry point when
    `.workflow/config.yml` exists; detail files under
-   `plugins/workflow/main-context/policy/` are loaded on demand.
+   `plugins/workflow/hooks/context/main/policy/` are loaded on demand.
 2. Before a workflow artifact write, the main assistant runs
    `$WORKFLOW authoring_resolver.py --type <type> --role <role> --json` for
    required authoring paths.

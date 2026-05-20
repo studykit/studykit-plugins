@@ -32,7 +32,6 @@ and update an existing issue body — share one shape:
   [--state-reason completed|not_planned|reopened] \
   [--parent <ref>] [--blocked-by <ref> ...] [--blocking <ref> ...] \
   [--child <ref> ...] [--related <ref> ...] \
-  --json
 ```
 
 Required: `--type`, `--title`, `--body-file`. `--state` defaults to `open`.
@@ -48,7 +47,6 @@ the newly created issue after the create succeeds.
   [--type <type>] \
   [--state open|closed] \
   [--state-reason completed|not_planned|reopened] \
-  --json
 ```
 
 Required: `--issue`, `--body-file`. `--type` defaults to `task`. `--state`
@@ -71,7 +69,6 @@ and `--state-reason` apply an inline state change on the same call.
   [--blocking <ref> ...]  [--remove-blocking <ref> ...] \
   [--child <ref> ...]     [--remove-child <ref> ...] \
   [--related <ref> ...]   [--remove-related <ref> ...] \
-  --json
 ```
 
 Required: `--issue`, `--body-file`. Optional metadata flags apply on the
@@ -95,7 +92,7 @@ provider call (no-op).
   [--blocking <ref> ...]  [--remove-blocking <ref> ...] \
   [--child <ref> ...]     [--remove-child <ref> ...] \
   [--related <ref> ...]   [--remove-related <ref> ...] \
-  [--type <type>] --json
+  [--type <type>]
 ```
 
 Flag semantics:

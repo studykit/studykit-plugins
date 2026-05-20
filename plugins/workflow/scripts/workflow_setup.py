@@ -511,7 +511,7 @@ def write_config(
         "path": str(target),
         "verified": True,
         "verification": {
-            "command": "workflow_config.py --require --json",
+            "command": "workflow_config.py --require",
             "config": verified.to_json(),
         },
     }
@@ -606,12 +606,10 @@ def build_parser() -> argparse.ArgumentParser:
     probe.add_argument("--project", type=Path, default=workflow_project_dir_from_env(), help="project path")
     probe.add_argument("--remote", default="origin", help="git remote name")
     probe.add_argument("--require", action="store_true", help="fail when no GitHub remote can be detected")
-    probe.add_argument("--json", action="store_true", help="emit JSON")
 
     profile = subparsers.add_parser("profile-from-docs", help="extract setup defaults from provider profile docs")
     profile.add_argument("paths", nargs="*", type=Path, help="profile document paths")
     profile.add_argument("--stdin", action="store_true", help="read an additional provider profile from stdin")
-    profile.add_argument("--json", action="store_true", help="emit JSON")
 
     capabilities = subparsers.add_parser("capabilities", help="show provider capabilities and setup warnings")
     capabilities.add_argument("--issue-provider", required=True, choices=sorted(ISSUE_PROVIDERS))
@@ -619,7 +617,6 @@ def build_parser() -> argparse.ArgumentParser:
     capabilities.add_argument("--jira-relationship-mappings-json")
     capabilities.add_argument("--jira-relationship-mappings-file", type=Path)
     capabilities.add_argument("--jira-relationship-mapping", action="append", default=[])
-    capabilities.add_argument("--json", action="store_true", help="emit JSON")
 
     jira_inspect = subparsers.add_parser(
         "jira-relationship-inspect",
@@ -636,7 +633,6 @@ def build_parser() -> argparse.ArgumentParser:
         default=[],
         help="field name/id text to include, e.g. parent or customfield_12345",
     )
-    jira_inspect.add_argument("--json", action="store_true", help="emit JSON")
 
     jira_state_inspect = subparsers.add_parser(
         "jira-state-transition-inspect",
@@ -652,7 +648,6 @@ def build_parser() -> argparse.ArgumentParser:
         required=True,
         help="sample Jira issue key to inspect; supply open- and closed-side keys to see both directions",
     )
-    jira_state_inspect.add_argument("--json", action="store_true", help="emit JSON")
 
     jira_mappings = subparsers.add_parser(
         "jira-relationship-mappings",
@@ -681,17 +676,14 @@ def build_parser() -> argparse.ArgumentParser:
     jira_mappings.add_argument("--jira-relationship-mappings-json")
     jira_mappings.add_argument("--jira-relationship-mappings-file", type=Path)
     jira_mappings.add_argument("--jira-relationship-mapping", action="append", default=[])
-    jira_mappings.add_argument("--json", action="store_true", help="emit JSON")
 
     build = subparsers.add_parser("build-config", help=f"build and validate {CONFIG_NAME} YAML")
     _add_config_build_args(build)
-    build.add_argument("--json", action="store_true", help="emit JSON with YAML and warnings")
 
     write = subparsers.add_parser("write", help=f"write {CONFIG_NAME} atomically")
     _add_config_build_args(write)
     write.add_argument("--config", type=Path, help="YAML config to write; use '-' for stdin")
     write.add_argument("--force", action="store_true", help="overwrite an existing config after explicit confirmation")
-    write.add_argument("--json", action="store_true", help="emit JSON")
 
     return parser
 
@@ -706,11 +698,9 @@ def main(argv: list[str] | None = None, *, stdout: Any = sys.stdout, stderr: Any
         print(f"workflow setup error: {exc}", file=stderr)
         return 2
 
+    _emit_payload(payload, stdout=stdout)
     if args.command == "probe-git-remote" and args.require and not payload.get("detected"):
-        _emit_payload(payload, json_output=args.json, stdout=stdout)
         return 1
-
-    _emit_payload(payload, json_output=getattr(args, "json", False), stdout=stdout)
     return 0
 
 
@@ -888,44 +878,7 @@ def _raw_config_for_write(args: argparse.Namespace) -> Mapping[str, Any]:
     return raw
 
 
-def _emit_payload(payload: Mapping[str, Any], *, json_output: bool, stdout: Any) -> None:
-    if json_output:
-        print(json.dumps(payload, indent=2, sort_keys=False), file=stdout)
-        return
-    operation = payload.get("operation")
-    if operation == "build_config":
-        print(payload["yaml"], end="", file=stdout)
-        return
-    if operation == "jira_relationship_mappings":
-        print(payload["yaml"], end="", file=stdout)
-        return
-    if operation == "jira_state_transition_inspect":
-        for sample in payload.get("sample_issues", []):
-            issue_key = sample.get("issue") or "<unknown>"
-            transitions = sample.get("transitions") or []
-            if not transitions:
-                print(f"{issue_key}: (no transitions reachable)", file=stdout)
-                continue
-            print(f"{issue_key}:", file=stdout)
-            for transition in transitions:
-                name = transition.get("name") or "<unnamed>"
-                target = transition.get("to_status_name") or "<unknown>"
-                print(f"  - {name} -> {target}", file=stdout)
-        auto_verbs = payload.get("auto_verbs") or {}
-        if auto_verbs:
-            print("auto_verbs:", file=stdout)
-            for verb, transition_name in auto_verbs.items():
-                print(f"  {verb} -> {transition_name}", file=stdout)
-        for warning in payload.get("warnings", []):
-            print(f"warning: {warning}", file=stdout)
-        return
-    if operation == "capabilities":
-        for warning in payload.get("warnings", []):
-            print(f"- {warning}", file=stdout)
-        return
-    if operation == "profile_from_docs":
-        print(yaml.safe_dump(payload.get("defaults", {}), sort_keys=False), end="", file=stdout)
-        return
+def _emit_payload(payload: Mapping[str, Any], *, stdout: Any) -> None:
     print(json.dumps(payload, indent=2, sort_keys=False), file=stdout)
 
 

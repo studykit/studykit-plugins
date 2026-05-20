@@ -36,7 +36,6 @@ The provider-write intents share one shape:
   [--epic-name <X>] \
   [--parent <KEY>] [--epic <KEY>] [--blocked-by <KEY> ...] [--blocking <KEY> ...] \
   [--child <KEY> ...] [--related <KEY-or-URL> ...] \
-  --json
 ```
 
 Required: `--type`, `--title`, `--body-file`. Use `--issue-type` when the
@@ -59,7 +58,6 @@ setup skill); missing config raises `ProviderOperationError`.
   --body-file <path> \
   [--type <task|bug|...>] \
   [--state <verb>] \
-  --json
 ```
 
 Required: `--issue`, `--body-file`. `--state` is a free-form verb keyed in
@@ -82,7 +80,6 @@ section) raises `ProviderOperationError`.
   [--add-label <label> ...] [--remove-label <label> ...] \
   [--set-labels <label,label,...>] \
   [--state <verb>] \
-  --json
 ```
 
 Required: `--issue`, `--body-file`. At least one of body, title, labels,
@@ -110,7 +107,7 @@ link surfaces, and refreshes the cache. No flag means no provider call
   [--blocking <KEY> ...]  [--remove-blocking <KEY> ...] \
   [--child <KEY> ...]     [--remove-child <KEY> ...] \
   [--related <KEY-or-URL> ...] [--remove-related <KEY-or-URL> ...] \
-  [--type <type>] --json
+  [--type <type>]
 ```
 
 Flag semantics:
