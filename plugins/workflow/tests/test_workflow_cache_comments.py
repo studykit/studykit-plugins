@@ -195,7 +195,7 @@ def test_jira_append_strips_body_file_frontmatter(tmp_path: Path) -> None:
     write_jira_config(tmp_path)
     _seed_cached_issue(tmp_path)
     body_file = _write_body_file(
-        tmp_path, "---\nschema_version: 1\n---\nInline comment body.\n"
+        tmp_path, "---\nschema_version: 2\n---\nInline comment body.\n"
     )
     runner = FakeRunner(
         {

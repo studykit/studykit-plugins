@@ -167,12 +167,14 @@ def test_github_issue_cache_writes_flat_layout_with_frontmatter_freshness(tmp_pa
     assert write.issue_dir == tmp_path / ".workflow-cache" / "issues" / "39"
     issue_text = write.issue_file.read_text(encoding="utf-8")
     assert "title: Add local cache for workflow provider reads" in issue_text
-    assert "source_updated_at: '2026-05-13T12:00:00Z'" in issue_text
+    assert "updated_at: '2026-05-13T12:00:00Z'" in issue_text
     assert "fetched_at: '2026-05-13T12:34:56Z'" in issue_text
-    assert "relationships:\n  source_updated_at:" in issue_text
-    assert "current:\n    parent: 28" in issue_text
-    assert "children:\n    - 41" in issue_text
-    assert "blocked_by:\n      - 32" in issue_text
+    assert "relationships:\n  updated_at:" in issue_text
+    assert "\n  parent: 28\n" in issue_text
+    assert "\n  children:\n  - 41\n" in issue_text
+    assert "\n  blocked_by:\n  - 32\n" in issue_text
+    assert "current:" not in issue_text
+    assert "dependencies:" not in issue_text
     assert "\ncomments:\n" not in issue_text
     assert "# Issue" not in issue_text
     assert issue_text.endswith("Raw issue body.")
@@ -195,7 +197,7 @@ def test_github_issue_cache_writes_flat_layout_with_frontmatter_freshness(tmp_pa
     assert relationships["fetched_at"] == "2026-05-13T12:34:56Z"
     assert relationships["parent"]["number"] == 28
     assert relationships["children"][0]["number"] == 41
-    assert relationships["dependencies"]["blocked_by"][0] == {"number": 32}
+    assert relationships["blocked_by"][0] == {"number": 32}
 
 
 def test_github_issue_cache_preserves_comments_when_provider_payload_omits_comments(tmp_path: Path) -> None:
@@ -306,14 +308,14 @@ def test_freshness_metadata_reads_from_issue_frontmatter(tmp_path: Path) -> None
     cached = cache.read_issue(repo(), 39, include_body=False, include_comments=False, include_relationships=False)
 
     assert issue_meta.path == write.issue_file
-    assert issue_meta.source_updated_at == "2026-05-13T12:00:00Z"
+    assert issue_meta.updated_at == "2026-05-13T12:00:00Z"
     assert issue_meta.fetched_at == "2026-05-13T12:34:56Z"
     assert comments_meta.path == write.issue_file
     assert comments_meta.fetched_at == "2026-05-13T12:34:56Z"
-    assert comments_meta.source_updated_at == "2026-05-13T11:21:00Z"
+    assert comments_meta.updated_at == "2026-05-13T11:21:00Z"
     assert relationships_meta.path == write.issue_file
     assert relationships_meta.fetched_at == "2026-05-13T12:34:56Z"
-    assert relationships_meta.source_updated_at == "2026-05-13T12:00:00Z"
+    assert relationships_meta.updated_at == "2026-05-13T12:00:00Z"
     assert cached["cache"]["issue_file"] == str(write.issue_file)
     assert cached["cache"]["fetchedAt"] == "2026-05-13T12:34:56Z"
 

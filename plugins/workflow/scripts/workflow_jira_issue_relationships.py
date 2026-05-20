@@ -14,6 +14,7 @@ def normalize_jira_data_center_issue(
     *,
     site: JiraDataCenterSite,
     remote_links: list[Mapping[str, Any]] | None = None,
+    relationship_mappings: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Normalize Jira Data Center REST JSON into the workflow provider payload shape."""
 
@@ -30,7 +31,11 @@ def normalize_jira_data_center_issue(
     assert isinstance(raw_comments, Mapping)
     comments = [_normalize_data_center_comment(comment) for comment in _mapping_list(raw_comments.get("comments"))]
 
-    relationships = _provider_relationships(fields, remote_links=remote_links)
+    relationships = _provider_relationships(
+        fields,
+        remote_links=remote_links,
+        relationship_mappings=relationship_mappings,
+    )
     payload: dict[str, Any] = {
         "issue": key,
         "key": key,
@@ -94,6 +99,7 @@ def _provider_relationships(
     fields: Mapping[str, Any],
     *,
     remote_links: list[Mapping[str, Any]] | None,
+    relationship_mappings: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     relationships: dict[str, Any] = {}
     if remote_links is not None:
@@ -110,7 +116,10 @@ def _provider_relationships(
     subtasks = [_issue_stub(item) for item in _mapping_list(fields.get("subtasks"))]
     if subtasks:
         relationships["subtasks"] = subtasks
-    workflow_relationships = _workflow_relationships(relationships)
+    workflow_relationships = _workflow_relationships(
+        relationships,
+        relationship_mappings=relationship_mappings,
+    )
     if workflow_relationships:
         relationships["workflow"] = workflow_relationships
     return relationships
@@ -134,12 +143,16 @@ def _normalize_issue_link(link: Mapping[str, Any]) -> dict[str, Any]:
     return {key: value for key, value in entry.items() if value is not None}
 
 
-def _workflow_relationships(provider_relationships: Mapping[str, Any]) -> dict[str, Any]:
-    """Map Jira-native relationship fields into workflow relationship categories.
+def _workflow_relationships(
+    provider_relationships: Mapping[str, Any],
+    *,
+    relationship_mappings: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Map Jira-native relationship fields into workflow relationship buckets.
 
-    Jira link direction is label-based. The REST payload exposes `inwardIssue`
-    or `outwardIssue`; the corresponding `type.inward` or `type.outward` label
-    is the only stable semantic surface for dependency mapping.
+    Issue-link buckets are resolved from ``providers.issues.relationship_mappings``.
+    Links whose ``(link_type, direction)`` matches a mapping land in that bucket;
+    unmapped links are preserved verbatim under ``issue_links``.
     """
 
     workflow: dict[str, Any] = {}
@@ -154,35 +167,32 @@ def _workflow_relationships(provider_relationships: Mapping[str, Any]) -> dict[s
         if children:
             workflow["children"] = children
 
-    dependencies: dict[str, list[dict[str, Any]]] = {"blocked_by": [], "blocking": []}
-    related: list[dict[str, Any]] = []
+    inverse_mapping = _inverse_issue_link_mapping(relationship_mappings or {})
+    buckets: dict[str, list[dict[str, Any]]] = {}
+    unmapped_links: list[dict[str, Any]] = []
     issue_links = provider_relationships.get("issue_links")
     if isinstance(issue_links, list):
         for link in issue_links:
             if not isinstance(link, Mapping):
                 continue
-            target, direction, label = _issue_link_target_and_label(link)
+            target, direction, _label = _issue_link_target_and_label(link)
             if target is None:
                 continue
             mapped = _workflow_issue(target)
-            mapped["source"] = "issuelinks"
-            mapped["direction"] = direction
-            if link.get("type"):
-                mapped["link_type"] = link.get("type")
-            if label:
-                mapped["label"] = label
-
-            bucket = _dependency_bucket(label)
-            if bucket is None:
-                related.append(mapped)
+            link_type = _normalize_optional(link.get("type"))
+            bucket = inverse_mapping.get((link_type, direction)) if link_type else None
+            if bucket is not None:
+                buckets.setdefault(bucket, []).append(mapped)
             else:
-                dependencies[bucket].append(mapped)
+                entry: dict[str, Any] = {"target": mapped, "direction": direction}
+                if link_type:
+                    entry["type"] = link_type
+                unmapped_links.append(entry)
 
-    compact_dependencies = {name: items for name, items in dependencies.items() if items}
-    if compact_dependencies:
-        workflow["dependencies"] = compact_dependencies
-    if related:
-        workflow["related"] = related
+    for name in sorted(buckets):
+        workflow[name] = buckets[name]
+    if unmapped_links:
+        workflow["issue_links"] = unmapped_links
 
     remote_links = provider_relationships.get("remote_links")
     if isinstance(remote_links, list):
@@ -193,27 +203,30 @@ def _workflow_relationships(provider_relationships: Mapping[str, Any]) -> dict[s
     return workflow
 
 
+def _inverse_issue_link_mapping(
+    relationship_mappings: Mapping[str, Any],
+) -> dict[tuple[str, str], str]:
+    """Build ``(link_type, direction) -> workflow relationship name`` from config."""
+
+    inverse: dict[tuple[str, str], str] = {}
+    for name, mapping in relationship_mappings.items():
+        if not isinstance(mapping, Mapping):
+            continue
+        if mapping.get("surface") != "issue_link":
+            continue
+        link_type = mapping.get("link_type")
+        direction = mapping.get("direction")
+        if isinstance(link_type, str) and isinstance(direction, str) and isinstance(name, str):
+            inverse[(link_type, direction)] = name
+    return inverse
+
+
 def _issue_link_target_and_label(link: Mapping[str, Any]) -> tuple[Mapping[str, Any] | None, str, str | None]:
     if isinstance(link.get("outward_issue"), Mapping):
         return link["outward_issue"], "outward", _normalize_optional(link.get("outward"))
     if isinstance(link.get("inward_issue"), Mapping):
         return link["inward_issue"], "inward", _normalize_optional(link.get("inward"))
     return None, "unknown", None
-
-
-def _dependency_bucket(label: str | None) -> str | None:
-    normalized = _normalize_link_label(label)
-    if normalized in {"blocks", "is blocking", "is depended on by", "is required by"}:
-        return "blocking"
-    if normalized in {"is blocked by", "blocked by", "depends on", "requires", "is dependent on"}:
-        return "blocked_by"
-    return None
-
-
-def _normalize_link_label(label: str | None) -> str:
-    if label is None:
-        return ""
-    return " ".join(str(label).strip().lower().replace("_", " ").replace("-", " ").split())
 
 
 def _workflow_issue(issue: Mapping[str, Any]) -> dict[str, Any]:

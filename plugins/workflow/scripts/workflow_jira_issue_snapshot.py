@@ -15,7 +15,7 @@ from workflow_cache import (
 def render_jira_snapshot(
     issue: Mapping[str, Any],
     *,
-    source_updated_at: str | None,
+    updated_at: str | None,
     fetched_at: str,
 ) -> str:
     """Render a Jira issue projection as YAML frontmatter plus issue body.
@@ -27,7 +27,7 @@ def render_jira_snapshot(
 
     frontmatter = build_jira_snapshot_frontmatter(
         issue,
-        source_updated_at=source_updated_at,
+        updated_at=updated_at,
         fetched_at=fetched_at,
     )
     body = str(issue.get("body") or "")
@@ -37,7 +37,7 @@ def render_jira_snapshot(
 def build_jira_snapshot_frontmatter(
     issue: Mapping[str, Any],
     *,
-    source_updated_at: str | None,
+    updated_at: str | None,
     fetched_at: str,
 ) -> dict[str, Any]:
     """Return the frontmatter mapping written into issue.md."""
@@ -48,7 +48,7 @@ def build_jira_snapshot_frontmatter(
         "state": _normalize_optional(issue.get("state")),
         "state_reason": _normalize_optional(issue.get("stateReason")),
         "labels": [str(label) for label in issue.get("labels") or []],
-        "source_updated_at": source_updated_at,
+        "updated_at": updated_at,
         "fetched_at": fetched_at,
         "url": _normalize_optional(issue.get("url")),
     }
@@ -62,7 +62,7 @@ def build_jira_snapshot_frontmatter(
 
     relationship_block = _build_relationship_frontmatter_block(
         relationships,
-        source_updated_at=source_updated_at,
+        updated_at=updated_at,
         fetched_at=fetched_at,
     )
     if relationship_block:
@@ -71,53 +71,43 @@ def build_jira_snapshot_frontmatter(
     return frontmatter
 
 
+_RESERVED_WORKFLOW_KEYS = {"parent", "issue_links", "external_links"}
+
+
 def _build_relationship_frontmatter_block(
     relationships: Mapping[str, Any],
     *,
-    source_updated_at: str | None,
+    updated_at: str | None,
     fetched_at: str,
 ) -> dict[str, Any]:
     workflow = relationships.get("workflow") if isinstance(relationships.get("workflow"), Mapping) else {}
     assert isinstance(workflow, Mapping)
 
-    current: dict[str, Any] = {}
+    fields: dict[str, Any] = {}
 
     parent_ref = _workflow_ref(workflow.get("parent"))
     if parent_ref:
-        current["parent"] = parent_ref
+        fields["parent"] = parent_ref
 
-    children = _workflow_refs(workflow.get("children"))
-    if children:
-        current["children"] = children
+    for key, value in workflow.items():
+        if key in _RESERVED_WORKFLOW_KEYS:
+            continue
+        refs = _workflow_refs(value)
+        if refs:
+            fields[key] = refs
 
-    dependencies = workflow.get("dependencies") if isinstance(workflow.get("dependencies"), Mapping) else {}
-    assert isinstance(dependencies, Mapping)
-    dependency_block: dict[str, Any] = {}
-    blocked_by = _workflow_refs(dependencies.get("blocked_by"))
-    if blocked_by:
-        dependency_block["blocked_by"] = blocked_by
-    blocking = _workflow_refs(dependencies.get("blocking"))
-    if blocking:
-        dependency_block["blocking"] = blocking
-    if dependency_block:
-        current["dependencies"] = dependency_block
+    unmapped_links = _compact_unmapped_issue_links(workflow.get("issue_links"))
+    if unmapped_links:
+        fields["issue_links"] = unmapped_links
 
-    related = _workflow_refs(workflow.get("related"))
-    if related:
-        current["related"] = related
-
-    issue_links = _compact_issue_links(relationships.get("issue_links"))
-    if issue_links:
-        current["issue_links"] = issue_links
-
-    if not current:
+    if not fields:
         return {}
 
     block: dict[str, Any] = {}
-    if source_updated_at is not None:
-        block["source_updated_at"] = source_updated_at
+    if updated_at is not None:
+        block["updated_at"] = updated_at
     block["fetched_at"] = fetched_at
-    block["current"] = current
+    block.update(fields)
     return block
 
 
@@ -170,30 +160,23 @@ def _compact_remote_links(value: Any) -> list[dict[str, Any]]:
     return links
 
 
-def _compact_issue_links(value: Any) -> list[dict[str, Any]]:
+def _compact_unmapped_issue_links(value: Any) -> list[dict[str, Any]]:
     if not isinstance(value, list):
         return []
     entries: list[dict[str, Any]] = []
     for item in value:
         if not isinstance(item, Mapping):
             continue
-        link_type = _normalize_optional(item.get("type"))
-        outward_issue = item.get("outward_issue")
-        inward_issue = item.get("inward_issue")
-        if isinstance(outward_issue, Mapping):
-            target = _workflow_ref(outward_issue)
-            direction = "outward"
-        elif isinstance(inward_issue, Mapping):
-            target = _workflow_ref(inward_issue)
-            direction = "inward"
-        else:
-            continue
+        target = _workflow_ref(item.get("target"))
         if target is None:
             continue
         entry: dict[str, Any] = {}
+        link_type = _normalize_optional(item.get("type"))
         if link_type is not None:
             entry["type"] = link_type
-        entry["direction"] = direction
+        direction = _normalize_optional(item.get("direction"))
+        if direction is not None:
+            entry["direction"] = direction
         entry["target"] = target
         entries.append(entry)
     return entries

@@ -29,7 +29,7 @@ def test_gitignore_excludes_workflow_cache_root() -> None:
 def test_provider_freshness_allows_clean_cache_metadata() -> None:
     result = require_provider_freshness(
         FreshnessMetadata(
-            source_updated_at="2026-05-13T12:00:00Z",
+            updated_at="2026-05-13T12:00:00Z",
             fetched_at="2026-05-13T12:34:56Z",
         ),
         provider_updated_at="2026-05-13T12:00:00Z",
@@ -44,7 +44,7 @@ def test_provider_freshness_blocks_stale_provider_timestamp() -> None:
     with pytest.raises(WorkflowFreshnessConflict) as excinfo:
         require_provider_freshness(
             FreshnessMetadata(
-                source_updated_at="2026-05-13T12:00:00Z",
+                updated_at="2026-05-13T12:00:00Z",
                 fetched_at="2026-05-13T12:34:56Z",
             ),
             provider_updated_at="2026-05-13T13:00:00Z",
@@ -57,7 +57,7 @@ def test_provider_freshness_blocks_stale_provider_timestamp() -> None:
 
 def test_provider_freshness_blocks_missing_local_metadata() -> None:
     result = check_provider_freshness(
-        FreshnessMetadata(source_updated_at=None, fetched_at="2026-05-13T12:34:56Z"),
+        FreshnessMetadata(updated_at=None, fetched_at="2026-05-13T12:34:56Z"),
         provider_updated_at="2026-05-13T12:00:00Z",
         artifact="GitHub issue #39 issue",
     )
@@ -69,7 +69,7 @@ def test_provider_freshness_blocks_missing_local_metadata() -> None:
 def test_provider_freshness_allows_missing_provider_timestamp() -> None:
     result = require_provider_freshness(
         FreshnessMetadata(
-            source_updated_at="2026-05-13T12:00:00Z",
+            updated_at="2026-05-13T12:00:00Z",
             fetched_at="2026-05-13T12:34:56Z",
         ),
         provider_updated_at=None,
@@ -116,7 +116,7 @@ def test_provider_freshness_allows_subsecond_precision_match() -> None:
 
     result = require_provider_freshness(
         FreshnessMetadata(
-            source_updated_at="2026-05-19T09:44:23.314000+00:00",
+            updated_at="2026-05-19T09:44:23.314000+00:00",
             fetched_at="2026-05-19T09:44:23.314000+00:00",
         ),
         provider_updated_at="2026-05-19T18:44:23.314+0900",

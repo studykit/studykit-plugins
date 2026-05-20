@@ -16,7 +16,7 @@ import frontmatter as frontmatter_lib
 
 
 CACHE_ROOT_NAME = ".workflow-cache"
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 _FRONTMATTER_HANDLER = frontmatter_lib.YAMLHandler()
 
 
@@ -75,7 +75,7 @@ class PendingIssueRelationshipOperation:
 class FreshnessMetadata:
     """Local cache freshness metadata for one write-back target."""
 
-    source_updated_at: str | None
+    updated_at: str | None
     fetched_at: str | None
     path: Path | None = None
     target: str = "artifact"
@@ -83,7 +83,7 @@ class FreshnessMetadata:
     def to_json(self) -> dict[str, str | None]:
         result: dict[str, str | None] = {
             "target": self.target,
-            "source_updated_at": self.source_updated_at,
+            "updated_at": self.updated_at,
             "fetched_at": self.fetched_at,
         }
         if self.path is not None:
@@ -99,7 +99,7 @@ class FreshnessCheckResult:
     status: str
     message: str
     artifact: str
-    source_updated_at: str | None = None
+    updated_at: str | None = None
     fetched_at: str | None = None
     provider_updated_at: str | None = None
 
@@ -109,7 +109,7 @@ class FreshnessCheckResult:
             "status": self.status,
             "message": self.message,
             "artifact": self.artifact,
-            "source_updated_at": self.source_updated_at,
+            "updated_at": self.updated_at,
             "fetched_at": self.fetched_at,
             "provider_updated_at": self.provider_updated_at,
         }
@@ -133,7 +133,7 @@ def check_provider_freshness(
             provider_updated_at=provider_updated_at,
         )
 
-    if metadata is None or not metadata.source_updated_at or not metadata.fetched_at:
+    if metadata is None or not metadata.updated_at or not metadata.fetched_at:
         return FreshnessCheckResult(
             ok=False,
             status="missing_metadata",
@@ -142,12 +142,12 @@ def check_provider_freshness(
                 "Refresh the provider cache before writing."
             ),
             artifact=artifact,
-            source_updated_at=metadata.source_updated_at if metadata else None,
+            updated_at=metadata.updated_at if metadata else None,
             fetched_at=metadata.fetched_at if metadata else None,
             provider_updated_at=provider_updated_at,
         )
 
-    source_dt = _parse_freshness_timestamp(metadata.source_updated_at)
+    source_dt = _parse_freshness_timestamp(metadata.updated_at)
     fetched_dt = _parse_freshness_timestamp(metadata.fetched_at)
     if source_dt is None or fetched_dt is None:
         return FreshnessCheckResult(
@@ -158,7 +158,7 @@ def check_provider_freshness(
                 "Refresh the provider cache before writing."
             ),
             artifact=artifact,
-            source_updated_at=metadata.source_updated_at,
+            updated_at=metadata.updated_at,
             fetched_at=metadata.fetched_at,
             provider_updated_at=provider_updated_at,
         )
@@ -173,7 +173,7 @@ def check_provider_freshness(
                 "could be detected."
             ),
             artifact=artifact,
-            source_updated_at=metadata.source_updated_at,
+            updated_at=metadata.updated_at,
             fetched_at=metadata.fetched_at,
             provider_updated_at=provider_updated_at,
         )
@@ -184,12 +184,12 @@ def check_provider_freshness(
             status="stale",
             message=(
                 f"Stale workflow cache for {artifact}: provider timestamp "
-                f"{provider_updated_at} is newer than cached source_updated_at "
-                f"{metadata.source_updated_at} or fetched_at {metadata.fetched_at}. "
+                f"{provider_updated_at} is newer than cached updated_at "
+                f"{metadata.updated_at} or fetched_at {metadata.fetched_at}. "
                 "Refresh the provider cache before writing."
             ),
             artifact=artifact,
-            source_updated_at=metadata.source_updated_at,
+            updated_at=metadata.updated_at,
             fetched_at=metadata.fetched_at,
             provider_updated_at=provider_updated_at,
         )
@@ -199,7 +199,7 @@ def check_provider_freshness(
         status="fresh",
         message=f"{artifact} cache is fresh enough for write-back.",
         artifact=artifact,
-        source_updated_at=metadata.source_updated_at,
+        updated_at=metadata.updated_at,
         fetched_at=metadata.fetched_at,
         provider_updated_at=provider_updated_at,
     )
@@ -319,7 +319,7 @@ def _pending_relationship_operations_from_declarative(
     target_id: str,
 ) -> list[PendingIssueRelationshipOperation]:
     operations: list[PendingIssueRelationshipOperation] = []
-    ignored = {"schema_version", "source_updated_at", "fetched_at", "operations"}
+    ignored = {"schema_version", "updated_at", "fetched_at", "operations"}
 
     if "parent" in data:
         operations.extend(

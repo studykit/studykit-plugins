@@ -152,6 +152,8 @@ class JiraDataCenterIssueNativeProvider(IssueProvider):
         try:
             site = resolve_jira_data_center_site(request.context.project)
             cache = JiraDataCenterIssueCache.for_project(request.context.project)
+            settings = _jira_issue_provider_settings(request.context.project)
+            mappings = _relationship_mappings(settings)
             if request.context.cache_policy == CACHE_POLICY_DEFAULT:
                 try:
                     return cache.read_issue(
@@ -160,21 +162,27 @@ class JiraDataCenterIssueNativeProvider(IssueProvider):
                         include_body=include_body,
                         include_comments=include_comments,
                         include_relationships=include_relationships,
+                        relationship_mappings=mappings,
                     )
                 except WorkflowCacheError:
                     pass
 
             raw_issue = get_issue(site, issue_key, runner=self.runner)
             remote_links = get_remote_links(site, issue_key, runner=self.runner) if include_remote_links else []
-            payload = normalize_jira_data_center_issue(raw_issue, site=site, remote_links=remote_links)
+            payload = normalize_jira_data_center_issue(
+                raw_issue,
+                site=site,
+                remote_links=remote_links,
+                relationship_mappings=mappings,
+            )
 
             if request.context.cache_policy != CACHE_POLICY_BYPASS:
-                settings = _jira_issue_provider_settings(request.context.project)
                 cache.write_issue_bundle(
                     site,
                     raw_issue,
                     remote_links=remote_links,
                     hidden_comment_markers=_jira_snapshot_hidden_comment_markers(settings),
+                    relationship_mappings=mappings,
                 )
 
             return filter_jira_payload(
@@ -638,7 +646,7 @@ class JiraDataCenterIssueNativeProvider(IssueProvider):
             metadata = cache.read_freshness_metadata(site, issue_key, target=target)
         except WorkflowCacheError:
             metadata = FreshnessMetadata(
-                source_updated_at=None,
+                updated_at=None,
                 fetched_at=None,
                 path=cache.issue_file(site, issue_key),
                 target=target,
@@ -666,6 +674,7 @@ class JiraDataCenterIssueNativeProvider(IssueProvider):
             raw_issue,
             remote_links=remote_links,
             hidden_comment_markers=_jira_snapshot_hidden_comment_markers(settings),
+            relationship_mappings=_relationship_mappings(settings),
         )
 
     def _stale_cache_block_payload(

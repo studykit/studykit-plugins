@@ -147,7 +147,7 @@ class GitHubIssueCache:
 
         frontmatter, _body = _read_frontmatter_markdown(issue_path)
         _require_schema(frontmatter, issue_path)
-        issue_source = _normalize_optional(frontmatter.get("source_updated_at"))
+        issue_source = _normalize_optional(frontmatter.get("updated_at"))
         issue_fetched = _normalize_optional(frontmatter.get("fetched_at"))
         if normalized == "issue":
             source: str | None = issue_source
@@ -158,7 +158,7 @@ class GitHubIssueCache:
         else:
             block = frontmatter.get(normalized)
             if isinstance(block, Mapping):
-                source = _normalize_optional(block.get("source_updated_at"))
+                source = _normalize_optional(block.get("updated_at"))
                 fetched = _normalize_optional(block.get("fetched_at"))
             elif block is not None:
                 raise WorkflowCacheCorrupt(
@@ -168,7 +168,7 @@ class GitHubIssueCache:
                 source = None
                 fetched = None
         return FreshnessMetadata(
-            source_updated_at=source,
+            updated_at=source,
             fetched_at=fetched,
             path=issue_path,
             target=normalized,
@@ -211,7 +211,7 @@ class GitHubIssueCache:
         try:
             frontmatter, body = _read_frontmatter_markdown(issue_path)
             _require_schema(frontmatter, issue_path)
-            for key in ("title", "state", "state_reason", "labels", "source_updated_at"):
+            for key in ("title", "state", "state_reason", "labels", "updated_at"):
                 if key not in frontmatter:
                     raise WorkflowCacheCorrupt(f"missing issue frontmatter field {key}: {issue_path}")
 
@@ -221,13 +221,13 @@ class GitHubIssueCache:
             if not isinstance(labels, list):
                 raise WorkflowCacheCorrupt(f"issue labels must be a list: {issue_path}")
 
-            source_updated_at = _normalize_optional(frontmatter.get("source_updated_at"))
+            updated_at = _normalize_optional(frontmatter.get("updated_at"))
             fetched_at = _normalize_optional(frontmatter.get("fetched_at"))
             cache_metadata: dict[str, Any] = {
                 "hit": True,
                 "issue_file": str(issue_path),
                 "fetchedAt": fetched_at,
-                "sourceUpdatedAt": source_updated_at,
+                "sourceUpdatedAt": updated_at,
             }
 
             payload: dict[str, Any] = {
@@ -236,7 +236,7 @@ class GitHubIssueCache:
                 "state": frontmatter.get("state"),
                 "stateReason": frontmatter.get("state_reason"),
                 "labels": [str(label) for label in labels],
-                "updatedAt": source_updated_at,
+                "updatedAt": updated_at,
                 "repository": repo.to_json(),
                 "cache": cache_metadata,
             }
@@ -309,7 +309,7 @@ class GitHubIssueCache:
                 "hit": True,
                 "issue_file": str(issue_path),
                 "fetchedAt": comments_freshness.fetched_at,
-                "sourceUpdatedAt": comments_freshness.source_updated_at,
+                "sourceUpdatedAt": comments_freshness.updated_at,
             },
         }
 
@@ -324,7 +324,7 @@ class GitHubIssueCache:
         except WorkflowCacheError:
             freshness = None
         if freshness is not None:
-            data["source_updated_at"] = freshness.source_updated_at
+            data["updated_at"] = freshness.updated_at
             data["fetched_at"] = freshness.fetched_at
         data.update(frontmatter_current)
         return data
@@ -345,13 +345,13 @@ class GitHubIssueCache:
         if not issue_path.is_file():
             raise WorkflowCacheMiss(f"issue cache does not exist: {issue_path}")
         current = _relationships_from_issue(relationship_payload)
-        source_updated_at = _normalize_optional(
+        updated_at = _normalize_optional(
             relationship_payload.get("updatedAt") or relationship_payload.get("updated_at")
         ) or now
         self._update_issue_frontmatter(
             issue_path,
             relationships_current=current,
-            relationships_source_updated_at=source_updated_at,
+            relationships_updated_at=updated_at,
             relationships_fetched_at=now,
         )
         return issue_path
@@ -369,7 +369,7 @@ class GitHubIssueCache:
         now = fetched_at or _utc_now()
         issue_dir = self.issue_dir(repo, issue_number)
         issue_dir.mkdir(parents=True, exist_ok=True)
-        source_updated_at = _normalize_optional(issue.get("updatedAt") or issue.get("updated_at")) or now
+        updated_at = _normalize_optional(issue.get("updatedAt") or issue.get("updated_at")) or now
         current_relationships = _relationships_from_issue(issue)
 
         if _has_comment_projection_payload(issue):
@@ -381,7 +381,7 @@ class GitHubIssueCache:
             "state": _normalize_state(issue.get("state")),
             "state_reason": _normalize_state_reason(issue.get("stateReason") or issue.get("state_reason")),
             "labels": _label_names(issue.get("labels")),
-            "source_updated_at": source_updated_at,
+            "updated_at": updated_at,
             "fetched_at": now,
         }
         projects = _project_items_for_frontmatter(issue.get("projectItems") or issue.get("projects"))
@@ -389,7 +389,7 @@ class GitHubIssueCache:
             issue_frontmatter["projects"] = projects
         issue_frontmatter["relationships"] = _relationship_frontmatter_block(
             current=current_relationships,
-            source_updated_at=source_updated_at,
+            updated_at=updated_at,
             fetched_at=now,
         )
 
@@ -448,23 +448,22 @@ class GitHubIssueCache:
         issue_path: Path,
         *,
         relationships_current: Mapping[str, Any] | None = None,
-        relationships_source_updated_at: str | None = None,
+        relationships_updated_at: str | None = None,
         relationships_fetched_at: str | None = None,
     ) -> None:
         frontmatter, body = _read_frontmatter_markdown(issue_path)
         existing_relationships = _frontmatter_relationship_block(frontmatter, issue_path, create=True)
         if relationships_current is None:
-            current_block = existing_relationships.get("current")
-            relationships_current = current_block if isinstance(current_block, Mapping) else {}
-        if relationships_source_updated_at is None:
-            relationships_source_updated_at = _normalize_optional(
-                existing_relationships.get("source_updated_at")
+            relationships_current = existing_relationships
+        if relationships_updated_at is None:
+            relationships_updated_at = _normalize_optional(
+                existing_relationships.get("updated_at")
             )
         if relationships_fetched_at is None:
             relationships_fetched_at = _normalize_optional(existing_relationships.get("fetched_at"))
         frontmatter["relationships"] = _relationship_frontmatter_block(
             current=relationships_current,
-            source_updated_at=relationships_source_updated_at,
+            updated_at=relationships_updated_at,
             fetched_at=relationships_fetched_at,
         )
         _atomic_write_text(issue_path, _format_markdown(frontmatter, body))
@@ -494,26 +493,21 @@ def _read_frontmatter_current_relationships(path: Path) -> dict[str, Any] | None
     relationships = _frontmatter_relationship_block(frontmatter, path, create=False)
     if relationships is None:
         return None
-    current = relationships.get("current")
-    if current is None:
-        return {}
-    if not isinstance(current, Mapping):
-        raise WorkflowCacheCorrupt(f"issue relationship current frontmatter must be a mapping: {path}")
-    return _relationships_from_issue(current)
+    return _relationships_from_issue(relationships)
 
 
 def _relationship_frontmatter_block(
     *,
     current: Mapping[str, Any],
-    source_updated_at: str | None,
+    updated_at: str | None,
     fetched_at: str | None,
 ) -> dict[str, Any]:
     block: dict[str, Any] = {}
-    if source_updated_at is not None:
-        block["source_updated_at"] = source_updated_at
+    if updated_at is not None:
+        block["updated_at"] = updated_at
     if fetched_at is not None:
         block["fetched_at"] = fetched_at
-    block["current"] = _compact_relationships_for_frontmatter(current)
+    block.update(_compact_relationships_for_frontmatter(current))
     return block
 
 
@@ -541,15 +535,12 @@ def _compact_relationships_for_frontmatter(current: Mapping[str, Any]) -> dict[s
         blocking = dependencies.get("blocking") or dependencies.get("blocks")
     blocked_by = blocked_by or current.get("blocked_by") or current.get("blockedBy")
     blocking = blocking or current.get("blocking") or current.get("blocks")
-    dependency_payload: dict[str, Any] = {}
     blocked_by_refs = _compact_relationship_refs(blocked_by)
-    blocking_refs = _compact_relationship_refs(blocking)
     if blocked_by_refs:
-        dependency_payload["blocked_by"] = blocked_by_refs
+        compact["blocked_by"] = blocked_by_refs
+    blocking_refs = _compact_relationship_refs(blocking)
     if blocking_refs:
-        dependency_payload["blocking"] = blocking_refs
-    if dependency_payload:
-        compact["dependencies"] = dependency_payload
+        compact["blocking"] = blocking_refs
 
     related = _compact_relationship_refs(current.get("related"))
     if related:
@@ -779,15 +770,12 @@ def _relationships_from_issue(issue: Mapping[str, Any]) -> dict[str, Any]:
         blocking = dependencies.get("blocking") or dependencies.get("blocks")
     blocked_by = blocked_by or issue.get("blocked_by") or issue.get("blockedBy")
     blocking = blocking or issue.get("blocking") or issue.get("blocks")
-    dependency_payload: dict[str, Any] = {}
     blocked_by_items = _relationship_items(blocked_by)
-    blocking_items = _relationship_items(blocking)
     if blocked_by_items:
-        dependency_payload["blocked_by"] = blocked_by_items
+        result["blocked_by"] = blocked_by_items
+    blocking_items = _relationship_items(blocking)
     if blocking_items:
-        dependency_payload["blocking"] = blocking_items
-    if dependency_payload:
-        result["dependencies"] = dependency_payload
+        result["blocking"] = blocking_items
 
     related = _relationship_items(issue.get("related"))
     if related:

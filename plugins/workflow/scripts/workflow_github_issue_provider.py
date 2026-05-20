@@ -850,7 +850,7 @@ class GitHubIssueNativeProvider(IssueProvider):
             metadata = cache.read_freshness_metadata(repo, issue_number, target=spec["target"])
         except WorkflowCacheError:
             metadata = FreshnessMetadata(
-                source_updated_at=None,
+                updated_at=None,
                 fetched_at=None,
                 path=cache.freshness_file(repo, issue_number, spec["target"]),
                 target=spec["target"],

@@ -414,7 +414,7 @@ def _tmp_project_from_args(request: CommandRequest) -> Path:
     return Path("/tmp")
 
 
-def _seed_cached_issue(project: Path, issue_number: int = 72, *, source_updated_at: str = "2026-05-14T00:00:00Z") -> None:
+def _seed_cached_issue(project: Path, issue_number: int = 72, *, updated_at: str = "2026-05-14T00:00:00Z") -> None:
     GitHubIssueCache.for_project(project, configured_repo=_repo()).write_issue_bundle(
         _repo(),
         {
@@ -424,10 +424,10 @@ def _seed_cached_issue(project: Path, issue_number: int = 72, *, source_updated_
             "stateReason": None,
             "body": "Cached body.",
             "labels": [{"name": "task"}],
-            "updatedAt": source_updated_at,
+            "updatedAt": updated_at,
             "comments": [],
         },
-        fetched_at=source_updated_at,
+        fetched_at=updated_at,
     )
 
 
