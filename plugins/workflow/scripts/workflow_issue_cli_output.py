@@ -20,6 +20,7 @@ class IssueFetchContext:
     cache_hit: bool | None = None
     provider_kind: str = "github"
     issue_file: str = "issue.md"
+    comments: tuple[str, ...] = ()
 
     def to_json(self) -> dict[str, Any]:
         payload = {
@@ -31,6 +32,8 @@ class IssueFetchContext:
         }
         if self.issue_file != "issue.md":
             payload["issue_file"] = self.issue_file
+        if self.comments:
+            payload["comments"] = list(self.comments)
         return payload
 
 
@@ -60,6 +63,9 @@ def format_issue_cache_context(
         issue_ref = f"#{context.number}" if context.provider_kind == "github" else context.number
         suffix = " (refreshed)" if context.cache_hit is False else ""
         lines.append(f"- {issue_ref} → `{issue_path}`{suffix}")
+        for comment_path in context.comments:
+            relative = comment_path[len(shared_base):] if shared_base and comment_path.startswith(shared_base) else comment_path
+            lines.append(f"  - `{relative}`")
     return "\n".join(lines)
 
 
@@ -92,6 +98,10 @@ def format_issue_cache_context_from_payload(payload: dict[str, object]) -> str:
         if not isinstance(item, dict):
             continue
         cache_hit = item.get("cache_hit")
+        raw_comments = item.get("comments")
+        comments: tuple[str, ...] = ()
+        if isinstance(raw_comments, list):
+            comments = tuple(str(entry) for entry in raw_comments if isinstance(entry, str))
         contexts.append(
             IssueFetchContext(
                 number=str(item.get("issue") or ""),
@@ -101,6 +111,7 @@ def format_issue_cache_context_from_payload(payload: dict[str, object]) -> str:
                 cache_hit=cache_hit if isinstance(cache_hit, bool) else None,
                 provider_kind=str(payload.get("kind") or "github"),
                 issue_file=str(item.get("issue_file") or "issue.md"),
+                comments=comments,
             )
         )
 
