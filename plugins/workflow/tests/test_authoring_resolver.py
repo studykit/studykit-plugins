@@ -236,6 +236,43 @@ def test_task_comment_scope_excludes_plan_mode_authoring() -> None:
     assert "common/plan-mode-authoring.md" not in _rel_paths(resolution.files)
 
 
+@pytest.mark.parametrize("artifact_type", ["task", "bug"])
+def test_implementation_types_emit_plan_mode_note(artifact_type: str) -> None:
+    resolution = resolve_authoring(artifact_type)
+    assert len(resolution.notes) == 1
+    note = resolution.notes[0]
+    assert "plan mode" in note.lower()
+    assert "retroactive" in note.lower()
+    assert "notes" in resolution.to_json()
+    assert resolution.to_json()["notes"] == [note]
+
+
+@pytest.mark.parametrize(
+    "artifact_type,role",
+    [
+        ("spike", None),
+        ("epic", None),
+        ("review", None),
+        ("research", "issue"),
+        ("usecase", "issue"),
+        ("spec", None),
+        ("architecture", None),
+    ],
+)
+def test_non_implementation_types_omit_plan_mode_note(
+    artifact_type: str, role: str | None
+) -> None:
+    resolution = resolve_authoring(artifact_type, role=role)
+    assert resolution.notes == ()
+    assert "notes" not in resolution.to_json()
+
+
+def test_task_comment_scope_omits_plan_mode_note() -> None:
+    resolution = resolve_authoring("task", role="issue", provider="github", scope="comment")
+    assert resolution.notes == ()
+    assert "notes" not in resolution.to_json()
+
+
 def test_authoring_path_classification_uses_plugin_authoring_root(tmp_path: Path) -> None:
     authoring_file = _PLUGIN_ROOT / "authoring" / "common" / "task-authoring.md"
     outside_file = tmp_path / "task-authoring.md"

@@ -26,6 +26,9 @@ The resolver returns absolute paths under `required_authoring_files`. Read
 those paths directly before drafting any provider-backed change. If the
 target is not a workflow artifact, the resolver returns `NONE`.
 
+When the JSON response carries a `notes` array, treat each entry as a
+binding rule for the calling flow.
+
 ## Types
 
 - Issue: `task`, `bug`, `spike`, `epic`, `review`. Dual-role with the

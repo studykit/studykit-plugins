@@ -40,6 +40,12 @@ PRD_COMPONENT_TYPES = {"context", "usecase", "nfr", "spec", "domain"}
 
 PLAN_MODE_TYPES = {"task", "bug"}
 
+PLAN_MODE_TRIGGER_NOTE = (
+    "Enter plan mode before drafting the body when the change is not yet "
+    "implemented. Skip plan mode for retroactive issues that track work "
+    "already done."
+)
+
 ISSUE_PROVIDER_FILES = {
     "github": "providers/github-issue-convention.md",
     "jira": "providers/jira-issue-convention.md",
@@ -83,9 +89,10 @@ class Resolution:
     role: str
     provider: str | None
     files: tuple[Path, ...]
+    notes: tuple[str, ...] = ()
 
     def to_json(self) -> dict[str, Any]:
-        return {
+        payload: dict[str, Any] = {
             "artifact": {
                 "type": self.artifact_type,
                 "role": self.role,
@@ -93,6 +100,9 @@ class Resolution:
             },
             "required_authoring_files": [str(path) for path in self.files],
         }
+        if self.notes:
+            payload["notes"] = list(self.notes)
+        return payload
 
 
 class ResolverError(ValueError):
@@ -250,11 +260,16 @@ def resolve_authoring(
     if normalized_provider is not None:
         parts.extend(PROVIDER_EXTRA_FILES.get((normalized_role, normalized_provider), ()))
 
+    notes: tuple[str, ...] = ()
+    if normalized_role == "issue" and normalized_type in PLAN_MODE_TYPES:
+        notes = (PLAN_MODE_TRIGGER_NOTE,)
+
     return Resolution(
         artifact_type=normalized_type,
         role=normalized_role,
         provider=normalized_provider,
         files=absolute_authoring_paths(parts),
+        notes=notes,
     )
 
 
