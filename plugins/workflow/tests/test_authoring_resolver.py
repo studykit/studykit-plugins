@@ -206,6 +206,36 @@ def test_require_config_fails_when_missing(tmp_path: Path) -> None:
         resolve_authoring("task", project=tmp_path, require_config=True)
 
 
+@pytest.mark.parametrize("artifact_type", ["task", "bug"])
+def test_implementation_types_include_plan_mode_authoring(artifact_type: str) -> None:
+    resolution = resolve_authoring(artifact_type)
+    assert "common/plan-mode-authoring.md" in _rel_paths(resolution.files)
+
+
+@pytest.mark.parametrize(
+    "artifact_type,role",
+    [
+        ("spike", None),
+        ("epic", None),
+        ("review", None),
+        ("research", "issue"),
+        ("usecase", "issue"),
+        ("spec", None),
+        ("architecture", None),
+    ],
+)
+def test_non_implementation_types_exclude_plan_mode_authoring(
+    artifact_type: str, role: str | None
+) -> None:
+    resolution = resolve_authoring(artifact_type, role=role)
+    assert "common/plan-mode-authoring.md" not in _rel_paths(resolution.files)
+
+
+def test_task_comment_scope_excludes_plan_mode_authoring() -> None:
+    resolution = resolve_authoring("task", role="issue", provider="github", scope="comment")
+    assert "common/plan-mode-authoring.md" not in _rel_paths(resolution.files)
+
+
 def test_authoring_path_classification_uses_plugin_authoring_root(tmp_path: Path) -> None:
     authoring_file = _PLUGIN_ROOT / "authoring" / "common" / "task-authoring.md"
     outside_file = tmp_path / "task-authoring.md"

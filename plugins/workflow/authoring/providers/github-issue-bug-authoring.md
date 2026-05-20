@@ -29,6 +29,9 @@ Common optional sections are defined by `../common/bug-authoring.md` and `../com
 - `## Environment`
 - `## Change Plan`
 - `## Interface Contracts`
+- `## Out of Scope`
+- `## Alternatives Considered`
+- `## Risks`
 - `## Resume`
 - `## Why Discarded`
 
