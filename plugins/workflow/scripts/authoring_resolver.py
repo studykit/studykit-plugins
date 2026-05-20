@@ -46,6 +46,15 @@ PLAN_MODE_TRIGGER_NOTE = (
     "already done."
 )
 
+TASK_AUDIT_TYPES = {"task"}
+
+TASK_AUDIT_TRIGGER_NOTE = (
+    "After the body file is drafted, before invoking the publish script, "
+    "ask the user via AskUserQuestion whether to run the task-size-auditor "
+    "subagent against the draft. Spawn task-size-auditor only when the user "
+    "accepts."
+)
+
 ISSUE_PROVIDER_FILES = {
     "github": "providers/github-issue-convention.md",
     "jira": "providers/jira-issue-convention.md",
@@ -260,9 +269,12 @@ def resolve_authoring(
     if normalized_provider is not None:
         parts.extend(PROVIDER_EXTRA_FILES.get((normalized_role, normalized_provider), ()))
 
-    notes: tuple[str, ...] = ()
+    notes_list: list[str] = []
     if normalized_role == "issue" and normalized_type in PLAN_MODE_TYPES:
-        notes = (PLAN_MODE_TRIGGER_NOTE,)
+        notes_list.append(PLAN_MODE_TRIGGER_NOTE)
+    if normalized_role == "issue" and normalized_type in TASK_AUDIT_TYPES:
+        notes_list.append(TASK_AUDIT_TRIGGER_NOTE)
+    notes = tuple(notes_list)
 
     return Resolution(
         artifact_type=normalized_type,
@@ -291,7 +303,6 @@ def build_parser() -> argparse.ArgumentParser:
         help="project path used to find .workflow/config.yml",
     )
     parser.add_argument("--require-config", action="store_true", help="fail when .workflow/config.yml is absent")
-    parser.add_argument("--json", action="store_true", help="emit JSON instead of one path per line")
     return parser
 
 
@@ -312,11 +323,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"authoring resolver error: {exc}", file=sys.stderr)
         return 2
 
-    if args.json:
-        print(json.dumps(resolution.to_json(), indent=2, sort_keys=False))
-    else:
-        for path in resolution.files:
-            print(path)
+    print(json.dumps(resolution.to_json(), indent=2, sort_keys=False))
     return 0
 
 

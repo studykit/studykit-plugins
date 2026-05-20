@@ -13,6 +13,8 @@ if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
 from authoring_resolver import (  # noqa: E402
+    PLAN_MODE_TRIGGER_NOTE,
+    TASK_AUDIT_TRIGGER_NOTE,
     ResolverError,
     authoring_relative_path,
     is_authoring_file,
@@ -239,12 +241,20 @@ def test_task_comment_scope_excludes_plan_mode_authoring() -> None:
 @pytest.mark.parametrize("artifact_type", ["task", "bug"])
 def test_implementation_types_emit_plan_mode_note(artifact_type: str) -> None:
     resolution = resolve_authoring(artifact_type)
-    assert len(resolution.notes) == 1
-    note = resolution.notes[0]
-    assert "plan mode" in note.lower()
-    assert "retroactive" in note.lower()
-    assert "notes" in resolution.to_json()
-    assert resolution.to_json()["notes"] == [note]
+    assert PLAN_MODE_TRIGGER_NOTE in resolution.notes
+    assert PLAN_MODE_TRIGGER_NOTE in resolution.to_json()["notes"]
+
+
+def test_task_emits_audit_trigger_note() -> None:
+    resolution = resolve_authoring("task")
+    assert TASK_AUDIT_TRIGGER_NOTE in resolution.notes
+    assert "task-size-auditor" in TASK_AUDIT_TRIGGER_NOTE
+    assert TASK_AUDIT_TRIGGER_NOTE in resolution.to_json()["notes"]
+
+
+def test_bug_omits_audit_trigger_note() -> None:
+    resolution = resolve_authoring("bug")
+    assert TASK_AUDIT_TRIGGER_NOTE not in resolution.notes
 
 
 @pytest.mark.parametrize(
@@ -267,7 +277,7 @@ def test_non_implementation_types_omit_plan_mode_note(
     assert "notes" not in resolution.to_json()
 
 
-def test_task_comment_scope_omits_plan_mode_note() -> None:
+def test_task_comment_scope_omits_notes() -> None:
     resolution = resolve_authoring("task", role="issue", provider="github", scope="comment")
     assert resolution.notes == ()
     assert "notes" not in resolution.to_json()
