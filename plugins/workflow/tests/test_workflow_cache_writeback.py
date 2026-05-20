@@ -179,6 +179,7 @@ def test_jira_update_writes_body_and_deletes_body_file(tmp_path: Path) -> None:
     assert payload["body_file_removed"] is True
     assert payload["state_changed"] is False
     assert payload["issue_file"].endswith("/issues/TEST-1234/snapshot.md")
+    assert "cache" not in payload
     assert not body_file.exists()
     write_request = next(request for request in runner.requests if request.args == curl_write_args())
     assert 'request = "PUT"' in str(write_request.input_text)

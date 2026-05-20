@@ -110,7 +110,6 @@ def publish_issue(
         "body_file": str(body_path),
         "body_file_removed": body_removed,
         "cache_refreshed": bool(provider_payload.get("cache_refreshed")),
-        "cache": cache_payload,
         "subtask_parent": provider_payload.get("subtask_parent"),
     }
 

@@ -134,7 +134,6 @@ def update_issue(
         "body_file": str(body_path),
         "body_file_removed": body_removed,
         "cache_refreshed": bool(provider_payload.get("cache_refreshed")),
-        "cache": cache_payload,
     }
 
     if relationship_intent:
