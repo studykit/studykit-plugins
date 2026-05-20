@@ -47,13 +47,13 @@ def test_infer_artifact_metadata_uses_single_workflow_type_label() -> None:
         EditTarget(
             path=Path("issue.md"),
             content="""---
-schema_version: 1
+schema_version: 2
 title: Cached issue
 state: open
 labels:
   - task
   - workflow
-source_updated_at: 2026-05-14T00:00:00Z
+updated_at: 2026-05-14T00:00:00Z
 ---
 
 Issue body.

@@ -465,7 +465,7 @@ def test_cache_fetch_refresh_reads_remote_and_updates_cache(tmp_path: Path) -> N
     relationships = GitHubIssueCache.for_project(tmp_path, configured_repo=repo()).read_relationships(repo(), 42)
     assert relationships["parent"]["number"] == 40
     assert relationships["children"][0]["number"] == 43
-    assert relationships["dependencies"]["blocked_by"][0]["number"] == 41
+    assert relationships["blocked_by"][0]["number"] == 41
     assert "relationships" not in payload["issues"][0]
 
 

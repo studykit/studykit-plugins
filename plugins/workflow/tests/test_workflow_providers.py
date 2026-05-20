@@ -983,8 +983,8 @@ def test_github_issue_apply_relationships_from_inline_intent_dispatches_and_refr
     assert response.payload["cache_refreshed"] is True
     relationships = cache.read_relationships(github_repo(), 44)
     assert relationships["parent"]["number"] == 36
-    assert relationships["dependencies"]["blocked_by"][0]["number"] == 33
-    assert relationships["dependencies"]["blocking"][0]["number"] == 45
+    assert relationships["blocked_by"][0]["number"] == 33
+    assert relationships["blocking"][0]["number"] == 45
     assert "add-parent" in events
     assert "add-dependency" in events
     assert "add-review-blocks-target" in events

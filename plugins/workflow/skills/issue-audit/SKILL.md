@@ -62,7 +62,7 @@ Stale references = `fail`. The implementer cannot follow a plan whose anchors ha
 
 For bug issues:
 
-- Is the root cause named as a concrete mechanism, not a symptom? "Half of publish --epic calls fail" is symptom; "`fetched_at` is truncated to whole seconds while `source_updated_at` keeps milliseconds" is mechanism.
+- Is the root cause named as a concrete mechanism, not a symptom? "Half of publish --epic calls fail" is symptom; "`fetched_at` is truncated to whole seconds while `updated_at` keeps milliseconds" is mechanism.
 - Does the cause fully explain the reported symptom? If the cause only explains some failure modes, the analysis is incomplete.
 
 For feature/refactor issues:

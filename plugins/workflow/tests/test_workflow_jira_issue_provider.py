@@ -329,7 +329,7 @@ def test_data_center_provider_fetches_issue_remote_links_and_writes_llm_snapshot
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    write_jira_config(tmp_path)
+    write_jira_config(tmp_path, relationship_mappings=issue_link_relationship_mappings())
     monkeypatch.delenv("JIRA_PERSONAL_TOKEN", raising=False)
     monkeypatch.delenv("JIRA_PAT", raising=False)
     monkeypatch.delenv("JIRA_USERNAME", raising=False)
@@ -351,9 +351,11 @@ def test_data_center_provider_fetches_issue_remote_links_and_writes_llm_snapshot
     workflow = response.payload["relationships"]["workflow"]
     assert workflow["parent"]["key"] == "TEST-1200"
     assert workflow["children"][0]["key"] == "TEST-1237"
-    assert workflow["dependencies"]["blocking"][0]["key"] == "TEST-1235"
-    assert workflow["dependencies"]["blocked_by"][0]["key"] == "TEST-1233"
+    assert workflow["blocking"][0]["key"] == "TEST-1235"
+    assert workflow["blocked_by"][0]["key"] == "TEST-1233"
     assert workflow["related"][0]["key"] == "TEST-1236"
+    assert "dependencies" not in workflow
+    assert "issue_links" not in workflow
     assert workflow["external_links"][0]["url"] == "https://example.com/design"
     assert [request.args for request in runner.requests] == [curl_args(issue_url()), curl_args(remote_links_url())]
     assert all(request.input_text == 'header = "Accept: application/json"\n' for request in runner.requests)
@@ -375,19 +377,15 @@ def test_data_center_provider_fetches_issue_remote_links_and_writes_llm_snapshot
     assert issue_md_frontmatter["remote_links"] == [
         {"title": "Design note", "url": "https://example.com/design", "relationship": "mentioned in"}
     ]
-    current_relationships = issue_md_frontmatter["relationships"]["current"]
-    assert current_relationships["parent"] == "TEST-1200"
-    assert current_relationships["children"] == ["TEST-1237"]
-    assert current_relationships["dependencies"] == {
-        "blocked_by": ["TEST-1233"],
-        "blocking": ["TEST-1235"],
-    }
-    assert current_relationships["related"] == ["TEST-1236"]
-    assert {(entry["type"], entry["direction"], entry["target"]) for entry in current_relationships["issue_links"]} == {
-        ("Blocks", "outward", "TEST-1235"),
-        ("Blocks", "inward", "TEST-1233"),
-        ("Relates", "outward", "TEST-1236"),
-    }
+    relationships_block = issue_md_frontmatter["relationships"]
+    assert "current" not in relationships_block
+    assert "dependencies" not in relationships_block
+    assert "issue_links" not in relationships_block
+    assert relationships_block["parent"] == "TEST-1200"
+    assert relationships_block["children"] == ["TEST-1237"]
+    assert relationships_block["blocked_by"] == ["TEST-1233"]
+    assert relationships_block["blocking"] == ["TEST-1235"]
+    assert relationships_block["related"] == ["TEST-1236"]
     assert body.strip() == "Data Center description."
     assert "Please keep Data Center first." not in issue_md_text
     assert "## Description" not in issue_md_text

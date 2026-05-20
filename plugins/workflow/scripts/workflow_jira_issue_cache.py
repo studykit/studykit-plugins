@@ -101,7 +101,7 @@ class JiraDataCenterIssueCache:
         frontmatter, _body = _read_frontmatter_markdown(path)
         _require_schema(frontmatter, path)
         return FreshnessMetadata(
-            source_updated_at=_normalize_optional(frontmatter.get("source_updated_at")),
+            updated_at=_normalize_optional(frontmatter.get("updated_at")),
             fetched_at=_normalize_optional(frontmatter.get("fetched_at")),
             path=path,
             target=target,
@@ -115,6 +115,7 @@ class JiraDataCenterIssueCache:
         include_body: bool = True,
         include_comments: bool = True,
         include_relationships: bool = True,
+        relationship_mappings: Mapping[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Read a cached Jira Data Center issue projection."""
 
@@ -131,13 +132,18 @@ class JiraDataCenterIssueCache:
             _require_schema(frontmatter, issue_md_path)
             issue = _read_json_mapping(issue_json_path)
             remote_links = _read_json_list_if_exists(self.remote_links_json_file(site, key))
-            payload = normalize_jira_data_center_issue(issue, site=site, remote_links=remote_links)
+            payload = normalize_jira_data_center_issue(
+                issue,
+                site=site,
+                remote_links=remote_links,
+                relationship_mappings=relationship_mappings,
+            )
             payload["cache"] = {
                 "hit": True,
                 "issue_dir": str(self.issue_dir(site, key)),
                 "issue_file": str(issue_md_path),
                 "fetchedAt": _normalize_optional(frontmatter.get("fetched_at")),
-                "sourceUpdatedAt": _normalize_optional(frontmatter.get("source_updated_at")),
+                "sourceUpdatedAt": _normalize_optional(frontmatter.get("updated_at")),
             }
             return filter_jira_payload(
                 payload,
@@ -165,14 +171,20 @@ class JiraDataCenterIssueCache:
         remote_links: list[Mapping[str, Any]] | None = None,
         fetched_at: str | None = None,
         hidden_comment_markers: Sequence[str] = (),
+        relationship_mappings: Mapping[str, Any] | None = None,
     ) -> dict[str, str]:
         """Write native JSON, metadata, generated snapshot, and per-comment files."""
 
         key = normalize_jira_issue_key(issue.get("key") or "")
         links = [dict(item) for item in (remote_links or [])]
-        normalized = normalize_jira_data_center_issue(issue, site=site, remote_links=links)
+        normalized = normalize_jira_data_center_issue(
+            issue,
+            site=site,
+            remote_links=links,
+            relationship_mappings=relationship_mappings,
+        )
         now = fetched_at or _utc_now()
-        source_updated_at = _normalize_optional(normalized.get("updatedAt")) or now
+        updated_at = _normalize_optional(normalized.get("updatedAt")) or now
 
         issue_dir = self.issue_dir(site, key)
         issue_dir.mkdir(parents=True, exist_ok=True)
@@ -186,7 +198,7 @@ class JiraDataCenterIssueCache:
             issue_md_path,
             render_jira_snapshot(
                 normalized,
-                source_updated_at=source_updated_at,
+                updated_at=updated_at,
                 fetched_at=now,
             ),
         )

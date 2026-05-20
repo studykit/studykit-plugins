@@ -1790,13 +1790,13 @@ def test_claude_pre_write_blocks_github_cache_issue_body_update(
     issue_file = tmp_path / ".workflow-cache" / "issues" / "39" / "issue.md"
     issue_file.parent.mkdir(parents=True)
     current_issue_text = """---
-schema_version: 1
+schema_version: 2
 title: Cached issue
 state: open
 labels:
   - task
   - workflow
-source_updated_at: 2026-05-14T00:00:00Z
+updated_at: 2026-05-14T00:00:00Z
 ---
 
 Current body.
@@ -1957,13 +1957,13 @@ def test_claude_pre_write_blocks_github_cache_issue_frontmatter_changes(
     issue_file.parent.mkdir(parents=True)
     issue_file.write_text(
         """---
-schema_version: 1
+schema_version: 2
 title: Cached issue
 state: open
 labels:
   - task
   - workflow
-source_updated_at: 2026-05-14T00:00:00Z
+updated_at: 2026-05-14T00:00:00Z
 ---
 
 Current body.
