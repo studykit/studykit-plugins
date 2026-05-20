@@ -17,6 +17,7 @@ from workflow_command import CommandRequest, CommandResult  # noqa: E402
 from workflow_config import load_workflow_config  # noqa: E402
 from workflow_jira_data_center_client import jira_data_center_site_from_provider_config  # noqa: E402
 from workflow_jira_issue_cache import JiraDataCenterIssueCache  # noqa: E402
+from workflow_providers import ProviderOperationError  # noqa: E402
 from jira_issue_fields import JiraIssueFieldsError, fields_payload  # noqa: E402
 
 
@@ -268,8 +269,14 @@ def test_unassign_sets_fields_assignee_null(tmp_path: Path) -> None:
     assert any('\\"assignee\\":null' in str(request.input_text) for request in write_requests)
 
 
-def test_reopen_defaults_to_reopen_transition_when_no_config(tmp_path: Path) -> None:
-    write_jira_config(tmp_path)
+def test_reopen_uses_configured_reopen_transition(tmp_path: Path) -> None:
+    write_jira_config(
+        tmp_path,
+        extra_settings="""
+    state_transitions:
+      reopen: Reopen
+""",
+    )
     _seed_cache(tmp_path)
     responses = _baseline_responses(write_results=[
         result(curl_write_args(), stdout=""),
@@ -294,13 +301,35 @@ def test_reopen_defaults_to_reopen_transition_when_no_config(tmp_path: Path) -> 
     assert any('\\"transition\\":{\\"id\\":\\"41\\"}' in str(request.input_text) for request in write_requests)
 
 
+def test_reopen_without_configured_transition_errors(tmp_path: Path) -> None:
+    write_jira_config(tmp_path)
+    _seed_cache(tmp_path)
+    responses = _baseline_responses(write_results=[
+        result(curl_write_args(), stdout=""),
+    ])
+    runner = FakeRunner(responses)
+
+    with pytest.raises(ProviderOperationError) as excinfo:
+        fields_payload(
+            project=tmp_path,
+            artifact_type="task",
+            verb="reopen",
+            issue="TEST-1234",
+            runner=runner,
+        )
+
+    message = str(excinfo.value)
+    assert "verb 'reopen'" in message
+    assert "state_transitions.reopen" in message
+
+
 def test_close_routes_through_state_transition_resolver(tmp_path: Path) -> None:
     write_jira_config(
         tmp_path,
         extra_settings="""
     state_transitions:
-      closed: Done
-      open: Reopen
+      close: Done
+      reopen: Reopen
 """,
     )
     _seed_cache(tmp_path)

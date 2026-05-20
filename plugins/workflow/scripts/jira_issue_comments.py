@@ -138,7 +138,10 @@ def build_parser() -> argparse.ArgumentParser:
         required=True,
         help="path to the opaque body content file (leading YAML frontmatter is stripped)",
     )
-    append.add_argument("--state", choices=["open", "closed"])
+    append.add_argument(
+        "--state",
+        help="workflow verb keyed in providers.issues.state_transitions (free-form)",
+    )
     append.add_argument(
         "--state-reason",
         choices=["completed", "not_planned", "reopened"],
