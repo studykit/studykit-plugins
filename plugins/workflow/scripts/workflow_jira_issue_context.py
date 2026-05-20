@@ -53,6 +53,9 @@ def cache_jira_issue_references(
                 )
             )
             issue_dir = cache.issue_dir(site, normalized)
+            comment_paths = tuple(
+                display_project_path(path, config.root) for path in cache.comment_files(site, normalized)
+            )
             contexts.append(
                 IssueFetchContext(
                     number=normalized,
@@ -61,7 +64,7 @@ def cache_jira_issue_references(
                     state=str(response.payload.get("state") or "").upper(),
                     cache_hit=cache_hit_from_payload(response.payload, default=False),
                     provider_kind="jira",
-                    issue_file="snapshot.md",
+                    comments=comment_paths,
                 )
             )
         except Exception:

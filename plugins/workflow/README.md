@@ -130,10 +130,10 @@ Git.
 
 Treat cache layout and projection schemas as workflow-script internals.
 Provider mutation scripts return the editable cache path and refresh the
-projection after every successful write; do not edit `issue.md` /
-`snapshot.md` files in place. Use the matching fetch / writeback / comments
-/ relationships script for explicit refresh, write-back, comment, or
-relationship operations (see
+projection after every successful write; do not edit `issue.md` or
+`comment-*.md` files in place. Use the matching fetch / writeback /
+comments / relationships script for explicit refresh, write-back,
+comment, or relationship operations (see
 `agents/workflow-main-context/policy/provider-writes.md`).
 
 ## Validation

@@ -5,7 +5,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-import yaml
+import frontmatter as frontmatter_lib
 
 _PLUGIN_ROOT = Path(__file__).resolve().parent.parent
 _SCRIPTS_DIR = _PLUGIN_ROOT / "scripts"
@@ -37,15 +37,17 @@ def _jira_issue_payload(status_name: str) -> dict[str, object]:
     }
 
 
-def test_jira_issue_cache_body_path_recognizer_matches_snapshot_only(tmp_path: Path) -> None:
-    snapshot = tmp_path / ".workflow-cache" / "jira" / "jira.example.test" / "issues" / "TEST-1234" / "snapshot.md"
-    issue_json = tmp_path / ".workflow-cache" / "jira" / "jira.example.test" / "issues" / "TEST-1234" / "issue.json"
+def test_jira_issue_cache_body_path_recognizer_matches_issue_md_and_comments(tmp_path: Path) -> None:
+    issue_md = tmp_path / ".workflow-cache" / "issues" / "TEST-1234" / "issue.md"
+    comment = tmp_path / ".workflow-cache" / "issues" / "TEST-1234" / "comment-2026-05-15T093000Z-1.md"
+    issue_json = tmp_path / ".workflow-cache" / "issues" / "TEST-1234" / "issue.json"
 
-    assert is_jira_issue_cache_body_path(snapshot, tmp_path)
+    assert is_jira_issue_cache_body_path(issue_md, tmp_path)
+    assert is_jira_issue_cache_body_path(comment, tmp_path)
     assert not is_jira_issue_cache_body_path(issue_json, tmp_path)
     assert not is_jira_issue_cache_body_path(tmp_path / "issue.md", tmp_path)
     assert not is_jira_issue_cache_body_path(
-        tmp_path / ".workflow-cache" / "issues" / "39" / "snapshot.md", tmp_path
+        tmp_path / ".workflow-cache" / "issues" / "TEST-1234" / "metadata.yml", tmp_path
     )
 
 
@@ -54,13 +56,13 @@ def test_jira_issue_cache_paths_are_provider_specific(tmp_path: Path) -> None:
     site = jira_site()
 
     assert cache.issue_dir(site, "test-1234") == (
-        tmp_path / ".workflow-cache" / "jira" / "jira.example.test" / "issues" / "TEST-1234"
+        tmp_path / ".workflow-cache" / "issues" / "TEST-1234"
     )
     assert cache.issue_json_file(site, "TEST-1234").name == "issue.json"
-    assert cache.snapshot_file(site, "TEST-1234").name == "snapshot.md"
+    assert cache.issue_file(site, "TEST-1234").name == "issue.md"
 
 
-def test_jira_metadata_records_native_state(tmp_path: Path) -> None:
+def test_jira_issue_frontmatter_records_native_state(tmp_path: Path) -> None:
     cache = JiraDataCenterIssueCache.for_project(tmp_path)
     site = jira_site()
 
@@ -70,11 +72,11 @@ def test_jira_metadata_records_native_state(tmp_path: Path) -> None:
         fetched_at="2026-05-15T10:00:00.000+0900",
     )
 
-    metadata = yaml.safe_load(cache.metadata_file(site, "TEST-1234").read_text(encoding="utf-8"))
-    assert metadata["state"] == "In Progress"
+    parsed = frontmatter_lib.loads(cache.issue_file(site, "TEST-1234").read_text(encoding="utf-8"))
+    assert parsed.metadata["state"] == "In Progress"
 
 
-def test_jira_metadata_state_round_trips_closed(tmp_path: Path) -> None:
+def test_jira_issue_frontmatter_state_round_trips_closed(tmp_path: Path) -> None:
     cache = JiraDataCenterIssueCache.for_project(tmp_path)
     site = jira_site()
 
@@ -84,5 +86,32 @@ def test_jira_metadata_state_round_trips_closed(tmp_path: Path) -> None:
         fetched_at="2026-05-15T10:00:00.000+0900",
     )
 
-    metadata = yaml.safe_load(cache.metadata_file(site, "TEST-1234").read_text(encoding="utf-8"))
-    assert metadata["state"] == "Closed"
+    parsed = frontmatter_lib.loads(cache.issue_file(site, "TEST-1234").read_text(encoding="utf-8"))
+    assert parsed.metadata["state"] == "Closed"
+
+
+def test_jira_write_issue_bundle_does_not_emit_metadata_file(tmp_path: Path) -> None:
+    cache = JiraDataCenterIssueCache.for_project(tmp_path)
+    site = jira_site()
+
+    cache.write_issue_bundle(
+        site,
+        _jira_issue_payload("Open"),
+        fetched_at="2026-05-15T10:00:00.000+0900",
+    )
+
+    issue_dir = cache.issue_dir(site, "TEST-1234")
+    assert not (issue_dir / "metadata.yml").exists()
+
+
+def test_jira_write_issue_bundle_response_omits_internal_json_paths(tmp_path: Path) -> None:
+    cache = JiraDataCenterIssueCache.for_project(tmp_path)
+    site = jira_site()
+
+    written = cache.write_issue_bundle(
+        site,
+        _jira_issue_payload("Open"),
+        fetched_at="2026-05-15T10:00:00.000+0900",
+    )
+
+    assert set(written) == {"issue_dir", "issue_file"}

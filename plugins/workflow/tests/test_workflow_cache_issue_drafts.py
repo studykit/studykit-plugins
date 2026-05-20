@@ -1029,7 +1029,7 @@ def test_jira_publish_creates_issue_inline_and_deletes_body_file(tmp_path: Path)
     assert payload["operation"] == "publish_issue"
     assert payload["issue"] == "TEST-1234"
     assert payload["body_file_removed"] is True
-    assert payload["issue_file"].endswith("issues/TEST-1234/snapshot.md")
+    assert payload["issue_file"].endswith("issues/TEST-1234/issue.md")
     assert "cache" not in payload
     cache = JiraDataCenterIssueCache.for_project(tmp_path)
     assert cache.issue_json_file(site, "TEST-1234").is_file()

@@ -19,6 +19,6 @@ Detailed procedures (read before performing the operation):
 - `{{WORKFLOW_POLICY_DIR}}/knowledge/{{WORKFLOW_KNOWLEDGE_PROVIDER}}.md` — knowledge-provider rules
 
 Don't quote, paraphrase, or summarize issue bodies, comments, or knowledge
-documents beyond what the user asked for. The cached `issue.md` /
-`snapshot.md` files are projection-owned and read-only — refresh them via
-the matching fetch script; never edit them in place.
+documents beyond what the user asked for. The cached `issue.md` and
+`comment-*.md` files are projection-owned and read-only — refresh them
+via the matching fetch script; never edit them in place.

@@ -493,14 +493,14 @@ def test_cache_fetch_uses_jira_cache_hit_without_remote_read(tmp_path: Path) -> 
     assert set(payload) == {"operation", "role", "kind", "cache_policy", "issues"}
     assert payload["kind"] == "jira"
     assert payload["issues"][0]["issue"] == "TEST-1234"
-    assert payload["issues"][0]["issue_dir"] == ".workflow-cache/jira/jira.example.test/issues/TEST-1234/"
-    assert payload["issues"][0]["issue_file"] == "snapshot.md"
+    assert payload["issues"][0]["issue_dir"] == ".workflow-cache/issues/TEST-1234/"
+    assert "issue_file" not in payload["issues"][0]
     assert payload["issues"][0]["cache_hit"] is True
     assert "relationships" not in payload["issues"][0]
     assert runner.requests == []
 
 
-def test_cache_fetch_plain_output_uses_jira_snapshot_path(tmp_path: Path) -> None:
+def test_cache_fetch_plain_output_uses_jira_issue_md_path(tmp_path: Path) -> None:
     write_jira_config(tmp_path)
     site = jira_site(tmp_path)
     cache = JiraDataCenterIssueCache.for_project(tmp_path)
@@ -514,7 +514,7 @@ def test_cache_fetch_plain_output_uses_jira_snapshot_path(tmp_path: Path) -> Non
     )
 
     assert code == 0
-    assert "- TEST-1234 → `.workflow-cache/jira/jira.example.test/issues/TEST-1234/snapshot.md`" in stdout.getvalue()
+    assert "- TEST-1234 → `.workflow-cache/issues/TEST-1234/issue.md`" in stdout.getvalue()
     assert "#TEST-1234" not in stdout.getvalue()
 
 
@@ -547,7 +547,7 @@ def test_cache_fetch_refresh_reads_remote_jira_and_updates_cache(tmp_path: Path)
     assert "repository" not in payload
     assert payload["issues"][0]["issue"] == "TEST-1234"
     assert payload["issues"][0]["cache_hit"] is False
-    assert payload["issues"][0]["issue_file"] == "snapshot.md"
+    assert "issue_file" not in payload["issues"][0]
     assert [request.args for request in runner.requests] == [
         curl_args(jira_issue_url()),
         curl_args(jira_remote_links_url()),

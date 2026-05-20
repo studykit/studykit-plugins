@@ -12,7 +12,7 @@ Leave durable continuation context for a fresh session that cannot see this conv
 ## Core rules
 
 - Refresh in-issue resume context first: for every touched mid-flight issue, rewrite the `Resume` section in the issue body so the issue alone shows current approach, who/what it is waiting for, open questions, and the next step. Append a comment only for narrative-worthy events: decision pivots, blocker resolutions, or approach changes. Follow `${CLAUDE_PLUGIN_ROOT}/authoring/common/issue-body.md` for `Resume` slot meaning and reference form.
-- The cached `issue.md` / `snapshot.md` projections are read-only. Resume rewrites and comments must go through the configured provider write scripts via `$WORKFLOW` per `${CLAUDE_PLUGIN_ROOT}/agents/workflow-main-context/policy/provider-writes/`. Mutations require a temp body file, user approval, and the freshness-check flow.
+- The cached `issue.md` and `comment-*.md` projections are read-only. Resume rewrites and comments must go through the configured provider write scripts via `$WORKFLOW` per `${CLAUDE_PLUGIN_ROOT}/agents/workflow-main-context/policy/provider-writes/`. Mutations require a temp body file, user approval, and the freshness-check flow.
 - Session-level residual that does not fit any in-flight issue's body lands in `review`-type issues. Each review item holds one concern only (`finding` / `gap` / `question`) per `${CLAUDE_PLUGIN_ROOT}/authoring/common/review-authoring.md`. Do not pack multiple concerns into one review; do not create a review item when an existing in-flight issue's `Resume` or a comment can hold it.
 
 ## Handoff gate
@@ -35,7 +35,7 @@ Long-lived user or project preferences belong in durable project guidance (`CLAU
 
 ### Stage 2 — residual check
 
-Ask: can the next session reach every mid-flight issue's next step by running `"$WORKFLOW" <provider>_issue_fetch.py <ref>` for each touched ref, reading the resulting `issue.md` / `snapshot.md` (Resume section plus the recent comment tail), plus `git log --oneline origin/main..HEAD` and commit messages?
+Ask: can the next session reach every mid-flight issue's next step by running `"$WORKFLOW" <provider>_issue_fetch.py <ref>` for each touched ref, reading the resulting `issue.md` (Resume section plus the recent `comment-*.md` tail), plus `git log --oneline origin/main..HEAD` and commit messages?
 
 - If yes, stop. Report pre-handoff commit(s) or `skipped`, the issue refs whose `Resume` and / or comments were updated, and `no session-level residual — no review issues published`.
 - If no, identify each residual concern as a single `finding`, `gap`, or `question`, and publish one review issue per concern.

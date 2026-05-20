@@ -103,7 +103,7 @@ def update_issue(
 
     cache_payload = provider_payload.get("cache") if isinstance(provider_payload.get("cache"), dict) else {}
     issue_file = (
-        cache_payload.get("snapshot") if isinstance(cache_payload, dict) else None
+        cache_payload.get("issue_file") if isinstance(cache_payload, dict) else None
     )
     body_removed = False
     try:
