@@ -331,6 +331,106 @@ def test_cache_fetch_plain_output_uses_shared_prefix_for_multiple_issues(tmp_pat
     )
 
 
+def issue_payload_with_comment(
+    number: int,
+    *,
+    comment_id: str = "4440388606",
+    comment_created_at: str = "2026-05-13T11:20:53Z",
+) -> dict[str, object]:
+    payload = issue_payload(number, body="Cached body.")
+    payload["comments"] = [
+        {
+            "id": "IC_node",
+            "url": f"https://github.com/studykit/studykit-plugins/issues/{number}#issuecomment-{comment_id}",
+            "author": {"login": "studykit"},
+            "body": "Comment body.",
+            "createdAt": comment_created_at,
+            "updatedAt": comment_created_at,
+        }
+    ]
+    return payload
+
+
+def test_cache_fetch_lists_comment_paths_in_json(tmp_path: Path) -> None:
+    write_config(tmp_path)
+    cache = GitHubIssueCache.for_project(tmp_path, configured_repo=repo())
+    cache.write_issue_bundle(repo(), issue_payload_with_comment(42))
+    stdout = io.StringIO()
+
+    code = github_issue_fetch_main(
+        ["--project", str(tmp_path), "--json", "42"],
+        stdout=stdout,
+        runner=FakeRunner({}),
+    )
+
+    payload = json.loads(stdout.getvalue())
+    assert code == 0
+    assert payload["issues"][0]["comments"] == [
+        ".workflow-cache/issues/42/comment-2026-05-13T112053Z-4440388606.md",
+    ]
+
+
+def test_cache_fetch_omits_comments_key_when_no_cached_comments(tmp_path: Path) -> None:
+    write_config(tmp_path)
+    cache = GitHubIssueCache.for_project(tmp_path, configured_repo=repo())
+    cache.write_issue_bundle(repo(), issue_payload(42, body="Cached body."))
+    stdout = io.StringIO()
+
+    code = github_issue_fetch_main(
+        ["--project", str(tmp_path), "--json", "42"],
+        stdout=stdout,
+        runner=FakeRunner({}),
+    )
+
+    payload = json.loads(stdout.getvalue())
+    assert code == 0
+    assert "comments" not in payload["issues"][0]
+
+
+def test_cache_fetch_plain_output_renders_comment_sub_bullets(tmp_path: Path) -> None:
+    write_config(tmp_path)
+    cache = GitHubIssueCache.for_project(tmp_path, configured_repo=repo())
+    cache.write_issue_bundle(repo(), issue_payload_with_comment(42))
+    stdout = io.StringIO()
+
+    code = github_issue_fetch_main(
+        ["--project", str(tmp_path), "42"],
+        stdout=stdout,
+        runner=FakeRunner({}),
+    )
+
+    assert code == 0
+    assert "- #42 → `.workflow-cache/issues/42/issue.md`" in stdout.getvalue()
+    assert "  - `.workflow-cache/issues/42/comment-2026-05-13T112053Z-4440388606.md`" in stdout.getvalue()
+
+
+def test_cache_fetch_plain_output_strips_shared_base_from_comment_paths(tmp_path: Path) -> None:
+    write_config(tmp_path)
+    cache = GitHubIssueCache.for_project(tmp_path, configured_repo=repo())
+    cache.write_issue_bundle(repo(), issue_payload(42, body="Cached body."))
+    cache.write_issue_bundle(repo(), issue_payload_with_comment(43))
+    stdout = io.StringIO()
+
+    code = github_issue_fetch_main(
+        ["--project", str(tmp_path), "42", "43"],
+        stdout=stdout,
+        runner=FakeRunner({}),
+    )
+
+    assert code == 0
+    assert stdout.getvalue() == "\n".join(
+        [
+            "## Workflow issue cache",
+            "",
+            "Base: `.workflow-cache/issues/`",
+            "- #42 → `42/issue.md`",
+            "- #43 → `43/issue.md`",
+            "  - `43/comment-2026-05-13T112053Z-4440388606.md`",
+            "",
+        ]
+    )
+
+
 def test_cache_fetch_refresh_reads_remote_and_updates_cache(tmp_path: Path) -> None:
     write_config(tmp_path)
     remote = issue_payload(42, body="Fresh body.")

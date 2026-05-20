@@ -52,6 +52,9 @@ def cache_github_issue_references(
                 )
             )
             issue_dir = cache.issue_dir(repo, normalized)
+            comment_paths = tuple(
+                display_project_path(path, config.root) for path in cache.comment_files(repo, normalized)
+            )
             contexts.append(
                 IssueFetchContext(
                     number=normalized,
@@ -60,6 +63,7 @@ def cache_github_issue_references(
                     state=str(response.payload.get("state") or "").upper(),
                     cache_hit=cache_hit_from_payload(response.payload, default=False),
                     provider_kind="github",
+                    comments=comment_paths,
                 )
             )
         except Exception:
