@@ -5,6 +5,8 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+import yaml
+
 _PLUGIN_ROOT = Path(__file__).resolve().parent.parent
 _SCRIPTS_DIR = _PLUGIN_ROOT / "scripts"
 if str(_SCRIPTS_DIR) not in sys.path:
@@ -16,6 +18,23 @@ from workflow_jira_issue_cache import JiraDataCenterIssueCache, is_jira_issue_ca
 
 def jira_site() -> JiraDataCenterSite:
     return JiraDataCenterSite(base_url="https://jira.example.test", authority="jira.example.test")
+
+
+def _jira_issue_payload(status_name: str) -> dict[str, object]:
+    return {
+        "id": "10001",
+        "key": "TEST-1234",
+        "fields": {
+            "summary": "Issue summary",
+            "description": "Body.",
+            "labels": [],
+            "created": "2026-05-15T09:00:00.000+0900",
+            "updated": "2026-05-15T10:00:00.000+0900",
+            "status": {"name": status_name, "statusCategory": {"key": "indeterminate"}},
+            "comment": {"comments": []},
+            "issuelinks": [],
+        },
+    }
 
 
 def test_jira_issue_cache_body_path_recognizer_matches_snapshot_only(tmp_path: Path) -> None:
@@ -39,3 +58,31 @@ def test_jira_issue_cache_paths_are_provider_specific(tmp_path: Path) -> None:
     )
     assert cache.issue_json_file(site, "TEST-1234").name == "issue.json"
     assert cache.snapshot_file(site, "TEST-1234").name == "snapshot.md"
+
+
+def test_jira_metadata_records_native_state(tmp_path: Path) -> None:
+    cache = JiraDataCenterIssueCache.for_project(tmp_path)
+    site = jira_site()
+
+    cache.write_issue_bundle(
+        site,
+        _jira_issue_payload("In Progress"),
+        fetched_at="2026-05-15T10:00:00.000+0900",
+    )
+
+    metadata = yaml.safe_load(cache.metadata_file(site, "TEST-1234").read_text(encoding="utf-8"))
+    assert metadata["state"] == "In Progress"
+
+
+def test_jira_metadata_state_round_trips_closed(tmp_path: Path) -> None:
+    cache = JiraDataCenterIssueCache.for_project(tmp_path)
+    site = jira_site()
+
+    cache.write_issue_bundle(
+        site,
+        _jira_issue_payload("Closed"),
+        fetched_at="2026-05-15T10:00:00.000+0900",
+    )
+
+    metadata = yaml.safe_load(cache.metadata_file(site, "TEST-1234").read_text(encoding="utf-8"))
+    assert metadata["state"] == "Closed"
