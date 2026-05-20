@@ -7,8 +7,7 @@ Resolve authoring paths with:
   --type <type> \
   [--role issue|knowledge] \
   [--scope comment] \
-  [--provider github|jira|confluence|filesystem] \
-  --json
+  [--provider github|jira|confluence|filesystem]
 ```
 
 Flags:
@@ -20,7 +19,6 @@ Flags:
   provider convention files only, not the full type body.
 - `--provider` — override the configured provider; omit to use
   `.workflow/config.yml`.
-- `--json` — recommended for parsing.
 
 The resolver returns absolute paths under `required_authoring_files`. Read
 those paths directly before drafting any provider-backed change. If the

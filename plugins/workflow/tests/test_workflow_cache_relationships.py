@@ -225,7 +225,7 @@ def test_relationships_cli_no_flag_returns_no_op(tmp_path: Path) -> None:
 
     stdout = io.StringIO()
     code = github_issue_relationships_main(
-        ["--project", str(tmp_path), "--json", "#44"],
+        ["--project", str(tmp_path), "#44"],
         stdout=stdout,
         runner=runner,
     )
@@ -275,7 +275,6 @@ def test_relationships_cli_dispatches_inline_intent(tmp_path: Path) -> None:
             "task",
             "--child",
             "#45",
-            "--json",
             "#44",
         ],
         stdout=stdout,

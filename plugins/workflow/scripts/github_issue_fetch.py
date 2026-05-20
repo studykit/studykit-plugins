@@ -23,7 +23,6 @@ from workflow_issue_cli_output import (
     IssueFetchContext,
     cache_hit_from_payload,
     display_project_path,
-    format_issue_cache_context_from_payload,
     format_issue_cache_json,
 )
 from workflow_providers import CACHE_POLICY_DEFAULT, CACHE_POLICY_REFRESH, ProviderContext, ProviderRequest
@@ -44,7 +43,6 @@ def build_parser() -> argparse.ArgumentParser:
         default=CACHE_POLICY_DEFAULT,
         help="provider cache policy",
     )
-    parser.add_argument("--json", action="store_true", help="emit JSON")
     parser.add_argument("references", nargs="+", help="GitHub issue IDs or configured repository issue references")
     return parser
 
@@ -137,11 +135,7 @@ def main(
         print(f"GitHub issue fetch error: {exc}", file=errors)
         return 2
 
-    if args.json:
-        print(json.dumps(payload, indent=2, sort_keys=False), file=output)
-        return 0
-
-    print(format_issue_cache_context_from_payload(payload), file=output)
+    print(json.dumps(payload, indent=2, sort_keys=False), file=output)
     return 0
 
 

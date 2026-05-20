@@ -19,20 +19,20 @@ workflow sessions, `$WORKFLOW` may already point to the launcher.
 Useful commands:
 
 ```bash
-"$WORKFLOW" workflow_setup.py probe-git-remote --project <project-root> --json
-"$WORKFLOW" workflow_setup.py profile-from-docs <profile-docs...> --json
-"$WORKFLOW" workflow_setup.py capabilities --issue-provider <provider> --knowledge-provider <provider> --json
-"$WORKFLOW" workflow_setup.py jira-relationship-inspect --jira-site <url> --issue <KEY> --json
-"$WORKFLOW" workflow_setup.py jira-relationship-inspect --jira-site <url> --jira-project <PROJECT> --issue <ISSUE-123> --json
-"$WORKFLOW" workflow_setup.py jira-relationship-inspect --jira-site <url> --field-query <field-name-or-id> --json
-"$WORKFLOW" workflow_setup.py jira-state-transition-inspect --jira-site <url> --issue <KEY-A> --issue <KEY-B> --json
-"$WORKFLOW" workflow_setup.py jira-relationship-mappings --issue-link blocked_by=Blocks:inward --field child=parent:target:key --json
-"$WORKFLOW" workflow_setup.py build-config --project <project-root> --issue-provider <provider> --knowledge-provider <provider> <options...> --json
-"$WORKFLOW" workflow_setup.py build-config --issue-provider jira --knowledge-provider <provider> --jira-snapshot-hidden-comment-marker '!git-event' <options...> --json
-"$WORKFLOW" workflow_setup.py build-config --issue-provider jira --knowledge-provider <provider> --jira-epic-field-name <id> --jira-epic-field-link <id> --jira-epic-field-status <id> [--jira-epic-issue-type <NAME>] <options...> --json
-"$WORKFLOW" workflow_setup.py build-config --issue-provider jira --knowledge-provider <provider> --jira-state-transition <verb>=<transition> [--jira-state-transition <verb>=<transition> ...] <options...> --json
-"$WORKFLOW" workflow_setup.py write --project <project-root> --config <reviewed-yaml-file> --json
-"$WORKFLOW" workflow_config.py --project <project-root> --require --json
+"$WORKFLOW" workflow_setup.py probe-git-remote --project <project-root>
+"$WORKFLOW" workflow_setup.py profile-from-docs <profile-docs...>
+"$WORKFLOW" workflow_setup.py capabilities --issue-provider <provider> --knowledge-provider <provider>
+"$WORKFLOW" workflow_setup.py jira-relationship-inspect --jira-site <url> --issue <KEY>
+"$WORKFLOW" workflow_setup.py jira-relationship-inspect --jira-site <url> --jira-project <PROJECT> --issue <ISSUE-123>
+"$WORKFLOW" workflow_setup.py jira-relationship-inspect --jira-site <url> --field-query <field-name-or-id>
+"$WORKFLOW" workflow_setup.py jira-state-transition-inspect --jira-site <url> --issue <KEY-A> --issue <KEY-B>
+"$WORKFLOW" workflow_setup.py jira-relationship-mappings --issue-link blocked_by=Blocks:inward --field child=parent:target:key
+"$WORKFLOW" workflow_setup.py build-config --project <project-root> --issue-provider <provider> --knowledge-provider <provider> <options...>
+"$WORKFLOW" workflow_setup.py build-config --issue-provider jira --knowledge-provider <provider> --jira-snapshot-hidden-comment-marker '!git-event' <options...>
+"$WORKFLOW" workflow_setup.py build-config --issue-provider jira --knowledge-provider <provider> --jira-epic-field-name <id> --jira-epic-field-link <id> --jira-epic-field-status <id> [--jira-epic-issue-type <NAME>] <options...>
+"$WORKFLOW" workflow_setup.py build-config --issue-provider jira --knowledge-provider <provider> --jira-state-transition <verb>=<transition> [--jira-state-transition <verb>=<transition> ...] <options...>
+"$WORKFLOW" workflow_setup.py write --project <project-root> --config <reviewed-yaml-file>
+"$WORKFLOW" workflow_config.py --project <project-root> --require
 ```
 
 ## Setup Flow
@@ -70,10 +70,11 @@ Useful commands:
 8. Collect the commit reference style.
 9. Run `capabilities` for the selected providers and show limitations before
    confirmation.
-10. Run `build-config --json`, show the generated YAML and warnings to the user,
-   and ask for explicit confirmation before writing.
+10. Run `build-config`, extract the `yaml` and `warnings` fields from the JSON
+   payload, show the generated YAML and warnings to the user, and ask for
+   explicit confirmation before writing.
 11. After confirmation, write with `write --config <reviewed-yaml-file>`. Then
-   verify with `workflow_config.py --require --json`.
+   verify with `workflow_config.py --require`.
 
 ## Provider Rules
 
@@ -237,7 +238,6 @@ The compact mapping helper accepts exact relationship specs:
   --remote-application-type studykit.workflow \
   --remote-application-name Workflow \
   --field child=parent:target:key \
-  --json
 ```
 
 ```yaml
