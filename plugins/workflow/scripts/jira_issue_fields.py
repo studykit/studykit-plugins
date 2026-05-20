@@ -8,7 +8,9 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
+from collections.abc import Iterable, Mapping
 from pathlib import Path
 from typing import Any, TextIO
 
@@ -27,25 +29,66 @@ from workflow_jira_issue_refs import JiraProviderError, normalize_jira_issue_key
 from workflow_providers import ProviderContext, ProviderRequest
 
 
+_RESERVED_VERBS = frozenset({"assign", "unassign", "set-type"})
+
+_LIFECYCLE_NOTE = (
+    "Lifecycle verbs come from providers.issues.state_transitions; "
+    "configure one with `workflow_setup.py build-config "
+    "--jira-state-transition <verb>=<transition>`."
+)
+
+
 class JiraIssueFieldsError(RuntimeError):
     """Raised when a Jira issue field mutation cannot proceed."""
 
 
-def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description=__doc__)
+class _JiraFieldsParser(argparse.ArgumentParser):
+    """Argparse parser that surfaces friendly errors for unknown verbs."""
+
+    def __init__(self, *args: Any, state_verbs: Iterable[str] = (), **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self._state_verbs: tuple[str, ...] = tuple(state_verbs)
+
+    def error(self, message: str) -> None:  # type: ignore[override]
+        match = re.match(r"argument verb: invalid choice: '([^']+)'", message)
+        if match:
+            verb = match.group(1)
+            self.print_usage(sys.stderr)
+            hint = self._unknown_verb_hint(verb)
+            self.exit(2, hint)
+        super().error(message)
+
+    def _unknown_verb_hint(self, verb: str) -> str:
+        reserved = ", ".join(sorted(_RESERVED_VERBS))
+        configured = ", ".join(self._state_verbs) if self._state_verbs else "(none configured)"
+        return (
+            f"{self.prog}: error: unknown verb '{verb}'.\n"
+            f"  reserved verbs: {reserved}\n"
+            f"  configured lifecycle verbs: {configured}\n"
+            f"  to add this verb, configure providers.issues.state_transitions.{verb} "
+            f"in .workflow/config.yml (see `workflow_setup.py build-config "
+            f"--jira-state-transition {verb}=<transition>`).\n"
+        )
+
+
+def build_base_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(add_help=False)
+    parser.add_argument("--project", type=Path, default=workflow_project_dir_from_env())
+    parser.add_argument("--type", default="task")
+    parser.add_argument("--json", action="store_true")
+    return parser
+
+
+def build_parser(state_verbs: Iterable[str] = ()) -> argparse.ArgumentParser:
+    verbs = tuple(state_verbs)
+    parser = _JiraFieldsParser(
+        description=f"{__doc__} {_LIFECYCLE_NOTE}",
+        state_verbs=verbs,
+    )
     parser.add_argument("--project", type=Path, default=workflow_project_dir_from_env(), help="project path")
     parser.add_argument("--type", default="task", help="workflow artifact type")
     parser.add_argument("--json", action="store_true", help="emit JSON")
     subparsers = parser.add_subparsers(dest="verb", required=True)
-
-    p_close = subparsers.add_parser("close", help="close an issue")
-    p_close.add_argument("issue", help="Jira issue key")
-    p_close.add_argument("--reason", choices=("completed", "not_planned"), default="completed")
-    p_close.add_argument("--comment", help="optional comment posted alongside the close")
-
-    p_reopen = subparsers.add_parser("reopen", help="reopen an issue")
-    p_reopen.add_argument("issue", help="Jira issue key")
-    p_reopen.add_argument("--comment", help="optional comment posted alongside the reopen")
 
     p_assign = subparsers.add_parser("assign", help="assign an issue to a user")
     p_assign.add_argument("issue", help="Jira issue key")
@@ -58,7 +101,38 @@ def build_parser() -> argparse.ArgumentParser:
     p_set_type.add_argument("issue", help="Jira issue key")
     p_set_type.add_argument("new_type", metavar="type", help="workflow artifact type whose Jira issuetype to apply")
 
+    for verb in verbs:
+        sub = subparsers.add_parser(verb, help=f"apply the '{verb}' state transition")
+        sub.add_argument("issue", help="Jira issue key")
+        sub.add_argument("--comment", help="optional comment posted alongside the transition")
+
     return parser
+
+
+def _discover_state_verbs(project: Path) -> list[str]:
+    try:
+        config = load_workflow_config(project)
+    except WorkflowConfigError:
+        return []
+    if config is None or config.issues.kind != "jira":
+        return []
+    try:
+        settings = _jira_issue_provider_settings(project)
+    except Exception:
+        return []
+    raw = settings.get("state_transitions") or settings.get("stateTransitions")
+    if not isinstance(raw, Mapping):
+        return []
+    verbs: list[str] = []
+    for key, value in raw.items():
+        verb = str(key).strip()
+        if not verb or verb in _RESERVED_VERBS:
+            continue
+        text = str(value).strip() if value is not None else ""
+        if not text:
+            continue
+        verbs.append(verb)
+    return sorted(set(verbs))
 
 
 def fields_payload(
@@ -67,7 +141,6 @@ def fields_payload(
     artifact_type: str,
     verb: str,
     issue: str,
-    reason: str | None = None,
     comment: str | None = None,
     user: str | None = None,
     new_type: str | None = None,
@@ -83,18 +156,17 @@ def fields_payload(
     provider = JiraDataCenterIssueNativeProvider(runner=runner)
     context = ProviderContext(project=config.root, artifact_type=artifact_type)
 
-    if verb in {"close", "reopen"}:
-        state = verb
+    if verb not in _RESERVED_VERBS:
         if comment:
             payload: dict[str, Any] = {
                 "issue": issue_key,
                 "freshness_check": True,
                 "body": comment,
-                "state": state,
+                "state": verb,
             }
             operation = "add_comment"
         else:
-            payload = {"issue": issue_key, "freshness_check": True, "state": state}
+            payload = {"issue": issue_key, "freshness_check": True, "state": verb}
             operation = "update"
         response = provider.call(
             ProviderRequest(
@@ -112,7 +184,6 @@ def fields_payload(
             "site": site.to_json(),
             "issue": issue_key,
             "key": issue_key,
-            "reason": reason if verb == "close" else None,
             "provider": dict(response.payload),
         }
 
@@ -185,7 +256,10 @@ def main(
     stderr: TextIO | None = None,
     runner: CommandRunner | None = None,
 ) -> int:
-    parser = build_parser()
+    base_args, _ = build_base_parser().parse_known_args(argv)
+    project = base_args.project or workflow_project_dir_from_env()
+    state_verbs = _discover_state_verbs(project)
+    parser = build_parser(state_verbs)
     args = parser.parse_args(argv)
     output = stdout or sys.stdout
     errors = stderr or sys.stderr
@@ -196,7 +270,6 @@ def main(
             artifact_type=args.type,
             verb=args.verb,
             issue=args.issue,
-            reason=getattr(args, "reason", None),
             comment=getattr(args, "comment", None),
             user=getattr(args, "user", None),
             new_type=getattr(args, "new_type", None),

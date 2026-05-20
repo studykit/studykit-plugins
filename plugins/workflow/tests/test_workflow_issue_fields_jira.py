@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import io
 import json
 import sys
 from pathlib import Path
@@ -18,7 +19,7 @@ from workflow_config import load_workflow_config  # noqa: E402
 from workflow_jira_data_center_client import jira_data_center_site_from_provider_config  # noqa: E402
 from workflow_jira_issue_cache import JiraDataCenterIssueCache  # noqa: E402
 from workflow_providers import ProviderOperationError  # noqa: E402
-from jira_issue_fields import JiraIssueFieldsError, fields_payload  # noqa: E402
+from jira_issue_fields import JiraIssueFieldsError, fields_payload, main  # noqa: E402
 
 
 class FakeRunner:
@@ -348,10 +349,79 @@ def test_close_routes_through_state_transition_resolver(tmp_path: Path) -> None:
         artifact_type="task",
         verb="close",
         issue="TEST-1234",
-        reason="completed",
         runner=runner,
     )
 
     assert payload["operation"] == "lifecycle_close"
     write_requests = [request for request in runner.requests if request.args == curl_write_args()]
     assert any('\\"transition\\":{\\"id\\":\\"31\\"}' in str(request.input_text) for request in write_requests)
+
+
+def test_dynamic_verb_registers_custom_lifecycle(tmp_path: Path) -> None:
+    write_jira_config(
+        tmp_path,
+        extra_settings="""
+    state_transitions:
+      ship: Done
+""",
+    )
+    _seed_cache(tmp_path)
+    responses = _baseline_responses(write_results=[
+        result(curl_write_args(), stdout=""),
+        result(curl_write_args(), stdout=""),
+    ])
+    responses[curl_args(jira_transitions_url())] = result(
+        curl_args(jira_transitions_url()),
+        stdout=json.dumps({"transitions": [{"id": "55", "name": "Done"}]}),
+    )
+    runner = FakeRunner(responses)
+
+    exit_code = main(
+        ["--project", str(tmp_path), "ship", "TEST-1234"],
+        stdout=io.StringIO(),
+        stderr=io.StringIO(),
+        runner=runner,
+    )
+
+    assert exit_code == 0
+    write_requests = [request for request in runner.requests if request.args == curl_write_args()]
+    assert any('\\"transition\\":{\\"id\\":\\"55\\"}' in str(request.input_text) for request in write_requests)
+
+
+def test_unknown_verb_emits_friendly_error(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    write_jira_config(
+        tmp_path,
+        extra_settings="""
+    state_transitions:
+      close: Done
+""",
+    )
+
+    with pytest.raises(SystemExit) as excinfo:
+        main(["--project", str(tmp_path), "wontdo", "TEST-1234"])
+
+    assert excinfo.value.code == 2
+    captured = capsys.readouterr()
+    assert "wontdo" in captured.err
+    assert "close" in captured.err
+    assert "assign" in captured.err
+    assert "state_transitions.wontdo" in captured.err
+
+
+def test_reserved_verbs_work_without_state_transitions(tmp_path: Path) -> None:
+    write_jira_config(tmp_path)
+    _seed_cache(tmp_path, payload=jira_issue_payload(assignee="alice"))
+    runner = FakeRunner(_baseline_responses())
+
+    exit_code = main(
+        ["--project", str(tmp_path), "unassign", "TEST-1234"],
+        stdout=io.StringIO(),
+        stderr=io.StringIO(),
+        runner=runner,
+    )
+
+    assert exit_code == 0
+    write_requests = [request for request in runner.requests if request.args == curl_write_args()]
+    assert any('\\"assignee\\":null' in str(request.input_text) for request in write_requests)
