@@ -14,10 +14,16 @@ Companion contracts:
 ## When to use
 
 Use plan mode when the issue body needs converged content for a planned
-implementation or fix.
+implementation or fix that has not yet been executed. Plan mode is the
+alignment gate before the change lands; once the code is in, the alignment
+has already happened elsewhere.
 
 Skip plan mode for:
 
+- Retroactive issues created after the change is already implemented,
+  typically to carry a commit-ref prefix or otherwise track completed work.
+  The convergence happened in the prior conversation or commit; the body
+  just records what was done.
 - Exploratory items (`spike`, `research`) where the body grows after the
   issue is created.
 - Trivial updates that touch a single field or short bullet.
