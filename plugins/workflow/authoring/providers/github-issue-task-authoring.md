@@ -27,6 +27,9 @@ Common optional sections are defined by `../common/task-authoring.md` and `../co
 
 - `## Change Plan`
 - `## Interface Contracts`
+- `## Out of Scope`
+- `## Alternatives Considered`
+- `## Risks`
 - `## Resume`
 - `## Why Discarded`
 

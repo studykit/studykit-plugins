@@ -70,6 +70,9 @@ Optional sections:
 
 - `Change Plan` — forward-looking scope fence naming files, packages, APIs, or migration steps expected to change.
 - `Interface Contracts` — contracts this task consumes or provides.
+- `Out of Scope` — work explicitly excluded from this issue. See `./issue-body.md`.
+- `Alternatives Considered` — design options evaluated but not chosen. See `./issue-body.md`.
+- `Risks` — technical or operational risks specific to this work. See `./issue-body.md`.
 - `Resume` — current-state snapshot while mid-flight. See `./issue-body.md`.
 - `Why Discarded` — reason when discarded. See `./issue-body.md`.
 
