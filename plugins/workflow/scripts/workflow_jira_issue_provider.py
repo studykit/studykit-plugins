@@ -264,10 +264,6 @@ class JiraDataCenterIssueNativeProvider(IssueProvider):
         issue_key = normalize_jira_issue_key(_required_payload_value(request, "issue"))
         state = _optional_string(request.payload.get("state"))
         normalized_state = state.lower() if state is not None else None
-        if normalized_state is not None and normalized_state not in {"open", "closed"}:
-            raise ProviderOperationError(
-                f"unsupported Jira issue state for update: {state}"
-            )
 
         label_set = request.payload.get("label_set")
         if label_set is None:
@@ -363,10 +359,6 @@ class JiraDataCenterIssueNativeProvider(IssueProvider):
         body = str(_required_payload_value(request, "body"))
         state = _optional_string(request.payload.get("state"))
         normalized_state = state.lower() if state is not None else None
-        if normalized_state is not None and normalized_state not in {"open", "closed"}:
-            raise ProviderOperationError(
-                f"unsupported Jira issue state for add_comment: {state}"
-            )
         return self._append_comment(request, issue_key, body, state=normalized_state)
 
     def apply_relationships(self, request: ProviderRequest) -> Mapping[str, Any]:
@@ -479,30 +471,30 @@ class JiraDataCenterIssueNativeProvider(IssueProvider):
         request: ProviderRequest,
         site: Any,
         issue_key: str,
-        state: str,
+        verb: str,
     ) -> Mapping[str, Any]:
         settings = _jira_issue_provider_settings(request.context.project)
-        transition_name = _jira_state_transition_name(state, settings)
+        transition_name = _jira_state_transition_name(verb, settings)
         if not transition_name:
             raise ProviderOperationError(
-                f"Jira state '{state}' has no configured transition. "
+                f"Jira verb '{verb}' has no configured transition. "
                 f"Run `workflow_setup.py jira-state-transition-inspect --jira-site <url> --issue <KEY>` "
                 f"to list the workflow's transitions, then re-run the setup skill so "
-                f"providers.issues.state_transitions.{state} is confirmed into .workflow/config.yml."
+                f"providers.issues.state_transitions.{verb} is confirmed into .workflow/config.yml."
             )
         transitions = get_transitions(site, issue_key, runner=self.runner)
         transition_id = _find_transition_id(transitions, transition_name)
         if transition_id is None:
             raise ProviderOperationError(
                 f"Jira issue {issue_key} does not expose a '{transition_name}' transition right now. "
-                f"If this workflow uses a different name for the '{state}' transition, run "
+                f"If this workflow uses a different name for the '{verb}' verb, run "
                 f"`workflow_setup.py jira-state-transition-inspect --jira-site <url> --issue <KEY>` and "
-                f"configure providers.issues.state_transitions.{state} in .workflow/config.yml."
+                f"configure providers.issues.state_transitions.{verb} in .workflow/config.yml."
             )
         transition_issue(site, issue_key, transition_id, runner=self.runner)
         return {
             "operation": "transition_issue",
-            "state": state,
+            "verb": verb,
             "transition_name": transition_name,
             "transition_id": transition_id,
         }
@@ -1004,18 +996,15 @@ def _find_transition_id(
     return None
 
 
-_JIRA_DEFAULT_STATE_TRANSITIONS = {"open": "Reopen"}
-
-
-def _jira_state_transition_name(state: str, settings: Mapping[str, Any]) -> str | None:
+def _jira_state_transition_name(verb: str, settings: Mapping[str, Any]) -> str | None:
     raw = settings.get("state_transitions") or settings.get("stateTransitions")
     if isinstance(raw, Mapping):
-        value = raw.get(state)
+        value = raw.get(verb)
         if value is not None:
             text = str(value).strip()
             if text:
                 return text
-    return _JIRA_DEFAULT_STATE_TRANSITIONS.get(state)
+    return None
 
 
 def _required_payload_value(request: ProviderRequest, key: str) -> Any:

@@ -303,8 +303,8 @@ def test_jira_update_applies_inline_state_transition(tmp_path: Path) -> None:
         tmp_path,
         extra_settings="""
     state_transitions:
-      closed: Done
-      open: Reopen
+      close: Done
+      reopen: Reopen
 """,
     )
     _seed_cached_issue(tmp_path)
@@ -341,7 +341,7 @@ def test_jira_update_applies_inline_state_transition(tmp_path: Path) -> None:
             "--body-file",
             str(body_file),
             "--state",
-            "closed",
+            "close",
             "--state-reason",
             "completed",
             "--json",

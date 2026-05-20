@@ -987,8 +987,8 @@ def test_data_center_update_applies_state_transition(tmp_path: Path) -> None:
         tmp_path,
         relationship_mappings="""
     state_transitions:
-      closed: Done
-      open: Reopen
+      close: Done
+      reopen: Reopen
 """,
     )
     site = jira_site(tmp_path)
@@ -1027,7 +1027,7 @@ def test_data_center_update_applies_state_transition(tmp_path: Path) -> None:
         "update",
         issue="TEST-1234",
         body="Closing body.",
-        state="closed",
+        state="close",
         state_reason="completed",
         freshness_check=True,
     )
@@ -1035,6 +1035,7 @@ def test_data_center_update_applies_state_transition(tmp_path: Path) -> None:
     assert response.payload["state_changed"] is True
     assert response.payload["state"]["transition_name"] == "Done"
     assert response.payload["state"]["transition_id"] == "31"
+    assert response.payload["state"]["verb"] == "close"
     write_requests = [request for request in runner.requests if request.args == curl_write_args()]
     assert any('\\"transition\\":{\\"id\\":\\"31\\"}' in str(request.input_text) for request in write_requests)
 
@@ -1065,13 +1066,14 @@ def test_data_center_update_state_without_configured_transition_errors(tmp_path:
             "update",
             issue="TEST-1234",
             body="Body.",
-            state="closed",
+            state="close",
             freshness_check=True,
         )
 
     message = str(excinfo.value)
-    # `closed` has no default; setup-skill discovery is required.
-    assert "state_transitions.closed" in message
+    # No baked verb mapping; setup-skill discovery is required.
+    assert "verb 'close'" in message
+    assert "state_transitions.close" in message
     assert "jira-state-transition-inspect" in message
     assert "setup skill" in message
 
