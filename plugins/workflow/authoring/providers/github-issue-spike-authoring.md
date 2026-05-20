@@ -27,7 +27,8 @@ Common required sections are defined by `../common/spike-authoring.md`:
 Common optional sections are defined by `../common/spike-authoring.md` and `../common/issue-body.md`:
 
 - `## Artifact Links`
-- `## Change Plan`
+- `## Approach`
+- `## Affected Paths`
 - `## Resume`
 - `## Why Discarded`
 

@@ -57,7 +57,7 @@ Required sections:
 
 The `Acceptance Criteria` section must exist even when the task has issue links to use cases or specs.
 
-Use the `Change Plan` section for expected implementation scope when present. Do not hide the motivation only in the plan. If the rationale is a long-lived design decision, create or update the relevant knowledge page instead of embedding the full decision record in the task body.
+Use the `Approach` section to record the implementation strategy and the `Affected Paths` section for the expected file scope when present. Do not hide the motivation only in those sections. If the rationale is a long-lived design decision, create or update the relevant knowledge page instead of embedding the full decision record in the task body.
 
 Acceptance criteria should be grounded in:
 
@@ -68,7 +68,8 @@ Acceptance criteria should be grounded in:
 
 Optional sections:
 
-- `Change Plan` — forward-looking scope fence naming files, packages, APIs, or migration steps expected to change.
+- `Approach` — implementation strategy: how the work will be done, including sequencing and architectural choices.
+- `Affected Paths` — forward-looking scope fence naming files, packages, APIs, or migration steps expected to change.
 - `Interface Contracts` — contracts this task consumes or provides.
 - `Out of Scope` — work explicitly excluded from this issue. See `./issue-body.md`.
 - `Alternatives Considered` — design options evaluated but not chosen. See `./issue-body.md`.
@@ -103,7 +104,7 @@ Use linked external evidence only when they have evidentiary or comparative valu
 - Migration dry-run output.
 - Benchmark data.
 
-Production source paths are recorded by git history. Mention planned source changes in the `Change Plan` section when they help scope the work.
+Production source paths are recorded by git history. Mention planned source changes in the `Affected Paths` section when they help scope the work.
 
 ## Completion criteria
 

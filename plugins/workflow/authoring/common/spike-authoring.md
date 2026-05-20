@@ -41,7 +41,8 @@ Required sections:
 Optional sections:
 
 - `Artifact Links` — branch, gist, repository path, benchmark output, screenshots, or other throwaway evidence.
-- `Change Plan` — planned experiment files, temporary branches, scripts, or environments.
+- `Approach` — exploration strategy: how the spike will be carried out, including probe sequencing and methodology choices.
+- `Affected Paths` — planned experiment files, temporary branches, scripts, or environments.
 - `Resume` — current-state snapshot while mid-flight. See `./issue-body.md`.
 - `Why Discarded` — reason when discarded. See `./issue-body.md`.
 

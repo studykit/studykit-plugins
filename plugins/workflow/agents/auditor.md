@@ -21,7 +21,7 @@ You are spawned by a workflow audit skill. The skill body is your task prompt �
 
 ## How to read workflow issues
 
-Use the workflow issue-fetch command for every issue you audit. Do not call raw `gh` / Jira tooling. Default cache policy is fine — do not force-refresh unless freshness is the question being asked. Extract Description, Root Cause (if present), Change Plan, Unit Test Strategy, Acceptance Criteria, any other named sections, plus the frontmatter `relationships` block when relationship context is needed.
+Use the workflow issue-fetch command for every issue you audit. Do not call raw `gh` / Jira tooling. Default cache policy is fine — do not force-refresh unless freshness is the question being asked. Extract Description, Root Cause (if present), Affected Paths, Unit Test Strategy, Acceptance Criteria, any other named sections, plus the frontmatter `relationships` block when relationship context is needed.
 
 ## Output discipline
 

@@ -1,6 +1,6 @@
 ---
 name: issue-audit
-description: "Audit a workflow-issue spec BEFORE implementation. Read-only review of AC quality, Change Plan grounding, root-cause coherence, workaround detection, cross-issue context, and scope sizing."
+description: "Audit a workflow-issue spec BEFORE implementation. Read-only review of AC quality, Affected Paths grounding, root-cause coherence, workaround detection, cross-issue context, and scope sizing."
 argument-hint: "<issue-ref>"
 disable-model-invocation: true
 context: fork
@@ -9,13 +9,13 @@ agent: auditor
 
 # Pre-implementation audit of workflow issue `$ARGUMENTS`
 
-Audit the spec **before** it is implemented. Push back on the issue itself: an unclear AC, a stale Change Plan, a plan that quietly works around the real problem, a scope that bundles unrelated concerns.
+Audit the spec **before** it is implemented. Push back on the issue itself: an unclear AC, a stale Affected Paths, a plan that quietly works around the real problem, a scope that bundles unrelated concerns.
 
 ## Workflow
 
 1. **Read the target issue.**
    - Fetch with the workflow issue-fetch command and `$ARGUMENTS` as the ref, default cache policy.
-   - Extract Description, Root Cause (if present), Change Plan, Unit Test Strategy, Acceptance Criteria, any other named sections.
+   - Extract Description, Root Cause (if present), Affected Paths, Unit Test Strategy, Acceptance Criteria, any other named sections.
    - Read the frontmatter `relationships` block: capture parent, children, blocked-by, blocking, related refs.
 
 2. **Walk the related issue graph (one hop).**
@@ -23,7 +23,7 @@ Audit the spec **before** it is implemented. Push back on the issue itself: an u
    - Note state (open/closed), purpose, and any constraint each related issue places on this work (parent direction, blocked-by deliverable, sibling overlap, prior decision in `related`).
 
 3. **Ground the plan in current code.**
-   - For every file path, symbol, or line number cited in Description / Root Cause / Change Plan, verify it exists in the current working tree; line numbers should reasonably match the named symbol (allow small drift).
+   - For every file path, symbol, or line number cited in Description / Root Cause / Affected Paths, verify it exists in the current working tree; line numbers should reasonably match the named symbol (allow small drift).
    - For every behavioral claim ("the helper truncates microseconds", "Y calls Z"), open the cited code and verify the claim is true today.
 
 ## Audit dimensions
@@ -38,13 +38,13 @@ For each Acceptance Criteria bullet:
 
 ### 2. Plan-skipped obvious work
 
-Read Description and Root Cause. List the implementation surfaces the stated problem demands. Then walk the Change Plan and mark which are present.
+Read Description and Root Cause. List the implementation surfaces the stated problem demands. Then walk the Affected Paths and mark which are present.
 
-Flag anything that the goal obviously requires but the plan omits — e.g. "fix X for both providers" with a Change Plan that touches only one provider; a consolidation that leaves dangling callers; a behavior change with no doc/policy update where one is expected.
+Flag anything that the goal obviously requires but the plan omits — e.g. "fix X for both providers" with a Affected Paths that touches only one provider; a consolidation that leaves dangling callers; a behavior change with no doc/policy update where one is expected.
 
 ### 3. Plan over-scoped
 
-Walk each Change Plan item. For each, ask: does the stated problem require this?
+Walk each Affected Paths item. For each, ask: does the stated problem require this?
 
 Flag work that exceeds the problem: new abstractions, helpers, error-handling layers, feature flags, version-gating, parallel writes, "while we're at it" cleanups, refactors that don't fall out of the fix. Plan-stage over-engineering is cheaper to cut than post-implementation.
 
@@ -98,7 +98,7 @@ Assess whether the issue is one coherent unit:
 
 - **AC independence** — count AC bullets that target distinct surfaces.
 - **Title / Description bundling** — phrases like "X and Y", "do A, B, and C", multiple unrelated concerns under one Description.
-- **Phased Change Plan** — explicit phases / stages where each could stand alone as a follow-up issue.
+- **Phased Approach** — explicit phases / stages where each could stand alone as a follow-up issue.
 - **Subsystem spread** — the work touches multiple subsystems that do not share a single root cause.
 - **PR sizing** — would a single PR closing this issue be reviewable, or would it need to be split?
 
