@@ -189,6 +189,7 @@ def test_github_publish_creates_issue_and_deletes_body_file(tmp_path: Path) -> N
     assert payload["body_file_removed"] is True
     assert payload["cache_refreshed"] is True
     assert payload["issue_file"].endswith("/issues/51/issue.md")
+    assert "cache" not in payload
     cache = GitHubIssueCache.for_project(tmp_path, configured_repo=_repo())
     assert cache.read_issue(_repo(), 51)["body"] == "Draft body.\n"
     assert not body_file.exists()
@@ -463,6 +464,7 @@ def test_github_append_posts_comment_and_deletes_body_file(tmp_path: Path) -> No
     assert payload["body_file_removed"] is True
     assert payload["cache_refreshed"] is True
     assert payload["issue_file"].endswith("/issues/72/issue.md")
+    assert "cache" not in payload
     assert runner.posted_bodies == ["Comment body.\n"]
     assert runner.state_calls == []
     assert not body_file.exists()
@@ -773,6 +775,7 @@ def test_github_update_writes_body_and_deletes_body_file(tmp_path: Path) -> None
     assert payload["body_file_removed"] is True
     assert payload["cache_refreshed"] is True
     assert payload["issue_file"].endswith("/issues/72/issue.md")
+    assert "cache" not in payload
     assert runner.edit_bodies == ["Updated body.\n"]
     assert runner.edit_titles == [None]
     assert runner.state_calls == []
@@ -1027,6 +1030,7 @@ def test_jira_publish_creates_issue_inline_and_deletes_body_file(tmp_path: Path)
     assert payload["issue"] == "TEST-1234"
     assert payload["body_file_removed"] is True
     assert payload["issue_file"].endswith("issues/TEST-1234/snapshot.md")
+    assert "cache" not in payload
     cache = JiraDataCenterIssueCache.for_project(tmp_path)
     assert cache.issue_json_file(site, "TEST-1234").is_file()
     assert not body_file.exists()

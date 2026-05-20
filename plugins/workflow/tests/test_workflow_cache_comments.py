@@ -183,6 +183,7 @@ def test_jira_append_posts_comment_and_deletes_body_file(tmp_path: Path) -> None
     assert payload["state_changed"] is False
     assert payload["body_file_removed"] is True
     assert payload["issue_file"].endswith("/issues/TEST-1234/snapshot.md")
+    assert "cache" not in payload
     write_request = next(request for request in runner.requests if request.args == curl_write_args())
     assert 'request = "POST"' in str(write_request.input_text)
     assert 'url = "https://jira.example.test/rest/api/2/issue/TEST-1234/comment"' in str(write_request.input_text)
