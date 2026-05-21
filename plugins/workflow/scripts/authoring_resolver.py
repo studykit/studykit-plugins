@@ -30,7 +30,6 @@ from workflow_env import (
     workflow_project_dir_from_env,
     workflow_session_id_from_env,
 )
-from workflow_providers import CACHE_POLICY_DEFAULT, CACHE_POLICY_REFRESH
 from workflow_session_state import (
     read_authoring_resolution,
     record_authoring_resolution,
@@ -153,7 +152,7 @@ def render_cache_hit_reference(
         )
     lines.append(
         "- If the anchor body is no longer in context, rerun this command "
-        "with `--cache-policy refresh`."
+        "with `--raw` to re-emit it."
     )
     return "\n".join(lines) + "\n"
 
@@ -350,10 +349,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--require-config", action="store_true", help="fail when .workflow/config.yml is absent")
     parser.add_argument(
-        "--cache-policy",
-        choices=(CACHE_POLICY_DEFAULT, CACHE_POLICY_REFRESH),
-        default=CACHE_POLICY_DEFAULT,
-        help="session-state cache policy; refresh forces full emission",
+        "--raw",
+        action="store_true",
+        help="force full markdown re-emission, overwriting the stored entry",
     )
     return parser
 
@@ -383,7 +381,7 @@ def main(argv: list[str] | None = None) -> int:
     anchor = resolution.reading_list_anchor
     current_key = _resolution_key(resolution)
     use_cache_hit = False
-    if args.cache_policy != CACHE_POLICY_REFRESH:
+    if not args.raw:
         existing = read_authoring_resolution(
             args.project, runtime, session_id, anchor
         )
