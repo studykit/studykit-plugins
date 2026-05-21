@@ -13,7 +13,7 @@ from urllib.parse import quote, urlparse
 
 from workflow_command import CommandRunner, run_command
 from workflow_config import ProviderConfig, WorkflowConfigError, load_workflow_config
-from workflow_jira_issue_refs import JiraProviderError, normalize_jira_issue_key
+from issue.jira.refs import JiraProviderError, normalize_jira_issue_key
 
 DEPLOYMENT_DATA_CENTER = "data_center"
 

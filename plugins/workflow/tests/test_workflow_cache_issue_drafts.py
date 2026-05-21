@@ -16,11 +16,11 @@ from github_issue_drafts import main as github_issue_drafts_main  # noqa: E402
 from github_issue_writeback import main as github_issue_writeback_main  # noqa: E402
 from jira_issue_drafts import main as jira_issue_drafts_main  # noqa: E402
 from workflow_command import CommandRequest, CommandResult  # noqa: E402
-from workflow_github_issue_cache import GitHubIssueCache  # noqa: E402
+from issue.github.cache import GitHubIssueCache  # noqa: E402
 from workflow_github import DEFAULT_ISSUE_FIELDS  # noqa: E402
 from workflow_github import GitHubRepository  # noqa: E402
 from workflow_jira_data_center_client import resolve_jira_data_center_site  # noqa: E402
-from workflow_jira_issue_cache import JiraDataCenterIssueCache  # noqa: E402
+from issue.jira.cache import JiraDataCenterIssueCache  # noqa: E402
 
 
 class GitHubFakeRunner:

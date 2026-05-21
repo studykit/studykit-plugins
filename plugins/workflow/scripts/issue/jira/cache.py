@@ -24,13 +24,13 @@ from workflow_cache import (
     _safe_path_segment,
     _utc_now,
 )
-from workflow_jira_data_center_client import JiraDataCenterSite
-from workflow_jira_issue_relationships import (
+from issue.jira.refs import normalize_jira_issue_key
+from issue.jira.relationships import (
     filter_jira_payload,
     normalize_jira_data_center_issue,
 )
-from workflow_jira_issue_refs import normalize_jira_issue_key
-from workflow_jira_issue_snapshot import render_jira_snapshot
+from issue.jira.snapshot import render_jira_snapshot
+from workflow_jira_data_center_client import JiraDataCenterSite
 
 
 _COMMENT_FILENAME_RE = re.compile(r"^comment-.*\.md$")

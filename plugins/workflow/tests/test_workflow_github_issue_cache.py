@@ -20,7 +20,7 @@ from workflow_cache import (  # noqa: E402
     check_provider_freshness,
     require_provider_freshness,
 )
-from workflow_github_issue_cache import GitHubIssueCache, is_github_issue_cache_body_path  # noqa: E402
+from issue.github.cache import GitHubIssueCache, is_github_issue_cache_body_path  # noqa: E402
 from workflow_command import CommandRequest, CommandResult  # noqa: E402
 from workflow_github import DEFAULT_ISSUE_FIELDS, GitHubRepository  # noqa: E402
 from workflow_providers import (  # noqa: E402

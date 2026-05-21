@@ -29,14 +29,14 @@ from workflow_edit_target import EditTarget  # noqa: E402
 from workflow_config import WorkflowConfig, WorkflowConfigError, load_workflow_config  # noqa: E402
 from workflow_github import GitHubRepository, GitHubRepositoryError, normalize_issue_number  # noqa: E402
 from workflow_github import resolve_github_repository  # noqa: E402
-from workflow_github_issue_cache import is_github_issue_cache_body_path  # noqa: E402
-from workflow_github_issue_context import cache_github_issue_references  # noqa: E402
-from workflow_github_issue_refs import extract_issue_numbers as extract_github_issue_numbers  # noqa: E402
-from workflow_issue_cli_output import format_issue_cache_context  # noqa: E402
-from workflow_jira_issue_cache import is_jira_issue_cache_body_path  # noqa: E402
-from workflow_jira_issue_context import cache_jira_issue_references  # noqa: E402
-from workflow_jira_issue_refs import jira_issue_keys_from_references  # noqa: E402
-from workflow_jira_issue_refs import normalize_jira_issue_key  # noqa: E402
+from issue.github.cache import is_github_issue_cache_body_path  # noqa: E402
+from issue.github.context import cache_github_issue_references  # noqa: E402
+from issue.github.refs import extract_issue_numbers as extract_github_issue_numbers  # noqa: E402
+from issue.cli_output import format_issue_cache_context  # noqa: E402
+from issue.jira.cache import is_jira_issue_cache_body_path  # noqa: E402
+from issue.jira.context import cache_jira_issue_references  # noqa: E402
+from issue.jira.refs import jira_issue_keys_from_references  # noqa: E402
+from issue.jira.refs import normalize_jira_issue_key  # noqa: E402
 from workflow_main_context import build_commit_prefix_context  # noqa: E402
 from workflow_main_context import build_session_policy_context, build_subagent_policy_context  # noqa: E402
 from workflow_session_state import (  # noqa: E402

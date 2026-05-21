@@ -16,7 +16,7 @@ if str(_SCRIPTS_DIR) not in sys.path:
 
 from workflow_command import CommandRequest, CommandResult  # noqa: E402
 from workflow_github import DEFAULT_ISSUE_FIELDS, GitHubRepository  # noqa: E402
-from workflow_github_issue_cache import GitHubIssueCache  # noqa: E402
+from issue.github.cache import GitHubIssueCache  # noqa: E402
 from github_issue_fields import (  # noqa: E402
     GitHubIssueFieldsError,
     fields_payload,

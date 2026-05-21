@@ -20,10 +20,10 @@ from workflow_command import CommandRunner
 from workflow_config import WorkflowConfig, WorkflowConfigError, load_workflow_config
 from workflow_env import workflow_project_dir_from_env
 from workflow_github import GitHubRepositoryError, resolve_github_repository
-from workflow_github_issue_cache import GitHubIssueCache
-from workflow_github_issue_provider import GitHubIssueNativeProvider
-from workflow_github_issue_refs import issue_numbers_from_references
-from workflow_issue_cli_output import flatten_provider_envelope
+from issue.github.cache import GitHubIssueCache
+from issue.github.provider import GitHubIssueNativeProvider
+from issue.github.refs import issue_numbers_from_references
+from issue.cli_output import flatten_provider_envelope
 from workflow_providers import ProviderContext, ProviderRequest
 
 

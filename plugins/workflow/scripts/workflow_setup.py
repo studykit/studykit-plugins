@@ -52,7 +52,7 @@ from workflow_jira_data_center_client import (  # noqa: E402
     jira_data_center_transitions_path,
     jira_get_json,
 )
-from workflow_jira_issue_refs import JiraProviderError, normalize_jira_issue_key  # noqa: E402
+from issue.jira.refs import JiraProviderError, normalize_jira_issue_key  # noqa: E402
 
 
 class WorkflowSetupError(ValueError):

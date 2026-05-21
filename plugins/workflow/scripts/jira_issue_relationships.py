@@ -19,11 +19,11 @@ from typing import TextIO
 from workflow_command import CommandRunner
 from workflow_config import WorkflowConfig, WorkflowConfigError, load_workflow_config
 from workflow_env import workflow_project_dir_from_env
-from workflow_issue_cli_output import flatten_provider_envelope
+from issue.cli_output import flatten_provider_envelope
 from workflow_jira_data_center_client import resolve_jira_data_center_site
-from workflow_jira_issue_cache import JiraDataCenterIssueCache
-from workflow_jira_issue_provider import JiraDataCenterIssueNativeProvider
-from workflow_jira_issue_refs import JiraProviderError, jira_issue_keys_from_references, normalize_jira_issue_key
+from issue.jira.cache import JiraDataCenterIssueCache
+from issue.jira.provider import JiraDataCenterIssueNativeProvider
+from issue.jira.refs import JiraProviderError, jira_issue_keys_from_references, normalize_jira_issue_key
 from workflow_providers import ProviderContext, ProviderRequest
 
 
