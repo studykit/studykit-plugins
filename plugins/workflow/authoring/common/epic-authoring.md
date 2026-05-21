@@ -2,7 +2,7 @@
 
 A workflow epic is an **issue-backed coordination parent** for a larger goal delivered through multiple member issues.
 
-An epic may represent a user-facing feature, platform capability, subsystem implementation effort, migration, stabilization campaign, or cross-cutting quality initiative. It is not an implementation unit; the work belongs to its member issues.
+The epic is not an implementation unit; the work belongs to its member issues. The parent body carries coordination narrative and integration-level outcomes, not a task-shaped implementation contract.
 
 Epics are stored in the configured issue backend.
 
@@ -10,6 +10,7 @@ Companion contracts:
 
 - `./issue-body.md`
 - Issue rules: `./issue-authoring.md`
+- Decomposition choice: `./decomposition-patterns.md`
 
 ## Storage role
 
@@ -19,20 +20,21 @@ Use canonical issue identity. Do not use local integer ids.
 
 ## When to create an epic
 
-Create an epic when one or more of these holds:
+Create an epic only when the work matches one of these canonical scopes:
 
-- A larger goal will be split into multiple member issues.
-- Several existing issues need a shared coordination home.
-- Cross-cutting decisions affect more than one member issue.
-- Integration-level acceptance criteria span several member issues.
-- A feature, migration, or stabilization campaign needs progress visibility.
+- **Feature initiative** — a user-facing feature delivered through multiple coordinated members, with an integration-level outcome (such as end-to-end behavior or rollout gate) that no single member owns.
+- **Platform or subsystem capability** — a new platform component or subsystem whose delivery requires multiple coordinated members with shared sequencing or interface decisions.
+- **Migration or campaign** — moving from an old system to a new one, or applying a cross-cutting change across many call sites; member types are usually mixed (`task`, `bug`, `spike`, `research`).
+- **Stabilization or quality initiative** — a coordinated effort to improve a quality dimension (flake reduction, observability rollout, deprecation cleanup) where the integration-level outcome is an external metric.
 
 Do not create an epic when:
 
 - One issue is enough.
-- Issues are unrelated and have no shared narrative.
-- A spec or architecture page is the real home for the decision.
-- The work is only a single implementation task.
+- A spec, architecture, or domain page is the real home for the decision.
+- The decomposition has only 2–3 task-typed slices and the parent body would naturally pass as a task — use a parent task with subtasks per `./decomposition-patterns.md` instead.
+- Members are unrelated and have no shared narrative or anchor.
+
+Parent task vs epic discriminator: the epic body cannot stand as a task. If a draft parent body would have a meaningful `Unit Test Strategy` and `Acceptance Criteria` at the parent level, the parent is a task, not an epic. See `./decomposition-patterns.md`.
 
 ## Shared narrative
 

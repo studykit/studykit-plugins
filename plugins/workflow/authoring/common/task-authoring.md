@@ -44,8 +44,7 @@ Split a task when it spans:
 - Independent test surfaces.
 - Work that can be assigned or sequenced independently.
 
-Record ordering constraints when split tasks must happen in a specific sequence.
-Use an epic or parent issue when siblings need shared coordination.
+When a split is warranted, the decomposition pattern (sibling tasks, parent task with subtasks, or epic with members) is selected per `./decomposition-patterns.md`. Use the `blocked_by` relationship intent for hard sequencing between siblings, and a shared anchor (use case, spec, parent task, or epic) when siblings deliver toward the same goal.
 
 ## Body shape
 
