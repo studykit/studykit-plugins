@@ -22,6 +22,17 @@ from workflow_providers import ProviderOperationError  # noqa: E402
 from jira_issue_fields import JiraIssueFieldsError, fields_payload, main  # noqa: E402
 
 
+_DROPPED_FIELD_KEYS = ("provider", "cache", "site", "operation", "role", "kind", "verified", "key")
+
+
+def _assert_flat_field_envelope(payload: dict, *, issue_basename: str = "TEST-1234/issue.md") -> None:
+    """Assert the flattened envelope contract for Jira field write payloads."""
+    for dropped in _DROPPED_FIELD_KEYS:
+        assert dropped not in payload, f"{dropped!r} should not be in payload"
+    assert payload["issue"].endswith(issue_basename), payload["issue"]
+    assert payload["cache_refreshed"] is True
+
+
 class FakeRunner:
     def __init__(self, responses: dict[tuple[str, ...], CommandResult | list[CommandResult]]):
         self.responses = responses
@@ -162,7 +173,7 @@ def test_set_type_puts_fields_issuetype_via_default_mapping(tmp_path: Path) -> N
         runner=runner,
     )
 
-    assert payload["operation"] == "fields_set_type"
+    _assert_flat_field_envelope(payload)
     write_requests = [request for request in runner.requests if request.args == curl_write_args()]
     assert any('\\"issuetype\\":{\\"name\\":\\"Bug\\"}' in str(request.input_text) for request in write_requests)
 
@@ -297,7 +308,7 @@ def test_reopen_uses_configured_reopen_transition(tmp_path: Path) -> None:
         runner=runner,
     )
 
-    assert payload["operation"] == "lifecycle_reopen"
+    _assert_flat_field_envelope(payload)
     write_requests = [request for request in runner.requests if request.args == curl_write_args()]
     assert any('\\"transition\\":{\\"id\\":\\"41\\"}' in str(request.input_text) for request in write_requests)
 
@@ -352,7 +363,7 @@ def test_close_routes_through_state_transition_resolver(tmp_path: Path) -> None:
         runner=runner,
     )
 
-    assert payload["operation"] == "lifecycle_close"
+    _assert_flat_field_envelope(payload)
     write_requests = [request for request in runner.requests if request.args == curl_write_args()]
     assert any('\\"transition\\":{\\"id\\":\\"31\\"}' in str(request.input_text) for request in write_requests)
 
@@ -425,3 +436,41 @@ def test_reserved_verbs_work_without_state_transitions(tmp_path: Path) -> None:
     assert exit_code == 0
     write_requests = [request for request in runner.requests if request.args == curl_write_args()]
     assert any('\\"assignee\\":null' in str(request.input_text) for request in write_requests)
+
+
+def test_unassign_on_stale_cache_returns_blocked_envelope_and_exit_3(tmp_path: Path) -> None:
+    write_jira_config(tmp_path)
+    _seed_cache(tmp_path, payload=jira_issue_payload(assignee="alice"))
+    # Provider reports a newer updated than the cached projection's fetched_at.
+    newer = jira_issue_payload(assignee="alice")
+    newer["fields"]["updated"] = "2026-05-15T11:00:00.000+0900"  # type: ignore[index]
+    runner = FakeRunner(
+        {
+            curl_args(jira_issue_url()): [
+                result(curl_args(jira_issue_url()), stdout=json.dumps(newer)),
+                result(curl_args(jira_issue_url()), stdout=json.dumps(newer)),
+            ],
+            curl_args(jira_remote_links_url()): result(
+                curl_args(jira_remote_links_url()),
+                stdout=json.dumps(remote_links_payload()),
+            ),
+        }
+    )
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+
+    exit_code = main(
+        ["--project", str(tmp_path), "unassign", "TEST-1234"],
+        stdout=stdout,
+        stderr=stderr,
+        runner=runner,
+    )
+
+    assert exit_code == 3, stderr.getvalue()
+    payload = json.loads(stdout.getvalue())
+    assert payload["status"] == "blocked"
+    assert payload["reason"]
+    assert payload["reread_required"] is True
+    assert payload["reread_paths"]
+    # No PUT/POST issued because the freshness gate blocked first.
+    assert all(request.args != curl_write_args() for request in runner.requests)

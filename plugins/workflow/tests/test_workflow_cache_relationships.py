@@ -215,6 +215,15 @@ def test_relationship_intent_helper_rejects_add_remove_overlap() -> None:
         )
 
 
+_DROPPED_RELATIONSHIP_KEYS = ("provider", "cache", "repository", "site", "operation", "role", "kind", "verified")
+
+
+def _assert_flat_relationship_envelope(payload: dict, *, issue_basename: str) -> None:
+    for dropped in _DROPPED_RELATIONSHIP_KEYS:
+        assert dropped not in payload, f"{dropped!r} should not be in payload"
+    assert payload["issue"].endswith(issue_basename), payload["issue"]
+
+
 def test_relationships_cli_no_flag_returns_no_op(tmp_path: Path) -> None:
     write_config(tmp_path)
     cache = GitHubIssueCache.for_project(tmp_path, configured_repo=repo())
@@ -231,7 +240,8 @@ def test_relationships_cli_no_flag_returns_no_op(tmp_path: Path) -> None:
     )
     payload = json.loads(stdout.getvalue())
     assert code == 0
-    assert payload["operation"] == "apply_relationships"
+    _assert_flat_relationship_envelope(payload, issue_basename="44/issue.md")
+    assert payload["cache_refreshed"] is False
     assert payload["applied"] == 0
     assert payload.get("no_changes") is True
 
@@ -282,6 +292,50 @@ def test_relationships_cli_dispatches_inline_intent(tmp_path: Path) -> None:
     )
     payload = json.loads(stdout.getvalue())
     assert code == 0
-    assert payload["operation"] == "apply_relationships"
-    assert payload["issue"] == "44"
+    _assert_flat_relationship_envelope(payload, issue_basename="44/issue.md")
+    assert payload["cache_refreshed"] is True
     assert payload["applied"] == 1
+
+
+def write_jira_config(project: Path) -> None:
+    path = project / ".workflow" / "config.yml"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        """
+version: 1
+providers:
+  issues:
+    kind: jira
+    site: https://jira.example.test
+    deployment: data-center
+    api_version: 2
+    project: TEST
+    issue_type: Task
+  knowledge:
+    kind: github
+issue_id_format: jira
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+
+def test_jira_relationships_cli_no_flag_returns_flat_no_op(tmp_path: Path) -> None:
+    from jira_issue_relationships import main as jira_issue_relationships_main  # noqa: E402
+
+    write_jira_config(tmp_path)
+
+    def runner(request: CommandRequest) -> CommandResult:
+        raise AssertionError(f"unexpected command in no-op call: {request.args}")
+
+    stdout = io.StringIO()
+    code = jira_issue_relationships_main(
+        ["--project", str(tmp_path), "TEST-1234"],
+        stdout=stdout,
+        runner=runner,
+    )
+    payload = json.loads(stdout.getvalue())
+    assert code == 0
+    _assert_flat_relationship_envelope(payload, issue_basename="TEST-1234/issue.md")
+    assert payload["cache_refreshed"] is False
+    assert payload["applied"] == 0
+    assert payload.get("no_changes") is True

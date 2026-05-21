@@ -9,7 +9,7 @@ from workflow_command import CommandRunner
 from workflow_config import WorkflowConfig
 from workflow_github import GitHubRepository, normalize_issue_number
 from workflow_github_issue_cache import GitHubIssueCache
-from workflow_issue_cli_output import IssueFetchContext, cache_hit_from_payload, display_project_path
+from workflow_issue_cli_output import IssueFetchContext, cache_refreshed_from_payload, display_project_path
 from workflow_providers import CACHE_POLICY_DEFAULT, ProviderContext, ProviderRequest
 
 
@@ -61,7 +61,7 @@ def cache_github_issue_references(
                     issue_dir=display_project_path(issue_dir, config.root, trailing_slash=True),
                     title=str(response.payload.get("title") or ""),
                     state=str(response.payload.get("state") or "").upper(),
-                    cache_hit=cache_hit_from_payload(response.payload, default=False),
+                    cache_refreshed=cache_refreshed_from_payload(response.payload, default=True),
                     provider_kind="github",
                     comments=comment_paths,
                 )

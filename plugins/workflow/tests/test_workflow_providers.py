@@ -728,11 +728,10 @@ def test_github_issue_fields_close_checks_freshness_and_refreshes_cache(
         runner=runner,
     )
 
-    assert payload["operation"] == "lifecycle_close"
-    provider_payload = payload["provider"]
-    assert provider_payload["operation"] == "close_issue"
-    assert provider_payload["verified"] is True
-    assert provider_payload["cache_refreshed"] is True
+    assert payload["cache_refreshed"] is True
+    assert payload["issue"].endswith("39/issue.md")
+    for dropped in ("operation", "provider", "cache", "repository", "role", "kind", "verified"):
+        assert dropped not in payload, f"{dropped!r} should not be in payload"
     assert cache.read_issue(github_repo(), 39)["state"] == "closed"
     assert events == ["freshness", "close", "verify", "refresh"]
 

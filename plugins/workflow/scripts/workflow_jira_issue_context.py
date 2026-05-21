@@ -7,7 +7,7 @@ from collections.abc import Sequence
 
 from workflow_command import CommandRunner
 from workflow_config import WorkflowConfig
-from workflow_issue_cli_output import IssueFetchContext, cache_hit_from_payload, display_project_path
+from workflow_issue_cli_output import IssueFetchContext, cache_refreshed_from_payload, display_project_path
 from workflow_jira_data_center_client import resolve_jira_data_center_site
 from workflow_jira_issue_cache import JiraDataCenterIssueCache
 from workflow_jira_issue_refs import normalize_jira_issue_key
@@ -62,7 +62,7 @@ def cache_jira_issue_references(
                     issue_dir=display_project_path(issue_dir, config.root, trailing_slash=True),
                     title=str(response.payload.get("title") or ""),
                     state=str(response.payload.get("state") or "").upper(),
-                    cache_hit=cache_hit_from_payload(response.payload, default=False),
+                    cache_refreshed=cache_refreshed_from_payload(response.payload, default=True),
                     provider_kind="jira",
                     comments=comment_paths,
                 )
