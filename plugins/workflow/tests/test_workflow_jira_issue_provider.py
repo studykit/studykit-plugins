@@ -261,6 +261,29 @@ def remote_link_relationship_mappings() -> str:
 """
 
 
+def issue_link_and_field_epic_relationship_mappings(*, value_kind: str = "string") -> str:
+    return f"""
+    relationship_mappings:
+      blocked_by:
+        surface: issue_link
+        link_type: Blocks
+        direction: inward
+      blocking:
+        surface: issue_link
+        link_type: Blocks
+        direction: outward
+      related:
+        surface: issue_link
+        link_type: Relates
+        direction: outward
+      epic:
+        surface: field
+        field: customfield_10350
+        write_to: source
+        value: {value_kind}
+"""
+
+
 def issue_url(issue: str = "TEST-1234") -> str:
     return f"https://jira.example.test/rest/api/2/issue/{issue}"
 
@@ -403,6 +426,127 @@ def test_data_center_provider_fetches_issue_remote_links_and_writes_llm_snapshot
     assert "Please keep Data Center first." in comment_text
     assert "provider_comment_id: '20001'" in comment_text
     assert "author: Example User" in comment_text
+
+
+def _assert_existing_workflow_buckets_unchanged(workflow: dict) -> None:
+    assert workflow["parent"]["key"] == "TEST-1200"
+    assert workflow["children"][0]["key"] == "TEST-1237"
+    assert workflow["blocking"][0]["key"] == "TEST-1235"
+    assert workflow["blocked_by"][0]["key"] == "TEST-1233"
+    assert workflow["related"][0]["key"] == "TEST-1236"
+
+
+def test_data_center_field_surface_string_relationship_surfaces_in_workflow(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    write_jira_config(
+        tmp_path,
+        relationship_mappings=issue_link_and_field_epic_relationship_mappings(value_kind="string"),
+    )
+    monkeypatch.delenv("JIRA_PERSONAL_TOKEN", raising=False)
+    monkeypatch.delenv("JIRA_PAT", raising=False)
+    monkeypatch.delenv("JIRA_USERNAME", raising=False)
+    monkeypatch.delenv("JIRA_PASSWORD", raising=False)
+    payload = jira_issue_payload()
+    fields = payload["fields"]
+    assert isinstance(fields, dict)
+    fields["customfield_10350"] = "TEST-EPIC-1"
+    runner = FakeRunner(
+        {
+            curl_args(issue_url()): result(curl_args(issue_url()), stdout=json.dumps(payload)),
+            curl_args(remote_links_url()): result(curl_args(remote_links_url()), stdout=json.dumps(remote_links_payload())),
+        }
+    )
+
+    response = dispatch_get(tmp_path, runner)
+
+    workflow = response.payload["relationships"]["workflow"]
+    assert workflow["epic"] == [{"provider": "jira", "key": "TEST-EPIC-1", "issue": "TEST-EPIC-1"}]
+    _assert_existing_workflow_buckets_unchanged(workflow)
+
+    cache = JiraDataCenterIssueCache.for_project(tmp_path)
+    site = jira_site(tmp_path)
+    issue_md_text = (cache.issue_dir(site, "TEST-1234") / "issue.md").read_text(encoding="utf-8")
+    frontmatter_text, _body = _split_issue_md(issue_md_text)
+    frontmatter = yaml.safe_load(frontmatter_text)
+    relationships_block = frontmatter["relationships"]
+    assert relationships_block["epic"] == ["TEST-EPIC-1"]
+    assert relationships_block["parent"] == "TEST-1200"
+    assert relationships_block["children"] == ["TEST-1237"]
+    assert relationships_block["blocked_by"] == ["TEST-1233"]
+    assert relationships_block["blocking"] == ["TEST-1235"]
+    assert relationships_block["related"] == ["TEST-1236"]
+
+
+def test_data_center_field_surface_key_object_relationship_surfaces_in_workflow(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    write_jira_config(
+        tmp_path,
+        relationship_mappings=issue_link_and_field_epic_relationship_mappings(value_kind="key_object"),
+    )
+    monkeypatch.delenv("JIRA_PERSONAL_TOKEN", raising=False)
+    monkeypatch.delenv("JIRA_PAT", raising=False)
+    monkeypatch.delenv("JIRA_USERNAME", raising=False)
+    monkeypatch.delenv("JIRA_PASSWORD", raising=False)
+    payload = jira_issue_payload()
+    fields = payload["fields"]
+    assert isinstance(fields, dict)
+    fields["customfield_10350"] = {"key": "TEST-EPIC-1"}
+    runner = FakeRunner(
+        {
+            curl_args(issue_url()): result(curl_args(issue_url()), stdout=json.dumps(payload)),
+            curl_args(remote_links_url()): result(curl_args(remote_links_url()), stdout=json.dumps(remote_links_payload())),
+        }
+    )
+
+    response = dispatch_get(tmp_path, runner)
+
+    workflow = response.payload["relationships"]["workflow"]
+    assert workflow["epic"] == [{"provider": "jira", "key": "TEST-EPIC-1", "issue": "TEST-EPIC-1"}]
+    _assert_existing_workflow_buckets_unchanged(workflow)
+
+    cache = JiraDataCenterIssueCache.for_project(tmp_path)
+    site = jira_site(tmp_path)
+    issue_md_text = (cache.issue_dir(site, "TEST-1234") / "issue.md").read_text(encoding="utf-8")
+    frontmatter_text, _body = _split_issue_md(issue_md_text)
+    frontmatter = yaml.safe_load(frontmatter_text)
+    assert frontmatter["relationships"]["epic"] == ["TEST-EPIC-1"]
+
+
+def test_data_center_field_surface_absent_field_is_omitted(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    write_jira_config(
+        tmp_path,
+        relationship_mappings=issue_link_and_field_epic_relationship_mappings(value_kind="string"),
+    )
+    monkeypatch.delenv("JIRA_PERSONAL_TOKEN", raising=False)
+    monkeypatch.delenv("JIRA_PAT", raising=False)
+    monkeypatch.delenv("JIRA_USERNAME", raising=False)
+    monkeypatch.delenv("JIRA_PASSWORD", raising=False)
+    runner = FakeRunner(
+        {
+            curl_args(issue_url()): result(curl_args(issue_url()), stdout=json.dumps(jira_issue_payload())),
+            curl_args(remote_links_url()): result(curl_args(remote_links_url()), stdout=json.dumps(remote_links_payload())),
+        }
+    )
+
+    response = dispatch_get(tmp_path, runner)
+
+    workflow = response.payload["relationships"]["workflow"]
+    assert "epic" not in workflow
+    _assert_existing_workflow_buckets_unchanged(workflow)
+
+    cache = JiraDataCenterIssueCache.for_project(tmp_path)
+    site = jira_site(tmp_path)
+    issue_md_text = (cache.issue_dir(site, "TEST-1234") / "issue.md").read_text(encoding="utf-8")
+    frontmatter_text, _body = _split_issue_md(issue_md_text)
+    frontmatter = yaml.safe_load(frontmatter_text)
+    assert "epic" not in frontmatter["relationships"]
 
 
 def test_data_center_snapshot_hides_comments_with_configured_markers(
