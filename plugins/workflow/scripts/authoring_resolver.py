@@ -12,11 +12,10 @@ read before writing workflow artifacts.
 from __future__ import annotations
 
 import argparse
-import json
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Iterable
 
 from workflow_config import (
     CONFIG_NAME,
@@ -90,6 +89,18 @@ PROVIDER_EXTRA_FILES = {
 }
 
 
+def _anchor_scope_suffix(scope: str) -> str:
+    return "-comment" if scope == "comment" else ""
+
+
+def reading_list_anchor(artifact_type: str, role: str, scope: str) -> str:
+    return f"{artifact_type}-{role}{_anchor_scope_suffix(scope)}-reading-list"
+
+
+def notes_anchor(artifact_type: str, role: str, scope: str) -> str:
+    return f"{artifact_type}-{role}{_anchor_scope_suffix(scope)}-notes"
+
+
 @dataclass(frozen=True)
 class Resolution:
     """Resolved authoring contract set."""
@@ -97,21 +108,40 @@ class Resolution:
     artifact_type: str
     role: str
     provider: str | None
+    scope: str
     files: tuple[Path, ...]
     notes: tuple[str, ...] = ()
 
-    def to_json(self) -> dict[str, Any]:
-        payload: dict[str, Any] = {
-            "artifact": {
-                "type": self.artifact_type,
-                "role": self.role,
-                "provider": self.provider,
-            },
-            "required_authoring_files": [str(path) for path in self.files],
-        }
+    @property
+    def reading_list_anchor(self) -> str:
+        return reading_list_anchor(self.artifact_type, self.role, self.scope)
+
+    @property
+    def notes_anchor(self) -> str:
+        return notes_anchor(self.artifact_type, self.role, self.scope)
+
+    def to_markdown(self) -> str:
+        sections: list[str] = []
+        reading_lines = [f"## {self.reading_list_anchor}"]
+        reading_lines.extend(f"- {path}" for path in self.files)
+        sections.append("\n".join(reading_lines))
         if self.notes:
-            payload["notes"] = list(self.notes)
-        return payload
+            notes_lines = [f"## {self.notes_anchor}"]
+            notes_lines.extend(f"- {note}" for note in self.notes)
+            sections.append("\n".join(notes_lines))
+        return "\n\n".join(sections) + "\n"
+
+
+def render_cache_hit_reference(
+    reading_list_anchor: str,
+    notes_anchor: str | None = None,
+) -> str:
+    lines = [f"- See `{reading_list_anchor}` above."]
+    if notes_anchor is not None:
+        lines.append(
+            f"- See `{notes_anchor}` above — triggers apply to this call too."
+        )
+    return "\n".join(lines) + "\n"
 
 
 class ResolverError(ValueError):
@@ -232,6 +262,7 @@ def resolve_authoring(
             artifact_type=normalized_type,
             role=normalized_role,
             provider=normalized_provider,
+            scope=normalized_scope,
             files=absolute_authoring_paths(parts),
         )
 
@@ -280,6 +311,7 @@ def resolve_authoring(
         artifact_type=normalized_type,
         role=normalized_role,
         provider=normalized_provider,
+        scope=normalized_scope,
         files=absolute_authoring_paths(parts),
         notes=notes,
     )
@@ -323,7 +355,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"authoring resolver error: {exc}", file=sys.stderr)
         return 2
 
-    print(json.dumps(resolution.to_json(), indent=2, sort_keys=False))
+    print(resolution.to_markdown(), end="")
     return 0
 
 

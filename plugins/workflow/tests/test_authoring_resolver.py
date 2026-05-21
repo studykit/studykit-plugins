@@ -18,6 +18,9 @@ from authoring_resolver import (  # noqa: E402
     ResolverError,
     authoring_relative_path,
     is_authoring_file,
+    notes_anchor,
+    reading_list_anchor,
+    render_cache_hit_reference,
     resolve_authoring,
 )
 
@@ -242,14 +245,12 @@ def test_task_comment_scope_excludes_plan_mode_authoring() -> None:
 def test_implementation_types_emit_plan_mode_note(artifact_type: str) -> None:
     resolution = resolve_authoring(artifact_type)
     assert PLAN_MODE_TRIGGER_NOTE in resolution.notes
-    assert PLAN_MODE_TRIGGER_NOTE in resolution.to_json()["notes"]
 
 
 def test_task_emits_audit_trigger_note() -> None:
     resolution = resolve_authoring("task")
     assert TASK_AUDIT_TRIGGER_NOTE in resolution.notes
     assert "task-size-auditor" in TASK_AUDIT_TRIGGER_NOTE
-    assert TASK_AUDIT_TRIGGER_NOTE in resolution.to_json()["notes"]
 
 
 def test_bug_omits_audit_trigger_note() -> None:
@@ -274,13 +275,113 @@ def test_non_implementation_types_omit_plan_mode_note(
 ) -> None:
     resolution = resolve_authoring(artifact_type, role=role)
     assert resolution.notes == ()
-    assert "notes" not in resolution.to_json()
 
 
 def test_task_comment_scope_omits_notes() -> None:
     resolution = resolve_authoring("task", role="issue", provider="github", scope="comment")
     assert resolution.notes == ()
-    assert "notes" not in resolution.to_json()
+
+
+@pytest.mark.parametrize(
+    "artifact_type,role,scope,expected_reading,expected_notes",
+    [
+        ("task", "issue", "content", "task-issue-reading-list", "task-issue-notes"),
+        ("bug", "issue", "content", "bug-issue-reading-list", "bug-issue-notes"),
+        ("spike", "issue", "content", "spike-issue-reading-list", None),
+        ("spec", "knowledge", "content", "spec-knowledge-reading-list", None),
+        (
+            "task",
+            "issue",
+            "comment",
+            "task-issue-comment-reading-list",
+            None,
+        ),
+    ],
+)
+def test_to_markdown_emits_expected_anchor_headings(
+    artifact_type: str,
+    role: str,
+    scope: str,
+    expected_reading: str,
+    expected_notes: str | None,
+) -> None:
+    resolution = resolve_authoring(
+        artifact_type, role=role, provider="github", scope=scope
+    )
+    rendered = resolution.to_markdown()
+
+    assert f"## {expected_reading}\n" in rendered
+    if expected_notes is None:
+        assert "-notes" not in rendered
+    else:
+        assert f"## {expected_notes}\n" in rendered
+
+
+def test_to_markdown_lists_every_resolved_path_as_a_bullet() -> None:
+    resolution = resolve_authoring("task", role="issue", provider="github")
+    rendered = resolution.to_markdown()
+
+    reading_section, _, _ = rendered.partition("\n\n## ")
+    bullet_lines = [
+        line for line in reading_section.splitlines() if line.startswith("- ")
+    ]
+    assert bullet_lines == [f"- {path}" for path in resolution.files]
+    assert all(path.is_absolute() for path in resolution.files)
+
+
+@pytest.mark.parametrize(
+    "artifact_type,role",
+    [
+        ("spike", None),
+        ("epic", None),
+        ("review", None),
+        ("spec", None),
+        ("architecture", None),
+        ("ci", None),
+        ("context", None),
+        ("domain", None),
+        ("nfr", None),
+    ],
+)
+def test_to_markdown_omits_notes_section_for_noteless_types(
+    artifact_type: str, role: str | None
+) -> None:
+    resolution = resolve_authoring(artifact_type, role=role)
+    rendered = resolution.to_markdown()
+
+    assert resolution.notes == ()
+    assert "-notes" not in rendered
+
+
+@pytest.mark.parametrize(
+    "scope,expected_reading,expected_notes",
+    [
+        ("content", "task-issue-reading-list", "task-issue-notes"),
+        ("comment", "task-issue-comment-reading-list", "task-issue-comment-notes"),
+    ],
+)
+def test_anchor_helpers_apply_comment_suffix_for_comment_scope(
+    scope: str, expected_reading: str, expected_notes: str
+) -> None:
+    assert reading_list_anchor("task", "issue", scope) == expected_reading
+    assert notes_anchor("task", "issue", scope) == expected_notes
+
+
+def test_render_cache_hit_reference_with_notes_anchor() -> None:
+    rendered = render_cache_hit_reference(
+        "task-issue-reading-list", "task-issue-notes"
+    )
+
+    assert rendered == (
+        "- See `task-issue-reading-list` above.\n"
+        "- See `task-issue-notes` above — triggers apply to this call too.\n"
+    )
+
+
+def test_render_cache_hit_reference_without_notes_anchor() -> None:
+    rendered = render_cache_hit_reference("spike-issue-reading-list")
+
+    assert rendered == "- See `spike-issue-reading-list` above.\n"
 
 
 def test_authoring_path_classification_uses_plugin_authoring_root(tmp_path: Path) -> None:
