@@ -319,15 +319,21 @@ def test_to_markdown_emits_expected_anchor_headings(
         assert f"## {expected_notes}\n" in rendered
 
 
-def test_to_markdown_lists_every_resolved_path_as_a_bullet() -> None:
+def test_to_markdown_lists_files_relative_to_a_declared_base() -> None:
     resolution = resolve_authoring("task", role="issue", provider="github")
     rendered = resolution.to_markdown()
 
     reading_section, _, _ = rendered.partition("\n\n## ")
-    bullet_lines = [
-        line for line in reading_section.splitlines() if line.startswith("- ")
+    lines = reading_section.splitlines()
+    base_lines = [line for line in lines if line.startswith("Base: ")]
+    bullet_lines = [line for line in lines if line.startswith("- ")]
+
+    assert len(base_lines) == 1
+    base = Path(base_lines[0].removeprefix("Base: "))
+    assert base.is_absolute()
+    assert bullet_lines == [
+        f"- {path.relative_to(base)}" for path in resolution.files
     ]
-    assert bullet_lines == [f"- {path}" for path in resolution.files]
     assert all(path.is_absolute() for path in resolution.files)
 
 

@@ -132,7 +132,10 @@ class Resolution:
     def to_markdown(self) -> str:
         sections: list[str] = []
         reading_lines = [f"## {self.reading_list_anchor}"]
-        reading_lines.extend(f"- {path}" for path in self.files)
+        reading_lines.append(f"Base: {AUTHORING_DIR}")
+        reading_lines.extend(
+            f"- {path.relative_to(AUTHORING_DIR)}" for path in self.files
+        )
         sections.append("\n".join(reading_lines))
         if self.notes:
             notes_lines = [f"## {self.notes_anchor}"]
