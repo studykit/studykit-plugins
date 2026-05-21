@@ -34,6 +34,7 @@ The provider-write intents share one shape:
   [--subtask-parent <PARENT-KEY>] \
   [--project-key <PROJECT>] \
   [--epic-name <X>] \
+  [--assignee <user>] \
   [--parent <KEY>] [--epic <KEY>] [--blocked-by <KEY> ...] [--blocking <KEY> ...] \
   [--child <KEY> ...] [--related <KEY-or-URL> ...] \
 ```
@@ -42,6 +43,11 @@ Required: `--type`, `--title`, `--body-file`. Use `--issue-type` when the
 Jira issue type must be set at create time. Use `--subtask-parent` when
 publishing a Sub-task. Relationship flags (add-only on publish) apply the
 relationships against the newly created issue after the create succeeds.
+
+`--assignee <user>` sets the assignee at create time. The literal `me`
+resolves the current Jira user via `/rest/api/<v>/myself` and uses the
+returned `name` on the create payload. To clear an assignee on an
+existing issue, use `jira_issue_fields.py unassign`.
 
 `--epic-name` overrides the Epic Name customfield at create time and is
 valid only with `--type epic` (defaults to `--title`); supplying it for any

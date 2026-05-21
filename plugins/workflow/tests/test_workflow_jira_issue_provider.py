@@ -715,6 +715,65 @@ def test_data_center_create_inline_refreshes_cache(tmp_path: Path) -> None:
     assert cache.issue_json_file(site, "TEST-1234").is_file()
 
 
+def test_data_center_create_with_assignee_carries_assignee_field(tmp_path: Path) -> None:
+    write_jira_config(tmp_path)
+    runner = FakeRunner(
+        {
+            curl_write_args(): result(curl_write_args(), stdout=json.dumps({"id": "10001", "key": "TEST-1234"})),
+            curl_args(issue_url()): result(curl_args(issue_url()), stdout=json.dumps(jira_issue_payload())),
+            curl_args(remote_links_url()): result(curl_args(remote_links_url()), stdout=json.dumps(remote_links_payload())),
+        }
+    )
+
+    response = dispatch_write(
+        tmp_path,
+        runner,
+        "create",
+        title="Pending Jira issue",
+        body="Pending body.\n",
+        assignee="alice",
+    )
+
+    assert response.payload["operation"] == "create_issue"
+    write_request = runner.requests[0]
+    assert write_request.args == curl_write_args()
+    assert '\\"assignee\\":{\\"name\\":\\"alice\\"}' in str(write_request.input_text)
+
+
+def test_data_center_create_with_assignee_me_resolves_via_myself_once(tmp_path: Path) -> None:
+    write_jira_config(tmp_path)
+    myself_url = "https://jira.example.test/rest/api/2/myself"
+    runner = FakeRunner(
+        {
+            curl_args(myself_url): result(
+                curl_args(myself_url),
+                stdout=json.dumps({"name": "studykit-svc", "displayName": "Studykit Service"}),
+            ),
+            curl_write_args(): result(curl_write_args(), stdout=json.dumps({"id": "10001", "key": "TEST-1234"})),
+            curl_args(issue_url()): result(curl_args(issue_url()), stdout=json.dumps(jira_issue_payload())),
+            curl_args(remote_links_url()): result(curl_args(remote_links_url()), stdout=json.dumps(remote_links_payload())),
+        }
+    )
+
+    response = dispatch_write(
+        tmp_path,
+        runner,
+        "create",
+        title="Pending Jira issue",
+        body="Pending body.\n",
+        assignee="me",
+    )
+
+    assert response.payload["operation"] == "create_issue"
+    myself_calls = [request for request in runner.requests if request.args == curl_args(myself_url)]
+    assert len(myself_calls) == 1
+    write_requests = [request for request in runner.requests if request.args == curl_write_args()]
+    assert any(
+        '\\"assignee\\":{\\"name\\":\\"studykit-svc\\"}' in str(request.input_text)
+        for request in write_requests
+    )
+
+
 def test_data_center_subtask_create_inline_refreshes_parent_cache(tmp_path: Path) -> None:
     write_jira_config(tmp_path)
     site = jira_site(tmp_path)

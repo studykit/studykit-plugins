@@ -3,7 +3,7 @@ first. `--help` shows flag syntax only; it does not cover the
 `authoring_resolver.py` prereq, the body-file lifecycle, or freshness-drift
 handling. Pick the script by intent:
 
-- `github_issue_drafts.py publish` — create a new issue
+- `github_issue_drafts.py publish` — create a new issue (`--assignee <user>` or `--assignee me` sets the assignee at create time)
 - `github_issue_comments.py append` — add a comment
 - `github_issue_writeback.py update` — change body, title, labels, or state
 - `github_issue_relationships.py` — add / remove / replace links

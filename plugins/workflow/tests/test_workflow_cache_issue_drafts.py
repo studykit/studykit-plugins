@@ -1051,3 +1051,197 @@ def test_jira_publish_epic_with_post_create_epic_link_is_rejected(tmp_path: Path
     assert "publish --epic cannot be combined with --type epic" in stderr.getvalue()
     assert runner.requests == []
     assert body_file.exists()
+
+
+def test_jira_publish_accepts_assignee_user_and_sets_field_on_post(tmp_path: Path) -> None:
+    _write_jira_config(tmp_path)
+    body_file = _write_body_file(tmp_path, "Body.\n")
+    issue_url = "https://jira.example.test/rest/api/2/issue/TEST-1234"
+    remote_links_url = "https://jira.example.test/rest/api/2/issue/TEST-1234/remotelink"
+
+    runner = JiraFakeRunner(
+        {
+            _jira_write_args(): CommandResult(
+                request=CommandRequest(args=()),
+                returncode=0,
+                stdout=json.dumps({"id": "10001", "key": "TEST-1234"}),
+            ),
+            _jira_curl_get_args(issue_url): CommandResult(
+                request=CommandRequest(args=()),
+                returncode=0,
+                stdout=json.dumps(_jira_issue_payload()),
+            ),
+            _jira_curl_get_args(remote_links_url): CommandResult(
+                request=CommandRequest(args=()),
+                returncode=0,
+                stdout=json.dumps([]),
+            ),
+        }
+    )
+    stdout = io.StringIO()
+
+    code = jira_issue_drafts_main(
+        [
+            "--project",
+            str(tmp_path),
+            "publish",
+            "--type",
+            "task",
+            "--title",
+            "Published Jira issue",
+            "--body-file",
+            str(body_file),
+            "--assignee",
+            "alice",
+        ],
+        stdout=stdout,
+        runner=runner,
+    )
+
+    assert code == 0
+    write_request = runner.requests[0]
+    assert write_request.args == _jira_write_args()
+    assert '\\"assignee\\":{\\"name\\":\\"alice\\"}' in str(write_request.input_text)
+
+
+def test_jira_publish_accepts_assignee_me_and_resolves_current_user(tmp_path: Path) -> None:
+    _write_jira_config(tmp_path)
+    body_file = _write_body_file(tmp_path, "Body.\n")
+    myself_url = "https://jira.example.test/rest/api/2/myself"
+    issue_url = "https://jira.example.test/rest/api/2/issue/TEST-1234"
+    remote_links_url = "https://jira.example.test/rest/api/2/issue/TEST-1234/remotelink"
+
+    runner = JiraFakeRunner(
+        {
+            _jira_curl_get_args(myself_url): CommandResult(
+                request=CommandRequest(args=()),
+                returncode=0,
+                stdout=json.dumps({"name": "studykit-svc", "displayName": "Studykit Service"}),
+            ),
+            _jira_write_args(): CommandResult(
+                request=CommandRequest(args=()),
+                returncode=0,
+                stdout=json.dumps({"id": "10001", "key": "TEST-1234"}),
+            ),
+            _jira_curl_get_args(issue_url): CommandResult(
+                request=CommandRequest(args=()),
+                returncode=0,
+                stdout=json.dumps(_jira_issue_payload()),
+            ),
+            _jira_curl_get_args(remote_links_url): CommandResult(
+                request=CommandRequest(args=()),
+                returncode=0,
+                stdout=json.dumps([]),
+            ),
+        }
+    )
+    stdout = io.StringIO()
+
+    code = jira_issue_drafts_main(
+        [
+            "--project",
+            str(tmp_path),
+            "publish",
+            "--type",
+            "task",
+            "--title",
+            "Published Jira issue",
+            "--body-file",
+            str(body_file),
+            "--assignee",
+            "me",
+        ],
+        stdout=stdout,
+        runner=runner,
+    )
+
+    assert code == 0
+    myself_calls = [r for r in runner.requests if r.args == _jira_curl_get_args(myself_url)]
+    assert len(myself_calls) == 1
+    write_requests = [r for r in runner.requests if r.args == _jira_write_args()]
+    assert any(
+        '\\"assignee\\":{\\"name\\":\\"studykit-svc\\"}' in str(r.input_text)
+        for r in write_requests
+    )
+
+
+def test_github_publish_accepts_assignee_user_and_passes_to_gh_create(tmp_path: Path) -> None:
+    _write_config(tmp_path)
+    body_file = _write_body_file(tmp_path, "Draft body.\n")
+    runner = GitHubFakeRunner()
+    stdout = io.StringIO()
+
+    code = github_issue_drafts_main(
+        [
+            "--project",
+            str(tmp_path),
+            "publish",
+            "--type",
+            "task",
+            "--title",
+            "Draft issue",
+            "--body-file",
+            str(body_file),
+            "--assignee",
+            "alice",
+        ],
+        stdout=stdout,
+        runner=runner,
+    )
+
+    payload = json.loads(stdout.getvalue())
+    assert code == 0
+    assert payload["operation"] == "publish_issue"
+    create_request = next(r for r in runner.requests if r.args[:3] == ("gh", "issue", "create"))
+    assert "--assignee" in create_request.args
+    assert create_request.args[create_request.args.index("--assignee") + 1] == "alice"
+
+
+def test_github_publish_accepts_assignee_me_and_resolves_current_login(tmp_path: Path) -> None:
+    _write_config(tmp_path)
+    body_file = _write_body_file(tmp_path, "Draft body.\n")
+    base_runner = GitHubFakeRunner()
+
+    me_args = _gh_api_args("user", "--jq", ".login")
+
+    class _AssigneeMeRunner:
+        def __init__(self) -> None:
+            self.requests: list[CommandRequest] = []
+
+        def __call__(self, request: CommandRequest) -> CommandResult:
+            self.requests.append(request)
+            if request.args == me_args:
+                return CommandResult(
+                    request=request,
+                    returncode=0,
+                    stdout="studykit-bot\n",
+                )
+            return base_runner(request)
+
+    runner = _AssigneeMeRunner()
+    stdout = io.StringIO()
+
+    code = github_issue_drafts_main(
+        [
+            "--project",
+            str(tmp_path),
+            "publish",
+            "--type",
+            "task",
+            "--title",
+            "Draft issue",
+            "--body-file",
+            str(body_file),
+            "--assignee",
+            "me",
+        ],
+        stdout=stdout,
+        runner=runner,
+    )
+
+    assert code == 0
+    me_calls = [r for r in runner.requests if r.args == me_args]
+    assert len(me_calls) == 1
+    create_request = next(r for r in runner.requests if r.args[:3] == ("gh", "issue", "create"))
+    assert "--assignee" in create_request.args
+    assert create_request.args[create_request.args.index("--assignee") + 1] == "studykit-bot"

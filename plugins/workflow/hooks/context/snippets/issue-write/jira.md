@@ -3,7 +3,7 @@ first. `--help` shows flag syntax only; it does not cover the
 `authoring_resolver.py` prereq, the body-file lifecycle, or freshness-drift
 handling. Pick the script by intent:
 
-- `jira_issue_drafts.py publish` — create a new issue (Epics use `--epic-name`; Sub-tasks use `--subtask-parent`)
+- `jira_issue_drafts.py publish` — create a new issue (Epics use `--epic-name`; Sub-tasks use `--subtask-parent`; `--assignee <user>` or `--assignee me` sets the assignee at create time)
 - `jira_issue_comments.py append` — add a comment
 - `jira_issue_writeback.py update` — change body, title, labels, or state
 - `jira_issue_relationships.py` — add / remove / replace links, parent, or Epic Link

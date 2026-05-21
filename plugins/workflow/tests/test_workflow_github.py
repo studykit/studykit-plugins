@@ -278,6 +278,54 @@ def test_create_issue_verifies_after_write(tmp_path: Path) -> None:
     assert result_payload == {"operation": "create_issue", "issue": "51", "verified": True}
 
 
+def test_create_issue_passes_assignee_to_gh(tmp_path: Path) -> None:
+    recorded: dict[str, tuple[str, ...]] = {}
+
+    def runner(request: CommandRequest) -> CommandResult:
+        if request.args == git_args(tmp_path, "remote", "get-url", "origin"):
+            return CommandResult(
+                request=request,
+                returncode=0,
+                stdout="git@github.com:studykit/studykit-plugins.git\n",
+            )
+        if request.args[:3] == ("gh", "issue", "create"):
+            recorded["create"] = request.args
+            return CommandResult(
+                request=request,
+                returncode=0,
+                stdout="https://github.com/studykit/studykit-plugins/issues/61\n",
+            )
+        if request.args == gh_issue_view_args(61, ("title", "body", "labels", "state", "stateReason")):
+            return CommandResult(
+                request=request,
+                returncode=0,
+                stdout=json.dumps(
+                    {
+                        "title": "Draft issue",
+                        "body": "Draft body.",
+                        "labels": [{"name": "task"}],
+                        "state": "OPEN",
+                        "stateReason": None,
+                    }
+                ),
+            )
+        return CommandResult(request=request, returncode=127, stderr="unexpected command")
+
+    result_payload = create_issue(
+        title="Draft issue",
+        body="Draft body.",
+        labels=("task",),
+        assignee="alice",
+        project=tmp_path,
+        runner=runner,
+    )
+
+    assert result_payload == {"operation": "create_issue", "issue": "61", "verified": True}
+    create_args = recorded["create"]
+    assert "--assignee" in create_args
+    assert create_args[create_args.index("--assignee") + 1] == "alice"
+
+
 def test_edit_issue_body_verifies_after_write(tmp_path: Path) -> None:
     def runner(request: CommandRequest) -> CommandResult:
         if request.args == git_args(tmp_path, "remote", "get-url", "origin"):

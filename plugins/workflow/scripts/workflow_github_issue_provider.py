@@ -27,6 +27,7 @@ from workflow_github import (
     comment_issue,
     create_issue,
     edit_issue,
+    get_github_login,
     issue_assignees,
     issue_relationships,
     issue_body_edit_history,
@@ -154,6 +155,9 @@ class GitHubIssueNativeProvider(IssueProvider):
         state_reason = _optional_string(
             request.payload.get("state_reason") or request.payload.get("stateReason")
         )
+        assignee = _optional_string(request.payload.get("assignee"))
+        if assignee is not None and assignee.lower() == "me":
+            assignee = get_github_login(project=request.context.project, runner=self.runner)
 
         created = create_issue(
             title=title,
@@ -161,6 +165,7 @@ class GitHubIssueNativeProvider(IssueProvider):
             labels=labels,
             state=state,
             state_reason=state_reason,
+            assignee=assignee,
             project=request.context.project,
             runner=self.runner,
         )

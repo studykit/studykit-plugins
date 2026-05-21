@@ -40,6 +40,7 @@ def publish_issue(
     subtask_parent: str | None = None,
     project_key: str | None = None,
     epic_name: str | None = None,
+    assignee: str | None = None,
     relationship_intent: dict[str, object] | None = None,
     runner: CommandRunner | None = None,
 ) -> dict[str, object]:
@@ -72,6 +73,9 @@ def publish_issue(
         payload["project_key"] = normalized_project_key
     if normalized_epic_name is not None:
         payload["epic_name"] = normalized_epic_name
+    normalized_assignee = _optional_text(assignee)
+    if normalized_assignee:
+        payload["assignee"] = normalized_assignee
 
     provider = JiraDataCenterIssueNativeProvider(runner=runner)
     response = provider.call(
@@ -172,6 +176,10 @@ def build_parser() -> argparse.ArgumentParser:
         "--epic-name",
         help="Epic Name customfield value (epic only; defaults to --title)",
     )
+    publish.add_argument(
+        "--assignee",
+        help='Jira DC username or the literal "me" to resolve via /rest/api/<v>/myself',
+    )
     publish.add_argument("--parent", help="add parent relationship after publish")
     publish.add_argument(
         "--epic",
@@ -248,6 +256,7 @@ def main(
                 subtask_parent=args.subtask_parent,
                 project_key=args.project_key,
                 epic_name=args.epic_name,
+                assignee=args.assignee,
                 relationship_intent=_publish_relationship_intent(args),
                 runner=runner,
             )

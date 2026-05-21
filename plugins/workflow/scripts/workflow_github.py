@@ -174,6 +174,7 @@ def create_issue(
     labels: tuple[str, ...] = (),
     state: str = "open",
     state_reason: str | None = None,
+    assignee: str | None = None,
     verify: bool = True,
     runner: CommandRunner | None = None,
 ) -> dict[str, Any]:
@@ -195,6 +196,8 @@ def create_issue(
         for label in labels:
             if label:
                 args.extend(["--label", label])
+        if assignee:
+            args.extend(["--assignee", assignee])
         result = _gh(args, project=project, runner=runner)
 
     issue_number = _issue_number_from_create_output(result.stdout, repo)
