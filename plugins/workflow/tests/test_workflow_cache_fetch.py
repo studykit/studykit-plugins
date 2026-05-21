@@ -12,8 +12,8 @@ _SCRIPTS_DIR = _PLUGIN_ROOT / "scripts"
 if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
-from issue_fetch import main as github_issue_fetch_main  # noqa: E402
-from issue_fetch import main as jira_issue_fetch_main  # noqa: E402
+from issue.legacy.issue_fetch import main as github_issue_fetch_main  # noqa: E402
+from issue.legacy.issue_fetch import main as jira_issue_fetch_main  # noqa: E402
 from workflow_command import CommandRequest, CommandResult  # noqa: E402
 from workflow_config import load_workflow_config  # noqa: E402
 from issue.github.cache import GitHubIssueCache  # noqa: E402

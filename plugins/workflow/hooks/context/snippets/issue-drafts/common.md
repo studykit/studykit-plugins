@@ -1,7 +1,7 @@
 Publish a `review` issue (used by the blocker-handling flow):
 
 ```bash
-"$WORKFLOW" issue_drafts.py publish \
+"$WORKFLOW" issue.py new \
   --type review \
   --title <title> \
   --body-file <body-path>

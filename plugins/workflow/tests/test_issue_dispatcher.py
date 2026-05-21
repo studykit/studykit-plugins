@@ -1,7 +1,8 @@
 """Issue dispatcher integration tests.
 
-Covers the dispatcher contract that ties the six ``issue_*.py`` scripts
-together:
+Covers the dispatcher contract that ties the six per-intent modules
+under ``issue.legacy.*`` together (now exposed through the unified
+``issue.py``):
 
 - ``--help`` reflects only the active backend's option surface for the
   configured ``providers.issues.kind`` (backend-exclusive flags from the
@@ -29,12 +30,12 @@ _SCRIPTS_DIR = _PLUGIN_ROOT / "scripts"
 if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
-from issue_comments import main as issue_comments_main  # noqa: E402
-from issue_drafts import main as issue_drafts_main  # noqa: E402
-from issue_fetch import main as issue_fetch_main  # noqa: E402
-from issue_fields import main as issue_fields_main  # noqa: E402
-from issue_relationships import main as issue_relationships_main  # noqa: E402
-from issue_writeback import main as issue_writeback_main  # noqa: E402
+from issue.legacy.issue_comments import main as issue_comments_main  # noqa: E402
+from issue.legacy.issue_drafts import main as issue_drafts_main  # noqa: E402
+from issue.legacy.issue_fetch import main as issue_fetch_main  # noqa: E402
+from issue.legacy.issue_fields import main as issue_fields_main  # noqa: E402
+from issue.legacy.issue_relationships import main as issue_relationships_main  # noqa: E402
+from issue.legacy.issue_writeback import main as issue_writeback_main  # noqa: E402
 
 
 _GITHUB_CONFIG = """

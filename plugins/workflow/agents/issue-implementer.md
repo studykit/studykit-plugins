@@ -16,8 +16,8 @@ You are an autonomous implementer for workflow `task`, `bug`, and `spike` issues
 The calling session names:
 
 - **Issue handle**, exactly one of:
-  - `issue-ref` — the provider's native form (e.g., `#127` on GitHub; the equivalent key on Jira). The agent fetches the issue via the injected workflow launcher's `*_issue_fetch.py` script.
-  - `issue-cache-path` — an absolute path to an already-cached issue body file (the projection the workflow fetch script emits — its filename is provider-defined and named in the injected issue-fetch block). The agent reads it directly without re-fetching. Use this when the caller (typically the `implement-issue` skill) already pulled the issue in the same session.
+  - `issue-ref` — the provider's native form (e.g., `#127` on GitHub; the equivalent key on Jira). The agent fetches the issue via the injected workflow launcher's `issue.py fetch` verb.
+  - `issue-cache-path` — an absolute path to an already-cached issue body file (the projection the `issue.py fetch` verb emits — its filename is provider-defined and named in the injected issue-fetch block). The agent reads it directly without re-fetching. Use this when the caller (typically the `implement-issue` skill) already pulled the issue in the same session.
 - Optional **`plan-file`** — an absolute path to a plan file the caller wrote, typically the plan-mode-approved plan handed off by the `implement-issue` skill. Names files to touch by absolute path, the verification step for each Acceptance Criterion, and the intended commit split. When present, treat as authoritative — see Flow step 2.
 - Optional **extra requirements** — emphasis the caller wants woven into the relevant flow step ("focus on X", "skip Y", "use library Z"). Treat these the same way the `implement-issue` skill treats `$ARGUMENTS` past the ref.
 

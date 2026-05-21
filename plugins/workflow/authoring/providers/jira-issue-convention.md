@@ -63,8 +63,8 @@ When used:
 
 ## Provider update intent
 
-When running `$WORKFLOW issue_writeback.py update` or
-`$WORKFLOW issue_fields.py {close|reopen|assign|unassign|set-type}`
+When running `$WORKFLOW issue.py update` or
+`$WORKFLOW issue.py {state <KEY> <verb>|assign|unassign|set-type}`
 to update provider-owned Jira issue fields, supply only the values needed
 for the requested update.
 
@@ -72,13 +72,13 @@ Generic supported update intents:
 
 - Issue key, plus desired summary/title when changing the Jira issue title.
 - Issue key, plus the workflow type whose Jira issuetype to apply when
-  swapping the issuetype (`issue_fields.py set-type`). The script
+  swapping the issuetype (`issue.py set-type`). The script
   resolves the native Jira issuetype name via the `artifact_issue_types`
   mapping.
 - Issue key, plus assignee username (or the literal `me`) when changing
-  the assignee (`issue_fields.py assign|unassign`).
+  the assignee (`issue.py assign|unassign`).
 - Issue key, plus the configured `state_transitions` mapping when closing
-  or reopening (`issue_fields.py close|reopen`).
+  or reopening (`issue.py state <KEY> close|reopen` or any configured verb).
 
 Do not ask for generic status or priority changes from this contract.
 Those writes require a separate project-specific workflow extension that

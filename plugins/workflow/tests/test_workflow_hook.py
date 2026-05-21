@@ -1400,9 +1400,9 @@ def test_claude_subagent_start_injects_issue_implementer_agent_block(
         issue_kind="github", agent_type="workflow:issue-implementer"
     )
     assert "## issue-implementer subagent context" in context
-    assert "issue_drafts.py publish" in context
-    assert "issue_relationships.py" in context
-    assert "issue_writeback.py update" in context
+    assert "issue.py new" in context
+    assert "issue.py link" in context
+    assert "issue.py update" in context
 
 
 def test_claude_subagent_start_emits_nothing_for_non_workflow_projects(
@@ -1985,7 +1985,7 @@ Updated body.
     assert payload["decision"] == "block"
     assert "projection has not been prepared yet" in reason
     assert f"Target: {issue_file}" in reason
-    assert "$WORKFLOW issue_fetch.py" in reason
+    assert "$WORKFLOW issue.py fetch" in reason
 
 
 def test_provider_issue_cache_body_recognition_dispatches_to_provider_module(

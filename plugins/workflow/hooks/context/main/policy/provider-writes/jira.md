@@ -11,21 +11,20 @@ The provider-write intents share one shape:
    do not edit them in place when updating.
 3. Present the metadata, issue ref (when applicable), and draft body to
    the user and wait for explicit approval.
-4. Run the matching script (see below) and supply the required refs,
-   `--body-file <path>` when the script accepts it, and any optional
-   metadata or state change.
+4. Run the matching `issue.py <verb>` invocation (see below) and supply
+   the required refs, `--body-file <path>` when the verb accepts it, and
+   any optional metadata or state change.
 5. The script runs the required freshness check, applies the mutation,
    refreshes the cache, deletes the body file on success (when body-file
    flow is supported), and returns the cached `issue.md` path with the
    issue key and verification result. On freshness drift it returns
    `status=blocked` with the cache paths to reread; reread them and retry.
-   Relationship intent triggers a follow-up `issue_relationships.py`
-   call.
+   Relationship intent triggers a follow-up `issue.py link` call.
 
 ## Publish a new issue
 
 ```bash
-"$WORKFLOW" issue_drafts.py publish \
+"$WORKFLOW" issue.py new \
   --type <task|bug|spike|epic|review|usecase|research> \
   --title <title> \
   --body-file <path> \
@@ -74,7 +73,7 @@ extra issue-link relationship.
 `--assignee <user>` sets the assignee at create time. The literal `me`
 resolves the current Jira user via `/rest/api/<v>/myself` and uses the
 returned `name` on the create payload. To clear an assignee on an
-existing issue, use `issue_fields.py unassign`.
+existing issue, use `issue.py unassign <KEY>`.
 
 `--epic-name` overrides the Epic Name customfield at create time and is
 valid only with `--type epic` (defaults to `--title`); supplying it for any
@@ -86,7 +85,7 @@ setup skill); missing config raises `ProviderOperationError`.
 ## Append a comment
 
 ```bash
-"$WORKFLOW" issue_comments.py append \
+"$WORKFLOW" issue.py comment \
   --issue <KEY> \
   --body-file <path> \
   [--type <task|bug|...>] \
@@ -105,7 +104,7 @@ section) raises `ProviderOperationError`.
 ## Update an existing issue body
 
 ```bash
-"$WORKFLOW" issue_writeback.py update \
+"$WORKFLOW" issue.py update \
   --issue <KEY> \
   --body-file <path> \
   [--type <task|bug|...>] \
@@ -133,7 +132,7 @@ link surfaces, and refreshes the cache. No flag means no provider call
 (no-op).
 
 ```bash
-"$WORKFLOW" issue_relationships.py <source-issue> \
+"$WORKFLOW" issue.py link <source-issue> \
   [--parent <KEY> | --replace-parent <KEY> | --remove-parent] \
   [--epic <KEY> | --replace-epic <KEY> | --remove-epic] \
   [--blocked-by <KEY> ...] [--remove-blocked-by <KEY> ...] \
@@ -170,31 +169,31 @@ See `../../../../authoring/providers/jira-issue-relationships.md` for
 canonical intent usage (`parent`, `blocked_by`, `related`; invert
 source/target for `child`/`blocking`).
 
-The same relationship flags can be supplied directly to `publish` to apply
-relationships in one call after the issue create.
+The same relationship flags can be supplied directly to `issue.py new`
+to apply relationships in one call after the issue create.
 
-## Other scripts
+## Other verbs
 
-| Intent           | Script                                                          |
-|------------------|-----------------------------------------------------------------|
-| Body-less change | `issue_fields.py {<verb> ...|assign|unassign|set-type}`   |
+| Intent           | Verb                                                                |
+|------------------|---------------------------------------------------------------------|
+| Body-less change | `issue.py state <KEY> <verb>` / `issue.py {assign\|unassign\|set-type} ...` |
 
-`issue_fields.py` covers state transitions, assignee changes, and
-issuetype swaps. Lifecycle subcommands are dynamic: one subcommand per
-`<verb>` key in `providers.issues.state_transitions`. Each takes
-`<issue> [--comment <text>]` and POSTs the configured transition.
-`assign` / `unassign` / `set-type` are reserved static subcommands and
-cannot be overridden by a verb of the same name (setup rejects those
-verbs at config time). Invoking an unknown verb prints the configured
-verb list, the reserved verbs, and the config path on stderr and exits
-non-zero. `assign me` resolves the current Jira user via
-`/rest/api/<v>/myself`. `set-type` PUTs `fields.issuetype` using the
-`artifact_issue_types` mapping (built-in defaults plus
-`.workflow/config.yml` overrides). Use `issue_writeback.py update`
+The `state` / `assign` / `unassign` / `set-type` verbs cover state
+transitions, assignee changes, and issuetype swaps. Lifecycle dispatch is
+dynamic: `issue.py state <KEY> <verb> [--comment <text>]` accepts any
+`<verb>` keyed in `providers.issues.state_transitions` and POSTs the
+configured transition. `assign` / `unassign` / `set-type` are reserved
+static verbs and cannot be overridden by a configured verb of the same
+name (setup rejects those verbs at config time). Invoking an unknown
+state verb prints the configured verb list, the reserved verbs, and the
+config path on stderr and exits non-zero. `assign <KEY> me` resolves the
+current Jira user via `/rest/api/<v>/myself`. `set-type` PUTs
+`fields.issuetype` using the `artifact_issue_types` mapping (built-in
+defaults plus `.workflow/config.yml` overrides). Use `issue.py update`
 when the change must also rewrite the body or title.
 
-Run `"$WORKFLOW" <script>.py --help` only when you need a flag not listed
-above.
+Run `"$WORKFLOW" issue.py <verb> --help` only when you need a flag not
+listed above.
 
 ## Body-file lifecycle
 
@@ -211,7 +210,7 @@ the freshness check.
 
 ## Dispatcher routing
 
-The unified `issue_*.py` dispatchers load `.workflow/config.yml` and
-route to the Jira backend automatically when `providers.issues.kind`
-is `jira`. `--help` shows only the active backend's options; supplying
-a GitHub-only flag exits with a clean parser error.
+`issue.py` loads `.workflow/config.yml` and routes to the Jira backend
+automatically when `providers.issues.kind` is `jira`. `<verb> --help`
+shows only the active backend's options; supplying a GitHub-only flag
+exits with a clean parser error.

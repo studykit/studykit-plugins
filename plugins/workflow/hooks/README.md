@@ -57,7 +57,7 @@ Behavior:
 
 - Records `agent_id` and `agent_type` for each spawned Claude subagent under `subagents.started` in the unified session state file.
 - Deduplicates repeated records by `agent_id`.
-- For workflow-configured projects, emits `additionalContext` built from `./context/subagent/policy.md`. The block tells the subagent that the main-session workflow shell environment is inherited and inlines the runtime launcher snippet from `./context/snippets/launcher/claude.md` plus the provider-specific issue-fetch snippet so the subagent knows which `*_issue_fetch.py` script to call.
+- For workflow-configured projects, emits `additionalContext` built from `./context/subagent/policy.md`. The block tells the subagent that the main-session workflow shell environment is inherited and inlines the runtime launcher snippet from `./context/snippets/launcher/claude.md` plus the provider-specific issue-fetch snippet so the subagent knows how to invoke `issue.py fetch`.
 - Does not inject the full main-session policy. Provider writes, knowledge-provider rules, and the on-demand `policy/` detail files stay main-session-only.
 - Emits nothing for non-workflow projects.
 
