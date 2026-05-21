@@ -363,8 +363,8 @@ def default_provider_registry(*, runner: CommandRunner | None = None) -> Provide
     available.
     """
 
-    from workflow_github_issue_provider import GitHubIssueNativeProvider
-    from workflow_jira_issue_provider import JiraDataCenterIssueNativeProvider
+    from issue.github.provider import GitHubIssueNativeProvider
+    from issue.jira.provider import JiraDataCenterIssueNativeProvider
     from workflow_confluence_knowledge_provider import (
         ConfluenceDataCenterKnowledgeNativeProvider,
     )

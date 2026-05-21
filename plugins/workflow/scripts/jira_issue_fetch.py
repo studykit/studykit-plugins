@@ -15,16 +15,16 @@ from typing import TextIO
 from workflow_command import CommandRunner
 from workflow_config import WorkflowConfig, WorkflowConfigError, load_workflow_config
 from workflow_env import workflow_project_dir_from_env
-from workflow_issue_cli_output import (
+from issue.cli_output import (
     IssueFetchContext,
     cache_refreshed_from_payload,
     display_project_path,
     format_issue_cache_json,
 )
 from workflow_jira_data_center_client import resolve_jira_data_center_site
-from workflow_jira_issue_cache import JiraDataCenterIssueCache
-from workflow_jira_issue_provider import JiraDataCenterIssueNativeProvider
-from workflow_jira_issue_refs import JiraProviderError, jira_issue_keys_from_references, normalize_jira_issue_key
+from issue.jira.cache import JiraDataCenterIssueCache
+from issue.jira.provider import JiraDataCenterIssueNativeProvider
+from issue.jira.refs import JiraProviderError, jira_issue_keys_from_references, normalize_jira_issue_key
 from workflow_providers import CACHE_POLICY_DEFAULT, CACHE_POLICY_REFRESH, ProviderContext, ProviderRequest
 
 CACHE_FETCH_POLICIES = (CACHE_POLICY_DEFAULT, CACHE_POLICY_REFRESH)

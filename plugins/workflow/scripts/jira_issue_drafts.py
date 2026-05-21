@@ -17,8 +17,8 @@ import frontmatter as frontmatter_lib
 from workflow_command import CommandRunner
 from workflow_config import WorkflowConfig, WorkflowConfigError, load_workflow_config
 from workflow_env import workflow_project_dir_from_env
-from workflow_jira_issue_provider import JiraDataCenterIssueNativeProvider
-from workflow_jira_issue_refs import JiraProviderError, normalize_jira_issue_key
+from issue.jira.provider import JiraDataCenterIssueNativeProvider
+from issue.jira.refs import JiraProviderError, normalize_jira_issue_key
 from workflow_providers import ProviderContext, ProviderRequest
 
 

@@ -40,7 +40,7 @@ from workflow_github import (
     resolve_github_repository,
     view_issue,
 )
-from workflow_github_issue_cache import GitHubIssueCache
+from issue.github.cache import GitHubIssueCache
 from workflow_providers import (
     CACHE_POLICY_BYPASS,
     CACHE_POLICY_DEFAULT,

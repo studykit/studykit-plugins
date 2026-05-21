@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Jira issue cache context readers for prompt-time hook injection."""
+"""GitHub issue cache context readers for prompt-time hook injection."""
 
 from __future__ import annotations
 
@@ -7,37 +7,36 @@ from collections.abc import Sequence
 
 from workflow_command import CommandRunner
 from workflow_config import WorkflowConfig
-from workflow_issue_cli_output import IssueFetchContext, cache_refreshed_from_payload, display_project_path
-from workflow_jira_data_center_client import resolve_jira_data_center_site
-from workflow_jira_issue_cache import JiraDataCenterIssueCache
-from workflow_jira_issue_refs import normalize_jira_issue_key
+from workflow_github import GitHubRepository, normalize_issue_number
+from issue.cli_output import IssueFetchContext, cache_refreshed_from_payload, display_project_path
+from issue.github.cache import GitHubIssueCache
 from workflow_providers import CACHE_POLICY_DEFAULT, ProviderContext, ProviderRequest
 
 
-def cache_jira_issue_references(
+def cache_github_issue_references(
     config: WorkflowConfig,
-    issue_keys: Sequence[str],
+    issue_numbers: Sequence[str],
     *,
+    repo: GitHubRepository,
     cache_policy: str = CACHE_POLICY_DEFAULT,
     runner: CommandRunner | None = None,
     strict: bool = False,
 ) -> list[IssueFetchContext]:
-    """Read Jira issues through the provider cache path and return hook context."""
+    """Read GitHub issues through the provider cache path and return hook context."""
 
-    from workflow_jira_issue_provider import JiraDataCenterIssueNativeProvider
+    from issue.github.provider import GitHubIssueNativeProvider
 
-    provider = JiraDataCenterIssueNativeProvider(runner=runner)
-    site = resolve_jira_data_center_site(config.root)
-    cache = JiraDataCenterIssueCache.for_project(config.root)
+    provider = GitHubIssueNativeProvider(runner=runner)
+    cache = GitHubIssueCache.for_project(config.root, configured_repo=repo)
     contexts: list[IssueFetchContext] = []
 
-    for key in issue_keys:
+    for number in issue_numbers:
         try:
-            normalized = normalize_jira_issue_key(key)
+            normalized = normalize_issue_number(number)
             response = provider.call(
                 ProviderRequest(
                     role="issue",
-                    kind="jira",
+                    kind="github",
                     operation="get",
                     context=ProviderContext(
                         project=config.root,
@@ -52,9 +51,9 @@ def cache_jira_issue_references(
                     },
                 )
             )
-            issue_dir = cache.issue_dir(site, normalized)
+            issue_dir = cache.issue_dir(repo, normalized)
             comment_paths = tuple(
-                display_project_path(path, config.root) for path in cache.comment_files(site, normalized)
+                display_project_path(path, config.root) for path in cache.comment_files(repo, normalized)
             )
             contexts.append(
                 IssueFetchContext(
@@ -63,7 +62,7 @@ def cache_jira_issue_references(
                     title=str(response.payload.get("title") or ""),
                     state=str(response.payload.get("state") or "").upper(),
                     cache_refreshed=cache_refreshed_from_payload(response.payload, default=True),
-                    provider_kind="jira",
+                    provider_kind="github",
                     comments=comment_paths,
                 )
             )

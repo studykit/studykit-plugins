@@ -13,7 +13,7 @@ if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
 from workflow_jira_data_center_client import JiraDataCenterSite  # noqa: E402
-from workflow_jira_issue_cache import JiraDataCenterIssueCache, is_jira_issue_cache_body_path  # noqa: E402
+from issue.jira.cache import JiraDataCenterIssueCache, is_jira_issue_cache_body_path  # noqa: E402
 
 
 def jira_site() -> JiraDataCenterSite:

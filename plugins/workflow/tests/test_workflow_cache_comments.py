@@ -15,7 +15,7 @@ if str(_SCRIPTS_DIR) not in sys.path:
 from jira_issue_comments import main as jira_issue_comments_main  # noqa: E402
 from workflow_command import CommandRequest, CommandResult  # noqa: E402
 from workflow_config import load_workflow_config  # noqa: E402
-from workflow_jira_issue_cache import JiraDataCenterIssueCache  # noqa: E402
+from issue.jira.cache import JiraDataCenterIssueCache  # noqa: E402
 from workflow_jira_data_center_client import jira_data_center_site_from_provider_config  # noqa: E402
 
 
