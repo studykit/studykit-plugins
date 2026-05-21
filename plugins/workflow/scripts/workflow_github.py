@@ -395,7 +395,8 @@ def close_issue(
 
     repo = resolve_github_repository(project, runner=runner)
     issue_number = normalize_issue_number(issue)
-    args = ["issue", "close", issue_number, "--repo", repo.slug, "--reason", reason]
+    gh_reason = _close_reason_from_state_reason(reason)
+    args = ["issue", "close", issue_number, "--repo", repo.slug, "--reason", gh_reason]
     if comment:
         args.extend(["--comment", comment])
     _gh(args, project=project, runner=runner)
@@ -404,7 +405,7 @@ def close_issue(
             repo,
             issue_number,
             expected_state="CLOSED",
-            expected_state_reason=_expected_closed_state_reason(reason),
+            expected_state_reason=_expected_closed_state_reason(gh_reason),
             project=project,
             runner=runner,
         )

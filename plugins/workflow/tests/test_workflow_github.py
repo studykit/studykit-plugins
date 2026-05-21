@@ -386,6 +386,43 @@ def test_close_issue_verifies_after_write(tmp_path: Path) -> None:
     assert result_payload == {"operation": "close_issue", "issue": "38", "verified": True}
 
 
+def test_close_issue_normalizes_not_planned_reason(tmp_path: Path) -> None:
+    def runner(request: CommandRequest) -> CommandResult:
+        if request.args == git_args(tmp_path, "remote", "get-url", "origin"):
+            return CommandResult(
+                request=request,
+                returncode=0,
+                stdout="git@github.com:studykit/studykit-plugins.git\n",
+            )
+        if request.args == (
+            "gh",
+            "issue",
+            "close",
+            "38",
+            "--repo",
+            "studykit/studykit-plugins",
+            "--reason",
+            "not planned",
+        ):
+            return CommandResult(request=request, returncode=0)
+        if request.args == gh_issue_view_args(38, ("state", "stateReason")):
+            return CommandResult(
+                request=request,
+                returncode=0,
+                stdout=json.dumps({"state": "CLOSED", "stateReason": "NOT_PLANNED"}),
+            )
+        return CommandResult(request=request, returncode=127, stderr="unexpected command")
+
+    result_payload = close_issue(
+        38,
+        project=tmp_path,
+        reason="not_planned",
+        runner=runner,
+    )
+
+    assert result_payload == {"operation": "close_issue", "issue": "38", "verified": True}
+
+
 def test_reopen_issue_verifies_after_write(tmp_path: Path) -> None:
     def runner(request: CommandRequest) -> CommandResult:
         if request.args == git_args(tmp_path, "remote", "get-url", "origin"):
