@@ -17,9 +17,12 @@ import frontmatter as frontmatter_lib
 from workflow_command import CommandRunner
 from workflow_config import WorkflowConfig, WorkflowConfigError, load_workflow_config
 from workflow_env import workflow_project_dir_from_env
-from issue.jira.provider import JiraDataCenterIssueNativeProvider
+from issue.jira.provider import (
+    JiraDataCenterIssueNativeProvider,
+    validate_relationship_intent_mappings,
+)
 from issue.jira.refs import JiraProviderError, normalize_jira_issue_key
-from workflow_providers import ProviderContext, ProviderRequest
+from workflow_providers import ProviderContext, ProviderOperationError, ProviderRequest
 
 
 _FRONTMATTER_HANDLER = frontmatter_lib.YAMLHandler()
@@ -57,6 +60,13 @@ def publish_issue(
     body_path = body_file.expanduser()
     if not body_path.is_file():
         raise JiraIssueDraftError(f"body file does not exist: {body_path}")
+
+    if relationship_intent:
+        try:
+            validate_relationship_intent_mappings(config.root, relationship_intent)
+        except ProviderOperationError as exc:
+            raise JiraIssueDraftError(str(exc)) from exc
+
     body = _strip_body_frontmatter(body_path.read_text(encoding="utf-8"))
 
     payload: dict[str, object] = {
