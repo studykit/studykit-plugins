@@ -377,13 +377,36 @@ def test_render_cache_hit_reference_with_notes_anchor() -> None:
     assert rendered == (
         "- See `task-issue-reading-list` above.\n"
         "- See `task-issue-notes` above — triggers apply to this call too.\n"
+        "- If the anchor body is no longer in context (e.g., after "
+        "compaction), rerun this command with `--cache-policy refresh`.\n"
     )
 
 
 def test_render_cache_hit_reference_without_notes_anchor() -> None:
     rendered = render_cache_hit_reference("spike-issue-reading-list")
 
-    assert rendered == "- See `spike-issue-reading-list` above.\n"
+    assert rendered == (
+        "- See `spike-issue-reading-list` above.\n"
+        "- If the anchor body is no longer in context (e.g., after "
+        "compaction), rerun this command with `--cache-policy refresh`.\n"
+    )
+
+
+def test_render_cache_hit_reference_includes_refresh_recovery_hint() -> None:
+    """Narrow contract: cache-hit output names the refresh policy token.
+
+    The exact prose may evolve, but the bullet must always contain the
+    `--cache-policy refresh` token so the model can find the escape hatch
+    when the anchor body has dropped out of context.
+    """
+
+    with_notes = render_cache_hit_reference(
+        "task-issue-reading-list", "task-issue-notes"
+    )
+    without_notes = render_cache_hit_reference("spike-issue-reading-list")
+
+    assert "`--cache-policy refresh`" in with_notes
+    assert "`--cache-policy refresh`" in without_notes
 
 
 def test_authoring_path_classification_uses_plugin_authoring_root(tmp_path: Path) -> None:
@@ -468,6 +491,8 @@ def test_main_repeat_call_emits_bullet_only_form(
     assert out == (
         "- See `task-issue-reading-list` above.\n"
         "- See `task-issue-notes` above — triggers apply to this call too.\n"
+        "- If the anchor body is no longer in context (e.g., after "
+        "compaction), rerun this command with `--cache-policy refresh`.\n"
     )
 
 
@@ -483,7 +508,11 @@ def test_main_repeat_call_for_noteless_type_omits_notes_bullet(
     authoring_resolver_main(args)
     out = capsys.readouterr().out
 
-    assert out == "- See `spike-issue-reading-list` above.\n"
+    assert out == (
+        "- See `spike-issue-reading-list` above.\n"
+        "- If the anchor body is no longer in context (e.g., after "
+        "compaction), rerun this command with `--cache-policy refresh`.\n"
+    )
 
 
 def test_main_cache_policy_refresh_forces_section_emission(
