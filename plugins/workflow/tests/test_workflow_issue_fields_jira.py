@@ -19,7 +19,8 @@ from workflow_config import load_workflow_config  # noqa: E402
 from workflow_jira_data_center_client import jira_data_center_site_from_provider_config  # noqa: E402
 from issue.jira.cache import JiraDataCenterIssueCache  # noqa: E402
 from workflow_providers import ProviderOperationError  # noqa: E402
-from jira_issue_fields import JiraIssueFieldsError, fields_payload, main  # noqa: E402
+from issue.jira.backend import JiraIssueFieldsError, fields_payload  # noqa: E402
+from issue_fields import main  # noqa: E402
 
 
 _DROPPED_FIELD_KEYS = ("provider", "cache", "site", "operation", "role", "kind", "verified", "key")

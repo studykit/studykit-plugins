@@ -56,7 +56,7 @@ Useful commands:
    issues or confirmed mappings are unavailable, stop setup as incomplete; do
    not offer to defer Jira relationship setup until later.
 6. For Jira issue providers, ask whether the user plans to drive workflow
-   state transitions through `--state` or the dynamic `jira_issue_fields.py
+   state transitions through `--state` or the dynamic `issue_fields.py
    <verb>` subcommands. If yes, run the State Transition Profiling step
    inside Jira Site Profiling, accept the `auto_verbs` defaults derived by
    `jira-state-transition-inspect`, collect any verb overrides, and pass
@@ -129,8 +129,8 @@ Useful commands:
   opt-in and workflow-dependent, and the verb space is free-form except
   for the reserved CLI verbs (`assign` / `unassign` / `set-type`). When
   the user plans to drive transitions through `--state <verb>` on
-  `jira_issue_writeback.py` / `jira_issue_comments.py`, or through
-  `jira_issue_fields.py <verb>`, source the transition names from
+  `issue_writeback.py` / `issue_comments.py`, or through
+  `issue_fields.py <verb>`, source the transition names from
   `jira-state-transition-inspect` (run against sample issues that sit on
   each side of the workflow so transitions in both directions are visible).
   The inspect output includes an `auto_verbs` map derived from each

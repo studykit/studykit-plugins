@@ -142,6 +142,20 @@ def _agent_type_segment(agent_type: str | None) -> str | None:
 
 
 def _read_snippet(group: str, provider: str) -> str:
+    if provider in {"github", "jira"}:
+        common_path = _CONTEXT_ROOT / "snippets" / group / "common.md"
+        extras_path = _CONTEXT_ROOT / "snippets" / group / f"{provider}.md"
+        # ``launcher`` and other non-provider groups never compose a common
+        # prepend; only the issue-* intent snippets carry the split. Fall
+        # through to the legacy single-file read when ``common.md`` is
+        # missing so launcher / future groups stay unaffected.
+        if common_path.exists():
+            common = common_path.read_text(encoding="utf-8").rstrip()
+            extras = extras_path.read_text(encoding="utf-8").strip()
+            if extras:
+                return f"{common}\n\n{extras}"
+            return common
+        return extras_path.read_text(encoding="utf-8").strip()
     path = _CONTEXT_ROOT / "snippets" / group / f"{provider}.md"
     return path.read_text(encoding="utf-8").strip()
 

@@ -56,8 +56,8 @@ When used:
 
 ## Provider update intent
 
-When running `$WORKFLOW github_issue_writeback.py update` or
-`$WORKFLOW github_issue_fields.py {close|reopen|assign|unassign|set-type}`
+When running `$WORKFLOW issue_writeback.py update` or
+`$WORKFLOW issue_fields.py {close|reopen|assign|unassign|set-type}`
 to update provider-owned GitHub issue fields, supply only the values
 needed for the requested update.
 
@@ -65,9 +65,9 @@ Generic supported update intents:
 
 - Issue reference, plus desired title when changing the GitHub issue title.
 - Issue reference, plus desired workflow type when explicitly changing the workflow type
-  (`github_issue_fields.py set-type`).
+  (`issue_fields.py set-type`).
 - Issue reference, plus assignee login (or the literal `me`) when changing
-  the assignee (`github_issue_fields.py assign|unassign`).
+  the assignee (`issue_fields.py assign|unassign`).
 
 Do not ask for generic status, priority, tag, label, or GitHub Project field
 writes from this contract. Those writes require a separate project-specific
