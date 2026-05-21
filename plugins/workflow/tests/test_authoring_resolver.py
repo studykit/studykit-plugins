@@ -243,6 +243,25 @@ def test_task_comment_scope_excludes_plan_mode_authoring() -> None:
     assert "common/plan-mode-authoring.md" not in _rel_paths(resolution.files)
 
 
+@pytest.mark.parametrize(
+    "artifact_type,role",
+    [
+        ("task", None),
+        ("epic", None),
+        ("bug", None),
+        ("spike", None),
+        ("review", None),
+        ("research", "issue"),
+        ("usecase", "issue"),
+    ],
+)
+def test_issue_resolution_excludes_decomposition_patterns(
+    artifact_type: str, role: str | None
+) -> None:
+    resolution = resolve_authoring(artifact_type, role=role)
+    assert "common/decomposition-patterns.md" not in _rel_paths(resolution.files)
+
+
 @pytest.mark.parametrize("artifact_type", ["task", "bug"])
 def test_implementation_types_emit_plan_mode_note(artifact_type: str) -> None:
     resolution = resolve_authoring(artifact_type)

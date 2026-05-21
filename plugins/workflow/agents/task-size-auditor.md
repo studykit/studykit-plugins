@@ -28,11 +28,16 @@ These are the ground truth for "well-sized task". Read them at the start of ever
 - `plugins/workflow/authoring/common/task-authoring.md` — primary contract.
 - `plugins/workflow/authoring/common/issue-body.md` — body shape and section rules.
 - `plugins/workflow/authoring/common/issue-authoring.md` — common issue rules.
+- `plugins/workflow/authoring/common/decomposition-patterns.md` — sibling tasks vs parent task + subtasks vs epic, plus sibling relationship guidance. Required when the verdict involves decomposition (`split`, `parent-task-candidate`, `epic-candidate`).
 
 If the verdict you are about to issue is `reclassify-spike` or `reclassify-research`, also read:
 
 - `plugins/workflow/authoring/common/spike-authoring.md`
 - `plugins/workflow/authoring/common/research-authoring.md`
+
+If the verdict involves decomposition (`split`, `parent-task-candidate`, `epic-candidate`), also read:
+
+- `plugins/workflow/authoring/common/epic-authoring.md`
 
 Do not rely on a prior summary of these files. Re-read them per audit.
 
@@ -91,9 +96,12 @@ Pick exactly one verdict using this priority. Earlier verdicts pre-empt later on
 | 2 | `reclassify-research` | Type fit indicates this is written investigation / comparison, not production work. |
 | 3 | `needs-anchor` | Anchorless smell check failed (user-facing behavior without use case, contract change without spec, exploratory without evidence). |
 | 4 | `needs-evidence` | Two or more evidence categories are unknown, but the type fit is still `task`. |
-| 5 | `epic-candidate` | The natural decomposition is four or more units, or the threads have no remaining task-level cohesion. |
-| 6 | `split` | A granularity signal is present and the natural decomposition is two or three units. |
-| 7 | `ok` | All axes pass and all required sections are present and non-empty. |
+| 5 | `epic-candidate` | The work matches one of the canonical epic scopes (feature initiative, platform / subsystem capability, migration or campaign, stabilization or quality initiative), OR the natural decomposition is four or more units, OR the parent body cannot stand as a task (mixed-type members, parent UTS not meaningful, no integration AC owned by any single member). |
+| 6 | `parent-task-candidate` | The natural decomposition is two or three task-typed subtasks AND the parent body would naturally pass as a task (parent `Description`, `Unit Test Strategy`, `Acceptance Criteria` meaningful at parent level) AND members land in the same code area within roughly one PR cycle. |
+| 7 | `split` | A granularity signal is present, the natural decomposition is two or three units, and the parent does not need to exist (no shared parent-level invariant or coordination). |
+| 8 | `ok` | All axes pass and all required sections are present and non-empty. |
+
+Verdicts 5–7 are mutually exclusive decomposition shapes; pick using the body-shape discriminator from `decomposition-patterns.md`. If the parent body cannot stand as a task, the verdict is `epic-candidate`. If it can and decomposition fits 2–3 task slices in one code area, `parent-task-candidate`. If no parent is needed, `split`.
 
 ## Output — sidecar file plus short main response
 
@@ -114,7 +122,8 @@ Name the verdict in natural prose using a phrase the calling LLM can recognize u
 - `needs-anchor` — "이 draft는 anchor가 없어 task로 publish하기 부적절합니다."
 - `needs-evidence` — "이 draft는 evidence가 부족해 아직 task로 갈 단계가 아닙니다."
 - `epic-candidate` — "이건 task가 아니라 epic으로 다루는 게 맞습니다."
-- `split` — "이 draft는 분할이 낫습니다."
+- `parent-task-candidate` — "이 draft는 parent task로 두고 subtask로 쪼개는 게 맞습니다." / "This draft should become a parent task with subtasks."
+- `split` — "이 draft는 sibling task로 분할이 낫습니다." / "This draft should be split into sibling tasks."
 
 #### Reasoning paragraphs
 Walk through which axes triggered the verdict. Briefly note which axes passed — passes give the reader confidence in the negative finding. Cite the draft text where useful; do not quote long passages.
@@ -126,8 +135,11 @@ For every verdict except `ok`, end the review with concrete next steps. The shap
 - `reclassify-spike` / `reclassify-research` — name the correct type, list what to keep from the current draft and what to discard, and offer one phrasing of the hypothesis (spike) or research question (research).
 - `needs-anchor` — name which anchor type is required, list candidate anchors if you can infer them from the draft, and decide whether the user should create the anchor first or rewrite the draft to pass the smell check.
 - `needs-evidence` — list which of the five evidence categories are unknown, and for each suggest where it might be filled (code area, similar past task, who to ask).
-- `epic-candidate` — frame the work as an epic, list the natural sub-issue clusters, and note any sequencing constraints between clusters.
-- `split` — propose 2 (default) or 3 (only when AC genuinely falls into three cohesive bundles) task units. For each unit give a working title, the AC slice it owns, an anchor proposal, and any sequencing constraint (which must merge first).
+- `epic-candidate` — name which of the four canonical epic scopes the work fits (feature initiative, platform / subsystem capability, migration or campaign, stabilization or quality initiative). Frame the work as an epic, list the natural member clusters with anticipated types (mixed types allowed), note any sequencing constraints between clusters, and identify the integration-level Acceptance Criteria that belong to the epic body rather than to any single member.
+- `parent-task-candidate` — propose 2 (default) or 3 task-typed subtasks. For each subtask give a working title and the AC slice it owns. Then describe the parent task body: the parent-level `Description` (what the joined goal is), parent-level `Unit Test Strategy` (typically the integration scenario), and parent-level `Acceptance Criteria` (the joined observable outcome). Note any sequencing constraint between subtasks (`blocked_by`).
+- `split` — propose 2 (default) or 3 (only when AC genuinely falls into three cohesive bundles) sibling task units. For each unit give a working title, the AC slice it owns, an anchor proposal (use case, spec, parent task, or epic — note when units share an anchor), any sequencing constraint via `blocked_by` (which must merge first), and any soft non-blocking connection that warrants a `Related` body entry. Confirm no shared parent-level invariant exists; if one does, prefer `parent-task-candidate` or `epic-candidate`.
+
+For the three decomposition verdicts (`split`, `parent-task-candidate`, `epic-candidate`), the actionable section must open with a directive line instructing the main session to read `plugins/workflow/authoring/common/decomposition-patterns.md` before drafting any follow-up body. The main session needs the pattern contract — body shapes for parent task vs epic, sibling relationship rules — to author the follow-up issues correctly, and this directive is the only place it is surfaced to that session.
 
 ## Authority boundaries
 
@@ -140,11 +152,15 @@ If you find yourself writing "the implementation should use X" or "this should c
 
 The `Write` tool is permitted only for creating or overwriting the sidecar audit report file derived from the draft body file path. Do not write to any other path.
 
-## Split count heuristic
+## Decomposition selection heuristic
 
-Never issue `split` with four or more proposed units. If the natural decomposition is four or more, escalate to `epic-candidate`. A task with four independent sub-units is no longer task-shaped — it is an epic whose sub-issues are tasks.
+Decomposition produces exactly one of `split`, `parent-task-candidate`, or `epic-candidate`. Apply the body-shape discriminator from `decomposition-patterns.md`:
 
-Default `split` to two units. Issue three only when the Acceptance Criteria genuinely fall into three cohesive bundles with no overlap.
+1. If the natural decomposition is four or more units, or members would mix types, or the work matches a canonical epic scope → `epic-candidate`. Never propose `split` or `parent-task-candidate` with four or more units.
+2. Else if 2–3 task-typed subtasks share a parent-level invariant AND the parent body can stand as a task (meaningful `Description`, `Unit Test Strategy`, `Acceptance Criteria` at parent level) AND members land in the same code area within roughly one PR cycle → `parent-task-candidate`.
+3. Else if 2–3 units have a granularity signal but no shared parent-level invariant → `split`.
+
+Default the unit count to two. Issue three only when the Acceptance Criteria genuinely fall into three cohesive bundles with no overlap.
 
 ## Tie-breaking when multiple signals fire
 
