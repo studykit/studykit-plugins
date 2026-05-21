@@ -391,7 +391,10 @@ def subagent_start(
             "hookSpecificOutput": {
                 "hookEventName": "SubagentStart",
                 "additionalContext": build_subagent_start_context(
-                    config, _plugin_root(), runtime="claude"
+                    config,
+                    _plugin_root(),
+                    runtime="claude",
+                    agent_type=event_payload.agent_type,
                 ),
             }
         },

@@ -98,6 +98,7 @@ def expected_subagent_start_context(
     *,
     runtime: str = "claude",
     issue_kind: str = "github",
+    agent_type: str | None = None,
 ) -> str:
     text = main_context_fragment("subagent/policy.md")
     issue_fetch_block = main_context_fragment(f"snippets/issue-fetch/{issue_kind}.md")
@@ -106,11 +107,27 @@ def expected_subagent_start_context(
         launcher_block = launcher_block.replace(
             "{{WORKFLOW_PLUGIN_ROOT}}", str(_PLUGIN_ROOT)
         )
-    return (
+    rendered = (
         text
         .replace("{{WORKFLOW_LAUNCHER_BLOCK}}", launcher_block)
         .replace("{{WORKFLOW_ISSUE_FETCH_BLOCK}}", issue_fetch_block)
     )
+    agent_name = (agent_type or "").rsplit(":", 1)[-1].strip().lower() if agent_type else ""
+    if agent_name == "issue-implementer":
+        template = main_context_fragment("subagent/agents/issue-implementer.md")
+        drafts_block = main_context_fragment(f"snippets/issue-drafts/{issue_kind}.md")
+        relationships_block = main_context_fragment(
+            f"snippets/issue-relationships/{issue_kind}.md"
+        )
+        writeback_block = main_context_fragment(f"snippets/issue-writeback/{issue_kind}.md")
+        agent_block = (
+            template
+            .replace("{{ISSUE_DRAFTS_REVIEW_BLOCK}}", drafts_block)
+            .replace("{{ISSUE_RELATIONSHIPS_BLOCKED_BY_BLOCK}}", relationships_block)
+            .replace("{{ISSUE_WRITEBACK_BODY_BLOCK}}", writeback_block)
+        )
+        rendered = f"{rendered}\n\n{agent_block}"
+    return rendered
 
 
 def default_github_relationship_response(request: CommandRequest) -> CommandResult | None:
@@ -1335,6 +1352,38 @@ def test_claude_subagent_start_records_subagent_identity_and_injects_workflow_co
     assert state["subagents"]["started"] == [
         {"agent_id": "agent-123", "agent_type": "general-purpose"}
     ]
+
+
+def test_claude_subagent_start_injects_issue_implementer_agent_block(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _write_config(tmp_path)
+    monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(tmp_path))
+    monkeypatch.setenv("CLAUDE_PLUGIN_ROOT", str(_PLUGIN_ROOT))
+
+    captured = io.StringIO()
+    assert claude_main(
+        payload={
+            "session_id": "claude-session-impl",
+            "transcript_path": "/tmp/transcript.jsonl",
+            "cwd": str(tmp_path),
+            "hook_event_name": "SubagentStart",
+            "agent_id": "agent-impl",
+            "agent_type": "workflow:issue-implementer",
+        },
+        stdout=captured,
+    ) == 0
+
+    payload = json.loads(captured.getvalue())
+    context = payload["hookSpecificOutput"]["additionalContext"]
+    assert context == expected_subagent_start_context(
+        issue_kind="github", agent_type="workflow:issue-implementer"
+    )
+    assert "## issue-implementer subagent context" in context
+    assert "github_issue_drafts.py publish" in context
+    assert "github_issue_relationships.py" in context
+    assert "github_issue_writeback.py update" in context
 
 
 def test_claude_subagent_start_emits_nothing_for_non_workflow_projects(
