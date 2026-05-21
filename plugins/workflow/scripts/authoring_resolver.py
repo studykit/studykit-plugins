@@ -151,6 +151,10 @@ def render_cache_hit_reference(
         lines.append(
             f"- See `{notes_anchor}` above — triggers apply to this call too."
         )
+    lines.append(
+        "- If the anchor body is no longer in context (e.g., after "
+        "compaction), rerun this command with `--cache-policy refresh`."
+    )
     return "\n".join(lines) + "\n"
 
 
