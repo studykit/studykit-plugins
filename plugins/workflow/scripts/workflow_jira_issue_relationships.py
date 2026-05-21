@@ -118,6 +118,7 @@ def _provider_relationships(
         relationships["subtasks"] = subtasks
     workflow_relationships = _workflow_relationships(
         relationships,
+        fields=fields,
         relationship_mappings=relationship_mappings,
     )
     if workflow_relationships:
@@ -146,13 +147,16 @@ def _normalize_issue_link(link: Mapping[str, Any]) -> dict[str, Any]:
 def _workflow_relationships(
     provider_relationships: Mapping[str, Any],
     *,
+    fields: Mapping[str, Any] | None = None,
     relationship_mappings: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Map Jira-native relationship fields into workflow relationship buckets.
 
     Issue-link buckets are resolved from ``providers.issues.relationship_mappings``.
     Links whose ``(link_type, direction)`` matches a mapping land in that bucket;
-    unmapped links are preserved verbatim under ``issue_links``.
+    unmapped links are preserved verbatim under ``issue_links``. Mappings with
+    ``surface: field`` (and ``write_to: source``) are resolved by reading the
+    configured field from the raw issue payload.
     """
 
     workflow: dict[str, Any] = {}
@@ -194,6 +198,11 @@ def _workflow_relationships(
     if unmapped_links:
         workflow["issue_links"] = unmapped_links
 
+    for name, ref in _field_surface_workflow_entries(fields or {}, relationship_mappings or {}):
+        if name in workflow:
+            continue
+        workflow[name] = [_workflow_issue({"key": ref})]
+
     remote_links = provider_relationships.get("remote_links")
     if isinstance(remote_links, list):
         external_links = [_workflow_external_link(item) for item in remote_links if isinstance(item, Mapping)]
@@ -201,6 +210,48 @@ def _workflow_relationships(
             workflow["external_links"] = external_links
 
     return workflow
+
+
+def _field_surface_workflow_entries(
+    fields: Mapping[str, Any],
+    relationship_mappings: Mapping[str, Any],
+) -> list[tuple[str, str]]:
+    """Yield ``(name, resolved_key)`` for each readable ``surface: field`` mapping."""
+
+    entries: list[tuple[str, str]] = []
+    for name, mapping in relationship_mappings.items():
+        if not isinstance(name, str) or not isinstance(mapping, Mapping):
+            continue
+        if mapping.get("surface") != "field":
+            continue
+        write_to = mapping.get("write_to") or "source"
+        if write_to != "source":
+            continue
+        field_id = mapping.get("field")
+        if not isinstance(field_id, str) or not field_id:
+            continue
+        raw_value = fields.get(field_id)
+        if raw_value is None:
+            continue
+        value_kind = mapping.get("value") or "string"
+        resolved = _field_relationship_key(raw_value, value_kind)
+        if resolved is None:
+            continue
+        entries.append((name, resolved))
+    return entries
+
+
+def _field_relationship_key(raw_value: Any, value_kind: Any) -> str | None:
+    """Extract the issue key string from a raw Jira field value."""
+
+    kind = str(value_kind) if value_kind is not None else "string"
+    if kind == "string":
+        return _normalize_optional(raw_value)
+    if kind in {"key", "key_object"}:
+        if isinstance(raw_value, Mapping):
+            return _normalize_optional(raw_value.get("key"))
+        return None
+    return None
 
 
 def _inverse_issue_link_mapping(
