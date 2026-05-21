@@ -60,8 +60,20 @@ TASK_AUDIT_TRIGGER_NOTE = (
     "After the body file is drafted, before invoking the publish script, "
     "ask the user via AskUserQuestion whether to run the task-size-auditor "
     "subagent against the draft. Spawn task-size-auditor only when the user "
-    "accepts."
+    "accepts. Skip this step entirely for retroactive issues that track "
+    "work already done."
 )
+
+RETROACTIVE_PUBLISH_STATE_NOTES = {
+    "github": (
+        "Retroactive issues that track work already done should be "
+        "published in the closed state."
+    ),
+    "jira": (
+        "Retroactive issues that track work already done should be "
+        "published in the resolved state."
+    ),
+}
 
 ISSUE_PROVIDER_FILES = {
     "github": "providers/github-issue-convention.md",
@@ -321,6 +333,10 @@ def resolve_authoring(
         notes_list.append(PLAN_MODE_TRIGGER_NOTE)
     if normalized_role == "issue" and normalized_type in TASK_AUDIT_TYPES:
         notes_list.append(TASK_AUDIT_TRIGGER_NOTE)
+    if normalized_role == "issue" and normalized_type in PLAN_MODE_TYPES:
+        retroactive_note = RETROACTIVE_PUBLISH_STATE_NOTES.get(normalized_provider)
+        if retroactive_note is not None:
+            notes_list.append(retroactive_note)
     notes = tuple(notes_list)
 
     return Resolution(
