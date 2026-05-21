@@ -377,8 +377,8 @@ def test_render_cache_hit_reference_with_notes_anchor() -> None:
     assert rendered == (
         "- See `task-issue-reading-list` above.\n"
         "- See `task-issue-notes` above — triggers apply to this call too.\n"
-        "- If the anchor body is no longer in context (e.g., after "
-        "compaction), rerun this command with `--cache-policy refresh`.\n"
+        "- If the anchor body is no longer in context, rerun this command "
+        "with `--cache-policy refresh`.\n"
     )
 
 
@@ -387,8 +387,8 @@ def test_render_cache_hit_reference_without_notes_anchor() -> None:
 
     assert rendered == (
         "- See `spike-issue-reading-list` above.\n"
-        "- If the anchor body is no longer in context (e.g., after "
-        "compaction), rerun this command with `--cache-policy refresh`.\n"
+        "- If the anchor body is no longer in context, rerun this command "
+        "with `--cache-policy refresh`.\n"
     )
 
 
@@ -491,8 +491,8 @@ def test_main_repeat_call_emits_bullet_only_form(
     assert out == (
         "- See `task-issue-reading-list` above.\n"
         "- See `task-issue-notes` above — triggers apply to this call too.\n"
-        "- If the anchor body is no longer in context (e.g., after "
-        "compaction), rerun this command with `--cache-policy refresh`.\n"
+        "- If the anchor body is no longer in context, rerun this command "
+        "with `--cache-policy refresh`.\n"
     )
 
 
@@ -510,8 +510,8 @@ def test_main_repeat_call_for_noteless_type_omits_notes_bullet(
 
     assert out == (
         "- See `spike-issue-reading-list` above.\n"
-        "- If the anchor body is no longer in context (e.g., after "
-        "compaction), rerun this command with `--cache-policy refresh`.\n"
+        "- If the anchor body is no longer in context, rerun this command "
+        "with `--cache-policy refresh`.\n"
     )
 
 
