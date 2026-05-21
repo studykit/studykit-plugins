@@ -44,6 +44,33 @@ Jira issue type must be set at create time. Use `--subtask-parent` when
 publishing a Sub-task. Relationship flags (add-only on publish) apply the
 relationships against the newly created issue after the create succeeds.
 
+### Native Sub-task vs parent issue-link
+
+`--subtask-parent` and `--parent` look interchangeable but produce
+structurally different issues. Pick by what the new issue should *be*, not
+by which flag name reads better:
+
+| Flag                       | When the create happens | Effect on the new issue                                                          | Config requirement                                       |
+|----------------------------|-------------------------|----------------------------------------------------------------------------------|----------------------------------------------------------|
+| `--subtask-parent <KEY>`   | At create time          | Forces `issuetype=Sub-task` and sets Jira's native Sub-task parent to `<KEY>`.   | None beyond standard issue-create config.                |
+| `--parent <KEY>`           | Post-create             | Adds an issue link to `<KEY>`. Issuetype is unchanged (Task, Bug, etc.).         | `providers.issues.relationship_mappings.parent` must be configured; publish fails after create otherwise. |
+
+Selection guidance:
+
+- Goal is "new Sub-task under `<P>`" — use `--subtask-parent <P>`. The
+  resulting issue is a native Jira Sub-task and shows up under `<P>` in
+  the Sub-tasks panel.
+- Goal is "new Task/Bug/etc. linked to `<P>` as a parent" — use
+  `--parent <P>`. The resulting issue keeps its own issuetype and gets
+  an issue link of the type configured in `relationship_mappings.parent`.
+- When unsure, inspect a sibling under the same parent first: if existing
+  siblings are Sub-tasks, use `--subtask-parent`; otherwise use
+  `--parent`. (Auto-inspection is intentionally out of scope.)
+
+The two flags are mutually exclusive in practice — using `--parent` does
+not create a Sub-task, and using `--subtask-parent` does not add an
+extra issue-link relationship.
+
 `--assignee <user>` sets the assignee at create time. The literal `me`
 resolves the current Jira user via `/rest/api/<v>/myself` and uses the
 returned `name` on the create payload. To clear an assignee on an
