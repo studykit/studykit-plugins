@@ -171,7 +171,13 @@ def build_parser() -> argparse.ArgumentParser:
     publish.add_argument("--issue-type", help="Jira provider issue type")
     publish.add_argument(
         "--subtask-parent",
-        help="Jira parent issue key when publishing a Sub-task",
+        help=(
+            "create the new issue as a native Jira Sub-task under this parent key. "
+            "Sets the create-time parent field and forces issuetype=Sub-task; no "
+            "post-create relationship step. Pick this when siblings under the parent "
+            "are Sub-tasks. Use --parent instead for a post-create issue-link "
+            "relationship that leaves issuetype unchanged."
+        ),
     )
     publish.add_argument(
         "--project-key",
@@ -191,7 +197,15 @@ def build_parser() -> argparse.ArgumentParser:
         "--assignee",
         help='Jira DC username or the literal "me" to resolve via /rest/api/<v>/myself',
     )
-    publish.add_argument("--parent", help="add parent relationship after publish")
+    publish.add_argument(
+        "--parent",
+        help=(
+            "add a post-create issue-link parent relationship to this key. "
+            "Does not change the new issue's issuetype (use --subtask-parent for a "
+            "native Sub-task). Requires providers.issues.relationship_mappings.parent "
+            "to be configured; the post-create step fails otherwise."
+        ),
+    )
     publish.add_argument(
         "--epic",
         help="add Epic Link after publish (rejected when --type epic)",
