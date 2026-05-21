@@ -1,12 +1,1 @@
-Publish a `review` issue (used by the blocker-handling flow):
-
-```bash
-"$WORKFLOW" github_issue_drafts.py publish \
-  --type review \
-  --title <title> \
-  --body-file <body-path>
-```
-
-Required: `--type`, `--title`, `--body-file`. The body file is the draft
-path returned by `"$WORKFLOW" authoring_resolver.py --type review`.
-Capture the returned review ref from the script's JSON output.
+The returned ref is the GitHub issue number (e.g., `#123`).

@@ -16,11 +16,11 @@ if str(_SCRIPTS_DIR) not in sys.path:
 from workflow_command import CommandRequest, CommandResult  # noqa: E402
 from workflow_github import DEFAULT_ISSUE_FIELDS, GitHubRepository  # noqa: E402
 from issue.github.cache import GitHubIssueCache  # noqa: E402
-from github_issue_writeback import (  # noqa: E402
+from issue.github.backend import (  # noqa: E402
     GitHubIssueWritebackError,
     update_issue as github_writeback_update,
 )
-from jira_issue_writeback import (  # noqa: E402
+from issue.jira.backend import (  # noqa: E402
     JiraIssueWritebackError,
     update_issue as jira_writeback_update,
 )

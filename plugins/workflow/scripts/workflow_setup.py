@@ -1469,7 +1469,7 @@ def _jira_state_transitions_from_args(args: argparse.Namespace) -> dict[str, str
         if verb in RESERVED_STATE_TRANSITION_VERBS:
             reserved = ", ".join(sorted(RESERVED_STATE_TRANSITION_VERBS))
             raise WorkflowSetupError(
-                f"--jira-state-transition verb {verb!r} collides with a reserved jira_issue_fields verb ({reserved})"
+                f"--jira-state-transition verb {verb!r} collides with a reserved issue_fields verb ({reserved})"
             )
         if not transition_name:
             raise WorkflowSetupError(

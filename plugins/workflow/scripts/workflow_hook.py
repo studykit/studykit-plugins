@@ -265,8 +265,8 @@ def provider_cache_body_write_reason(target: EditTarget, config: WorkflowConfig)
             "workflow cache protection blocked a provider cache issue body write "
             "because the projection has not been prepared yet.\n\n"
             f"Target: {target.path}\n\n"
-            "Refresh the cache projection with the matching workflow fetch script "
-            "(`$WORKFLOW github_issue_fetch.py` or `$WORKFLOW jira_issue_fetch.py`), "
+            "Refresh the cache projection with the workflow fetch dispatcher "
+            "(`$WORKFLOW issue_fetch.py`), "
             "then edit only the Markdown body below the existing YAML frontmatter."
         )
 
@@ -278,9 +278,9 @@ def provider_cache_body_write_reason(target: EditTarget, config: WorkflowConfig)
         "because the projection is read-only; use the body-file flow.\n\n"
         f"Target: {target.path}\n\n"
         "Write the new body or comment to a caller-chosen temp file and run the "
-        "matching workflow script with `--body-file <path>` "
-        "(`$WORKFLOW github_issue_writeback.py update`, "
-        "`$WORKFLOW github_issue_comments.py append`, or the `jira_*` equivalents) "
+        "matching workflow dispatcher with `--body-file <path>` "
+        "(`$WORKFLOW issue_writeback.py update` or "
+        "`$WORKFLOW issue_comments.py append`) "
         "instead of editing the cached file in place."
     )
 

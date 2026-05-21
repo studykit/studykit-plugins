@@ -753,7 +753,7 @@ def _build_config_cli(args: list[str]) -> int:
     "value, message",
     [
         ("closedDone", "must be <verb>=<transition name>"),
-        ("assign=Done", "collides with a reserved jira_issue_fields verb"),
+        ("assign=Done", "collides with a reserved issue_fields verb"),
         ("close=", "must include a non-empty transition name"),
     ],
 )

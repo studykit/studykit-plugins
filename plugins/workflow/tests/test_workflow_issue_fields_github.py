@@ -17,11 +17,11 @@ if str(_SCRIPTS_DIR) not in sys.path:
 from workflow_command import CommandRequest, CommandResult  # noqa: E402
 from workflow_github import DEFAULT_ISSUE_FIELDS, GitHubRepository  # noqa: E402
 from issue.github.cache import GitHubIssueCache  # noqa: E402
-from github_issue_fields import (  # noqa: E402
+from issue.github.backend import (  # noqa: E402
     GitHubIssueFieldsError,
     fields_payload,
-    main as github_issue_fields_main,
 )
+from issue_fields import main as github_issue_fields_main  # noqa: E402
 
 
 _DROPPED_FIELD_KEYS = ("provider", "cache", "repository", "operation", "role", "kind", "verified")
