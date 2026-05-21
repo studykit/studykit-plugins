@@ -108,11 +108,7 @@ def fetch_cache_payload(
             )
         )
 
-    return format_issue_cache_json(
-        contexts,
-        provider_kind="jira",
-        cache_policy=cache_policy,
-    )
+    return format_issue_cache_json(contexts)
 
 
 def main(

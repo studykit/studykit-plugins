@@ -266,11 +266,10 @@ def test_cache_fetch_uses_cache_hit_without_remote_issue_view(tmp_path: Path) ->
 
     payload = json.loads(stdout.getvalue())
     assert code == 0
-    assert set(payload) == {"operation", "role", "kind", "repository", "cache_policy", "issues"}
-    assert payload["operation"] == "cache_fetch"
-    assert payload["issues"][0]["issue"] == "42"
-    assert set(payload["issues"][0]) == {"issue", "issue_dir", "title", "state", "cache_hit"}
-    assert payload["issues"][0]["issue_dir"] == ".workflow-cache/issues/42/"
+    assert set(payload) == {"basedir", "issues"}
+    assert payload["basedir"] == ".workflow-cache/issues/"
+    assert set(payload["issues"][0]) == {"issue", "title", "state", "cache_hit"}
+    assert payload["issues"][0]["issue"] == "42/issue.md"
     assert payload["issues"][0]["cache_hit"] is True
     assert runner.requests == []
 
@@ -310,7 +309,7 @@ def test_cache_fetch_lists_comment_paths_in_json(tmp_path: Path) -> None:
     payload = json.loads(stdout.getvalue())
     assert code == 0
     assert payload["issues"][0]["comments"] == [
-        ".workflow-cache/issues/42/comment-2026-05-13T112053Z-4440388606.md",
+        "42/comment-2026-05-13T112053Z-4440388606.md",
     ]
 
 
@@ -350,7 +349,7 @@ def test_cache_fetch_refresh_reads_remote_and_updates_cache(tmp_path: Path) -> N
 
     payload = json.loads(stdout.getvalue())
     assert code == 0
-    assert payload["cache_policy"] == "refresh"
+    assert payload["basedir"] == ".workflow-cache/issues/"
     assert payload["issues"][0]["cache_hit"] is False
     assert [request.args for request in runner.requests] == [
         gh_issue_view_args(42),
@@ -390,11 +389,9 @@ def test_cache_fetch_uses_jira_cache_hit_without_remote_read(tmp_path: Path) -> 
 
     payload = json.loads(stdout.getvalue())
     assert code == 0
-    assert set(payload) == {"operation", "role", "kind", "cache_policy", "issues"}
-    assert payload["kind"] == "jira"
-    assert payload["issues"][0]["issue"] == "TEST-1234"
-    assert payload["issues"][0]["issue_dir"] == ".workflow-cache/issues/TEST-1234/"
-    assert "issue_file" not in payload["issues"][0]
+    assert set(payload) == {"basedir", "issues"}
+    assert payload["basedir"] == ".workflow-cache/issues/"
+    assert payload["issues"][0]["issue"] == "TEST-1234/issue.md"
     assert payload["issues"][0]["cache_hit"] is True
     assert "relationships" not in payload["issues"][0]
     assert runner.requests == []
@@ -424,12 +421,9 @@ def test_cache_fetch_refresh_reads_remote_jira_and_updates_cache(tmp_path: Path)
 
     payload = json.loads(stdout.getvalue())
     assert code == 0
-    assert payload["cache_policy"] == "refresh"
-    assert payload["kind"] == "jira"
-    assert "repository" not in payload
-    assert payload["issues"][0]["issue"] == "TEST-1234"
+    assert payload["basedir"] == ".workflow-cache/issues/"
+    assert payload["issues"][0]["issue"] == "TEST-1234/issue.md"
     assert payload["issues"][0]["cache_hit"] is False
-    assert "issue_file" not in payload["issues"][0]
     assert [request.args for request in runner.requests] == [
         curl_args(jira_issue_url()),
         curl_args(jira_remote_links_url()),

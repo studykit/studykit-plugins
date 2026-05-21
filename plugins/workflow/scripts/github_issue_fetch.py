@@ -104,12 +104,7 @@ def fetch_cache_payload(
             )
         )
 
-    return format_issue_cache_json(
-        contexts,
-        provider_kind="github",
-        cache_policy=cache_policy,
-        repository=repo.to_json(),
-    )
+    return format_issue_cache_json(contexts)
 
 
 def main(
