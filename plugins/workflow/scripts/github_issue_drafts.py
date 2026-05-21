@@ -37,6 +37,7 @@ def publish_issue(
     labels: tuple[str, ...] = (),
     state: str = "open",
     state_reason: str | None = None,
+    assignee: str | None = None,
     relationship_intent: dict[str, object] | None = None,
     runner: CommandRunner | None = None,
 ) -> dict[str, object]:
@@ -62,6 +63,9 @@ def publish_issue(
     }
     if state_reason:
         payload["state_reason"] = state_reason.strip()
+    normalized_assignee = (assignee or "").strip()
+    if normalized_assignee:
+        payload["assignee"] = normalized_assignee
 
     provider = GitHubIssueNativeProvider(runner=runner)
     response = provider.call(
@@ -152,6 +156,10 @@ def build_parser() -> argparse.ArgumentParser:
     publish.add_argument("--state", default="open")
     publish.add_argument("--state-reason")
     publish.add_argument(
+        "--assignee",
+        help='GitHub login or the literal "me" to resolve via `gh api user`',
+    )
+    publish.add_argument(
         "--body-file",
         type=Path,
         required=True,
@@ -223,6 +231,7 @@ def main(
                 labels=tuple(args.label),
                 state=args.state,
                 state_reason=args.state_reason,
+                assignee=args.assignee,
                 relationship_intent=_publish_relationship_intent(args),
                 runner=runner,
             )

@@ -234,6 +234,9 @@ class JiraDataCenterIssueNativeProvider(IssueProvider):
             issue_type=issue_type,
             title=title,
         )
+        assignee = _optional_string(request.payload.get("assignee"))
+        if assignee is not None and assignee.lower() == "me":
+            assignee = get_jira_myself(site, runner=self.runner)
 
         created = create_issue(
             site,
@@ -245,6 +248,7 @@ class JiraDataCenterIssueNativeProvider(IssueProvider):
             subtask_parent_key=subtask_parent_key,
             epic_name=epic_name,
             epic_name_field=epic_name_field,
+            assignee=assignee,
             runner=self.runner,
         )
         issue_key = normalize_jira_issue_key(created.get("key") or created.get("issue") or "")
@@ -764,6 +768,7 @@ def create_issue(
     subtask_parent_key: str | None = None,
     epic_name: str | None = None,
     epic_name_field: str | None = None,
+    assignee: str | None = None,
     runner: CommandRunner | None = None,
 ) -> Mapping[str, Any]:
     payload: dict[str, Any] = {
@@ -780,6 +785,8 @@ def create_issue(
         payload["fields"]["parent"] = {"key": subtask_parent_key}
     if epic_name is not None and epic_name_field is not None:
         payload["fields"][epic_name_field] = epic_name
+    if assignee:
+        payload["fields"]["assignee"] = {"name": assignee}
     result = jira_send_json(site, "POST", f"/rest/api/{site.api_version}/issue", payload, runner=runner)
     if not isinstance(result, Mapping):
         raise JiraProviderError("Jira create issue response was not an object")

@@ -30,6 +30,7 @@ and update an existing issue body — share one shape:
   [--label <label> ...] \
   [--state open|closed] \
   [--state-reason completed|not_planned|reopened] \
+  [--assignee <user>] \
   [--parent <ref>] [--blocked-by <ref> ...] [--blocking <ref> ...] \
   [--child <ref> ...] [--related <ref> ...] \
 ```
@@ -37,6 +38,12 @@ and update an existing issue body — share one shape:
 Required: `--type`, `--title`, `--body-file`. `--state` defaults to `open`.
 Relationship flags (add-only on publish) apply the relationships against
 the newly created issue after the create succeeds.
+
+`--assignee <user>` sets the assignee at create time. The literal `me`
+resolves the current GitHub login via `gh api user` (same path as
+`github_issue_fields.py assign me`) and uses the returned login on the
+create. To clear assignees on an existing issue, use
+`github_issue_fields.py unassign`.
 
 ## Append a comment
 
