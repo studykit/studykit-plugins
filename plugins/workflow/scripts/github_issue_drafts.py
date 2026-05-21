@@ -81,13 +81,6 @@ def publish_issue(
     provider_payload = dict(response.payload)
     cache_payload = provider_payload.get("cache") if isinstance(provider_payload.get("cache"), dict) else {}
     issue_file = cache_payload.get("issue_file") if isinstance(cache_payload, dict) else None
-    body_removed = False
-    try:
-        body_path.unlink()
-    except OSError:
-        body_removed = False
-    else:
-        body_removed = True
 
     result: dict[str, object] = {
         "operation": "publish_issue",
@@ -96,10 +89,11 @@ def publish_issue(
         "verified": bool(provider_payload.get("verified")),
         "issue_file": issue_file,
         "body_file": str(body_path),
-        "body_file_removed": body_removed,
+        "body_file_removed": False,
         "cache_refreshed": bool(provider_payload.get("cache_refreshed")),
     }
 
+    relationship_failed = False
     if relationship_intent:
         try:
             relationships_response = provider.call(
@@ -116,12 +110,21 @@ def publish_issue(
             )
             result["relationships"] = dict(relationships_response.payload)
         except Exception as exc:
+            relationship_failed = True
             result["relationships"] = {
                 "operation": "apply_relationships",
                 "status": "failed",
                 "error": str(exc),
                 "intent": dict(relationship_intent),
             }
+
+    if not relationship_failed:
+        try:
+            body_path.unlink()
+        except OSError:
+            pass
+        else:
+            result["body_file_removed"] = True
 
     return result
 
@@ -242,6 +245,9 @@ def main(
         return 2
 
     print(json.dumps(payload, indent=2, sort_keys=False), file=output)
+    relationships = payload.get("relationships") if isinstance(payload, dict) else None
+    if isinstance(relationships, dict) and relationships.get("status") == "failed":
+        return 1
     return 0
 
 

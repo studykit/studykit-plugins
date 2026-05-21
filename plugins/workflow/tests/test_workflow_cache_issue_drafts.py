@@ -231,7 +231,7 @@ def test_github_publish_strips_body_file_frontmatter(tmp_path: Path) -> None:
     assert not body_file.exists()
 
 
-def test_github_publish_surfaces_unsupported_relationship_intent(tmp_path: Path) -> None:
+def test_github_publish_preserves_body_on_relationship_failure(tmp_path: Path) -> None:
     _write_config(tmp_path)
     body_file = _write_body_file(tmp_path, "Draft body.\n")
     runner = GitHubFakeRunner()
@@ -256,11 +256,12 @@ def test_github_publish_surfaces_unsupported_relationship_intent(tmp_path: Path)
     )
 
     payload = json.loads(stdout.getvalue())
-    assert code == 0
+    assert code == 1
     assert payload["issue"] == "51"
     assert payload["verified"] is True
-    assert payload["body_file_removed"] is True
-    assert not body_file.exists()
+    assert payload["body_file_removed"] is False
+    assert payload["body_file"] == str(body_file)
+    assert body_file.exists()
     relationships = payload["relationships"]
     assert relationships["status"] == "failed"
     assert "related" in relationships["error"]
@@ -1020,6 +1021,63 @@ def test_jira_publish_creates_issue_inline_and_deletes_body_file(tmp_path: Path)
     assert cache.issue_json_file(site, "TEST-1234").is_file()
     assert not body_file.exists()
     assert runner.requests[0].args == _jira_write_args()
+
+
+def test_jira_publish_preserves_body_on_relationship_failure(tmp_path: Path) -> None:
+    _write_jira_config(tmp_path)
+    body_file = _write_body_file(tmp_path, "Body.\n")
+    issue_url = "https://jira.example.test/rest/api/2/issue/TEST-1234"
+    remote_links_url = "https://jira.example.test/rest/api/2/issue/TEST-1234/remotelink"
+
+    runner = JiraFakeRunner(
+        {
+            _jira_write_args(): CommandResult(
+                request=CommandRequest(args=()),
+                returncode=0,
+                stdout=json.dumps({"id": "10001", "key": "TEST-1234"}),
+            ),
+            _jira_curl_get_args(issue_url): CommandResult(
+                request=CommandRequest(args=()),
+                returncode=0,
+                stdout=json.dumps(_jira_issue_payload()),
+            ),
+            _jira_curl_get_args(remote_links_url): CommandResult(
+                request=CommandRequest(args=()),
+                returncode=0,
+                stdout=json.dumps([]),
+            ),
+        }
+    )
+    stdout = io.StringIO()
+
+    code = jira_issue_drafts_main(
+        [
+            "--project",
+            str(tmp_path),
+            "publish",
+            "--type",
+            "task",
+            "--title",
+            "Published Jira issue",
+            "--body-file",
+            str(body_file),
+            "--related",
+            "TEST-99",
+        ],
+        stdout=stdout,
+        runner=runner,
+    )
+
+    payload = json.loads(stdout.getvalue())
+    assert code == 1
+    assert payload["issue"] == "TEST-1234"
+    assert payload["body_file_removed"] is False
+    assert payload["body_file"] == str(body_file)
+    assert body_file.exists()
+    relationships = payload["relationships"]
+    assert relationships["status"] == "failed"
+    assert "related" in relationships["error"]
+    assert relationships["intent"] == {"related_add": ["TEST-99"]}
 
 
 def test_jira_publish_epic_with_post_create_epic_link_is_rejected(tmp_path: Path) -> None:
