@@ -95,16 +95,18 @@ onto them distorts the type's role.
      - Any `$ARGUMENTS` tokens past the ref, verbatim as extra
        requirements.
 
-   The agent enters an isolated worktree, adopts the approved plan,
+   The agent runs in an isolated worktree the harness provisions via
+   its `isolation: worktree` frontmatter, adopts the approved plan,
    implements, verifies every Acceptance Criterion, commits with the
    issue ref prefix, pushes the worktree's branch, opens a GitHub PR
-   via `gh` that auto-closes the issue on merge, writes back the
-   issue's `Resume` to a handoff snapshot pointing at the PR, and
-   exits the worktree leaving it on disk. On AC verification failure,
-   body-vs-reality divergence, or external decisions surfacing
-   mid-execution, the agent publishes a `review` issue and links the
-   implementation task as `blocked-by` instead of opening a PR on
-   partial work.
+   via `gh` that auto-closes the issue on merge, and writes back the
+   issue's `Resume` to a handoff snapshot pointing at the PR. The
+   harness cleans up the worktree automatically on agent exit — kept
+   on disk when commits/uncommitted edits exist, removed otherwise.
+   On AC verification failure, body-vs-reality divergence, or external
+   decisions surfacing mid-execution, the agent publishes a `review`
+   issue and links the implementation task as `blocked-by` instead of
+   opening a PR on partial work.
 
    The skill does not run any edits, git commands, PR creation, or
    workflow writes itself after this dispatch — that is the agent's
