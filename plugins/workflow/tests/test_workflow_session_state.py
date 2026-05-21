@@ -14,7 +14,11 @@ if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
 import workflow_session_state  # noqa: E402
-from workflow_session_state import read_subagent_starts  # noqa: E402
+from workflow_session_state import (  # noqa: E402
+    read_authoring_resolution,
+    read_subagent_starts,
+    record_authoring_resolution,
+)
 
 
 def test_subagent_start_records_survive_concurrent_parent_state_updates(
@@ -75,3 +79,152 @@ def test_subagent_start_records_survive_concurrent_parent_state_updates(
 
     assert {item["agent_id"] for item in starts} == expected_agent_ids
     assert {item["agent_type"] for item in starts} == {"worker"}
+
+
+def test_record_and_read_authoring_resolution_round_trip(tmp_path: Path) -> None:
+    key = {"type": "task", "role": "issue", "provider": "github", "scope": "content"}
+    body = ["## task-issue-reading-list", "- /abs/path"]
+
+    assert record_authoring_resolution(
+        tmp_path,
+        "claude",
+        "sess-1",
+        anchor="task-issue-reading-list",
+        key=key,
+        body=body,
+        emitted_at="2026-05-21T00:00:00+00:00",
+    )
+
+    entry = read_authoring_resolution(
+        tmp_path, "claude", "sess-1", "task-issue-reading-list"
+    )
+
+    assert entry is not None
+    assert entry["key"] == key
+    assert entry["body"] == body
+    assert entry["emitted_at"] == "2026-05-21T00:00:00+00:00"
+
+
+def test_record_authoring_resolution_overwrites_existing_entry(tmp_path: Path) -> None:
+    record_authoring_resolution(
+        tmp_path,
+        "claude",
+        "sess-1",
+        anchor="task-issue-reading-list",
+        key={"type": "task", "role": "issue", "provider": "github", "scope": "content"},
+        body=["v1"],
+        emitted_at="2026-05-21T00:00:00+00:00",
+    )
+    record_authoring_resolution(
+        tmp_path,
+        "claude",
+        "sess-1",
+        anchor="task-issue-reading-list",
+        key={"type": "task", "role": "issue", "provider": "jira", "scope": "content"},
+        body=["v2"],
+        emitted_at="2026-05-21T00:01:00+00:00",
+    )
+
+    entry = read_authoring_resolution(
+        tmp_path, "claude", "sess-1", "task-issue-reading-list"
+    )
+
+    assert entry is not None
+    assert entry["key"]["provider"] == "jira"
+    assert entry["body"] == ["v2"]
+    assert entry["emitted_at"] == "2026-05-21T00:01:00+00:00"
+
+
+def test_record_authoring_resolution_handles_null_provider(tmp_path: Path) -> None:
+    record_authoring_resolution(
+        tmp_path,
+        "claude",
+        "sess-1",
+        anchor="spike-issue-reading-list",
+        key={"type": "spike", "role": "issue", "provider": None, "scope": "content"},
+        body=["## spike-issue-reading-list"],
+        emitted_at="2026-05-21T00:00:00+00:00",
+    )
+
+    entry = read_authoring_resolution(
+        tmp_path, "claude", "sess-1", "spike-issue-reading-list"
+    )
+
+    assert entry is not None
+    assert entry["key"]["provider"] is None
+
+
+def test_read_authoring_resolution_returns_none_when_absent(tmp_path: Path) -> None:
+    assert (
+        read_authoring_resolution(
+            tmp_path, "claude", "sess-1", "task-issue-reading-list"
+        )
+        is None
+    )
+
+
+def test_authoring_resolutions_survive_concurrent_recorders(tmp_path: Path) -> None:
+    if workflow_session_state.fcntl is None:
+        pytest.skip("session state locking requires fcntl on this platform")
+
+    start_file = tmp_path / "start"
+    recorder = tmp_path / "record_authoring_resolution.py"
+    recorder.write_text(
+        "\n".join(
+            [
+                "import sys",
+                "import time",
+                "from pathlib import Path",
+                f"sys.path.insert(0, {str(_SCRIPTS_DIR)!r})",
+                "from workflow_session_state import record_authoring_resolution",
+                "project = Path(sys.argv[1])",
+                "start_file = Path(sys.argv[2])",
+                "anchor = sys.argv[3]",
+                "deadline = time.time() + 5",
+                "while not start_file.exists():",
+                "    if time.time() > deadline:",
+                "        raise SystemExit('timed out waiting for start signal')",
+                "    time.sleep(0.01)",
+                "ok = record_authoring_resolution(",
+                "    project,",
+                "    'codex',",
+                "    'parent-session',",
+                "    anchor=anchor,",
+                "    key={",
+                "        'type': anchor.split('-')[0],",
+                "        'role': 'issue',",
+                "        'provider': 'github',",
+                "        'scope': 'content',",
+                "    },",
+                "    body=[f'## {anchor}'],",
+                "    emitted_at='2026-05-21T00:00:00+00:00',",
+                ")",
+                "raise SystemExit(0 if ok else 1)",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    expected_anchors = {f"a{index:02d}-issue-reading-list" for index in range(8)}
+    processes = [
+        subprocess.Popen(
+            [sys.executable, str(recorder), str(tmp_path), str(start_file), anchor],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        for anchor in sorted(expected_anchors)
+    ]
+    start_file.write_text("go\n", encoding="utf-8")
+
+    for process in processes:
+        stdout, stderr = process.communicate(timeout=10)
+        assert process.returncode == 0, stdout + stderr
+
+    for anchor in expected_anchors:
+        entry = read_authoring_resolution(
+            tmp_path, "codex", "parent-session", anchor
+        )
+        assert entry is not None, anchor
+        assert entry["body"] == [f"## {anchor}"]

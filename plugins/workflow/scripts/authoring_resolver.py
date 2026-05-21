@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # /// script
-# dependencies = ["PyYAML"]
+# dependencies = ["PyYAML", "python-frontmatter"]
 # ///
 """Resolve workflow authoring contracts for workflow artifacts.
 
@@ -24,7 +24,17 @@ from workflow_config import (
     normalize_provider,
     validate_provider_for_role,
 )
-from workflow_env import workflow_project_dir_from_env
+from workflow_env import (
+    WorkflowEnvError,
+    detect_shell_runtime,
+    workflow_project_dir_from_env,
+    workflow_session_id_from_env,
+)
+from workflow_providers import CACHE_POLICY_DEFAULT, CACHE_POLICY_REFRESH
+from workflow_session_state import (
+    read_authoring_resolution,
+    record_authoring_resolution,
+)
 
 PLUGIN_ROOT = Path(__file__).resolve().parent.parent
 AUTHORING_DIR = PLUGIN_ROOT / "authoring"
@@ -335,6 +345,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="project path used to find .workflow/config.yml",
     )
     parser.add_argument("--require-config", action="store_true", help="fail when .workflow/config.yml is absent")
+    parser.add_argument(
+        "--cache-policy",
+        choices=(CACHE_POLICY_DEFAULT, CACHE_POLICY_REFRESH),
+        default=CACHE_POLICY_DEFAULT,
+        help="session-state cache policy; refresh forces full emission",
+    )
     return parser
 
 
@@ -355,8 +371,72 @@ def main(argv: list[str] | None = None) -> int:
         print(f"authoring resolver error: {exc}", file=sys.stderr)
         return 2
 
-    print(resolution.to_markdown(), end="")
+    runtime, session_id = _resolve_session()
+    if not session_id:
+        print(resolution.to_markdown(), end="")
+        return 0
+
+    anchor = resolution.reading_list_anchor
+    current_key = _resolution_key(resolution)
+    use_cache_hit = False
+    if args.cache_policy != CACHE_POLICY_REFRESH:
+        existing = read_authoring_resolution(
+            args.project, runtime, session_id, anchor
+        )
+        if existing is not None and _keys_equal(existing.get("key"), current_key):
+            use_cache_hit = True
+
+    if use_cache_hit:
+        notes_anchor_value = (
+            resolution.notes_anchor if resolution.notes else None
+        )
+        print(
+            render_cache_hit_reference(
+                resolution.reading_list_anchor, notes_anchor_value
+            ),
+            end="",
+        )
+        return 0
+
+    rendered = resolution.to_markdown()
+    print(rendered, end="")
+    body_lines = rendered.rstrip("\n").splitlines() if rendered else []
+    record_authoring_resolution(
+        args.project,
+        runtime,
+        session_id,
+        anchor=anchor,
+        key=current_key,
+        body=body_lines,
+    )
     return 0
+
+
+def _resolve_session() -> tuple[str, str]:
+    runtime = detect_shell_runtime()
+    if runtime.session_id:
+        return runtime.name, runtime.session_id
+    try:
+        session_id = workflow_session_id_from_env()
+    except WorkflowEnvError:
+        return "", ""
+    return runtime.name, session_id
+
+
+def _resolution_key(resolution: Resolution) -> dict[str, str | None]:
+    return {
+        "type": resolution.artifact_type,
+        "role": resolution.role,
+        "provider": resolution.provider,
+        "scope": resolution.scope,
+    }
+
+
+def _keys_equal(left: object, right: dict[str, str | None]) -> bool:
+    if not isinstance(left, dict):
+        return False
+    fields = ("type", "role", "provider", "scope")
+    return all(left.get(field) == right.get(field) for field in fields)
 
 
 if __name__ == "__main__":

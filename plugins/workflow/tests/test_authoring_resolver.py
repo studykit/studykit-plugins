@@ -18,11 +18,13 @@ from authoring_resolver import (  # noqa: E402
     ResolverError,
     authoring_relative_path,
     is_authoring_file,
+    main as authoring_resolver_main,
     notes_anchor,
     reading_list_anchor,
     render_cache_hit_reference,
     resolve_authoring,
 )
+from workflow_session_state import read_authoring_resolution  # noqa: E402
 
 
 def _config_path(project: Path) -> Path:
@@ -395,3 +397,158 @@ def test_authoring_path_classification_uses_plugin_authoring_root(tmp_path: Path
     assert is_authoring_file(authoring_file, plugin_root=_PLUGIN_ROOT)
     assert authoring_relative_path(outside_file, plugin_root=_PLUGIN_ROOT) is None
     assert not is_authoring_file(outside_file, plugin_root=_PLUGIN_ROOT)
+
+
+_RESOLVER_SESSION_ID = "session-resolver-test"
+
+
+@pytest.fixture
+def resolver_session(monkeypatch: pytest.MonkeyPatch) -> tuple[str, str]:
+    monkeypatch.setenv("CLAUDE_CODE_SESSION_ID", _RESOLVER_SESSION_ID)
+    monkeypatch.setenv("WORKFLOW_SESSION_ID", _RESOLVER_SESSION_ID)
+    monkeypatch.delenv("CODEX_THREAD_ID", raising=False)
+    return "claude", _RESOLVER_SESSION_ID
+
+
+def _resolver_args(tmp_path: Path, *, provider: str = "github", artifact: str = "task") -> list[str]:
+    return [
+        "--type",
+        artifact,
+        "--role",
+        "issue",
+        "--provider",
+        provider,
+        "--project",
+        str(tmp_path),
+    ]
+
+
+def test_main_first_call_emits_sections_and_persists(
+    capsys: pytest.CaptureFixture[str],
+    resolver_session: tuple[str, str],
+    tmp_path: Path,
+) -> None:
+    runtime, session_id = resolver_session
+
+    exit_code = authoring_resolver_main(_resolver_args(tmp_path))
+
+    assert exit_code == 0
+    out = capsys.readouterr().out
+    assert "## task-issue-reading-list" in out
+    assert "## task-issue-notes" in out
+
+    entry = read_authoring_resolution(
+        tmp_path, runtime, session_id, "task-issue-reading-list"
+    )
+    assert entry is not None
+    assert entry["key"] == {
+        "type": "task",
+        "role": "issue",
+        "provider": "github",
+        "scope": "content",
+    }
+    assert entry["body"]
+    assert entry["body"][0] == "## task-issue-reading-list"
+    assert entry["emitted_at"]
+
+
+def test_main_repeat_call_emits_bullet_only_form(
+    capsys: pytest.CaptureFixture[str],
+    resolver_session: tuple[str, str],
+    tmp_path: Path,
+) -> None:
+    args = _resolver_args(tmp_path)
+    authoring_resolver_main(args)
+    capsys.readouterr()
+
+    exit_code = authoring_resolver_main(args)
+
+    assert exit_code == 0
+    out = capsys.readouterr().out
+    assert out == (
+        "- See `task-issue-reading-list` above.\n"
+        "- See `task-issue-notes` above — triggers apply to this call too.\n"
+    )
+
+
+def test_main_repeat_call_for_noteless_type_omits_notes_bullet(
+    capsys: pytest.CaptureFixture[str],
+    resolver_session: tuple[str, str],
+    tmp_path: Path,
+) -> None:
+    args = _resolver_args(tmp_path, artifact="spike")
+    authoring_resolver_main(args)
+    capsys.readouterr()
+
+    authoring_resolver_main(args)
+    out = capsys.readouterr().out
+
+    assert out == "- See `spike-issue-reading-list` above.\n"
+
+
+def test_main_cache_policy_refresh_forces_section_emission(
+    capsys: pytest.CaptureFixture[str],
+    resolver_session: tuple[str, str],
+    tmp_path: Path,
+) -> None:
+    runtime, session_id = resolver_session
+    base = _resolver_args(tmp_path)
+
+    authoring_resolver_main(base)
+    capsys.readouterr()
+    first_entry = read_authoring_resolution(
+        tmp_path, runtime, session_id, "task-issue-reading-list"
+    )
+
+    authoring_resolver_main(base + ["--cache-policy", "refresh"])
+    out = capsys.readouterr().out
+
+    assert "## task-issue-reading-list" in out
+    second_entry = read_authoring_resolution(
+        tmp_path, runtime, session_id, "task-issue-reading-list"
+    )
+    assert first_entry is not None
+    assert second_entry is not None
+    assert second_entry["key"] == first_entry["key"]
+    assert second_entry["emitted_at"] >= first_entry["emitted_at"]
+
+
+def test_main_provider_drift_triggers_refresh(
+    capsys: pytest.CaptureFixture[str],
+    resolver_session: tuple[str, str],
+    tmp_path: Path,
+) -> None:
+    runtime, session_id = resolver_session
+
+    authoring_resolver_main(_resolver_args(tmp_path, provider="github"))
+    capsys.readouterr()
+
+    authoring_resolver_main(_resolver_args(tmp_path, provider="jira"))
+    out = capsys.readouterr().out
+
+    assert "## task-issue-reading-list" in out
+    entry = read_authoring_resolution(
+        tmp_path, runtime, session_id, "task-issue-reading-list"
+    )
+    assert entry is not None
+    assert entry["key"]["provider"] == "jira"
+
+
+def test_main_without_session_emits_sections_without_persisting(
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.delenv("CLAUDE_CODE_SESSION_ID", raising=False)
+    monkeypatch.delenv("CODEX_THREAD_ID", raising=False)
+    monkeypatch.delenv("WORKFLOW_SESSION_ID", raising=False)
+
+    exit_code = authoring_resolver_main(_resolver_args(tmp_path))
+
+    assert exit_code == 0
+    out = capsys.readouterr().out
+    assert "## task-issue-reading-list" in out
+
+    hook_state_dir = tmp_path / ".workflow-cache" / "hook-state"
+    if hook_state_dir.exists():
+        assert not list(hook_state_dir.iterdir())
