@@ -1,160 +1,123 @@
 ---
 name: implement-issue
-description: "Implement a workflow `task`, `bug`, or `spike` issue: read the issue body, enter plan mode to converge on the implementation plan, apply the change, verify Acceptance Criteria, commit with the issue ref prefix, and close the issue with a refreshed Resume."
+description: "Implement a workflow `task`, `bug`, or `spike` issue: read the issue body, enter plan mode to converge on the implementation plan, and after the user approves, dispatch the implementation, verification, commit, push, and writeback to the `issue-implementer` agent."
 argument-hint: "<issue-ref> [additional requirements]"
 disable-model-invocation: true
 allowed-tools:
   - 'Bash("$WORKFLOW":*)'
-  - 'Bash(git status:*)'
-  - 'Bash(git diff:*)'
-  - 'Bash(git add:*)'
-  - 'Bash(git commit:*)'
+  - 'Bash(mkdir -p:*)'
   - EnterPlanMode
   - ExitPlanMode
   - Read
-  - Edit
   - Write
   - Grep
   - Glob
+  - Agent
 ---
 
 # Plan-Mode Implement
 
-The issue body is the spec. Read it, enter plan mode to converge on the
-implementation plan, apply the change after approval, verify, commit, close.
-Provider command shapes (fetch, writeback, close, freshness handling) come
-from the session's workflow policy context — this skill does not restate
-them.
+The issue body carries both the spec (the outcome to achieve) and the
+planned approach (how the issue's author intends to get there) per the
+workflow's authoring contract. Read it, enter plan mode to refine the
+body's planned approach into a concrete execution plan, and after the
+user approves that plan, dispatch the mechanical execution (implement,
+verify, commit, push, decide terminal state, writeback) to the
+`issue-implementer` agent. The skill owns the interactive plan-approval
+gate; the agent owns the rest in its own context. The body's section
+schema lives in the authoring docs — this skill does not restate it.
+Provider command shapes (fetch, writeback, terminal transition,
+freshness handling) come from the session's workflow policy context —
+likewise not restated here.
 
 ## Scope
 
-In scope: `task`, `bug`, `spike`. The type lives in the cached `issue.md`
-frontmatter. For any other type (`epic`, `review`, `research`, `usecase`,
-knowledge types), stop and redirect — these coordinate other work or live
-on a different surface, and forcing plan-mode implementation onto them
-distorts the type's role.
+In scope: `task`, `bug`, `spike`. The type lives in the cached issue
+body's frontmatter. For any other type (`epic`, `review`, `research`,
+`usecase`, knowledge types), stop and redirect — these coordinate other
+work or live on a different surface, and forcing plan-mode implementation
+onto them distorts the type's role.
 
 ## Flow
 
 1. **Read the issue.** Fetch the ref from the first `$ARGUMENTS` token (ask
-   when missing or ambiguous), then read the cached `issue.md`. Follow the
-   links the body cites: parent, blocked-by, knowledge pages, and paths
-   named in `Affected Paths`. The body is the contract; its links complete
-   it. Never edit the cached `issue.md` or `comment-*.md` projections in
-   place.
+   when missing or ambiguous), then read the cached issue body file the
+   fetch script returns. Follow the links the body cites: parent,
+   blocked-by, knowledge pages, and paths named in `Affected Paths`. The
+   body is the contract; its links complete it. Capture the cached body
+   path — the agent will reuse it in step 3. Never edit the cached body
+   or comment projections in place.
 
 2. **Enter plan mode and converge on the plan.** Call `EnterPlanMode`
-   before drafting so the harness blocks edits during planning. Map the
-   issue's `Description`, `Approach`, `Affected Paths`, `Unit Test
-   Strategy`, and `Acceptance Criteria` (plus `Reproduction` for `bug`,
-   `Hypothesis` / `Validation Method` for `spike`) onto a concrete plan:
-   files to touch by absolute path, the verification step for each
-   Acceptance Criterion, and the intended commit split. Present the
-   converged plan via `ExitPlanMode`; no edits before the user accepts the
-   plan and exits plan mode. If the plan keeps diverging from the body,
-   the body itself is usually the problem — propose updating the body via
-   the provider's writeback flow before iterating further on the plan.
+   before drafting so the harness blocks edits during planning. Refine
+   the body's planned approach into a concrete execution plan against
+   its spec: files to touch by absolute path, the verification step for
+   each Acceptance Criterion, and the intended commit split. Present
+   the refined plan via `ExitPlanMode`; nothing proceeds before the user
+   accepts it and exits plan mode. If the refined plan keeps diverging
+   from the body's planned approach, the body itself is usually the
+   problem — propose updating the body via the provider's writeback
+   flow before iterating further on the plan.
 
-3. **Implement.** Apply the approved plan exactly. Keep the change to the
-   smallest shape that satisfies Acceptance Criteria; surface unrelated
-   cleanups as follow-ups instead of folding them in. For `bug`, add the
-   regression test first and confirm it fails on the unfixed code, then
-   apply the fix and confirm it passes — both outputs become AC evidence.
-   For `spike`, run the validation method and capture evidence; PoC code
-   stays throwaway and production work belongs in a follow-up `task`.
+3. **Save the approved plan and dispatch to the `issue-implementer`
+   agent.** After the user accepts the plan and plan mode exits, write
+   the approved plan text to a stable path —
+   `/tmp/workflow-plans/issue-<ref>-plan.md` (create the directory with
+   `mkdir -p` if missing). Then dispatch the agent with:
+   - `issue-cache-path` — the cached issue body path captured in step 1
+     (the agent will not re-fetch).
+   - `plan-file` — the absolute path of the plan file you just wrote.
+   - Any `$ARGUMENTS` tokens past the ref, verbatim as extra
+     requirements.
 
-4. **Verify Acceptance Criteria.** Pair every AC bullet with concrete
-   evidence — test command and outcome, manual observation, artifact
-   produced. Symmetry from a primary fix is not evidence for related ACs;
-   each bullet needs its own check. If any AC fails, stop and ask the
-   user before committing.
+   The agent enters an isolated worktree, adopts the approved plan,
+   implements, verifies every Acceptance Criterion, commits with the
+   issue ref prefix, pushes the worktree's branch, opens a GitHub PR
+   via `gh` that auto-closes the issue on merge, writes back the
+   issue's `Resume` to a handoff snapshot pointing at the PR, and
+   exits the worktree leaving it on disk. On AC verification failure,
+   body-vs-reality divergence, or external decisions surfacing
+   mid-execution, the agent publishes a `review` issue and links the
+   implementation task as `blocked-by` instead of opening a PR on
+   partial work.
 
-5. **Commit.** Stage only the changes the plan covered and split into
-   meaningful commits (implementation, tests, scaffolding, tooling). Every
-   subject carries the issue ref prefix per the session's commit-prefix
-   policy. Do not list commit SHAs in the issue body or comments — the
-   timeline already links commits by ref prefix.
-
-6. **Push.** Push the commits to the remote before refreshing `Resume` or
-   closing. The close should reference work that already exists on the
-   remote so the timeline's ref-prefixed commit links resolve the moment
-   the issue body lands.
-
-7. **Decide terminal state.** Pick one of five outcomes — this is a
-   judgment step, no writes yet.
-
-   - `closed: completed` — every Acceptance Criterion met, no external
-     gate remaining.
-   - `closed: completed (with deferrals)` — core intent met *and* every
-     unmet AC is **already captured in a separate follow-up issue**.
-     This is a hard gate: if any unmet AC lacks a real follow-up ref,
-     this branch is not eligible and the state falls back to
-     `still open: handoff` or `still open: <reason>`.
-   - `closed: <provider non-completion reason>` — the question is no
-     longer load-bearing; close with the provider's non-completion state
-     reason (GitHub `not_planned`, Jira `Won't Do` / `Cancelled` /
-     similar transition). For `spike`, this branch is only taken when
-     the user agrees the question is no longer load-bearing.
-   - `still open: handoff` — local implementation is finished but
-     external gates remain (push complete, review pending, merge,
-     deploy, integration). Deferred items are articulated as follow-up
-     **candidates** in `Open questions`, not yet split into separate
-     issues. Distinguished from "paused" by `Waiting for` pointing at an
-     external decision/action rather than an internal unresolved
-     question.
-   - `still open: <other reason>` — paused mid-flight, blocked by an
-     internal unresolved question, or otherwise not ready to hand off.
-
-   For `bug`, the regression test + fix evidence determines whether all
-   AC are met. For `spike`, captured evidence (Artifact Links + short
-   summary) accompanies the body update on whichever branch is chosen.
-
-8. **Refresh `Resume` and execute the writeback.** The `Resume` shape
-   varies by the terminal state chosen in step 7. Present the draft body
-   to the user before invoking. On freshness drift, reread the cache
-   paths the script reports and retry — never bypass the check.
-
-   - **Closed branches** (`closed: completed` /
-     `closed: completed (with deferrals)` /
-     `closed: <provider non-completion reason>`): closed-state snapshot
-     — `Approach` summarised, `Waiting for` empty, `Open questions`
-     resolved or each one moved into a follow-up issue ref, `Next` empty
-     or naming the follow-up. For the deferrals sub-branch, add an
-     explicit `Deferred to: <follow-up refs>` line so the carve-out is
-     visible from the closed body. Execute via the provider's writeback
-     update that changes body + state in one call (or, when the body
-     does not need to change, via the body-less close path).
-   - **`still open: handoff`**: handoff snapshot —  `Approach`
-     summarises what was delivered locally, `Waiting for` names the
-     external gate (review, merge, deploy, etc.), `Open questions`
-     enumerates deferred items each labelled as a follow-up
-     **candidate** (not yet ticketed), `Next` names the immediate next
-     action gating close. Execute via the provider's body-only writeback
-     update — no close call.
-   - **`still open: <other reason>`**: progress snapshot reflecting
-     current state (what landed so far, what blocks the next move,
-     unresolved questions, the next action). Execute via the provider's
-     body-only writeback update — no close call.
+   The skill does not run any edits, git commands, PR creation, or
+   workflow writes itself after this dispatch — that is the agent's
+   responsibility.
 
 ## Additional Requirements
 
 Treat `$ARGUMENTS` past the issue ref as extra emphasis from the user.
-Incorporate it into the relevant step rather than tacking it on at the end.
+Weave it into the plan you converge on in step 2, and pass it through
+verbatim to the agent in step 3 so the agent can honour it during
+execution.
 
 $ARGUMENTS
 
 ## Output
 
-Report only:
+Pass through what the agent returns. The skill itself adds nothing on top
+beyond confirming dispatch. The agent's report shape:
 
-1. Issue ref and final state — one of:
-   - `closed: completed`
-   - `closed: completed (deferrals → <follow-up refs>)`
-   - `closed: <provider non-completion reason>` (e.g. GitHub
-     `not_planned`, Jira `Won't Do` / `Cancelled`)
-   - `still open: handoff` — also name `Waiting for` and `Next`
-   - `still open: <other reason>` — paused, blocked, etc.
-2. Commit SHA(s), or `skipped`.
-3. One line per Acceptance Criterion paired with its status: concrete
-   evidence (closed branches), `deferred → <follow-up ref>`, or
-   `in progress: <state>` (open branches).
+1. Implementation issue ref and final state — one of:
+   - `still open: handoff (PR: <url>)` — successful execution; also
+     names `Waiting for` and `Next`
+   - `resolved: <provider terminal reason>` (e.g. GitHub
+     `state=closed --state-reason=not_planned`, Jira `Won't Do` /
+     `Cancelled`)
+   - `still open: blocked-by <review-ref>` — a `review` issue was
+     published mid-execution; also names the concern type (`finding` /
+     `gap` / `question`)
+   - `still open: <other reason>` — paused, blocked by an internal
+     unresolved question, etc.
+   - `stopped: <reason>` — operational stop (out-of-scope type,
+     freshness drift, write conflict, worktree or PR creation failure)
+2. PR URL, or `none`.
+3. Worktree path / branch, so the user can re-enter the work in progress.
+4. Commit SHA(s), or `skipped`.
+5. One line per Acceptance Criterion paired with its status: concrete
+   evidence (PR opened), `deferred → <follow-up ref>`,
+   `in progress: <state>` (open branches without PR), or
+   `unverified: <blocker>` (blocked / stopped).
+6. If a review was published: review ref, concern type, and one-sentence
+   summary, plus any further review candidates the agent observed.

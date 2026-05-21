@@ -75,6 +75,7 @@ def build_subagent_policy_context(
     *,
     plugin_root: Path | None = None,
     runtime: str | None = None,
+    agent_type: str | None = None,
 ) -> str:
     """Return SubagentStart context guidance injected into subagent prompts."""
 
@@ -85,11 +86,59 @@ def build_subagent_policy_context(
     issue_provider = _provider_segment(config, "issues", _KNOWN_ISSUE_PROVIDERS)
     issue_fetch_block = _read_snippet("issue-fetch", issue_provider)
     launcher_block = _build_launcher_block(runtime, resolved_plugin_root)
-    return (
+    text = (
         text
         .replace("{{WORKFLOW_LAUNCHER_BLOCK}}", launcher_block)
         .replace("{{WORKFLOW_ISSUE_FETCH_BLOCK}}", issue_fetch_block)
     )
+    agent_block = _build_agent_context_block(agent_type, issue_provider)
+    if agent_block:
+        text = f"{text}\n\n{agent_block}"
+    return text
+
+
+def _build_agent_context_block(
+    agent_type: str | None,
+    issue_provider: str,
+) -> str:
+    """Build the agent-specific context block appended at SubagentStart."""
+
+    name = _agent_type_segment(agent_type)
+    if name is None:
+        return ""
+    template_path = _CONTEXT_ROOT / "subagent" / "agents" / f"{name}.md"
+    try:
+        template = template_path.read_text(encoding="utf-8").strip()
+    except OSError:
+        return ""
+    if name == "issue-implementer":
+        return (
+            template
+            .replace("{{ISSUE_DRAFTS_REVIEW_BLOCK}}", _read_snippet("issue-drafts", issue_provider))
+            .replace(
+                "{{ISSUE_RELATIONSHIPS_BLOCKED_BY_BLOCK}}",
+                _read_snippet("issue-relationships", issue_provider),
+            )
+            .replace(
+                "{{ISSUE_WRITEBACK_BODY_BLOCK}}",
+                _read_snippet("issue-writeback", issue_provider),
+            )
+        )
+    return template
+
+
+def _agent_type_segment(agent_type: str | None) -> str | None:
+    """Normalise the harness-reported agent_type to a bare agent name."""
+
+    if not agent_type:
+        return None
+    text = str(agent_type).strip().lower()
+    if not text:
+        return None
+    # Strip a plugin namespace prefix (e.g., "workflow:issue-implementer").
+    if ":" in text:
+        text = text.rsplit(":", 1)[-1]
+    return text or None
 
 
 def _read_snippet(group: str, provider: str) -> str:

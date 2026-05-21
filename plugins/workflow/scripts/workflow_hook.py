@@ -191,10 +191,16 @@ def build_subagent_start_context(
     plugin_root: Path,
     *,
     runtime: str,
+    agent_type: str | None = None,
 ) -> str:
     """Build the SubagentStart context block for configured workflow projects."""
 
-    return build_subagent_policy_context(config, plugin_root=plugin_root, runtime=runtime)
+    return build_subagent_policy_context(
+        config,
+        plugin_root=plugin_root,
+        runtime=runtime,
+        agent_type=agent_type,
+    )
 
 
 def build_prompt_commit_context(config: WorkflowConfig, prompt_text: str) -> str:
