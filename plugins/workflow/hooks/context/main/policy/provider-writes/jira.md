@@ -19,13 +19,13 @@ The provider-write intents share one shape:
    flow is supported), and returns the cached `issue.md` path with the
    issue key and verification result. On freshness drift it returns
    `status=blocked` with the cache paths to reread; reread them and retry.
-   Relationship intent triggers a follow-up `jira_issue_relationships.py`
+   Relationship intent triggers a follow-up `issue_relationships.py`
    call.
 
 ## Publish a new issue
 
 ```bash
-"$WORKFLOW" jira_issue_drafts.py publish \
+"$WORKFLOW" issue_drafts.py publish \
   --type <task|bug|spike|epic|review|usecase|research> \
   --title <title> \
   --body-file <path> \
@@ -74,7 +74,7 @@ extra issue-link relationship.
 `--assignee <user>` sets the assignee at create time. The literal `me`
 resolves the current Jira user via `/rest/api/<v>/myself` and uses the
 returned `name` on the create payload. To clear an assignee on an
-existing issue, use `jira_issue_fields.py unassign`.
+existing issue, use `issue_fields.py unassign`.
 
 `--epic-name` overrides the Epic Name customfield at create time and is
 valid only with `--type epic` (defaults to `--title`); supplying it for any
@@ -86,7 +86,7 @@ setup skill); missing config raises `ProviderOperationError`.
 ## Append a comment
 
 ```bash
-"$WORKFLOW" jira_issue_comments.py append \
+"$WORKFLOW" issue_comments.py append \
   --issue <KEY> \
   --body-file <path> \
   [--type <task|bug|...>] \
@@ -105,7 +105,7 @@ section) raises `ProviderOperationError`.
 ## Update an existing issue body
 
 ```bash
-"$WORKFLOW" jira_issue_writeback.py update \
+"$WORKFLOW" issue_writeback.py update \
   --issue <KEY> \
   --body-file <path> \
   [--type <task|bug|...>] \
@@ -133,7 +133,7 @@ link surfaces, and refreshes the cache. No flag means no provider call
 (no-op).
 
 ```bash
-"$WORKFLOW" jira_issue_relationships.py <source-issue> \
+"$WORKFLOW" issue_relationships.py <source-issue> \
   [--parent <KEY> | --replace-parent <KEY> | --remove-parent] \
   [--epic <KEY> | --replace-epic <KEY> | --remove-epic] \
   [--blocked-by <KEY> ...] [--remove-blocked-by <KEY> ...] \
@@ -177,9 +177,9 @@ relationships in one call after the issue create.
 
 | Intent           | Script                                                          |
 |------------------|-----------------------------------------------------------------|
-| Body-less change | `jira_issue_fields.py {<verb> ...|assign|unassign|set-type}`   |
+| Body-less change | `issue_fields.py {<verb> ...|assign|unassign|set-type}`   |
 
-`jira_issue_fields.py` covers state transitions, assignee changes, and
+`issue_fields.py` covers state transitions, assignee changes, and
 issuetype swaps. Lifecycle subcommands are dynamic: one subcommand per
 `<verb>` key in `providers.issues.state_transitions`. Each takes
 `<issue> [--comment <text>]` and POSTs the configured transition.
@@ -190,7 +190,7 @@ verb list, the reserved verbs, and the config path on stderr and exits
 non-zero. `assign me` resolves the current Jira user via
 `/rest/api/<v>/myself`. `set-type` PUTs `fields.issuetype` using the
 `artifact_issue_types` mapping (built-in defaults plus
-`.workflow/config.yml` overrides). Use `jira_issue_writeback.py update`
+`.workflow/config.yml` overrides). Use `issue_writeback.py update`
 when the change must also rewrite the body or title.
 
 Run `"$WORKFLOW" <script>.py --help` only when you need a flag not listed
@@ -209,7 +209,9 @@ If a mutation response has `status=blocked` and `reread_required=true`,
 stop, reread the listed cache paths, and only then retry. Do not bypass
 the freshness check.
 
-## Do not call other provider families
+## Dispatcher routing
 
-Use only the Jira issue script family for this project. Do not call
-`github_issue_*.py` scripts when Jira is the configured issue provider.
+The unified `issue_*.py` dispatchers load `.workflow/config.yml` and
+route to the Jira backend automatically when `providers.issues.kind`
+is `jira`. `--help` shows only the active backend's options; supplying
+a GitHub-only flag exits with a clean parser error.

@@ -68,6 +68,27 @@ def main_context_fragment(name: str) -> str:
     return (_MAIN_CONTEXT_ROOT / name).read_text(encoding="utf-8").strip()
 
 
+def _composed_snippet(group: str, provider: str) -> str:
+    """Mirror :func:`workflow_main_context._read_snippet` for assertion helpers.
+
+    Concatenates ``snippets/<group>/common.md`` with
+    ``snippets/<group>/<provider>.md`` for ``provider ∈ {github, jira}``;
+    other providers read a single file as before.
+    """
+
+    base = _MAIN_CONTEXT_ROOT / "snippets" / group
+    extras = (base / f"{provider}.md").read_text(encoding="utf-8")
+    if provider in {"github", "jira"}:
+        common_path = base / "common.md"
+        if common_path.exists():
+            common = common_path.read_text(encoding="utf-8").rstrip()
+            extras_stripped = extras.strip()
+            if extras_stripped:
+                return f"{common}\n\n{extras_stripped}"
+            return common
+    return extras.strip()
+
+
 def expected_session_start_context(
     *,
     runtime: str,
@@ -76,8 +97,8 @@ def expected_session_start_context(
 ) -> str:
     text = main_context_fragment("main/session-policy.md")
     policy_dir = _PLUGIN_ROOT / "hooks" / "context" / "main" / "policy"
-    issue_fetch_block = main_context_fragment(f"snippets/issue-fetch/{issue_kind}.md")
-    issue_write_block = main_context_fragment(f"snippets/issue-write/{issue_kind}.md")
+    issue_fetch_block = _composed_snippet("issue-fetch", issue_kind)
+    issue_write_block = _composed_snippet("issue-write", issue_kind)
     launcher_block = main_context_fragment(f"snippets/launcher/{runtime}.md")
     if runtime == "codex":
         launcher_block = launcher_block.replace(
@@ -101,7 +122,7 @@ def expected_subagent_start_context(
     agent_type: str | None = None,
 ) -> str:
     text = main_context_fragment("subagent/policy.md")
-    issue_fetch_block = main_context_fragment(f"snippets/issue-fetch/{issue_kind}.md")
+    issue_fetch_block = _composed_snippet("issue-fetch", issue_kind)
     launcher_block = main_context_fragment(f"snippets/launcher/{runtime}.md")
     if runtime == "codex":
         launcher_block = launcher_block.replace(
@@ -115,11 +136,9 @@ def expected_subagent_start_context(
     agent_name = (agent_type or "").rsplit(":", 1)[-1].strip().lower() if agent_type else ""
     if agent_name == "issue-implementer":
         template = main_context_fragment("subagent/agents/issue-implementer.md")
-        drafts_block = main_context_fragment(f"snippets/issue-drafts/{issue_kind}.md")
-        relationships_block = main_context_fragment(
-            f"snippets/issue-relationships/{issue_kind}.md"
-        )
-        writeback_block = main_context_fragment(f"snippets/issue-writeback/{issue_kind}.md")
+        drafts_block = _composed_snippet("issue-drafts", issue_kind)
+        relationships_block = _composed_snippet("issue-relationships", issue_kind)
+        writeback_block = _composed_snippet("issue-writeback", issue_kind)
         agent_block = (
             template
             .replace("{{ISSUE_DRAFTS_REVIEW_BLOCK}}", drafts_block)
@@ -1381,9 +1400,9 @@ def test_claude_subagent_start_injects_issue_implementer_agent_block(
         issue_kind="github", agent_type="workflow:issue-implementer"
     )
     assert "## issue-implementer subagent context" in context
-    assert "github_issue_drafts.py publish" in context
-    assert "github_issue_relationships.py" in context
-    assert "github_issue_writeback.py update" in context
+    assert "issue_drafts.py publish" in context
+    assert "issue_relationships.py" in context
+    assert "issue_writeback.py update" in context
 
 
 def test_claude_subagent_start_emits_nothing_for_non_workflow_projects(
@@ -1966,7 +1985,7 @@ Updated body.
     assert payload["decision"] == "block"
     assert "projection has not been prepared yet" in reason
     assert f"Target: {issue_file}" in reason
-    assert "$WORKFLOW github_issue_fetch.py" in reason
+    assert "$WORKFLOW issue_fetch.py" in reason
 
 
 def test_provider_issue_cache_body_recognition_dispatches_to_provider_module(

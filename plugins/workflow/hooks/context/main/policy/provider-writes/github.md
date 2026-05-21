@@ -18,12 +18,12 @@ and update an existing issue body — share one shape:
    cached `issue.md` path with the issue ref and verification result. On
    freshness drift it returns `status=blocked` with the cache paths to
    reread; reread them and retry. Relationship intent triggers a follow-up
-   `github_issue_relationships.py` call.
+   `issue_relationships.py` call.
 
 ## Publish a new issue
 
 ```bash
-"$WORKFLOW" github_issue_drafts.py publish \
+"$WORKFLOW" issue_drafts.py publish \
   --type <task|bug|spike|epic|review|usecase|research> \
   --title <title> \
   --body-file <path> \
@@ -41,14 +41,14 @@ the newly created issue after the create succeeds.
 
 `--assignee <user>` sets the assignee at create time. The literal `me`
 resolves the current GitHub login via `gh api user` (same path as
-`github_issue_fields.py assign me`) and uses the returned login on the
+`issue_fields.py assign me`) and uses the returned login on the
 create. To clear assignees on an existing issue, use
-`github_issue_fields.py unassign`.
+`issue_fields.py unassign`.
 
 ## Append a comment
 
 ```bash
-"$WORKFLOW" github_issue_comments.py append \
+"$WORKFLOW" issue_comments.py append \
   --issue <ref> \
   --body-file <path> \
   [--type <type>] \
@@ -62,7 +62,7 @@ and `--state-reason` apply an inline state change on the same call.
 ## Update an existing issue body
 
 ```bash
-"$WORKFLOW" github_issue_writeback.py update \
+"$WORKFLOW" issue_writeback.py update \
   --issue <ref> \
   --body-file <path> \
   [--type <type>] \
@@ -93,7 +93,7 @@ provider to apply it directly, and refreshes the cache. No flag means no
 provider call (no-op).
 
 ```bash
-"$WORKFLOW" github_issue_relationships.py <source-issue> \
+"$WORKFLOW" issue_relationships.py <source-issue> \
   [--parent <ref> | --replace-parent <ref> | --remove-parent] \
   [--blocked-by <ref> ...] [--remove-blocked-by <ref> ...] \
   [--blocking <ref> ...]  [--remove-blocking <ref> ...] \
@@ -130,12 +130,12 @@ update.
 
 | Intent          | Script                                                            |
 |-----------------|-------------------------------------------------------------------|
-| Body-less change | `github_issue_fields.py {close|reopen|assign|unassign|set-type}` |
+| Body-less change | `issue_fields.py {close|reopen|assign|unassign|set-type}` |
 
-`github_issue_fields.py` covers state transitions, assignee changes, and
+`issue_fields.py` covers state transitions, assignee changes, and
 workflow-type label swaps. `assign me` resolves the current GitHub login
 via `gh api user`. `set-type` preserves non-type labels and swaps only the
-workflow-type label. Use `github_issue_writeback.py update` when the change
+workflow-type label. Use `issue_writeback.py update` when the change
 must also rewrite the body or title.
 
 Run `"$WORKFLOW" <script>.py --help` only when you need a flag not listed
@@ -154,7 +154,9 @@ If a mutation response has `status=blocked` and `reread_required=true`,
 stop, reread the listed cache paths, and only then retry. Do not bypass
 the freshness check.
 
-## Do not call other provider families
+## Dispatcher routing
 
-Use only the GitHub issue script family for this project. Do not call
-`jira_issue_*.py` scripts when GitHub is the configured issue provider.
+The unified `issue_*.py` dispatchers load `.workflow/config.yml` and
+route to the GitHub backend automatically when `providers.issues.kind`
+is `github`. `--help` shows only the active backend's options; supplying
+a Jira-only flag exits with a clean parser error.
