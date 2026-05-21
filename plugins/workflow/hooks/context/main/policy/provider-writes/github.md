@@ -4,7 +4,7 @@ The three provider-write intents — publish a new issue, append a comment,
 and update an existing issue body — share one shape:
 
 1. Resolve and read the authoring paths
-   (`"$WORKFLOW" authoring_resolver.py ...`; see `../authoring.md`).
+   (`workflow authoring_resolver.py ...`; see `../authoring.md`).
 2. Write the body to a temp file you choose. Body content is what gets
    sent; if the file happens to start with a YAML frontmatter block, the
    script strips it before posting. The cached `issue.md` body is
@@ -24,7 +24,7 @@ and update an existing issue body — share one shape:
 ## Publish a new issue
 
 ```bash
-"$WORKFLOW" issue.py new \
+workflow issue new \
   --type <task|bug|spike|epic|review|usecase|research> \
   --title <title> \
   --body-file <path> \
@@ -49,7 +49,7 @@ create. To clear assignees on an existing issue, use
 ## Append a comment
 
 ```bash
-"$WORKFLOW" issue.py comment \
+workflow issue comment \
   --issue <ref> \
   --body-file <path> \
   [--type <type>] \
@@ -63,7 +63,7 @@ and `--state-reason` apply an inline state change on the same call.
 ## Update an existing issue body
 
 ```bash
-"$WORKFLOW" issue.py update \
+workflow issue update \
   --issue <ref> \
   --body-file <path> \
   [--type <type>] \
@@ -94,7 +94,7 @@ provider to apply it directly, and refreshes the cache. No flag means no
 provider call (no-op).
 
 ```bash
-"$WORKFLOW" issue.py link <source-issue> \
+workflow issue link <source-issue> \
   [--parent <ref> | --replace-parent <ref> | --remove-parent] \
   [--blocked-by <ref> ...] [--remove-blocked-by <ref> ...] \
   [--blocking <ref> ...]  [--remove-blocking <ref> ...] \
@@ -139,7 +139,7 @@ transitions, assignee changes, and workflow-type label swaps. `assign
 preserves non-type labels and swaps only the workflow-type label. Use
 `issue.py update` when the change must also rewrite the body or title.
 
-Run `"$WORKFLOW" issue.py <verb> --help` only when you need a flag not
+Run `workflow issue <verb> --help` only when you need a flag not
 listed above.
 
 ## Body-file lifecycle

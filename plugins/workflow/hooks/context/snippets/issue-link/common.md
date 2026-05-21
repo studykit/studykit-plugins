@@ -1,7 +1,7 @@
 Link the implementation task as blocked by the newly published review:
 
 ```bash
-"$WORKFLOW" issue.py link <implementation-issue> \
+workflow issue link <implementation-issue> \
   --blocked-by <review-issue>
 ```
 

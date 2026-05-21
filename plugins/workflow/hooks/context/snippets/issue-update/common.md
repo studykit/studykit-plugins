@@ -4,7 +4,7 @@ uses this in two shapes.
 Body-only `Resume` update (handoff / paused snapshots, no state change):
 
 ```bash
-"$WORKFLOW" issue.py update \
+workflow issue update \
   --issue <implementation-issue> \
   --body-file <updated-body-path>
 ```

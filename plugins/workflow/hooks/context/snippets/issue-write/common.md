@@ -2,7 +2,7 @@ Write operations — read `{{WORKFLOW_POLICY_DIR}}/provider-writes/{{WORKFLOW_IS
 first. `--help` shows flag syntax only; it does not cover the
 `authoring_resolver.py` prereq, the body-file lifecycle, or freshness-drift
 handling. Every issue operation runs through the unified
-`$WORKFLOW issue.py` dispatcher; pick the subcommand by intent:
+`workflow issue` dispatcher; pick the subcommand by intent:
 
 - `issue.py new` — create a new issue
 - `issue.py comment` — add a comment
@@ -14,17 +14,17 @@ Common shapes (resolver prereq is required for any body-file flow):
 
 ```bash
 # Publish a new issue
-"$WORKFLOW" authoring_resolver.py --type task
+workflow authoring_resolver.py --type task
 # Read the returned paths, draft the body to <body-path>, get user approval.
-"$WORKFLOW" issue.py new \
+workflow issue new \
   --type task --title "<title>" --body-file <body-path>
 
 # Update an existing issue body
-"$WORKFLOW" issue.py update \
+workflow issue update \
   --type task --issue <issue> --body-file <body-path>
 
 # Add a relationship (also: --blocked-by, --blocking, --child, --related, --remove-*)
-"$WORKFLOW" issue.py link <issue> --parent <issue>
+workflow issue link <issue> --parent <issue>
 ```
 
 `issue.py` loads `.workflow/config.yml`, dispatches to the configured

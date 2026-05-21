@@ -14,9 +14,11 @@ if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
 from workflow_env import (  # noqa: E402
+    append_claude_env_file,
     codex_env_file_path,
     codex_env_exports,
     detect_shell_runtime,
+    render_path_prepend,
     render_shell_exports,
     write_codex_env_file,
     workflow_project_dir_from_env,
@@ -38,6 +40,60 @@ def test_render_shell_exports_quotes_values() -> None:
     assert "export WORKFLOW_PLUGIN_ROOT='/tmp/plugin root'" in rendered
     assert "export WORKFLOW_PROJECT_DIR=/tmp/project" in rendered
     assert "export WORKFLOW_SESSION_ID=session-1" in rendered
+
+
+def test_render_path_prepend_quotes_directory_and_is_idempotent(tmp_path: Path) -> None:
+    scripts_dir = tmp_path / "plugin with space" / "scripts"
+    snippet = render_path_prepend(scripts_dir)
+
+    assert f"__workflow_scripts_dir='{scripts_dir}'" in snippet
+    assert "export PATH" in snippet
+
+    probe = (
+        f"PATH=/usr/bin\n"
+        f"{snippet}"
+        f"{snippet}"
+        f"printf '%s' \"$PATH\"\n"
+    )
+    proc = subprocess.run(
+        ["sh", "-c", probe],
+        check=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+
+    assert proc.stdout == f"{scripts_dir}:/usr/bin"
+
+
+def test_append_claude_env_file_prepends_scripts_dir_to_path(tmp_path: Path) -> None:
+    env_file = tmp_path / "claude.env"
+
+    assert append_claude_env_file(
+        env_file=str(env_file),
+        project_dir=tmp_path,
+        plugin_root=_PLUGIN_ROOT,
+        session_id="claude-session-1",
+    )
+
+    content = env_file.read_text(encoding="utf-8")
+    assert f"export WORKFLOW={_SCRIPTS_DIR / 'workflow'}" in content
+    assert f"__workflow_scripts_dir={_SCRIPTS_DIR}" in content
+
+    probe = (
+        f"PATH=/usr/bin\n"
+        f". {env_file}\n"
+        f"printf '%s' \"$PATH\"\n"
+    )
+    proc = subprocess.run(
+        ["sh", "-c", probe],
+        check=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+
+    assert proc.stdout == f"{_SCRIPTS_DIR}:/usr/bin"
 
 
 def test_detect_shell_runtime_uses_exact_session_markers() -> None:
@@ -230,6 +286,20 @@ def test_workflow_wrapper_uses_terminal_defaults_without_runtime_marker(tmp_path
     assert payload["WORKFLOW_PLUGIN_ROOT"] == str(_PLUGIN_ROOT)
     assert payload["WORKFLOW_PROJECT_DIR"] == str(tmp_path)
     assert payload["WORKFLOW_SESSION_ID"] is None
+
+
+def test_workflow_wrapper_resolves_bare_name_to_py_script(tmp_path: Path) -> None:
+    proc = subprocess.run(
+        [str(_SCRIPTS_DIR / "workflow"), "issue", "--help"],
+        check=True,
+        cwd=tmp_path,
+        env={"PATH": os.environ.get("PATH", "")},
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+
+    assert "usage: issue.py <verb>" in proc.stdout
 
 
 def test_workflow_wrapper_terminal_defaults_use_launcher_plugin_root(tmp_path: Path) -> None:

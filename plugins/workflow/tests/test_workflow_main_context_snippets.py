@@ -4,8 +4,8 @@ Under ``config.issues.kind=github`` the composed snippet must not contain
 Jira-specific tokens (``--epic``, ``<KEY>``, ``--subtask-``, ``<verb>``);
 under ``config.issues.kind=jira`` the composed snippet must not contain
 GitHub-specific tokens (``<ref>``, ``--state-reason``, `` close ``, `` reopen ``
-static verbs). The ``unsupported`` / ``filesystem`` providers must keep
-reading a single file (no ``common.md`` prepended).
+static verbs). The ``filesystem`` provider must keep reading a single file
+(no ``common.md`` prepended).
 """
 
 from __future__ import annotations
@@ -25,10 +25,10 @@ from workflow_main_context import _read_snippet  # noqa: E402
 
 _INTENTS = (
     "issue-fetch",
-    "issue-drafts",
+    "issue-new",
     "issue-write",
-    "issue-writeback",
-    "issue-relationships",
+    "issue-update",
+    "issue-link",
 )
 
 _JIRA_ONLY_TOKENS = ("--epic", "<KEY>", "--subtask-", "<verb>")
@@ -79,20 +79,6 @@ def test_jira_composition_prepends_common(intent: str) -> None:
     assert composed.startswith(common[: min(80, len(common))]), (
         f"common.md prefix not detected at the head of the {intent!r} composition "
         f"under jira"
-    )
-
-
-@pytest.mark.parametrize("intent", _INTENTS)
-def test_unsupported_provider_reads_single_file(intent: str) -> None:
-    """``unsupported`` does NOT prepend common.md."""
-    composed = _read_snippet(intent, "unsupported")
-    unsupported_path = (
-        _PLUGIN_ROOT / "hooks" / "context" / "snippets" / intent / "unsupported.md"
-    )
-    expected = unsupported_path.read_text(encoding="utf-8").strip()
-    assert composed == expected, (
-        f"unsupported.md content should be returned verbatim for {intent!r}; "
-        f"common.md must not be prepended"
     )
 
 

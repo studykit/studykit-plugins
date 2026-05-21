@@ -63,8 +63,8 @@ When used:
 
 ## Provider update intent
 
-When running `$WORKFLOW issue.py update` or
-`$WORKFLOW issue.py {state <KEY> <verb>|assign|unassign|set-type}`
+When running `workflow issue update` or
+`workflow issue {state <KEY> <verb>|assign|unassign|set-type}`
 to update provider-owned Jira issue fields, supply only the values needed
 for the requested update.
 

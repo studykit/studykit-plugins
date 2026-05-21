@@ -12,9 +12,12 @@ import pytest
 
 _PLUGIN_ROOT = Path(__file__).resolve().parent.parent
 _SCRIPTS_DIR = _PLUGIN_ROOT / "scripts"
+_HOOK_SCRIPTS_DIR = _PLUGIN_ROOT / "hooks" / "scripts"
 _MAIN_CONTEXT_ROOT = _PLUGIN_ROOT / "hooks" / "context"
 if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
+if str(_HOOK_SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(_HOOK_SCRIPTS_DIR))
 
 import workflow_hook  # noqa: E402
 from workflow_command import CommandRequest, CommandResult  # noqa: E402
@@ -136,9 +139,9 @@ def expected_subagent_start_context(
     agent_name = (agent_type or "").rsplit(":", 1)[-1].strip().lower() if agent_type else ""
     if agent_name == "issue-implementer":
         template = main_context_fragment("subagent/agents/issue-implementer.md")
-        drafts_block = _composed_snippet("issue-drafts", issue_kind)
-        relationships_block = _composed_snippet("issue-relationships", issue_kind)
-        writeback_block = _composed_snippet("issue-writeback", issue_kind)
+        drafts_block = _composed_snippet("issue-new", issue_kind)
+        relationships_block = _composed_snippet("issue-link", issue_kind)
+        writeback_block = _composed_snippet("issue-update", issue_kind)
         agent_block = (
             template
             .replace("{{ISSUE_DRAFTS_REVIEW_BLOCK}}", drafts_block)
@@ -1030,7 +1033,7 @@ def test_session_start_injects_policy_for_configured_project(
     policy_dir = _PLUGIN_ROOT / "hooks" / "context" / "main" / "policy"
     assert "## workflow policy" in context
     if runtime == "claude":
-        assert "\"$WORKFLOW\" <script>.py" in context
+        assert "workflow <script>" in context
     else:
         assert f"\"{_PLUGIN_ROOT}/scripts/workflow\" <script>.py" in context
         assert "{{WORKFLOW_PLUGIN_ROOT}}" not in context
@@ -1073,6 +1076,7 @@ def test_claude_session_start_appends_workflow_env_file(
     assert f"export WORKFLOW_PLUGIN_ROOT={_PLUGIN_ROOT}" in content
     assert f"export WORKFLOW_PROJECT_DIR={tmp_path}" in content
     assert "export WORKFLOW_SESSION_ID=claude-shell-session" in content
+    assert f"__workflow_scripts_dir={_PLUGIN_ROOT / 'scripts'}" in content
     assert "AUTHORING_RESOLVER" not in content
 
 
@@ -1400,9 +1404,9 @@ def test_claude_subagent_start_injects_issue_implementer_agent_block(
         issue_kind="github", agent_type="workflow:issue-implementer"
     )
     assert "## issue-implementer subagent context" in context
-    assert "issue.py new" in context
-    assert "issue.py link" in context
-    assert "issue.py update" in context
+    assert "issue new" in context
+    assert "issue link" in context
+    assert "issue update" in context
 
 
 def test_claude_subagent_start_emits_nothing_for_non_workflow_projects(
@@ -1467,7 +1471,7 @@ def test_static_claude_manifest_registers_global_subagent_start_hook() -> None:
     assert "SubagentStart" in manifest["hooks"]
     assert "matcher" not in manifest["hooks"]["SubagentStart"][0]
     assert manifest["hooks"]["SubagentStart"][0]["hooks"][0]["command"] == (
-        'uv run --script "${CLAUDE_PLUGIN_ROOT}/scripts/hook_claude.py"'
+        'uv run --script "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/hook_claude.py"'
     )
 
 
@@ -1985,7 +1989,7 @@ Updated body.
     assert payload["decision"] == "block"
     assert "projection has not been prepared yet" in reason
     assert f"Target: {issue_file}" in reason
-    assert "$WORKFLOW issue.py fetch" in reason
+    assert "workflow issue fetch" in reason
 
 
 def test_provider_issue_cache_body_recognition_dispatches_to_provider_module(

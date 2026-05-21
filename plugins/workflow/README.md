@@ -75,7 +75,7 @@ Workflow authoring contracts apply only to workflow artifact types:
 - Dual-role: `usecase` and `research`.
 
 Before editing a workflow artifact, resolve the required authoring paths via
-`"$WORKFLOW" authoring_resolver.py --type <type> --role <role>`, then
+`workflow authoring_resolver.py --type <type> --role <role>`, then
 read the returned files from `authoring/`. For non-workflow artifacts, such
 as `AGENTS.md`, `CLAUDE.md`, plugin README files, ordinary docs outside
 configured workflow knowledge, or host configuration files, the resolver
@@ -86,8 +86,8 @@ returns `NONE`.
 The main assistant runs all workflow provider, cache, and authoring
 operations through the workflow launcher, with runtime-specific guidance
 under `hooks/context/snippets/launcher/<runtime>.md`
-(Claude uses the persisted `$WORKFLOW` contract; Codex invokes the
-launcher by absolute path). Detailed procedures — launcher invocation,
+(Claude has the `workflow` launcher on `PATH`; Codex invokes the launcher
+by absolute path). Detailed procedures — launcher invocation,
 authoring path resolution, and the publish/append/update body-file
 contract — live as on-demand files under
 `hooks/context/main/policy/`. The always-loaded entry point at

@@ -114,14 +114,14 @@ def _build_agent_context_block(
     if name == "issue-implementer":
         return (
             template
-            .replace("{{ISSUE_DRAFTS_REVIEW_BLOCK}}", _read_snippet("issue-drafts", issue_provider))
+            .replace("{{ISSUE_DRAFTS_REVIEW_BLOCK}}", _read_snippet("issue-new", issue_provider))
             .replace(
                 "{{ISSUE_RELATIONSHIPS_BLOCKED_BY_BLOCK}}",
-                _read_snippet("issue-relationships", issue_provider),
+                _read_snippet("issue-link", issue_provider),
             )
             .replace(
                 "{{ISSUE_WRITEBACK_BODY_BLOCK}}",
-                _read_snippet("issue-writeback", issue_provider),
+                _read_snippet("issue-update", issue_provider),
             )
         )
     return template

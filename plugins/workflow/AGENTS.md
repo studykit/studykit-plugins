@@ -46,7 +46,7 @@ that wording is intentionally a contract.
 
 Before writing or editing any `agents/<name>.md` or
 `skills/<name>/SKILL.md` in this plugin, **read the context that
-`scripts/hook_claude.py` injects on the surface you are authoring**.
+`hooks/scripts/hook_claude.py` injects on the surface you are authoring**.
 Skipping this leaves the doc duplicating runtime-injected text, restating
 it stale, or — worse — assuming context that isn't actually injected on
 that surface and leaving the runtime instance missing what it needs.
@@ -64,11 +64,11 @@ Where the injected text comes from:
   - `policy.md` (general subagent policy)
   - `agents/<agent-name>.md` (per-agent block, when present)
 - **Provider snippets** — `hooks/context/snippets/{issue-fetch,
-  issue-write, issue-writeback, issue-relationships, issue-drafts,
+  issue-write, issue-update, issue-link, issue-new,
   launcher}/<provider>.md` are composed into the above blocks based
   on the active issue provider.
 
-`hooks/hooks.json` and `scripts/hook_claude.py` are the source of truth
+`hooks/hooks.json` and `hooks/scripts/hook_claude.py` are the source of truth
 whenever the layout above looks stale.
 
 Rules that follow:
@@ -83,5 +83,5 @@ Rules that follow:
   needed inputs through the caller's dispatch arguments instead.
 - When adding a new agent that needs its own injected block, add the
   file under `hooks/context/subagent/agents/`, wire it through
-  `scripts/hook_claude.py`, and only then reference it from the agent
+  `hooks/scripts/hook_claude.py`, and only then reference it from the agent
   body.

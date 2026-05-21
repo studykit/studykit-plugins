@@ -4,7 +4,7 @@ description: "Wrap a workflow session: refresh in-flight issue Resume sections a
 argument-hint: "[additional requirements]"
 disable-model-invocation: true
 allowed-tools:
-  - 'Bash("$WORKFLOW":*)'
+  - 'Bash(workflow:*)'
   - 'Bash(date:*)'
   - 'Bash(git status:*)'
   - 'Bash(git log:*)'
@@ -18,7 +18,7 @@ Leave durable continuation context for a fresh session that cannot see this conv
 ## Core rules
 
 - Refresh in-issue resume context first: for every touched mid-flight issue, rewrite the `Resume` section in the issue body so the issue alone shows current approach, who/what it is waiting for, open questions, and the next step. Append a comment only for narrative-worthy events: decision pivots, blocker resolutions, or approach changes. Follow `${CLAUDE_PLUGIN_ROOT}/authoring/common/issue-body.md` for `Resume` slot meaning and reference form.
-- The cached `issue.md` and `comment-*.md` projections are read-only. Resume rewrites and comments must go through the configured provider write scripts via `$WORKFLOW` per `${CLAUDE_PLUGIN_ROOT}/hooks/context/main/policy/provider-writes/`. Mutations require a temp body file, user approval, and the freshness-check flow.
+- The cached `issue.md` and `comment-*.md` projections are read-only. Resume rewrites and comments must go through the configured provider write scripts via the `workflow` launcher per `${CLAUDE_PLUGIN_ROOT}/hooks/context/main/policy/provider-writes/`. Mutations require a temp body file, user approval, and the freshness-check flow.
 - Session-level residual that does not fit any in-flight issue's body lands in `review`-type issues. Each review item holds one concern only (`finding` / `gap` / `question`) per `${CLAUDE_PLUGIN_ROOT}/authoring/common/review-authoring.md`. Do not pack multiple concerns into one review; do not create a review item when an existing in-flight issue's `Resume` or a comment can hold it.
 
 ## Handoff gate
@@ -41,7 +41,7 @@ Long-lived user or project preferences belong in durable project guidance (`CLAU
 
 ### Stage 2 — residual check
 
-Ask: can the next session reach every mid-flight issue's next step by running `"$WORKFLOW" issue.py fetch <ref>` for each touched ref, reading the resulting `issue.md` (Resume section plus the recent `comment-*.md` tail), plus `git log --oneline origin/main..HEAD` and commit messages?
+Ask: can the next session reach every mid-flight issue's next step by running `workflow issue fetch <ref>` for each touched ref, reading the resulting `issue.md` (Resume section plus the recent `comment-*.md` tail), plus `git log --oneline origin/main..HEAD` and commit messages?
 
 - If yes, stop. Report pre-handoff commit(s) or `skipped`, the issue refs whose `Resume` and / or comments were updated, and `no session-level residual — no review issues published`.
 - If no, identify each residual concern as a single `finding`, `gap`, or `question`, and publish one review issue per concern.
@@ -65,7 +65,7 @@ Non-triggers on their own (do not publish a review for these):
 1. **Refresh touched mid-flight issues before anything else.**
    - Scope: every issue touched, opened, advanced, blocked, or relied on this session, excluding ones already closed / discarded / superseded at the provider.
    - For each, draft the new `Resume` section as a current snapshot per `${CLAUDE_PLUGIN_ROOT}/authoring/common/issue-body.md`: Approach / Waiting for / Open questions / Next. Remove stale items; the `Resume` section is rewritten in place and does not preserve history.
-   - Resolve authoring paths first: `"$WORKFLOW" authoring_resolver.py --type <type>` and read the returned files. The provider-write contract (publish / append / update body-file flow, freshness handling) lives at `${CLAUDE_PLUGIN_ROOT}/hooks/context/main/policy/provider-writes/<provider>.md` — open it before drafting.
+   - Resolve authoring paths first: `workflow authoring_resolver.py --type <type>` and read the returned files. The provider-write contract (publish / append / update body-file flow, freshness handling) lives at `${CLAUDE_PLUGIN_ROOT}/hooks/context/main/policy/provider-writes/<provider>.md` — open it before drafting.
    - Apply the rewrite via `issue.py update --issue <ref> --body-file <path>`. Present the draft body to the user for approval before invoking the script. On `status=blocked` (freshness drift), reread the listed cache paths and retry; never bypass the freshness check.
    - For narrative-worthy events (decision pivot, blocker resolution, approach change), add a comment via `issue.py comment --issue <ref> --body-file <path>`. Do not log routine status changes. Do not list commit SHAs in the comment body by default; the timeline already links commits whose subjects carry the issue ref prefix.
    - For cross-cutting decisions across siblings sharing a parent, leave the parent's comment as the durable record and update each affected child's `Resume` Open-questions slot to cite the parent.
@@ -82,7 +82,7 @@ Non-triggers on their own (do not publish a review for these):
    - Otherwise, list each residual concern atomically. One concern per review item. The concern type is one of `finding`, `gap`, or `question` per `${CLAUDE_PLUGIN_ROOT}/authoring/common/review-authoring.md`.
 
 4. **Publish one `review` issue per residual concern.**
-   - Resolve authoring paths: `"$WORKFLOW" authoring_resolver.py --type review` and read the returned files.
+   - Resolve authoring paths: `workflow authoring_resolver.py --type review` and read the returned files.
    - Draft each review body per `${CLAUDE_PLUGIN_ROOT}/authoring/common/review-authoring.md`: a `Description` that states the single concern, why it matters, and what would resolve it; optional `Suggested Fix`, `Evidence`, `Resume`. Identify the target issue or content per the review-target rules; if truly cross-cutting, say so explicitly in `Description`.
    - Reference related in-flight issues by provider-native ref (`#NNN` for GitHub Issues, `KEY-NNN` for Jira). Do not use cache projection paths as identity. Do not paste issue body or comment content; link instead.
    - Publish via `issue.py new --type review --title <title> --body-file <path>` after presenting the draft and obtaining user approval. Link siblings or the parent using relationship flags when appropriate.

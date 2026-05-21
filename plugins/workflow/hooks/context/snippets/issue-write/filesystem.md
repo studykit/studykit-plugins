@@ -7,6 +7,6 @@ directly in the working tree. Do not call `github_issue_*.py` or
 Most common shape — resolve then edit:
 
 ```bash
-"$WORKFLOW" authoring_resolver.py --type task
+workflow authoring_resolver.py --type task
 # Edit the returned files directly; commit through normal git.
 ```

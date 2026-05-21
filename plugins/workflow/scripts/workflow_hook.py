@@ -266,7 +266,7 @@ def provider_cache_body_write_reason(target: EditTarget, config: WorkflowConfig)
             "because the projection has not been prepared yet.\n\n"
             f"Target: {target.path}\n\n"
             "Refresh the cache projection with the workflow fetch dispatcher "
-            "(`$WORKFLOW issue.py fetch`), "
+            "(`workflow issue fetch`), "
             "then edit only the Markdown body below the existing YAML frontmatter."
         )
 
@@ -279,8 +279,8 @@ def provider_cache_body_write_reason(target: EditTarget, config: WorkflowConfig)
         f"Target: {target.path}\n\n"
         "Write the new body or comment to a caller-chosen temp file and run the "
         "matching workflow dispatcher with `--body-file <path>` "
-        "(`$WORKFLOW issue.py update` or "
-        "`$WORKFLOW issue.py comment`) "
+        "(`workflow issue update` or "
+        "`workflow issue comment`) "
         "instead of editing the cached file in place."
     )
 

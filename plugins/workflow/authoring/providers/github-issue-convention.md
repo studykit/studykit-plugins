@@ -56,8 +56,8 @@ When used:
 
 ## Provider update intent
 
-When running `$WORKFLOW issue.py update` or
-`$WORKFLOW issue.py {state <ref> close|state <ref> reopen|assign|unassign|set-type}`
+When running `workflow issue update` or
+`workflow issue {state <ref> close|state <ref> reopen|assign|unassign|set-type}`
 to update provider-owned GitHub issue fields, supply only the values
 needed for the requested update.
 

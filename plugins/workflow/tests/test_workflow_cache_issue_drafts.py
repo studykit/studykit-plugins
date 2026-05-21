@@ -12,9 +12,9 @@ if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
 from issue.legacy.issue_comments import main as github_issue_comments_main  # noqa: E402
-from issue.legacy.issue_drafts import main as github_issue_drafts_main  # noqa: E402
-from issue.legacy.issue_writeback import main as github_issue_writeback_main  # noqa: E402
-from issue.legacy.issue_drafts import main as jira_issue_drafts_main  # noqa: E402
+from issue.legacy.issue_new import main as github_issue_drafts_main  # noqa: E402
+from issue.legacy.issue_update import main as github_issue_writeback_main  # noqa: E402
+from issue.legacy.issue_new import main as jira_issue_drafts_main  # noqa: E402
 from workflow_command import CommandRequest, CommandResult  # noqa: E402
 from issue.github.cache import GitHubIssueCache  # noqa: E402
 from workflow_github import DEFAULT_ISSUE_FIELDS  # noqa: E402

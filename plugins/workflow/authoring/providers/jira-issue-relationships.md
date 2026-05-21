@@ -18,7 +18,7 @@ Do not infer Jira link type names, directions, remote-link surfaces, or parent f
 
 ## Relationship intents
 
-When running `$WORKFLOW issue.py link` to apply a Jira relationship, supply the source issue key, canonical relationship intent, and target reference.
+When running `workflow issue link` to apply a Jira relationship, supply the source issue key, canonical relationship intent, and target reference.
 
 Use these canonical intents:
 
@@ -36,4 +36,4 @@ Use body fallback sections only when configured native relationship storage is u
 
 Do not duplicate Jira-native hierarchy, issue links, or remote links in issue body sections. Read `./jira-issue-anti-patterns.md` for forbidden body sections and fallback boundaries.
 
-Apply provider relationship changes through `$WORKFLOW issue.py link`. The main assistant supplies the relationship intent and target references; the script owns provider invocation and cache refresh.
+Apply provider relationship changes through `workflow issue link`. The main assistant supplies the relationship intent and target references; the script owns provider invocation and cache refresh.

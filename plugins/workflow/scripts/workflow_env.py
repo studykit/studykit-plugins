@@ -94,6 +94,20 @@ def append_shell_exports(path: Path, values: Mapping[str, str]) -> bool:
         return False
 
 
+def render_path_prepend(directory: Path) -> str:
+    """Render an idempotent POSIX shell snippet that prepends ``directory`` to ``PATH``."""
+
+    quoted = shlex.quote(str(directory))
+    return (
+        f"__workflow_scripts_dir={quoted}\n"
+        f'case ":${{PATH-}}:" in\n'
+        f'    *":$__workflow_scripts_dir:"*) ;;\n'
+        f'    *) PATH="$__workflow_scripts_dir${{PATH:+:}}${{PATH-}}"; export PATH ;;\n'
+        f"esac\n"
+        f"unset __workflow_scripts_dir\n"
+    )
+
+
 def write_shell_exports(path: Path, values: Mapping[str, str]) -> bool:
     """Write a complete workflow export file."""
 
@@ -171,14 +185,22 @@ def append_claude_env_file(
 
     if not env_file or not session_id:
         return False
-    return append_shell_exports(
-        Path(env_file),
-        workflow_env_values(
-            plugin_root=plugin_root,
-            project_dir=project_dir,
-            session_id=session_id,
-        ),
+    resolved_plugin_root = plugin_root.expanduser().resolve()
+    values = workflow_env_values(
+        plugin_root=resolved_plugin_root,
+        project_dir=project_dir,
+        session_id=session_id,
     )
+    scripts_dir = resolved_plugin_root / "scripts"
+    try:
+        path = Path(env_file).expanduser()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("a", encoding="utf-8") as handle:
+            handle.write(render_shell_exports(values))
+            handle.write(render_path_prepend(scripts_dir))
+        return True
+    except OSError:
+        return False
 
 
 def workflow_project_dir_from_env(

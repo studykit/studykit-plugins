@@ -1,7 +1,7 @@
 Body + state update (closing with a non-completion reason):
 
 ```bash
-"$WORKFLOW" issue.py update \
+workflow issue update \
   --issue <implementation-ref> \
   --body-file <updated-body-path> \
   --state closed \

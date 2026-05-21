@@ -14,7 +14,7 @@ if str(_SCRIPTS_DIR) not in sys.path:
 
 from workflow_cache import relationship_operations_from_intent  # noqa: E402
 from issue.github.cache import GitHubIssueCache  # noqa: E402
-from issue.legacy.issue_relationships import main as github_issue_relationships_main  # noqa: E402
+from issue.legacy.issue_link import main as github_issue_relationships_main  # noqa: E402
 from workflow_command import CommandRequest, CommandResult  # noqa: E402
 from workflow_github import GitHubRepository  # noqa: E402
 
@@ -320,7 +320,7 @@ issue_id_format: jira
 
 
 def test_jira_relationships_cli_no_flag_returns_flat_no_op(tmp_path: Path) -> None:
-    from issue.legacy.issue_relationships import main as jira_issue_relationships_main  # noqa: E402
+    from issue.legacy.issue_link import main as jira_issue_relationships_main  # noqa: E402
 
     write_jira_config(tmp_path)
 

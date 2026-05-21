@@ -14,25 +14,25 @@ never create or recommend legacy `workflow.config.yml`.
 
 Resolve the workflow launcher relative to this `SKILL.md` as
 `../../scripts/workflow`, then run `workflow_setup.py` through it. In installed
-workflow sessions, `$WORKFLOW` may already point to the launcher.
+workflow sessions, the `workflow` launcher is already on `PATH`.
 
 Useful commands:
 
 ```bash
-"$WORKFLOW" workflow_setup.py probe-git-remote --project <project-root>
-"$WORKFLOW" workflow_setup.py profile-from-docs <profile-docs...>
-"$WORKFLOW" workflow_setup.py capabilities --issue-provider <provider> --knowledge-provider <provider>
-"$WORKFLOW" workflow_setup.py jira-relationship-inspect --jira-site <url> --issue <KEY>
-"$WORKFLOW" workflow_setup.py jira-relationship-inspect --jira-site <url> --jira-project <PROJECT> --issue <ISSUE-123>
-"$WORKFLOW" workflow_setup.py jira-relationship-inspect --jira-site <url> --field-query <field-name-or-id>
-"$WORKFLOW" workflow_setup.py jira-state-transition-inspect --jira-site <url> --issue <KEY-A> --issue <KEY-B>
-"$WORKFLOW" workflow_setup.py jira-relationship-mappings --issue-link blocked_by=Blocks:inward --field child=parent:target:key
-"$WORKFLOW" workflow_setup.py build-config --project <project-root> --issue-provider <provider> --knowledge-provider <provider> <options...>
-"$WORKFLOW" workflow_setup.py build-config --issue-provider jira --knowledge-provider <provider> --jira-snapshot-hidden-comment-marker '!git-event' <options...>
-"$WORKFLOW" workflow_setup.py build-config --issue-provider jira --knowledge-provider <provider> --jira-epic-field-name <id> --jira-epic-field-link <id> --jira-epic-field-status <id> [--jira-epic-issue-type <NAME>] <options...>
-"$WORKFLOW" workflow_setup.py build-config --issue-provider jira --knowledge-provider <provider> --jira-state-transition <verb>=<transition> [--jira-state-transition <verb>=<transition> ...] <options...>
-"$WORKFLOW" workflow_setup.py write --project <project-root> --config <reviewed-yaml-file>
-"$WORKFLOW" workflow_config.py --project <project-root> --require
+workflow workflow_setup.py probe-git-remote --project <project-root>
+workflow workflow_setup.py profile-from-docs <profile-docs...>
+workflow workflow_setup.py capabilities --issue-provider <provider> --knowledge-provider <provider>
+workflow workflow_setup.py jira-relationship-inspect --jira-site <url> --issue <KEY>
+workflow workflow_setup.py jira-relationship-inspect --jira-site <url> --jira-project <PROJECT> --issue <ISSUE-123>
+workflow workflow_setup.py jira-relationship-inspect --jira-site <url> --field-query <field-name-or-id>
+workflow workflow_setup.py jira-state-transition-inspect --jira-site <url> --issue <KEY-A> --issue <KEY-B>
+workflow workflow_setup.py jira-relationship-mappings --issue-link blocked_by=Blocks:inward --field child=parent:target:key
+workflow workflow_setup.py build-config --project <project-root> --issue-provider <provider> --knowledge-provider <provider> <options...>
+workflow workflow_setup.py build-config --issue-provider jira --knowledge-provider <provider> --jira-snapshot-hidden-comment-marker '!git-event' <options...>
+workflow workflow_setup.py build-config --issue-provider jira --knowledge-provider <provider> --jira-epic-field-name <id> --jira-epic-field-link <id> --jira-epic-field-status <id> [--jira-epic-issue-type <NAME>] <options...>
+workflow workflow_setup.py build-config --issue-provider jira --knowledge-provider <provider> --jira-state-transition <verb>=<transition> [--jira-state-transition <verb>=<transition> ...] <options...>
+workflow workflow_setup.py write --project <project-root> --config <reviewed-yaml-file>
+workflow workflow_config.py --project <project-root> --require
 ```
 
 ## Setup Flow
@@ -231,7 +231,7 @@ Use `--jira-relationship-mappings-json` or
 The compact mapping helper accepts exact relationship specs:
 
 ```bash
-"$WORKFLOW" workflow_setup.py jira-relationship-mappings \
+workflow workflow_setup.py jira-relationship-mappings \
   --issue-link blocked_by=Blocks:inward \
   --issue-link blocking=Blocks:outward \
   --remote-link "related=relates to" \

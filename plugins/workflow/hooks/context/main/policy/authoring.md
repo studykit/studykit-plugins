@@ -3,7 +3,7 @@
 Resolve authoring paths with:
 
 ```bash
-"$WORKFLOW" authoring_resolver.py \
+workflow authoring_resolver.py \
   --type <type> \
   [--role issue|knowledge] \
   [--scope comment] \
