@@ -15,6 +15,7 @@ parallel hook processes do not overwrite each other's parent-session updates.
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
+from datetime import datetime, timezone
 import json
 import re
 import shlex
@@ -291,6 +292,60 @@ def record_authoring_file_read(
     return _mutate_session_state(project, runtime, session_id, mutator)
 
 
+def read_authoring_resolution(
+    project: Path,
+    runtime: str,
+    session_id: str,
+    anchor: str,
+) -> dict[str, Any] | None:
+    normalized_anchor = str(anchor).strip()
+    if not normalized_anchor:
+        return None
+    return _authoring_resolution(
+        _read_session_state(project, runtime, session_id),
+        normalized_anchor,
+    )
+
+
+def record_authoring_resolution(
+    project: Path,
+    runtime: str,
+    session_id: str,
+    *,
+    anchor: str,
+    key: Mapping[str, Any],
+    body: list[str] | tuple[str, ...],
+    emitted_at: str | None = None,
+) -> bool:
+    normalized_anchor = str(anchor).strip()
+    if not normalized_anchor:
+        return False
+    normalized_key = {
+        str(name): _coerce_resolution_key_value(value)
+        for name, value in dict(key).items()
+        if str(name)
+    }
+    normalized_body = [str(line) for line in body]
+    if emitted_at and str(emitted_at).strip():
+        normalized_emitted_at = str(emitted_at).strip()
+    else:
+        normalized_emitted_at = datetime.now(timezone.utc).isoformat()
+
+    def mutator(state: dict[str, Any]) -> None:
+        authoring = _authoring_section(state)
+        resolutions = authoring.get("resolutions")
+        if not isinstance(resolutions, dict):
+            resolutions = {}
+            authoring["resolutions"] = resolutions
+        resolutions[normalized_anchor] = {
+            "key": dict(normalized_key),
+            "body": list(normalized_body),
+            "emitted_at": normalized_emitted_at,
+        }
+
+    return _mutate_session_state(project, runtime, session_id, mutator)
+
+
 def read_subagent_starts(
     project: Path,
     runtime: str,
@@ -518,6 +573,43 @@ def _authoring_file_reads(state: Mapping[str, Any]) -> list[dict[str, str]]:
             continue
         reads[path] = {"path": path, "relative_path": relative_path}
     return sorted(reads.values(), key=lambda item: (item["relative_path"], item["path"]))
+
+
+def _authoring_resolution(
+    state: Mapping[str, Any], anchor: str
+) -> dict[str, Any] | None:
+    authoring = state.get("authoring")
+    if not isinstance(authoring, Mapping):
+        return None
+    resolutions = authoring.get("resolutions")
+    if not isinstance(resolutions, Mapping):
+        return None
+    entry = resolutions.get(anchor)
+    if not isinstance(entry, Mapping):
+        return None
+    raw_key = entry.get("key")
+    raw_body = entry.get("body")
+    raw_emitted_at = entry.get("emitted_at")
+    if not isinstance(raw_key, Mapping) or not isinstance(raw_body, list):
+        return None
+    coerced_key: dict[str, str | None] = {}
+    for name, value in raw_key.items():
+        if not isinstance(name, str) or not name:
+            continue
+        coerced_key[name] = None if value is None else str(value)
+    coerced_body = [str(line) for line in raw_body if isinstance(line, str)]
+    coerced_emitted_at = raw_emitted_at if isinstance(raw_emitted_at, str) else ""
+    return {
+        "key": coerced_key,
+        "body": coerced_body,
+        "emitted_at": coerced_emitted_at,
+    }
+
+
+def _coerce_resolution_key_value(value: Any) -> str | None:
+    if value is None:
+        return None
+    return str(value)
 
 
 def _subagents_section(state: dict[str, Any]) -> dict[str, Any]:
