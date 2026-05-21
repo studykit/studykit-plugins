@@ -7,5 +7,5 @@ the matching legacy intent without duplicating logic.
 
 The files retain their PEP 723 inline metadata, so they remain runnable
 in isolation via ``uv run --script`` for debugging, but the public
-``$WORKFLOW`` surface is ``issue.py <verb>``.
+surface is ``workflow issue <verb>``.
 """

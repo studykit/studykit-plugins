@@ -6,7 +6,7 @@ Backend-only extras for GitHub issues:
 
 ```bash
 # Close, reopen, assign, unassign, or change the workflow-type label
-"$WORKFLOW" issue.py state <ref> close
-"$WORKFLOW" issue.py assign <ref> me
-"$WORKFLOW" issue.py set-type <ref> bug
+workflow issue state <ref> close
+workflow issue assign <ref> me
+workflow issue set-type <ref> bug
 ```

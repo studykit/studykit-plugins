@@ -378,7 +378,7 @@ Hook behavior differs by host. Treat each item below as adapter-owned.
 | Surface | Claude | Codex |
 | --- | --- | --- |
 | Manifest file | `hooks/hooks.json` | Use `hooks/hooks.codex.json` when Codex hook syntax differs; reference it from `.codex-plugin/plugin.json`. |
-| Entrypoint | `scripts/hook_claude.py` | `scripts/hook_codex.py` |
+| Entrypoint | `hooks/scripts/hook_claude.py` | `hooks/scripts/hook_codex.py` |
 | Dispatch | Payload `hook_event_name` | Manifest argv subcommand |
 | Plugin root | `CLAUDE_PLUGIN_ROOT` from the Claude hook environment | `PLUGIN_ROOT` from the Codex hook process environment used by this repository's Codex hook manifest or wrapper |
 | Project root | `CLAUDE_PROJECT_DIR` from the Claude hook environment | Resolve from payload `cwd` using git root fallback, then `cwd` |
@@ -402,8 +402,8 @@ Use this structure unless a plugin has a documented reason to differ:
 
 Do not use a shared hook driver that detects the host at runtime. Use one entrypoint per host:
 
-- `scripts/hook_claude.py` owns Claude payload parsing, Claude environment variables, Claude event dispatch, Claude dataclass payload structures, and Claude hook output.
-- `scripts/hook_codex.py` owns Codex payload parsing, Codex environment variables, Codex argv dispatch, Codex transcript metadata parsing, Codex `apply_patch` target parsing, and Codex hook output.
+- `hooks/scripts/hook_claude.py` owns Claude payload parsing, Claude environment variables, Claude event dispatch, Claude dataclass payload structures, and Claude hook output.
+- `hooks/scripts/hook_codex.py` owns Codex payload parsing, Codex environment variables, Codex argv dispatch, Codex transcript metadata parsing, Codex `apply_patch` target parsing, and Codex hook output.
 
 The runtime entrypoint may read stdin, argv, environment variables, and runtime-specific payload fields. Shared plugin functions must receive concrete values such as `project_dir`, `plugin_root`, `session_id`, `read_target`, `edit_targets`, `prompt_text`, or `scan_text`.
 
@@ -438,7 +438,7 @@ Do not put payload key extraction such as `tool_input.file_path`, `source`, `pro
 
 ### Claude Hook Adapter Contract
 
-Claude hook commands should invoke `scripts/hook_claude.py` through `uv run --script` with no event subcommand. The adapter dispatches using the payload `hook_event_name`.
+Claude hook commands should invoke `hooks/scripts/hook_claude.py` through `uv run --script` with no event subcommand. The adapter dispatches using the payload `hook_event_name`.
 
 Rules:
 
@@ -452,7 +452,7 @@ Rules:
 
 ### Codex Hook Adapter Contract
 
-Codex hook commands should invoke `scripts/hook_codex.py` through `uv run --script` with no event subcommand. The adapter dispatches using the payload `hook_event_name`.
+Codex hook commands should invoke `hooks/scripts/hook_codex.py` through `uv run --script` with no event subcommand. The adapter dispatches using the payload `hook_event_name`.
 
 Rules:
 

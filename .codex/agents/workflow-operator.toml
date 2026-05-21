@@ -39,7 +39,7 @@ recipes, or script paths to the caller; those are operator internals.
 At agent start, workflow hooks may inject project-specific runtime context.
 Treat that injected context as the source of truth for:
 
-- The `$WORKFLOW` launcher path.
+- The workflow launcher path.
 - The configured issue provider and active issue command aliases.
 - The configured knowledge provider guidance.
 - Provider-specific unsupported-operation boundaries.

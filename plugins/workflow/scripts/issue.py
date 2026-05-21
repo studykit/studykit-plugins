@@ -9,7 +9,7 @@ imports the matching module from :mod:`issue.legacy` and calls its
 ``main(argv)`` with a translated argument vector; the heavy lifting still
 lives in the per-intent legacy modules. The verb table below is the
 public surface that callers (skills, agents, hook-injected context)
-should target — direct ``$WORKFLOW issue_*.py`` invocations are no longer
+should target — direct ``workflow issue_*.py`` invocations are no longer
 documented.
 
 Verb mapping
@@ -18,11 +18,11 @@ Verb mapping
 ==============================  =======================================
 ``issue.py <verb>``             Legacy entry point
 ==============================  =======================================
-``new ...``                     ``issue_drafts.main(["publish", ...])``
-``update ...``                  ``issue_writeback.main(["update", ...])``
+``new ...``                     ``issue_new.main(["publish", ...])``
+``update ...``                  ``issue_update.main(["update", ...])``
 ``fetch ...``                   ``issue_fetch.main([...])``
 ``comment ...``                 ``issue_comments.main(["append", ...])``
-``link ...``                    ``issue_relationships.main([...])``
+``link ...``                    ``issue_link.main([...])``
 ``state <ref> <target> [opts]`` ``issue_fields.main([<target>, <ref>, ...])``
 ``assign <ref> <user>``         ``issue_fields.main(["assign", <ref>, <user>])``
 ``unassign <ref>``              ``issue_fields.main(["unassign", <ref>])``
@@ -42,11 +42,11 @@ from workflow_command import CommandRunner
 
 from issue.legacy import (
     issue_comments,
-    issue_drafts,
+    issue_new,
     issue_fetch,
     issue_fields,
-    issue_relationships,
-    issue_writeback,
+    issue_link,
+    issue_update,
 )
 
 
@@ -67,11 +67,11 @@ _USAGE = (
     "usage: issue.py <verb> [args...]\n"
     "\n"
     "verbs:\n"
-    "  new        create a new issue (legacy: issue_drafts publish)\n"
-    "  update     update title / body / labels / state (legacy: issue_writeback update)\n"
+    "  new        create a new issue (legacy: issue_new publish)\n"
+    "  update     update title / body / labels / state (legacy: issue_update update)\n"
     "  fetch      fetch one or more issues into the cache (legacy: issue_fetch)\n"
     "  comment    append a comment from a body file (legacy: issue_comments append)\n"
-    "  link       add / remove / replace relationships (legacy: issue_relationships)\n"
+    "  link       add / remove / replace relationships (legacy: issue_link)\n"
     "  state      change lifecycle state (e.g. `state <ref> close`)\n"
     "  assign     assign an issue to a user (e.g. `assign <ref> me`)\n"
     "  unassign   clear all assignees (e.g. `unassign <ref>`)\n"
@@ -110,15 +110,15 @@ def main(
     kwargs = {"stdout": out, "stderr": err, "runner": runner}
 
     if verb == "new":
-        return issue_drafts.main(["publish", *rest], **kwargs)
+        return issue_new.main(["publish", *rest], **kwargs)
     if verb == "update":
-        return issue_writeback.main(["update", *rest], **kwargs)
+        return issue_update.main(["update", *rest], **kwargs)
     if verb == "fetch":
         return issue_fetch.main(rest, **kwargs)
     if verb == "comment":
         return issue_comments.main(["append", *rest], **kwargs)
     if verb == "link":
-        return issue_relationships.main(rest, **kwargs)
+        return issue_link.main(rest, **kwargs)
     if verb == "state":
         return _run_state(rest, kwargs=kwargs, stderr=err)
     if verb in {"assign", "unassign", "set-type"}:

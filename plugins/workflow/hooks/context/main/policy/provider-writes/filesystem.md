@@ -7,7 +7,7 @@ relationship script.
 
 ## Flow
 
-1. Resolve the authoring paths with `"$WORKFLOW" authoring_resolver.py
+1. Resolve the authoring paths with `workflow authoring_resolver.py
    --type <type> --role issue` (see `../authoring.md`).
 2. Read and edit the returned files directly in the working tree.
 3. Commit the changes through normal version control.

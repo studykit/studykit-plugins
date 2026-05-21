@@ -4,7 +4,7 @@ Knowledge documents live as repository Markdown files under `wiki/`.
 
 1. Choose the target file before requesting authoring paths.
 2. Resolve the authoring paths with
-   `"$WORKFLOW" authoring_resolver.py --type <type> --role knowledge`
+   `workflow authoring_resolver.py --type <type> --role knowledge`
    (see `../authoring.md`).
 3. Read the returned files.
 4. Edit the target file directly in the working tree.

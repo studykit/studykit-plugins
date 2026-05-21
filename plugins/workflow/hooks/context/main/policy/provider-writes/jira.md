@@ -3,7 +3,7 @@
 The provider-write intents share one shape:
 
 1. Resolve and read the authoring paths
-   (`"$WORKFLOW" authoring_resolver.py ...`; see `../authoring.md`).
+   (`workflow authoring_resolver.py ...`; see `../authoring.md`).
 2. Write the body to a temp file you choose. Body content is what gets
    sent; if the file happens to start with a YAML frontmatter block, the
    script strips it before posting. The cached `issue.md` (frontmatter
@@ -24,7 +24,7 @@ The provider-write intents share one shape:
 ## Publish a new issue
 
 ```bash
-"$WORKFLOW" issue.py new \
+workflow issue new \
   --type <task|bug|spike|epic|review|usecase|research> \
   --title <title> \
   --body-file <path> \
@@ -85,7 +85,7 @@ setup skill); missing config raises `ProviderOperationError`.
 ## Append a comment
 
 ```bash
-"$WORKFLOW" issue.py comment \
+workflow issue comment \
   --issue <KEY> \
   --body-file <path> \
   [--type <task|bug|...>] \
@@ -104,7 +104,7 @@ section) raises `ProviderOperationError`.
 ## Update an existing issue body
 
 ```bash
-"$WORKFLOW" issue.py update \
+workflow issue update \
   --issue <KEY> \
   --body-file <path> \
   [--type <task|bug|...>] \
@@ -132,7 +132,7 @@ link surfaces, and refreshes the cache. No flag means no provider call
 (no-op).
 
 ```bash
-"$WORKFLOW" issue.py link <source-issue> \
+workflow issue link <source-issue> \
   [--parent <KEY> | --replace-parent <KEY> | --remove-parent] \
   [--epic <KEY> | --replace-epic <KEY> | --remove-epic] \
   [--blocked-by <KEY> ...] [--remove-blocked-by <KEY> ...] \
@@ -192,7 +192,7 @@ current Jira user via `/rest/api/<v>/myself`. `set-type` PUTs
 defaults plus `.workflow/config.yml` overrides). Use `issue.py update`
 when the change must also rewrite the body or title.
 
-Run `"$WORKFLOW" issue.py <verb> --help` only when you need a flag not
+Run `workflow issue <verb> --help` only when you need a flag not
 listed above.
 
 ## Body-file lifecycle

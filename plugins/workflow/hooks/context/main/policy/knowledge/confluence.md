@@ -3,7 +3,7 @@
 Confluence knowledge documents are provider-backed pages. Workflow scripts
 do not currently support Confluence knowledge writes. Resolve authoring
 paths for read-time guidance with
-`"$WORKFLOW" authoring_resolver.py --type <type> --role knowledge`
+`workflow authoring_resolver.py --type <type> --role knowledge`
 (see `../authoring.md`), but report the write limitation to the user
 rather than attempting a provider write.
 

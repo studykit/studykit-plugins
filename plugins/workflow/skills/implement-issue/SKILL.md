@@ -4,7 +4,7 @@ description: "Implement a workflow `task`, `bug`, or `spike` issue: read the iss
 argument-hint: "<issue-ref> [additional requirements]"
 disable-model-invocation: true
 allowed-tools:
-  - 'Bash("$WORKFLOW":*)'
+  - 'Bash(workflow:*)'
   - 'Bash(mkdir -p:*)'
   - EnterPlanMode
   - ExitPlanMode

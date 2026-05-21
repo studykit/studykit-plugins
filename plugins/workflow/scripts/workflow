@@ -18,7 +18,11 @@ exec_workflow_command() {
 
   local candidate
   if [[ "$command" != */* ]]; then
-    candidate="$SCRIPT_DIR/$command"
+    if [[ "$command" != *.* && -f "$SCRIPT_DIR/$command.py" ]]; then
+      candidate="$SCRIPT_DIR/$command.py"
+    else
+      candidate="$SCRIPT_DIR/$command"
+    fi
   else
     candidate="$command"
   fi

@@ -17,10 +17,10 @@ required_authoring_files are read before a workflow artifact write
 ### Main assistant
 
 The main assistant resolves required authoring paths through the workflow
-launcher (`$WORKFLOW authoring_resolver.py --type <type> --role <role> --json`),
+launcher (`workflow authoring_resolver.py --type <type> --role <role> --json`),
 reads the returned files directly, drafts content, and runs the matching
-provider/cache scripts (`$WORKFLOW github_issue_drafts.py publish`,
-`*_writeback.py update`, `*_comments.py append`, `*_relationships.py`, etc.)
+`workflow issue` dispatcher verbs (`workflow issue new`,
+`workflow issue update`, `workflow issue comment`, `workflow issue link`, etc.)
 for writes and verification.
 
 Detailed launcher usage, authoring path resolution, and the body-file write
@@ -77,7 +77,7 @@ operator handoff expectations.
    `.workflow/config.yml` exists; detail files under
    `plugins/workflow/hooks/context/main/policy/` are loaded on demand.
 2. Before a workflow artifact write, the main assistant runs
-   `$WORKFLOW authoring_resolver.py --type <type> --role <role> --json` for
+   `workflow authoring_resolver.py --type <type> --role <role> --json` for
    required authoring paths.
 3. If the resolver returns `NONE`, the target is not a workflow artifact for
    authoring-policy purposes.

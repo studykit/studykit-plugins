@@ -31,7 +31,7 @@ The SubagentStart hook injects three blocks for this agent:
 - The active issue provider's issue-fetch usage.
 - An `issue-implementer subagent context` block holding the provider-specific command shapes for **Publish a review**, **Link the implementation task as blocked by the review**, and **Refresh the implementation task's body**. The agent body does not restate these — refer to them by name from the injected block.
 
-Authoring semantics (which docs to read, type taxonomy) are not auto-injected. When the flow calls `"$WORKFLOW" authoring_resolver.py --type review --raw`, follow the docs that the resolver names in its output.
+Authoring semantics (which docs to read, type taxonomy) are not auto-injected. When the flow calls `workflow authoring_resolver.py --type review --raw`, follow the docs that the resolver names in its output.
 
 ## Type scope
 
@@ -102,7 +102,7 @@ Any of these triggers the review publish flow before any commit:
 
 Per review authoring rules, **one review = one concern**. If multiple independent concerns surfaced, the review covers the primary blocker only; surface the others in the final report as candidates for separate review. Name the implementation issue ref as the review's target so the relationship is reviewable from either side.
 
-1. Resolve authoring with `"$WORKFLOW" authoring_resolver.py --type review --raw` and follow the docs / draft path the resolver returns. The authoring docs define what the review body must contain; do not restate them here.
+1. Resolve authoring with `workflow authoring_resolver.py --type review --raw` and follow the docs / draft path the resolver returns. The authoring docs define what the review body must contain; do not restate them here.
 2. Publish the review using the **Publish a review** command shape from the SubagentStart-injected `issue-implementer subagent context` block (the agent file does not restate the command — the active issue provider's form is injected at SubagentStart). Capture the returned review ref.
 3. Link the implementation task as blocked by the review using the **Link the implementation task as blocked by the review** block from the same injected context.
 4. Refresh `Resume` on the implementation task using the **Refresh the implementation task's body** block from the injected context (body-only form) — `Approach` summarises what landed locally up to the blocker, `Waiting for` names the review ref, `Open questions` enumerates the concern the review captures, `Next` is "resolve <review-ref>". Do **not** apply any terminal state transition to the implementation task.

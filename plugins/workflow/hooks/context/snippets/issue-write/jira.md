@@ -7,14 +7,14 @@ Backend-only extras for Jira issues:
 
 ```bash
 # Publish a new Epic
-"$WORKFLOW" issue.py new \
+workflow issue new \
   --type epic --title "<title>" --body-file <body-path>
 
 # Run a configured state transition, assign, unassign, or change the issuetype
-"$WORKFLOW" issue.py state <KEY> <verb>
-"$WORKFLOW" issue.py assign <KEY> me
-"$WORKFLOW" issue.py set-type <KEY> bug
+workflow issue state <KEY> <verb>
+workflow issue assign <KEY> me
+workflow issue set-type <KEY> bug
 
 # Add a Jira-specific Epic Link relationship
-"$WORKFLOW" issue.py link <KEY> --epic <KEY>
+workflow issue link <KEY> --epic <KEY>
 ```
