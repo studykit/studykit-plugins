@@ -1482,16 +1482,21 @@ def _find_issue_link_id(
         raw_type = link.get("type") if isinstance(link.get("type"), Mapping) else {}
         if not isinstance(raw_type, Mapping) or raw_type.get("name") != operation.mapping.link_type:
             continue
-        direction_field = "outwardIssue" if operation.mapping.direction == "outward" else "inwardIssue"
-        target_issue = link.get(direction_field)
-        if not isinstance(target_issue, Mapping):
+        if link.get("id") is None:
             continue
-        try:
-            key = normalize_jira_issue_key(target_issue.get("key") or "")
-        except JiraProviderError:
-            continue
-        if key == operation.target_issue and link.get("id") is not None:
-            return str(link["id"])
+        # Jira populates whichever of outwardIssue/inwardIssue points away from
+        # the current issue, so the populated side depends on which end of the
+        # link the source lives on — not on operation.mapping.direction.
+        for side_field in ("outwardIssue", "inwardIssue"):
+            target_issue = link.get(side_field)
+            if not isinstance(target_issue, Mapping):
+                continue
+            try:
+                key = normalize_jira_issue_key(target_issue.get("key") or "")
+            except JiraProviderError:
+                continue
+            if key == operation.target_issue:
+                return str(link["id"])
     return None
 
 
