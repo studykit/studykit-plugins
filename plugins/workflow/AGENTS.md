@@ -41,3 +41,47 @@ Before adding or changing tests, read `dev/testing-principles.md` and
 `tests/AGENTS.md`. Tests protect executable behavior and stable layer
 boundaries; they do not freeze prose, headings, or authoring judgment unless
 that wording is intentionally a contract.
+
+## Authoring agent and skill docs — check the hook-injected context first
+
+Before writing or editing any `agents/<name>.md` or
+`skills/<name>/SKILL.md` in this plugin, **read the context that
+`scripts/hook_claude.py` injects on the surface you are authoring**.
+Skipping this leaves the doc duplicating runtime-injected text, restating
+it stale, or — worse — assuming context that isn't actually injected on
+that surface and leaving the runtime instance missing what it needs.
+
+Where the injected text comes from:
+
+- **Skills run in the main session** — `SessionStart` injects from
+  `hooks/context/main/`:
+  - `session-policy.md`, `commit-prefix.md`
+  - `policy/authoring.md`,
+    `policy/provider-writes/<provider>.md`,
+    `policy/knowledge/<provider>.md`
+- **Agents run as subagents** — `SubagentStart` injects from
+  `hooks/context/subagent/`:
+  - `policy.md` (general subagent policy)
+  - `agents/<agent-name>.md` (per-agent block, when present)
+- **Provider snippets** — `hooks/context/snippets/{issue-fetch,
+  issue-write, issue-writeback, issue-relationships, issue-drafts,
+  launcher}/<provider>.md` are composed into the above blocks based
+  on the active issue provider.
+
+`hooks/hooks.json` and `scripts/hook_claude.py` are the source of truth
+whenever the layout above looks stale.
+
+Rules that follow:
+
+- Refer to injected blocks by name (e.g., "use the **Publish a review**
+  block from the SubagentStart-injected `issue-implementer subagent
+  context`") instead of restating provider-specific command shapes that
+  the runtime will inject anyway.
+- Do not assume cross-surface context. A skill (main session) sees
+  `main/...` blocks; a subagent sees `subagent/...` blocks. Crossing the
+  boundary leaves the runtime doc missing assumed context — surface the
+  needed inputs through the caller's dispatch arguments instead.
+- When adding a new agent that needs its own injected block, add the
+  file under `hooks/context/subagent/agents/`, wire it through
+  `scripts/hook_claude.py`, and only then reference it from the agent
+  body.

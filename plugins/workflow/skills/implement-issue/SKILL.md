@@ -40,35 +40,60 @@ onto them distorts the type's role.
 
 ## Flow
 
-1. **Read the issue.** Fetch the ref from the first `$ARGUMENTS` token (ask
-   when missing or ambiguous), then read the cached issue body file the
-   fetch script returns. Follow the links the body cites: parent,
-   blocked-by, knowledge pages, and paths named in `Affected Paths`. The
-   body is the contract; its links complete it. Capture the cached body
-   path — the agent will reuse it in step 3. Never edit the cached body
-   or comment projections in place.
+1. **Read the issue body.** Fetch the ref from the first `$ARGUMENTS`
+   token (ask when missing or ambiguous), then read the cached issue body
+   file the fetch script returns. Follow the workflow links the body
+   cites — parent, blocked-by, knowledge pages — to ground intent. **Do
+   NOT open the source files named in `Affected Paths` yet.** The
+   code-vs-body cross-check belongs inside plan mode in step 2, so the
+   harness governs every step from code reading onward. Capture the
+   cached body path — step 3 reuses it. Never edit the cached body or
+   comment projections in place.
 
-2. **Enter plan mode and converge on the plan.** Call `EnterPlanMode`
-   before drafting so the harness blocks edits during planning. Refine
-   the body's planned approach into a concrete execution plan against
-   its spec: files to touch by absolute path, the verification step for
-   each Acceptance Criterion, and the intended commit split. Present
-   the refined plan via `ExitPlanMode`; nothing proceeds before the user
-   accepts it and exits plan mode. If the refined plan keeps diverging
-   from the body's planned approach, the body itself is usually the
-   problem — propose updating the body via the provider's writeback
-   flow before iterating further on the plan.
+2. **Enter plan mode, cross-check the body against the current code,
+   and converge on the plan.** Call `EnterPlanMode` before opening any
+   source files so the harness governs the cross-check and plan
+   drafting. Inside plan mode:
 
-3. **Save the approved plan and dispatch to the `issue-implementer`
-   agent.** After the user accepts the plan and plan mode exits, write
-   the approved plan text to a stable path —
-   `/tmp/workflow-plans/issue-<ref>-plan.md` (create the directory with
-   `mkdir -p` if missing). Then dispatch the agent with:
-   - `issue-cache-path` — the cached issue body path captured in step 1
-     (the agent will not re-fetch).
-   - `plan-file` — the absolute path of the plan file you just wrote.
-   - Any `$ARGUMENTS` tokens past the ref, verbatim as extra
-     requirements.
+   - Open the files named in `Affected Paths` and the surrounding code
+     the body's planned approach assumes — current signatures, module
+     structure, dependency graph, surrounding helpers.
+   - Compare the body (`Description`, `Approach`, `Affected Paths`,
+     `Acceptance Criteria`, plus type-specific sections) against the
+     code as it stands now. Note any drift: stale file paths, signatures
+     that no longer match, helpers that moved or were removed,
+     assumptions that no longer hold.
+   - If you find material drift, **ask the user explicitly** whether to
+     update the body via the provider's writeback flow before
+     continuing. Surface the specific drifted elements and a concrete
+     body-change proposal. Do not silently rewrite the plan around stale
+     body text. Capture the user's decision (and the approved body
+     draft, if any) so step 3 can execute the writeback.
+   - Refine the body's planned approach into a concrete execution plan
+     against its spec: files to touch by absolute path, the verification
+     step for each Acceptance Criterion, and the intended commit split.
+
+   Present the refined plan via `ExitPlanMode`; nothing proceeds before
+   the user accepts it and exits plan mode.
+
+3. **Apply any approved body update, save the plan, and dispatch to the
+   `issue-implementer` agent.** After the user accepts the plan and
+   plan mode exits:
+
+   - If the user approved a body update in step 2, execute the
+     provider's writeback flow now, then re-fetch the issue with
+     `--cache-policy refresh` so the agent reads the updated body. Use
+     the refreshed cache path as `issue-cache-path` below.
+   - Write the approved plan text to
+     `/tmp/workflow-plans/issue-<ref>-plan.md` (create the directory
+     with `mkdir -p` if missing).
+   - Dispatch the agent with:
+     - `issue-cache-path` — the refreshed cached body path if step 2
+       updated the body; otherwise the path captured in step 1. The
+       agent will not re-fetch.
+     - `plan-file` — the absolute path of the plan file you just wrote.
+     - Any `$ARGUMENTS` tokens past the ref, verbatim as extra
+       requirements.
 
    The agent enters an isolated worktree, adopts the approved plan,
    implements, verifies every Acceptance Criterion, commits with the

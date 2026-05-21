@@ -26,13 +26,11 @@ If neither `issue-ref` nor `issue-cache-path` is supplied, stop and ask. Do not 
 
 The SubagentStart hook injects three blocks for this agent:
 
-- The launcher contract (`$WORKFLOW`, `$WORKFLOW_PLUGIN_ROOT`, `$WORKFLOW_PROJECT_DIR`, `$WORKFLOW_SESSION_ID`) — every workflow operation runs through `"$WORKFLOW" <script>.py [...args]`.
+- The workflow launcher contract. Every workflow operation runs through it.
 - The active issue provider's issue-fetch usage.
 - An `issue-implementer subagent context` block holding the provider-specific command shapes for **Publish a review**, **Link the implementation task as blocked by the review**, and **Refresh the implementation task's body**. The agent body does not restate these — refer to them by name from the injected block.
 
-Authoring semantics (which docs to read, type taxonomy) are not auto-injected. When the flow calls `"$WORKFLOW" authoring_resolver.py --type review`, follow the docs that the resolver names in its output. For provider-write flags beyond what the injected blocks surface (e.g. labels, alternate states), the source of truth is `plugins/workflow/hooks/context/main/policy/provider-writes/<provider>.md` — read it only when the injected block is not enough.
-
-Never edit the cached issue body or comment projections in place. Refresh them via the matching fetch script.
+Authoring semantics (which docs to read, type taxonomy) are not auto-injected. When the flow calls `"$WORKFLOW" authoring_resolver.py --type review --raw`, follow the docs that the resolver names in its output.
 
 ## Type scope
 
@@ -48,7 +46,13 @@ For any other type (`epic`, `review`, `research`, `usecase`, knowledge types), s
 
     Then cross-check the body and the plan against the current code. The body may have been authored against a prior state; the plan file may rest on assumptions that have since drifted. Open the files named in `Affected Paths` and in the plan, confirm they exist, and confirm their current shape (function signatures, module structure, dependency graph, surrounding helpers) is consistent with what the body and plan assume. Repeat this cross-check whenever a later step surfaces additional files — body and plan must remain in agreement with the code throughout the run, not only at the start. Material divergence between body / plan and the current code is the **Plan diverges from body** blocker trigger regardless of when it is discovered.
 
-3. **Enter a worktree.** Call `EnterWorktree` with `name: "issue/<ref>"` (slashes are segment separators, both segments satisfy the tool's character rules). The session's working directory switches to the new worktree, on a fresh branch off origin's default branch. If a worktree with that name already exists from a prior attempt, enter it via `path:` and continue where it left off. All subsequent edits, commits, and pushes happen inside the worktree.
+3. **Enter a worktree.** Audit prior-attempt state first with `git worktree list` and `git branch --list issue/<ref>`, then pick the matching case:
+
+   - **Worktree already exists for `issue/<ref>`** — call `EnterWorktree` with the `path:` from `git worktree list` and continue where it left off.
+   - **Local branch `issue/<ref>` exists but no worktree is attached** — `EnterWorktree({name: "issue/<ref>"})` will silently reuse that stale branch, putting the worktree on whatever commit it points at and ignoring the user's `worktree.baseRef`. Decide explicitly: if the stale branch has no unmerged work (`git log <default-branch>..issue/<ref>` empty), delete it with `git branch -D issue/<ref>` and fall through to the next case; otherwise attach a worktree to it with `git worktree add` and enter via `path:`.
+   - **Neither exists** — call `EnterWorktree` with `name: "issue/<ref>"` (slashes are segment separators, both segments satisfy the tool's character rules). The session's working directory switches into the new worktree, on a fresh branch off the ref the user configured via `worktree.baseRef` (`fresh` = origin's default branch, `head` = local HEAD).
+
+   All subsequent edits, commits, and pushes happen inside the worktree.
 
 4. **Implement.** Apply the plan inside the worktree. Keep the change to the smallest shape that satisfies Acceptance Criteria; surface unrelated cleanups as follow-up candidates rather than folding them in. For `bug`, add the regression test first and confirm it fails on the unfixed code, then apply the fix and confirm it passes — both outputs become AC evidence. For `spike`, run the validation method and capture evidence; PoC code stays throwaway and production work belongs in a follow-up `task`.
 
@@ -67,13 +71,13 @@ For any other type (`epic`, `review`, `research`, `usecase`, knowledge types), s
 9. **Decide terminal state.** Pick one of:
 
    - `still open: handoff (PR: <ref>)` — successful execution. The PR is the deliverable; on GitHub-Issues backends the PR's auto-close keyword closes the linked issue at merge time, otherwise the issue closes when the user resolves it after merge. `Waiting for` names the PR ref; `Next` is "merge <PR-ref>". Any deferred AC are listed in `Open questions` as follow-up candidates or follow-up refs (if already ticketed).
-   - `resolved: <provider terminal reason>` — the work is no longer load-bearing; resolve the implementation task with the provider's terminal transition (GitHub `state=closed --state-reason=not_planned`; Jira `Won't Do` / `Cancelled` / equivalent transition). No PR opened. For `spike`, this branch only applies when the caller's emphasis or the body already indicates the question is no longer load-bearing — do not unilaterally decide that an open question is dead.
+   - `resolved: <provider terminal reason>` — the work is no longer load-bearing; resolve the implementation task with the provider's terminal transition. No PR opened. For `spike`, this branch only applies when the caller's emphasis or the body already indicates the question is no longer load-bearing — do not unilaterally decide that an open question is dead.
    - `still open: blocked-by <review-ref>` — see **Blocker handling**. A review was published before any PR could open.
    - `still open: <other reason>` — paused mid-flight, blocked by an internal unresolved question, or otherwise not ready to hand off. No PR opened.
 
    For `bug`, the regression test plus fix evidence determines whether all AC are met. For `spike`, captured evidence (Artifact Links plus short summary) accompanies the body update on whichever branch is chosen.
 
-10. **Refresh `Resume` and execute the writeback.** Use the **Refresh the implementation task's body** block from the SubagentStart-injected `issue-implementer subagent context`. On freshness drift, reread the cache paths the script reports and retry — never bypass the check.
+10. **Refresh `Resume` and execute the writeback.** Use the **Refresh the implementation task's body** block from the SubagentStart-injected `issue-implementer subagent context`.
 
     - **`still open: handoff (PR: <ref>)`**: handoff snapshot — `Approach` summarises what landed in the PR, `Waiting for` names the PR ref, `Open questions` enumerates any deferred AC each labelled as a follow-up candidate or follow-up ref, `Next` is "merge <PR-ref>". Body-only writeback (the body-only form of the injected block); the agent does **not** resolve the issue itself.
     - **`resolved: <provider terminal reason>`**: terminal snapshot — `Approach` summarised, `Waiting for` empty, `Open questions` resolved. Use the body + state form of the injected writeback block to update body and apply the provider's terminal transition in one call.
@@ -105,7 +109,7 @@ Any of these triggers the review publish flow before any commit:
 
 Per review authoring rules, **one review = one concern**. If multiple independent concerns surfaced, the review covers the primary blocker only; surface the others in the final report as candidates for separate review. Name the implementation issue ref as the review's target so the relationship is reviewable from either side.
 
-1. Resolve authoring with `"$WORKFLOW" authoring_resolver.py --type review` and follow the docs / draft path the resolver returns. The authoring docs define what the review body must contain; do not restate them here.
+1. Resolve authoring with `"$WORKFLOW" authoring_resolver.py --type review --raw` and follow the docs / draft path the resolver returns. The authoring docs define what the review body must contain; do not restate them here.
 2. Publish the review using the **Publish a review** command shape from the SubagentStart-injected `issue-implementer subagent context` block (the agent file does not restate the command — the active issue provider's form is injected at SubagentStart). Capture the returned review ref.
 3. Link the implementation task as blocked by the review using the **Link the implementation task as blocked by the review** block from the same injected context.
 4. Refresh `Resume` on the implementation task using the **Refresh the implementation task's body** block from the injected context (body-only form) — `Approach` summarises what landed locally up to the blocker, `Waiting for` names the review ref, `Open questions` enumerates the concern the review captures, `Next` is "resolve <review-ref>". Do **not** apply any terminal state transition to the implementation task.
@@ -118,9 +122,7 @@ Per review authoring rules, **one review = one concern**. If multiple independen
 - Do not commit or push outside the worktree. All commits live on the worktree's branch and reach the remote via that branch only.
 - Do not call `ExitWorktree` with `action: "remove"`. The worktree continues to exist until the PR merges and the user cleans it up.
 - Do not resolve the implementation task yourself on the handoff branch. On GitHub-Issues backends the PR's auto-close keyword closes the linked issue when the PR merges; on other issue backends the user resolves the issue after merge using the provider's terminal transition.
-- Do not edit the cached issue body or comment projections in place. Refresh them via the matching fetch script.
 - Do not list commit SHAs in issue bodies or comments. The provider's timeline already links commits by ref prefix.
-- Do not bypass the writeback freshness check. Re-fetch and retry.
 - Do not create follow-up `task` / `bug` / `spike` issues yourself in this run. Surface them as candidates in the report or in `Open questions`. The only issue type this agent publishes is a `review`, and only via the blocker-handling flow above.
 - Do not fold unrelated cleanups into the commit. Surface them as follow-up candidates.
 - Do not skip Acceptance Criterion verification. Every bullet needs its own evidence.
@@ -131,7 +133,7 @@ Return only:
 
 1. Implementation issue ref and final state — one of:
    - `still open: handoff (PR: <url>)` — successful execution; also name `Waiting for` and `Next`
-   - `resolved: <provider terminal reason>` (e.g. GitHub `state=closed --state-reason=not_planned`, Jira `Won't Do` / `Cancelled`)
+   - `resolved: <provider terminal reason>`
    - `still open: blocked-by <review-ref>` — a review was published; also name the concern type (`finding` / `gap` / `question`)
    - `still open: <other reason>` — paused, blocked by an internal unresolved question, etc.
    - `stopped: <reason>` — an operational stop fired (out-of-scope type, freshness drift, write conflict, worktree or PR creation failure)
