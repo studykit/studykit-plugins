@@ -1039,8 +1039,9 @@ class JiraIssueBackend:
     def discover_state_verbs(self, config: WorkflowConfig) -> list[str]:
         """Return the configured Jira state-transition verbs.
 
-        Used by the ``issue_fields.py`` dispatcher so the parser only knows
-        about the active project's transitions.
+        Used by the ``issue.py`` dispatcher (via the legacy ``issue_fields``
+        module) so the parser only knows about the active project's
+        transitions.
         """
 
         try:

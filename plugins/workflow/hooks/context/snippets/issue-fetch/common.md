@@ -1,5 +1,5 @@
 ```bash
-"$WORKFLOW" issue_fetch.py <issue> [<issue> ...] \
+"$WORKFLOW" issue.py fetch <issue> [<issue> ...] \
   [--cache-policy default|refresh]
 ```
 

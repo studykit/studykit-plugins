@@ -170,7 +170,7 @@ Use the priority table above. Only the chosen verdict appears in the first parag
 
 - Do not modify the draft body file.
 - Do not write to any path other than the sidecar audit report (`<body_file_path>.audit.md`).
-- Do not call `issue_drafts.py`, `issue_writeback.py`, or any other write-side workflow script.
+- Do not call `issue.py new`, `issue.py update`, or any other write-side `issue.py` verb.
 - Do not fetch issues other than the anchors that the main session names.
 - Do not issue a verdict outside the seven in the taxonomy.
 - Do not skip reading the authority documents at the start of the audit.
