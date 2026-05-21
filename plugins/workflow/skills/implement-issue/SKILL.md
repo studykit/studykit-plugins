@@ -75,16 +75,66 @@ distorts the type's role.
    policy. Do not list commit SHAs in the issue body or comments — the
    timeline already links commits by ref prefix.
 
-6. **Refresh `Resume` and close.** Rewrite the `Resume` section to a
-   closed-state snapshot (Approach summarised, `Waiting for` empty,
-   `Open questions` resolved or moved to follow-ups, `Next` empty or
-   naming the follow-up) and close in the same writeback call. Present
-   the draft body to the user before invoking. For `spike`, the body
-   update also carries the captured evidence (typically `Artifact Links`
-   plus a short summary); close as `not_planned` only when the user
-   agrees the question is no longer load-bearing. On freshness drift,
-   reread the cache paths the script reports and retry — never bypass the
-   check.
+6. **Push.** Push the commits to the remote before refreshing `Resume` or
+   closing. The close should reference work that already exists on the
+   remote so the timeline's ref-prefixed commit links resolve the moment
+   the issue body lands.
+
+7. **Decide terminal state.** Pick one of five outcomes — this is a
+   judgment step, no writes yet.
+
+   - `closed: completed` — every Acceptance Criterion met, no external
+     gate remaining.
+   - `closed: completed (with deferrals)` — core intent met *and* every
+     unmet AC is **already captured in a separate follow-up issue**.
+     This is a hard gate: if any unmet AC lacks a real follow-up ref,
+     this branch is not eligible and the state falls back to
+     `still open: handoff` or `still open: <reason>`.
+   - `closed: <provider non-completion reason>` — the question is no
+     longer load-bearing; close with the provider's non-completion state
+     reason (GitHub `not_planned`, Jira `Won't Do` / `Cancelled` /
+     similar transition). For `spike`, this branch is only taken when
+     the user agrees the question is no longer load-bearing.
+   - `still open: handoff` — local implementation is finished but
+     external gates remain (push complete, review pending, merge,
+     deploy, integration). Deferred items are articulated as follow-up
+     **candidates** in `Open questions`, not yet split into separate
+     issues. Distinguished from "paused" by `Waiting for` pointing at an
+     external decision/action rather than an internal unresolved
+     question.
+   - `still open: <other reason>` — paused mid-flight, blocked by an
+     internal unresolved question, or otherwise not ready to hand off.
+
+   For `bug`, the regression test + fix evidence determines whether all
+   AC are met. For `spike`, captured evidence (Artifact Links + short
+   summary) accompanies the body update on whichever branch is chosen.
+
+8. **Refresh `Resume` and execute the writeback.** The `Resume` shape
+   varies by the terminal state chosen in step 7. Present the draft body
+   to the user before invoking. On freshness drift, reread the cache
+   paths the script reports and retry — never bypass the check.
+
+   - **Closed branches** (`closed: completed` /
+     `closed: completed (with deferrals)` /
+     `closed: <provider non-completion reason>`): closed-state snapshot
+     — `Approach` summarised, `Waiting for` empty, `Open questions`
+     resolved or each one moved into a follow-up issue ref, `Next` empty
+     or naming the follow-up. For the deferrals sub-branch, add an
+     explicit `Deferred to: <follow-up refs>` line so the carve-out is
+     visible from the closed body. Execute via the provider's writeback
+     update that changes body + state in one call (or, when the body
+     does not need to change, via the body-less close path).
+   - **`still open: handoff`**: handoff snapshot —  `Approach`
+     summarises what was delivered locally, `Waiting for` names the
+     external gate (review, merge, deploy, etc.), `Open questions`
+     enumerates deferred items each labelled as a follow-up
+     **candidate** (not yet ticketed), `Next` names the immediate next
+     action gating close. Execute via the provider's body-only writeback
+     update — no close call.
+   - **`still open: <other reason>`**: progress snapshot reflecting
+     current state (what landed so far, what blocks the next move,
+     unresolved questions, the next action). Execute via the provider's
+     body-only writeback update — no close call.
 
 ## Additional Requirements
 
@@ -97,7 +147,14 @@ $ARGUMENTS
 
 Report only:
 
-1. Issue ref and final state — `closed: completed`, `closed: not_planned`,
-   or `still open: <reason>`.
+1. Issue ref and final state — one of:
+   - `closed: completed`
+   - `closed: completed (deferrals → <follow-up refs>)`
+   - `closed: <provider non-completion reason>` (e.g. GitHub
+     `not_planned`, Jira `Won't Do` / `Cancelled`)
+   - `still open: handoff` — also name `Waiting for` and `Next`
+   - `still open: <other reason>` — paused, blocked, etc.
 2. Commit SHA(s), or `skipped`.
-3. One line per Acceptance Criterion paired with its evidence.
+3. One line per Acceptance Criterion paired with its status: concrete
+   evidence (closed branches), `deferred → <follow-up ref>`, or
+   `in progress: <state>` (open branches).
