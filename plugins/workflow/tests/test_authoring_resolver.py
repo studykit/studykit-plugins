@@ -378,7 +378,7 @@ def test_render_cache_hit_reference_with_notes_anchor() -> None:
         "- See `task-issue-reading-list` above.\n"
         "- See `task-issue-notes` above — triggers apply to this call too.\n"
         "- If the anchor body is no longer in context, rerun this command "
-        "with `--cache-policy refresh`.\n"
+        "with `--raw` to re-emit it.\n"
     )
 
 
@@ -388,16 +388,16 @@ def test_render_cache_hit_reference_without_notes_anchor() -> None:
     assert rendered == (
         "- See `spike-issue-reading-list` above.\n"
         "- If the anchor body is no longer in context, rerun this command "
-        "with `--cache-policy refresh`.\n"
+        "with `--raw` to re-emit it.\n"
     )
 
 
-def test_render_cache_hit_reference_includes_refresh_recovery_hint() -> None:
-    """Narrow contract: cache-hit output names the refresh policy token.
+def test_render_cache_hit_reference_includes_raw_recovery_hint() -> None:
+    """Narrow contract: cache-hit output names the `--raw` token.
 
     The exact prose may evolve, but the bullet must always contain the
-    `--cache-policy refresh` token so the model can find the escape hatch
-    when the anchor body has dropped out of context.
+    `--raw` token so the model can find the escape hatch when the anchor
+    body has dropped out of context.
     """
 
     with_notes = render_cache_hit_reference(
@@ -405,8 +405,8 @@ def test_render_cache_hit_reference_includes_refresh_recovery_hint() -> None:
     )
     without_notes = render_cache_hit_reference("spike-issue-reading-list")
 
-    assert "`--cache-policy refresh`" in with_notes
-    assert "`--cache-policy refresh`" in without_notes
+    assert "`--raw`" in with_notes
+    assert "`--raw`" in without_notes
 
 
 def test_authoring_path_classification_uses_plugin_authoring_root(tmp_path: Path) -> None:
@@ -492,7 +492,7 @@ def test_main_repeat_call_emits_bullet_only_form(
         "- See `task-issue-reading-list` above.\n"
         "- See `task-issue-notes` above — triggers apply to this call too.\n"
         "- If the anchor body is no longer in context, rerun this command "
-        "with `--cache-policy refresh`.\n"
+        "with `--raw` to re-emit it.\n"
     )
 
 
@@ -511,11 +511,11 @@ def test_main_repeat_call_for_noteless_type_omits_notes_bullet(
     assert out == (
         "- See `spike-issue-reading-list` above.\n"
         "- If the anchor body is no longer in context, rerun this command "
-        "with `--cache-policy refresh`.\n"
+        "with `--raw` to re-emit it.\n"
     )
 
 
-def test_main_cache_policy_refresh_forces_section_emission(
+def test_main_raw_flag_forces_section_emission(
     capsys: pytest.CaptureFixture[str],
     resolver_session: tuple[str, str],
     tmp_path: Path,
@@ -529,7 +529,7 @@ def test_main_cache_policy_refresh_forces_section_emission(
         tmp_path, runtime, session_id, "task-issue-reading-list"
     )
 
-    authoring_resolver_main(base + ["--cache-policy", "refresh"])
+    authoring_resolver_main(base + ["--raw"])
     out = capsys.readouterr().out
 
     assert "## task-issue-reading-list" in out
