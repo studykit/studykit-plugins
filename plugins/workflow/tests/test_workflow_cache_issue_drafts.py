@@ -1023,32 +1023,13 @@ def test_jira_publish_creates_issue_inline_and_deletes_body_file(tmp_path: Path)
     assert runner.requests[0].args == _jira_write_args()
 
 
-def test_jira_publish_preserves_body_on_relationship_failure(tmp_path: Path) -> None:
+def test_jira_publish_fails_fast_when_relationship_mapping_missing(tmp_path: Path) -> None:
     _write_jira_config(tmp_path)
     body_file = _write_body_file(tmp_path, "Body.\n")
-    issue_url = "https://jira.example.test/rest/api/2/issue/TEST-1234"
-    remote_links_url = "https://jira.example.test/rest/api/2/issue/TEST-1234/remotelink"
 
-    runner = JiraFakeRunner(
-        {
-            _jira_write_args(): CommandResult(
-                request=CommandRequest(args=()),
-                returncode=0,
-                stdout=json.dumps({"id": "10001", "key": "TEST-1234"}),
-            ),
-            _jira_curl_get_args(issue_url): CommandResult(
-                request=CommandRequest(args=()),
-                returncode=0,
-                stdout=json.dumps(_jira_issue_payload()),
-            ),
-            _jira_curl_get_args(remote_links_url): CommandResult(
-                request=CommandRequest(args=()),
-                returncode=0,
-                stdout=json.dumps([]),
-            ),
-        }
-    )
+    runner = JiraFakeRunner({})
     stdout = io.StringIO()
+    stderr = io.StringIO()
 
     code = jira_issue_drafts_main(
         [
@@ -1065,19 +1046,15 @@ def test_jira_publish_preserves_body_on_relationship_failure(tmp_path: Path) -> 
             "TEST-99",
         ],
         stdout=stdout,
+        stderr=stderr,
         runner=runner,
     )
 
-    payload = json.loads(stdout.getvalue())
-    assert code == 1
-    assert payload["issue"] == "TEST-1234"
-    assert payload["body_file_removed"] is False
-    assert payload["body_file"] == str(body_file)
+    assert code == 2
+    assert "Jira relationship 'related' is not configured" in stderr.getvalue()
+    assert runner.requests == []
     assert body_file.exists()
-    relationships = payload["relationships"]
-    assert relationships["status"] == "failed"
-    assert "related" in relationships["error"]
-    assert relationships["intent"] == {"related_add": ["TEST-99"]}
+    assert stdout.getvalue() == ""
 
 
 def test_jira_publish_epic_with_post_create_epic_link_is_rejected(tmp_path: Path) -> None:

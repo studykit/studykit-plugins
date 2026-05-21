@@ -1299,6 +1299,30 @@ def _resolve_jira_relationship_operation(
     raise ProviderOperationError(f"unsupported Jira relationship surface: {mapping.surface}")
 
 
+def validate_relationship_intent_mappings(
+    project: Any, intent: Mapping[str, Any]
+) -> None:
+    """Raise ``ProviderOperationError`` if any relationship in ``intent`` lacks a
+    configured ``providers.issues.relationship_mappings`` entry. Lets callers
+    fail fast before issuing a remote write that would later be rejected by
+    ``apply_relationships``.
+    """
+
+    if not intent:
+        return
+    settings = _jira_issue_provider_settings(project)
+    operations = relationship_operations_from_intent(
+        intent, target_kind="issue", target_id="__pre_create__"
+    )
+    seen: set[str] = set()
+    for operation in operations:
+        name = operation.relationship
+        if name in seen:
+            continue
+        seen.add(name)
+        _relationship_mapping(settings, name)
+
+
 def _relationship_mapping(settings: Mapping[str, Any], relationship: str) -> _JiraRelationshipMapping:
     raw_mappings = _relationship_mappings(settings)
     aliases = _relationship_aliases(relationship)
