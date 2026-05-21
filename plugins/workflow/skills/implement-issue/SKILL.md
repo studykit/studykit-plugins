@@ -1,5 +1,5 @@
 ---
-name: plan-mode-implement
+name: implement-issue
 description: "Implement a workflow `task`, `bug`, or `spike` issue: read the issue body, enter plan mode to converge on the implementation plan, apply the change, verify Acceptance Criteria, commit with the issue ref prefix, and close the issue with a refreshed Resume."
 argument-hint: "<issue-ref> [additional requirements]"
 disable-model-invocation: true
