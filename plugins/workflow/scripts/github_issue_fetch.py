@@ -21,7 +21,7 @@ from workflow_github_issue_provider import GitHubIssueNativeProvider
 from workflow_github_issue_refs import issue_numbers_from_references
 from workflow_issue_cli_output import (
     IssueFetchContext,
-    cache_hit_from_payload,
+    cache_refreshed_from_payload,
     display_project_path,
     format_issue_cache_json,
 )
@@ -98,7 +98,7 @@ def fetch_cache_payload(
                 issue_dir=display_project_path(issue_dir, config.root, trailing_slash=True),
                 title=str(response.payload.get("title") or ""),
                 state=str(response.payload.get("state") or "").upper(),
-                cache_hit=cache_hit_from_payload(response.payload, default=False),
+                cache_refreshed=cache_refreshed_from_payload(response.payload, default=True),
                 provider_kind="github",
                 comments=comment_paths,
             )

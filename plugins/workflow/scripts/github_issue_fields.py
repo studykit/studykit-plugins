@@ -24,6 +24,7 @@ from workflow_github import (
 from workflow_github_issue_cache import GitHubIssueCache
 from workflow_github_issue_provider import GitHubIssueNativeProvider
 from workflow_github_issue_refs import issue_numbers_from_references
+from workflow_issue_cli_output import flatten_provider_envelope
 from workflow_providers import ProviderContext, ProviderRequest
 
 
@@ -107,14 +108,7 @@ def fields_payload(
                 payload=payload,
             )
         )
-        return {
-            "operation": f"lifecycle_{verb}",
-            "role": "issue",
-            "kind": "github",
-            "repository": repo.to_json(),
-            "issue": issue_number,
-            "provider": dict(response.payload),
-        }
+        return flatten_provider_envelope(response.payload, project=config.root)
 
     if verb == "assign":
         if not user:
@@ -160,14 +154,7 @@ def fields_payload(
             payload=payload,
         )
     )
-    return {
-        "operation": f"fields_{verb.replace('-', '_')}",
-        "role": "issue",
-        "kind": "github",
-        "repository": repo.to_json(),
-        "issue": issue_number,
-        "provider": dict(response.payload),
-    }
+    return flatten_provider_envelope(response.payload, project=config.root)
 
 
 def _replace_github_type_label(labels: set[str], workflow_type: str) -> set[str]:
@@ -246,7 +233,7 @@ def main(
         return 2
 
     print(json.dumps(payload, indent=2, sort_keys=False), file=output)
-    if (payload.get("provider") or {}).get("status") == "blocked":
+    if payload.get("status") == "blocked":
         return 3
     return 0
 

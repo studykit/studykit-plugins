@@ -17,6 +17,7 @@ from typing import Any, TextIO
 from workflow_command import CommandRunner
 from workflow_config import WorkflowConfig, WorkflowConfigError, load_workflow_config
 from workflow_env import workflow_project_dir_from_env
+from workflow_issue_cli_output import flatten_provider_envelope
 from workflow_jira_data_center_client import resolve_jira_data_center_site
 from workflow_jira_issue_provider import (
     JIRA_ARTIFACT_ISSUE_TYPES,
@@ -175,15 +176,7 @@ def fields_payload(
                 payload=payload,
             )
         )
-        return {
-            "operation": f"lifecycle_{verb}",
-            "role": "issue",
-            "kind": "jira",
-            "site": site.to_json(),
-            "issue": issue_key,
-            "key": issue_key,
-            "provider": dict(response.payload),
-        }
+        return flatten_provider_envelope(response.payload, project=config.root)
 
     if verb == "assign":
         if not user:
@@ -222,15 +215,7 @@ def fields_payload(
             payload=payload,
         )
     )
-    return {
-        "operation": f"fields_{verb.replace('-', '_')}",
-        "role": "issue",
-        "kind": "jira",
-        "site": site.to_json(),
-        "issue": issue_key,
-        "key": issue_key,
-        "provider": dict(response.payload),
-    }
+    return flatten_provider_envelope(response.payload, project=config.root)
 
 
 def _load_jira_issue_config(project: Path) -> WorkflowConfig:
@@ -278,7 +263,7 @@ def main(
         return 2
 
     print(json.dumps(payload, indent=2, sort_keys=False), file=output)
-    if (payload.get("provider") or {}).get("status") == "blocked":
+    if payload.get("status") == "blocked":
         return 3
     return 0
 

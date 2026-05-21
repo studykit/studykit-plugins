@@ -17,7 +17,7 @@ from workflow_config import WorkflowConfig, WorkflowConfigError, load_workflow_c
 from workflow_env import workflow_project_dir_from_env
 from workflow_issue_cli_output import (
     IssueFetchContext,
-    cache_hit_from_payload,
+    cache_refreshed_from_payload,
     display_project_path,
     format_issue_cache_json,
 )
@@ -102,7 +102,7 @@ def fetch_cache_payload(
                 issue_dir=display_project_path(issue_dir, config.root, trailing_slash=True),
                 title=str(response.payload.get("title") or ""),
                 state=str(response.payload.get("state") or "").upper(),
-                cache_hit=cache_hit_from_payload(response.payload, default=False),
+                cache_refreshed=cache_refreshed_from_payload(response.payload, default=True),
                 provider_kind="jira",
                 comments=comment_paths,
             )

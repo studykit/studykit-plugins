@@ -268,9 +268,9 @@ def test_cache_fetch_uses_cache_hit_without_remote_issue_view(tmp_path: Path) ->
     assert code == 0
     assert set(payload) == {"basedir", "issues"}
     assert payload["basedir"] == ".workflow-cache/issues/"
-    assert set(payload["issues"][0]) == {"issue", "title", "state", "cache_hit"}
+    assert set(payload["issues"][0]) == {"issue", "title", "state", "cache_refreshed"}
     assert payload["issues"][0]["issue"] == "42/issue.md"
-    assert payload["issues"][0]["cache_hit"] is True
+    assert payload["issues"][0]["cache_refreshed"] is False
     assert runner.requests == []
 
 
@@ -350,7 +350,7 @@ def test_cache_fetch_refresh_reads_remote_and_updates_cache(tmp_path: Path) -> N
     payload = json.loads(stdout.getvalue())
     assert code == 0
     assert payload["basedir"] == ".workflow-cache/issues/"
-    assert payload["issues"][0]["cache_hit"] is False
+    assert payload["issues"][0]["cache_refreshed"] is True
     assert [request.args for request in runner.requests] == [
         gh_issue_view_args(42),
         gh_api_args("repos/studykit/studykit-plugins/issues/42"),
@@ -392,7 +392,7 @@ def test_cache_fetch_uses_jira_cache_hit_without_remote_read(tmp_path: Path) -> 
     assert set(payload) == {"basedir", "issues"}
     assert payload["basedir"] == ".workflow-cache/issues/"
     assert payload["issues"][0]["issue"] == "TEST-1234/issue.md"
-    assert payload["issues"][0]["cache_hit"] is True
+    assert payload["issues"][0]["cache_refreshed"] is False
     assert "relationships" not in payload["issues"][0]
     assert runner.requests == []
 
@@ -423,7 +423,7 @@ def test_cache_fetch_refresh_reads_remote_jira_and_updates_cache(tmp_path: Path)
     assert code == 0
     assert payload["basedir"] == ".workflow-cache/issues/"
     assert payload["issues"][0]["issue"] == "TEST-1234/issue.md"
-    assert payload["issues"][0]["cache_hit"] is False
+    assert payload["issues"][0]["cache_refreshed"] is True
     assert [request.args for request in runner.requests] == [
         curl_args(jira_issue_url()),
         curl_args(jira_remote_links_url()),

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import io
 import json
 import sys
 from pathlib import Path
@@ -19,7 +20,19 @@ from workflow_github_issue_cache import GitHubIssueCache  # noqa: E402
 from github_issue_fields import (  # noqa: E402
     GitHubIssueFieldsError,
     fields_payload,
+    main as github_issue_fields_main,
 )
+
+
+_DROPPED_FIELD_KEYS = ("provider", "cache", "repository", "operation", "role", "kind", "verified")
+
+
+def _assert_flat_field_envelope(payload: dict, *, issue_basename: str = "39/issue.md") -> None:
+    """Assert the flattened envelope contract for GitHub field write payloads."""
+    for dropped in _DROPPED_FIELD_KEYS:
+        assert dropped not in payload, f"{dropped!r} should not be in payload"
+    assert payload["issue"].endswith(issue_basename), payload["issue"]
+    assert payload["cache_refreshed"] is True
 
 
 class FakeRunner:
@@ -171,8 +184,7 @@ def test_set_type_preserves_non_type_labels_and_swaps_type_label(tmp_path: Path)
         runner=runner,
     )
 
-    assert payload["operation"] == "fields_set_type"
-    assert payload["issue"] == "39"
+    _assert_flat_field_envelope(payload)
     cached = cache.read_issue(repo(), 39, include_body=False, include_comments=False, include_relationships=False)
     assert sorted(cached["labels"]) == ["bug", "workflow"]
     assert edit_args in {request.args for request in runner.requests}
@@ -214,7 +226,7 @@ def test_assign_me_resolves_via_gh_api_user(tmp_path: Path) -> None:
         runner=runner,
     )
 
-    assert payload["operation"] == "fields_assign"
+    _assert_flat_field_envelope(payload)
     assert edit_args in {request.args for request in runner.requests}
     me_calls = [request for request in runner.requests if request.args == me_args]
     assert len(me_calls) == 1
@@ -260,7 +272,7 @@ def test_unassign_clears_all_current_assignees(tmp_path: Path) -> None:
         runner=runner,
     )
 
-    assert payload["operation"] == "fields_unassign"
+    _assert_flat_field_envelope(payload)
     assert edit_args in {request.args for request in runner.requests}
 
 
@@ -274,3 +286,130 @@ def test_set_type_rejects_empty_type(tmp_path: Path) -> None:
             issue="#39",
             new_type="   ",
         )
+
+
+def _close_args(reason: str = "completed") -> tuple[str, ...]:
+    return (
+        "gh",
+        "issue",
+        "close",
+        "39",
+        "--repo",
+        "studykit/studykit-plugins",
+        "--reason",
+        reason,
+    )
+
+
+def _reopen_args() -> tuple[str, ...]:
+    return ("gh", "issue", "reopen", "39", "--repo", "studykit/studykit-plugins")
+
+
+def _verify_state_args() -> tuple[str, ...]:
+    return gh_issue_view_args(39, "state,stateReason")
+
+
+def test_close_returns_flat_envelope(tmp_path: Path) -> None:
+    write_github_config(tmp_path)
+    _seed_cache(tmp_path)
+    refreshed = issue_payload()
+    refreshed["state"] = "CLOSED"
+    refreshed["stateReason"] = "COMPLETED"
+    responses = {
+        _freshness_args(): result(
+            _freshness_args(),
+            stdout=json.dumps({"number": 39, "updatedAt": "2026-05-13T12:00:00Z"}),
+        ),
+        _close_args(): result(_close_args()),
+        _verify_state_args(): result(
+            _verify_state_args(),
+            stdout=json.dumps({"state": "CLOSED", "stateReason": "COMPLETED"}),
+        ),
+        _refresh_args(): result(_refresh_args(), stdout=json.dumps(refreshed)),
+        **_refresh_relationship_args(),
+    }
+    runner = FakeRunner(responses)
+
+    payload = fields_payload(
+        project=tmp_path,
+        artifact_type="task",
+        verb="close",
+        issue="#39",
+        reason="completed",
+        runner=runner,
+    )
+
+    _assert_flat_field_envelope(payload)
+    assert _close_args() in {request.args for request in runner.requests}
+
+
+def test_reopen_returns_flat_envelope(tmp_path: Path) -> None:
+    write_github_config(tmp_path)
+    cache = _seed_cache(tmp_path)
+    # Seed cache as closed so reopen lands at OPEN.
+    closed = issue_payload()
+    closed["state"] = "CLOSED"
+    closed["stateReason"] = "COMPLETED"
+    cache.write_issue_bundle(repo(), closed, fetched_at="2026-05-13T12:34:56Z")
+    refreshed = issue_payload()
+    responses = {
+        _freshness_args(): result(
+            _freshness_args(),
+            stdout=json.dumps({"number": 39, "updatedAt": "2026-05-13T12:00:00Z"}),
+        ),
+        _reopen_args(): result(_reopen_args()),
+        _verify_state_args(): result(
+            _verify_state_args(),
+            stdout=json.dumps({"state": "OPEN", "stateReason": None}),
+        ),
+        _refresh_args(): result(_refresh_args(), stdout=json.dumps(refreshed)),
+        **_refresh_relationship_args(),
+    }
+    runner = FakeRunner(responses)
+
+    payload = fields_payload(
+        project=tmp_path,
+        artifact_type="task",
+        verb="reopen",
+        issue="#39",
+        runner=runner,
+    )
+
+    _assert_flat_field_envelope(payload)
+    assert _reopen_args() in {request.args for request in runner.requests}
+
+
+def test_close_on_stale_cache_returns_blocked_envelope_and_exit_3(tmp_path: Path) -> None:
+    write_github_config(tmp_path)
+    _seed_cache(tmp_path)
+    # Provider reports a newer updated_at than the cached projection.
+    drifted_freshness = result(
+        _freshness_args(),
+        stdout=json.dumps({"number": 39, "updatedAt": "2026-05-13T13:00:00Z"}),
+    )
+    refreshed = issue_payload()
+    refreshed["updatedAt"] = "2026-05-13T13:00:00Z"
+    responses = {
+        _freshness_args(): drifted_freshness,
+        _refresh_args(): result(_refresh_args(), stdout=json.dumps(refreshed)),
+        **_refresh_relationship_args(),
+    }
+    runner = FakeRunner(responses)
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+
+    exit_code = github_issue_fields_main(
+        ["--project", str(tmp_path), "close", "#39"],
+        stdout=stdout,
+        stderr=stderr,
+        runner=runner,
+    )
+
+    assert exit_code == 3, stderr.getvalue()
+    payload = json.loads(stdout.getvalue())
+    assert payload["status"] == "blocked"
+    assert payload["reason"]
+    assert payload["reread_required"] is True
+    assert payload["reread_paths"]
+    # Provider close was not issued because the freshness gate blocked first.
+    assert _close_args() not in {request.args for request in runner.requests}
