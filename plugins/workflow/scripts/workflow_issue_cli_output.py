@@ -22,18 +22,20 @@ class IssueFetchContext:
     issue_file: str = "issue.md"
     comments: tuple[str, ...] = ()
 
-    def to_json(self) -> dict[str, Any]:
-        payload = {
-            "issue": self.number,
-            "issue_dir": self.issue_dir,
+    def to_json(self, basedir: str = "") -> dict[str, Any]:
+        issue_dir = ensure_trailing_slash(self.issue_dir.strip())
+        relative_dir = issue_dir[len(basedir):] if basedir and issue_dir.startswith(basedir) else issue_dir
+        payload: dict[str, Any] = {
+            "issue": f"{relative_dir}{self.issue_file}",
             "title": self.title,
             "state": self.state,
             "cache_hit": self.cache_hit,
         }
-        if self.issue_file != "issue.md":
-            payload["issue_file"] = self.issue_file
         if self.comments:
-            payload["comments"] = list(self.comments)
+            payload["comments"] = [
+                comment[len(basedir):] if basedir and comment.startswith(basedir) else comment
+                for comment in self.comments
+            ]
         return payload
 
 
@@ -71,23 +73,32 @@ def format_issue_cache_context(
 
 def format_issue_cache_json(
     contexts: Sequence[IssueFetchContext],
-    *,
-    provider_kind: str,
-    cache_policy: str,
-    repository: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Build compact JSON for provider issue fetch output."""
 
-    payload: dict[str, Any] = {
-        "operation": "cache_fetch",
-        "role": "issue",
-        "kind": provider_kind,
-        "cache_policy": cache_policy,
-        "issues": [context.to_json() for context in contexts],
+    basedir = shared_basedir(contexts)
+    return {
+        "basedir": basedir,
+        "issues": [context.to_json(basedir) for context in contexts],
     }
-    if repository is not None:
-        payload["repository"] = dict(repository)
-    return payload
+
+
+def shared_basedir(contexts: Sequence[IssueFetchContext]) -> str:
+    """Return the directory shared by every context's issue_dir."""
+
+    bases: list[str] = []
+    for context in contexts:
+        issue_dir = ensure_trailing_slash(context.issue_dir.strip())
+        suffix = f"{context.number}/"
+        if not issue_dir.endswith(suffix):
+            return ""
+        bases.append(issue_dir[: -len(suffix)])
+    if not bases:
+        return ""
+    first = bases[0]
+    if any(base != first for base in bases):
+        return ""
+    return first
 
 
 def display_project_path(path: Path, project: Path, *, trailing_slash: bool = False) -> str:
