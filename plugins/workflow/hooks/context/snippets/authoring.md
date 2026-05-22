@@ -1,9 +1,9 @@
-```bash
+<bash>
 workflow authoring_resolver.py \
   --type <type> \
   [--role issue|knowledge] \
   [--scope comment]
-```
+</bash>
 
 - `--type` — required.
 - `--role` — required for dual-role types (`issue` or `knowledge`); omit

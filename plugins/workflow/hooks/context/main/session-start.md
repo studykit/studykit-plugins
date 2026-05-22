@@ -1,10 +1,18 @@
-## workflow policy
+<launcher>
 
 {{SNIPPET_LAUNCHER}}
+
+</launcher>
+
+<authoring-resolver>
 
 Resolve authoring paths before any issue or knowledge pages:
 
 {{SNIPPET_AUTHORING}}
+
+</authoring-resolver>
+
+<runbook>
 
 Reference docs (read on demand) at
 `{{WORKFLOW_RUNBOOK_DIR}}/<intent>/{{WORKFLOW_ISSUE_PROVIDER}}.md`:
@@ -16,6 +24,8 @@ Reference docs (read on demand) at
 - `issue-update` — update body, title, labels, or state
 - `issue-link` — relationships
 - `issue-state` — body-less verbs (state, assign, unassign, set-type)
+
+</runbook>
 
 Don't quote, paraphrase, or summarize issue bodies, comments, or knowledge
 documents beyond what the user asked for. The cached `issue.md` and
