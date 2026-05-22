@@ -108,11 +108,14 @@ commit_refs:
     )
 
 
-def _write_jira_config(project: Path) -> None:
+def _write_jira_config(
+    project: Path,
+    *,
+    relationship_mappings: dict[str, dict[str, str]] | None = None,
+) -> None:
     config_path = project / ".workflow" / "config.yml"
     config_path.parent.mkdir(parents=True, exist_ok=True)
-    config_path.write_text(
-        """
+    text = """
 version: 1
 providers:
   issues:
@@ -122,12 +125,18 @@ providers:
     api_version: 2
     project: TEST
     issue_type: Task
-  knowledge:
+""".lstrip()
+    if relationship_mappings:
+        text += "    relationship_mappings:\n"
+        for name, mapping in relationship_mappings.items():
+            text += f"      {name}:\n"
+            for key, value in mapping.items():
+                text += f"        {key}: {value}\n"
+    text += """  knowledge:
     kind: github
 issue_id_format: jira
-""".lstrip(),
-        encoding="utf-8",
-    )
+"""
+    config_path.write_text(text, encoding="utf-8")
 
 
 def _repo() -> GitHubRepository:
@@ -1055,6 +1064,97 @@ def test_jira_publish_fails_fast_when_relationship_mapping_missing(tmp_path: Pat
     assert runner.requests == []
     assert body_file.exists()
     assert stdout.getvalue() == ""
+
+
+class JiraPublishRelationshipFailureRunner(JiraFakeRunner):
+    """Mirror of GitHub's post-create relationship failure shape for Jira.
+
+    The Jira `create` and `create_issue_link` POSTs both hit curl with the
+    same outer argv (``_jira_write_args()``); the destination URL lives in
+    the curl --config stdin. This subclass routes the create POST to the
+    success response and lets the link POST fall through to the default
+    ``returncode=127`` raise that trips ``_publish_issue``'s
+    ``except Exception`` handler.
+    """
+
+    def __call__(self, request: CommandRequest) -> CommandResult:
+        if request.args == _jira_write_args() and "/issueLink" in (request.input_text or ""):
+            self.requests.append(request)
+            return CommandResult(
+                request=request,
+                returncode=127,
+                stderr="unexpected: issueLink dispatch (intended to fail)",
+            )
+        return super().__call__(request)
+
+
+def test_jira_publish_preserves_body_on_relationship_failure(tmp_path: Path) -> None:
+    _write_jira_config(
+        tmp_path,
+        relationship_mappings={"related": {"link_type": "Relates", "direction": "outward"}},
+    )
+    body_file = _write_body_file(tmp_path, "Body.\n")
+    issue_url = "https://jira.example.test/rest/api/2/issue/TEST-1234"
+    remote_links_url = "https://jira.example.test/rest/api/2/issue/TEST-1234/remotelink"
+
+    runner = JiraPublishRelationshipFailureRunner(
+        {
+            _jira_write_args(): CommandResult(
+                request=CommandRequest(args=()),
+                returncode=0,
+                stdout=json.dumps({"id": "10001", "key": "TEST-1234"}),
+            ),
+            _jira_curl_get_args(issue_url): CommandResult(
+                request=CommandRequest(args=()),
+                returncode=0,
+                stdout=json.dumps(_jira_issue_payload()),
+            ),
+            _jira_curl_get_args(remote_links_url): CommandResult(
+                request=CommandRequest(args=()),
+                returncode=0,
+                stdout=json.dumps([]),
+            ),
+        }
+    )
+    stdout = io.StringIO()
+
+    code = jira_issue_drafts_main(
+        [
+            "--project",
+            str(tmp_path),
+            "publish",
+            "--type",
+            "task",
+            "--title",
+            "Published Jira issue",
+            "--body-file",
+            str(body_file),
+            "--related",
+            "TEST-99",
+        ],
+        stdout=stdout,
+        runner=runner,
+    )
+
+    payload = json.loads(stdout.getvalue())
+    assert code == 1
+    assert payload["issue"] == "TEST-1234"
+    assert payload["body_file_removed"] is False
+    assert payload["body_file"] == str(body_file)
+    assert body_file.exists()
+    relationships = payload["relationships"]
+    assert relationships["status"] == "failed"
+    assert relationships["intent"] == {"related_add": ["TEST-99"]}
+    # Guard: the create POST must actually fire so a future regression that
+    # short-circuits in the pre-create validator (the branch already covered
+    # by test_jira_publish_fails_fast_when_relationship_mapping_missing) does
+    # not silently pass this post-create regression test.
+    assert runner.requests[0].args == _jira_write_args()
+    link_writes = [
+        r for r in runner.requests
+        if r.args == _jira_write_args() and "/issueLink" in (r.input_text or "")
+    ]
+    assert len(link_writes) == 1
 
 
 def test_jira_publish_epic_with_post_create_epic_link_is_rejected(tmp_path: Path) -> None:
