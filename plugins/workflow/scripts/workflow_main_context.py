@@ -76,16 +76,17 @@ def build_session_policy_context(
 
     text = _read_fragment("main/session-start.md").strip()
     if plugin_root is None:
-        return text
+        return _wrap_policy(text)
     resolved_plugin_root = plugin_root.expanduser().resolve()
     runbook_dir = resolved_plugin_root / "authoring" / "runbook"
     issue_provider = _provider_segment(config, "issues", _KNOWN_ISSUE_PROVIDERS)
-    return render(text, {
+    rendered = render(text, {
         "SNIPPET_LAUNCHER": _build_launcher_block(runtime, resolved_plugin_root),
         "SNIPPET_AUTHORING": _read_fragment("snippets/authoring.md").strip(),
         "WORKFLOW_RUNBOOK_DIR": str(runbook_dir),
         "WORKFLOW_ISSUE_PROVIDER": issue_provider,
     })
+    return _wrap_policy(rendered)
 
 
 def build_subagent_policy_context(
@@ -99,7 +100,7 @@ def build_subagent_policy_context(
 
     text = _read_fragment("subagent/session-start.md").strip()
     if plugin_root is None:
-        return text
+        return _wrap_policy(text)
     resolved_plugin_root = plugin_root.expanduser().resolve()
     runbook_dir = resolved_plugin_root / "authoring" / "runbook"
     issue_provider = _provider_segment(config, "issues", _KNOWN_ISSUE_PROVIDERS)
@@ -110,9 +111,48 @@ def build_subagent_policy_context(
         "WORKFLOW_ISSUE_PROVIDER": issue_provider,
     })
     agent_block = _build_agent_context_block(agent_type, issue_provider, runbook_dir)
-    if agent_block:
-        rendered = f"{rendered}\n\n{agent_block}"
-    return rendered
+    merged = _merge_runbook_blocks(rendered, agent_block)
+    return _wrap_policy(merged)
+
+
+_RUNBOOK_BLOCK_RE = re.compile(
+    r"\n?<runbook>\s*\n?(?P<body>.*?)\n?\s*</runbook>\n?",
+    re.DOTALL,
+)
+
+
+def _merge_runbook_blocks(base: str, per_agent: str) -> str:
+    """Combine a base subagent context with an optional per-agent block.
+
+    If ``per_agent`` carries its own ``<runbook>...</runbook>`` block, the
+    base's ``<runbook>`` is stripped first so the merged text emits a
+    single ``<runbook>``. Any empty ``<runbook>`` (whitespace-only body)
+    is removed from the combined text — agents without listed intents
+    do not get an empty tag injected.
+    """
+
+    def has_runbook(text: str) -> bool:
+        return _RUNBOOK_BLOCK_RE.search(text) is not None
+
+    def strip_empty_runbooks(text: str) -> str:
+        def replace(match: re.Match[str]) -> str:
+            body = match.group("body").strip()
+            return "" if not body else match.group(0)
+
+        return _RUNBOOK_BLOCK_RE.sub(replace, text)
+
+    if per_agent and has_runbook(per_agent):
+        base = _RUNBOOK_BLOCK_RE.sub("\n\n", base, count=1)
+        base = base.rstrip()
+    combined = f"{base}\n\n{per_agent}" if per_agent else base
+    combined = strip_empty_runbooks(combined)
+    # Collapse 3+ consecutive newlines that the strip-and-merge can leave behind.
+    combined = re.sub(r"\n{3,}", "\n\n", combined)
+    return combined.strip()
+
+
+def _wrap_policy(text: str) -> str:
+    return f"<policy>\n{text.strip()}\n</policy>"
 
 
 def _build_agent_context_block(

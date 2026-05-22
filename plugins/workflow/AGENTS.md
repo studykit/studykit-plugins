@@ -60,7 +60,7 @@ Where the injected text comes from:
     a commit keyword fires)
 - **Agents run as subagents** — `SubagentStart` injects from
   `hooks/context/subagent/`:
-  - `policy.md` (general subagent policy)
+  - `session-start.md` (general subagent policy)
   - `agents/<agent-name>.md` (per-agent block, when present)
 - **Inline snippets** — `hooks/context/snippets/authoring.md` (authoring
   resolver) and `hooks/context/snippets/launcher/<runtime>.md` (launcher
@@ -85,10 +85,13 @@ whenever the layout above looks stale.
 
 Rules that follow:
 
-- Refer to injected blocks by name (e.g., "use the **Publish a review**
-  block from the SubagentStart-injected `issue-implementer subagent
-  context`") instead of restating provider-specific command shapes that
-  the runtime will inject anyway.
+- Refer to injected blocks by tag (e.g., `<launcher>`, `<authoring-resolver>`,
+  `<commit-prefix>`, `<runbook>`) and point at runbook intents by tag
+  (e.g., "verb syntax at `<runbook>`'s `issue-new` intent") instead of
+  restating provider-specific command shapes that the runtime will inject
+  anyway. Procedures that span multiple runbook intents belong in the
+  agent body as a named section the body refers to internally — not in
+  the SubagentStart per-agent block, which only carries injected tags.
 - Do not assume cross-surface context. A skill (main session) sees
   `main/...` blocks; a subagent sees `subagent/...` blocks. Crossing the
   boundary leaves the runtime doc missing assumed context — surface the
