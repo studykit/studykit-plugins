@@ -10,14 +10,14 @@ The goal is to let workflow operate over multiple sources of truth:
 
 - Filesystem-backed local Markdown.
 - GitHub Issues and repository-backed `wiki/` Markdown directories.
-- Jira and Confluence.
-- Mixed provider setups, such as GitHub Issues plus Confluence.
+- Jira.
+- Mixed provider setups, such as Jira issues plus GitHub repository `wiki/`.
 
 ## Core Direction
 
 `plugins/workflow` should be a provider-agnostic workflow and semantic layer.
 
-Local Markdown remains a possible projection or future provider, but the workflow plugin is designed around provider-backed sources of truth. When GitHub, Jira, repository-backed `wiki/`, or Confluence are configured as the source of truth, local Markdown files are optional projections rather than required canonical records.
+Local Markdown remains a possible projection or future provider, but the workflow plugin is designed around provider-backed sources of truth. When GitHub, Jira, or repository-backed `wiki/` are configured as the source of truth, local Markdown files are optional projections rather than required canonical records.
 
 ## Terms
 
@@ -39,7 +39,7 @@ Examples:
 
 - Filesystem: local Markdown files under a configured path.
 - GitHub: GitHub Issues, Projects, and a repository `wiki/` directory for knowledge.
-- Atlassian: Jira issues and Confluence pages.
+- Atlassian: Jira issues.
 
 ## Configuration Location
 
@@ -62,15 +62,14 @@ source_of_truth:
   issues:
     provider: github # github | jira | filesystem
   knowledge:
-    provider: confluence # github | confluence | filesystem
+    provider: github
 ```
 
 This supports mixed configurations such as:
 
 - GitHub Issues + repository `wiki/` directory.
-- Jira + Confluence.
-- GitHub Issues + Confluence.
-- Filesystem-only.
+- Jira + repository `wiki/` directory.
+- Filesystem issues + repository `wiki/` directory.
 
 ## Recommended Type Mapping
 
@@ -176,7 +175,6 @@ Recommended identity authority:
 - Filesystem mode: local monotonic workflow id.
 - GitHub mode: `owner/repo#number`.
 - Jira mode: Jira issue key, such as `PROJ-123`.
-- Confluence mode: page id, page URL, or stable space/page key.
 - GitHub knowledge mode: repository-relative path under `wiki/`.
 
 Commit messages should use provider-native references:
@@ -210,13 +208,13 @@ Example knowledge view:
 
 ```yaml
 ---
-provider: confluence
+provider: github
 kind: page
-key: ENG/Auth Session v2
+key: org/repo:wiki/auth-session-v2.md
 type: spec
 status: active
 supersedes:
-  - ENG/Auth Session v1
+  - org/repo:wiki/auth-session-v1.md
 related:
   - org/repo#123
 created_at: 2026-05-13T00:00:00Z
@@ -246,14 +244,14 @@ Example body fallback:
 ```markdown
 ## Implements
 
-- [Login Usecase](https://confluence.example.com/pages/123456)
+- [Login Usecase](https://github.com/org/repo/blob/main/wiki/login-usecase.md)
 ```
 
 The adapter may also store the same relationship as metadata:
 
 ```yaml
 implements:
-  - confluence:123456
+  - github:org/repo:wiki/login-usecase.md
 ```
 
 See `workflow-issue-relationship-policy.md` for the GitHub issue relationship policy used by the workflow MVP backlog.
@@ -344,7 +342,7 @@ Recommended knowledge artifacts:
 - Curated `usecase` pages.
 - Curated `research` reports.
 
-A repository `wiki/` directory has normal git history, branch review, pull requests, CODEOWNERS, and CI integration. It does not have provider-native page metadata like Confluence, so workflow metadata may need to live in page metadata blocks or an index file under `wiki/<plugin>/`.
+A repository `wiki/` directory has normal git history, branch review, pull requests, CODEOWNERS, and CI integration. It does not have provider-native page metadata, so workflow metadata may need to live in page metadata blocks or an index file under `wiki/<plugin>/`.
 
 Decision:
 
@@ -352,36 +350,6 @@ Decision:
 - Use `wiki/` in the main repository when GitHub is the knowledge provider.
 - Use `wiki/<plugin>/` for plugin-specific knowledge pages in multi-plugin repositories.
 - Treat `wiki/<plugin>/<page>.md` as the provider identity for plugin-specific pages.
-
-## Confluence Mapping
-
-Confluence is a strong fit for curated knowledge artifacts.
-
-Recommended artifacts:
-
-- `spec`
-- `architecture`
-- `domain`
-- `context`
-- `actors`
-- `nfr`
-- `ci`
-- Curated `usecase` pages.
-- Curated `research` reports.
-
-Potential mappings:
-
-| Workflow concept | Confluence capability |
-| --- | --- |
-| Page identity | Page id, URL, or space/page key |
-| Title and body | Page title and content |
-| Type | Label or page property |
-| Status | Label, page property, or status macro |
-| Related items | Page links and Jira issue links |
-| Created and updated time | Page system metadata |
-| Log | Comments and version history |
-
-Confluence is likely a better fit than a GitHub repository `wiki/` directory when provider-native metadata and cross-team document collaboration are important.
 
 ## Jira Mapping
 
@@ -419,7 +387,6 @@ Recommended log storage:
 
 - GitHub Issues: comments plus timeline events.
 - Jira: comments, history, and worklog.
-- Confluence: comments and page version history.
 - GitHub repository `wiki/` directory: git history and optional page section.
 
 The workflow normalized view can render a log section from provider-native events.
@@ -501,7 +468,6 @@ Native transports:
 - GitHub Issues: `gh` and `gh api`.
 - GitHub repository `wiki/` directory: `git` against the main repository.
 - Jira: a REST wrapper.
-- Confluence: a REST wrapper.
 
 MCP should be a fallback, not the primary transport. This keeps the provider layer usable from CI, local scripts, and non-Claude runtimes while still allowing MCP-backed operation when native tools or credentials are unavailable.
 
@@ -514,7 +480,7 @@ The wrapper must enforce the same authoring guard regardless of transport. A wri
 Purpose:
 
 - Find project work documents and work items in configured providers.
-- Search GitHub Issues, Jira issues, repository `wiki/` Markdown pages, and Confluence pages.
+- Search GitHub Issues, Jira issues, and repository `wiki/` Markdown pages.
 - Return compact results with provider refs, URLs, status/type metadata, and short summaries.
 
 Scope:
@@ -560,9 +526,9 @@ providers:
     repo: org/repo
 
   knowledge:
-    kind: confluence
-    site: company.atlassian.net
-    space: ENG
+    kind: github
+    repo: org/repo
+    path: wiki/workflow
 
 issue_id_format: github
 
@@ -611,7 +577,7 @@ Output:
 }
 ```
 
-Authoring contracts are plugin-bundled Markdown files only. The resolver must return absolute file paths so the assistant can read the exact files without guessing relative locations. Project-local, repository `wiki/`, or Confluence-hosted authoring overrides are out of scope for v1.
+Authoring contracts are plugin-bundled Markdown files only. The resolver must return absolute file paths so the assistant can read the exact files without guessing relative locations. Project-local or repository `wiki/` authoring overrides are out of scope for v1.
 
 The main assistant should read the returned files before drafting workflow artifacts. Provider writes, cache refresh, and verification remain operator responsibilities.
 
@@ -638,7 +604,7 @@ This separates workflow convenience from authoring enforcement:
 6. Frontmatter should become a normalized view over provider metadata.
 7. `spec` belongs in the knowledge backend, not the issue backend.
 8. `usecase` and `research` should support dual artifacts and should always create the issue artifact first.
-9. Wiki or Confluence pages should contain curated content only.
+9. Wiki pages should contain curated content only.
 10. Discussion, questions, and work logs should stay in the issue backend.
 11. `review` is always issue-backed because it represents feedback workflow, not page-local commentary.
 12. Review targets should use provider-native relationships when available; use a human-readable `## Target` body section only when the target is not represented provider-natively.

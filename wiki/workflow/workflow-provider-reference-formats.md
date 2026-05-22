@@ -15,7 +15,6 @@ Recommended author-facing references:
 - GitHub issue or PR outside GitHub-native contexts when ambiguity matters: full URL.
 - Jira issue: `PROJ-123`.
 - Jira issue in GitHub comments when using GitHub for Atlassian: `[PROJ-123]`.
-- Confluence page: page title or Smart Link; use full URL when creating portable text links.
 - GitHub repository `wiki/` page: repository-relative Markdown path such as `wiki/workflow/home.md`, or a full GitHub file URL when portability matters.
 
 The adapter should resolve author-facing refs into provider-native identity objects when it needs to call APIs, validate relationships, or write metadata.
@@ -40,7 +39,6 @@ If a machine-only metadata field needs a compact stable value, use a provider-qu
 ```text
 workflowref:github:issue:github.com/octo-org/octo-repo/123
 workflowref:jira:issue:acme.atlassian.net/PROJ-123
-workflowref:confluence:page:acme.atlassian.net/123456789
 ```
 
 Do not require users or LLM-authored prose to use `workflowref:`. It is a machine fallback, not the normal writing style.
@@ -128,7 +126,7 @@ Implications for workflow:
 - Display `issue_key` in commits, branches, PR titles, comments, and page content.
 - For GitHub comments with GitHub for Atlassian, use `[PROJ-123]` when a clickable Jira link is desired.
 - Use Jira issue links for Jira-to-Jira relationships when configured link types match workflow semantics.
-- Use remote links for Jira-to-GitHub, Jira-to-Confluence, or Jira-to-filesystem references. If a `globalId` is needed, derive it from the resolved reference object.
+- Use remote links for Jira-to-GitHub or Jira-to-filesystem references. If a `globalId` is needed, derive it from the resolved reference object.
 
 Branch, commit, and PR conventions:
 
@@ -137,25 +135,6 @@ Branch, commit, and PR conventions:
 - PR title default: `PROJ-123 <summary>`.
 - A slash branch pattern such as `PROJ-123/some-name` may work because the key is present, but the default should follow Atlassian's hyphen examples for maximum compatibility.
 
-### Confluence pages
-
-Confluence Cloud REST API v2 identifies pages by numeric/string page `id`; page objects include `title`, `spaceId`, `parentId`, version data, and `_links` such as `webui`, `editui`, and `tinyui`. The page create and update APIs use `spaceId`, `title`, `parentId`, body, and version fields. Source: https://developer.atlassian.com/cloud/confluence/rest/v2/api-group-page/
-
-Confluence supports ordinary links and Smart Links. Atlassian documents that most pasted URLs in a Confluence page or live doc automatically unfurl or convert into Smart Links, and that Smart Links work across Confluence, Jira, and other apps. Sources: https://support.atlassian.com/confluence-cloud/docs/insert-links-and-anchors/ and https://support.atlassian.com/platform-experiences/docs/use-smart-links-to-collaborate-across-products/
-
-Smart Link rendering is permission-sensitive. Atlassian documents that a pasted URL is checked against a domain pattern, and if the domain matches and the user is authenticated, the link can display metadata such as title, last updated date, and preview image. Source: https://support.atlassian.com/platform-experiences/docs/what-data-is-sent-and-received-when-pasting-a-smart-link/
-
-Confluence Data Center documentation says internal Confluence page links are relative, so moves and renames do not break those internal links. This is useful behavior inside Confluence, but an external workflow reference should still retain the page ID because external URLs and titles are easier to change. Source: https://confluence.atlassian.com/doc/links-776656293.html
-
-Implications for workflow:
-
-- Store `site`, `page_id`, `space_id`, `title`, and URLs from `_links`, including `webui` and `tinyui` when available.
-- Resolve Confluence pages using configured site and space context.
-- Metadata identity should prefer `page_id` scoped by Confluence site.
-- Body display should prefer page title or Smart Link, with URL fallback.
-- `space + title` is readable but not stable across rename or move; use it as a lookup/display alias, not canonical identity.
-- For cross-links to Jira, Confluence's Smart Links are useful display behavior, but workflow should resolve and store the underlying Jira or Confluence identity separately when metadata is available.
-
 ## Stability and human-readability tradeoffs
 
 | Provider object | Preferred author-facing ref | Resolved identity for APIs/metadata | Main weakness |
@@ -163,7 +142,6 @@ Implications for workflow:
 | GitHub issue/PR | `#123` in configured repo; `owner/repo#123` cross-repo | host, owner, repo, number, optional `node_id` | `#123` is context-relative. |
 | GitHub repository `wiki/` page | `wiki/<plugin>/<page>.md` for plugin-specific pages, or full GitHub file URL | host, owner, repo, path, optional branch/commit | Path changes change identity; no page-level opaque ID. |
 | Jira issue | `PROJ-123` | Jira site, key, optional numeric issue ID | Keys are site-scoped; key changes can happen after project moves or renames. |
-| Confluence page | Page title or Smart Link | Confluence site, page ID, space ID, URLs | Titles and spaces are readable but rename/move-sensitive. |
 | GitHub Project item/field | Project view field name | Project item/field IDs | Useful metadata target, not artifact identity. |
 
 General rule: accept and render native short references for humans. Resolve them with provider context for APIs and metadata. Do not force every provider into an integer workflow ID. Do not treat display references as globally unique without provider authority and site/repository scope.
@@ -177,7 +155,7 @@ Use raw provider-native references in body sections by default:
 
 - #123
 - PROJ-456
-- [Auth Session v2](https://acme.atlassian.net/wiki/spaces/ENG/pages/123456789/Auth+Session+v2)
+- [Auth Session v2](https://github.com/org/repo/blob/main/wiki/workflow/auth-session-v2.md)
 ```
 
 When provider metadata supports structured relationships, store a resolved object. The object can be generated from the raw ref and `.workflow/config.yml`.
@@ -241,25 +219,10 @@ url: https://acme.atlassian.net/browse/PROJ-123
 display: PROJ-123
 ```
 
-```yaml
-input: "Auth Session v2"
-provider: confluence
-kind: page
-authority: acme.atlassian.net
-native:
-  page_id: "123456789"
-  space_id: "98765"
-  title: Auth Session v2
-  tinyui: /x/AbCdE
-  webui: /spaces/ENG/pages/123456789/Auth+Session+v2
-url: https://acme.atlassian.net/wiki/spaces/ENG/pages/123456789/Auth+Session+v2
-display: Auth Session v2
-```
-
 Recommended fields:
 
 - `input`: the author-facing raw ref that was parsed.
-- `provider`: `filesystem`, `github`, `jira`, or `confluence`.
+- `provider`: `filesystem`, `github`, or `jira`.
 - `kind`: provider object kind, such as `issue`, `pull_request`, `page`, `project_item`, or `file`.
 - `authority`: host or instance authority, such as `github.com` or `acme.atlassian.net`.
 - `native`: provider-native identity fields needed for API resolution.
@@ -268,7 +231,7 @@ Recommended fields:
 - `title`: optional last-known title/summary.
 - `status`: optional last-known state/status.
 - `aliases`: optional previous keys, previous URLs, old wiki paths, or old titles found during sync.
-- `version`: optional provider version marker, such as Confluence page version or wiki commit SHA.
+- `version`: optional provider version marker, such as a wiki commit SHA.
 - `ref`: optional machine-only canonical ref, used only where a compact stable metadata key is useful.
 
 Relationship body sections should keep raw provider-native refs. Relationship metadata should use resolved objects when provider capabilities allow. Raw strings should be accepted in user input and normalized by provider-specific parsers.
@@ -279,10 +242,8 @@ Relationship body sections should keep raw provider-native refs. Relationship me
 2. Decide whether workflow should store GitHub `node_id` for issues as a mandatory field. It is stable and API-friendly, but less portable and less readable than `owner/repo#number`.
 4. Validate Jira key-change behavior for moved issues in target Jira Cloud instances. The REST API documents moved issue lookup behavior, but display and Smart Link behavior may vary by instance configuration.
 5. Decide which Jira link types map to workflow relationships by default, and how to handle instances where admins rename or remove link types.
-6. Confirm Confluence Cloud URL shapes for the target tenant, including whether `tinyui` is consistently present from API v2 and whether public/shared links introduce additional URL forms.
-7. Decide whether Confluence `space_id` or space key should be displayed in workflow refs. Space keys are readable; page IDs are more stable.
-8. Define parser precedence for ambiguous text such as `ABC-123` in GitHub comments where custom autolinks may also exist.
-9. Define how aliases are updated after provider redirects, repository renames, issue transfers, Jira project moves, or page renames.
+6. Define parser precedence for ambiguous text such as `ABC-123` in GitHub comments where custom autolinks may also exist.
+7. Define how aliases are updated after provider redirects, repository renames, issue transfers, Jira project moves, or page renames.
 
 ## Change Log
 

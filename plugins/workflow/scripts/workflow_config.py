@@ -28,7 +28,7 @@ CONFIG_NAME = f"{CONFIG_DIR_NAME}/{CONFIG_FILE_NAME}"
 CONFIG_RELATIVE_PATH = Path(CONFIG_DIR_NAME) / CONFIG_FILE_NAME
 
 ISSUE_PROVIDERS = {"github", "jira", "filesystem"}
-KNOWLEDGE_PROVIDERS = {"github", "confluence", "filesystem"}
+KNOWLEDGE_PROVIDERS = {"github"}
 
 COMMIT_REF_STYLES = {"provider-native", "issue-prefix", "issue-suffix", "disabled"}
 

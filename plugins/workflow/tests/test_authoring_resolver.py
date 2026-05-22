@@ -70,19 +70,6 @@ def test_review_github_issue_authoring_uses_native_target_relationship() -> None
     assert "## Related" not in text
 
 
-def test_spec_confluence_knowledge_resolution() -> None:
-    resolution = resolve_authoring("spec", provider="confluence")
-
-    assert resolution.role == "knowledge"
-    assert _rel_paths(resolution.files) == [
-"common/knowledge-body.md",
-        "common/prd-authoring.md",
-        "common/spec-authoring.md",
-        "providers/confluence-page-convention.md",
-        "providers/confluence-page-spec-authoring.md",
-    ]
-
-
 def test_dual_artifact_requires_explicit_role() -> None:
     with pytest.raises(ResolverError, match="specify --role"):
         resolve_authoring("research", provider="jira")
@@ -139,11 +126,6 @@ def test_github_knowledge_prd_paths_included_for_prd_components(artifact_type: s
 
 def test_github_knowledge_prd_paths_excluded_for_non_prd_type() -> None:
     resolution = resolve_authoring("architecture", role="knowledge", provider="github")
-    assert "providers/github-knowledge-prd-paths.md" not in _rel_paths(resolution.files)
-
-
-def test_confluence_knowledge_does_not_include_github_prd_paths() -> None:
-    resolution = resolve_authoring("spec", role="knowledge", provider="confluence")
     assert "providers/github-knowledge-prd-paths.md" not in _rel_paths(resolution.files)
 
 

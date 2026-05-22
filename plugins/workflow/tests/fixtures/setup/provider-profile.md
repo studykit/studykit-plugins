@@ -16,10 +16,8 @@ providers:
         link_type: Blocks
         direction: inward
   knowledge:
-    kind: confluence
-    site: https://confluence.example.test
-    deployment: data_center
-    space: ENG
+    kind: github
+    path: wiki/workflow
 commit_refs:
   style: issue-prefix
 ```

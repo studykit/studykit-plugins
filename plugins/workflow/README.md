@@ -1,20 +1,18 @@
 # Workflow Plugin
 
 Issue- and knowledge-backed workflow for Claude Code and Codex sessions. The
-plugin treats the configured provider — GitHub Issues, Jira, GitHub
-repository `wiki/`, or Confluence — as the source of truth and helps the
-assistant draft, publish, refresh, and link work items without leaving the
-session.
+plugin treats the configured provider — GitHub Issues, Jira, or a GitHub
+repository `wiki/` — as the source of truth and helps the assistant draft,
+publish, refresh, and link work items without leaving the session.
 
 ## Supported Providers
 
 - **Issues** — GitHub Issues, Jira (Data Center / Server), or a local
   filesystem provider.
-- **Knowledge** — GitHub repository `wiki/`, Confluence (Data Center /
-  Server), or a local filesystem provider.
+- **Knowledge** — GitHub repository `wiki/`.
 
 Issue tracking and knowledge documentation are configured independently, so
-mixed setups (e.g., GitHub Issues + Confluence) are supported.
+mixed setups (e.g., Jira issues + GitHub repository `wiki/`) are supported.
 
 ## Installation
 

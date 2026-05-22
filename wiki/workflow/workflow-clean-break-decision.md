@@ -4,7 +4,7 @@
 
 Create a new `plugins/workflow` plugin instead of turning `plugins/a4` into a remote-native provider workflow system.
 
-`plugins/a4` remains the existing local Markdown workflow plugin. `plugins/workflow` is the clean-break implementation for provider-backed workflow over GitHub, Jira, repository `wiki/` directories, and Confluence.
+`plugins/a4` remains the existing local Markdown workflow plugin. `plugins/workflow` is the clean-break implementation for provider-backed workflow over GitHub, Jira, and repository `wiki/` directories.
 
 ## Rationale
 
@@ -18,7 +18,7 @@ The workflow direction is materially different:
 
 - Issue and knowledge providers are separate.
 - GitHub or Jira can be the issue source of truth.
-- Repository `wiki/` directories or Confluence can be the knowledge source of truth.
+- Repository `wiki/` directories can be the knowledge source of truth.
 - Local files are optional projections, not required canonical state.
 - Authoring is resolved by artifact type, role, and provider, not by local path.
 
@@ -36,7 +36,7 @@ Use for provider-backed workflow:
 
 - `.workflow/config.yml` at repository root.
 - Issue provider: GitHub Issues or Jira.
-- Knowledge provider: repository `wiki/` directory or Confluence.
+- Knowledge provider: repository `wiki/` directory.
 - Provider-native references in body text.
 - Native transports first, MCP fallback.
 - Authoring resolver with absolute plugin-bundled authoring file paths.

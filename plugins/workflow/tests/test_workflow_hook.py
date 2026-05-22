@@ -271,8 +271,8 @@ providers:
     kind: filesystem
     path: workflow/issues
   knowledge:
-    kind: filesystem
-    path: workflow/knowledge
+    kind: github
+    path: wiki/workflow
 issue_id_format: number
 commit_refs:
   enabled: false
@@ -2152,7 +2152,7 @@ def test_session_start_emits_nothing_for_invalid_config(
 version: 1
 providers:
   issues:
-    kind: confluence
+    kind: wiki
   knowledge:
     kind: github
 """.lstrip(),

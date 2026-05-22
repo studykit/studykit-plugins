@@ -1067,7 +1067,7 @@ def test_request_from_config_selects_provider_for_role(tmp_path: Path) -> None:
             "version": 1,
             "providers": {
                 "issues": {"kind": "github"},
-                "knowledge": {"kind": "confluence"},
+                "knowledge": {"kind": "github"},
             },
             "issue_id_format": "github",
         },
@@ -1083,7 +1083,7 @@ def test_request_from_config_selects_provider_for_role(tmp_path: Path) -> None:
     )
 
     assert issue.kind == "github"
-    assert knowledge.kind == "confluence"
+    assert knowledge.kind == "github"
 
 
 def test_default_registry_registers_github_native_issue_provider() -> None:

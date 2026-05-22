@@ -60,7 +60,7 @@ commit_refs:
     assert config.commit_refs.style == "provider-native"
 
 
-def test_loads_jira_and_confluence_from_source_of_truth_shape(
+def test_loads_jira_and_github_from_source_of_truth_shape(
     tmp_path: Path,
 ) -> None:
     _config_path(tmp_path).write_text(
@@ -72,9 +72,8 @@ source_of_truth:
     site: acme.atlassian.net
     project: PROJ
   knowledge:
-    provider: confluence
-    site: acme.atlassian.net
-    space: ENG
+    provider: github
+    path: wiki/workflow
 commit_refs:
   style: issue-prefix
 """.lstrip(),
@@ -87,12 +86,12 @@ commit_refs:
     assert config.issues.kind == "jira"
     assert config.issue_id_format == "jira"
     assert config.issues.settings["site"] == "acme.atlassian.net"
-    assert config.knowledge.kind == "confluence"
-    assert config.knowledge.settings["space"] == "ENG"
+    assert config.knowledge.kind == "github"
+    assert config.knowledge.settings["path"] == "wiki/workflow"
     assert config.commit_refs.style == "issue-prefix"
 
 
-def test_loads_filesystem_only_config(tmp_path: Path) -> None:
+def test_loads_filesystem_issues_with_github_knowledge_config(tmp_path: Path) -> None:
     _config_path(tmp_path).write_text(
         """
 version: 1
@@ -101,8 +100,8 @@ providers:
     kind: filesystem
     path: workflow/issues
   knowledge:
-    kind: filesystem
-    path: workflow/knowledge
+    kind: github
+    path: wiki/workflow
 commit_refs:
   enabled: false
 """.lstrip(),
@@ -114,7 +113,7 @@ commit_refs:
     assert config is not None
     assert config.issues.kind == "filesystem"
     assert config.issue_id_format == "number"
-    assert config.knowledge.kind == "filesystem"
+    assert config.knowledge.kind == "github"
     assert config.commit_refs.enabled is False
     assert config.commit_refs.style == "disabled"
 
@@ -129,7 +128,7 @@ def test_missing_config_returns_none_and_can_be_required(tmp_path: Path) -> None
 @pytest.mark.parametrize(
     ("issue_provider", "knowledge_provider", "message"),
     [
-        ("confluence", "github", "not valid for role 'issue'"),
+        ("wiki", "github", "not valid for role 'issue'"),
         ("github", "jira", "not valid for role 'knowledge'"),
     ],
 )
@@ -214,7 +213,7 @@ providers:
   issues:
     kind: jira
   knowledge:
-    kind: confluence
+    kind: github
 commit_refs:
   style: magic
 """.lstrip(),
