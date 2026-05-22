@@ -4,7 +4,7 @@ description: Explain English vocabulary and idioms.
 argument-hint: <word or idiom>
 disable-model-invocation: true
 context: fork
-
+model: sonnet
 ---
 
 # Vocabulary Explanation Guide
