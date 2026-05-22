@@ -76,7 +76,7 @@ Suggested slots:
 
 - **Approach.** Current strategy.
 - **Waiting for.** External input or sequencing note.
-- **Open questions.** Questions awaiting input.
+- **Open questions.** Items left open for downstream resolution — questions awaiting input (decisions or info needed), deferred work tracked elsewhere, follow-up candidates surfaced during this work, or lateral concerns observed but not addressed within this issue's scope.
 - **Next.** Next concrete step.
 
 Rewrite the `Resume` section in place. Do not preserve history there.
