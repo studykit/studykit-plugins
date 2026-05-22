@@ -114,8 +114,6 @@ providers:
 Supported knowledge provider kinds:
 
 - `github`
-- `confluence`
-- `filesystem`
 
 When the knowledge provider is `github`, workflow uses the main repository `wiki/` directory, such as `wiki/workflow/`. It does not use GitHub's separate wiki feature.
 
@@ -153,12 +151,11 @@ Provider kind values are:
 
 - `github`
 - `jira`
-- `confluence`
 - `filesystem`
 
-Use the values documented in each enum section exactly. Aliases such as `github-issues`, `repo-wiki`, `jira-issues`, `confluence-page`, `fs`, or `provider_native` are invalid.
+Use the values documented in each enum section exactly. Aliases such as `github-issues`, `repo-wiki`, `jira-issues`, `fs`, or `provider_native` are invalid.
 
-Provider values are still checked against the provider role. `confluence` is invalid for the issue provider, and `jira` is invalid for the knowledge provider.
+Provider values are still checked against the provider role. `jira` and `filesystem` are invalid for the knowledge provider.
 
 ## Compatibility Shape
 
@@ -169,7 +166,7 @@ source_of_truth:
   issues:
     provider: jira
   knowledge:
-    provider: confluence
+    provider: github
 ```
 
 New configuration files should use `providers`.

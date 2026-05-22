@@ -62,7 +62,7 @@ issue_id_format: github
     )
 
 
-def _jira_confluence_config(project: Path) -> None:
+def _jira_config(project: Path) -> None:
     _config_path(project).write_text(
         """
 version: 1
@@ -72,10 +72,8 @@ providers:
     site: acme.atlassian.net
     project: PROJ
   knowledge:
-    kind: confluence
-    site: acme.atlassian.net
-    space: ENG
-    space_id: "98765"
+    kind: github
+    path: wiki/workflow
 """.lstrip(),
         encoding="utf-8",
     )
@@ -156,7 +154,7 @@ def test_normalizes_github_issue_url_display_for_same_repo(tmp_path: Path) -> No
 
 
 def test_normalizes_jira_issue_key(tmp_path: Path) -> None:
-    _jira_confluence_config(tmp_path)
+    _jira_config(tmp_path)
     config = load_workflow_config(tmp_path)
     assert config is not None
 
@@ -172,42 +170,6 @@ def test_normalizes_jira_issue_key(tmp_path: Path) -> None:
         "url": "https://acme.atlassian.net/browse/PROJ-123",
         "ref": "workflowref:jira:issue:acme.atlassian.net/PROJ-123",
     }
-
-
-def test_normalizes_confluence_page_url(tmp_path: Path) -> None:
-    _jira_confluence_config(tmp_path)
-    config = load_workflow_config(tmp_path)
-    assert config is not None
-    url = "https://acme.atlassian.net/wiki/spaces/ENG/pages/123456789/Auth+Session+v2"
-
-    ref = normalize_provider_reference(url, config, role="knowledge")
-
-    assert ref.provider == "confluence"
-    assert ref.kind == "page"
-    assert ref.authority == "acme.atlassian.net"
-    assert ref.native == {
-        "page_id": "123456789",
-        "space": "ENG",
-        "space_id": "98765",
-        "title": "Auth Session v2",
-    }
-    assert ref.display == "Auth Session v2"
-    assert ref.ref == "workflowref:confluence:page:acme.atlassian.net/123456789"
-
-
-def test_normalizes_confluence_page_display_ref_with_config_context(tmp_path: Path) -> None:
-    _jira_confluence_config(tmp_path)
-    config = load_workflow_config(tmp_path)
-    assert config is not None
-
-    ref = normalize_provider_reference("Auth Session v2", config, role="knowledge")
-
-    assert ref.provider == "confluence"
-    assert ref.kind == "page"
-    assert ref.authority == "acme.atlassian.net"
-    assert ref.native == {"title": "Auth Session v2", "space": "ENG", "space_id": "98765"}
-    assert ref.display == "Auth Session v2"
-    assert ref.url is None
 
 
 def test_normalizes_github_repository_wiki_page(tmp_path: Path) -> None:
@@ -268,10 +230,3 @@ def test_provider_mismatch_errors_are_clear(tmp_path: Path) -> None:
         )
 
 
-def test_page_display_refs_are_ambiguous_without_knowledge_context(tmp_path: Path) -> None:
-    _jira_confluence_config(tmp_path)
-    config = load_workflow_config(tmp_path)
-    assert config is not None
-
-    with pytest.raises(ProviderReferenceAmbiguityError):
-        normalize_provider_reference("Auth Session v2", config)

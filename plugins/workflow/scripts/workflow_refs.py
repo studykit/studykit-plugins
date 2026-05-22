@@ -8,7 +8,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import PurePosixPath
 from typing import Any
-from urllib.parse import parse_qs, quote, unquote, urlparse
+from urllib.parse import quote, urlparse
 
 from workflow_command import CommandRunner, WorkflowCommandError
 from workflow_config import ProviderConfig, WorkflowConfig, normalize_role
@@ -26,9 +26,6 @@ GITHUB_ISSUE_URL_RE = re.compile(
 )
 JIRA_KEY_RE = re.compile(r"^(?P<project>[A-Z][A-Z0-9]+)-(?P<number>[1-9]\d*)$", re.IGNORECASE)
 WIKI_PATH_RE = re.compile(r"^(?:\./)?(?P<path>wiki/[^/\s]+/.+)$")
-CONFLUENCE_PAGE_PATH_RE = re.compile(
-    r"/wiki/spaces/(?P<space>[^/]+)/pages/(?P<page_id>\d+)(?:/(?P<title>[^/?#]+))?"
-)
 
 
 class ProviderReferenceError(ValueError):
@@ -123,13 +120,6 @@ def normalize_provider_reference(
     wiki_page = _parse_github_wiki_page(raw, config, role=normalized_role, runner=runner)
     if wiki_page is not None:
         return wiki_page
-
-    confluence_page = _parse_confluence_page(raw, config, role=normalized_role)
-    if confluence_page is not None:
-        return confluence_page
-
-    if normalized_role == "knowledge" and config.knowledge.kind == "confluence":
-        return _confluence_display_reference(raw, config)
 
     raise ProviderReferenceAmbiguityError(f"could not determine provider reference type: {reference}")
 
@@ -267,81 +257,6 @@ def _parse_github_wiki_page(
         url=f"https://{authority}/{repo.owner}/{repo.name}/blob/{quote(branch, safe='')}/{quote(path, safe='/')}",
         display=path,
         ref=f"workflowref:github:page:{authority}/{repo.owner}/{repo.name}/{path}",
-    )
-
-
-def _parse_confluence_page(raw: str, config: WorkflowConfig, *, role: str | None) -> ProviderReference | None:
-    parsed = urlparse(raw)
-    if parsed.scheme not in {"http", "https"} or not parsed.hostname:
-        return None
-
-    page_id: str | None = None
-    title: str | None = None
-    space: str | None = None
-
-    match = CONFLUENCE_PAGE_PATH_RE.search(parsed.path)
-    if match:
-        page_id = match.group("page_id")
-        space = _decode_url_segment(match.group("space"))
-        if match.group("title"):
-            title = _decode_url_segment(match.group("title"))
-    elif parsed.path.endswith("/wiki/pages/viewpage.action"):
-        page_ids = parse_qs(parsed.query).get("pageId")
-        if page_ids:
-            page_id = page_ids[0]
-
-    if page_id is None:
-        return None
-
-    _ensure_provider_role(config, role, expected_role="knowledge", provider="confluence", raw=raw)
-    authority = _normalize_authority(parsed.hostname)
-    native: dict[str, Any] = {"page_id": page_id}
-    if space:
-        native["space"] = space
-    configured_space = _string_setting(config.knowledge.settings, "space", "space_key")
-    if configured_space and "space" not in native:
-        native["space"] = configured_space
-    space_id = _string_setting(config.knowledge.settings, "space_id")
-    if space_id:
-        native["space_id"] = space_id
-    if title:
-        native["title"] = title
-    display = title or raw
-    return ProviderReference(
-        input=raw,
-        provider="confluence",
-        kind="page",
-        authority=authority,
-        native=native,
-        url=raw,
-        display=display,
-        title=title,
-        ref=f"workflowref:confluence:page:{authority}/{page_id}",
-    )
-
-
-def _confluence_display_reference(raw: str, config: WorkflowConfig) -> ProviderReference:
-    _ensure_provider_role(config, "knowledge", expected_role="knowledge", provider="confluence", raw=raw)
-    settings = config.knowledge.settings
-    site = _authority_from_settings(settings, "site", "host", "hostname", "base_url", "url")
-    if site is None:
-        site = "confluence"
-    authority = _normalize_authority(site)
-    native: dict[str, Any] = {"title": raw}
-    space = _string_setting(settings, "space", "space_key")
-    if space:
-        native["space"] = space
-    space_id = _string_setting(settings, "space_id")
-    if space_id:
-        native["space_id"] = space_id
-    return ProviderReference(
-        input=raw,
-        provider="confluence",
-        kind="page",
-        authority=authority,
-        native=native,
-        display=raw,
-        title=raw,
     )
 
 
@@ -483,7 +398,3 @@ def _normalize_authority(value: str) -> str:
     parsed = urlparse(text if "://" in text else f"https://{text}")
     authority = parsed.netloc or parsed.path.split("/", 1)[0]
     return authority.strip("/").lower()
-
-
-def _decode_url_segment(value: str) -> str:
-    return unquote(value).replace("+", " ")
