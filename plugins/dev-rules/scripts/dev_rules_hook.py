@@ -4,22 +4,25 @@
 Subcommands
 -----------
 - pre-edit       PreToolUse on Write|Edit|MultiEdit. Resolves the target file's
-                 language from its extension, then injects **pointer paths** to
-                 matching ruleset files as `additionalContext` with an
-                 imperative directive ("Read these — binding, not optional").
-                 The model performs the Read itself, so ruleset bodies enter
-                 the transcript as the model's own tool-result rather than as
-                 system-injected text — higher attention weight, and the rules
-                 stay live across subsequent edits via the cached Read result.
-                 Rulesets are organized by category: each subdirectory under
-                 `rulesets/` is one category (e.g. `rulesets/logging/`), and
-                 within each category the same `general.md` + `<language>.md`
-                 pattern is used. Per-session dedup ensures each
-                 `<category>:<key>` pointer is emitted at most once per
-                 session. `general` is announced on the first code edit of any
-                 language; `<language>` on the first edit of a file in that
-                 language. All categories that ship a matching file are
-                 announced together on the same edit.
+                 language from its extension, then — if matching ruleset
+                 pointers have not yet been announced this session — returns
+                 `permissionDecision: "deny"` with `permissionDecisionReason`
+                 listing the pointer paths the model must Read before
+                 retrying. Denying (rather than just emitting context) is the
+                 only PreToolUse mechanism that guarantees the model sees the
+                 directive — PreToolUse does not honor `additionalContext`.
+                 The dedup keys are recorded **before** the deny is emitted,
+                 so the model's retry on the same edit is not blocked again;
+                 the rule bodies remain live across subsequent edits via the
+                 cached Read result. Rulesets are organized by category: each
+                 subdirectory under `rulesets/` is one category (e.g.
+                 `rulesets/logging/`), and within each category the same
+                 `general.md` + `<language>.md` pattern is used. Per-session
+                 dedup ensures each `<category>:<key>` pointer triggers a deny
+                 at most once per session. `general` is announced on the
+                 first code edit of any language; `<language>` on the first
+                 edit of a file in that language. All categories that ship a
+                 matching file are announced together on the same edit.
 - session-end    SessionEnd. Deletes this session's dedup state file under
                  `.claude/tmp/dev-rules/`.
 - session-start  SessionStart. Sweeps orphan dedup state files older than 1
@@ -27,7 +30,8 @@ Subcommands
                  and truncates the trace log if its mtime is older than 1 day.
 
 Design constraints (mirrors `plugins/a4/dev/hook-conventions.md`):
-- Always exits 0; never blocks an edit, session start, or session end.
+- Always exits 0; pre-edit may emit a deny *decision* (the model retries
+  after Reading the pointed files) but never blocks via non-zero exit.
 - Internal failures (missing env, IO errors, malformed JSON) are silent.
 - Silent on dedup hit (no heartbeat, no "ran successfully" line).
 - Dedup state is session-scoped under `.claude/tmp/dev-rules/`.
@@ -292,6 +296,9 @@ def pre_edit() -> int:
         )
         return 0
 
+    # Record dedup keys BEFORE emitting the deny so the model's retry on the
+    # same edit is not denied again. If recording fails (IO error), the model
+    # may see the same deny twice — acceptable; idempotent on the model side.
     _record_injected(state_file, new_keys)
 
     if language:
@@ -305,16 +312,22 @@ def pre_edit() -> int:
         cat_display = category.capitalize()
         pointer_block = "\n".join(f"- `{p}`" for p in paths)
         sections.append(
-            f"## {cat_display} rules to follow {scope_phrase}\n\n"
-            "Read these — binding:\n\n"
+            f"{cat_display} rules to follow {scope_phrase} — binding:\n"
             f"{pointer_block}"
         )
 
-    additional_context = "\n\n".join(sections) + "\n"
+    reason = (
+        "This edit is gated until you load the project's coding rules.\n\n"
+        + "\n\n".join(sections)
+        + "\n\nRead each file above, then retry the same edit. "
+        "The retry will not be denied — pointers are recorded once per session."
+    )
+
     output = {
         "hookSpecificOutput": {
             "hookEventName": "PreToolUse",
-            "additionalContext": additional_context,
+            "permissionDecision": "deny",
+            "permissionDecisionReason": reason,
         }
     }
     json.dump(output, sys.stdout)
@@ -322,11 +335,11 @@ def pre_edit() -> int:
         project_dir,
         session_id,
         "pre-edit",
-        "inject",
+        "deny",
         file_path=file_path,
         language=language,
         injected_keys=new_keys,
-        context_bytes=len(additional_context),
+        reason_bytes=len(reason),
     )
     return 0
 

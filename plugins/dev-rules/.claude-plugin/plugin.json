@@ -1,7 +1,7 @@
 {
   "name": "dev-rules",
-  "version": "0.3.1",
-  "description": "Inject coding rule sets (logging conventions) into Claude's context on file edits via PreToolUse hook. Per-language dedup ensures each ruleset is injected at most once per session.",
+  "version": "0.4.0",
+  "description": "Gate file edits via a PreToolUse deny + reason that points to the project's coding rule sets (e.g. logging conventions) and tells the model to Read them before retrying. Per-language dedup ensures each ruleset is announced at most once per session.",
   "author": {
     "name": "studykit"
   },
