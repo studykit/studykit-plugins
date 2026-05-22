@@ -531,11 +531,9 @@ class JiraIssueBackend:
         )
 
         result: dict[str, object] = {
-            "operation": "publish_issue",
             "kind": "jira",
             "issue": provider_payload.get("issue") or provider_payload.get("key"),
             "key": provider_payload.get("key"),
-            "verified": bool(provider_payload.get("verified")),
             "issue_file": issue_file,
             "body_file": str(body_path),
             "body_file_removed": False,
@@ -756,11 +754,9 @@ class JiraIssueBackend:
             body_removed = True
 
         return {
-            "operation": "update_issue",
             "kind": "jira",
             "issue": provider_payload.get("issue") or provider_payload.get("key"),
             "key": provider_payload.get("key"),
-            "verified": bool(provider_payload.get("verified")),
             "state_changed": bool(provider_payload.get("state_changed")),
             "state": provider_payload.get("state"),
             "issue_file": issue_file,

@@ -463,10 +463,8 @@ class GitHubIssueBackend:
         )
 
         result: dict[str, object] = {
-            "operation": "publish_issue",
             "kind": "github",
             "issue": provider_payload.get("issue"),
-            "verified": bool(provider_payload.get("verified")),
             "issue_file": issue_file,
             "body_file": str(body_path),
             "body_file_removed": False,
@@ -783,10 +781,8 @@ class GitHubIssueBackend:
             body_removed = True
 
         result: dict[str, object] = {
-            "operation": "update_issue",
             "kind": "github",
             "issue": provider_payload.get("issue"),
-            "verified": bool(provider_payload.get("verified")),
             "state_changed": bool(provider_payload.get("state_changed")),
             "state": provider_payload.get("state"),
             "issue_file": issue_file,
