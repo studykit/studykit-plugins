@@ -143,7 +143,7 @@
     {
       "name": "dev-rules",
       "source": "./plugins/dev-rules",
-      "description": "Inject coding rule sets (logging conventions; extensible by category) into Claude's context on file edits via PreToolUse hook. Rulesets are organized as `rulesets/<category>/<key>.md`; the hook emits absolute pointer paths (not bodies) with an imperative read directive so the model Reads the rule files itself, landing them in the transcript as its own tool-result. Per `<category>:<key>` dedup keeps each pointer to once per session.",
+      "description": "Gate file edits via a PreToolUse deny + reason that points to the project's coding rule sets (logging conventions; extensible by category) and tells the model to Read them before retrying. Rulesets are organized as `rulesets/<category>/<key>.md`; the hook lists absolute pointer paths (not bodies) in the deny reason so the model Reads the rule files itself, landing them in the transcript as its own tool-result. Per `<category>:<key>` dedup keeps each pointer to once per session.",
       "author": {
         "name": "studykit"
       },

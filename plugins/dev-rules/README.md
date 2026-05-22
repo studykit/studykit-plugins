@@ -8,15 +8,16 @@ A single `PreToolUse` hook fires on `Write | Edit | MultiEdit`. The dispatcher s
 
 1. Extracts the target `file_path` from the tool input.
 2. Resolves the file's language from its extension (Python / JavaScript / Java / Kotlin).
-3. Scans every category subdirectory under `rulesets/` (e.g. `rulesets/logging/`) and emits **pointer paths** to matching ruleset files as `additionalContext`, with an imperative directive to Read them before writing:
+3. Scans every category subdirectory under `rulesets/` (e.g. `rulesets/logging/`) for matching ruleset files:
    - `rulesets/<category>/general.md` — once per session per category, on the first code edit (any language).
    - `rulesets/<category>/<language>.md` — once per session per `<category>:<language>` pair, on the first edit of a file in that language.
-4. The model performs the Read itself, so the rule body lands in the transcript as the model's own tool-result (higher attention weight than system-injected text, and the cached Read result stays accessible across subsequent edits).
-5. Subsequent edits matching an already-emitted pointer emit nothing (silent on dedup).
+4. If any new pointer applies, the hook returns `permissionDecision: "deny"` with `permissionDecisionReason` listing the pointer paths the model must Read before retrying. PreToolUse does not honor `additionalContext`, so denying with a reason is the only reliable way to get the directive in front of the model.
+5. Dedup keys are recorded **before** the deny is emitted. The model Reads the pointed files and retries the same edit; the retry does not match any new pointer, so it is allowed through. The cached Read result keeps the rule bodies live across subsequent edits.
+6. Subsequent edits matching an already-announced pointer return no decision (silent on dedup) — the edit runs normally.
 
-Dedup state lives at `.claude/tmp/dev-rules/injected-<session_id>.txt` (one line per emitted `<category>:<key>` pointer). A `SessionEnd` hook deletes it, and a `SessionStart` hook sweeps orphan files older than 1 day as a safety net for crashed sessions.
+Dedup state lives at `.claude/tmp/dev-rules/injected-<session_id>.txt` (one line per announced `<category>:<key>` pointer). A `SessionEnd` hook deletes it, and a `SessionStart` hook sweeps orphan files older than 1 day as a safety net for crashed sessions.
 
-All hooks exit 0 unconditionally — they never block an edit, session start, or session end. Internal failures (missing env, IO errors, malformed JSON) are silent.
+All hooks exit 0 unconditionally; pre-edit may *deny* an edit via its decision payload (so the model retries after Reading the pointed files), but it never blocks via a non-zero exit, and session-start / session-end never block. Internal failures (missing env, IO errors, malformed JSON) are silent.
 
 ## Language coverage
 
@@ -31,7 +32,7 @@ Files with unrecognized extensions still receive each category's `general.md` po
 
 ## Customizing rules
 
-Edit the markdown files under `rulesets/<category>/`. The hook only emits pointer paths — Claude Reads each file directly, so authoring overhead is zero (no frontmatter, no parsing). Keep each ruleset short (Claude reads it on every relevant first edit) and concrete (rules Claude can actually follow).
+Edit the markdown files under `rulesets/<category>/`. The hook only names pointer paths in the deny reason — Claude Reads each file directly, so authoring overhead is zero (no frontmatter, no parsing). Keep each ruleset short (Claude reads it on every relevant first edit) and concrete (rules Claude can actually follow).
 
 To add a new category, create a new subdirectory under `rulesets/` (e.g. `rulesets/error-handling/`) containing a `general.md` and any of the supported `<language>.md` files. The hook auto-discovers categories at runtime — no code change required.
 
@@ -74,7 +75,7 @@ When enabled, the dispatcher writes a structured record at every decision point 
 
 Sample record:
 ```json
-{"ts": "2026-05-03T14:13:01.123456", "sid": "abc-123", "cmd": "pre-edit", "event": "inject", "file_path": "/x/foo.py", "language": "python", "injected_keys": ["logging:general", "logging:python"]}
+{"ts": "2026-05-03T14:13:01.123456", "sid": "abc-123", "cmd": "pre-edit", "event": "deny", "file_path": "/x/foo.py", "language": "python", "injected_keys": ["logging:general", "logging:python"]}
 ```
 
 To stop tracing, simply unset `DEV_RULES_TRACE` (or set it to `0` / unset / empty) and restart Claude Code. The existing `trace.log` file is left in place; delete it manually if you want a clean slate.
