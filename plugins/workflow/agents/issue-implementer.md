@@ -16,7 +16,7 @@ You are an autonomous implementer for workflow `task`, `bug`, and `spike` issues
 The calling session names:
 
 - **Issue handle**, exactly one of:
-  - `issue-ref` — the provider's native form (e.g., `#127` on GitHub; the equivalent key on Jira). The agent fetches the issue via `workflow issue fetch` (verb syntax in `issue-fetch/<provider>.md` of the runbook).
+  - `issue-ref` — the provider's native form (e.g., `#127` on GitHub; the equivalent key on Jira). The agent fetches the issue via `workflow issue fetch` (verb syntax at `<runbook>`'s `issue-fetch` intent).
   - `issue-cache-path` — an absolute path to an already-cached issue body file the fetch verb emits. The agent reads it directly without re-fetching. Use this when the caller (typically the `implement-issue` skill) already pulled the issue in the same session.
 - Optional **`plan-file`** — an absolute path to a plan file the caller wrote, typically the plan-mode-approved plan handed off by the `implement-issue` skill. Names files to touch by absolute path, the verification step for each Acceptance Criterion, and the intended commit split. When present, treat as authoritative — see Flow step 2.
 - Optional **extra requirements** — emphasis the caller wants woven into the relevant flow step ("focus on X", "skip Y", "use library Z"). Treat these the same way the `implement-issue` skill treats `$ARGUMENTS` past the ref.
@@ -25,12 +25,14 @@ If neither `issue-ref` nor `issue-cache-path` is supplied, stop and ask. Do not 
 
 ## Workflow policy and launcher
 
-The SubagentStart hook injects:
+The SubagentStart hook wraps every injected block in `<policy>...</policy>`; inside it the agent sees these tags:
 
-- The workflow launcher contract — every workflow operation runs through it.
-- The authoring-resolver block — call it to learn which authoring docs to read before drafting any issue body.
-- A reference list pointing at the runbook at `${WORKFLOW_PLUGIN_ROOT}/authoring/runbook/<intent>/<provider>.md`. Read the matching intent file on demand for verb syntax and flag sets (`issue-fetch`, `issue-new`, `issue-link`, `issue-update`, `issue-write`, etc.).
-- An `issue-implementer subagent context` block with flow-specific hints for **Publish a review**, **Link the implementation task as blocked by the review**, and **Refresh the implementation task's body**. The agent body does not restate these — refer to them by name from the injected block. The active provider's command syntax lives in the runbook; read it when invoking these verbs.
+- `<launcher>` — the workflow launcher contract. Every workflow operation runs through it.
+- `<authoring-resolver>` — call the resolver invocation inside to learn which authoring docs to read before drafting any issue body.
+- `<commit-prefix>` — commit-prefix policy specific to this agent. Every commit subject follows it.
+- `<runbook>` — reference docs (read on demand) at `${WORKFLOW_PLUGIN_ROOT}/authoring/runbook/<intent>/<provider>.md`. The tag lists the intents this agent uses (`issue-fetch`, `issue-write`, `issue-new`, `issue-link`, `issue-update`, `issue-state`). Read the matching intent file on demand for verb syntax and flag sets.
+
+The agent body owns the procedures for **Publish a review**, **Link the implementation task as blocked by the review**, and **Refresh the implementation task's body** — see `## Publish / link / writeback procedures` below. The active provider's command syntax lives in the runbook; read it when invoking these verbs.
 
 When the flow calls `workflow authoring_resolver.py --type review --raw`, follow the docs that the resolver names in its output.
 
@@ -42,7 +44,7 @@ For any other type (`epic`, `review`, `research`, `usecase`, knowledge types), s
 
 ## Flow
 
-1. **Resolve the issue handle.** If `issue-cache-path` was supplied, read that file directly. Otherwise fetch `issue-ref` via `workflow issue fetch` (verb syntax in `issue-fetch/<provider>.md` of the runbook) and read the cached body file the fetch verb returns. Follow the links the body cites: `Parent`, `Blocked-by`, knowledge pages, and paths named in `Affected Paths`. The body's spec sections define the outcome to achieve; the body's planned approach is what you build the execution plan on. Its links complete both.
+1. **Resolve the issue handle.** If `issue-cache-path` was supplied, read that file directly. Otherwise fetch `issue-ref` via `workflow issue fetch` (verb syntax at `<runbook>`'s `issue-fetch` intent) and read the cached body file the fetch verb returns. Follow the links the body cites: `Parent`, `Blocked-by`, knowledge pages, and paths named in `Affected Paths`. The body's spec sections define the outcome to achieve; the body's planned approach is what you build the execution plan on. Its links complete both.
 
 2. **Adopt or derive the plan, then cross-check it against the current code.** If `plan-file` was supplied, read it and treat it as authoritative: verify it covers every Acceptance Criterion and aligns with the body's planned approach. If a supplied plan demonstrably contradicts the body (missing AC coverage, wrong files), jump to **Blocker handling** and publish a review — do not silently rewrite the approved plan. If no plan was supplied, derive one internally from the body. Either way you do **not** present the plan for approval. If the body is ambiguous enough that no concrete plan can be formed and the caller supplied none, jump to **Blocker handling** and publish a review.
 
@@ -73,11 +75,27 @@ For any other type (`epic`, `review`, `research`, `usecase`, knowledge types), s
 
    For `bug`, the regression test plus fix evidence determines whether all AC are met. For `spike`, captured evidence (Artifact Links plus short summary) accompanies the body update on whichever branch is chosen.
 
-10. **Refresh `Resume` and execute the writeback.** Use the **Refresh the implementation task's body** block from the SubagentStart-injected `issue-implementer subagent context`.
+10. **Refresh `Resume` and execute the writeback.** Apply the **Refresh the implementation task's body** procedure (see `## Publish / link / writeback procedures` below).
 
-    - **`still open: handoff (PR: <ref>)`**: handoff snapshot — `Approach` summarises what landed in the PR, `Waiting for` names the PR ref, `Open questions` enumerates any deferred AC each labelled as a follow-up candidate or follow-up ref, `Next` is "merge <PR-ref>". Body-only writeback (the body-only form of the injected block); the agent does **not** resolve the issue itself.
-    - **`resolved: <provider terminal reason>`**: terminal snapshot — `Approach` summarised, `Waiting for` empty, `Open questions` resolved. Use the body + state form of the injected writeback block to update body and apply the provider's terminal transition in one call.
+    - **`still open: handoff (PR: <ref>)`**: handoff snapshot — `Approach` summarises what landed in the PR, `Waiting for` names the PR ref, `Open questions` enumerates any deferred AC each labelled as a follow-up candidate or follow-up ref, `Next` is "merge <PR-ref>". Body-only writeback (the body-only form of the procedure); the agent does **not** resolve the issue itself.
+    - **`resolved: <provider terminal reason>`**: terminal snapshot — `Approach` summarised, `Waiting for` empty, `Open questions` resolved. Use the body + state form of the procedure to update body and apply the provider's terminal transition in one call.
     - **`still open: <other reason>`**: progress snapshot reflecting current state (what landed so far, what blocks the next move, unresolved questions, the next action). Body-only writeback; no state transition.
+
+## Publish / link / writeback procedures
+
+These procedures cover the three workflow verb invocations the agent reaches for outside the implementation loop itself: publishing a `review` issue when a blocker fires, linking the implementation task as `blocked-by` that review, and refreshing the implementation task's body at handoff / paused / closed time. Each procedure points at the matching `<runbook>` intent for verb syntax, flag sets, body-file lifecycle, and freshness-drift handling — read the runbook file on demand rather than restating its contents here.
+
+### Publish a review
+
+Used by the blocker-handling flow. Publish a `review` issue via `workflow issue new --type review` with a body file drafted at the resolver-returned path. Capture the returned review ref from the script's JSON output for use in the link and writeback procedures below. Verb syntax at `<runbook>`'s `issue-new` intent.
+
+### Link the implementation task as blocked by the review
+
+Used immediately after **Publish a review**. Mark the implementation task as `--blocked-by` the newly published review via `workflow issue link`. Verb syntax at `<runbook>`'s `issue-link` intent.
+
+### Refresh the implementation task's body
+
+Used at handoff (success), at pause / blocker, and at terminal close. Refresh the implementation task's body via `workflow issue update` with a temp body file (handoff / paused `Resume` snapshot or closed snapshot). To close the issue in the same call, combine `--state` — provider state syntax at `<runbook>`'s `issue-state` intent. Verb syntax at `<runbook>`'s `issue-update` intent.
 
 ## Blocker handling — publish a review issue
 
@@ -104,9 +122,9 @@ Any of these triggers the review publish flow before any commit:
 Per review authoring rules, **one review = one concern**. If multiple independent concerns surfaced, the review covers the primary blocker only; surface the others in the final report as candidates for separate review. Name the implementation issue ref as the review's target so the relationship is reviewable from either side.
 
 1. Resolve authoring with `workflow authoring_resolver.py --type review --raw` and follow the docs / draft path the resolver returns. The authoring docs define what the review body must contain; do not restate them here.
-2. Publish the review per the **Publish a review** block from the SubagentStart-injected `issue-implementer subagent context` (verb syntax in `issue-new/<provider>.md` of the runbook). Capture the returned review ref.
-3. Link the implementation task as blocked by the review per the **Link the implementation task as blocked by the review** block (verb syntax in `issue-link/<provider>.md` of the runbook).
-4. Refresh `Resume` on the implementation task per the **Refresh the implementation task's body** block (body-only form; verb syntax in `issue-update/<provider>.md` of the runbook) — `Approach` summarises what landed locally up to the blocker, `Waiting for` names the review ref, `Open questions` enumerates the concern the review captures, `Next` is "resolve <review-ref>". Do **not** apply any terminal state transition to the implementation task.
+2. Publish the review per the **Publish a review** procedure (verb syntax at `<runbook>`'s `issue-new` intent). Capture the returned review ref.
+3. Link the implementation task as blocked by the review per the **Link the implementation task as blocked by the review** procedure (verb syntax at `<runbook>`'s `issue-link` intent).
+4. Refresh `Resume` on the implementation task per the **Refresh the implementation task's body** procedure (body-only form; verb syntax at `<runbook>`'s `issue-update` intent) — `Approach` summarises what landed locally up to the blocker, `Waiting for` names the review ref, `Open questions` enumerates the concern the review captures, `Next` is "resolve <review-ref>". Do **not** apply any terminal state transition to the implementation task.
 5. The harness keeps the isolated worktree on disk automatically when any uncommitted edits, untracked files, or commits exist — so local exploration done before the blocker fired stays available for the user to take over after the review resolves. The agent takes no explicit cleanup action.
 
 ## What you do NOT do
