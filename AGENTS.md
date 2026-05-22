@@ -30,6 +30,27 @@ The `global/` directory manages rules, subagents, skills, hooks, and MCP configu
 
 When creating an `AGENTS.md` instruction file, always create a sibling `CLAUDE.md` file that imports it with exactly `@AGENTS.md`. Keep shared instructions in `AGENTS.md`; use `CLAUDE.md` only as the Claude Code import shim unless a location explicitly requires Claude-only instructions.
 
+## Plugin README Scope
+
+Each plugin's `plugins/<name>/README.md` is written for **end users who install the plugin from the marketplace**. It is not a contributor guide and is not context for the assistant at runtime.
+
+Keep it scoped to user-visible surface:
+
+- What the plugin does at a high level.
+- Supported backends / providers / integrations.
+- How to install and configure the plugin (config files, bootstrap skills).
+- The slash commands, skills, or agents the plugin exposes and what each one does for the user.
+- Pointers to deeper schema / reference docs (e.g. under `wiki/`).
+
+Do **not** put in `README.md`:
+
+- Directory or file-structure listings (script paths, hook layout, authoring tree, cache layout, internal module names).
+- Hook-injected context, snippet substitution, runbook internals, or any other runtime-injected text.
+- Test commands, validation, or anything else only contributors run.
+- Implementation details of launchers, scripts, caches, or other plugin internals.
+
+Contributor- and runtime-facing guidance lives in `AGENTS.md` files and under each plugin's `dev/`; runtime-injected context lives under `hooks/context/` (or the equivalent path for that plugin). When in doubt, ask whether a plugin user — not an author of the plugin — needs the information to install, configure, or invoke the plugin. If not, it does not belong in `README.md`.
+
 ## Path References in Documentation
 
 Inside markdown documentation (CLAUDE.md, README.md, `plugins/a4/authoring/*.md`, `plugins/a4/dev/*.md`, etc.), reference plugin-internal files using **backticked relative paths** (`` `./file.md` ``, `` `../dir/file.md` ``, `` `plugins/a4/authoring/foo.md` ``) rather than markdown links (`[text](path)`). Reserve markdown link form for examples that demonstrate cross-reference syntax used inside `<project-root>/a4/` workspace files.

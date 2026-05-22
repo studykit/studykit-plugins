@@ -55,18 +55,30 @@ Where the injected text comes from:
 
 - **Skills run in the main session** — `SessionStart` injects from
   `hooks/context/main/`:
-  - `session-policy.md`, `commit-prefix.md`
-  - `policy/authoring.md`,
-    `policy/provider-writes/<provider>.md`,
-    `policy/knowledge/<provider>.md`
+  - `session-start.md` (always)
+  - `snippets/commit-prefix.md` (re-injected at `UserPromptSubmit` when
+    a commit keyword fires)
 - **Agents run as subagents** — `SubagentStart` injects from
   `hooks/context/subagent/`:
   - `policy.md` (general subagent policy)
   - `agents/<agent-name>.md` (per-agent block, when present)
-- **Provider snippets** — `hooks/context/snippets/{issue-fetch,
-  issue-write, issue-update, issue-link, issue-new,
-  launcher}/<provider>.md` are composed into the above blocks based
-  on the active issue provider.
+- **Inline snippets** — `hooks/context/snippets/authoring.md` (authoring
+  resolver) and `hooks/context/snippets/launcher/<runtime>.md` (launcher
+  invocation) are the only fragments inlined into the templates above.
+  Everything else is referenced on demand.
+- **On-demand reference docs** are *not* injected. The injected
+  `main/session-start.md` and `subagent/session-start.md` only point at them; the
+  agent reads them with `Read` when needed. They live under
+  `authoring/runbook/`, organized by intent:
+  - `authoring/runbook/issue-fetch/<provider>.md`
+  - `authoring/runbook/issue-write/<provider>.md` — shared body-bearing
+    write procedure (intent index for github/jira; full flow for
+    filesystem)
+  - `authoring/runbook/issue-new/<provider>.md` (github / jira)
+  - `authoring/runbook/issue-comment/<provider>.md` (github / jira)
+  - `authoring/runbook/issue-update/<provider>.md` (github / jira)
+  - `authoring/runbook/issue-link/<provider>.md` (github / jira)
+  - `authoring/runbook/issue-state/<provider>.md` (github / jira)
 
 `hooks/hooks.json` and `hooks/scripts/hook_claude.py` are the source of truth
 whenever the layout above looks stale.

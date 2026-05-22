@@ -20,6 +20,7 @@ if str(_HOOK_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_HOOK_SCRIPTS_DIR))
 
 import workflow_hook  # noqa: E402
+from workflow_main_context import render as render_template  # noqa: E402
 from workflow_command import CommandRequest, CommandResult  # noqa: E402
 from issue.github.cache import GitHubIssueCache  # noqa: E402
 from workflow_github import DEFAULT_ISSUE_FIELDS, GitHubRepository  # noqa: E402
@@ -80,42 +81,37 @@ def _composed_snippet(group: str, provider: str) -> str:
     """
 
     base = _MAIN_CONTEXT_ROOT / "snippets" / group
-    extras = (base / f"{provider}.md").read_text(encoding="utf-8")
+    extras_path = base / f"{provider}.md"
     if provider in {"github", "jira"}:
         common_path = base / "common.md"
         if common_path.exists():
             common = common_path.read_text(encoding="utf-8").rstrip()
-            extras_stripped = extras.strip()
-            if extras_stripped:
-                return f"{common}\n\n{extras_stripped}"
+            if extras_path.exists():
+                extras_stripped = extras_path.read_text(encoding="utf-8").strip()
+                if extras_stripped:
+                    return f"{common}\n\n{extras_stripped}"
             return common
-    return extras.strip()
+    return extras_path.read_text(encoding="utf-8").strip()
 
 
 def expected_session_start_context(
     *,
     runtime: str,
-    knowledge_kind: str,
     issue_kind: str = "github",
 ) -> str:
-    text = main_context_fragment("main/session-policy.md")
-    policy_dir = _PLUGIN_ROOT / "hooks" / "context" / "main" / "policy"
-    issue_fetch_block = _composed_snippet("issue-fetch", issue_kind)
-    issue_write_block = _composed_snippet("issue-write", issue_kind)
+    text = main_context_fragment("main/session-start.md")
+    runbook_dir = _PLUGIN_ROOT / "authoring" / "runbook"
     launcher_block = main_context_fragment(f"snippets/launcher/{runtime}.md")
     if runtime == "codex":
         launcher_block = launcher_block.replace(
             "{{WORKFLOW_PLUGIN_ROOT}}", str(_PLUGIN_ROOT)
         )
-    return (
-        text
-        .replace("{{WORKFLOW_LAUNCHER_BLOCK}}", launcher_block)
-        .replace("{{WORKFLOW_ISSUE_FETCH_BLOCK}}", issue_fetch_block)
-        .replace("{{WORKFLOW_ISSUE_WRITE_BLOCK}}", issue_write_block)
-        .replace("{{WORKFLOW_POLICY_DIR}}", str(policy_dir))
-        .replace("{{WORKFLOW_ISSUE_PROVIDER}}", issue_kind)
-        .replace("{{WORKFLOW_KNOWLEDGE_PROVIDER}}", knowledge_kind)
-    )
+    return render_template(text, {
+        "SNIPPET_LAUNCHER": launcher_block,
+        "SNIPPET_AUTHORING": main_context_fragment("snippets/authoring.md"),
+        "WORKFLOW_RUNBOOK_DIR": str(runbook_dir),
+        "WORKFLOW_ISSUE_PROVIDER": issue_kind,
+    })
 
 
 def expected_subagent_start_context(
@@ -124,30 +120,27 @@ def expected_subagent_start_context(
     issue_kind: str = "github",
     agent_type: str | None = None,
 ) -> str:
-    text = main_context_fragment("subagent/policy.md")
-    issue_fetch_block = _composed_snippet("issue-fetch", issue_kind)
+    text = main_context_fragment("subagent/session-start.md")
+    runbook_dir = _PLUGIN_ROOT / "authoring" / "runbook"
     launcher_block = main_context_fragment(f"snippets/launcher/{runtime}.md")
     if runtime == "codex":
         launcher_block = launcher_block.replace(
             "{{WORKFLOW_PLUGIN_ROOT}}", str(_PLUGIN_ROOT)
         )
-    rendered = (
-        text
-        .replace("{{WORKFLOW_LAUNCHER_BLOCK}}", launcher_block)
-        .replace("{{WORKFLOW_ISSUE_FETCH_BLOCK}}", issue_fetch_block)
-    )
+    rendered = render_template(text, {
+        "SNIPPET_LAUNCHER": launcher_block,
+        "SNIPPET_AUTHORING": main_context_fragment("snippets/authoring.md"),
+        "WORKFLOW_RUNBOOK_DIR": str(runbook_dir),
+        "WORKFLOW_ISSUE_PROVIDER": issue_kind,
+    })
     agent_name = (agent_type or "").rsplit(":", 1)[-1].strip().lower() if agent_type else ""
     if agent_name == "issue-implementer":
         template = main_context_fragment("subagent/agents/issue-implementer.md")
-        drafts_block = _composed_snippet("issue-new", issue_kind)
-        relationships_block = _composed_snippet("issue-link", issue_kind)
-        writeback_block = _composed_snippet("issue-update", issue_kind)
-        agent_block = (
-            template
-            .replace("{{ISSUE_DRAFTS_REVIEW_BLOCK}}", drafts_block)
-            .replace("{{ISSUE_RELATIONSHIPS_BLOCKED_BY_BLOCK}}", relationships_block)
-            .replace("{{ISSUE_WRITEBACK_BODY_BLOCK}}", writeback_block)
-        )
+        agent_block = render_template(template, {
+            "SNIPPET_COMMIT_PREFIX": main_context_fragment("snippets/commit-prefix.md"),
+            "WORKFLOW_RUNBOOK_DIR": str(runbook_dir),
+            "WORKFLOW_ISSUE_PROVIDER": issue_kind,
+        })
         rendered = f"{rendered}\n\n{agent_block}"
     return rendered
 
@@ -1028,9 +1021,9 @@ def test_session_start_injects_policy_for_configured_project(
     context = payload["hookSpecificOutput"]["additionalContext"]
     assert payload["hookSpecificOutput"]["hookEventName"] == "SessionStart"
     assert context == expected_session_start_context(
-        runtime=runtime, knowledge_kind="github", issue_kind="github"
+        runtime=runtime, issue_kind="github"
     )
-    policy_dir = _PLUGIN_ROOT / "hooks" / "context" / "main" / "policy"
+    runbook_dir = _PLUGIN_ROOT / "authoring" / "runbook"
     assert "## workflow policy" in context
     if runtime == "claude":
         assert "workflow <script>" in context
@@ -1038,17 +1031,18 @@ def test_session_start_injects_policy_for_configured_project(
         assert f"\"{_PLUGIN_ROOT}/scripts/workflow\" <script>.py" in context
         assert "{{WORKFLOW_PLUGIN_ROOT}}" not in context
     assert "read-only" in context
-    assert str(policy_dir / "authoring.md") in context
-    assert str(policy_dir / "provider-writes" / "github.md") in context
-    assert str(policy_dir / "knowledge" / "github.md") in context
-    assert "{{WORKFLOW_POLICY_DIR}}" not in context
-    assert "{{WORKFLOW_LAUNCHER_BLOCK}}" not in context
-    assert "{{WORKFLOW_ISSUE_FETCH_BLOCK}}" not in context
-    assert "{{WORKFLOW_ISSUE_WRITE_BLOCK}}" not in context
+    assert "workflow authoring_resolver.py" in context
+    assert f"{runbook_dir}/<intent>/github.md" in context
+    assert "- `issue-fetch`" in context
+    assert "- `issue-write`" in context
+    assert "- `issue-new`" in context
+    assert "- `issue-link`" in context
+    assert "{{WORKFLOW_RUNBOOK_DIR}}" not in context
+    assert "{{SNIPPET_LAUNCHER}}" not in context
+    assert "{{SNIPPET_AUTHORING}}" not in context
     assert "{{WORKFLOW_ISSUE_PROVIDER}}" not in context
-    assert "{{WORKFLOW_KNOWLEDGE_PROVIDER}}" not in context
-    assert "provider-writes/jira.md" not in context
-    assert "provider-writes/filesystem.md" not in context
+    assert "jira.md" not in context
+    assert "filesystem.md" not in context
     assert "workflow-operator" not in context
     assert "Delegate workflow operations" not in context
     assert "codex-operator-reuse" not in context
@@ -1195,14 +1189,12 @@ def test_session_start_uses_filesystem_issue_policy_for_local_artifacts(
     payload = json.loads(out)
     context = payload["hookSpecificOutput"]["additionalContext"]
     assert context == expected_session_start_context(
-        runtime=runtime, knowledge_kind="filesystem", issue_kind="filesystem"
+        runtime=runtime, issue_kind="filesystem"
     )
-    policy_dir = _PLUGIN_ROOT / "hooks" / "context" / "main" / "policy"
-    assert str(policy_dir / "provider-writes" / "filesystem.md") in context
-    assert str(policy_dir / "knowledge" / "filesystem.md") in context
-    assert "provider-writes/github.md" not in context
-    assert "provider-writes/jira.md" not in context
-    assert "knowledge/github.md" not in context
+    runbook_dir = _PLUGIN_ROOT / "authoring" / "runbook"
+    assert f"{runbook_dir}/<intent>/filesystem.md" in context
+    assert "github.md" not in context
+    assert "jira.md" not in context
 
 
 def test_session_start_discovers_config_from_nested_project_path(
@@ -1313,10 +1305,12 @@ def test_session_start_uses_jira_provider_writes_pointer_for_jira_config(
 
     payload = json.loads(out)
     context = payload["hookSpecificOutput"]["additionalContext"]
-    policy_dir = _PLUGIN_ROOT / "hooks" / "context" / "main" / "policy"
-    assert str(policy_dir / "provider-writes" / "jira.md") in context
-    assert "provider-writes/github.md" not in context
-    assert "provider-writes/filesystem.md" not in context
+    runbook_dir = _PLUGIN_ROOT / "authoring" / "runbook"
+    assert f"{runbook_dir}/<intent>/jira.md" in context
+    assert "- `issue-fetch`" in context
+    assert "- `issue-write`" in context
+    assert "github.md" not in context
+    assert "filesystem.md" not in context
 
 
 def test_session_start_skips_claude_subagent_payload(
@@ -1557,7 +1551,7 @@ def test_user_prompt_injects_github_commit_prefix_hint_without_issue_fetch(
 
     payload = json.loads(captured.getvalue())
     context = payload["hookSpecificOutput"]["additionalContext"]
-    assert context == main_context_fragment("main/commit-prefix.md")
+    assert context == main_context_fragment("snippets/commit-prefix.md")
 
     repeated = io.StringIO()
     repeated_event = parse_codex_event_payload(raw_payload)
@@ -1710,7 +1704,7 @@ def test_user_prompt_injects_jira_commit_prefix_hint_without_issue_fetch(
 
     payload = json.loads(captured.getvalue())
     context = payload["hookSpecificOutput"]["additionalContext"]
-    assert context == main_context_fragment("main/commit-prefix.md")
+    assert context == main_context_fragment("snippets/commit-prefix.md")
     assert runner.requests == []
 
 
