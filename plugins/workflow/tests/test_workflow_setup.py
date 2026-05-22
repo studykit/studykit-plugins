@@ -68,9 +68,7 @@ def _curl_get_args(url: str) -> tuple[str, ...]:
     "fixture",
     [
         "github-github.yml",
-        "github-confluence.yml",
-        "jira-confluence.yml",
-        "filesystem-filesystem.yml",
+        "filesystem-github.yml",
     ],
 )
 def test_setup_fixtures_round_trip_through_workflow_config(fixture: str, tmp_path: Path) -> None:
@@ -94,12 +92,12 @@ def test_build_config_records_commit_refs(tmp_path: Path) -> None:
     raw = build_config(
         project=tmp_path,
         issue_provider="filesystem",
-        knowledge_provider="filesystem",
+        knowledge_provider="github",
         commit_ref_style="provider-native",
         commit_refs_enabled=False,
     )
 
-    assert raw == _fixture("filesystem-filesystem.yml")
+    assert raw == _fixture("filesystem-github.yml")
     assert raw["commit_refs"] == {"enabled": False, "style": "disabled"}
 
 
@@ -107,10 +105,9 @@ def test_build_config_defaults_issue_id_format_to_provider_native(tmp_path: Path
     raw = build_config(
         project=tmp_path,
         issue_provider="jira",
-        knowledge_provider="confluence",
+        knowledge_provider="github",
         jira_site="https://jira.example.test",
         jira_relationship_mappings=_jira_relationship_mappings(),
-        confluence_site="https://confluence.example.test",
     )
 
     assert raw["issue_id_format"] == "jira"
@@ -120,11 +117,10 @@ def test_build_config_records_jira_snapshot_hidden_comment_markers(tmp_path: Pat
     raw = build_config(
         project=tmp_path,
         issue_provider="jira",
-        knowledge_provider="confluence",
+        knowledge_provider="github",
         jira_site="https://jira.example.test",
         jira_relationship_mappings=_jira_relationship_mappings(),
         jira_snapshot_hidden_comment_markers=("!git-event",),
-        confluence_site="https://confluence.example.test",
     )
 
     assert raw["providers"]["issues"]["snapshot"] == {"hidden_comment_markers": ["!git-event"]}
@@ -135,54 +131,32 @@ def test_build_config_requires_jira_relationship_mappings(tmp_path: Path) -> Non
         build_config(
             project=tmp_path,
             issue_provider="jira",
-            knowledge_provider="confluence",
+            knowledge_provider="github",
             jira_site="https://jira.example.test",
-            confluence_site="https://confluence.example.test",
-        )
+            )
 
 
 def test_build_config_rejects_invalid_provider_for_role(tmp_path: Path) -> None:
     with pytest.raises(WorkflowConfigError, match="not valid for role"):
         build_config(
             project=tmp_path,
-            issue_provider="confluence",
+            issue_provider="wiki",
             knowledge_provider="github",
         )
 
 
-@pytest.mark.parametrize(
-    ("kwargs", "message"),
-    [
-        (
-            {
-                "issue_provider": "jira",
-                "knowledge_provider": "github",
-                "jira_site": "https://acme.atlassian.net",
-            },
-            "Jira Cloud",
-        ),
-        (
-            {
-                "issue_provider": "github",
-                "knowledge_provider": "confluence",
-                "confluence_deployment": "cloud",
-                "confluence_site": "https://confluence.example.test",
-            },
-            "Confluence Cloud",
-        ),
-    ],
-)
-def test_build_config_rejects_cloud_deployments(
-    tmp_path: Path,
-    kwargs: dict[str, Any],
-    message: str,
-) -> None:
-    with pytest.raises(WorkflowSetupError, match=message):
-        build_config(project=tmp_path, **kwargs)
+def test_build_config_rejects_jira_cloud_deployment(tmp_path: Path) -> None:
+    with pytest.raises(WorkflowSetupError, match="Jira Cloud"):
+        build_config(
+            project=tmp_path,
+            issue_provider="jira",
+            knowledge_provider="github",
+            jira_site="https://acme.atlassian.net",
+        )
 
 
 def test_capabilities_mark_jira_setup_incomplete_when_relationship_mappings_are_missing() -> None:
-    payload = provider_capabilities(issue_provider="jira", knowledge_provider="confluence")
+    payload = provider_capabilities(issue_provider="jira", knowledge_provider="github")
 
     assert payload["issues"]["relationship_writes"] is False
     assert any("setup is incomplete" in item for item in payload["warnings"])
@@ -196,10 +170,9 @@ def test_build_config_accepts_explicit_jira_relationship_mappings(tmp_path: Path
     raw = build_config(
         project=tmp_path,
         issue_provider="jira",
-        knowledge_provider="confluence",
+        knowledge_provider="github",
         jira_site="https://jira.example.test",
         jira_relationship_mappings=mappings,
-        confluence_site="https://confluence.example.test",
     )
     payload = build_config_payload(raw, project=tmp_path)
 
@@ -489,7 +462,7 @@ def test_build_config_writes_epic_fields_when_provided(tmp_path: Path) -> None:
     raw = build_config(
         project=tmp_path,
         issue_provider="jira",
-        knowledge_provider="confluence",
+        knowledge_provider="github",
         jira_site="https://jira.example.test",
         jira_relationship_mappings=_jira_relationship_mappings(),
         jira_epic_fields={
@@ -497,7 +470,6 @@ def test_build_config_writes_epic_fields_when_provided(tmp_path: Path) -> None:
             "link": "customfield_12346",
             "status": "customfield_12347",
         },
-        confluence_site="https://confluence.example.test",
     )
 
     issues = raw["providers"]["issues"]
@@ -525,11 +497,10 @@ def test_build_config_keeps_explicit_epic_mapping_when_provided(tmp_path: Path) 
     raw = build_config(
         project=tmp_path,
         issue_provider="jira",
-        knowledge_provider="confluence",
+        knowledge_provider="github",
         jira_site="https://jira.example.test",
         jira_relationship_mappings=mappings,
         jira_epic_fields={"link": "customfield_12346"},
-        confluence_site="https://confluence.example.test",
     )
 
     assert raw["providers"]["issues"]["relationship_mappings"]["epic"]["field"] == "customfield_99999"
@@ -539,20 +510,18 @@ def test_build_config_writes_epic_issue_type_only_when_non_default(tmp_path: Pat
     raw_default = build_config(
         project=tmp_path,
         issue_provider="jira",
-        knowledge_provider="confluence",
+        knowledge_provider="github",
         jira_site="https://jira.example.test",
         jira_relationship_mappings=_jira_relationship_mappings(),
         jira_epic_issue_type="Epic",
-        confluence_site="https://confluence.example.test",
     )
     raw_override = build_config(
         project=tmp_path,
         issue_provider="jira",
-        knowledge_provider="confluence",
+        knowledge_provider="github",
         jira_site="https://jira.example.test",
         jira_relationship_mappings=_jira_relationship_mappings(),
         jira_epic_issue_type="Initiative",
-        confluence_site="https://confluence.example.test",
     )
 
     assert "artifact_issue_types" not in raw_default["providers"]["issues"]
@@ -564,12 +533,11 @@ def test_build_config_rejects_unknown_epic_fields_key(tmp_path: Path) -> None:
         build_config(
             project=tmp_path,
             issue_provider="jira",
-            knowledge_provider="confluence",
+            knowledge_provider="github",
             jira_site="https://jira.example.test",
             jira_relationship_mappings=_jira_relationship_mappings(),
             jira_epic_fields={"unknown": "customfield_12345"},
-            confluence_site="https://confluence.example.test",
-        )
+            )
 
 
 def _jira_state_transition_runner(
@@ -717,11 +685,10 @@ def test_build_config_writes_state_transitions_when_provided(tmp_path: Path) -> 
     raw = build_config(
         project=tmp_path,
         issue_provider="jira",
-        knowledge_provider="confluence",
+        knowledge_provider="github",
         jira_site="https://jira.example.test",
         jira_relationship_mappings=_jira_relationship_mappings(),
         jira_state_transitions={"close": "Closed", "reopen": "Reopened"},
-        confluence_site="https://confluence.example.test",
     )
 
     assert raw["providers"]["issues"]["state_transitions"] == {
@@ -734,10 +701,9 @@ def test_build_config_omits_state_transitions_when_not_provided(tmp_path: Path) 
     raw = build_config(
         project=tmp_path,
         issue_provider="jira",
-        knowledge_provider="confluence",
+        knowledge_provider="github",
         jira_site="https://jira.example.test",
         jira_relationship_mappings=_jira_relationship_mappings(),
-        confluence_site="https://confluence.example.test",
     )
 
     assert "state_transitions" not in raw["providers"]["issues"]
@@ -767,15 +733,13 @@ def test_build_config_state_transition_flag_rejects_malformed_input(
         "--issue-provider",
         "jira",
         "--knowledge-provider",
-        "confluence",
+        "github",
         "--jira-site",
         "https://jira.example.test",
         "--jira-relationship-mapping",
         "blocked_by:surface=issue_link,link_type=Blocks,direction=inward",
         "--jira-state-transition",
         value,
-        "--confluence-site",
-        "https://confluence.example.test",
     ]
     stdout = io.StringIO()
     stderr = io.StringIO()
@@ -792,7 +756,7 @@ def test_build_config_state_transition_flag_rejects_duplicate_verb(tmp_path: Pat
         "--issue-provider",
         "jira",
         "--knowledge-provider",
-        "confluence",
+        "github",
         "--jira-site",
         "https://jira.example.test",
         "--jira-relationship-mapping",
@@ -801,8 +765,6 @@ def test_build_config_state_transition_flag_rejects_duplicate_verb(tmp_path: Pat
         "close=Closed",
         "--jira-state-transition",
         "close=Resolved",
-        "--confluence-site",
-        "https://confluence.example.test",
     ]
     stdout = io.StringIO()
     stderr = io.StringIO()
@@ -816,9 +778,8 @@ def test_jira_relationship_mappings_require_explicit_surface(tmp_path: Path) -> 
         build_config(
             project=tmp_path,
             issue_provider="jira",
-            knowledge_provider="confluence",
+            knowledge_provider="github",
             jira_site="https://jira.example.test",
-            confluence_site="https://confluence.example.test",
             jira_relationship_mappings={"blocked_by": {"link_type": "Blocks", "direction": "inward"}},
         )
 
@@ -828,7 +789,7 @@ def test_write_refuses_overwrite_and_force_rewrites(tmp_path: Path) -> None:
     second = build_config(
         project=tmp_path,
         issue_provider="filesystem",
-        knowledge_provider="filesystem",
+        knowledge_provider="github",
         commit_refs_enabled=False,
     )
 
@@ -854,9 +815,8 @@ def test_write_rejects_jira_config_without_relationship_mappings(tmp_path: Path)
                 "api_version": "2",
             },
             "knowledge": {
-                "kind": "confluence",
-                "site": "https://confluence.example.test",
-                "deployment": "data_center",
+                "kind": "github",
+                "path": "wiki/workflow",
             },
         },
         "issue_id_format": "jira",
@@ -965,9 +925,7 @@ def test_profile_from_docs_extracts_defaults_and_ignores_unrelated_git_docs() ->
     )
 
     assert payload["defaults"]["issue_provider"] == "jira"
-    assert payload["defaults"]["knowledge_provider"] == "confluence"
     assert payload["defaults"]["jira_project"] == "PROJ"
-    assert payload["defaults"]["confluence_space"] == "ENG"
     assert payload["defaults"]["jira_relationship_mappings"]["blocked_by"]["surface"] == "issue_link"
     assert any(item["source"].endswith("unrelated-git-history.md") for item in payload["ignored"])
 
@@ -1005,7 +963,6 @@ def test_profile_from_docs_reports_cloud_defaults() -> None:
         stdin_text="""
 Workflow provider profile:
 Jira site: https://acme.atlassian.net
-Confluence site: https://acme.atlassian.net/wiki
 """.strip(),
     )
 

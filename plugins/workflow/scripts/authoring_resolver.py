@@ -87,7 +87,6 @@ ISSUE_PROVIDER_RELATIONSHIP_FILES = {
 
 KNOWLEDGE_PROVIDER_FILES = {
     "github": "providers/github-knowledge-convention.md",
-    "confluence": "providers/confluence-page-convention.md",
 }
 
 ISSUE_PROVIDER_TYPE_PATTERNS = {
@@ -97,7 +96,6 @@ ISSUE_PROVIDER_TYPE_PATTERNS = {
 
 KNOWLEDGE_PROVIDER_TYPE_PATTERNS = {
     "github": "providers/github-knowledge-{artifact_type}-authoring.md",
-    "confluence": "providers/confluence-page-{artifact_type}-authoring.md",
 }
 
 KNOWLEDGE_PROVIDER_PRD_FILES = {
@@ -353,7 +351,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--type", required=True, help="workflow artifact type")
     parser.add_argument("--role", help="issue or knowledge; required for usecase/research")
-    parser.add_argument("--provider", help="provider override, such as github, jira, or confluence")
+    parser.add_argument("--provider", help="provider override, such as github or jira")
     parser.add_argument(
         "--scope",
         choices=sorted(AUTHORING_SCOPES),

@@ -1,6 +1,6 @@
 ---
 name: setup
-description: Initialize the workflow plugin in a repository by generating and writing .workflow/config.yml, including GitHub, Jira Data Center or Server, filesystem issues, GitHub repository wiki, Confluence Data Center or Server, filesystem knowledge, and Jira site profiling for relationship mappings, fields, Epic configuration, and labels.
+description: Initialize the workflow plugin in a repository by generating and writing .workflow/config.yml, including GitHub, Jira Data Center or Server, filesystem issues, GitHub repository wiki, and Jira site profiling for relationship mappings, fields, Epic configuration, and labels.
 disable-model-invocation: true
 ---
 
@@ -46,9 +46,8 @@ workflow workflow_config.py --project <project-root> --require
 3. Collect the issue provider: `github`, `jira`, or `filesystem`. Ask the user
    when it was not already named explicitly by the user or a provider profile;
    do not infer it from a Git remote or assume GitHub.
-4. Collect the knowledge provider: `github`, `confluence`, or `filesystem`.
-   Ask the user when it was not already named explicitly by the user or a
-   provider profile; do not infer it from the issue provider.
+4. Collect the knowledge provider: `github`. Ask the user when it was
+   not already named explicitly by the user or a provider profile.
 5. If the issue provider is `jira`, run the Jira site profiling flow before
    `capabilities` or `build-config`. Collect representative sample issue keys,
    inspect relationship surfaces, ask the user to confirm exact mappings, and
@@ -91,8 +90,6 @@ workflow workflow_config.py --project <project-root> --require
   that path. If the knowledge/wiki repository host differs from the issue
   repository host, use `--github-wiki-host`.
 - Jira setup targets Data Center or Server only. Reject or report Cloud,
-  including `*.atlassian.net` sites.
-- Confluence setup targets Data Center or Server only. Reject or report Cloud,
   including `*.atlassian.net` sites.
 - Jira issue setup requires explicit `providers.issues.relationship_mappings`
   before final config generation. Collect sample issue keys, inspect the Jira

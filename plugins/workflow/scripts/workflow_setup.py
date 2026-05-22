@@ -363,13 +363,7 @@ def build_config(
     jira_relationship_mappings: Mapping[str, Any] | None = None,
     jira_state_transitions: Mapping[str, str] | None = None,
     jira_snapshot_hidden_comment_markers: Sequence[str] | None = None,
-    confluence_site: str | None = None,
-    confluence_deployment: str | None = "data_center",
-    confluence_space: str | None = None,
-    confluence_space_id: str | None = None,
-    confluence_parent_page_id: str | None = None,
     filesystem_issues_path: str | None = None,
-    filesystem_knowledge_path: str | None = None,
     commit_ref_style: str = "provider-native",
     commit_refs_enabled: bool = True,
     mode: str = "remote-native",
@@ -425,20 +419,12 @@ def build_config(
         github_repo=github_wiki_repo or github_repo or probed_repo,
         github_host=knowledge_github_host,
         github_path=github_wiki_path,
-        confluence_site=confluence_site,
-        confluence_deployment=confluence_deployment,
-        confluence_space=confluence_space,
-        confluence_space_id=confluence_space_id,
-        confluence_parent_page_id=confluence_parent_page_id,
-        filesystem_path=filesystem_knowledge_path,
     )
 
     if issue_provider == "jira":
         _reject_cloud_provider("Jira", issues)
         _require_jira_relationship_mappings(jira_relationship_mappings)
         _validate_relationship_mappings(jira_relationship_mappings)
-    if knowledge_provider == "confluence":
-        _reject_cloud_provider("Confluence", knowledge)
 
     effective_commit_style = "disabled" if not commit_refs_enabled else commit_ref_style
     raw: dict[str, Any] = {
@@ -571,17 +557,13 @@ def profile_from_docs(paths: Sequence[Path], *, stdin_text: str | None = None) -
                 defaults[key] = value
                 sources[key] = source
 
-    for key in ("jira_deployment", "confluence_deployment"):
-        value = defaults.get(key)
-        if isinstance(value, str) and _is_cloud_deployment(value):
-            product = "Jira" if key.startswith("jira") else "Confluence"
-            warnings.append(f"{product} Cloud was found in provider profile defaults, but only Data Center or Server is supported")
+    jira_deployment = defaults.get("jira_deployment")
+    if isinstance(jira_deployment, str) and _is_cloud_deployment(jira_deployment):
+        warnings.append("Jira Cloud was found in provider profile defaults, but only Data Center or Server is supported")
 
-    for key in ("jira_site", "confluence_site"):
-        value = defaults.get(key)
-        if isinstance(value, str) and _is_atlassian_cloud_site(value):
-            product = "Jira" if key.startswith("jira") else "Confluence"
-            warnings.append(f"{product} atlassian.net site was found in provider profile defaults, but Cloud is unsupported")
+    jira_site = defaults.get("jira_site")
+    if isinstance(jira_site, str) and _is_atlassian_cloud_site(jira_site):
+        warnings.append("Jira atlassian.net site was found in provider profile defaults, but Cloud is unsupported")
 
     return {
         "operation": "profile_from_docs",
@@ -807,13 +789,7 @@ def _add_config_build_args(parser: argparse.ArgumentParser) -> None:
         default=[],
         help="repeatable mapping, e.g. blocked_by:surface=issue_link,link_type=Blocks,direction=inward",
     )
-    parser.add_argument("--confluence-site", help="Confluence Data Center or Server base URL")
-    parser.add_argument("--confluence-deployment", default="data_center", help="Confluence deployment; Cloud is unsupported")
-    parser.add_argument("--confluence-space", help="Confluence space key")
-    parser.add_argument("--confluence-space-id", help="Confluence space id")
-    parser.add_argument("--confluence-parent-page-id", help="Confluence parent page id")
     parser.add_argument("--filesystem-issues-path", default="workflow/issues", help="filesystem issue provider path")
-    parser.add_argument("--filesystem-knowledge-path", default="workflow/knowledge", help="filesystem knowledge provider path")
     parser.add_argument("--commit-ref-style", choices=sorted(COMMIT_REF_STYLES), default="provider-native")
     parser.add_argument("--disable-commit-refs", action="store_true", help="disable commit references")
 
@@ -841,13 +817,7 @@ def _config_from_args(args: argparse.Namespace) -> dict[str, Any]:
         jira_relationship_mappings=_relationship_mappings_from_args(args),
         jira_state_transitions=_jira_state_transitions_from_args(args),
         jira_snapshot_hidden_comment_markers=_jira_snapshot_hidden_comment_markers_from_args(args),
-        confluence_site=args.confluence_site,
-        confluence_deployment=args.confluence_deployment,
-        confluence_space=args.confluence_space,
-        confluence_space_id=args.confluence_space_id,
-        confluence_parent_page_id=args.confluence_parent_page_id,
         filesystem_issues_path=args.filesystem_issues_path,
-        filesystem_knowledge_path=args.filesystem_knowledge_path,
         commit_ref_style=args.commit_ref_style,
         commit_refs_enabled=not args.disable_commit_refs,
         mode=args.mode,
@@ -931,26 +901,12 @@ def _knowledge_provider_config(
     github_repo: str | None,
     github_host: str | None,
     github_path: str | None,
-    confluence_site: str | None,
-    confluence_deployment: str | None,
-    confluence_space: str | None,
-    confluence_space_id: str | None,
-    confluence_parent_page_id: str | None,
-    filesystem_path: str | None,
 ) -> dict[str, Any]:
     settings: dict[str, Any] = {"kind": provider}
     if provider == "github":
         _set_if_text(settings, "repo", github_repo)
         _set_if_text(settings, "host", github_host)
         _set_if_text(settings, "path", github_path or "wiki/workflow")
-    elif provider == "confluence":
-        _set_if_text(settings, "site", confluence_site)
-        _set_if_text(settings, "deployment", confluence_deployment or "data_center")
-        _set_if_text(settings, "space", confluence_space.upper() if confluence_space else None)
-        _set_if_text(settings, "space_id", confluence_space_id)
-        _set_if_text(settings, "parent_page_id", confluence_parent_page_id)
-    elif provider == "filesystem":
-        _set_if_text(settings, "path", filesystem_path or "workflow/knowledge")
     return settings
 
 
@@ -998,37 +954,14 @@ def _issue_capabilities(provider: str, has_jira_mappings: bool) -> dict[str, Any
 
 
 def _knowledge_capabilities(provider: str) -> dict[str, Any]:
-    if provider == "confluence":
-        return {
-            "provider": provider,
-            "native_transport": True,
-            "reads": True,
-            "writes": True,
-            "metadata_writes": False,
-            "limitations": [
-                "Confluence Cloud is unsupported; use Data Center or Server",
-                "set_metadata, link, and add_comment knowledge operations are not implemented",
-            ],
-            "warnings": ["Confluence setup targets Data Center or Server only"],
-        }
-    if provider == "github":
-        return {
-            "provider": provider,
-            "native_transport": False,
-            "reads": "config-only",
-            "writes": False,
-            "metadata_writes": False,
-            "limitations": ["GitHub repository wiki knowledge provider commands are not registered yet"],
-            "warnings": ["GitHub knowledge writes are not implemented by the native provider registry yet"],
-        }
     return {
         "provider": provider,
         "native_transport": False,
         "reads": "config-only",
         "writes": False,
         "metadata_writes": False,
-        "limitations": ["filesystem knowledge provider commands are not registered yet"],
-        "warnings": ["filesystem knowledge writes are not implemented by the native provider registry yet"],
+        "limitations": ["GitHub repository wiki knowledge provider commands are not registered yet"],
+        "warnings": ["GitHub knowledge writes are not implemented by the native provider registry yet"],
     }
 
 
@@ -1655,7 +1588,6 @@ def _looks_like_provider_profile(text: str) -> bool:
         "issue provider",
         "knowledge provider",
         "jira",
-        "confluence",
         "github issue",
         "github issues",
         "wiki/",
@@ -1665,7 +1597,7 @@ def _looks_like_provider_profile(text: str) -> bool:
         return False
     unrelated_git = ("git log", "commit history", "merge commit", "git remote")
     if any(marker in normalized for marker in unrelated_git) and not any(
-        marker in normalized for marker in ("jira", "confluence", "github issue", "workflow provider", ".workflow/config.yml")
+        marker in normalized for marker in ("jira", "github issue", "workflow provider", ".workflow/config.yml")
     ):
         return False
     return True
@@ -1717,11 +1649,6 @@ def _merge_profile_mapping(defaults: dict[str, Any], mapping: Mapping[str, Any])
         _set_default(defaults, "github_wiki_repo", _text(knowledge.get("repo") or knowledge.get("repository") or knowledge.get("slug")))
         _set_default(defaults, "github_wiki_host", _text(knowledge.get("host") or knowledge.get("hostname")))
         _set_default(defaults, "github_wiki_path", _text(knowledge.get("path")))
-        _set_default(defaults, "confluence_site", _text(knowledge.get("site") or knowledge.get("base_url") or knowledge.get("url")))
-        _set_default(defaults, "confluence_deployment", _text(knowledge.get("deployment") or knowledge.get("type") or knowledge.get("edition")))
-        _set_default(defaults, "confluence_space", _text(knowledge.get("space") or knowledge.get("space_key")))
-        _set_default(defaults, "confluence_space_id", _text(knowledge.get("space_id") or knowledge.get("spaceId")))
-        _set_default(defaults, "confluence_parent_page_id", _text(knowledge.get("parent_page_id") or knowledge.get("parentPageId")))
 
     _set_default(defaults, "commit_ref_style", _dig_text(mapping, ("commit_refs", "style")))
 
@@ -1738,14 +1665,9 @@ def _extract_profile_regex_defaults(text: str) -> dict[str, Any]:
     if jira_site:
         defaults["jira_site"] = jira_site
         defaults.setdefault("issue_provider", "jira")
-    confluence_site = _first_url_matching(text, "confluence")
-    if confluence_site:
-        defaults["confluence_site"] = confluence_site
-        defaults.setdefault("knowledge_provider", "confluence")
     for key, pattern in {
         "jira_project": r"(?im)^\s*(?:jira[-_ ]*)?project(?: key)?\s*[:=]\s*(?P<value>[A-Za-z][A-Za-z0-9_]+)\s*$",
         "jira_issue_type": r"(?im)^\s*(?:jira[-_ ]*)?issue type\s*[:=]\s*(?P<value>[A-Za-z][A-Za-z0-9 _-]+)\s*$",
-        "confluence_space": r"(?im)^\s*(?:confluence[-_ ]*)?space(?: key)?\s*[:=]\s*(?P<value>[A-Za-z][A-Za-z0-9_]+)\s*$",
         "github_wiki_path": r"(?im)^\s*(?:github[-_ ]*)?(?:wiki|knowledge) path\s*[:=]\s*(?P<value>[A-Za-z0-9_./-]+)\s*$",
     }.items():
         match = re.search(pattern, text)
@@ -1753,10 +1675,8 @@ def _extract_profile_regex_defaults(text: str) -> dict[str, Any]:
             defaults[key] = match.group("value").strip()
     if re.search(r"(?i)\bdata\s*center\b|\bdatacenter\b|\bserver\b", text):
         defaults.setdefault("jira_deployment", "data_center")
-        defaults.setdefault("confluence_deployment", "data_center")
     if re.search(r"(?i)\bcloud\b|atlassian\.net", text):
         defaults.setdefault("jira_deployment", "cloud")
-        defaults.setdefault("confluence_deployment", "cloud")
     return defaults
 
 
@@ -1829,7 +1749,7 @@ def _dig_text(mapping: Mapping[str, Any], keys: tuple[str, str]) -> str | None:
 
 def _is_cloud_deployment(value: str) -> bool:
     normalized = value.strip().lower().replace("-", "_").replace(" ", "_")
-    return normalized in {"cloud", "jira_cloud", "confluence_cloud", "atlassian_cloud"}
+    return normalized in {"cloud", "jira_cloud", "atlassian_cloud"}
 
 
 def _is_atlassian_cloud_site(value: str) -> bool:
