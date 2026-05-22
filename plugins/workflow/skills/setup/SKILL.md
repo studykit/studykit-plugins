@@ -47,7 +47,14 @@ workflow workflow_config.py --project <project-root> --require
    when it was not already named explicitly by the user or a provider profile;
    do not infer it from a Git remote or assume GitHub.
 4. Collect the knowledge provider: `github`. Ask the user when it was
-   not already named explicitly by the user or a provider profile.
+   not already named explicitly by the user or a provider profile. For
+   the `github` knowledge provider, also collect the knowledge folder
+   path (`--github-wiki-path`) from the user. There is no default; ask
+   the user which repo-relative folder should hold knowledge pages (for
+   example `wiki/<project>`, `docs/workflow`, or `knowledge/`) and pass
+   the confirmed value through `--github-wiki-path`. Do not assume,
+   suggest, or fall back to `wiki/workflow` or any other path the user
+   has not named.
 5. If the issue provider is `jira`, run the Jira site profiling flow before
    `capabilities` or `build-config`. Collect representative sample issue keys,
    inspect relationship surfaces, ask the user to confirm exact mappings, and
@@ -74,6 +81,16 @@ workflow workflow_config.py --project <project-root> --require
    explicit confirmation before writing.
 11. After confirmation, write with `write --config <reviewed-yaml-file>`. Then
    verify with `workflow_config.py --require`.
+12. `write` also records the configured knowledge folder under a
+   `## Workflow Knowledge Root` section in `<project-root>/AGENTS.md`
+   (auto-created when missing) and creates `<project-root>/CLAUDE.md`
+   as a `@AGENTS.md` shim if absent. The section is appended only when
+   the heading is not already present; an existing section is left
+   untouched so the agent should manually update the heading body when
+   the configured knowledge path changes. Skipped when the github
+   knowledge provider has no `path` configured. Inspect `result.agents_md`
+   from the `write` payload to see which actions ran
+   (`create` / `append` / `skip`).
 
 ## Provider Rules
 
@@ -85,10 +102,14 @@ workflow workflow_config.py --project <project-root> --require
 - Always pass explicit `--issue-provider` and `--knowledge-provider` values to
   `build-config` or `write` when building config from options. Missing provider
   flags mean setup is incomplete; ask for the provider choice before continuing.
-- GitHub knowledge setup represents a repository `wiki/<plugin>/` directory.
-  Use `--github-wiki-path`, defaulting to `wiki/workflow` when the user accepts
-  that path. If the knowledge/wiki repository host differs from the issue
-  repository host, use `--github-wiki-host`.
+- GitHub knowledge setup represents a repository-relative directory.
+  `--github-wiki-path` has no default and must be supplied by the user.
+  Always ask the user which folder should hold the knowledge pages
+  (for example `wiki/<project>`, `docs/workflow`, `knowledge/`) and pass
+  the confirmed value exactly through `--github-wiki-path`. Do not
+  assume, suggest, or fall back to `wiki/workflow` or any other path
+  the user has not named. If the knowledge/wiki repository host differs
+  from the issue repository host, use `--github-wiki-host`.
 - Jira setup targets Data Center or Server only. Reject or report Cloud,
   including `*.atlassian.net` sites.
 - Jira issue setup requires explicit `providers.issues.relationship_mappings`

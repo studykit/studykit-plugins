@@ -38,6 +38,7 @@ from workflow_config import (  # noqa: E402
     KNOWLEDGE_PROVIDERS,
     PROVIDER_NATIVE_ISSUE_ID_FORMATS,
     ProviderConfig,
+    WorkflowConfig,
     WorkflowConfigError,
     load_workflow_config,
     parse_workflow_config,
@@ -464,6 +465,74 @@ def build_config_payload(raw: Mapping[str, Any], *, project: Path) -> dict[str, 
     }
 
 
+AGENTS_FILENAME = "AGENTS.md"
+CLAUDE_FILENAME = "CLAUDE.md"
+AGENTS_KNOWLEDGE_HEADING = "## Workflow Knowledge Root"
+CLAUDE_AGENTS_SHIM = "@AGENTS.md\n"
+
+
+def _knowledge_root_section(repo_relative: str, absolute: str) -> str:
+    return (
+        f"{AGENTS_KNOWLEDGE_HEADING}\n\n"
+        f"Workflow knowledge pages live at `{repo_relative}` "
+        f"(resolved: `{absolute}`).\n"
+    )
+
+
+def ensure_agents_knowledge_root(
+    project: Path, config: WorkflowConfig
+) -> dict[str, Any] | None:
+    """Append the workflow knowledge-root section to ``AGENTS.md`` when applicable.
+
+    The section is appended only when it is not already present. ``CLAUDE.md`` is
+    auto-created as a sibling shim (``@AGENTS.md``) when missing, matching the
+    project convention. Returns ``None`` when there is no configured knowledge
+    path to surface.
+    """
+
+    if config.knowledge.kind != "github":
+        return None
+    raw_path = config.knowledge.settings.get("path")
+    if not isinstance(raw_path, str) or not raw_path.strip():
+        return None
+
+    project = project.expanduser().resolve()
+    repo_relative = raw_path.strip()
+    absolute = str((project / repo_relative).resolve())
+    section = _knowledge_root_section(repo_relative, absolute)
+
+    agents_path = project / AGENTS_FILENAME
+    if agents_path.exists():
+        existing = agents_path.read_text(encoding="utf-8")
+        if AGENTS_KNOWLEDGE_HEADING in existing:
+            agents_action = "skip"
+        else:
+            separator = "" if existing.endswith("\n") else "\n"
+            _atomic_write_text(agents_path, existing + separator + "\n" + section)
+            agents_action = "append"
+    else:
+        _atomic_write_text(agents_path, section)
+        agents_action = "create"
+
+    claude_path = project / CLAUDE_FILENAME
+    if claude_path.exists():
+        claude_action = "skip"
+    else:
+        _atomic_write_text(claude_path, CLAUDE_AGENTS_SHIM)
+        claude_action = "create"
+
+    return {
+        "agents_path": str(agents_path),
+        "agents_action": agents_action,
+        "claude_path": str(claude_path),
+        "claude_action": claude_action,
+        "knowledge_root": {
+            "repo_relative": repo_relative,
+            "absolute": absolute,
+        },
+    }
+
+
 def write_config(
     project: Path,
     raw: Mapping[str, Any],
@@ -492,7 +561,7 @@ def write_config(
     if verified is None:
         raise WorkflowSetupError(f"{CONFIG_NAME} was written but could not be verified")
 
-    return {
+    result: dict[str, Any] = {
         "operation": "write",
         "path": str(target),
         "verified": True,
@@ -501,6 +570,10 @@ def write_config(
             "config": verified.to_json(),
         },
     }
+    agents_update = ensure_agents_knowledge_root(project, verified)
+    if agents_update is not None:
+        result["agents_md"] = agents_update
+    return result
 
 
 def existing_config_summary(project: Path) -> dict[str, Any]:
@@ -747,7 +820,7 @@ def _add_config_build_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--github-issue-host", help="GitHub issue provider host when it differs from the wiki host")
     parser.add_argument("--github-wiki-repo", help="GitHub knowledge repository slug when different from issue repo")
     parser.add_argument("--github-wiki-host", help="GitHub knowledge/wiki repository host when it differs from the issue host")
-    parser.add_argument("--github-wiki-path", default="wiki/workflow", help="GitHub repository wiki directory path")
+    parser.add_argument("--github-wiki-path", help="GitHub knowledge repository directory path (required for the github knowledge provider; no default is assumed)")
     parser.add_argument("--jira-site", help="Jira Data Center or Server base URL")
     parser.add_argument("--jira-deployment", default="data_center", help="Jira deployment; Cloud is unsupported")
     parser.add_argument("--jira-api-version", default="2", help="Jira REST API version")
@@ -906,7 +979,7 @@ def _knowledge_provider_config(
     if provider == "github":
         _set_if_text(settings, "repo", github_repo)
         _set_if_text(settings, "host", github_host)
-        _set_if_text(settings, "path", github_path or "wiki/workflow")
+        _set_if_text(settings, "path", github_path)
     return settings
 
 
