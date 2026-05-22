@@ -83,26 +83,59 @@ def test_subagent_start_records_survive_concurrent_parent_state_updates(
 
 def test_record_and_read_authoring_resolution_round_trip(tmp_path: Path) -> None:
     key = {"type": "task", "role": "issue", "provider": "github", "scope": "content"}
-    body = ["## task-issue-reading-list", "- /abs/path"]
 
     assert record_authoring_resolution(
         tmp_path,
         "claude",
         "sess-1",
-        anchor="task-issue-reading-list",
+        tag="reading",
+        anchor="task-issue",
         key=key,
-        body=body,
         emitted_at="2026-05-21T00:00:00+00:00",
     )
 
     entry = read_authoring_resolution(
-        tmp_path, "claude", "sess-1", "task-issue-reading-list"
+        tmp_path, "claude", "sess-1", tag="reading", anchor="task-issue"
     )
 
     assert entry is not None
     assert entry["key"] == key
-    assert entry["body"] == body
     assert entry["emitted_at"] == "2026-05-21T00:00:00+00:00"
+
+
+def test_record_authoring_resolution_separates_tags(tmp_path: Path) -> None:
+    key = {"type": "task", "role": "issue", "provider": "github", "scope": "content"}
+
+    assert record_authoring_resolution(
+        tmp_path,
+        "claude",
+        "sess-1",
+        tag="reading",
+        anchor="task-issue",
+        key=key,
+        emitted_at="2026-05-21T00:00:00+00:00",
+    )
+    assert record_authoring_resolution(
+        tmp_path,
+        "claude",
+        "sess-1",
+        tag="notes",
+        anchor="task-issue",
+        key=key,
+        emitted_at="2026-05-21T00:00:01+00:00",
+    )
+
+    reading_entry = read_authoring_resolution(
+        tmp_path, "claude", "sess-1", tag="reading", anchor="task-issue"
+    )
+    notes_entry = read_authoring_resolution(
+        tmp_path, "claude", "sess-1", tag="notes", anchor="task-issue"
+    )
+
+    assert reading_entry is not None
+    assert notes_entry is not None
+    assert reading_entry["emitted_at"] == "2026-05-21T00:00:00+00:00"
+    assert notes_entry["emitted_at"] == "2026-05-21T00:00:01+00:00"
 
 
 def test_record_authoring_resolution_overwrites_existing_entry(tmp_path: Path) -> None:
@@ -110,28 +143,27 @@ def test_record_authoring_resolution_overwrites_existing_entry(tmp_path: Path) -
         tmp_path,
         "claude",
         "sess-1",
-        anchor="task-issue-reading-list",
+        tag="reading",
+        anchor="task-issue",
         key={"type": "task", "role": "issue", "provider": "github", "scope": "content"},
-        body=["v1"],
         emitted_at="2026-05-21T00:00:00+00:00",
     )
     record_authoring_resolution(
         tmp_path,
         "claude",
         "sess-1",
-        anchor="task-issue-reading-list",
+        tag="reading",
+        anchor="task-issue",
         key={"type": "task", "role": "issue", "provider": "jira", "scope": "content"},
-        body=["v2"],
         emitted_at="2026-05-21T00:01:00+00:00",
     )
 
     entry = read_authoring_resolution(
-        tmp_path, "claude", "sess-1", "task-issue-reading-list"
+        tmp_path, "claude", "sess-1", tag="reading", anchor="task-issue"
     )
 
     assert entry is not None
     assert entry["key"]["provider"] == "jira"
-    assert entry["body"] == ["v2"]
     assert entry["emitted_at"] == "2026-05-21T00:01:00+00:00"
 
 
@@ -140,14 +172,14 @@ def test_record_authoring_resolution_handles_null_provider(tmp_path: Path) -> No
         tmp_path,
         "claude",
         "sess-1",
-        anchor="spike-issue-reading-list",
+        tag="reading",
+        anchor="spike-issue",
         key={"type": "spike", "role": "issue", "provider": None, "scope": "content"},
-        body=["## spike-issue-reading-list"],
         emitted_at="2026-05-21T00:00:00+00:00",
     )
 
     entry = read_authoring_resolution(
-        tmp_path, "claude", "sess-1", "spike-issue-reading-list"
+        tmp_path, "claude", "sess-1", tag="reading", anchor="spike-issue"
     )
 
     assert entry is not None
@@ -157,7 +189,7 @@ def test_record_authoring_resolution_handles_null_provider(tmp_path: Path) -> No
 def test_read_authoring_resolution_returns_none_when_absent(tmp_path: Path) -> None:
     assert (
         read_authoring_resolution(
-            tmp_path, "claude", "sess-1", "task-issue-reading-list"
+            tmp_path, "claude", "sess-1", tag="reading", anchor="task-issue"
         )
         is None
     )
@@ -189,6 +221,7 @@ def test_authoring_resolutions_survive_concurrent_recorders(tmp_path: Path) -> N
                 "    project,",
                 "    'codex',",
                 "    'parent-session',",
+                "    tag='reading',",
                 "    anchor=anchor,",
                 "    key={",
                 "        'type': anchor.split('-')[0],",
@@ -196,7 +229,6 @@ def test_authoring_resolutions_survive_concurrent_recorders(tmp_path: Path) -> N
                 "        'provider': 'github',",
                 "        'scope': 'content',",
                 "    },",
-                "    body=[f'## {anchor}'],",
                 "    emitted_at='2026-05-21T00:00:00+00:00',",
                 ")",
                 "raise SystemExit(0 if ok else 1)",
@@ -206,7 +238,7 @@ def test_authoring_resolutions_survive_concurrent_recorders(tmp_path: Path) -> N
         encoding="utf-8",
     )
 
-    expected_anchors = {f"a{index:02d}-issue-reading-list" for index in range(8)}
+    expected_anchors = {f"a{index:02d}-issue" for index in range(8)}
     processes = [
         subprocess.Popen(
             [sys.executable, str(recorder), str(tmp_path), str(start_file), anchor],
@@ -224,7 +256,7 @@ def test_authoring_resolutions_survive_concurrent_recorders(tmp_path: Path) -> N
 
     for anchor in expected_anchors:
         entry = read_authoring_resolution(
-            tmp_path, "codex", "parent-session", anchor
+            tmp_path, "codex", "parent-session", tag="reading", anchor=anchor
         )
         assert entry is not None, anchor
-        assert entry["body"] == [f"## {anchor}"]
+        assert entry["key"]["type"] == anchor.split("-")[0]

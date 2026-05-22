@@ -466,19 +466,23 @@ def test_main_first_call_emits_sections_and_persists(
     assert '<reading anchor="task-issue">' in out
     assert '<notes anchor="task-issue">' in out
 
-    entry = read_authoring_resolution(
-        tmp_path, runtime, session_id, "task-issue"
+    reading_entry = read_authoring_resolution(
+        tmp_path, runtime, session_id, tag="reading", anchor="task-issue"
     )
-    assert entry is not None
-    assert entry["key"] == {
+    assert reading_entry is not None
+    assert reading_entry["key"] == {
         "type": "task",
         "role": "issue",
         "provider": "github",
         "scope": "content",
     }
-    assert entry["body"]
-    assert entry["body"][0] == '<reading anchor="task-issue">'
-    assert entry["emitted_at"]
+    assert reading_entry["emitted_at"]
+
+    notes_entry = read_authoring_resolution(
+        tmp_path, runtime, session_id, tag="notes", anchor="task-issue"
+    )
+    assert notes_entry is not None
+    assert notes_entry["key"] == reading_entry["key"]
 
 
 def test_main_repeat_call_emits_bullet_only_form(
@@ -533,7 +537,7 @@ def test_main_raw_flag_forces_section_emission(
     authoring_resolver_main(base)
     capsys.readouterr()
     first_entry = read_authoring_resolution(
-        tmp_path, runtime, session_id, "task-issue"
+        tmp_path, runtime, session_id, tag="reading", anchor="task-issue"
     )
 
     authoring_resolver_main(base + ["--raw"])
@@ -541,7 +545,7 @@ def test_main_raw_flag_forces_section_emission(
 
     assert '<reading anchor="task-issue">' in out
     second_entry = read_authoring_resolution(
-        tmp_path, runtime, session_id, "task-issue"
+        tmp_path, runtime, session_id, tag="reading", anchor="task-issue"
     )
     assert first_entry is not None
     assert second_entry is not None
@@ -564,7 +568,7 @@ def test_main_provider_drift_triggers_refresh(
 
     assert '<reading anchor="task-issue">' in out
     entry = read_authoring_resolution(
-        tmp_path, runtime, session_id, "task-issue"
+        tmp_path, runtime, session_id, tag="reading", anchor="task-issue"
     )
     assert entry is not None
     assert entry["key"]["provider"] == "jira"

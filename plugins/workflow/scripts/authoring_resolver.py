@@ -403,7 +403,7 @@ def main(argv: list[str] | None = None) -> int:
     use_cache_hit = False
     if not args.raw:
         existing = read_authoring_resolution(
-            args.project, runtime, session_id, anchor
+            args.project, runtime, session_id, tag="reading", anchor=anchor
         )
         if existing is not None and _keys_equal(existing.get("key"), current_key):
             use_cache_hit = True
@@ -421,17 +421,24 @@ def main(argv: list[str] | None = None) -> int:
         )
         return 0
 
-    rendered = resolution.to_markdown()
-    print(rendered, end="")
-    body_lines = rendered.rstrip("\n").splitlines() if rendered else []
+    print(resolution.to_markdown(), end="")
     record_authoring_resolution(
         args.project,
         runtime,
         session_id,
+        tag="reading",
         anchor=anchor,
         key=current_key,
-        body=body_lines,
     )
+    if resolution.notes:
+        record_authoring_resolution(
+            args.project,
+            runtime,
+            session_id,
+            tag="notes",
+            anchor=resolution.notes_anchor,
+            key=current_key,
+        )
     return 0
 
 
