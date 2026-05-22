@@ -20,7 +20,10 @@ if str(_HOOK_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_HOOK_SCRIPTS_DIR))
 
 import workflow_hook  # noqa: E402
-from workflow_main_context import render as render_template  # noqa: E402
+from workflow_main_context import (  # noqa: E402
+    _merge_runbook_blocks,
+    render as render_template,
+)
 from workflow_command import CommandRequest, CommandResult  # noqa: E402
 from issue.github.cache import GitHubIssueCache  # noqa: E402
 from workflow_github import DEFAULT_ISSUE_FIELDS, GitHubRepository  # noqa: E402
@@ -94,6 +97,10 @@ def _composed_snippet(group: str, provider: str) -> str:
     return extras_path.read_text(encoding="utf-8").strip()
 
 
+def _wrap_policy(text: str) -> str:
+    return f"<policy>\n{text.strip()}\n</policy>"
+
+
 def expected_session_start_context(
     *,
     runtime: str,
@@ -106,12 +113,13 @@ def expected_session_start_context(
         launcher_block = launcher_block.replace(
             "{{WORKFLOW_PLUGIN_ROOT}}", str(_PLUGIN_ROOT)
         )
-    return render_template(text, {
+    rendered = render_template(text, {
         "SNIPPET_LAUNCHER": launcher_block,
         "SNIPPET_AUTHORING": main_context_fragment("snippets/authoring.md"),
         "WORKFLOW_RUNBOOK_DIR": str(runbook_dir),
         "WORKFLOW_ISSUE_PROVIDER": issue_kind,
     })
+    return _wrap_policy(rendered)
 
 
 def expected_subagent_start_context(
@@ -134,6 +142,7 @@ def expected_subagent_start_context(
         "WORKFLOW_ISSUE_PROVIDER": issue_kind,
     })
     agent_name = (agent_type or "").rsplit(":", 1)[-1].strip().lower() if agent_type else ""
+    agent_block = ""
     if agent_name == "issue-implementer":
         template = main_context_fragment("subagent/agents/issue-implementer.md")
         agent_block = render_template(template, {
@@ -141,8 +150,8 @@ def expected_subagent_start_context(
             "WORKFLOW_RUNBOOK_DIR": str(runbook_dir),
             "WORKFLOW_ISSUE_PROVIDER": issue_kind,
         })
-        rendered = f"{rendered}\n\n{agent_block}"
-    return rendered
+    merged = _merge_runbook_blocks(rendered, agent_block)
+    return _wrap_policy(merged)
 
 
 def default_github_relationship_response(request: CommandRequest) -> CommandResult | None:
@@ -1024,7 +1033,13 @@ def test_session_start_injects_policy_for_configured_project(
         runtime=runtime, issue_kind="github"
     )
     runbook_dir = _PLUGIN_ROOT / "authoring" / "runbook"
-    assert "## workflow policy" in context
+    assert "<policy>" in context
+    assert "</policy>" in context
+    assert "<launcher>" in context
+    assert "<authoring-resolver>" in context
+    assert "<runbook>" in context
+    assert "<bash>" in context
+    assert "## workflow policy" not in context
     if runtime == "claude":
         assert "workflow <script>" in context
     else:
@@ -1209,7 +1224,9 @@ def test_session_start_discovers_config_from_nested_project_path(
 
     payload = json.loads(out)
     context = payload["hookSpecificOutput"]["additionalContext"]
-    assert "## workflow policy" in context
+    assert "<policy>" in context
+    assert "<launcher>" in context
+    assert "## workflow policy" not in context
     assert f"\"{_PLUGIN_ROOT}/scripts/workflow\" <script>.py" in context
 
 
@@ -1397,10 +1414,92 @@ def test_claude_subagent_start_injects_issue_implementer_agent_block(
     assert context == expected_subagent_start_context(
         issue_kind="github", agent_type="workflow:issue-implementer"
     )
-    assert "## issue-implementer subagent context" in context
-    assert "issue new" in context
-    assert "issue link" in context
-    assert "issue update" in context
+    assert "<commit-prefix>" in context
+    assert "## issue-implementer subagent context" not in context
+    assert "issue-new" in context
+    assert "issue-link" in context
+    assert "issue-update" in context
+
+
+def test_subagent_start_emits_single_runbook_for_issue_implementer(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _write_config(tmp_path)
+    monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(tmp_path))
+    monkeypatch.setenv("CLAUDE_PLUGIN_ROOT", str(_PLUGIN_ROOT))
+
+    captured = io.StringIO()
+    assert claude_main(
+        payload={
+            "session_id": "claude-session-impl-single-runbook",
+            "transcript_path": "/tmp/transcript.jsonl",
+            "cwd": str(tmp_path),
+            "hook_event_name": "SubagentStart",
+            "agent_id": "agent-impl-single",
+            "agent_type": "workflow:issue-implementer",
+        },
+        stdout=captured,
+    ) == 0
+
+    payload = json.loads(captured.getvalue())
+    context = payload["hookSpecificOutput"]["additionalContext"]
+    assert context.count("<runbook>") == 1
+    assert context.count("</runbook>") == 1
+    for intent in (
+        "issue-fetch",
+        "issue-write",
+        "issue-new",
+        "issue-link",
+        "issue-update",
+        "issue-state",
+    ):
+        assert f"`{intent}`" in context
+
+
+def test_subagent_start_emits_single_runbook_for_generic_agent(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _write_config(tmp_path)
+    monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(tmp_path))
+    monkeypatch.setenv("CLAUDE_PLUGIN_ROOT", str(_PLUGIN_ROOT))
+
+    captured = io.StringIO()
+    assert claude_main(
+        payload={
+            "session_id": "claude-session-generic-runbook",
+            "transcript_path": "/tmp/transcript.jsonl",
+            "cwd": str(tmp_path),
+            "hook_event_name": "SubagentStart",
+            "agent_id": "agent-generic",
+            "agent_type": "general-purpose",
+        },
+        stdout=captured,
+    ) == 0
+
+    payload = json.loads(captured.getvalue())
+    context = payload["hookSpecificOutput"]["additionalContext"]
+    assert context.count("<runbook>") == 1
+    assert context.count("</runbook>") == 1
+    assert "issue-fetch" in context
+    for intent in ("issue-write", "issue-new", "issue-link", "issue-update", "issue-state"):
+        assert intent not in context
+
+
+def test_merge_runbook_blocks_drops_empty_runbook() -> None:
+    base = (
+        "<launcher>\nlauncher body\n</launcher>\n\n"
+        "<runbook>\nbase runbook body\n</runbook>"
+    )
+    per_agent = "<commit-prefix>\ncommit-prefix body\n</commit-prefix>\n\n<runbook>\n   \n</runbook>"
+
+    merged = _merge_runbook_blocks(base, per_agent)
+
+    assert "<runbook>" not in merged
+    assert "</runbook>" not in merged
+    assert "<commit-prefix>" in merged
+    assert "<launcher>" in merged
 
 
 def test_claude_subagent_start_emits_nothing_for_non_workflow_projects(
