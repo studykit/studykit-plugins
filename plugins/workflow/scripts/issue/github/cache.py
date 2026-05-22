@@ -380,6 +380,7 @@ class GitHubIssueCache:
             "title": str(issue.get("title") or ""),
             "state": _normalize_state(issue.get("state")),
             "state_reason": _normalize_state_reason(issue.get("stateReason") or issue.get("state_reason")),
+            "assignees": _github_assignees(issue.get("assignees")),
             "labels": _label_names(issue.get("labels")),
             "updated_at": updated_at,
             "fetched_at": now,
@@ -734,6 +735,42 @@ def _author_login(value: Any) -> str:
     if value:
         return str(value)
     return "unknown"
+
+
+def _github_person_display_name(value: Any) -> str | None:
+    """Resolve the best GitHub user display name from an assignee mapping.
+
+    GitHub user objects always carry ``login``; ``name`` is optional and
+    only populated when the user has set a public display name. Prefer
+    ``name`` when present so the frontmatter is human-friendly, fall back
+    to ``login`` otherwise. Returns ``None`` when the input is not a
+    mapping or carries neither key with a truthy value.
+    """
+
+    if isinstance(value, Mapping):
+        for key in ("name", "login"):
+            raw = value.get(key)
+            if raw:
+                return str(raw)
+    return None
+
+
+def _github_assignees(value: Any) -> list[str]:
+    """Project a GitHub assignees list into resolved display names.
+
+    Preserves provider order and skips entries that resolve to ``None``
+    (no ``name`` and no ``login``). Returns ``[]`` for missing or
+    non-list inputs so the frontmatter always carries a list.
+    """
+
+    if not isinstance(value, list):
+        return []
+    names: list[str] = []
+    for item in value:
+        resolved = _github_person_display_name(item)
+        if resolved is not None:
+            names.append(resolved)
+    return names
 
 
 def _latest_comment_timestamp(comments: list[Mapping[str, Any]]) -> str | None:

@@ -29,6 +29,7 @@ DEFAULT_ISSUE_FIELDS = (
     "stateReason",
     "body",
     "labels",
+    "assignees",
     "comments",
     "projectItems",
     "url",

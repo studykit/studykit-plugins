@@ -47,6 +47,7 @@ def build_jira_snapshot_frontmatter(
         "title": str(issue.get("title") or ""),
         "state": _normalize_optional(issue.get("state")),
         "state_reason": _normalize_optional(issue.get("stateReason")),
+        "assignee": _jira_person_display_name(issue.get("assignee")),
         "labels": [str(label) for label in issue.get("labels") or []],
         "updated_at": updated_at,
         "fetched_at": fetched_at,
@@ -180,6 +181,24 @@ def _compact_unmapped_issue_links(value: Any) -> list[dict[str, Any]]:
         entry["target"] = target
         entries.append(entry)
     return entries
+
+
+def _jira_person_display_name(value: Any) -> str | None:
+    """Resolve the best Jira person display name from a user mapping.
+
+    Mirrors the fallback chain Jira's REST API documents for user objects:
+    ``displayName`` is preferred, then ``name`` (Data Center username),
+    then ``key``, then ``accountId`` (Cloud). Returns ``None`` when the
+    input is not a mapping or carries none of these keys with a truthy
+    value.
+    """
+
+    if isinstance(value, Mapping):
+        for key in ("displayName", "name", "key", "accountId"):
+            raw = value.get(key)
+            if raw:
+                return str(raw)
+    return None
 
 
 def _normalize_optional(value: Any) -> str | None:

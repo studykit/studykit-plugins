@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 
 import frontmatter as frontmatter_lib
+import pytest
 
 _PLUGIN_ROOT = Path(__file__).resolve().parent.parent
 _SCRIPTS_DIR = _PLUGIN_ROOT / "scripts"
@@ -13,7 +14,11 @@ if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
 from workflow_jira_data_center_client import JiraDataCenterSite  # noqa: E402
-from issue.jira.cache import JiraDataCenterIssueCache, is_jira_issue_cache_body_path  # noqa: E402
+from issue.jira.cache import (  # noqa: E402
+    JiraDataCenterIssueCache,
+    _comment_author_name,
+    is_jira_issue_cache_body_path,
+)
 
 
 def jira_site() -> JiraDataCenterSite:
@@ -115,3 +120,100 @@ def test_jira_write_issue_bundle_response_omits_internal_json_paths(tmp_path: Pa
     )
 
     assert set(written) == {"issue_dir", "issue_file"}
+
+
+def _payload_with_assignee(assignee: object) -> dict[str, object]:
+    payload = _jira_issue_payload("Open")
+    fields = payload["fields"]
+    assert isinstance(fields, dict)
+    fields["assignee"] = assignee
+    return payload
+
+
+def test_snapshot_frontmatter_includes_assignee_display_name(tmp_path: Path) -> None:
+    cache = JiraDataCenterIssueCache.for_project(tmp_path)
+    site = jira_site()
+
+    cache.write_issue_bundle(
+        site,
+        _payload_with_assignee({"displayName": "Alice Anderson", "name": "alice"}),
+        fetched_at="2026-05-15T10:00:00.000+0900",
+    )
+
+    parsed = frontmatter_lib.loads(cache.issue_file(site, "TEST-1234").read_text(encoding="utf-8"))
+    assert parsed.metadata["assignee"] == "Alice Anderson"
+
+
+@pytest.mark.parametrize(
+    ("assignee_field", "expected"),
+    [
+        (
+            {"displayName": "Alice Anderson", "name": "alice", "key": "alice-key", "accountId": "acc-1"},
+            "Alice Anderson",
+        ),
+        ({"name": "alice", "key": "alice-key", "accountId": "acc-1"}, "alice"),
+        ({"key": "alice-key", "accountId": "acc-1"}, "alice-key"),
+        ({"accountId": "acc-1"}, "acc-1"),
+    ],
+)
+def test_snapshot_frontmatter_assignee_falls_back_through_keys(
+    tmp_path: Path,
+    assignee_field: dict[str, object],
+    expected: str,
+) -> None:
+    cache = JiraDataCenterIssueCache.for_project(tmp_path)
+    site = jira_site()
+
+    cache.write_issue_bundle(
+        site,
+        _payload_with_assignee(assignee_field),
+        fetched_at="2026-05-15T10:00:00.000+0900",
+    )
+
+    parsed = frontmatter_lib.loads(cache.issue_file(site, "TEST-1234").read_text(encoding="utf-8"))
+    assert parsed.metadata["assignee"] == expected
+
+
+def test_snapshot_frontmatter_assignee_is_null_when_unassigned(tmp_path: Path) -> None:
+    cache = JiraDataCenterIssueCache.for_project(tmp_path)
+    site = jira_site()
+
+    cache.write_issue_bundle(
+        site,
+        _payload_with_assignee(None),
+        fetched_at="2026-05-15T10:00:00.000+0900",
+    )
+
+    parsed = frontmatter_lib.loads(cache.issue_file(site, "TEST-1234").read_text(encoding="utf-8"))
+    assert "assignee" in parsed.metadata
+    assert parsed.metadata["assignee"] is None
+
+
+def test_existing_snapshot_payload_still_renders_without_assignee_field(tmp_path: Path) -> None:
+    cache = JiraDataCenterIssueCache.for_project(tmp_path)
+    site = jira_site()
+
+    payload = _jira_issue_payload("Open")
+    fields = payload["fields"]
+    assert isinstance(fields, dict)
+    assert "assignee" not in fields
+
+    cache.write_issue_bundle(
+        site,
+        payload,
+        fetched_at="2026-05-15T10:00:00.000+0900",
+    )
+
+    parsed = frontmatter_lib.loads(cache.issue_file(site, "TEST-1234").read_text(encoding="utf-8"))
+    assert "assignee" in parsed.metadata
+    assert parsed.metadata["assignee"] is None
+
+
+def test_comment_author_name_still_uses_shared_jira_display_name_fallback() -> None:
+    assert _comment_author_name({"displayName": "Alice", "name": "alice"}) == "Alice"
+    assert _comment_author_name({"name": "alice"}) == "alice"
+    assert _comment_author_name({"key": "alice-key"}) == "alice-key"
+    assert _comment_author_name({"accountId": "acc-1"}) == "acc-1"
+    assert _comment_author_name(None) == "unknown"
+    assert _comment_author_name({}) == "unknown"
+    assert _comment_author_name("alice") == "alice"

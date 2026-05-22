@@ -29,7 +29,7 @@ from issue.jira.relationships import (
     filter_jira_payload,
     normalize_jira_data_center_issue,
 )
-from issue.jira.snapshot import render_jira_snapshot
+from issue.jira.snapshot import _jira_person_display_name, render_jira_snapshot
 from workflow_jira_data_center_client import JiraDataCenterSite
 
 
@@ -302,12 +302,10 @@ def _mapping_list(value: Any) -> list[Mapping[str, Any]]:
 
 
 def _comment_author_name(value: Any) -> str:
-    if isinstance(value, Mapping):
-        for key in ("displayName", "name", "key", "accountId"):
-            raw = value.get(key)
-            if raw:
-                return str(raw)
-    if value:
+    resolved = _jira_person_display_name(value)
+    if resolved is not None:
+        return resolved
+    if value and not isinstance(value, Mapping):
         return str(value)
     return "unknown"
 

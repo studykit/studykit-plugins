@@ -415,3 +415,93 @@ def test_corrupt_cache_entry_is_treated_as_miss(tmp_path: Path) -> None:
 
     assert response.payload["body"] == "Recovered body."
     assert cache.read_issue(repo(), 39)["body"] == "Recovered body."
+
+
+def test_default_issue_fields_includes_assignees() -> None:
+    """Guard against accidental removal of ``assignees`` from gh view fields.
+
+    Cache-refresh paths in ``issue/github/provider.py`` all call
+    ``view_issue`` with ``DEFAULT_ISSUE_FIELDS``, so dropping the key
+    would silently leave assignee data out of every cached snapshot.
+    """
+
+    assert "assignees" in DEFAULT_ISSUE_FIELDS
+
+
+def _payload_with_assignees(value: object) -> dict[str, object]:
+    payload = issue_payload()
+    payload["assignees"] = value
+    return payload
+
+
+def test_github_snapshot_frontmatter_includes_assignee_display_name(tmp_path: Path) -> None:
+    import frontmatter as frontmatter_lib
+
+    cache = GitHubIssueCache.for_project(tmp_path)
+    write = cache.write_issue_bundle(
+        repo(),
+        _payload_with_assignees([{"login": "alice", "name": "Alice Anderson"}]),
+        fetched_at="2026-05-13T12:34:56Z",
+    )
+
+    parsed = frontmatter_lib.loads(write.issue_file.read_text(encoding="utf-8"))
+    assert parsed.metadata["assignees"] == ["Alice Anderson"]
+
+
+def test_github_snapshot_frontmatter_assignees_fall_back_to_login(tmp_path: Path) -> None:
+    import frontmatter as frontmatter_lib
+
+    cache = GitHubIssueCache.for_project(tmp_path)
+    write = cache.write_issue_bundle(
+        repo(),
+        _payload_with_assignees([{"login": "alice"}]),
+        fetched_at="2026-05-13T12:34:56Z",
+    )
+
+    parsed = frontmatter_lib.loads(write.issue_file.read_text(encoding="utf-8"))
+    assert parsed.metadata["assignees"] == ["alice"]
+
+
+def test_github_snapshot_frontmatter_assignees_empty_when_unassigned(tmp_path: Path) -> None:
+    import frontmatter as frontmatter_lib
+
+    cache = GitHubIssueCache.for_project(tmp_path)
+
+    write_empty = cache.write_issue_bundle(
+        repo(),
+        _payload_with_assignees([]),
+        fetched_at="2026-05-13T12:34:56Z",
+    )
+    parsed_empty = frontmatter_lib.loads(write_empty.issue_file.read_text(encoding="utf-8"))
+    assert parsed_empty.metadata["assignees"] == []
+
+    payload_without_key = issue_payload()
+    payload_without_key.pop("assignees", None)
+    write_missing = cache.write_issue_bundle(
+        repo(),
+        payload_without_key,
+        fetched_at="2026-05-13T12:34:56Z",
+    )
+    parsed_missing = frontmatter_lib.loads(write_missing.issue_file.read_text(encoding="utf-8"))
+    assert "assignees" in parsed_missing.metadata
+    assert parsed_missing.metadata["assignees"] == []
+
+
+def test_github_snapshot_frontmatter_assignees_preserves_multiple(tmp_path: Path) -> None:
+    import frontmatter as frontmatter_lib
+
+    cache = GitHubIssueCache.for_project(tmp_path)
+    write = cache.write_issue_bundle(
+        repo(),
+        _payload_with_assignees(
+            [
+                {"login": "alice", "name": "Alice Anderson"},
+                {"login": "bob"},
+                {"login": "carol", "name": "Carol Carter"},
+            ]
+        ),
+        fetched_at="2026-05-13T12:34:56Z",
+    )
+
+    parsed = frontmatter_lib.loads(write.issue_file.read_text(encoding="utf-8"))
+    assert parsed.metadata["assignees"] == ["Alice Anderson", "bob", "Carol Carter"]
