@@ -172,7 +172,8 @@ def test_jira_update_writes_body_and_deletes_body_file(tmp_path: Path) -> None:
 
     payload = json.loads(stdout.getvalue())
     assert code == 0
-    assert payload["operation"] == "update_issue"
+    assert "operation" not in payload
+    assert "verified" not in payload
     assert payload["kind"] == "jira"
     assert payload["issue"] == "TEST-1234"
     assert payload["body_file_removed"] is True

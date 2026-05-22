@@ -183,7 +183,8 @@ def test_github_publish_creates_issue_and_deletes_body_file(tmp_path: Path) -> N
 
     payload = json.loads(stdout.getvalue())
     assert code == 0
-    assert payload["operation"] == "publish_issue"
+    assert "operation" not in payload
+    assert "verified" not in payload
     assert payload["issue"] == "51"
     assert payload["body_file_removed"] is True
     assert payload["cache_refreshed"] is True
@@ -224,7 +225,7 @@ def test_github_publish_strips_body_file_frontmatter(tmp_path: Path) -> None:
     payload = json.loads(stdout.getvalue())
     assert code == 0
     assert payload["issue"] == "51"
-    assert payload["verified"] is True
+    assert "verified" not in payload
     assert payload["body_file_removed"] is True
     cache = GitHubIssueCache.for_project(tmp_path, configured_repo=_repo())
     assert cache.read_issue(_repo(), 51)["body"] == "Draft body.\n"
@@ -258,7 +259,7 @@ def test_github_publish_preserves_body_on_relationship_failure(tmp_path: Path) -
     payload = json.loads(stdout.getvalue())
     assert code == 1
     assert payload["issue"] == "51"
-    assert payload["verified"] is True
+    assert "verified" not in payload
     assert payload["body_file_removed"] is False
     assert payload["body_file"] == str(body_file)
     assert body_file.exists()
@@ -758,10 +759,10 @@ def test_github_update_writes_body_and_deletes_body_file(tmp_path: Path) -> None
 
     payload = json.loads(stdout.getvalue())
     assert code == 0
-    assert payload["operation"] == "update_issue"
+    assert "operation" not in payload
+    assert "verified" not in payload
     assert payload["kind"] == "github"
     assert payload["issue"] == "72"
-    assert payload["verified"] is True
     assert payload["state_changed"] is False
     assert payload["body_file_removed"] is True
     assert payload["cache_refreshed"] is True
@@ -1012,7 +1013,8 @@ def test_jira_publish_creates_issue_inline_and_deletes_body_file(tmp_path: Path)
 
     payload = json.loads(stdout.getvalue())
     assert code == 0
-    assert payload["operation"] == "publish_issue"
+    assert "operation" not in payload
+    assert "verified" not in payload
     assert payload["issue"] == "TEST-1234"
     assert payload["body_file_removed"] is True
     assert payload["issue_file"].endswith("issues/TEST-1234/issue.md")
@@ -1226,7 +1228,8 @@ def test_github_publish_accepts_assignee_user_and_passes_to_gh_create(tmp_path: 
 
     payload = json.loads(stdout.getvalue())
     assert code == 0
-    assert payload["operation"] == "publish_issue"
+    assert "operation" not in payload
+    assert "verified" not in payload
     create_request = next(r for r in runner.requests if r.args[:3] == ("gh", "issue", "create"))
     assert "--assignee" in create_request.args
     assert create_request.args[create_request.args.index("--assignee") + 1] == "alice"
