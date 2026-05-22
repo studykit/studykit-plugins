@@ -36,6 +36,12 @@ def normalize_jira_data_center_issue(
         remote_links=remote_links,
         relationship_mappings=relationship_mappings,
     )
+    raw_assignee = fields.get("assignee")
+    assignee = (
+        {str(akey): avalue for akey, avalue in raw_assignee.items()}
+        if isinstance(raw_assignee, Mapping)
+        else None
+    )
     payload: dict[str, Any] = {
         "issue": key,
         "key": key,
@@ -45,6 +51,7 @@ def normalize_jira_data_center_issue(
         "state": _normalize_optional(status.get("name")) or "unknown",
         "stateReason": _normalize_optional(status_category.get("key")),
         "labels": [str(label) for label in fields.get("labels") or [] if label is not None],
+        "assignee": assignee,
         "createdAt": _normalize_optional(fields.get("created")),
         "updatedAt": _normalize_optional(fields.get("updated")),
         "url": f"{site.base_url}/browse/{key}",

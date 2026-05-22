@@ -282,6 +282,47 @@ def test_unassign_sets_fields_assignee_null(tmp_path: Path) -> None:
     assert any('\\"assignee\\":null' in str(request.input_text) for request in write_requests)
 
 
+def test_assign_refreshes_snapshot_frontmatter_with_new_assignee(tmp_path: Path) -> None:
+    """End-to-end: after assign, the refreshed issue.md shows the new assignee.
+
+    The writeback's `_refresh_cache` re-fetches the issue after the curl
+    write succeeds and replays `write_issue_bundle`, so the second
+    `curl_args(jira_issue_url())` response in the queue is what lands in
+    the on-disk snapshot. Returning an assignee-bearing payload there
+    asserts AC4 / AC1 hold without a manual `--cache-policy refresh`.
+    """
+
+    write_jira_config(tmp_path)
+    _seed_cache(tmp_path)
+    refreshed_payload = jira_issue_payload()
+    refreshed_fields = refreshed_payload["fields"]
+    assert isinstance(refreshed_fields, dict)
+    refreshed_fields["assignee"] = {"name": "alice", "displayName": "Alice Anderson"}
+
+    responses = _baseline_responses()
+    responses[curl_args(jira_issue_url())] = [
+        result(curl_args(jira_issue_url()), stdout=json.dumps(jira_issue_payload())),
+        result(curl_args(jira_issue_url()), stdout=json.dumps(refreshed_payload)),
+    ]
+    runner = FakeRunner(responses)
+
+    fields_payload(
+        project=tmp_path,
+        artifact_type="task",
+        verb="assign",
+        issue="TEST-1234",
+        user="alice",
+        runner=runner,
+    )
+
+    cache = JiraDataCenterIssueCache.for_project(tmp_path)
+    issue_md = cache.issue_file(jira_site(tmp_path), "TEST-1234")
+    import frontmatter as frontmatter_lib
+
+    parsed = frontmatter_lib.loads(issue_md.read_text(encoding="utf-8"))
+    assert parsed.metadata["assignee"] == "Alice Anderson"
+
+
 def test_reopen_uses_configured_reopen_transition(tmp_path: Path) -> None:
     write_jira_config(
         tmp_path,
