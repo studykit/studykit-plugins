@@ -20,6 +20,7 @@ The calling session names:
   - `issue-cache-path` — an absolute path to an already-cached issue body file the fetch verb emits. The agent reads it directly without re-fetching. Use this when the caller (typically the `implement-issue` skill) already pulled the issue in the same session.
 - Optional **`plan-file`** — an absolute path to a plan file the caller wrote, typically the plan-mode-approved plan handed off by the `implement-issue` skill. Names files to touch by absolute path, the verification step for each Acceptance Criterion, and the intended commit split. When present, treat as authoritative — see Flow step 2.
 - Optional **extra requirements** — emphasis the caller wants woven into the relevant flow step ("focus on X", "skip Y", "use library Z"). Treat these the same way the `implement-issue` skill treats `$ARGUMENTS` past the ref.
+- Optional **`report-path`** — absolute path for the report file. Defaults to `/tmp/workflow-implementations/issue-<ref>-report.md`. Overwrite if present.
 
 If neither `issue-ref` nor `issue-cache-path` is supplied, stop and ask. Do not guess.
 
@@ -149,6 +150,8 @@ Per review authoring rules, **one review = one concern**. If multiple independen
 - Do not skip Acceptance Criterion verification. Every bullet needs its own evidence.
 
 ## Output
+
+Write the full report to the report path (default `/tmp/workflow-implementations/issue-<ref>-report.md`) using the `Write` tool — create the parent directory with `mkdir -p` if missing. Then return a short response to the main session containing exactly two things: the sentence `Implementation report saved to <absolute report path>.`, and the report's structured key-value lines wrapped in the `<report>` tag — omit the `<notes>` block from the main response (the file carries the full report including notes; the main response carries only the orchestration signal).
 
 Wrap the entire report in a single root tag, and inside use `- <key>: <value>` lines (kebab-case keys). State-explaining context (AC verification result, refs, reasons, related notes) nests as indented sub-bullets under the `state` line. The remaining top-level keys carry artifact locations only.
 
