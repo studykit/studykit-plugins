@@ -20,7 +20,7 @@ from authoring_resolver import (  # noqa: E402
     is_authoring_file,
     main as authoring_resolver_main,
     notes_anchor,
-    reading_list_anchor,
+    reading_anchor,
     render_cache_hit_reference,
     resolve_authoring,
 )
@@ -288,20 +288,20 @@ def test_task_comment_scope_omits_notes() -> None:
 @pytest.mark.parametrize(
     "artifact_type,role,scope,expected_reading,expected_notes",
     [
-        ("task", "issue", "content", "task-issue-reading-list", "task-issue-notes"),
-        ("bug", "issue", "content", "bug-issue-reading-list", "bug-issue-notes"),
-        ("spike", "issue", "content", "spike-issue-reading-list", None),
-        ("spec", "knowledge", "content", "spec-knowledge-reading-list", None),
+        ("task", "issue", "content", "task-issue", "task-issue"),
+        ("bug", "issue", "content", "bug-issue", "bug-issue"),
+        ("spike", "issue", "content", "spike-issue", None),
+        ("spec", "knowledge", "content", "spec-knowledge", None),
         (
             "task",
             "issue",
             "comment",
-            "task-issue-comment-reading-list",
+            "task-issue-comment",
             None,
         ),
     ],
 )
-def test_to_markdown_emits_expected_anchor_headings(
+def test_to_markdown_emits_expected_anchor_tags(
     artifact_type: str,
     role: str,
     scope: str,
@@ -313,18 +313,20 @@ def test_to_markdown_emits_expected_anchor_headings(
     )
     rendered = resolution.to_markdown()
 
-    assert f"## {expected_reading}\n" in rendered
+    assert f'<reading anchor="{expected_reading}">' in rendered
+    assert "</reading>" in rendered
     if expected_notes is None:
-        assert "-notes" not in rendered
+        assert "<notes " not in rendered
     else:
-        assert f"## {expected_notes}\n" in rendered
+        assert f'<notes anchor="{expected_notes}">' in rendered
+        assert "</notes>" in rendered
 
 
 def test_to_markdown_lists_files_relative_to_a_declared_base() -> None:
     resolution = resolve_authoring("task", role="issue", provider="github")
     rendered = resolution.to_markdown()
 
-    reading_section, _, _ = rendered.partition("\n\n## ")
+    reading_section, _, _ = rendered.partition("</reading>")
     lines = reading_section.splitlines()
     base_lines = [line for line in lines if line.startswith("Base: ")]
     bullet_lines = [line for line in lines if line.startswith("- ")]
@@ -359,41 +361,40 @@ def test_to_markdown_omits_notes_section_for_noteless_types(
     rendered = resolution.to_markdown()
 
     assert resolution.notes == ()
-    assert "-notes" not in rendered
+    assert "<notes " not in rendered
 
 
 @pytest.mark.parametrize(
-    "scope,expected_reading,expected_notes",
+    "scope,expected",
     [
-        ("content", "task-issue-reading-list", "task-issue-notes"),
-        ("comment", "task-issue-comment-reading-list", "task-issue-comment-notes"),
+        ("content", "task-issue"),
+        ("comment", "task-issue-comment"),
     ],
 )
 def test_anchor_helpers_apply_comment_suffix_for_comment_scope(
-    scope: str, expected_reading: str, expected_notes: str
+    scope: str, expected: str
 ) -> None:
-    assert reading_list_anchor("task", "issue", scope) == expected_reading
-    assert notes_anchor("task", "issue", scope) == expected_notes
+    assert reading_anchor("task", "issue", scope) == expected
+    assert notes_anchor("task", "issue", scope) == expected
 
 
 def test_render_cache_hit_reference_with_notes_anchor() -> None:
-    rendered = render_cache_hit_reference(
-        "task-issue-reading-list", "task-issue-notes"
-    )
+    rendered = render_cache_hit_reference("task-issue", "task-issue")
 
     assert rendered == (
-        "- See `task-issue-reading-list` above.\n"
-        "- See `task-issue-notes` above — triggers apply to this call too.\n"
+        '- See `<reading anchor="task-issue">` above.\n'
+        '- See `<notes anchor="task-issue">` above — '
+        "triggers apply to this call too.\n"
         "- If the anchor body is no longer in context, rerun this command "
         "with `--raw` to re-emit it.\n"
     )
 
 
 def test_render_cache_hit_reference_without_notes_anchor() -> None:
-    rendered = render_cache_hit_reference("spike-issue-reading-list")
+    rendered = render_cache_hit_reference("spike-issue")
 
     assert rendered == (
-        "- See `spike-issue-reading-list` above.\n"
+        '- See `<reading anchor="spike-issue">` above.\n'
         "- If the anchor body is no longer in context, rerun this command "
         "with `--raw` to re-emit it.\n"
     )
@@ -407,10 +408,8 @@ def test_render_cache_hit_reference_includes_raw_recovery_hint() -> None:
     body has dropped out of context.
     """
 
-    with_notes = render_cache_hit_reference(
-        "task-issue-reading-list", "task-issue-notes"
-    )
-    without_notes = render_cache_hit_reference("spike-issue-reading-list")
+    with_notes = render_cache_hit_reference("task-issue", "task-issue")
+    without_notes = render_cache_hit_reference("spike-issue")
 
     assert "`--raw`" in with_notes
     assert "`--raw`" in without_notes
@@ -464,11 +463,11 @@ def test_main_first_call_emits_sections_and_persists(
 
     assert exit_code == 0
     out = capsys.readouterr().out
-    assert "## task-issue-reading-list" in out
-    assert "## task-issue-notes" in out
+    assert '<reading anchor="task-issue">' in out
+    assert '<notes anchor="task-issue">' in out
 
     entry = read_authoring_resolution(
-        tmp_path, runtime, session_id, "task-issue-reading-list"
+        tmp_path, runtime, session_id, "task-issue"
     )
     assert entry is not None
     assert entry["key"] == {
@@ -478,7 +477,7 @@ def test_main_first_call_emits_sections_and_persists(
         "scope": "content",
     }
     assert entry["body"]
-    assert entry["body"][0] == "## task-issue-reading-list"
+    assert entry["body"][0] == '<reading anchor="task-issue">'
     assert entry["emitted_at"]
 
 
@@ -496,8 +495,9 @@ def test_main_repeat_call_emits_bullet_only_form(
     assert exit_code == 0
     out = capsys.readouterr().out
     assert out == (
-        "- See `task-issue-reading-list` above.\n"
-        "- See `task-issue-notes` above — triggers apply to this call too.\n"
+        '- See `<reading anchor="task-issue">` above.\n'
+        '- See `<notes anchor="task-issue">` above — '
+        "triggers apply to this call too.\n"
         "- If the anchor body is no longer in context, rerun this command "
         "with `--raw` to re-emit it.\n"
     )
@@ -516,7 +516,7 @@ def test_main_repeat_call_for_noteless_type_omits_notes_bullet(
     out = capsys.readouterr().out
 
     assert out == (
-        "- See `spike-issue-reading-list` above.\n"
+        '- See `<reading anchor="spike-issue">` above.\n'
         "- If the anchor body is no longer in context, rerun this command "
         "with `--raw` to re-emit it.\n"
     )
@@ -533,15 +533,15 @@ def test_main_raw_flag_forces_section_emission(
     authoring_resolver_main(base)
     capsys.readouterr()
     first_entry = read_authoring_resolution(
-        tmp_path, runtime, session_id, "task-issue-reading-list"
+        tmp_path, runtime, session_id, "task-issue"
     )
 
     authoring_resolver_main(base + ["--raw"])
     out = capsys.readouterr().out
 
-    assert "## task-issue-reading-list" in out
+    assert '<reading anchor="task-issue">' in out
     second_entry = read_authoring_resolution(
-        tmp_path, runtime, session_id, "task-issue-reading-list"
+        tmp_path, runtime, session_id, "task-issue"
     )
     assert first_entry is not None
     assert second_entry is not None
@@ -562,9 +562,9 @@ def test_main_provider_drift_triggers_refresh(
     authoring_resolver_main(_resolver_args(tmp_path, provider="jira"))
     out = capsys.readouterr().out
 
-    assert "## task-issue-reading-list" in out
+    assert '<reading anchor="task-issue">' in out
     entry = read_authoring_resolution(
-        tmp_path, runtime, session_id, "task-issue-reading-list"
+        tmp_path, runtime, session_id, "task-issue"
     )
     assert entry is not None
     assert entry["key"]["provider"] == "jira"
@@ -583,7 +583,7 @@ def test_main_without_session_emits_sections_without_persisting(
 
     assert exit_code == 0
     out = capsys.readouterr().out
-    assert "## task-issue-reading-list" in out
+    assert '<reading anchor="task-issue">' in out
 
     hook_state_dir = tmp_path / ".workflow-cache" / "hook-state"
     if hook_state_dir.exists():

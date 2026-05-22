@@ -6,7 +6,6 @@ providers:
     path: workflow/issues
   knowledge:
     kind: github
-    path: wiki/workflow
 issue_id_format: number
 commit_refs:
   enabled: false

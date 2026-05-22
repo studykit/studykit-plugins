@@ -112,12 +112,12 @@ def _anchor_scope_suffix(scope: str) -> str:
     return "-comment" if scope == "comment" else ""
 
 
-def reading_list_anchor(artifact_type: str, role: str, scope: str) -> str:
-    return f"{artifact_type}-{role}{_anchor_scope_suffix(scope)}-reading-list"
+def reading_anchor(artifact_type: str, role: str, scope: str) -> str:
+    return f"{artifact_type}-{role}{_anchor_scope_suffix(scope)}"
 
 
 def notes_anchor(artifact_type: str, role: str, scope: str) -> str:
-    return f"{artifact_type}-{role}{_anchor_scope_suffix(scope)}-notes"
+    return f"{artifact_type}-{role}{_anchor_scope_suffix(scope)}"
 
 
 @dataclass(frozen=True)
@@ -132,8 +132,8 @@ class Resolution:
     notes: tuple[str, ...] = ()
 
     @property
-    def reading_list_anchor(self) -> str:
-        return reading_list_anchor(self.artifact_type, self.role, self.scope)
+    def reading_anchor(self) -> str:
+        return reading_anchor(self.artifact_type, self.role, self.scope)
 
     @property
     def notes_anchor(self) -> str:
@@ -141,27 +141,30 @@ class Resolution:
 
     def to_markdown(self) -> str:
         sections: list[str] = []
-        reading_lines = [f"## {self.reading_list_anchor}"]
+        reading_lines = [f'<reading anchor="{self.reading_anchor}">']
         reading_lines.append(f"Base: {AUTHORING_DIR}")
         reading_lines.extend(
             f"- {path.relative_to(AUTHORING_DIR)}" for path in self.files
         )
+        reading_lines.append("</reading>")
         sections.append("\n".join(reading_lines))
         if self.notes:
-            notes_lines = [f"## {self.notes_anchor}"]
+            notes_lines = [f'<notes anchor="{self.notes_anchor}">']
             notes_lines.extend(f"- {note}" for note in self.notes)
+            notes_lines.append("</notes>")
             sections.append("\n".join(notes_lines))
         return "\n\n".join(sections) + "\n"
 
 
 def render_cache_hit_reference(
-    reading_list_anchor: str,
+    reading_anchor: str,
     notes_anchor: str | None = None,
 ) -> str:
-    lines = [f"- See `{reading_list_anchor}` above."]
+    lines = [f'- See `<reading anchor="{reading_anchor}">` above.']
     if notes_anchor is not None:
         lines.append(
-            f"- See `{notes_anchor}` above — triggers apply to this call too."
+            f'- See `<notes anchor="{notes_anchor}">` above — '
+            "triggers apply to this call too."
         )
     lines.append(
         "- If the anchor body is no longer in context, rerun this command "
@@ -395,7 +398,7 @@ def main(argv: list[str] | None = None) -> int:
         print(resolution.to_markdown(), end="")
         return 0
 
-    anchor = resolution.reading_list_anchor
+    anchor = resolution.reading_anchor
     current_key = _resolution_key(resolution)
     use_cache_hit = False
     if not args.raw:
@@ -411,7 +414,8 @@ def main(argv: list[str] | None = None) -> int:
         )
         print(
             render_cache_hit_reference(
-                resolution.reading_list_anchor, notes_anchor_value
+                resolution.reading_anchor,
+                notes_anchor_value,
             ),
             end="",
         )

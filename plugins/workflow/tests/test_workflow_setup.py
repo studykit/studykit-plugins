@@ -21,6 +21,10 @@ import workflow_setup  # noqa: E402
 from workflow_command import CommandRequest, CommandResult  # noqa: E402
 from workflow_config import WorkflowConfigError, parse_workflow_config  # noqa: E402
 from workflow_setup import (  # noqa: E402
+    AGENTS_FILENAME,
+    AGENTS_KNOWLEDGE_HEADING,
+    CLAUDE_AGENTS_SHIM,
+    CLAUDE_FILENAME,
     WorkflowSetupError,
     build_config,
     build_config_payload,
@@ -845,6 +849,77 @@ def test_write_is_atomic_when_replace_fails(tmp_path: Path, monkeypatch: pytest.
     assert not list(config_dir.glob("*.tmp"))
 
 
+def test_write_creates_agents_md_with_knowledge_root(tmp_path: Path) -> None:
+    raw = _github_github_config(tmp_path)
+
+    result = write_config(tmp_path, raw)
+
+    agents_path = tmp_path / AGENTS_FILENAME
+    claude_path = tmp_path / CLAUDE_FILENAME
+    agents_text = agents_path.read_text(encoding="utf-8")
+    expected_absolute = str((tmp_path / "wiki" / "workflow").resolve())
+
+    assert AGENTS_KNOWLEDGE_HEADING in agents_text
+    assert "`wiki/workflow`" in agents_text
+    assert expected_absolute in agents_text
+    assert claude_path.read_text(encoding="utf-8") == CLAUDE_AGENTS_SHIM
+    assert result["agents_md"]["agents_action"] == "create"
+    assert result["agents_md"]["claude_action"] == "create"
+    assert result["agents_md"]["knowledge_root"] == {
+        "repo_relative": "wiki/workflow",
+        "absolute": expected_absolute,
+    }
+
+
+def test_write_appends_knowledge_root_when_agents_md_exists(tmp_path: Path) -> None:
+    agents_path = tmp_path / AGENTS_FILENAME
+    original = "# Project Agents\n\nExisting prose.\n"
+    agents_path.write_text(original, encoding="utf-8")
+    claude_path = tmp_path / CLAUDE_FILENAME
+    claude_path.write_text("custom CLAUDE shim\n", encoding="utf-8")
+
+    raw = _github_github_config(tmp_path)
+    result = write_config(tmp_path, raw)
+
+    agents_text = agents_path.read_text(encoding="utf-8")
+    assert agents_text.startswith(original)
+    assert AGENTS_KNOWLEDGE_HEADING in agents_text
+    assert claude_path.read_text(encoding="utf-8") == "custom CLAUDE shim\n"
+    assert result["agents_md"]["agents_action"] == "append"
+    assert result["agents_md"]["claude_action"] == "skip"
+
+
+def test_write_skips_agents_md_when_section_already_present(tmp_path: Path) -> None:
+    agents_path = tmp_path / AGENTS_FILENAME
+    existing = (
+        f"# Project Agents\n\n{AGENTS_KNOWLEDGE_HEADING}\n\nStale entry.\n"
+    )
+    agents_path.write_text(existing, encoding="utf-8")
+
+    raw = _github_github_config(tmp_path)
+    result = write_config(tmp_path, raw)
+
+    assert agents_path.read_text(encoding="utf-8") == existing
+    assert result["agents_md"]["agents_action"] == "skip"
+
+
+def test_write_omits_agents_md_update_when_knowledge_path_absent(
+    tmp_path: Path,
+) -> None:
+    raw = build_config(
+        project=tmp_path,
+        issue_provider="filesystem",
+        knowledge_provider="github",
+        commit_refs_enabled=False,
+    )
+
+    result = write_config(tmp_path, raw)
+
+    assert "agents_md" not in result
+    assert not (tmp_path / AGENTS_FILENAME).exists()
+    assert not (tmp_path / CLAUDE_FILENAME).exists()
+
+
 def test_probe_git_remote_detects_github_repository(tmp_path: Path) -> None:
     def runner(request: CommandRequest) -> CommandResult:
         assert request.args == ("git", "remote", "get-url", "origin")
@@ -902,7 +977,6 @@ def test_build_config_supports_distinct_github_issue_and_wiki_hosts(tmp_path: Pa
         "kind": "github",
         "repo": "enterprise/wiki",
         "host": "github.enterprise.test",
-        "path": "wiki/workflow",
     }
 
 
