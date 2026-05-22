@@ -303,8 +303,6 @@ def resolve_authoring(
     if normalized_type in PRD_COMPONENT_TYPES:
         parts.append("common/prd-authoring.md")
     parts.append(f"common/{normalized_type}-authoring.md")
-    if normalized_role == "issue" and normalized_type in PLAN_MODE_TYPES:
-        parts.append("common/plan-mode-authoring.md")
 
     if normalized_role == "issue" and normalized_provider in ISSUE_PROVIDER_FILES:
         parts.append(ISSUE_PROVIDER_FILES[normalized_provider])
