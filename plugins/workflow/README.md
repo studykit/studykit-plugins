@@ -1,32 +1,39 @@
 # Workflow Plugin
 
-Provider-backed workflow over GitHub Issues, Jira, GitHub repository `wiki/`
-files, and Confluence.
+Issue- and knowledge-backed workflow for Claude Code and Codex sessions. The
+plugin treats the configured provider — GitHub Issues, Jira, GitHub
+repository `wiki/`, or Confluence — as the source of truth and helps the
+assistant draft, publish, refresh, and link work items without leaving the
+session.
 
-The plugin keeps issue-backed work tracking separate from knowledge-backed
-documentation. The provider is the source of truth.
+## Supported Providers
 
-## Runtime Surface
+- **Issues** — GitHub Issues, Jira (Data Center / Server), or a local
+  filesystem provider.
+- **Knowledge** — GitHub repository `wiki/`, Confluence (Data Center /
+  Server), or a local filesystem provider.
 
-Key files:
+Issue tracking and knowledge documentation are configured independently, so
+mixed setups (e.g., GitHub Issues + Confluence) are supported.
 
-- `.claude-plugin/plugin.json` — Claude plugin metadata.
-- `.codex-plugin/plugin.json` — Codex plugin metadata.
-- `hooks/hooks.json` — Claude hook declarations.
-- `hooks/hooks.codex.json` — Codex hook declarations.
-- `hooks/context/` — main-assistant policy fragments
-  (always-loaded entry point + on-demand `policy/` detail files).
-- `scripts/` — provider, cache, and hook entrypoints.
-- `authoring/` — workflow artifact authoring contracts.
+## Installation
 
-Use `hooks/README.md` for hook-specific behavior. Use
-`../../wiki/workflow/workflow-configuration.md` for the configuration schema.
+Install from the studykit plugin marketplace inside Claude Code or Codex.
+The plugin works in both runtimes.
 
 ## Configuration
 
-A configured project has `.workflow/config.yml` at the repository root.
+Per-project configuration lives at `.workflow/config.yml` at the repository
+root. The fastest way to create it is the bundled setup skill:
 
-Minimal shape:
+```
+/setup
+```
+
+The skill walks through provider selection, fills in the required fields,
+and writes `.workflow/config.yml`.
+
+A minimal hand-written configuration looks like:
 
 ```yaml
 version: 1
@@ -46,99 +53,39 @@ commit_refs:
   style: provider-native
 ```
 
-Inspect resolved configuration:
+For the full schema and per-provider fields, see
+`../../wiki/workflow/workflow-configuration.md`.
 
-```bash
-"./plugins/workflow/scripts/workflow" workflow_config.py \
-  --require \
-```
+## Slash Commands
 
-The `scripts/workflow` launcher is the shell-tool entrypoint. It executes the
-requested workflow script directly for Claude sessions and reads generated
-exports from the Codex session-state file before execution for Codex sessions.
-In a plain terminal, it falls back to local defaults for `WORKFLOW`,
-`WORKFLOW_PLUGIN_ROOT`, and `WORKFLOW_PROJECT_DIR` without inventing a
-`WORKFLOW_SESSION_ID`. Hooks publish `WORKFLOW`, `WORKFLOW_PLUGIN_ROOT`,
-`WORKFLOW_PROJECT_DIR`, and `WORKFLOW_SESSION_ID` so repeated assistant shell
-commands do not need to pass plugin root, project root, or session id flags.
-When the launcher runs bundled Python scripts, it uses `uv run --script` so
-scripts can declare inline dependencies such as `python-frontmatter` for
-Markdown frontmatter and `PyYAML` for `.workflow/config.yml`.
+Once configured, the plugin exposes three slash commands:
 
-## Authoring Policy
+- `/setup` — Generate and write `.workflow/config.yml` for the current
+  repository.
+- `/implement-issue <issue-ref> [extra requirements]` — Read the issue
+  body, converge on a plan with you, and then run implementation,
+  verification, commit, push, and writeback for the approved plan.
+- `/handoff` — Wrap up a session by refreshing the `Resume` section of
+  every in-flight issue and, if needed, publishing `review`-type issues
+  for residual findings, gaps, or questions.
 
-Workflow authoring contracts apply only to workflow artifact types:
+## What the Plugin Does for You
 
-- Issue-backed: `task`, `bug`, `spike`, `epic`, and `review`.
-- Knowledge-backed: `spec`, `architecture`, `domain`, `context`, `nfr`, and
-  `ci`.
-- Dual-role: `usecase` and `research`.
+- Looks up issues by provider-native reference (`#123`, `KEY-456`, etc.)
+  and surfaces a readable issue body inside the session.
+- Drafts and publishes new issues, comments, body updates, and
+  relationship links through the configured provider.
+- Keeps commit subjects prefixed with the related issue reference and the
+  PR's `Closes` keyword pointing at the right issue.
+- Refreshes in-flight issues at session handoff so the next session can
+  pick up from the issue body alone.
 
-Before editing a workflow artifact, resolve the required authoring paths via
-`workflow authoring_resolver.py --type <type> --role <role>`, then
-read the returned files from `authoring/`. For non-workflow artifacts, such
-as `AGENTS.md`, `CLAUDE.md`, plugin README files, ordinary docs outside
-configured workflow knowledge, or host configuration files, the resolver
-returns `NONE`.
+## Configuration Reference
 
-## Workflow Scripts
-
-The main assistant runs all workflow provider, cache, and authoring
-operations through the workflow launcher, with runtime-specific guidance
-under `hooks/context/snippets/launcher/<runtime>.md`
-(Claude has the `workflow` launcher on `PATH`; Codex invokes the launcher
-by absolute path). Detailed procedures — launcher invocation,
-authoring path resolution, and the publish/append/update body-file
-contract — live as on-demand files under
-`hooks/context/main/policy/`. The always-loaded entry point at
-`hooks/context/main/session-policy.md` carries only the role
-boundary and pointers to those detail files.
-
-Scripts cover:
-
-- Status and completion checks for provider-backed workflow issues.
-- Cache-aware provider reads and refresh.
-- GitHub and Jira issue writes through `*_drafts.py`, `*_writeback.py`,
-  `*_comments.py`, `*_relationships.py`, and `*_metadata.py`.
-- Authoring path discovery via `authoring_resolver.py`.
-- Provider mutation verification and freshness-checked cache refresh.
-
-Scripts return operational metadata, paths, relationship metadata, and
-verification details. They do not summarize issue bodies, comments, or
-knowledge page content; the main assistant reads and interprets content
-directly.
-
-## Hooks
-
-Session hooks are intentionally concise:
-
-- `SessionStart` injects configured workflow policy only for main sessions.
-- `UserPromptSubmit` prepares cache projections for mentioned GitHub issue
-  references and injects project-relative cache paths.
-- Workflow manifests do not register `Stop`; there is no stop-time cache
-  mutation.
-- `PreToolUse` on writes protects provider cache issue body projections from
-  unsafe frontmatter edits.
-
-Non-workflow projects receive no workflow hook output.
-
-## Cache Projections
-
-GitHub issue reads may be cached under `.workflow-cache/`, which is ignored by
-Git.
-
-Treat cache layout and projection schemas as workflow-script internals.
-Provider mutation scripts return the editable cache path and refresh the
-projection after every successful write; do not edit `issue.md` or
-`comment-*.md` files in place. Use the matching fetch / writeback /
-comments / relationships script for explicit refresh, write-back,
-comment, or relationship operations (see
-`hooks/context/main/policy/provider-writes.md`).
-
-## Validation
-
-Run workflow plugin tests:
-
-```bash
-uv run --with pytest --with python-frontmatter --with PyYAML pytest plugins/workflow/tests
-```
+- Provider configuration schema:
+  `../../wiki/workflow/workflow-configuration.md`
+- Provider model and reference formats:
+  `../../wiki/workflow/workflow-provider-model.md`,
+  `../../wiki/workflow/workflow-provider-reference-formats.md`
+- Issue relationship policy:
+  `../../wiki/workflow/workflow-issue-relationship-policy.md`

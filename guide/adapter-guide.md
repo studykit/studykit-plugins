@@ -395,7 +395,7 @@ Use this structure unless a plugin has a documented reason to differ:
 
 - `plugins/<name>/hooks/hooks.json` for Claude hook declarations.
 - `plugins/<name>/hooks/hooks.codex.json` for Codex hook declarations when Codex hook syntax differs. This filename is a Studykit convention, not the Codex default. Reference it from `.codex-plugin/plugin.json` via `"hooks": "./hooks/hooks.codex.json"`.
-- `plugins/<name>/hooks/README.md` for hook behavior notes when the hook system is non-trivial.
+- `plugins/<name>/hooks/AGENTS.md` (with a sibling `CLAUDE.md` that imports it via `@AGENTS.md`) for hook behavior notes when the hook system is non-trivial.
 - `plugins/<name>/tests/` fixtures for host-specific hook payloads when hook logic is complex.
 
 ### Runtime-Specific Entrypoints

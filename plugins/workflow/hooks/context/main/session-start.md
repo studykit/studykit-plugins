@@ -1,0 +1,23 @@
+## workflow policy
+
+{{SNIPPET_LAUNCHER}}
+
+Resolve authoring paths before any issue or knowledge pages:
+
+{{SNIPPET_AUTHORING}}
+
+Reference docs (read on demand) at
+`{{WORKFLOW_RUNBOOK_DIR}}/<intent>/{{WORKFLOW_ISSUE_PROVIDER}}.md`:
+
+- `issue-fetch` — fetch issues + cache projections
+- `issue-write` — body-bearing writes (publish / comment / update) — procedure index
+- `issue-new` — publish a new issue
+- `issue-comment` — append a comment
+- `issue-update` — update body, title, labels, or state
+- `issue-link` — relationships
+- `issue-state` — body-less verbs (state, assign, unassign, set-type)
+
+Don't quote, paraphrase, or summarize issue bodies, comments, or knowledge
+documents beyond what the user asked for. The cached `issue.md` and
+`comment-*.md` files are projection-owned and read-only — refresh them
+via the matching fetch script; never edit them in place.

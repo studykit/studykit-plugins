@@ -43,7 +43,7 @@ Do not rely on a prior summary of these files. Re-read them per audit.
 
 ## Fetching linked anchors
 
-The workflow launcher contract and the provider-specific issue-fetch convention are injected into your context at SubagentStart — use those, not a re-invented form. The only constraint specific to this audit: fetch only the anchor refs the main session named for the draft under audit. Do not pull adjacent issues to broaden context on your own.
+The workflow launcher is injected into your context at SubagentStart, and the SubagentStart context names the runbook's `issue-fetch/<provider>.md` reference for verb syntax — use those, not a re-invented form. The only constraint specific to this audit: fetch only the anchor refs the main session named for the draft under audit. Do not pull adjacent issues to broaden context on your own.
 
 ## Evaluation axes
 
