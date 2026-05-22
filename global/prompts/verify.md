@@ -31,3 +31,19 @@ external change could have shifted state.
 
 Confident-sounding wrong answers are the worst failure mode. The cost of a 2-second grep is far
 smaller than the cost of being wrong.
+
+# Documentation Scope
+
+When writing documentation, do not record content that any LLM obviously already knows — general
+language syntax, standard library behavior, well-known framework conventions, common design patterns,
+or basic tool usage. Docs are for project-specific knowledge that cannot be derived from training data
+or the current code: hidden constraints, non-obvious decisions, local conventions, integration quirks,
+and the *why* behind choices a reader could not infer.
+
+- Skip: "Python uses indentation for blocks," "React components return JSX," "git commit creates a
+  commit," restating what a function's name already conveys.
+- Keep: why this module deviates from the framework default, which invariant a caller must uphold,
+  the incident that motivated a workaround, the specific version pin and the reason for it.
+
+If removing a sentence would not leave a future reader (human or LLM) less able to do the work, the
+sentence does not belong in the document.
