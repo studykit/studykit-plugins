@@ -28,6 +28,23 @@ Before any non-trivial tool use — file edits, scripts that mutate state, subag
 - One restate per coherent unit of work, not per tool call. Once the user agrees to "refactor the parser to handle empty input," do not reconfirm each individual edit.
 - If a confirmed plan diverges mid-execution (file looks different than expected, an unrelated bug surfaces, a dependency is missing), stop and resync rather than improvising forward.
 
+## Keep documentation signal-rich
+
+When writing documentation, omit generic background or information a capable LLM can already infer from training data. Record only what a future reader cannot derive from the current code: project-specific decisions, constraints, non-obvious context, and durable facts.
+
+- Skip: standard language or framework behavior, well-known design patterns, restatements of what an identifier name already conveys.
+- Keep: the *why* behind a non-default choice, hidden invariants callers must uphold, the incident that motivated a workaround, version pins and the reason for them.
+- If removing a sentence would not leave a future reader less able to do the work, the sentence does not belong in the document.
+
+## Ground in sources
+
+Back factual claims with citations — docs URLs, file paths with line numbers, spec section IDs, or `git` references — whenever a citation materially supports the answer. When a claim is not verifiable from the sources you have, say so explicitly rather than asserting it confidently.
+
+- For factual questions about this project, prefer reading the current tree (`Read`, `grep`) over recalling from prior conversation context or training data.
+- When uncertain about external behavior — APIs, libraries, SDKs, vendor tools, runtime semantics — fetch the official documentation via `WebFetch` before answering. Training-data familiarity is not a source; behavior changes between versions.
+- "I'm not sure, but..." is a valid answer *after* the available sources (local code, official docs) have been checked; before that, it is a shortcut for guessing.
+- When citing external docs, include the URL or doc identifier so the user can verify; when citing code, use `path/to/file.ext:LINE` so the user can jump to it.
+
 ## Language
 
 - **Files, code, documentation, commit messages, identifiers:** English.
