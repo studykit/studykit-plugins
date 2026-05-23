@@ -3,8 +3,6 @@ name: implement-issue
 description: "Implement a workflow `task`, `bug`, or `spike` issue: dispatch `issue-planner` to refine the body autonomously, dispatch `issue-implementer` when the planner reports `planned`, then dispatch `implementation-auditor` on the implementer's result unless the implementer declined or failed. Pass each agent's report through."
 argument-hint: "<issue-ref> [additional requirements]"
 disable-model-invocation: true
-context: fork
-model: sonnet
 allowed-tools:
   - Agent
 ---
