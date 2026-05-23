@@ -170,13 +170,15 @@ def _build_agent_context_block(
         template = template_path.read_text(encoding="utf-8").strip()
     except OSError:
         return ""
+    substitutions = {
+        "WORKFLOW_RUNBOOK_DIR": str(runbook_dir),
+        "WORKFLOW_ISSUE_PROVIDER": issue_provider,
+    }
     if name == "issue-implementer":
-        return render(template, {
-            "SNIPPET_COMMIT_PREFIX": _read_fragment("snippets/commit-prefix.md").strip(),
-            "WORKFLOW_RUNBOOK_DIR": str(runbook_dir),
-            "WORKFLOW_ISSUE_PROVIDER": issue_provider,
-        })
-    return template
+        substitutions["SNIPPET_COMMIT_PREFIX"] = _read_fragment(
+            "snippets/commit-prefix.md"
+        ).strip()
+    return render(template, substitutions)
 
 
 def _agent_type_segment(agent_type: str | None) -> str | None:
