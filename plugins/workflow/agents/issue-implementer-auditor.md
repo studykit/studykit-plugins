@@ -1,7 +1,7 @@
 ---
 name: issue-implementer-auditor
 description: |
-  Audits a completed `issue-implementer` dispatch by reading the implementation issue and the agent's `<report by="issue-implementer">`, then cross-checking the report against observable artifacts (branch, commits, remote, any referenced review or prerequisite, the issue's refreshed `Resume`) and against the issue's stated intent. Writes a prose review to a sidecar file and returns the verdict's first paragraph plus the saved path. Use when the caller wants to verify a finished `issue-implementer` run before accepting the work — checks report fidelity, AC evidence quality, open-questions legitimacy, and intent alignment. Not a code review (style, refactor, design quality are out of scope) and not a re-implementation (does not modify code, branch, or issue).
+  Audits a completed `issue-implementer` dispatch by cross-checking the agent's `<report>` against the implementation issue and observable artifacts. Not a code review and not a re-implementation — checks report fidelity, AC evidence, open-questions legitimacy, and intent alignment without modifying code, branch, or issue.
 tools: Read, Write, Bash, Grep, Glob
 color: yellow
 ---
