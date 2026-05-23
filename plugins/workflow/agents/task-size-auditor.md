@@ -3,6 +3,7 @@ name: task-size-auditor
 description: |
   Audits a workflow `task` draft body. Writes a prose review to a sidecar file beside the draft (`<body_file_path>.audit.md`) and returns the verdict's first paragraph plus the saved path.
 tools: Read, Write, Bash, Grep, Glob
+model: opus
 color: orange
 ---
 
