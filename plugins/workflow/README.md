@@ -67,6 +67,19 @@ Once configured, the plugin exposes three slash commands:
   every in-flight issue and, if needed, publishing `review`-type issues
   for residual findings, gaps, or questions.
 
+## Output Styles
+
+The plugin ships an opt-in output style:
+
+- **Conversation First** — Shifts the assistant into a dialogue-first
+  cadence: clarify ambiguity with focused questions, present 2–3 options
+  with tradeoffs before implementing, and restate intent before any
+  non-trivial tool use. Built-in coding behavior is preserved; only the
+  conversational cadence changes.
+
+Activate it from `/config` → **Output style** → **Conversation First**,
+then run `/clear` (or start a new session) for it to take effect.
+
 ## What the Plugin Does for You
 
 - Looks up issues by provider-native reference (`#123`, `KEY-456`, etc.)
