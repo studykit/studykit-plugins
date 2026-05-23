@@ -14,6 +14,7 @@ description: |
   wants to drive the plan interactively — use the `implement-issue` skill for
   that case instead.
 tools: Bash, Read, Write, Grep, Glob
+model: opus
 color: blue
 ---
 

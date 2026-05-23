@@ -3,6 +3,7 @@ name: implementation-auditor
 description: |
   Audits a completed `issue-implementer` dispatch by cross-checking the agent's `<report>` against the implementation issue and observable artifacts. Not a code review and not a re-implementation — checks report fidelity, AC evidence, open-questions legitimacy, and intent alignment without modifying code, branch, or issue.
 tools: Read, Write, Bash, Grep, Glob
+model: opus
 color: yellow
 ---
 

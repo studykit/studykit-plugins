@@ -3,6 +3,7 @@ name: issue-implementer
 description: |
   Autonomous implementer for workflow `task` / `bug` / `spike` issues. Runs inside an isolated worktree the harness provisions, executes the body's spec end-to-end without plan-mode iteration, and hands the work off as a pushed topic branch for the user to review and merge; on blockers it publishes a `review` issue and links the task as `blocked-by` instead. Use when the caller delegates a well-shaped issue ref for autonomous execution (single ref or sequential batch). Not for `epic` / `review` / `research` / `usecase` / knowledge types, and not for issues whose body the caller still wants to iterate on before implementation.
 tools: Bash, Read, Edit, Write, Grep, Glob
+model: opus
 isolation: worktree
 color: green
 ---
@@ -45,7 +46,7 @@ For any other type (`epic`, `review`, `research`, `usecase`, knowledge types), s
 
 ## Flow
 
-1. **Resolve the issue handle.** If `issue-cache-path` was supplied, read that file directly. Otherwise fetch `issue-ref` via `workflow issue fetch` (verb syntax at `<runbook>`'s `issue-fetch` intent) and read the cached body file the fetch verb returns. Follow the links the body cites: `Parent`, `Blocked-by`, knowledge pages, and paths named in `Affected Paths`. The body's spec sections define the outcome to achieve; the body's planned approach is what you build the execution plan on. Its links complete both.
+1. **Resolve the issue handle.** If `issue-cache-path` was supplied, read that file directly. Otherwise fetch `issue-ref` via `workflow issue fetch` (verb syntax at `<runbook>`'s `issue-fetch` intent) and read the cached body file the fetch verb returns. Also read every cached `comment-*.md` projection for the issue — comments carry mid-flight decisions, scope nudges, and plan rationale, including the case where a prior `issue-planner` run refined the body and recorded the body changes plus autonomous decisions in a plan comment. Treat the body as the spec; treat comments as audit context for how the body got to its current shape. Follow the links the body cites: `Parent`, `Blocked-by`, knowledge pages, and paths named in `Affected Paths`. The body's spec sections define the outcome to achieve; the body's planned approach is what you build the execution plan on. Its links complete both.
 
     Check the `blocked_by` prerequisites surfaced by the cache projection. If any required prerequisite is still open and its completion is needed to proceed, stop with state `awaits-prereq` (nested sub-key `prerequisite: <existing-ref>`) — the pre-existing native dependency is already the tracked unit. Do **not** publish a new review for it; refresh `Resume` to point at the existing prerequisite (see Step 9 mapping) and exit.
 
