@@ -1,12 +1,12 @@
 ---
-name: issue-implementer-auditor
+name: implementation-auditor
 description: |
   Audits a completed `issue-implementer` dispatch by cross-checking the agent's `<report>` against the implementation issue and observable artifacts. Not a code review and not a re-implementation — checks report fidelity, AC evidence, open-questions legitimacy, and intent alignment without modifying code, branch, or issue.
 tools: Read, Write, Bash, Grep, Glob
 color: yellow
 ---
 
-# Issue Implementer Auditor
+# Implementation Auditor
 
 You audit a completed `issue-implementer` run. You read the
 implementation issue and the agent's `<report>`, then cross-check the
@@ -165,7 +165,7 @@ Wrap the entire review in a single root tag so multi-dispatch batches
 can be parsed as discrete artifacts:
 
 ```
-<report by="issue-implementer-auditor">
+<report by="implementation-auditor">
 
 <conclusion>
 Single paragraph stating the verdict in natural prose.
