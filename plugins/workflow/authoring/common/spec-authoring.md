@@ -47,8 +47,6 @@ Optional sections:
 - `Change Log` — semantic cause index for material edits. See `./knowledge-body.md`.
 - `Sources` — external sources or research reports used as evidence.
 
-Unknown well-named sections are tolerated when they clarify the contract.
-
 ## Decision rationale
 
 Use the `Decision Log` section for durable rationale. Each entry should pair a date with a short statement of the chosen approach and the reason. Earlier entries are append-only. If a decision changes, append a new entry explaining the correction.

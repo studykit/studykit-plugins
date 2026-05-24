@@ -115,6 +115,100 @@ def test_comment_scope_excludes_prd_index() -> None:
     assert "common/prd-authoring.md" not in _rel_paths(resolution.files)
 
 
+@pytest.mark.parametrize("role", ["issue", "knowledge"])
+def test_usecase_includes_abstraction_guard(role: str) -> None:
+    resolution = resolve_authoring("usecase", role=role)
+    assert "common/usecase-abstraction-guard.md" in _rel_paths(resolution.files)
+
+
+@pytest.mark.parametrize(
+    "artifact_type,role",
+    [
+        ("context", None),
+        ("nfr", None),
+        ("spec", None),
+        ("domain", None),
+        ("task", None),
+        ("review", None),
+        ("research", "issue"),
+        ("research", "knowledge"),
+    ],
+)
+def test_non_usecase_excludes_abstraction_guard(
+    artifact_type: str, role: str | None
+) -> None:
+    resolution = resolve_authoring(artifact_type, role=role)
+    assert "common/usecase-abstraction-guard.md" not in _rel_paths(resolution.files)
+
+
+def test_usecase_comment_scope_excludes_abstraction_guard() -> None:
+    resolution = resolve_authoring("usecase", role="issue", scope="comment")
+    assert "common/usecase-abstraction-guard.md" not in _rel_paths(resolution.files)
+
+
+@pytest.mark.parametrize(
+    "artifact_type,role,expected",
+    [
+        ("usecase", "issue", "common/usecase-issue-authoring.md"),
+        ("usecase", "knowledge", "common/usecase-knowledge-authoring.md"),
+        ("research", "issue", "common/research-issue-authoring.md"),
+        ("research", "knowledge", "common/research-knowledge-authoring.md"),
+    ],
+)
+def test_dual_type_returns_role_specific_authoring_file(
+    artifact_type: str, role: str, expected: str
+) -> None:
+    resolution = resolve_authoring(artifact_type, role=role)
+    rels = _rel_paths(resolution.files)
+    assert expected in rels
+
+
+@pytest.mark.parametrize(
+    "artifact_type,role,unexpected",
+    [
+        ("usecase", "issue", "common/usecase-knowledge-authoring.md"),
+        ("usecase", "knowledge", "common/usecase-issue-authoring.md"),
+        ("research", "issue", "common/research-knowledge-authoring.md"),
+        ("research", "knowledge", "common/research-issue-authoring.md"),
+    ],
+)
+def test_dual_type_excludes_other_role_authoring_file(
+    artifact_type: str, role: str, unexpected: str
+) -> None:
+    resolution = resolve_authoring(artifact_type, role=role)
+    rels = _rel_paths(resolution.files)
+    assert unexpected not in rels
+
+
+@pytest.mark.parametrize("artifact_type", ["usecase", "research"])
+@pytest.mark.parametrize("role", ["issue", "knowledge"])
+def test_dual_type_includes_common_authoring_file(
+    artifact_type: str, role: str
+) -> None:
+    resolution = resolve_authoring(artifact_type, role=role)
+    rels = _rel_paths(resolution.files)
+    assert f"common/{artifact_type}-authoring.md" in rels
+
+
+@pytest.mark.parametrize(
+    "artifact_type,role",
+    [
+        ("usecase", "issue"),
+        ("usecase", "knowledge"),
+        ("research", "issue"),
+        ("research", "knowledge"),
+    ],
+)
+def test_dual_type_common_authoring_precedes_role_specific(
+    artifact_type: str, role: str
+) -> None:
+    resolution = resolve_authoring(artifact_type, role=role)
+    rels = _rel_paths(resolution.files)
+    common = f"common/{artifact_type}-authoring.md"
+    role_specific = f"common/{artifact_type}-{role}-authoring.md"
+    assert rels.index(common) < rels.index(role_specific)
+
+
 @pytest.mark.parametrize(
     "artifact_type",
     ["context", "usecase", "nfr", "spec", "domain"],

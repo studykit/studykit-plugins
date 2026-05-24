@@ -22,19 +22,18 @@ Rules:
 - Each section starts with a level-2 heading rendered in the provider's heading form. Subsections may appear inside a section using deeper heading levels.
 - Do not put a top-level title heading inside the body when the page title is stored separately.
 - Avoid stray content above the first section unless the selected type template requires a short summary block.
-- Unknown sections are tolerated when they are useful, well-named, and well-formed.
 
-Common reusable section names for knowledge pages:
+## Tailoring the body
 
-- `Context`
-- `Specification`
-- `Sources`
-- `Change Log`
-- `Decision Log`
-- `Open Questions`
-- `Rejected Alternatives`
-- `Supersedes`
-- `Related Work`
+Beyond the required sections defined by the page's type-specific
+authoring file, each page author may add purpose-specific sections
+when the page has natural structure that the type-defined sections
+do not capture. Pick short, descriptive Title Case section names;
+keep each section narrow (one named thing per section); and keep
+the overall body short — a custom section earns its place only when
+its content would otherwise have to be folded awkwardly into an
+existing section. If the content fits naturally into an existing
+section, fold it back in instead of adding a new heading.
 
 ## Reference form
 
@@ -93,9 +92,14 @@ Each entry should:
 
 When a knowledge page is created or materially updated because of an issue-backed item, include a visible link back to that work item in `Change Log`, `Related Work`, or another relevant section.
 
-## Relationship sections
+## Optional reusable sections
 
-Use visible relationship sections when relevant.
+The named sections defined below (`Supersedes`, `Related Work`,
+`Sources`) are optional reusable building blocks for any knowledge
+page type. Include each only when its per-section guidance applies;
+otherwise omit it. A type-specific authoring file may pin one of
+them as required for a particular type — in that case the type
+contract overrides this file's optional framing.
 
 ### `Supersedes` section
 

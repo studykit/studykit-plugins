@@ -47,8 +47,6 @@ Optional sections:
 - `Resume` — current-state snapshot while mid-flight. See `./issue-body.md`.
 - `Why Discarded` — reason when discarded. See `./issue-body.md`.
 
-Unknown well-named sections are tolerated.
-
 ## Regression test rule
 
 A bug should end with a regression test when technically feasible.

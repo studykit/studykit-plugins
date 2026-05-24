@@ -78,7 +78,7 @@
       "repository": "https://github.com/studykit/studykit-plugins",
       "license": "MIT",
       "category": "development",
-      "keywords": ["workflow", "github", "jira", "confluence", "wiki", "issues", "spec", "authoring"]
+      "keywords": ["workflow", "github", "jira", "confluence", "wiki", "issues", "spec", "usecase", "authoring"]
     },
     {
       "name": "obsidian",

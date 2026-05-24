@@ -4,7 +4,7 @@ Provider-specific binding for `research` knowledge pages stored as repository Ma
 
 Read after:
 
-- `../common/research-authoring.md`
+- `../common/research-knowledge-authoring.md`
 - `./github-knowledge-convention.md`
 
 ## Scope
@@ -15,13 +15,13 @@ Use this binding for GitHub repository Markdown `research` pages. The final body
 
 Use this final GitHub repository Markdown body structure for `research` pages.
 
-Common required sections are defined by `../common/research-authoring.md`:
+Common required sections are defined by `../common/research-knowledge-authoring.md`:
 
 - `## Context`
 - `## Options` for comparative mode
 - `## Findings` for single mode
 
-Common optional sections are defined by `../common/research-authoring.md` and `../common/knowledge-body.md`:
+Common optional sections are defined by `../common/research-knowledge-authoring.md` and `../common/knowledge-body.md`:
 
 - `## Summary`
 - `## Criteria`

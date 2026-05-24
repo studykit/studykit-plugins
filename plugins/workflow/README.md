@@ -56,10 +56,17 @@ For the full schema and per-provider fields, see
 
 ## Slash Commands
 
-Once configured, the plugin exposes three slash commands:
+Once configured, the plugin exposes these slash commands:
 
 - `/setup` — Generate and write `.workflow/config.yml` for the current
   repository.
+- `/usecase <idea>` — Walk a rough product idea through a Socratic,
+  one-question-at-a-time discovery interview. Each confirmed use case is
+  published as its own workflow `usecase` issue. Knowledge side effects
+  (new domain concept, NFR, screen, etc.) surface as separate `review`
+  issues. At wrap-up the skill dispatches the explorer and reviewer
+  subagents to find gaps and quality issues. Run with `iterate` (or an
+  existing `usecase` ref) to resume an earlier discovery session.
 - `/implement-issue <issue-ref> [extra requirements]` — Read the issue
   body, converge on a plan with you, and then run implementation,
   verification, commit, push, and writeback for the approved plan.

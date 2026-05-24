@@ -41,8 +41,6 @@ Optional sections:
 - `Related Work` — use cases, epics, specs, research, or reviews related to framing.
 - `Change Log` — required for material updates. See `./knowledge-body.md`.
 
-Unknown well-named sections are tolerated when they clarify project framing.
-
 ## Original idea rule
 
 Preserve the original input as faithfully as possible.

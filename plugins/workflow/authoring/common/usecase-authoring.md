@@ -1,34 +1,20 @@
-# Workflow Use Case Authoring
+# Workflow Use Case Authoring — Common
 
 A workflow use case describes **how an actor interacts with the system to achieve a goal in a specific situation**, with a user-visible flow and expected outcome.
 
-Use cases have two authoring surfaces:
+Use case is a dual-role type: it has an **issue side** (discovery, questions, status, discussion, feedback) and a **knowledge side** (curated page that downstream tasks and specs cite). The workflow issue is always created first; the curated knowledge page is created or updated later when the user-visible flow is stable enough to be cited.
 
-1. An issue-backed item for discovery, questions, discussion, status, and feedback.
-2. A knowledge-backed curated page for the settled use case content.
-
-The issue item is always created first. The curated knowledge page is created or updated when there is stable content worth publishing.
+This file carries the rules that apply across both sides. Role-specific rules live in the companion contracts.
 
 Companion contracts:
 
-- `./issue-body.md`
-- `./knowledge-body.md`
-- Issue rules: `./issue-authoring.md`
-
-## Storage role
-
-`usecase` has two roles.
-
-| Role | Backend | Purpose |
-| --- | --- | --- |
-| Workflow issue | Configured issue backend | Discovery, questions, review, status, discussion, and task linkage. |
-| Curated knowledge page | Configured knowledge backend | Stable use case content used by implementation and testing. |
-
-The workflow issue may exist without a curated page while the use case is being shaped. The curated page should link back to the workflow issue when published.
+- Issue side: `./usecase-issue-authoring.md`
+- Knowledge side: `./usecase-knowledge-authoring.md`
+- Abstraction guard (conversion table + per-field obligations): `./usecase-abstraction-guard.md`
 
 ## Abstraction discipline
 
-Use cases stay at the user level.
+Use cases stay at the user level on both surfaces — the issue body and the curated page.
 
 Write:
 
@@ -47,98 +33,4 @@ Do not write:
 
 Internal mechanics belong in `architecture`, `spec`, or implementation tasks.
 
-## Workflow issue body
-
-The workflow issue body should summarize discovery state and link to the curated page when available.
-
-Recommended sections:
-
-- `Description` — why this use case is being explored and who needs it.
-- `Actors` — list of actors that participate in this use case, one per bullet.
-- `Current Draft` — short current summary or link to curated page draft.
-- `Open Questions` — outstanding questions, one per bullet.
-
-Optional sections:
-
-- `Related Work` — related tasks, specs, reviews, research, or pages.
-- `Supersedes` — prior use case when replacing one.
-- `Resume` — current-state snapshot while shaping. See `./issue-body.md`.
-
-Use comments for conversation, interview notes, and feedback threads.
-
-## Curated page body
-
-The curated use case page should contain the stable user-facing content.
-
-Place a metadata line immediately under the page title that points back to the paired workflow issue, in the provider's link form. The metadata line should read `source: <link to paired workflow issue>`.
-
-Required body sections:
-
-- `Goal` — what the actor wants to accomplish.
-- `Actors` — every actor that participates in this use case, with each actor's role.
-- `Situation` — trigger and context.
-- `Flow` — ordered list of user-visible steps and responses.
-- `Expected Outcome` — observable successful outcome.
-
-List every actor that participates in this use case under the `Actors` section. Use the same actor name across use cases when referring to the same role, so the actor catalog can be read off the curated pages.
-
-Optional sections:
-
-- `Validation` — user-visible input constraints, limits, or required formats.
-- `Error Handling` — what the actor sees when things fail.
-- `Related Work` — workflow issues, tasks, specs, or research.
-- `Supersedes` — prior use case page when replacing one.
-- `Change Log` — required for material updates. See `./knowledge-body.md`.
-
-Do not include raw discovery discussion in the curated page.
-
-## Publishing rule
-
-Publish or update the curated page when:
-
-- The actor and goal are clear.
-- The flow is stable enough to guide tasks.
-- Expected outcome is explicit.
-- Blocking open questions are resolved or intentionally deferred.
-- User-visible validation and error handling are known or explicitly out of scope.
-
-The first publication should add a `Change Log` entry linking to the workflow issue.
-
-## Knowledge side effects
-
-Authoring or revising a use case may require updates to other knowledge pages:
-
-- New domain concept → `domain` page.
-- Scope or problem framing change → `context` page.
-- New screen or interaction group → `context` or product-facing page.
-- New non-functional requirement → `nfr` page.
-- New implementation contract → `spec` page.
-
-If the update is deferred, create a `review` item with `kind: gap` targeting the affected knowledge page and the causing use case issue/page.
-
-## Splitting a use case
-
-Split a use case when the actor goal forks or the flow contains multiple independent goals.
-
-When splitting:
-
-1. Confirm the split with the user.
-2. Create separate workflow issues for the child use cases.
-3. Publish or update curated pages when each child is stable.
-4. Link parent and child workflow issues according to the selected issue authoring files.
-5. Do not use supersession unless an older published use case is being replaced.
-
-## Common mistakes
-
-- Writing internal system mechanics into the use case.
-- Publishing a curated page before the user-visible flow is stable.
-- Leaving the workflow issue without a link to the curated page after publication.
-- Putting long discovery discussion into the curated page.
-- Creating tasks from a use case whose flow or expected outcome is still unclear.
-
-## Do not
-
-- Do not create the curated page before the workflow issue unless importing existing documents.
-- Do not store use case discussion only in the knowledge page.
-- Do not pack multiple actor goals into one use case.
-
+For concrete before/after rewrites and the per-field abstraction obligations, see `./usecase-abstraction-guard.md`.
