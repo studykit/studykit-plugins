@@ -76,8 +76,6 @@ Optional sections:
 - `Resume` — current-state snapshot while mid-flight. See `./issue-body.md`.
 - `Why Discarded` — reason when discarded. See `./issue-body.md`.
 
-Unknown well-named sections are tolerated.
-
 ## Evidence-readiness
 
 A task that is ready for implementation should be actionable as a handoff.

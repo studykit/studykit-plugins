@@ -50,8 +50,6 @@ Optional sections:
 - `Related Work` — issues, specs, reviews, research, use cases, or architecture pages related to NFR changes.
 - `Change Log` — required for material updates. See `./knowledge-body.md`.
 
-Unknown well-named sections are tolerated when they clarify NFRs.
-
 ## Measurability rule
 
 Every NFR should be measurable.
@@ -68,7 +66,7 @@ Prefer measurable forms:
 - "All admin actions require audit log entries with actor, timestamp, action, and target."
 - "UI meets WCAG 2.2 AA for the onboarding flow."
 
-If a requirement cannot yet be measured, create a `review` item with `kind: question` or `gap` rather than adding an aspirational NFR.
+If a requirement cannot yet be measured, create a `review` item describing the open question or the missing measurement basis rather than adding an aspirational NFR.
 
 ## Content boundaries
 

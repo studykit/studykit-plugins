@@ -49,8 +49,6 @@ Optional sections:
 - `Related Work` — workflow issues, specs, use cases, research, reviews, or architecture pages that inform the vocabulary.
 - `Change Log` — required for material updates. See `./knowledge-body.md`.
 
-Unknown well-named sections are tolerated when they clarify the domain model.
-
 ## Concept stability
 
 Domain terms are reference targets for use cases, specs, architecture, and code.
@@ -84,9 +82,9 @@ Use these boundaries to place domain content. Do not encode these as metadata re
 
 ## Drift and feedback
 
-If a concept appears repeatedly in use cases, specs, architecture, or tasks but is missing from domain, create a `review` item with `kind: gap` targeting the domain page and the causing work item.
+If a concept appears repeatedly in use cases, specs, architecture, or tasks but is missing from domain, create a `review` item targeting the domain page and the causing work item; describe the missing concept in prose.
 
-If architecture uses a domain term differently from this page, create a `review` item with `kind: finding` targeting both pages.
+If architecture uses a domain term differently from this page, create a `review` item targeting both pages; describe the inconsistency in prose.
 
 ## Change log
 

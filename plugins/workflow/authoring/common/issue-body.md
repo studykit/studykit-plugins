@@ -22,20 +22,18 @@ Rules:
 - Each section starts with a level-2 heading rendered in the provider's heading form. Subsections may appear inside a section using deeper heading levels.
 - Do not put a top-level title heading inside the body when the issue title is stored separately.
 - Avoid stray content above the first section unless the selected type template requires a short summary block.
-- Unknown sections are tolerated when they are useful, well-named, and well-formed.
 
-Common reusable section names for issue-backed items:
+## Tailoring the body
 
-- `Description`
-- `Acceptance Criteria`
-- `Unit Test Strategy`
-- `Out of Scope`
-- `Alternatives Considered`
-- `Risks`
-- `Open Questions`
-- `Related`
-- `Resume`
-- `Why Discarded`
+Beyond the required sections defined by the item's type-specific
+authoring file, each issue author may add purpose-specific sections
+when the issue has natural structure that the type-defined sections
+do not capture. Pick short, descriptive Title Case section names;
+keep each section narrow (one named thing per section); and keep
+the overall body short — a custom section earns its place only when
+its content would otherwise have to be folded awkwardly into an
+existing section. If the content fits naturally into an existing
+section, fold it back in instead of adding a new heading.
 
 ## Reference form
 
@@ -60,13 +58,23 @@ Issue relationship body sections are type-specific or provider-specific. Do not 
 
 Provider relationship files define which relationships are provider-native and which may appear as visible body context.
 
-## `Related` section
+## Optional reusable sections
+
+The named sections defined below (`Related`, `Resume`, `Why
+Discarded`, `Out of Scope`, `Alternatives Considered`, `Risks`)
+are optional reusable building blocks for any issue type. Include
+each only when its per-section guidance applies; otherwise omit
+it. A type-specific authoring file may pin one of them as required
+for a particular type — in that case the type contract overrides
+this file's optional framing.
+
+### `Related` section
 
 Use for human-readable references that help interpret the issue but are not stored as provider-native relationships.
 
 Provider convention files define when a `Related` section is appropriate and when a provider-native relationship should be used instead.
 
-## `Resume` section
+### `Resume` section
 
 Purpose: current-state snapshot for a future session.
 
@@ -81,13 +89,13 @@ Suggested slots:
 
 Rewrite the `Resume` section in place. Do not preserve history there.
 
-## `Why Discarded` section
+### `Why Discarded` section
 
 Use when an issue is intentionally abandoned and provider status alone does not explain why.
 
 The section should hold one dated bullet per reason, citing the cause when relevant. Provider files define the exact list and link form.
 
-## `Out of Scope` section
+### `Out of Scope` section
 
 Purpose: name what the issue explicitly does not cover.
 
@@ -97,7 +105,7 @@ Do not use when the body is small enough that scope is obvious from `Description
 
 List one deferred item per bullet with a short reason or link to the follow-up.
 
-## `Alternatives Considered` section
+### `Alternatives Considered` section
 
 Purpose: record design or implementation options that were evaluated but not chosen, with the rejection reason.
 
@@ -107,7 +115,7 @@ Do not use when no real alternatives were considered, or when the reasoning belo
 
 List one alternative per bullet with the rejection reason. Do not re-litigate the accepted decision here.
 
-## `Risks` section
+### `Risks` section
 
 Purpose: name technical risks, regression hazards, or operational concerns specific to this issue.
 

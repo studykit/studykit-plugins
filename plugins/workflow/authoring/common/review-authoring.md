@@ -1,10 +1,11 @@
 # Workflow Review Authoring
 
-A workflow review item captures a single finding, gap, or question that needs
-independent workflow tracking.
+A workflow review item captures a single concern about a target —
+something wrong, missing, unsettled, or worth surfacing for separate
+tracking apart from the target's normal work.
 
 Use an existing issue comment when the feedback is local to that issue and can
-be resolved as part of the issue's normal work. Create a review item when the
+be resolved as part of that issue's normal work. Create a review item when the
 feedback needs separate ownership, prioritization, discussion, or completion
 criteria.
 
@@ -16,17 +17,21 @@ Companion contracts:
 Do not create a review item for every comment. Use comments for local
 discussion. Use a review item when the feedback must be tracked independently.
 
-## Review concern
+## One concern per item
 
-State the concern type in the title or body.
+Each review item carries exactly one concern. Do not pack several unrelated
+findings into a single review — split into separate items so each can be
+owned, tracked, and resolved independently.
 
-| Concern | Meaning |
-| --- | --- |
-| `finding` | Something is wrong, inconsistent, risky, or below the expected contract. |
-| `gap` | Something expected is missing or incomplete. |
-| `question` | A decision or clarification is needed before the target can be considered settled. |
+When multiple concerns share a single root cause and resolving the root cause
+resolves them all, treat the root cause as the one concern and name the
+related symptoms in `Evidence` or `Description` — not in separate sections.
 
-Each review item should contain one concern only. Do not pack multiple findings, gaps, or questions into one review item.
+Publishing agents that surface a vocabulary of concern categories
+(`finding`, `gap`, `question`, or a domain-specific set) carry that
+vocabulary inside the agent's own body — not as a binding contract here.
+When a category is needed for filtering, encode it as an issue label or
+provider field at publish time, not as a body field.
 
 ## Review target rules
 
@@ -58,30 +63,48 @@ Review bodies are deliberately compact.
 
 Required sections:
 
-- `Description` — one concern, why it matters, and what would resolve it.
+- `Description` — the concern, why it matters, and what would resolve it.
+  The first paragraph is the conclusion (see the conclusion-paragraph
+  rule below).
 
 Target-specific reviews must identify the target according to the selected authoring files. For truly cross-cutting reviews, the `Description` section must explain why there is no specific target.
 
-Optional sections:
+Beyond `Description`, each review author decides which sections
+their reviews need based on the review's purpose. See `./issue-body.md`'s
+tailoring guidance.
 
-- `Resume` — current-state snapshot while the review is being resolved. See `./issue-body.md`.
-- `Suggested Fix` — concise proposed action when useful.
-- `Evidence` — short links, snippets, or reproduction notes.
+## Description and the conclusion paragraph
 
-Unknown well-named sections are tolerated, but keep reviews short.
+The first paragraph of the `Description` section is the conclusion
+paragraph. A reader who reads only that paragraph can decide what to do.
 
-## Description guidance
+The conclusion paragraph states, in plain prose:
 
-For each concern:
+- What the concern is.
+- What target it lands on (when the target is not obvious from the title).
+- Why a reader should care (one short clause is usually enough).
 
-- `finding`: explain what is wrong, where it appears, and why it matters.
-- `gap`: explain what is missing, why it should exist, and what item should receive it.
-- `question`: state the unresolved question and what answer would allow progress.
+Reasoning, evidence, sub-points, and remediation details belong in
+later paragraphs of `Description` or in any purpose-specific section
+the author adds per `./issue-body.md`'s tailoring guidance. Do not
+start the review body with a section header, a bulleted list, or
+scaffolding — the first thing the reader sees should be the
+conclusion in sentences.
+
+Keep the body short. Long discussion belongs in comments or in linked
+evidence, not in the body.
+
+This mirrors the verdict-comment shape the workflow auditors already
+use (`agents/implementation-auditor.md`, `agents/task-size-auditor.md`):
+first paragraph names the verdict in natural prose; everything else
+backs it up.
 
 ## Common mistakes
 
 - Missing target identity for a target-specific review.
-- Packing several findings into one review item.
+- Burying the conclusion under a heading, a bullet list, or
+  reasoning paragraphs.
+- Packing several unrelated concerns into one review item.
 - Using a page comment instead of a review item for feedback that needs workflow tracking.
 - Treating a review as complete before the target item was updated.
 - Duplicating long discussion in the issue body instead of comments.
@@ -91,3 +114,5 @@ For each concern:
 - Do not store review as a knowledge page.
 - Do not create placeholder targets.
 - Do not use one review item for multiple unrelated concerns.
+- Do not start the body with anything other than a conclusion
+  paragraph in prose.

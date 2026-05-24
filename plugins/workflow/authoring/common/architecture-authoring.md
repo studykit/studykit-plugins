@@ -51,8 +51,6 @@ Optional sections:
 - `Related Work` — issues, specs, reviews, use cases, or research that inform the architecture.
 - `Change Log` — required for material updates. See `./knowledge-body.md`.
 
-Unknown well-named sections are tolerated when they clarify current architecture.
-
 ## Component anchors
 
 Component headings are reference targets for tasks, bugs, specs, and reviews.

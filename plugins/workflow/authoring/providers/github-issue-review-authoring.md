@@ -23,7 +23,7 @@ resolved as part of that issue.
 Recommended comment shape:
 
 ```markdown
-Review feedback: <finding, gap, or question>
+<one-sentence conclusion describing the concern>
 
 Why it matters:
 - <short reason>
@@ -31,6 +31,9 @@ Why it matters:
 Suggested fix:
 - <short action>
 ```
+
+Open the comment with a one-sentence conclusion. Reasoning and
+suggestions follow.
 
 Keep the comment short. If the discussion needs independent tracking, create a
 separate review issue instead.

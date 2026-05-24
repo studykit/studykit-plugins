@@ -9,7 +9,7 @@ This file is an index, not a separate artifact type. The authoring resolver does
 | Component | Authoring | Storage role | Cardinality | Purpose |
 | --- | --- | --- | --- | --- |
 | `context` | `./context-authoring.md` | Knowledge | 1 per project | Original idea, problem framing, scope, coarse success. |
-| `usecase` | `./usecase-authoring.md` | Issue + knowledge | N per project | How an actor achieves a goal in a specific situation. |
+| `usecase` | `./usecase-authoring.md` (+ `-issue` / `-knowledge` side files) | Issue + knowledge | N per project | How an actor achieves a goal in a specific situation. |
 | `nfr` | `./nfr-authoring.md` | Knowledge | N per project | Non-functional targets. |
 | `spec` | `./spec-authoring.md` | Knowledge | N per project | Implementation contracts. |
 | `domain` | `./domain-authoring.md` | Knowledge | N per project | Shared vocabulary and concepts. |

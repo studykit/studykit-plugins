@@ -4,7 +4,7 @@ Provider-specific binding for `usecase` issues stored as Jira issues.
 
 Read after:
 
-- `../common/usecase-authoring.md`
+- `../common/usecase-issue-authoring.md`
 - `./jira-issue-convention.md`
 - `./jira-issue-relationships.md`
 - `./jira-issue-anti-patterns.md`
@@ -17,14 +17,14 @@ Use this binding for Jira `usecase` issues. The final body structure is listed b
 
 Use this final Jira body structure for `usecase` issues. Emit each section in wiki markup (`h2. Name`); see `./jira-issue-convention.md` for the markup mapping.
 
-Common required sections are defined by `../common/usecase-authoring.md`:
+Common required sections are defined by `../common/usecase-issue-authoring.md`:
 
 - `h2. Description`
 - `h2. Actors`
 - `h2. Current Draft`
 - `h2. Open Questions`
 
-Common optional sections are defined by `../common/usecase-authoring.md` and `../common/issue-body.md`:
+Common optional sections are defined by `../common/usecase-issue-authoring.md` and `../common/issue-body.md`:
 
 - `h2. Resume`
 

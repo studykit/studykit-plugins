@@ -4,7 +4,7 @@ Provider-specific binding for `usecase` knowledge pages stored as repository Mar
 
 Read after:
 
-- `../common/usecase-authoring.md`
+- `../common/usecase-knowledge-authoring.md`
 - `./github-knowledge-convention.md`
 
 ## Scope
@@ -15,7 +15,7 @@ Use this binding for GitHub repository Markdown `usecase` pages. The final body 
 
 Use this final GitHub repository Markdown body structure for `usecase` pages.
 
-Common required sections are defined by `../common/usecase-authoring.md`:
+Common required sections are defined by `../common/usecase-knowledge-authoring.md`:
 
 - `## Goal`
 - `## Actors`
@@ -23,7 +23,7 @@ Common required sections are defined by `../common/usecase-authoring.md`:
 - `## Flow`
 - `## Expected Outcome`
 
-Common optional sections are defined by `../common/usecase-authoring.md` and `../common/knowledge-body.md`:
+Common optional sections are defined by `../common/usecase-knowledge-authoring.md` and `../common/knowledge-body.md`:
 
 - `## Validation`
 - `## Error Handling`

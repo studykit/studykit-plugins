@@ -66,8 +66,6 @@ Optional sections:
 - `Resume` — current-state snapshot while open. See `./issue-body.md`.
 - `Why Discarded` — reason when discarded. See `./issue-body.md`.
 
-Unknown well-named sections are tolerated.
-
 ## Relationship to knowledge pages
 
 Epics coordinate work. They do not define the product, architecture, or implementation contract.

@@ -46,8 +46,6 @@ Optional sections:
 - `Resume` — current-state snapshot while mid-flight. See `./issue-body.md`.
 - `Why Discarded` — reason when discarded. See `./issue-body.md`.
 
-Unknown well-named sections are tolerated.
-
 ## Artifact handling
 
 Issue-backed spikes should link to evidence or output files instead of assuming a local evidence directory.

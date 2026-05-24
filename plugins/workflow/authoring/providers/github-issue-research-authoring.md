@@ -4,7 +4,7 @@ Provider-specific binding for `research` issues stored as GitHub Issues.
 
 Read after:
 
-- `../common/research-authoring.md`
+- `../common/research-issue-authoring.md`
 - `./github-issue-convention.md`
 - `./github-issue-relationships.md`
 - `./github-issue-anti-patterns.md`
@@ -17,14 +17,14 @@ Use this binding for the GitHub issue side of `research`. The final body structu
 
 Use this final GitHub body structure for `research` issues.
 
-Common required sections are defined by `../common/research-authoring.md`:
+Common required sections are defined by `../common/research-issue-authoring.md`:
 
 - `## Description`
 - `## Research Question`
 - `## Mode`
 - `## Options`
 
-Common optional sections are defined by `../common/research-authoring.md` and `../common/issue-body.md`:
+Common optional sections are defined by `../common/research-issue-authoring.md` and `../common/issue-body.md`:
 
 - `## Scope`
 - `## Sources To Check`

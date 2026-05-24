@@ -4,7 +4,7 @@ Provider-specific binding for `usecase` issues stored as GitHub Issues.
 
 Read after:
 
-- `../common/usecase-authoring.md`
+- `../common/usecase-issue-authoring.md`
 - `./github-issue-convention.md`
 - `./github-issue-relationships.md`
 - `./github-issue-anti-patterns.md`
@@ -17,14 +17,14 @@ Use this binding for the GitHub issue side of `usecase`. The final body structur
 
 Use this final GitHub body structure for `usecase` issues.
 
-Common required sections are defined by `../common/usecase-authoring.md`:
+Common required sections are defined by `../common/usecase-issue-authoring.md`:
 
 - `## Description`
 - `## Actors`
 - `## Current Draft`
 - `## Open Questions`
 
-Common optional sections are defined by `../common/usecase-authoring.md` and `../common/issue-body.md`:
+Common optional sections are defined by `../common/usecase-issue-authoring.md` and `../common/issue-body.md`:
 
 - `## Resume`
 
