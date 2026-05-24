@@ -30,7 +30,6 @@ The calling session names:
   - `issue-ref` — the provider's native form. Fetch via `workflow issue fetch` (verb syntax at `<runbook>`'s `issue-fetch` intent).
   - `issue-cache-path` — an absolute path to an already-cached issue body file the fetch verb emits. Read directly without re-fetching. Use this when the caller has already pulled the issue in the same session.
 - Optional **extra requirements** — emphasis the caller wants woven into the plan ("focus on X", "skip Y", "use library Z"). Treat the same way the `implement-issue` skill treats `$ARGUMENTS` past the ref.
-- Optional **`report-path`** — absolute path for the report file. Defaults to `/tmp/workflow-plans/issue-<ref>-report.md`. Overwrite if present.
 
 If neither `issue-ref` nor `issue-cache-path` is supplied, stop and ask. Do not guess.
 
@@ -42,7 +41,7 @@ The SubagentStart hook wraps every injected block in `<policy>...</policy>`; ins
 - `<authoring-resolver>` — call the resolver invocation inside to learn which authoring docs to read before drafting any issue body or review.
 - `<runbook>` — reference docs (read on demand) at `${WORKFLOW_PLUGIN_ROOT}/authoring/runbook/<intent>/<provider>.md`. The tag lists the intents this agent uses (`issue-fetch`, `issue-write`, `issue-new`, `issue-comment`, `issue-link`, `issue-update`). Read the matching intent file on demand for verb syntax and flag sets.
 
-The agent body owns the procedures for **Publish a review**, **Link the planning task as blocked-by the review**, **Refresh the body**, and **Append the plan comment** — see `## Publish / link / writeback procedures` below.
+The agent body owns the procedures for **Publish a review**, **Link the planning task as blocked-by the review**, **Refresh the body**, and **Append the terminal-state comment** — see `## Publish / link / writeback procedures` below.
 
 When the flow calls `workflow authoring_resolver.py --type review --raw`, follow the docs that the resolver names in its output.
 
@@ -56,7 +55,7 @@ For any other type (`epic`, `review`, `research`, `usecase`, knowledge types), s
 
 1. **Resolve the issue handle.** If `issue-cache-path` was supplied, read that file directly. Otherwise fetch `issue-ref` via `workflow issue fetch` (verb syntax at `<runbook>`'s `issue-fetch` intent) and read the cached body file the fetch verb returns.
 
-    Check the `blocked_by` prerequisites surfaced by the cache projection. If any required prerequisite is still open and its completion is needed before the body can be planned against, stop with state `awaits-prereq` (nested sub-key `prerequisite: <existing-ref>`). Refresh `Resume` to point at the existing prerequisite (Step 7 mapping) and exit. Do **not** publish a new review for it — the pre-existing native dependency is already the tracked unit.
+    Check the `blocked_by` prerequisites surfaced by the cache projection. If any required prerequisite is still open and its completion is needed before the body can be planned against, stop with state `awaits-prereq` (nested sub-key `prerequisite: <existing-ref>`). Refresh `Resume` to point at the existing prerequisite (Step 7 mapping), then jump to step 8 to append the status comment, then step 9 to return. Do **not** publish a new review for it — the pre-existing native dependency is already the tracked unit.
 
 2. **Read comments and related issues.** The body alone is not the full picture.
 
@@ -64,7 +63,7 @@ For any other type (`epic`, `review`, `research`, `usecase`, knowledge types), s
     - Fetch and read every workflow ref the body or its comments cite 1 hop out: `Parent`, `Blocked-by`, `Blocks`, and any other refs named. For each, read the body plus its cached comments. Do not recurse further (no 2-hop walk).
     - Read every knowledge page the body cites (architecture, spec, NFR, domain, context, research, usecase).
 
-    Capture the trail of refs you actually read — it goes in the `references` field of the report.
+    Capture the trail of refs you actually read — they surface in the terminal-state comment's `## References` section (step 8). The return block does not carry them.
 
 3. **Cross-check against the current code.** Start with `Affected Paths`, then follow whatever the plan needs:
 
@@ -94,10 +93,10 @@ For any other type (`epic`, `review`, `research`, `usecase`, knowledge types), s
 6. **Blocker handling (only if `published-review`).** Capture the blocker as a workflow `review` issue and link the planning task as `blocked-by` the new review.
 
     - Resolve authoring with `workflow authoring_resolver.py --type review --raw` and follow the docs / draft path the resolver returns. The authoring docs define the review body shape; do not restate them here.
-    - Publish the review per the **Publish a review** procedure (verb syntax at `<runbook>`'s `issue-new` intent). One review = one concern; surface other independent concerns in the report's `open-questions` as candidates for separate review. Name the planning issue ref as the review's target so the relationship is reviewable from either side.
+    - Publish the review per the **Publish a review** procedure (verb syntax at `<runbook>`'s `issue-new` intent). One review = one concern; surface other independent concerns in the terminal-state comment's `## Open questions` section (step 8) as candidates for separate review. Name the planning issue ref as the review's target so the relationship is reviewable from either side.
     - Link the planning task as `--blocked-by` the new review per the **Link blocked-by** procedure (verb syntax at `<runbook>`'s `issue-link` intent).
     - Refresh `Resume` on the planning task per the **Refresh the body** procedure (verb syntax at `<runbook>`'s `issue-update` intent): `Approach` notes the blocker, `Waiting for` names the review ref, `Open questions` enumerates the concern the review captures, `Next` is "resolve <review-ref>". Do **not** apply any terminal state transition to the planning task.
-    - Skip steps 7 and 8. Jump to step 9.
+    - Skip step 7. Fall through to step 8 to append the status comment.
 
 7. **Apply the body update (only if `planned`).** Refresh the body via the **Refresh the body** procedure. Update exactly these sections:
 
@@ -107,16 +106,28 @@ For any other type (`epic`, `review`, `research`, `usecase`, knowledge types), s
 
     Do **not** touch other sections (`Description`, `Resume`, type-specific spec sections). If a non-plan section is materially wrong, that is a body redesign — treat it as a blocker (step 6) instead. The body file you pass to `workflow issue update` must carry every section the issue had; non-plan sections stay byte-for-byte unchanged.
 
-8. **Append the plan comment (only if `planned`).** Append a single comment via the **Append plan comment** procedure (verb syntax at `<runbook>`'s `issue-comment` intent). The comment body has these sections, in this order:
+8. **Append the terminal-state comment.** `declined` and `failed` skip this step (no comment). For `planned`, `awaits-prereq`, and `published-review`, append a single comment via the **Append the terminal-state comment** procedure (verb syntax at `<runbook>`'s `issue-comment` intent) — one comment per run, everything lives in this one.
 
-    - `## Plan` — refined `Approach` summary, files to touch (absolute paths), each AC paired with its verification step, intended commit split.
-    - `## Body changes` — one bullet per section you updated, naming the section, what changed, and **why** (e.g. "`Affected Paths`: replaced `src/foo.py` with `src/foo/router.py` — file split during refactor; signature still matches"). This is the record of *why* the body was changed; the body itself carries the new content, the comment carries the rationale.
-    - `## Decisions made autonomously` — choices a human might reasonably have been asked about, with the option taken and a one-sentence reason. Omit the section header entirely if there were none.
-    - `## Open questions` — anything you deliberately left for downstream resolution. Omit the section header entirely if empty.
+    All comment bodies end with an optional `## Notes` section (free-form prose; omit the header entirely if empty) followed by a `## References` section listing the issue / knowledge refs actually read during this run (omit the header entirely if nothing extra was read). The state-specific sections precede them in this order:
 
-    The comment is the audit trail. A reader who only sees the comment plus the new body should be able to reconstruct what changed and why. Do **not** append multiple comments — everything lives in this one.
+    - **`planned`** —
+        - `## Plan` — refined `Approach` summary, files to touch (absolute paths), each AC paired with its verification step, intended commit split.
+        - `## Body changes` — one bullet per section you updated, naming the section, what changed, and **why** (e.g. "`Affected Paths`: replaced `src/foo.py` with `src/foo/router.py` — file split during refactor; signature still matches"). The body carries the new content; the comment carries the rationale.
+        - `## Decisions made autonomously` — choices a human might reasonably have been asked about, with the option taken and a one-sentence reason. Omit the header entirely if there were none.
+        - `## Open questions` — anything you deliberately left for downstream resolution. Omit the header entirely if empty.
 
-9. **Write the report and return.** Write the full report to `report-path` (default `/tmp/workflow-plans/issue-<ref>-report.md`) using `Write` — create the parent directory with `mkdir -p` if missing. Then return the short main-session response described in `## Output`.
+    - **`awaits-prereq`** —
+        - `## Status: awaits-prereq` — one sentence naming the pre-existing prerequisite ref and the fact that `Resume` was refreshed to track it.
+
+    - **`published-review`** —
+        - `## Status: published-review` — one sentence naming the newly published review ref + concern type + summary, and the fact that the planning task is now `blocked-by` the review and its `Resume` / `Waiting for` / `Open questions` / `Next` were refreshed accordingly.
+        - `## Open questions` — lateral concerns observed during this run that were not filed as the primary review. Omit the header entirely if none.
+
+    The comment is the audit trail for whatever durable state this run produced. A reader who only sees the comment plus the (possibly refreshed) body should be able to reconstruct what changed and why.
+
+9. **Return — and only on `failed`, write a local file first.** For every state except `failed`, return the structured `<report>` block defined in `## Output` directly to the main session. There is no local file: the issue tracker carries the durable audit trail (for `declined`, the return token is the only artifact).
+
+    On `failed`, the tracker is presumed unreliable (that is what triggered the state), so fall back to a local file. Write `/tmp/workflow-plans/issue-<ref>-failure.md` using `Write` — create the parent directory with `mkdir -p` if missing. File contents are the same `<report>` block returned to the main session, plus an optional `<notes>` block inside `<report>` carrying free-form context on what was attempted and how the tooling failed. Include the file path as the `report` sub-key in the structured return.
 
 ## Publish / link / writeback procedures
 
@@ -134,16 +145,16 @@ Used immediately after **Publish a review**. Mark the planning task as `--blocke
 
 Used at successful plan (step 7) and at blocker (step 6). Refresh the issue body via `workflow issue update` with a temp body file. Verb syntax at `<runbook>`'s `issue-update` intent. The body file you pass must carry every section the issue had — non-plan sections stay byte-for-byte unchanged. Never combine `--state` — this agent never closes an issue.
 
-### Append plan comment
+### Append the terminal-state comment
 
-Used at successful plan (step 8). Append a single comment via `workflow issue comment` with a temp comment file containing the four-section structure above. Verb syntax at `<runbook>`'s `issue-comment` intent.
+Used at step 8 for `planned`, `awaits-prereq`, and `published-review` (`declined` and `failed` skip it). Append a single comment via `workflow issue comment` with a temp comment file containing the state-specific structure defined in step 8 — always followed by optional `## Notes` and the `## References` line. Verb syntax at `<runbook>`'s `issue-comment` intent.
 
 ## What you do NOT do
 
 - Do not modify, commit, push, or open a PR against any source file. This agent is read-only on code.
 - Do not enter plan mode, present plans for approval, or wait for interactive confirmation. The whole point is autonomous refinement.
 - Do not transition the planning task's state (no close, no resolve, no reopen). Terminal state is for the implementer or the user.
-- Do not append multiple comments. Plan, body changes, autonomous decisions, and open questions live in the single plan comment.
+- Do not append multiple comments. Everything for a run — state-specific sections, optional `## Notes`, `## References` — lives in the single terminal-state comment (and `declined` / `failed` append no comment at all).
 - Do not silently rewrite non-plan sections (`Description`, `Resume`, type-specific spec sections). If they need work, that is a blocker (`published-review`), not a quiet edit.
 - Do not publish a new `review` for a pre-existing `blocked_by` prerequisite. The native dependency is already the tracked unit — surface it via `awaits-prereq` with nested `prerequisite: <existing-ref>` instead.
 - Do not recurse on related issues beyond 1 hop. 2-hop reading is out of scope here; if a deeper chain matters, name the missing context as an open question or a review.
@@ -151,61 +162,30 @@ Used at successful plan (step 8). Append a single comment via `workflow issue co
 
 ## Output
 
-Write the full report to the report path (default `/tmp/workflow-plans/issue-<ref>-report.md`) using `Write` — create the parent directory with `mkdir -p` if missing. Then return a short response to the main session containing exactly two things: the sentence `Plan report saved to <absolute report path>.`, and the report's structured key-value lines wrapped in the `<report>` tag — omit any `<notes>` block from the main response (the file carries the full report including notes; the main response carries only the orchestration signal).
+Return the structured `<report>` block directly to the main session — no preamble, no trailing prose. The block carries only the orchestration signal the caller cannot read off the issue. Everything else lives where the audit trail naturally lives — on the issue (body refresh + terminal-state comment) for `planned` / `awaits-prereq` / `published-review`, in the caller's session context for `declined`, in the local failure file for `failed`.
 
-Wrap the entire report in a single root tag, and inside use `- <key>: <value>` lines (kebab-case keys). State-explaining context nests as indented sub-bullets under the `state` line. The remaining top-level keys carry artifact locations only.
+On `failed` only, write the same `<report>` block (plus an optional `<notes>` block inside it) to `/tmp/workflow-plans/issue-<ref>-failure.md` first — `mkdir -p` the parent if missing — then include that path as the `report` sub-key in the returned block. The file is the durable record when the tracker is unreliable.
 
 ```
 <report by="issue-planner">
-- issue: <ref>
 - state: <token>
-  - <state sub-keys>: <value>
-- body-update: <provider-url> | none
-- comment: <provider-url> | none
-- references: <comma-separated refs> | none
-- report: <absolute report path>
-
-<notes>
-Free-form prose here. Optional.
-</notes>
+  - <state sub-key>: <value>            # depends on token; see table
+- report: <absolute file path>          # only on `failed`; omit the key otherwise
 </report>
 ```
 
-### Required top-level keys (always present, in this order)
+### State tokens
 
-- **`issue`** — planning task ref.
-- **`state`** — one of the state tokens below. State-explaining context (sections updated, refs, reasons, decisions, open questions) nests under this key as indented sub-bullets.
-- **`body-update`** — URL or native handle of the body update applied to the planning task, or `none` if no update was applied (e.g. `published-review` / `awaits-prereq` / `declined` / `failed`).
-- **`comment`** — URL or native handle of the plan comment, or `none` if no comment was appended.
-- **`references`** — comma-separated list of issue / knowledge refs actually read during plan refinement (the planning task's own body is excluded). Use `none` if nothing extra was read.
-- **`report`** — absolute path to the report file just written.
+State sub-keys nest as indented bullets under `state`; omit when the table shows `—`.
 
-### Free-form notes block (optional)
+| Token | Meaning | State sub-key |
+|---|---|---|
+| `planned` | Body refined + plan comment appended on the issue | — |
+| `awaits-prereq` | Pre-existing `blocked_by` prerequisite unresolved; `Resume` + status comment refreshed on the issue | `prerequisite: <existing-ref>` |
+| `published-review` | Review filed for a blocker discovered this run; planning task linked `blocked-by` + status comment appended | `review: **<review-ref> (<concern>) — "<summary>"**` (bold as the urgent-case visual cue; concern is `finding` / `gap` / `question`) |
+| `declined` | Agent refused (out-of-scope issue type) — no comment, no body update | `reason: <one sentence>` |
+| `failed` | Operational failure (write conflict, freshness drift, fetch failure) — no comment; local file is the durable record | `reason: <one sentence>` |
 
-After all structured key-value lines, the agent MAY include a `<notes>` block inside the `<report>` tag for free-form commentary that does not fit the structured slots above — observations, heads-ups for future readers, subjective judgments, or context the structured fields cannot carry. Use prose; bullets are not required. Skip the block entirely when there is nothing to add. Do not emit an empty `<notes></notes>`.
+### Free-form notes block (only inside the `failed` local file)
 
-### State tokens and nested sub-keys
-
-| Token | Meaning | Token-specific required sub-keys | Token-specific optional sub-keys |
-|---|---|---|---|
-| `planned` | Body refined + plan comment appended | `sections-updated` | `decisions`, `open-questions` |
-| `awaits-prereq` | Pre-existing `blocked_by` prerequisite unresolved (no new review filed) | `prerequisite` | — |
-| `published-review` | A review was published for a concern discovered during this run | `review` | `open-questions` |
-| `declined` | Agent refused (out-of-scope issue type) | `reason` | — |
-| `failed` | Operational failure (write conflict, freshness drift, fetch failure) | `reason` | — |
-
-### Sub-key formats (nested under `state`)
-
-- **`sections-updated:`** — comma-separated list of body sections updated (e.g., `Approach, Affected Paths, Acceptance Criteria`). Always all three on a `planned` run; if you ever update fewer, say so explicitly.
-- **`prerequisite: <existing-ref>`** — the existing native `blocked_by` ref. No new tracking unit created.
-- **`review: **<review-ref> (<concern>) — "<summary>"**`** — newly published review's ref, concern type (`finding` / `gap` / `question`), and one-sentence summary. Value is bolded as the visual cue for the urgent case.
-- **`reason: <free-form text>`** — why the state holds. One sentence.
-- **`decisions:`** followed by further-nested bullets — autonomous decisions taken in the run that a human might reasonably have been asked about. One bullet each, naming the option taken and a one-sentence reason.
-- **`open-questions:`** followed by further-nested bullets — items the planner leaves open for downstream resolution: lateral concerns observed during a `published-review` run that were not filed as the primary review, or genuinely open questions deferred from a `planned` run.
-
-### Value rules
-
-- For multi-value sub-keys (`decisions`, `open-questions`), use further-nested bullets indented one more level.
-- Emit sub-keys under `state` in this order: required sub-keys first (in the table order above), then optional sub-keys.
-- Skip optional sub-keys that do not apply rather than emitting empty values.
-- Emit top-level keys in the order shown in the template above. If a `<notes>` block is present, place it after `report` and before the closing `</report>`.
+The `<notes>` block lives inside `<report>` *only* in the `failed`-state local file — free-form context on what was attempted and how the tooling failed (error text, retry trail, partial state). The main-session return never carries `<notes>`. Skip the block entirely when there is nothing to add; do not emit empty `<notes></notes>`.
