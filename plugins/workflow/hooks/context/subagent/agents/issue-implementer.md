@@ -13,6 +13,8 @@ lives in the runbook at
 - `issue-fetch` — fetch issues + cache projections
 - `issue-write` — shared body-bearing write procedure
 - `issue-new` — publish a new issue (used for the review publish flow)
+- `issue-comment` — append the optional summary comment when there are
+  decisions / open questions / notes worth recording (Step 10)
 - `issue-link` — relationships (used for the blocked-by link)
 - `issue-update` — update body and state (used for the writeback)
 - `issue-state` — provider terminal-transition verbs (when combining
