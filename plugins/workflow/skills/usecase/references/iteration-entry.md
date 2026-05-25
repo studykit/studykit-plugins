@@ -33,8 +33,6 @@ Filter to the items the session can act on:
   whose `source` indicates `usecase-reviewer` or `usecase-explorer`
   (these are quality findings or candidate gaps waiting for
   resolution).
-- Open `review` issues from prior knowledge side effects that the
-  user wants to walk through.
 
 Present the active backlog as a short priority-ordered list (the
 user-supplied ref first, then issues with the most open questions,
@@ -44,7 +42,7 @@ then everything else).
 
 Ask the user where to resume. Common shapes:
 
-- "Fix UC-<ref>" — load that one issue plus every open `review`
+- "Fix <ref>" — load that one issue plus every open `review`
   linked to it; jump straight into the discovery loop scoped to that
   use case.
 - "Walk findings" — go directly to the wrap-up walk (`./wrap-up.md`
@@ -59,7 +57,7 @@ Do not pick a path on your own — the user names the scope.
 Replace the new-discovery seed with an iteration-shaped backlog:
 
 - `"Iteration: backlog walk"` → `in_progress`
-- One `"Iteration: UC-<ref> <title>"` per use case the user selected.
+- One `"Iteration: <ref> <title>"` per use case the user selected.
 - One `"Iteration: review-<ref>"` per `review` item the user agreed
   to walk through.
 - `"Wrap Up: Session report"` → `pending` (the iteration session
@@ -68,10 +66,7 @@ Replace the new-discovery seed with an iteration-shaped backlog:
 
 ## 5. Iteration discipline
 
-The shared rules in
-`${CLAUDE_PLUGIN_ROOT}/authoring/common/usecase-authoring.md`,
-`${CLAUDE_PLUGIN_ROOT}/authoring/common/usecase-issue-authoring.md`,
-and `${CLAUDE_PLUGIN_ROOT}/authoring/common/issue-authoring.md` apply
+The shared rules from the `usecase` issue authoring contract apply
 unchanged. In addition:
 
 - **Show before/after on use case body changes.** When modifying an
@@ -91,4 +86,4 @@ unchanged. In addition:
   `workflow issue update --state closed` (or the equivalent state
   verb at `<runbook>`'s `issue-state` intent) once the resolution
   has landed on the target. Closing the review without updating the
-  target leaves the side effect floating.
+  target leaves the finding unresolved.

@@ -44,7 +44,7 @@ the user can react to a concrete visual.
    - The screen-group label.
    - Layout requirements (the user's wording verbatim).
    - An absolute output directory under
-     `/tmp/workflow-mocks/<screen-slug>/`.
+     `$(workflow project-dir .workflow-cache/mocks/<screen-slug>/)`.
 3. After the agent returns the output path, present the mock to the
    user (file path they can open in a browser). Gather feedback.
 4. **Reflect mock feedback into use cases** through a follow-up
@@ -58,9 +58,8 @@ the user can react to a concrete visual.
   mentioned them in the same breath. The grouping rule is shared
   visual surface, not topical proximity.
 - Treating a mock as a use case deliverable. Mocks support
-  discovery; the durable artifact is the use case issue and any
-  `review` items it spawned.
+  discovery; the durable artifact is the use case issue.
 - Letting the screen narrative live only in the session
-  conversation. If it matters to the product, it belongs in a
-  `review` item targeting `context` — otherwise the screen story is
-  lost when the session ends.
+  conversation. If it matters to the product, capture it in the
+  wrap-up session report so the user can author the `context` page
+  later — otherwise the screen story is lost when the session ends.

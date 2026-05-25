@@ -31,7 +31,7 @@ sidecar file and surfaces a `<conclusion>` block to the user.
 
 The skill itself owns dispatch and state branching only — no plan mode,
 no interactive approval gates, no code reading by the skill, no
-`/tmp/workflow-plans/` scratch files. The agents do the substantive
+`.workflow-cache/plans/` scratch files. The agents do the substantive
 work in their own contexts.
 
 ## Scope
@@ -117,7 +117,7 @@ which this skill passes through unchanged.
    observable artifacts on four axes (report fidelity, AC evidence
    quality, open-questions legitimacy, intent alignment), writes a
    prose review to its sidecar file (default
-   `/tmp/workflow-audits/issue-<ref>-audit.md`), and returns a short
+   `.workflow-cache/audits/issue-<ref>-audit.md`), and returns a short
    main-session response containing the `Audit report saved to
    <path>.` sentence plus a `<conclusion>` block carrying the verdict
    in natural prose. Verdicts: `ok`, `unverifiable`,

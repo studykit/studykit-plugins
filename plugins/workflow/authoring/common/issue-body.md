@@ -10,7 +10,7 @@ These rules apply to the visible issue body.
 
 Type-specific authoring files define the required body shape for each item type. This file defines body structure, readability, reusable sections, and references for issue-backed items.
 
-The literal markup form for headings, lists, inline emphasis, links, code, tables, and checklists is defined by the matching provider convention file (`../providers/<provider>-issue-convention.md`). This file uses canonical section names only and does not embed provider markup.
+This file uses canonical section names only and does not embed literal markup. The literal markup form for headings, lists, inline emphasis, links, code, tables, and checklists is defined by the matching rendering convention.
 
 ## Section structure
 
@@ -19,7 +19,7 @@ An issue body is organized as a sequence of named sections.
 Rules:
 
 - Each section has a canonical Title Case name (`Description`, `Acceptance Criteria`, `Unit Test Strategy`, etc.).
-- Each section starts with a level-2 heading rendered in the provider's heading form. Subsections may appear inside a section using deeper heading levels.
+- Each section starts with a level-2 heading rendered in the rendering convention's heading form. Subsections may appear inside a section using deeper heading levels.
 - Do not put a top-level title heading inside the body when the issue title is stored separately.
 - Avoid stray content above the first section unless the selected type template requires a short summary block.
 
@@ -43,7 +43,7 @@ Use stable, readable references in body text.
 | --- | --- |
 | Issue-backed item | Issue reference from the selected issue backend |
 | Knowledge page | Page, document, or file reference from the selected knowledge backend |
-| External source | Provider-native link form |
+| External source | Native link form from the rendering convention |
 
 Rules:
 
@@ -54,9 +54,7 @@ Rules:
 
 ## Relationship body sections
 
-Issue relationship body sections are type-specific or provider-specific. Do not invent new relationship sections unless the selected authoring files require them.
-
-Provider relationship files define which relationships are provider-native and which may appear as visible body context.
+Issue relationship body sections are defined by the type-specific authoring file or the matching rendering convention. Do not invent new relationship sections unless the selected authoring files require them.
 
 ## Optional reusable sections
 
@@ -70,9 +68,7 @@ this file's optional framing.
 
 ### `Related` section
 
-Use for human-readable references that help interpret the issue but are not stored as provider-native relationships.
-
-Provider convention files define when a `Related` section is appropriate and when a provider-native relationship should be used instead.
+Use for references that help interpret the issue but are not stored as native backend relationships. Express each reference using the native reference form from the configured issue or knowledge backend.
 
 ### `Resume` section
 
@@ -91,9 +87,9 @@ Rewrite the `Resume` section in place. Do not preserve history there.
 
 ### `Why Discarded` section
 
-Use when an issue is intentionally abandoned and provider status alone does not explain why.
+Use when an issue is intentionally abandoned and backend status alone does not explain why.
 
-The section should hold one dated bullet per reason, citing the cause when relevant. Provider files define the exact list and link form.
+The section should hold one dated bullet per reason, citing the cause when relevant.
 
 ### `Out of Scope` section
 
@@ -142,7 +138,7 @@ Do not copy long comment threads into the body. Summarize the resulting decision
 If workflow tooling creates local files as projections of external issues, do not treat projection paths as canonical identity.
 
 - Do not use projection paths in commits, branches, or comments unless the local path itself is the topic.
-- Do not edit projection metadata as authoring state. Use provider fields through the selected provider workflow, and keep canonical references in visible body text.
+- Do not edit projection metadata as authoring state. Use backend fields through the selected backend workflow, and keep canonical references in visible body text.
 
 ## Cross-references
 

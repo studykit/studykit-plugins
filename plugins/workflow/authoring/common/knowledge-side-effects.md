@@ -27,12 +27,12 @@ Each `review` item contains **one concern** — do not pack several side effects
 1. Resolve the `review` authoring docs through the `<authoring-resolver>`:
 
    ```bash
-   workflow mustread --type review --purpose author
+   workflow mustread --type review
    ```
 
    Follow the body shape the resolver returns. `review-authoring.md` keeps the body deliberately compact: required `Description`, optional `Suggested Fix`, `Evidence`, `Resume`.
 
-2. Draft the `review` body under a temp directory the originating skill / agent picks (e.g., `/tmp/workflow-<originator>-side-effects/<slug>.md`). Include in `Description`:
+2. Draft the `review` body under a scratch path the originating skill / agent picks (e.g., `$(workflow project-dir .workflow-cache/<originator>-side-effects/<slug>.md)` — the helper resolves the project root and creates the parent, anchoring on the main repo so the draft survives worktree teardown). Include in `Description`:
 
    - What is missing or wrong on the knowledge surface.
    - Why it matters (one or two sentences, grounded in the originating work).

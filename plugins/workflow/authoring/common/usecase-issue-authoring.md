@@ -37,7 +37,7 @@ Use comments for conversation, interview notes, and feedback threads.
 
 Cite each `Actors` entry by the canonical name from the project's actors registry. Before naming an actor in a new use case issue:
 
-1. The actors authoring contract is bundled with the usecase issue authoring contract returned by `workflow mustread --type usecase --role issue --purpose author`. Resolve the actors page path with `workflow prd_path actors`.
+1. The actors authoring contract is bundled with the usecase issue authoring contract returned by `workflow mustread --type usecase --side issue`. Resolve the actors page path with `workflow prd_path actors`.
 2. If the actor already exists in the registry, reuse the canonical name verbatim.
 3. If the actor is missing, pick a canonical name that fits the registry's naming conventions and list it in the `Actors` bullet. Do not write identity into the issue body; the registry is the only place identity lives.
 
