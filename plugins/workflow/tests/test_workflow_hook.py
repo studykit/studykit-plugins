@@ -116,6 +116,7 @@ def expected_session_start_context(
     rendered = render_template(text, {
         "SNIPPET_LAUNCHER": launcher_block,
         "SNIPPET_AUTHORING": main_context_fragment("snippets/authoring.md"),
+        "SNIPPET_PRD_PATH": main_context_fragment("snippets/prd-path.md"),
         "WORKFLOW_RUNBOOK_DIR": str(runbook_dir),
         "WORKFLOW_ISSUE_PROVIDER": issue_kind,
     })
@@ -138,6 +139,7 @@ def expected_subagent_start_context(
     rendered = render_template(text, {
         "SNIPPET_LAUNCHER": launcher_block,
         "SNIPPET_AUTHORING": main_context_fragment("snippets/authoring.md"),
+        "SNIPPET_PRD_PATH": main_context_fragment("snippets/prd-path.md"),
         "WORKFLOW_RUNBOOK_DIR": str(runbook_dir),
         "WORKFLOW_ISSUE_PROVIDER": issue_kind,
     })
@@ -898,6 +900,7 @@ def test_session_start_injects_policy_for_configured_project(
     assert "</policy>" in context
     assert "<launcher>" in context
     assert "<authoring-resolver>" in context
+    assert "<prd-path>" in context
     assert "<runbook>" in context
     assert "<bash>" in context
     assert "## workflow policy" not in context
@@ -916,6 +919,7 @@ def test_session_start_injects_policy_for_configured_project(
     assert "{{WORKFLOW_RUNBOOK_DIR}}" not in context
     assert "{{SNIPPET_LAUNCHER}}" not in context
     assert "{{SNIPPET_AUTHORING}}" not in context
+    assert "{{SNIPPET_PRD_PATH}}" not in context
     assert "{{WORKFLOW_ISSUE_PROVIDER}}" not in context
     assert "jira.md" not in context
     assert "filesystem.md" not in context
