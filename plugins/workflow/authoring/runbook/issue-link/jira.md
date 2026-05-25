@@ -27,6 +27,6 @@ workflow issue link <source-issue> \
 The same relationship flags also work on `workflow issue new` to
 apply links in the same call as the create.
 
-See `../../../authoring/providers/jira-issue-relationships.md` for
+See `../../../authoring/providers/issue/jira/relationships.md` for
 canonical intent usage (`parent`, `blocked_by`, `related`; invert
 source/target for `child` / `blocking`).

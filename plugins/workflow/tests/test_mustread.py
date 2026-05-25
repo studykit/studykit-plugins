@@ -45,13 +45,13 @@ def test_bare_review_resolution_uses_absolute_authoring_files() -> None:
     assert resolution.target is None
     assert resolution.provider == "github"
     assert _rel_paths(resolution.files) == [
-        "common/issue-body.md",
-        "common/issue-authoring.md",
-        "common/review-authoring.md",
-        "providers/github-issue-convention.md",
-        "providers/github-issue-relationships.md",
-        "providers/github-issue-review-authoring.md",
-        "providers/github-issue-anti-patterns.md",
+        "contracts/issue/body.md",
+        "contracts/issue/authoring.md",
+        "contracts/issue/review.md",
+        "providers/issue/github/convention.md",
+        "providers/issue/github/relationships.md",
+        "providers/issue/github/review.md",
+        "providers/issue/github/anti-patterns.md",
     ]
     assert all(path.is_absolute() for path in resolution.files)
     assert all("plugins/workflow/operator" not in str(path) for path in resolution.files)
@@ -60,7 +60,9 @@ def test_bare_review_resolution_uses_absolute_authoring_files() -> None:
 def test_bare_review_authoring_uses_native_target_relationship() -> None:
     resolution = resolve_authoring("review", side="issue", provider="github")
     github_review_doc = next(
-        path for path in resolution.files if path.name == "github-issue-review-authoring.md"
+        path
+        for path in resolution.files
+        if path.parent.name == "github" and path.name == "review.md"
     )
 
     text = github_review_doc.read_text(encoding="utf-8")
@@ -89,7 +91,7 @@ def test_dual_artifact_requires_explicit_side() -> None:
 )
 def test_prd_component_includes_prd_index(artifact_type: str, side: str | None) -> None:
     resolution = resolve_authoring(artifact_type, side=side)
-    assert "common/prd-authoring.md" in _rel_paths(resolution.files)
+    assert "contracts/prd.md" in _rel_paths(resolution.files)
 
 
 @pytest.mark.parametrize(
@@ -108,18 +110,18 @@ def test_prd_component_includes_prd_index(artifact_type: str, side: str | None) 
 )
 def test_non_prd_artifact_excludes_prd_index(artifact_type: str, side: str | None) -> None:
     resolution = resolve_authoring(artifact_type, side=side)
-    assert "common/prd-authoring.md" not in _rel_paths(resolution.files)
+    assert "contracts/prd.md" not in _rel_paths(resolution.files)
 
 
 def test_comment_scope_excludes_prd_index() -> None:
     resolution = resolve_authoring("usecase", side="issue", scope="comment")
-    assert "common/prd-authoring.md" not in _rel_paths(resolution.files)
+    assert "contracts/prd.md" not in _rel_paths(resolution.files)
 
 
 @pytest.mark.parametrize("side", ["issue", "knowledge"])
 def test_usecase_includes_abstraction_guard(side: str) -> None:
     resolution = resolve_authoring("usecase", side=side)
-    assert "common/usecase-abstraction-guard.md" in _rel_paths(resolution.files)
+    assert "contracts/usecase-abstraction-guard.md" in _rel_paths(resolution.files)
 
 
 @pytest.mark.parametrize(
@@ -139,21 +141,21 @@ def test_non_usecase_excludes_abstraction_guard(
     artifact_type: str, side: str | None
 ) -> None:
     resolution = resolve_authoring(artifact_type, side=side)
-    assert "common/usecase-abstraction-guard.md" not in _rel_paths(resolution.files)
+    assert "contracts/usecase-abstraction-guard.md" not in _rel_paths(resolution.files)
 
 
 def test_usecase_comment_scope_excludes_abstraction_guard() -> None:
     resolution = resolve_authoring("usecase", side="issue", scope="comment")
-    assert "common/usecase-abstraction-guard.md" not in _rel_paths(resolution.files)
+    assert "contracts/usecase-abstraction-guard.md" not in _rel_paths(resolution.files)
 
 
 @pytest.mark.parametrize(
     "artifact_type,side,expected",
     [
-        ("usecase", "issue", "common/usecase-issue-authoring.md"),
-        ("usecase", "knowledge", "common/usecase-knowledge-authoring.md"),
-        ("research", "issue", "common/research-issue-authoring.md"),
-        ("research", "knowledge", "common/research-knowledge-authoring.md"),
+        ("usecase", "issue", "contracts/issue/usecase.md"),
+        ("usecase", "knowledge", "contracts/knowledge/usecase.md"),
+        ("research", "issue", "contracts/issue/research.md"),
+        ("research", "knowledge", "contracts/knowledge/research.md"),
     ],
 )
 def test_dual_type_returns_side_specific_authoring_file(
@@ -167,10 +169,10 @@ def test_dual_type_returns_side_specific_authoring_file(
 @pytest.mark.parametrize(
     "artifact_type,side,unexpected",
     [
-        ("usecase", "issue", "common/usecase-knowledge-authoring.md"),
-        ("usecase", "knowledge", "common/usecase-issue-authoring.md"),
-        ("research", "issue", "common/research-knowledge-authoring.md"),
-        ("research", "knowledge", "common/research-issue-authoring.md"),
+        ("usecase", "issue", "contracts/knowledge/usecase.md"),
+        ("usecase", "knowledge", "contracts/issue/usecase.md"),
+        ("research", "issue", "contracts/knowledge/research.md"),
+        ("research", "knowledge", "contracts/issue/research.md"),
     ],
 )
 def test_dual_type_excludes_other_side_authoring_file(
@@ -188,7 +190,7 @@ def test_dual_type_includes_common_authoring_file(
 ) -> None:
     resolution = resolve_authoring(artifact_type, side=side)
     rels = _rel_paths(resolution.files)
-    assert f"common/{artifact_type}-authoring.md" in rels
+    assert f"contracts/{artifact_type}.md" in rels
 
 
 @pytest.mark.parametrize(
@@ -205,8 +207,8 @@ def test_dual_type_common_authoring_precedes_side_specific(
 ) -> None:
     resolution = resolve_authoring(artifact_type, side=side)
     rels = _rel_paths(resolution.files)
-    common = f"common/{artifact_type}-authoring.md"
-    side_specific = f"common/{artifact_type}-{side}-authoring.md"
+    common = f"contracts/{artifact_type}.md"
+    side_specific = f"contracts/{side}/{artifact_type}.md"
     assert rels.index(common) < rels.index(side_specific)
 
 
@@ -227,17 +229,17 @@ providers:
     knowledge_resolution = resolve_authoring("architecture", project=tmp_path)
 
     assert issue_resolution.provider == "jira"
-    assert "common/issue-authoring.md" in _rel_paths(issue_resolution.files)
-    assert "providers/jira-issue-convention.md" in _rel_paths(issue_resolution.files)
-    assert "providers/jira-issue-relationships.md" in _rel_paths(issue_resolution.files)
-    assert "providers/jira-issue-task-authoring.md" in _rel_paths(issue_resolution.files)
-    assert "providers/jira-issue-anti-patterns.md" in _rel_paths(issue_resolution.files)
+    assert "contracts/issue/authoring.md" in _rel_paths(issue_resolution.files)
+    assert "providers/issue/jira/convention.md" in _rel_paths(issue_resolution.files)
+    assert "providers/issue/jira/relationships.md" in _rel_paths(issue_resolution.files)
+    assert "providers/issue/jira/task.md" in _rel_paths(issue_resolution.files)
+    assert "providers/issue/jira/anti-patterns.md" in _rel_paths(issue_resolution.files)
     assert knowledge_resolution.provider == "github"
     assert _rel_paths(knowledge_resolution.files) == [
-        "common/knowledge-body.md",
-        "common/architecture-authoring.md",
-        "providers/github-knowledge-convention.md",
-        "providers/github-knowledge-architecture-authoring.md",
+        "contracts/knowledge/body.md",
+        "contracts/knowledge/architecture.md",
+        "providers/knowledge/github/convention.md",
+        "providers/knowledge/github/architecture.md",
     ]
 
 
@@ -247,7 +249,7 @@ def test_comment_scope_github_issue_resolution_uses_only_comment_relevant_files(
     assert resolution.side == "issue"
     assert resolution.provider == "github"
     assert _rel_paths(resolution.files) == [
-        "providers/github-issue-convention.md",
+        "providers/issue/github/convention.md",
     ]
 
 
@@ -257,7 +259,7 @@ def test_comment_scope_jira_issue_resolution_uses_only_comment_relevant_files() 
     assert resolution.side == "issue"
     assert resolution.provider == "jira"
     assert _rel_paths(resolution.files) == [
-        "providers/jira-issue-convention.md",
+        "providers/issue/jira/convention.md",
     ]
 
 
@@ -285,7 +287,7 @@ def test_issue_resolution_excludes_decomposition_patterns(
     artifact_type: str, side: str | None
 ) -> None:
     resolution = resolve_authoring(artifact_type, side=side)
-    assert "common/decomposition-patterns.md" not in _rel_paths(resolution.files)
+    assert "contracts/issue/decomposition-patterns.md" not in _rel_paths(resolution.files)
 
 
 @pytest.mark.parametrize("artifact_type", ["task", "epic"])
@@ -294,9 +296,9 @@ def test_decomposition_eligible_types_include_decomposition_patterns(
 ) -> None:
     resolution = resolve_authoring(artifact_type)
     rels = _rel_paths(resolution.files)
-    assert "common/decomposition-patterns.md" in rels
-    assert rels.index(f"common/{artifact_type}-authoring.md") < rels.index(
-        "common/decomposition-patterns.md"
+    assert "contracts/issue/decomposition-patterns.md" in rels
+    assert rels.index(f"contracts/issue/{artifact_type}.md") < rels.index(
+        "contracts/issue/decomposition-patterns.md"
     )
 
 
@@ -307,7 +309,7 @@ def test_decomposition_patterns_excluded_from_comment_scope(
     resolution = resolve_authoring(
         artifact_type, side="issue", provider="github", scope="comment"
     )
-    assert "common/decomposition-patterns.md" not in _rel_paths(resolution.files)
+    assert "contracts/issue/decomposition-patterns.md" not in _rel_paths(resolution.files)
 
 
 @pytest.mark.parametrize("artifact_type", ["task", "bug"])
@@ -477,11 +479,11 @@ def test_usecase_issue_author_bundles_actors_with_provider() -> None:
     )
     rels = _rel_paths(resolution.files)
 
-    assert "common/usecase-issue-authoring.md" in rels
-    assert "common/actors-authoring.md" in rels
-    assert "providers/github-knowledge-actors-authoring.md" in rels
-    assert rels.index("common/usecase-issue-authoring.md") < rels.index(
-        "common/actors-authoring.md"
+    assert "contracts/issue/usecase.md" in rels
+    assert "contracts/knowledge/actors.md" in rels
+    assert "providers/knowledge/github/actors.md" in rels
+    assert rels.index("contracts/issue/usecase.md") < rels.index(
+        "contracts/knowledge/actors.md"
     )
 
 
@@ -491,17 +493,17 @@ def test_usecase_knowledge_author_bundles_actors_with_provider() -> None:
     )
     rels = _rel_paths(resolution.files)
 
-    assert "common/usecase-knowledge-authoring.md" in rels
-    assert "common/actors-authoring.md" in rels
-    assert "providers/github-knowledge-actors-authoring.md" in rels
+    assert "contracts/knowledge/usecase.md" in rels
+    assert "contracts/knowledge/actors.md" in rels
+    assert "providers/knowledge/github/actors.md" in rels
 
 
 def test_usecase_author_without_provider_omits_provider_actors_file() -> None:
     resolution = resolve_authoring("usecase", side="issue")
     rels = _rel_paths(resolution.files)
 
-    assert "common/actors-authoring.md" in rels
-    assert "providers/github-knowledge-actors-authoring.md" not in rels
+    assert "contracts/knowledge/actors.md" in rels
+    assert "providers/knowledge/github/actors.md" not in rels
 
 
 def test_review_target_usecase_issue_bundles_actors_companion() -> None:
@@ -511,16 +513,16 @@ def test_review_target_usecase_issue_bundles_actors_companion() -> None:
 
     assert resolution.target == "usecase"
     assert _rel_paths(resolution.files) == [
-        "common/quality/usecase-issue-criteria.md",
-        "common/usecase-abstraction-guard.md",
-        "common/quality/actors-criteria.md",
-        "common/issue-body.md",
-        "common/issue-authoring.md",
-        "common/review-authoring.md",
-        "providers/github-issue-convention.md",
-        "providers/github-issue-relationships.md",
-        "providers/github-issue-review-authoring.md",
-        "providers/github-issue-anti-patterns.md",
+        "contracts/quality/usecase-issue-criteria.md",
+        "contracts/usecase-abstraction-guard.md",
+        "contracts/quality/actors-criteria.md",
+        "contracts/issue/body.md",
+        "contracts/issue/authoring.md",
+        "contracts/issue/review.md",
+        "providers/issue/github/convention.md",
+        "providers/issue/github/relationships.md",
+        "providers/issue/github/review.md",
+        "providers/issue/github/anti-patterns.md",
     ]
     assert resolution.notes == ()
 
@@ -531,9 +533,9 @@ def test_review_target_omits_target_type_authoring_files() -> None:
     )
     rels = _rel_paths(resolution.files)
 
-    assert "common/usecase-authoring.md" not in rels
-    assert "common/usecase-issue-authoring.md" not in rels
-    assert "providers/github-issue-usecase-authoring.md" not in rels
+    assert "contracts/usecase.md" not in rels
+    assert "contracts/issue/usecase.md" not in rels
+    assert "providers/issue/github/usecase.md" not in rels
 
 
 def test_review_target_anchor_includes_review_suffix() -> None:
@@ -575,9 +577,9 @@ def test_bare_review_returns_authoring_contract_without_review_files() -> None:
 
     assert resolution.target is None
     rels = _rel_paths(resolution.files)
-    assert "common/issue-authoring.md" in rels
-    assert "common/review-authoring.md" in rels
-    assert "common/quality/usecase-issue-criteria.md" not in rels
+    assert "contracts/issue/authoring.md" in rels
+    assert "contracts/issue/review.md" in rels
+    assert "contracts/quality/usecase-issue-criteria.md" not in rels
     assert resolution.reading_anchor == "review-issue"
 
 
@@ -597,12 +599,12 @@ def test_render_cache_hit_reference_includes_raw_recovery_hint() -> None:
 
 
 def test_authoring_path_classification_uses_plugin_authoring_root(tmp_path: Path) -> None:
-    authoring_file = _PLUGIN_ROOT / "authoring" / "common" / "task-authoring.md"
-    outside_file = tmp_path / "task-authoring.md"
+    authoring_file = _PLUGIN_ROOT / "authoring" / "contracts" / "issue" / "task.md"
+    outside_file = tmp_path / "task.md"
     outside_file.write_text("# Task\n", encoding="utf-8")
 
     assert authoring_relative_path(authoring_file, plugin_root=_PLUGIN_ROOT) == (
-        "common/task-authoring.md"
+        "contracts/issue/task.md"
     )
     assert is_authoring_file(authoring_file, plugin_root=_PLUGIN_ROOT)
     assert authoring_relative_path(outside_file, plugin_root=_PLUGIN_ROOT) is None
