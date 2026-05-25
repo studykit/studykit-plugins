@@ -15,6 +15,14 @@ Resolve authoring paths before any issue or knowledge pages:
 
 </authoring-resolver>
 
+<prd-path>
+
+Resolve PRD-component page locations before reading or writing them:
+
+{{SNIPPET_PRD_PATH}}
+
+</prd-path>
+
 <runbook>
 
 Reference doc (read on demand) at

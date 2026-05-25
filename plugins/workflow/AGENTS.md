@@ -63,8 +63,9 @@ Where the injected text comes from:
   - `session-start.md` (general subagent policy)
   - `agents/<agent-name>.md` (per-agent block, when present)
 - **Inline snippets** — `hooks/context/snippets/authoring.md` (authoring
-  resolver) and `hooks/context/snippets/launcher/<runtime>.md` (launcher
-  invocation) are the only fragments inlined into the templates above.
+  resolver), `hooks/context/snippets/launcher/<runtime>.md` (launcher
+  invocation), and `hooks/context/snippets/prd-path.md` (PRD-path
+  resolver) are the only fragments inlined into the templates above.
   Everything else is referenced on demand.
 - **On-demand reference docs** are *not* injected. The injected
   `main/session-start.md` and `subagent/session-start.md` only point at them; the

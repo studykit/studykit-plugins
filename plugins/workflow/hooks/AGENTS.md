@@ -25,6 +25,8 @@ shared functions — do not duplicate them here.
   when a commit keyword fires.
 - `context/snippets/launcher/<runtime>.md` — runtime-keyed launcher
   snippet inlined into both `SessionStart` and `SubagentStart`.
+- `context/snippets/prd-path.md` — single-file snippet inlined into both
+  `SessionStart` and `SubagentStart` (the PRD-path resolver invocation).
 
 All of the above are composed into the templates above via `{{...}}`
 substitution in `../scripts/workflow_main_context.py`.
@@ -37,8 +39,8 @@ runbook pages (`issue-fetch/<provider>.md`, `issue-write/<provider>.md`,
 in this tree. `hooks/context/` holds only what hooks read for injection.
 Both main session and subagents resolve verb syntax and flag sets by
 reading those runbook files on demand; the inlined snippets are
-deliberately limited to the launcher invocation and the authoring
-resolver block.
+deliberately limited to the launcher invocation, the authoring resolver
+block, and the PRD-path resolver block.
 
 ## Invariants
 
@@ -52,10 +54,10 @@ resolver block.
   one of those events on the target runtime or be runtime-only.
 - **Stdout is JSON or empty.** Empty stdout = no-op. Never emit plain text.
 - **Subagents inherit env, not policy.** SubagentStart injection stays
-  narrow (launcher + authoring resolver + the same runbook reference
-  list as the main session, plus per-agent flow blocks for
-  `issue-implementer`). Verb syntax lives in the runbook for both main
-  session and subagents.
+  narrow (launcher + authoring resolver + PRD-path resolver + the same
+  runbook reference list as the main session, plus per-agent flow blocks
+  for `issue-implementer`). Verb syntax lives in the runbook for both
+  main session and subagents.
 - **Codex cannot persist env from SessionStart.** `hook_codex.py` records
   session state under `.workflow-cache/hook-state/`; the
   `../scripts/workflow` wrapper sources the exports later via
@@ -64,9 +66,10 @@ resolver block.
 - **Placeholders use `{{NAME}}`, not `$NAME`.** Substituted in
   `../scripts/workflow_main_context.py`. Adding a new placeholder
   requires wiring it there in the same change as the template wording.
-  Two snippet placeholders exist: `{{SNIPPET_AUTHORING}}` ↔
-  `snippets/authoring.md` and `{{SNIPPET_LAUNCHER}}` ↔
-  `snippets/launcher/<runtime>.md`. Other usage (fetch / write / link /
+  Three snippet placeholders exist: `{{SNIPPET_AUTHORING}}` ↔
+  `snippets/authoring.md`, `{{SNIPPET_LAUNCHER}}` ↔
+  `snippets/launcher/<runtime>.md`, and `{{SNIPPET_PRD_PATH}}` ↔
+  `snippets/prd-path.md`. Other usage (fetch / write / link /
   etc.) is referenced via `{{WORKFLOW_RUNBOOK_DIR}}` +
   `{{WORKFLOW_ISSUE_PROVIDER}}` pointing at
   `authoring/runbook/<intent>/<provider>.md`.

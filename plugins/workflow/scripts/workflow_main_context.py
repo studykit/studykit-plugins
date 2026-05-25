@@ -9,16 +9,19 @@ fragments live under ``hooks/context/main/``; subagent fragments live under
 ``hooks/context/subagent/``; the only remaining inline snippets are
 ``hooks/context/snippets/authoring.md`` (single file, used at both
 ``SessionStart`` and ``SubagentStart``) and
-``hooks/context/snippets/launcher/<runtime>.md`` (runtime-keyed). On-demand
-reference docs that the assistant ``Read``s when the injected text points at
-them live under ``authoring/runbook/`` (not under ``hooks/context/``), so they
-sit on the same ``authoring/`` read-tracking contract as the rest of the
-authoring tree.
+``hooks/context/snippets/launcher/<runtime>.md`` (runtime-keyed), and
+``hooks/context/snippets/prd-path.md`` (single file, used at both
+``SessionStart`` and ``SubagentStart``). On-demand reference docs that the
+assistant ``Read``s when the injected text points at them live under
+``authoring/runbook/`` (not under ``hooks/context/``), so they sit on the
+same ``authoring/`` read-tracking contract as the rest of the authoring
+tree.
 
 Template placeholders use ``{{NAME}}`` (double braces) so they stay visually
 distinct from real ``$NAME`` shell variables in the same text.
-``{{SNIPPET_AUTHORING}}`` and ``{{SNIPPET_LAUNCHER}}`` substitute the two
-remaining snippet files; ``{{WORKFLOW_RUNBOOK_DIR}}`` resolves to
+``{{SNIPPET_AUTHORING}}``, ``{{SNIPPET_LAUNCHER}}``, and
+``{{SNIPPET_PRD_PATH}}`` substitute the three inlined snippet files;
+``{{WORKFLOW_RUNBOOK_DIR}}`` resolves to
 ``<plugin_root>/authoring/runbook``; ``{{WORKFLOW_ISSUE_PROVIDER}}`` resolves
 to the active issue provider (``github``/``jira``/``filesystem``). Fetch /
 write / link / etc. usage is *not* inlined — both ``main/session-start.md``
@@ -83,6 +86,7 @@ def build_session_policy_context(
     rendered = render(text, {
         "SNIPPET_LAUNCHER": _build_launcher_block(runtime, resolved_plugin_root),
         "SNIPPET_AUTHORING": _read_fragment("snippets/authoring.md").strip(),
+        "SNIPPET_PRD_PATH": _read_fragment("snippets/prd-path.md").strip(),
         "WORKFLOW_RUNBOOK_DIR": str(runbook_dir),
         "WORKFLOW_ISSUE_PROVIDER": issue_provider,
     })
@@ -107,6 +111,7 @@ def build_subagent_policy_context(
     rendered = render(text, {
         "SNIPPET_LAUNCHER": _build_launcher_block(runtime, resolved_plugin_root),
         "SNIPPET_AUTHORING": _read_fragment("snippets/authoring.md").strip(),
+        "SNIPPET_PRD_PATH": _read_fragment("snippets/prd-path.md").strip(),
         "WORKFLOW_RUNBOOK_DIR": str(runbook_dir),
         "WORKFLOW_ISSUE_PROVIDER": issue_provider,
     })
