@@ -7,6 +7,7 @@ Companion contracts:
 
 - `./body.md`
 - Issue rules: `./authoring.md`
+- Decomposition choice: `./decomposition-patterns.md`
 
 ## Task title
 
@@ -28,23 +29,6 @@ Anchorless tasks are allowed for small, obvious changes, but they should pass a 
 - If the task is exploratory and evidence is missing, use `spike` or `research` instead.
 
 Do not hide design decisions only in the task body when they should become curated knowledge.
-
-## Shared narrative
-
-When a task belongs to a larger batch of work, keep shared context in the parent
-issue. The task body should record only the scope, acceptance criteria, and
-implementation notes that are specific to this task.
-
-## Granularity
-
-Split a task when it spans:
-
-- Unrelated code areas.
-- Independent acceptance criteria.
-- Independent test surfaces.
-- Work that can be assigned or sequenced independently.
-
-When a split is warranted, the decomposition pattern (sibling tasks, parent task with subtasks, or epic with members) is selected per `./decomposition-patterns.md`. Use the `blocked_by` relationship intent for hard sequencing between siblings, and a shared anchor (use case, spec, parent task, or epic) when siblings deliver toward the same goal.
 
 ## Body shape
 

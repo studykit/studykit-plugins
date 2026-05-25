@@ -36,19 +36,7 @@ Do not create an epic when:
 
 Parent task vs epic discriminator: the epic body cannot stand as a task. If a draft parent body would have a meaningful `Unit Test Strategy` and `Acceptance Criteria` at the parent level, the parent is a task, not an epic. See `./decomposition-patterns.md`.
 
-## Shared narrative
-
-The epic is the home for narrative that spans its member issues:
-
-- Decisions across member issues.
-- Integration constraints.
-- Shared blockers.
-- Sequencing choices.
-- Scope changes that affect several member issues.
-
-Use comments for discussion. Keep the epic body as the current coordination summary.
-
-Member issues should link to the epic when their own approach depends on epic-level narrative.
+The epic body is the home for shared narrative across member issues (decisions, integration constraints, shared blockers, sequencing, scope changes). See the Shared narrative section in `./decomposition-patterns.md`.
 
 ## Body shape
 
