@@ -1,4 +1,4 @@
-# Workflow Use Case Authoring — Knowledge Side
+# Use Case Authoring — Knowledge Side
 
 This file covers the **knowledge side** of `usecase`: the curated knowledge page that carries the stable, citable use case content.
 

@@ -1,4 +1,4 @@
-# Workflow Issue Common Rules
+# Issue Common Rules
 
 Common semantic rules for issue-backed items.
 

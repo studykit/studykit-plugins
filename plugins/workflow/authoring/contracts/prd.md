@@ -1,4 +1,4 @@
-# Workflow PRD Authoring
+# PRD Authoring
 
 A PRD (Product Requirements Document) in this workflow is the **aggregate of several knowledge pages and issue-backed items** that together describe a project's framing, user-visible behavior, and decided requirements.
 

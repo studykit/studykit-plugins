@@ -1,4 +1,4 @@
-# Workflow Epic Authoring
+# Epic Authoring
 
 A workflow epic is an **issue-backed coordination parent** for a larger goal delivered through multiple member issues.
 

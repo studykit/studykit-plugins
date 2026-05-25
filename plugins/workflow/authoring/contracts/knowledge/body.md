@@ -1,4 +1,4 @@
-# Workflow Knowledge Body Conventions
+# Knowledge Body Conventions
 
 Body-level rules for knowledge pages stored in a knowledge backend.
 

@@ -1,4 +1,4 @@
-# Workflow Spike Authoring
+# Spike Authoring
 
 A workflow spike is an **issue-backed, time-boxed exploration to unblock a decision**. It may involve throwaway code, a proof of concept, benchmark, integration probe, or focused technical experiment.
 

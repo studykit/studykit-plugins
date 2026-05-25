@@ -1,4 +1,4 @@
-# Workflow Spec Authoring
+# Spec Authoring
 
 A workflow spec is a **knowledge-backed prescriptive implementation contract** for a single implementation surface: an API shape, schema, protocol, renderer rule, CLI surface, file format, integration contract, or other downstream implementation shape.
 

@@ -1,4 +1,4 @@
-# Workflow Research Authoring — Knowledge Side
+# Research Authoring — Knowledge Side
 
 This file covers the **knowledge side** of `research`: the curated report that carries final findings, evidence, options, and recommendation-neutral conclusions.
 
