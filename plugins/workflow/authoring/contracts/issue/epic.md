@@ -9,7 +9,7 @@ Epics are stored in the configured issue backend.
 Companion contracts:
 
 - `./body.md`
-- Issue rules: `./authoring.md`
+- Issue rules: `./common.md`
 - Decomposition choice: `./decomposition-patterns.md`
 
 ## Storage role

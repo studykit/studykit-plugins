@@ -339,12 +339,12 @@ def _common_parts(
                 ])
             parts.extend([
                 "contracts/issue/body.md",
-                "contracts/issue/authoring.md",
+                "contracts/issue/common.md",
                 "contracts/issue/review.md",
             ])
             return parts
         case (_, None, "issue"):
-            parts = ["contracts/issue/body.md", "contracts/issue/authoring.md"]
+            parts = ["contracts/issue/body.md", "contracts/issue/common.md"]
         case _:  # (_, None, "knowledge")
             parts = ["contracts/knowledge/body.md"]
 

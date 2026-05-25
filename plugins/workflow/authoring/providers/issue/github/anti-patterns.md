@@ -5,7 +5,7 @@ GitHub Issues can store parent/sub-issue and dependency relationships as provide
 Read this with:
 
 - `../../../contracts/issue/body.md`
-- `../../../contracts/issue/authoring.md`
+- `../../../contracts/issue/common.md`
 - `./convention.md`
 - `./relationships.md`
 

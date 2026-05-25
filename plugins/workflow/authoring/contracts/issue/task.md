@@ -6,7 +6,7 @@ extension, refactor, or other planned code change.
 Companion contracts:
 
 - `./body.md`
-- Issue rules: `./authoring.md`
+- Issue rules: `./common.md`
 - Decomposition choice: `./decomposition-patterns.md`
 
 ## Task title

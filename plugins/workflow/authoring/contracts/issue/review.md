@@ -12,7 +12,7 @@ criteria.
 Companion contracts:
 
 - `./body.md`
-- Issue rules: `./authoring.md`
+- Issue rules: `./common.md`
 
 Do not create a review item for every comment. Use comments for local
 discussion. Use a review item when the feedback must be tracked independently.
