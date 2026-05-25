@@ -15,7 +15,9 @@ if str(_SCRIPTS_DIR) not in sys.path:
 from prd_path import (  # noqa: E402
     COMPONENT_PATHS,
     PrdPathError,
+    main,
     normalize_prd_path,
+    resolve_all_prd_paths,
     resolve_prd_path,
 )
 
@@ -182,3 +184,94 @@ def test_normalize_prd_path_valid(value: str | None, expected: str) -> None:
 def test_normalize_prd_path_rejects(value: str) -> None:
     with pytest.raises(PrdPathError):
         normalize_prd_path(value)
+
+
+def test_resolve_all_returns_every_component_sorted(tmp_path: Path) -> None:
+    _write_config(tmp_path, knowledge_path="wiki/workflow")
+
+    listing = resolve_all_prd_paths(project=tmp_path)
+
+    assert listing.base == (tmp_path / "wiki/workflow").resolve()
+    assert [name for name, _ in listing.entries] == sorted(COMPONENT_PATHS)
+    assert dict(listing.entries) == COMPONENT_PATHS
+
+
+def test_resolve_all_respects_prd_path_setting(tmp_path: Path) -> None:
+    _write_config(tmp_path, knowledge_path="wiki/workflow", prd_path="prd")
+
+    listing = resolve_all_prd_paths(project=tmp_path)
+
+    assert listing.base == (tmp_path / "wiki/workflow/prd").resolve()
+
+
+def test_resolve_all_missing_config_raises(tmp_path: Path) -> None:
+    with pytest.raises(PrdPathError, match=".workflow/config.yml was not found"):
+        resolve_all_prd_paths(project=tmp_path)
+
+
+def test_resolve_all_to_markdown_shape(tmp_path: Path) -> None:
+    _write_config(tmp_path, knowledge_path="wiki/workflow")
+    listing = resolve_all_prd_paths(project=tmp_path)
+
+    output = listing.to_markdown()
+
+    expected_base = (tmp_path / "wiki/workflow").resolve()
+    expected_lines = ["<prd_path>", f"Base: {expected_base}"]
+    for name in sorted(COMPONENT_PATHS):
+        expected_lines.append(f"- {name}: {COMPONENT_PATHS[name]}")
+    expected_lines.append("</prd_path>")
+    assert output == "\n".join(expected_lines) + "\n"
+
+
+def test_main_list_prints_listing(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    _write_config(tmp_path, knowledge_path="wiki/workflow")
+
+    exit_code = main(["--list", "--project", str(tmp_path)])
+
+    captured = capsys.readouterr()
+    assert exit_code == 0
+    assert captured.out.startswith("<prd_path>\n")
+    assert "- actors: usecases/actors.md" in captured.out
+    assert captured.out.rstrip().endswith("</prd_path>")
+    assert captured.err == ""
+
+
+def test_main_list_with_component_errors(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    _write_config(tmp_path, knowledge_path="wiki/workflow")
+
+    with pytest.raises(SystemExit) as exc_info:
+        main(["--list", "actors", "--project", str(tmp_path)])
+
+    assert exc_info.value.code == 2
+    captured = capsys.readouterr()
+    assert "--list cannot be combined" in captured.err
+
+
+def test_main_without_component_or_list_errors(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    _write_config(tmp_path, knowledge_path="wiki/workflow")
+
+    with pytest.raises(SystemExit) as exc_info:
+        main(["--project", str(tmp_path)])
+
+    assert exc_info.value.code == 2
+    captured = capsys.readouterr()
+    assert "provide a component name or pass --list" in captured.err
+
+
+def test_main_single_component_prints_resolution(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    _write_config(tmp_path, knowledge_path="wiki/workflow")
+
+    exit_code = main(["actors", "--project", str(tmp_path)])
+
+    captured = capsys.readouterr()
+    assert exit_code == 0
+    assert captured.out.startswith('<prd_path component="actors">\n')
+    assert "- usecases/actors.md" in captured.out
