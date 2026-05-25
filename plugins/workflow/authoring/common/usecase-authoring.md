@@ -6,11 +6,6 @@ Use case is a dual-role type: it has an **issue side** (discovery, questions, st
 
 This file carries the rules that apply across both sides. Role-specific rules live in the companion contracts.
 
-Companion contracts:
-
-- Issue side: `./usecase-issue-authoring.md`
-- Knowledge side: `./usecase-knowledge-authoring.md`
-- Abstraction guard (conversion table + per-field obligations): `./usecase-abstraction-guard.md`
 
 ## Abstraction discipline
 
