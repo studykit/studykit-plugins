@@ -26,19 +26,19 @@ Derive the audit report path from the draft body file path by appending `.audit.
 
 These are the ground truth for "well-sized task". Read them at the start of every audit — they may have changed since the last invocation.
 
-- `plugins/workflow/authoring/common/task-authoring.md` — primary contract.
-- `plugins/workflow/authoring/common/issue-body.md` — body shape and section rules.
-- `plugins/workflow/authoring/common/issue-authoring.md` — common issue rules.
-- `plugins/workflow/authoring/common/decomposition-patterns.md` — sibling tasks vs parent task + subtasks vs epic, plus sibling relationship guidance. Required when the verdict involves decomposition (`split`, `parent-task-candidate`, `epic-candidate`).
+- `plugins/workflow/authoring/contracts/issue/task.md` — primary contract.
+- `plugins/workflow/authoring/contracts/issue/body.md` — body shape and section rules.
+- `plugins/workflow/authoring/contracts/issue/authoring.md` — common issue rules.
+- `plugins/workflow/authoring/contracts/issue/decomposition-patterns.md` — sibling tasks vs parent task + subtasks vs epic, plus sibling relationship guidance. Required when the verdict involves decomposition (`split`, `parent-task-candidate`, `epic-candidate`).
 
 If the verdict you are about to issue is `reclassify-spike` or `reclassify-research`, also read:
 
-- `plugins/workflow/authoring/common/spike-authoring.md`
-- `plugins/workflow/authoring/common/research-authoring.md`
+- `plugins/workflow/authoring/contracts/issue/spike.md`
+- `plugins/workflow/authoring/contracts/research.md`
 
 If the verdict involves decomposition (`split`, `parent-task-candidate`, `epic-candidate`), also read:
 
-- `plugins/workflow/authoring/common/epic-authoring.md`
+- `plugins/workflow/authoring/contracts/issue/epic.md`
 
 Do not rely on a prior summary of these files. Re-read them per audit.
 
@@ -140,7 +140,7 @@ For every verdict except `ok`, end the review with concrete next steps. The shap
 - `parent-task-candidate` — propose 2 (default) or 3 task-typed subtasks. For each subtask give a working title and the AC slice it owns. Then describe the parent task body: the parent-level `Description` (what the joined goal is), parent-level `Unit Test Strategy` (typically the integration scenario), and parent-level `Acceptance Criteria` (the joined observable outcome). Note any sequencing constraint between subtasks (`blocked_by`).
 - `split` — propose 2 (default) or 3 (only when AC genuinely falls into three cohesive bundles) sibling task units. For each unit give a working title, the AC slice it owns, an anchor proposal (use case, spec, parent task, or epic — note when units share an anchor), any sequencing constraint via `blocked_by` (which must merge first), and any soft non-blocking connection that warrants a `Related` body entry. Confirm no shared parent-level invariant exists; if one does, prefer `parent-task-candidate` or `epic-candidate`.
 
-For the three decomposition verdicts (`split`, `parent-task-candidate`, `epic-candidate`), the actionable section must open with a directive line instructing the main session to read `plugins/workflow/authoring/common/decomposition-patterns.md` before drafting any follow-up body. The main session needs the pattern contract — body shapes for parent task vs epic, sibling relationship rules — to author the follow-up issues correctly, and this directive is the only place it is surfaced to that session.
+For the three decomposition verdicts (`split`, `parent-task-candidate`, `epic-candidate`), the actionable section must open with a directive line instructing the main session to read `plugins/workflow/authoring/contracts/issue/decomposition-patterns.md` before drafting any follow-up body. The main session needs the pattern contract — body shapes for parent task vs epic, sibling relationship rules — to author the follow-up issues correctly, and this directive is the only place it is surfaced to that session.
 
 ## Authority boundaries
 

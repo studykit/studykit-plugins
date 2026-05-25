@@ -20,6 +20,6 @@ workflow issue link <source-issue> \
 The same relationship flags also work on `workflow issue new` and
 `workflow issue update` to apply links in the same call.
 
-See `../../../authoring/providers/github-issue-relationships.md` for
+See `../../../authoring/providers/issue/github/relationships.md` for
 canonical intent usage (`parent`, `blocked_by`; invert source/target
 for `child` / `blocking`).

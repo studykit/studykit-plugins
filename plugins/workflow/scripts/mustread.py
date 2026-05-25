@@ -67,44 +67,15 @@ TASK_AUDIT_TRIGGER_NOTE = (
     "work already done."
 )
 
-RETROACTIVE_PUBLISH_STATE_NOTES = {
-    "github": (
-        "Retroactive issues that track work already done should be "
-        "published in the closed state."
-    ),
-    "jira": (
-        "Retroactive issues that track work already done should be "
-        "published in the resolved state."
-    ),
-}
+RETROACTIVE_PUBLISH_STATE_GITHUB = (
+    "Retroactive issues that track work already done should be "
+    "published in the closed state."
+)
 
-ISSUE_PROVIDER_FILES = {
-    "github": "providers/github-issue-convention.md",
-    "jira": "providers/jira-issue-convention.md",
-}
-
-ISSUE_PROVIDER_RELATIONSHIP_FILES = {
-    "github": "providers/github-issue-relationships.md",
-    "jira": "providers/jira-issue-relationships.md",
-}
-
-KNOWLEDGE_PROVIDER_FILES = {
-    "github": "providers/github-knowledge-convention.md",
-}
-
-ISSUE_PROVIDER_TYPE_PATTERNS = {
-    "github": "providers/github-issue-{artifact_type}-authoring.md",
-    "jira": "providers/jira-issue-{artifact_type}-authoring.md",
-}
-
-KNOWLEDGE_PROVIDER_TYPE_PATTERNS = {
-    "github": "providers/github-knowledge-{artifact_type}-authoring.md",
-}
-
-PROVIDER_EXTRA_FILES = {
-    ("issue", "github"): ("providers/github-issue-anti-patterns.md",),
-    ("issue", "jira"): ("providers/jira-issue-anti-patterns.md",),
-}
+RETROACTIVE_PUBLISH_STATE_JIRA = (
+    "Retroactive issues that track work already done should be "
+    "published in the resolved state."
+)
 
 
 def _anchor_scope_suffix(scope: str) -> str:
@@ -187,23 +158,39 @@ class ResolverError(ValueError):
     """Raised when authoring cannot be resolved safely."""
 
 
-def normalize_type(value: str) -> str:
-    normalized = value.strip().lower().replace("_", "-")
-    if normalized == "use-case":
-        normalized = "usecase"
-    if normalized not in ALL_TYPES:
+def validate_type(value: str) -> None:
+    if value not in ALL_TYPES:
         raise ResolverError(f"unsupported artifact type: {value}")
-    return normalized
 
 
-def normalize_side(
+def validate_side(value: str) -> None:
+    if value not in {"issue", "knowledge"}:
+        raise ResolverError(f"unsupported artifact side: {value}")
+
+
+def validate_scope(value: str) -> None:
+    if value not in AUTHORING_SCOPES:
+        raise ResolverError(f"unsupported authoring scope: {value}")
+
+
+def validate_target(value: str, artifact_type: str) -> None:
+    if artifact_type != "review":
+        raise ResolverError("--target is only valid with --type review")
+    if value == "review":
+        raise ResolverError("--target review is not supported")
+    if value not in REVIEW_TARGETS:
+        raise ResolverError(f"unsupported target type: {value}")
+
+
+def resolve_side(
     value: str | None, artifact_type: str, target: str | None = None
 ) -> str:
-    """Normalize the side axis (issue or knowledge).
+    """Resolve the side axis (issue or knowledge).
 
     When ``target`` is set the side refers to the target's side (the
     artifact being reviewed). Otherwise the side refers to the
-    artifact_type being authored.
+    artifact_type being authored. Defaults from type for single-side
+    types; dual-side types require an explicit value.
     """
     effective_type = target if target is not None else artifact_type
     if value is None:
@@ -214,94 +201,93 @@ def normalize_side(
         raise ResolverError(
             f"artifact type '{effective_type}' can be issue or knowledge; specify --side"
         )
-
-    normalized = value.strip().lower().replace("_", "-")
-    if normalized in {"page", "wiki", "doc", "document"}:
-        normalized = "knowledge"
-    if normalized in {"role"}:
-        # legacy callers that still pass --side role — treat as missing
-        raise ResolverError(f"unsupported artifact side: {value}")
-    if normalized not in {"issue", "knowledge"}:
-        raise ResolverError(f"unsupported artifact side: {value}")
-
-    if effective_type in ISSUE_TYPES and normalized != "issue":
+    validate_side(value)
+    if effective_type in ISSUE_TYPES and value != "issue":
         raise ResolverError(f"artifact type '{effective_type}' is issue-backed")
-    if effective_type in KNOWLEDGE_TYPES and normalized != "knowledge":
+    if effective_type in KNOWLEDGE_TYPES and value != "knowledge":
         raise ResolverError(f"artifact type '{effective_type}' is knowledge-backed")
-    return normalized
+    return value
 
 
-def normalize_scope(value: str | None) -> str:
-    if value is None:
-        return "content"
-    normalized = value.strip().lower().replace("_", "-")
-    if normalized in {"body", "edit", "full"}:
-        normalized = "content"
-    if normalized in {"comments", "comment-only", "comment-only-work"}:
-        normalized = "comment"
-    if normalized not in AUTHORING_SCOPES:
-        raise ResolverError(f"unsupported authoring scope: {value}")
-    return normalized
+def _resolve_authoring_github_issue(
+    artifact_type: str, target: str | None, scope: str
+) -> tuple[list[str], list[str]]:
+    convention = "providers/issue/github/convention.md"
+    relationships = "providers/issue/github/relationships.md"
+    anti_patterns = "providers/issue/github/anti-patterns.md"
+    match (scope, target):
+        case ("comment", _):
+            return [convention], []
+        case (_, str()):
+            return [
+                convention,
+                relationships,
+                "providers/issue/github/review.md",
+                anti_patterns,
+            ], []
+        case _:
+            parts = [
+                convention,
+                relationships,
+                f"providers/issue/github/{artifact_type}.md",
+                anti_patterns,
+            ]
+            if artifact_type == "usecase":
+                parts.append("providers/knowledge/github/actors.md")
+            notes = (
+                [RETROACTIVE_PUBLISH_STATE_GITHUB]
+                if artifact_type in PLAN_MODE_TYPES
+                else []
+            )
+            return parts, notes
 
 
-def normalize_target(value: str | None, artifact_type: str) -> str | None:
-    if value is None:
-        return None
-    if artifact_type != "review":
-        raise ResolverError("--target is only valid with --type review")
-    normalized = value.strip().lower().replace("_", "-")
-    if normalized == "use-case":
-        normalized = "usecase"
-    if normalized == "review":
-        raise ResolverError("--target review is not supported")
-    if normalized not in REVIEW_TARGETS:
-        raise ResolverError(f"unsupported target type: {value}")
-    return normalized
+def _resolve_authoring_github_knowledge(
+    artifact_type: str, target: str | None, scope: str
+) -> tuple[list[str], list[str]]:
+    convention = "providers/knowledge/github/convention.md"
+    match (scope, target):
+        case ("comment", _):
+            return [convention], []
+        case _:
+            parts = [
+                convention,
+                f"providers/knowledge/github/{artifact_type}.md",
+            ]
+            if artifact_type == "usecase":
+                parts.append("providers/knowledge/github/actors.md")
+            return parts, []
 
 
-def _actors_companion_parts(
-    provider: str | None, *, for_review: bool
-) -> list[str]:
-    """Actors registry files bundled with usecase work.
-
-    The actors registry is a knowledge page co-authored alongside use
-    case issues and the use case wiki page; it has no dedicated
-    ``--type actors`` axis. Returns the contract files when authoring
-    and the criteria file when reviewing.
-    """
-    if for_review:
-        return ["common/quality/actors-criteria.md"]
-    parts = ["common/actors-authoring.md"]
-    if provider in KNOWLEDGE_PROVIDER_TYPE_PATTERNS:
-        parts.append(
-            KNOWLEDGE_PROVIDER_TYPE_PATTERNS[provider].format(artifact_type="actors")
-        )
-    return parts
-
-
-def _review_issue_authoring_parts(provider: str | None) -> list[str]:
-    """Files needed to author a review-type issue body.
-
-    Equivalent to what ``resolve_authoring("review", side="issue",
-    provider=...)`` would compute, so callers that resolve a review's
-    target receive the contract used to publish findings without a
-    second resolver call. Kept narrow on purpose: review is not a PRD
-    component and not in DUAL_TYPES, so the full author chain reduces
-    to these entries.
-    """
-    parts = [
-        "common/issue-body.md",
-        "common/issue-authoring.md",
-        "common/review-authoring.md",
-    ]
-    if provider in ISSUE_PROVIDER_FILES:
-        parts.append(ISSUE_PROVIDER_FILES[provider])
-        parts.append(ISSUE_PROVIDER_RELATIONSHIP_FILES[provider])
-        parts.append(
-            ISSUE_PROVIDER_TYPE_PATTERNS[provider].format(artifact_type="review")
-        )
-        parts.extend(PROVIDER_EXTRA_FILES.get(("issue", provider), ()))
-    return parts
+def _resolve_authoring_jira_issue(
+    artifact_type: str, target: str | None, scope: str
+) -> tuple[list[str], list[str]]:
+    convention = "providers/issue/jira/convention.md"
+    relationships = "providers/issue/jira/relationships.md"
+    anti_patterns = "providers/issue/jira/anti-patterns.md"
+    match (scope, target):
+        case ("comment", _):
+            return [convention], []
+        case (_, str()):
+            return [
+                convention,
+                relationships,
+                "providers/issue/jira/review.md",
+                anti_patterns,
+            ], []
+        case _:
+            parts = [
+                convention,
+                relationships,
+                f"providers/issue/jira/{artifact_type}.md",
+                anti_patterns,
+            ]
+            notes = (
+                [RETROACTIVE_PUBLISH_STATE_JIRA]
+                if artifact_type in PLAN_MODE_TYPES
+                else []
+            )
+            return parts, notes
 
 
 def absolute_authoring_paths(parts: Iterable[str]) -> tuple[Path, ...]:
@@ -334,6 +320,64 @@ def is_authoring_file(path: Path, *, plugin_root: Path | None = None) -> bool:
     return authoring_relative_path(path, plugin_root=plugin_root) is not None
 
 
+def _common_parts(
+    side: str, artifact_type: str, target: str | None, scope: str
+) -> list[str]:
+    match (scope, target, side):
+        case ("comment", _, _):
+            return []
+        case (_, str() as t, s):
+            parts = [
+                f"contracts/quality/{t}-{s}-criteria.md"
+                if t in DUAL_TYPES
+                else f"contracts/quality/{t}-criteria.md"
+            ]
+            if t == "usecase":
+                parts.extend([
+                    "contracts/usecase-abstraction-guard.md",
+                    "contracts/quality/actors-criteria.md",
+                ])
+            parts.extend([
+                "contracts/issue/body.md",
+                "contracts/issue/authoring.md",
+                "contracts/issue/review.md",
+            ])
+            return parts
+        case (_, None, "issue"):
+            parts = ["contracts/issue/body.md", "contracts/issue/authoring.md"]
+        case _:  # (_, None, "knowledge")
+            parts = ["contracts/knowledge/body.md"]
+
+    if artifact_type in PRD_COMPONENT_TYPES:
+        parts.append("contracts/prd.md")
+    if artifact_type in DUAL_TYPES:
+        parts.append(f"contracts/{artifact_type}.md")
+        parts.append(f"contracts/{side}/{artifact_type}.md")
+    else:
+        parts.append(f"contracts/{side}/{artifact_type}.md")
+    if artifact_type in DECOMPOSITION_TYPES:
+        parts.append("contracts/issue/decomposition-patterns.md")
+    if artifact_type == "usecase":
+        parts.extend([
+            "contracts/usecase-abstraction-guard.md",
+            "contracts/knowledge/actors.md",
+        ])
+    return parts
+
+
+def _common_notes(
+    side: str, artifact_type: str, target: str | None, scope: str
+) -> list[str]:
+    if scope == "comment" or target is not None or side != "issue":
+        return []
+    notes: list[str] = []
+    if artifact_type in PLAN_MODE_TYPES:
+        notes.append(PLAN_MODE_TRIGGER_NOTE)
+    if artifact_type in TASK_AUDIT_TYPES:
+        notes.append(TASK_AUDIT_TRIGGER_NOTE)
+    return notes
+
+
 def resolve_authoring(
     artifact_type: str,
     *,
@@ -344,12 +388,13 @@ def resolve_authoring(
     require_config: bool = False,
     scope: str = "content",
 ) -> Resolution:
-    normalized_type = normalize_type(artifact_type)
-    normalized_target = normalize_target(target, normalized_type)
-    normalized_side = normalize_side(side, normalized_type, normalized_target)
-    normalized_scope = normalize_scope(scope)
+    validate_type(artifact_type)
+    if target is not None:
+        validate_target(target, artifact_type)
+    validate_scope(scope)
+    side = resolve_side(side, artifact_type, target)
 
-    if normalized_target is not None and normalized_scope == "comment":
+    if target is not None and scope == "comment":
         raise ResolverError(
             "--target does not apply to comment scope; "
             "quality-criteria files only describe content-level review"
@@ -362,116 +407,49 @@ def resolve_authoring(
         except WorkflowConfigError as exc:
             raise ResolverError(str(exc)) from exc
         if config is not None:
-            config_provider = config.provider_for_role(normalized_side)
+            config_provider = config.provider_for_role(side)
 
-    normalized_provider = normalize_provider(provider) or config_provider
-    if normalized_provider is not None:
+    provider = normalize_provider(provider) or config_provider
+    if provider is not None:
         try:
-            validate_provider_for_role(normalized_side, normalized_provider)
+            validate_provider_for_role(side, provider)
         except WorkflowConfigError as exc:
             raise ResolverError(str(exc)) from exc
 
-    if normalized_target is not None:
-        parts: list[str] = []
-        if normalized_target in DUAL_TYPES:
-            parts.append(
-                f"common/quality/{normalized_target}-{normalized_side}-criteria.md"
+    parts = _common_parts(side, artifact_type, target, scope)
+    provider_parts: list[str] = []
+    provider_notes: list[str] = []
+    helper_side = "issue" if target is not None else side
+    match (provider, helper_side):
+        case ("github", "issue"):
+            provider_parts, provider_notes = _resolve_authoring_github_issue(
+                artifact_type, target, scope
             )
-        else:
-            parts.append(f"common/quality/{normalized_target}-criteria.md")
-        if normalized_target == "usecase":
-            parts.append("common/usecase-abstraction-guard.md")
-            for companion in _actors_companion_parts(
-                normalized_provider, for_review=True
-            ):
-                if companion not in parts:
-                    parts.append(companion)
-        for review_part in _review_issue_authoring_parts(normalized_provider):
-            if review_part not in parts:
-                parts.append(review_part)
-        return Resolution(
-            artifact_type=normalized_type,
-            side=normalized_side,
-            provider=normalized_provider,
-            scope=normalized_scope,
-            target=normalized_target,
-            files=absolute_authoring_paths(parts),
-        )
-
-    parts: list[str] = []
-    if normalized_scope == "comment":
-        if normalized_side == "issue" and normalized_provider in ISSUE_PROVIDER_FILES:
-            parts.append(ISSUE_PROVIDER_FILES[normalized_provider])
-        if normalized_side == "knowledge" and normalized_provider in KNOWLEDGE_PROVIDER_FILES:
-            parts.append(KNOWLEDGE_PROVIDER_FILES[normalized_provider])
-        return Resolution(
-            artifact_type=normalized_type,
-            side=normalized_side,
-            provider=normalized_provider,
-            scope=normalized_scope,
-            target=None,
-            files=absolute_authoring_paths(parts),
-        )
-
-    if normalized_side == "issue":
-        parts.append("common/issue-body.md")
-        parts.append("common/issue-authoring.md")
-    else:
-        parts.append("common/knowledge-body.md")
-    if normalized_type in PRD_COMPONENT_TYPES:
-        parts.append("common/prd-authoring.md")
-    parts.append(f"common/{normalized_type}-authoring.md")
-    if normalized_type in DECOMPOSITION_TYPES:
-        parts.append("common/decomposition-patterns.md")
-    if normalized_type in DUAL_TYPES:
-        parts.append(f"common/{normalized_type}-{normalized_side}-authoring.md")
-    if normalized_type == "usecase":
-        parts.append("common/usecase-abstraction-guard.md")
-        for companion in _actors_companion_parts(
-            normalized_provider, for_review=False
-        ):
-            if companion not in parts:
-                parts.append(companion)
-
-    if normalized_side == "issue" and normalized_provider in ISSUE_PROVIDER_FILES:
-        parts.append(ISSUE_PROVIDER_FILES[normalized_provider])
-        parts.append(ISSUE_PROVIDER_RELATIONSHIP_FILES[normalized_provider])
-        parts.append(
-            ISSUE_PROVIDER_TYPE_PATTERNS[normalized_provider].format(
-                artifact_type=normalized_type
+        case ("github", "knowledge"):
+            provider_parts, provider_notes = _resolve_authoring_github_knowledge(
+                artifact_type, target, scope
             )
-        )
-    if normalized_side == "knowledge" and normalized_provider in KNOWLEDGE_PROVIDER_FILES:
-        parts.append(KNOWLEDGE_PROVIDER_FILES[normalized_provider])
-        parts.append(
-            KNOWLEDGE_PROVIDER_TYPE_PATTERNS[normalized_provider].format(
-                artifact_type=normalized_type
+        case ("jira", "issue"):
+            provider_parts, provider_notes = _resolve_authoring_jira_issue(
+                artifact_type, target, scope
             )
-        )
-    if normalized_provider is not None:
-        parts.extend(
-            PROVIDER_EXTRA_FILES.get((normalized_side, normalized_provider), ())
-        )
+        case _:
+            pass
 
-    notes_list: list[str] = []
-    if normalized_side == "issue" and normalized_type in PLAN_MODE_TYPES:
-        notes_list.append(PLAN_MODE_TRIGGER_NOTE)
-    if normalized_side == "issue" and normalized_type in TASK_AUDIT_TYPES:
-        notes_list.append(TASK_AUDIT_TRIGGER_NOTE)
-    if normalized_side == "issue" and normalized_type in PLAN_MODE_TYPES:
-        retroactive_note = RETROACTIVE_PUBLISH_STATE_NOTES.get(normalized_provider)
-        if retroactive_note is not None:
-            notes_list.append(retroactive_note)
-    notes = tuple(notes_list)
+    for part in provider_parts:
+        if part not in parts:
+            parts.append(part)
+
+    notes = _common_notes(side, artifact_type, target, scope) + provider_notes
 
     return Resolution(
-        artifact_type=normalized_type,
-        side=normalized_side,
-        provider=normalized_provider,
-        scope=normalized_scope,
-        target=None,
+        artifact_type=artifact_type,
+        side=side,
+        provider=provider,
+        scope=scope,
+        target=target,
         files=absolute_authoring_paths(parts),
-        notes=notes,
+        notes=tuple(notes),
     )
 
 

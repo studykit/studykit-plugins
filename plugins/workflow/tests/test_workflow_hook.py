@@ -561,7 +561,7 @@ def test_claude_post_read_records_authoring_file_reads_in_session_state(
 ) -> None:
     _write_config(tmp_path)
     _hook_env(monkeypatch, tmp_path, runtime="claude")
-    authoring_file = _PLUGIN_ROOT / "authoring" / "common" / "task-authoring.md"
+    authoring_file = _PLUGIN_ROOT / "authoring" / "contracts" / "issue" / "task.md"
     payload = {
         "session_id": "claude-authoring-read",
         "cwd": str(tmp_path),
@@ -585,7 +585,7 @@ def test_claude_post_read_records_authoring_file_reads_in_session_state(
     assert state["authoring"]["read_files"] == [
         {
             "path": str(authoring_file.resolve()),
-            "relative_path": "common/task-authoring.md",
+            "relative_path": "contracts/issue/task.md",
         }
     ]
 
@@ -623,7 +623,7 @@ def test_claude_post_read_skips_subagent_authoring_reads(
 ) -> None:
     _write_config(tmp_path)
     _hook_env(monkeypatch, tmp_path, runtime="claude")
-    authoring_file = _PLUGIN_ROOT / "authoring" / "common" / "task-authoring.md"
+    authoring_file = _PLUGIN_ROOT / "authoring" / "contracts" / "issue" / "task.md"
 
     captured = io.StringIO()
     assert claude_main(
@@ -718,10 +718,10 @@ def test_parse_claude_event_payload_builds_event_structures(
             "hook_event_name": "PostToolUse",
             "tool_name": "Read",
             "tool_input": {
-                "file_path": "plugins/workflow/authoring/common/task-authoring.md"
+                "file_path": "plugins/workflow/authoring/contracts/issue/task.md"
             },
             "tool_response": {
-                "filePath": "plugins/workflow/authoring/common/task-authoring.md"
+                "filePath": "plugins/workflow/authoring/contracts/issue/task.md"
             },
             "tool_use_id": "toolu_456",
             "duration_ms": 9,
@@ -733,10 +733,10 @@ def test_parse_claude_event_payload_builds_event_structures(
     assert post_tool_event.effort == {"level": "medium"}
     assert post_tool_event.tool_name == "Read"
     assert post_tool_event.tool_input == {
-        "file_path": "plugins/workflow/authoring/common/task-authoring.md"
+        "file_path": "plugins/workflow/authoring/contracts/issue/task.md"
     }
     assert post_tool_event.tool_response == {
-        "filePath": "plugins/workflow/authoring/common/task-authoring.md"
+        "filePath": "plugins/workflow/authoring/contracts/issue/task.md"
     }
     assert post_tool_event.tool_use_id == "toolu_456"
     assert post_tool_event.duration_ms == 9

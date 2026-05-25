@@ -17,9 +17,9 @@ Leave durable continuation context for a fresh session that cannot see this conv
 
 ## Core rules
 
-- Refresh in-issue resume context first: for every touched mid-flight issue, rewrite the `Resume` section in the issue body so the issue alone shows current approach, who/what it is waiting for, open questions, and the next step. Append a comment only for narrative-worthy events: decision pivots, blocker resolutions, or approach changes. Follow `${CLAUDE_PLUGIN_ROOT}/authoring/common/issue-body.md` for `Resume` slot meaning and reference form.
+- Refresh in-issue resume context first: for every touched mid-flight issue, rewrite the `Resume` section in the issue body so the issue alone shows current approach, who/what it is waiting for, open questions, and the next step. Append a comment only for narrative-worthy events: decision pivots, blocker resolutions, or approach changes. Follow `${CLAUDE_PLUGIN_ROOT}/authoring/contracts/issue/body.md` for `Resume` slot meaning and reference form.
 - The cached `issue.md` and `comment-*.md` projections are read-only. Resume rewrites and comments must go through the configured provider write scripts via the `workflow` launcher per `${CLAUDE_PLUGIN_ROOT}/authoring/runbook/provider-writes/`. Mutations require a temp body file, user approval, and the freshness-check flow.
-- Session-level residual that does not fit any in-flight issue's body lands in `review`-type issues. Each review item holds one concern only (`finding` / `gap` / `question`) per `${CLAUDE_PLUGIN_ROOT}/authoring/common/review-authoring.md`. Do not pack multiple concerns into one review; do not create a review item when an existing in-flight issue's `Resume` or a comment can hold it.
+- Session-level residual that does not fit any in-flight issue's body lands in `review`-type issues. Each review item holds one concern only (`finding` / `gap` / `question`) per `${CLAUDE_PLUGIN_ROOT}/authoring/contracts/issue/review.md`. Do not pack multiple concerns into one review; do not create a review item when an existing in-flight issue's `Resume` or a comment can hold it.
 
 ## Handoff gate
 
@@ -64,7 +64,7 @@ Non-triggers on their own (do not publish a review for these):
 
 1. **Refresh touched mid-flight issues before anything else.**
    - Scope: every issue touched, opened, advanced, blocked, or relied on this session, excluding ones already closed / discarded / superseded at the provider.
-   - For each, draft the new `Resume` section as a current snapshot per `${CLAUDE_PLUGIN_ROOT}/authoring/common/issue-body.md`: Approach / Waiting for / Open questions / Next. Remove stale items; the `Resume` section is rewritten in place and does not preserve history.
+   - For each, draft the new `Resume` section as a current snapshot per `${CLAUDE_PLUGIN_ROOT}/authoring/contracts/issue/body.md`: Approach / Waiting for / Open questions / Next. Remove stale items; the `Resume` section is rewritten in place and does not preserve history.
    - Resolve authoring paths first: `workflow mustread --type <type>` (add `--side issue|knowledge` for dual-side types) and read the returned files. The provider-write contract (publish / append / update body-file flow, freshness handling) lives at `${CLAUDE_PLUGIN_ROOT}/authoring/runbook/provider-writes/<provider>.md` — open it before drafting.
    - Apply the rewrite via `issue.py update --issue <ref> --body-file <path>`. Present the draft body to the user for approval before invoking the script. On `status=blocked` (freshness drift), reread the listed cache paths and retry; never bypass the freshness check.
    - For narrative-worthy events (decision pivot, blocker resolution, approach change), add a comment via `issue.py comment --issue <ref> --body-file <path>`. Do not log routine status changes. Do not list commit SHAs in the comment body by default; the timeline already links commits whose subjects carry the issue ref prefix.
@@ -79,11 +79,11 @@ Non-triggers on their own (do not publish a review for these):
 
 3. **Run the Stage 2 residual check.**
    - If no residual remains, stop here and report the no-op outcome.
-   - Otherwise, list each residual concern atomically. One concern per review item. The concern type is one of `finding`, `gap`, or `question` per `${CLAUDE_PLUGIN_ROOT}/authoring/common/review-authoring.md`.
+   - Otherwise, list each residual concern atomically. One concern per review item. The concern type is one of `finding`, `gap`, or `question` per `${CLAUDE_PLUGIN_ROOT}/authoring/contracts/issue/review.md`.
 
 4. **Publish one `review` issue per residual concern.**
    - Resolve authoring paths: `workflow mustread --type review` and read the returned files.
-   - Draft each review body per `${CLAUDE_PLUGIN_ROOT}/authoring/common/review-authoring.md`: a `Description` that states the single concern, why it matters, and what would resolve it; optional `Suggested Fix`, `Evidence`, `Resume`. Identify the target issue or content per the review-target rules; if truly cross-cutting, say so explicitly in `Description`.
+   - Draft each review body per `${CLAUDE_PLUGIN_ROOT}/authoring/contracts/issue/review.md`: a `Description` that states the single concern, why it matters, and what would resolve it; optional `Suggested Fix`, `Evidence`, `Resume`. Identify the target issue or content per the review-target rules; if truly cross-cutting, say so explicitly in `Description`.
    - Reference related in-flight issues by provider-native ref (`#NNN` for GitHub Issues, `KEY-NNN` for Jira). Do not use cache projection paths as identity. Do not paste issue body or comment content; link instead.
    - Publish via `issue.py new --type review --title <title> --body-file <path>` after presenting the draft and obtaining user approval. Link siblings or the parent using relationship flags when appropriate.
 
