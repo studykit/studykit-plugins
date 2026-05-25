@@ -44,8 +44,8 @@ workflow prd_path actors
 ```
 
 The call returns both review criteria files bundled together —
-`common/review/usecase-issue-review-criteria.md` (use case quality)
-and `common/review/actors-review-criteria.md` (registry quality) —
+`common/quality/usecase-issue-criteria.md` (use case quality)
+and `common/quality/actors-criteria.md` (registry quality) —
 plus the review issue authoring chain you need to publish findings
 (`common/issue-body.md`, `common/issue-authoring.md`,
 `common/review-authoring.md`, and the provider-specific review
@@ -87,12 +87,12 @@ The review criteria files resolved at startup are the source of
 truth. Do not duplicate or paraphrase them here — apply them as
 written.
 
-- `common/review/usecase-issue-review-criteria.md` — criteria 1–11
+- `common/quality/usecase-issue-criteria.md` — criteria 1–11
   applied to every ref in `usecase-refs`. Each criterion that
   yields a non-OK verdict becomes one `review` issue (subject to
   deduplication). Criterion 11 (Actor registry alignment) is a
   knowledge-side finding — see Knowledge-side findings below.
-- `common/review/actors-review-criteria.md` — criteria applied
+- `common/quality/actors-criteria.md` — criteria applied
   once to the actors registry when present. Every finding from
   this file is a knowledge-side finding.
 

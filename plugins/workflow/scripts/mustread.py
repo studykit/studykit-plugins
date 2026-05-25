@@ -270,7 +270,7 @@ def _actors_companion_parts(
     and the criteria file when reviewing.
     """
     if for_review:
-        return ["common/review/actors-review-criteria.md"]
+        return ["common/quality/actors-criteria.md"]
     parts = ["common/actors-authoring.md"]
     if provider in KNOWLEDGE_PROVIDER_TYPE_PATTERNS:
         parts.append(
@@ -352,7 +352,7 @@ def resolve_authoring(
     if normalized_target is not None and normalized_scope == "comment":
         raise ResolverError(
             "--target does not apply to comment scope; "
-            "review-criteria files only describe content-level review"
+            "quality-criteria files only describe content-level review"
         )
 
     config_provider: str | None = None
@@ -375,11 +375,12 @@ def resolve_authoring(
         parts: list[str] = []
         if normalized_target in DUAL_TYPES:
             parts.append(
-                f"common/review/{normalized_target}-{normalized_side}-review-criteria.md"
+                f"common/quality/{normalized_target}-{normalized_side}-criteria.md"
             )
         else:
-            parts.append(f"common/review/{normalized_target}-review-criteria.md")
+            parts.append(f"common/quality/{normalized_target}-criteria.md")
         if normalized_target == "usecase":
+            parts.append("common/usecase-abstraction-guard.md")
             for companion in _actors_companion_parts(
                 normalized_provider, for_review=True
             ):
