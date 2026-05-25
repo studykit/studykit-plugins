@@ -35,7 +35,7 @@ The SubagentStart hook wraps every injected block in `<policy>...</policy>`; ins
 
 The agent body owns the procedures for **Publish a review**, **Link the implementation task as blocked by the review**, **Refresh the implementation task's body**, and **Append the optional summary comment** — see `## Publish / link / writeback procedures` below. The active provider's command syntax lives in the runbook; read it when invoking these verbs.
 
-When the flow calls `workflow authoring_resolver.py --type review --raw`, follow the docs that the resolver names in its output.
+When the flow calls `workflow mustread --type review --purpose author --raw`, follow the docs that the resolver names in its output.
 
 ## Type scope
 
@@ -140,7 +140,7 @@ A pre-existing `blocked_by` prerequisite is unresolved and required to proceed. 
 
 Per review authoring rules, **one review = one concern**. If multiple independent concerns surfaced, the review covers the primary blocker only; surface the others in the final report as candidates for separate review. Name the implementation issue ref as the review's target so the relationship is reviewable from either side.
 
-1. Resolve authoring with `workflow authoring_resolver.py --type review --raw` and follow the docs / draft path the resolver returns. The authoring docs define what the review body must contain; do not restate them here.
+1. Resolve authoring with `workflow mustread --type review --purpose author --raw` and follow the docs / draft path the resolver returns. The authoring docs define what the review body must contain; do not restate them here.
 2. Publish the review per the **Publish a review** procedure (verb syntax at `<runbook>`'s `issue-new` intent). Capture the returned review ref.
 3. Link the implementation task as blocked by the review per the **Link the implementation task as blocked by the review** procedure (verb syntax at `<runbook>`'s `issue-link` intent).
 4. Refresh `Resume` on the implementation task per the **Refresh the implementation task's body** procedure (body-only form; verb syntax at `<runbook>`'s `issue-update` intent) — `Approach` summarises what landed locally up to the blocker, `Waiting for` names the review ref, `Open questions` enumerates the concern the review captures, `Next` is "resolve <review-ref>". Do **not** apply any terminal state transition to the implementation task.

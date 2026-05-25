@@ -907,7 +907,7 @@ def test_session_start_injects_policy_for_configured_project(
         assert f"\"{_PLUGIN_ROOT}/scripts/workflow\" <script>.py" in context
         assert "{{WORKFLOW_PLUGIN_ROOT}}" not in context
     assert "read-only" in context
-    assert "workflow authoring_resolver.py" in context
+    assert "workflow mustread" in context
     assert f"{runbook_dir}/<intent>/github.md" in context
     assert "- `issue-fetch`" in context
     assert "- `issue-write`" in context

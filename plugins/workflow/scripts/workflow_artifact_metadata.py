@@ -9,7 +9,7 @@ section when no frontmatter is present).
 
 Keeping the parser separate from the hook dispatcher keeps the dispatcher's
 job clear — orchestrating runtimes and entrypoints — and gives the metadata
-contract a single home that ``authoring_resolver`` callers can grow without
+contract a single home that ``mustread`` callers can grow without
 touching unrelated hook logic.
 """
 
@@ -25,7 +25,7 @@ _SCRIPTS_DIR = str(Path(__file__).resolve().parent)
 if _SCRIPTS_DIR not in sys.path:
     sys.path.insert(0, _SCRIPTS_DIR)
 
-from authoring_resolver import ALL_TYPES, DUAL_TYPES  # noqa: E402
+from mustread import ALL_TYPES, DUAL_TYPES  # noqa: E402
 from workflow_edit_target import EditTarget  # noqa: E402
 
 _METADATA_KEYS = {"type", "role", "provider"}

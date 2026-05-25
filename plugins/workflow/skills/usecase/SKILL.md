@@ -36,8 +36,10 @@ Out of scope in this skill:
   when the flow is stable per the publishing rule in
   `${CLAUDE_PLUGIN_ROOT}/authoring/common/usecase-knowledge-authoring.md`.
 - Editing knowledge pages (`domain`, `actors`, `nfr`, `context`,
-  `architecture`, `spec`) inline — knowledge side effects are surfaced
-  as `review` items; see `references/knowledge-side-effects.md`.
+  `architecture`, `spec`) — out of scope. The skill produces use
+  case issues only; cross-surface alignment is left to the wrap-up
+  `usecase-reviewer` (for actors) and to the user (for other
+  knowledge surfaces).
 - Implementation work — handed off to `task` / `bug` / `spike` issues
   authored separately once a use case is stable.
 
@@ -98,7 +100,6 @@ backlog to seed.
 **Conditional tasks** — add when the corresponding step fires:
 
 - `"Discovery: UC-<ref> <title>"` — one per confirmed and published use case.
-- `"Side effect: review <ref>"` — one per knowledge `review` item filed.
 - `"Research: <topic>"` — when a similar-systems research dispatch fires.
 - `"UI screen grouping"` — when the user agrees to group UI-related use cases.
 - `"Mock: <screen slug>"` — when mock generation is requested.
@@ -123,7 +124,6 @@ Restate the idea back in one sentence to confirm understanding. Then:
 |------|-------|-----------|
 | 2 | Discovery loop (four-gap interview + actor capture) | `references/discovery-loop.md` |
 | 3 | Progressive use case extraction + publish | `references/progressive-extraction.md` |
-| 3a | Knowledge side-effect detection (file as `review`) | `references/knowledge-side-effects.md` |
 | 4 | Use case splitting | `references/usecase-splitting.md` |
 | 5 | Facilitation mode shifts (Contrarian / Simplifier / Reframer) | `references/facilitation-techniques.md` |
 | 6 | Similar-systems research (on request, after 3+ use cases) | `references/research-procedure.md` |

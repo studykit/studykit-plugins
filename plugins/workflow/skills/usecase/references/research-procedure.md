@@ -36,7 +36,7 @@ under **When research is warranted** is the contract.
 2. **Resolve `research` authoring.** Call:
 
    ```bash
-   workflow authoring_resolver.py --type research --role issue
+   workflow mustread --type research --role issue --purpose author
    ```
 
    The resolver returns the issue-side body shape (`Description`,
@@ -80,12 +80,8 @@ under **When research is warranted** is the contract.
 6. **Reflect findings back into use cases.** When the research
    surfaces a pattern the use cases should adopt (a new actor, a
    different flow shape, an unstated NFR), do **not** edit the use
-   case bodies silently. Either:
-
-   - File a knowledge side-effect `review` item per
-     `./knowledge-side-effects.md`, or
-   - Re-open the discovery loop with the user and let progressive
-     extraction produce the updated draft.
+   case bodies silently. Re-open the discovery loop with the user
+   and let progressive extraction produce the updated draft.
 
 ## Anti-patterns
 

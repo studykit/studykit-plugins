@@ -43,7 +43,7 @@ The SubagentStart hook wraps every injected block in `<policy>...</policy>`; ins
 
 The agent body owns the procedures for **Publish a review**, **Link the planning task as blocked-by the review**, **Refresh the body**, and **Append the terminal-state comment** — see `## Publish / link / writeback procedures` below.
 
-When the flow calls `workflow authoring_resolver.py --type review --raw`, follow the docs that the resolver names in its output.
+When the flow calls `workflow mustread --type review --purpose author --raw`, follow the docs that the resolver names in its output.
 
 ## Type scope
 
@@ -92,7 +92,7 @@ For any other type (`epic`, `review`, `research`, `usecase`, knowledge types), s
 
 6. **Blocker handling (only if `published-review`).** Capture the blocker as a workflow `review` issue and link the planning task as `blocked-by` the new review.
 
-    - Resolve authoring with `workflow authoring_resolver.py --type review --raw` and follow the docs / draft path the resolver returns. The authoring docs define the review body shape; do not restate them here.
+    - Resolve authoring with `workflow mustread --type review --purpose author --raw` and follow the docs / draft path the resolver returns. The authoring docs define the review body shape; do not restate them here.
     - Publish the review per the **Publish a review** procedure (verb syntax at `<runbook>`'s `issue-new` intent). One review = one concern; surface other independent concerns in the terminal-state comment's `## Open questions` section (step 8) as candidates for separate review. Name the planning issue ref as the review's target so the relationship is reviewable from either side.
     - Link the planning task as `--blocked-by` the new review per the **Link blocked-by** procedure (verb syntax at `<runbook>`'s `issue-link` intent).
     - Refresh `Resume` on the planning task per the **Refresh the body** procedure (verb syntax at `<runbook>`'s `issue-update` intent): `Approach` notes the blocker, `Waiting for` names the review ref, `Open questions` enumerates the concern the review captures, `Next` is "resolve <review-ref>". Do **not** apply any terminal state transition to the planning task.

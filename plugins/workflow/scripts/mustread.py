@@ -43,6 +43,7 @@ KNOWLEDGE_TYPES = {"spec", "architecture", "domain", "context", "nfr", "ci"}
 DUAL_TYPES = {"usecase", "research"}
 ALL_TYPES = ISSUE_TYPES | KNOWLEDGE_TYPES | DUAL_TYPES
 AUTHORING_SCOPES = {"content", "comment"}
+AUTHORING_PURPOSES = {"author", "review"}
 
 PRD_COMPONENT_TYPES = {"context", "usecase", "nfr", "spec", "domain"}
 
@@ -112,12 +113,26 @@ def _anchor_scope_suffix(scope: str) -> str:
     return "-comment" if scope == "comment" else ""
 
 
-def reading_anchor(artifact_type: str, role: str, scope: str) -> str:
-    return f"{artifact_type}-{role}{_anchor_scope_suffix(scope)}"
+def _anchor_purpose_suffix(purpose: str) -> str:
+    return "-review" if purpose == "review" else ""
 
 
-def notes_anchor(artifact_type: str, role: str, scope: str) -> str:
-    return f"{artifact_type}-{role}{_anchor_scope_suffix(scope)}"
+def reading_anchor(
+    artifact_type: str, role: str, scope: str, purpose: str
+) -> str:
+    return (
+        f"{artifact_type}-{role}"
+        f"{_anchor_purpose_suffix(purpose)}{_anchor_scope_suffix(scope)}"
+    )
+
+
+def notes_anchor(
+    artifact_type: str, role: str, scope: str, purpose: str
+) -> str:
+    return (
+        f"{artifact_type}-{role}"
+        f"{_anchor_purpose_suffix(purpose)}{_anchor_scope_suffix(scope)}"
+    )
 
 
 @dataclass(frozen=True)
@@ -128,16 +143,21 @@ class Resolution:
     role: str
     provider: str | None
     scope: str
+    purpose: str
     files: tuple[Path, ...]
     notes: tuple[str, ...] = ()
 
     @property
     def reading_anchor(self) -> str:
-        return reading_anchor(self.artifact_type, self.role, self.scope)
+        return reading_anchor(
+            self.artifact_type, self.role, self.scope, self.purpose
+        )
 
     @property
     def notes_anchor(self) -> str:
-        return notes_anchor(self.artifact_type, self.role, self.scope)
+        return notes_anchor(
+            self.artifact_type, self.role, self.scope, self.purpose
+        )
 
     def to_markdown(self) -> str:
         sections: list[str] = []
@@ -222,6 +242,64 @@ def normalize_scope(value: str | None) -> str:
     return normalized
 
 
+def normalize_purpose(value: str | None) -> str:
+    if value is None:
+        raise ResolverError(
+            "authoring purpose is required; pass --purpose author or --purpose review"
+        )
+    normalized = value.strip().lower().replace("_", "-")
+    if normalized in {"authoring", "write", "writer"}:
+        normalized = "author"
+    if normalized in {"reviewing", "reviewer", "criteria", "review-criteria"}:
+        normalized = "review"
+    if normalized not in AUTHORING_PURPOSES:
+        raise ResolverError(f"unsupported authoring purpose: {value}")
+    return normalized
+
+
+def _actors_companion_parts(provider: str | None, purpose: str) -> list[str]:
+    """Actors registry files bundled with usecase work.
+
+    The actors registry is a knowledge page co-authored alongside use
+    case issues and the use case wiki page; it has no dedicated
+    `--type actors` axis. Returns the contract files when authoring
+    and the criteria file when reviewing.
+    """
+    if purpose == "review":
+        return ["common/review/actors-review-criteria.md"]
+    parts = ["common/actors-authoring.md"]
+    if provider in KNOWLEDGE_PROVIDER_TYPE_PATTERNS:
+        parts.append(
+            KNOWLEDGE_PROVIDER_TYPE_PATTERNS[provider].format(artifact_type="actors")
+        )
+    return parts
+
+
+def _review_issue_authoring_parts(provider: str | None) -> list[str]:
+    """Files needed to author a review-type issue body.
+
+    Mirrors what `resolve_authoring("review", role="issue",
+    purpose="author", provider=...)` would compute, so review-purpose
+    callers receive the contract used to publish findings without a
+    second resolver call. Kept narrow on purpose: review is not a PRD
+    component and not in DUAL_TYPES, so the full author chain reduces
+    to these entries.
+    """
+    parts = [
+        "common/issue-body.md",
+        "common/issue-authoring.md",
+        "common/review-authoring.md",
+    ]
+    if provider in ISSUE_PROVIDER_FILES:
+        parts.append(ISSUE_PROVIDER_FILES[provider])
+        parts.append(ISSUE_PROVIDER_RELATIONSHIP_FILES[provider])
+        parts.append(
+            ISSUE_PROVIDER_TYPE_PATTERNS[provider].format(artifact_type="review")
+        )
+        parts.extend(PROVIDER_EXTRA_FILES.get(("issue", provider), ()))
+    return parts
+
+
 def absolute_authoring_paths(parts: Iterable[str]) -> tuple[Path, ...]:
     paths: list[Path] = []
     for rel in parts:
@@ -255,6 +333,7 @@ def is_authoring_file(path: Path, *, plugin_root: Path | None = None) -> bool:
 def resolve_authoring(
     artifact_type: str,
     *,
+    purpose: str,
     role: str | None = None,
     provider: str | None = None,
     project: Path | None = None,
@@ -264,6 +343,13 @@ def resolve_authoring(
     normalized_type = normalize_type(artifact_type)
     normalized_role = normalize_role(role, normalized_type)
     normalized_scope = normalize_scope(scope)
+    normalized_purpose = normalize_purpose(purpose)
+
+    if normalized_purpose == "review" and normalized_scope == "comment":
+        raise ResolverError(
+            "purpose 'review' does not apply to comment scope; "
+            "review-criteria files only describe content-level review"
+        )
 
     config_provider: str | None = None
     if project is not None or require_config:
@@ -281,6 +367,32 @@ def resolve_authoring(
         except WorkflowConfigError as exc:
             raise ResolverError(str(exc)) from exc
 
+    if normalized_purpose == "review":
+        parts: list[str] = []
+        if normalized_type in DUAL_TYPES:
+            parts.append(
+                f"common/review/{normalized_type}-{normalized_role}-review-criteria.md"
+            )
+        else:
+            parts.append(f"common/review/{normalized_type}-review-criteria.md")
+        if normalized_type == "usecase":
+            for companion in _actors_companion_parts(
+                normalized_provider, "review"
+            ):
+                if companion not in parts:
+                    parts.append(companion)
+        for review_part in _review_issue_authoring_parts(normalized_provider):
+            if review_part not in parts:
+                parts.append(review_part)
+        return Resolution(
+            artifact_type=normalized_type,
+            role=normalized_role,
+            provider=normalized_provider,
+            scope=normalized_scope,
+            files=absolute_authoring_paths(parts),
+            purpose=normalized_purpose,
+        )
+
     parts: list[str] = []
     if normalized_scope == "comment":
         if normalized_role == "issue" and normalized_provider in ISSUE_PROVIDER_FILES:
@@ -293,6 +405,7 @@ def resolve_authoring(
             provider=normalized_provider,
             scope=normalized_scope,
             files=absolute_authoring_paths(parts),
+            purpose=normalized_purpose,
         )
 
     if normalized_role == "issue":
@@ -307,6 +420,9 @@ def resolve_authoring(
         parts.append(f"common/{normalized_type}-{normalized_role}-authoring.md")
     if normalized_type == "usecase":
         parts.append("common/usecase-abstraction-guard.md")
+        for companion in _actors_companion_parts(normalized_provider, "author"):
+            if companion not in parts:
+                parts.append(companion)
 
     if normalized_role == "issue" and normalized_provider in ISSUE_PROVIDER_FILES:
         parts.append(ISSUE_PROVIDER_FILES[normalized_provider])
@@ -349,6 +465,7 @@ def resolve_authoring(
         scope=normalized_scope,
         files=absolute_authoring_paths(parts),
         notes=notes,
+        purpose=normalized_purpose,
     )
 
 
@@ -362,6 +479,16 @@ def build_parser() -> argparse.ArgumentParser:
         choices=sorted(AUTHORING_SCOPES),
         default="content",
         help="authoring surface to resolve; use comment for comment-only work",
+    )
+    parser.add_argument(
+        "--purpose",
+        choices=sorted(AUTHORING_PURPOSES),
+        required=True,
+        help=(
+            "audience for the resolved files; 'author' returns the authoring "
+            "contract, 'review' returns the review-criteria file used to "
+            "evaluate an already-written artifact"
+        ),
     )
     parser.add_argument(
         "--project",
@@ -390,6 +517,7 @@ def main(argv: list[str] | None = None) -> int:
             project=args.project,
             require_config=args.require_config,
             scope=args.scope,
+            purpose=args.purpose,
         )
     except ResolverError as exc:
         print(f"authoring resolver error: {exc}", file=sys.stderr)
@@ -461,13 +589,14 @@ def _resolution_key(resolution: Resolution) -> dict[str, str | None]:
         "role": resolution.role,
         "provider": resolution.provider,
         "scope": resolution.scope,
+        "purpose": resolution.purpose,
     }
 
 
 def _keys_equal(left: object, right: dict[str, str | None]) -> bool:
     if not isinstance(left, dict):
         return False
-    fields = ("type", "role", "provider", "scope")
+    fields = ("type", "role", "provider", "scope", "purpose")
     return all(left.get(field) == right.get(field) for field in fields)
 
 

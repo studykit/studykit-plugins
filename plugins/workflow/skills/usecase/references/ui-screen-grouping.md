@@ -8,11 +8,9 @@ cases the user wants to see together.
 
 The skill never edits a curated knowledge page from this procedure.
 Screen narrative belongs to the `context` knowledge page (Screens
-section) per
-`${CLAUDE_PLUGIN_ROOT}/authoring/common/usecase-issue-authoring.md`'s
-knowledge side-effects table; surface it as a `review` item per
-`./knowledge-side-effects.md` when grouping reveals a screen that the
-context page does not yet name.
+section); the skill captures the screen-group label on participating
+use case issues and surfaces the grouping in the wrap-up session
+report. Further context-page authoring is left to the user.
 
 ## Procedure
 
@@ -27,11 +25,10 @@ For each screen the user names:
    support custom labels for this issue type, append a comment on
    each participating issue naming the screen group instead — comment
    syntax at `<runbook>`'s `issue-comment` intent.
-3. **Record the screen narrative.** When the `context` knowledge
-   page does not yet describe this screen, file a `review` item per
-   `./knowledge-side-effects.md` targeting `context`. The `review`
-   body's `Suggested Fix` should sketch the screen's purpose, the
-   use cases that compose it, and the navigation flow between them.
+3. **Note the screen narrative.** Capture screen purpose, the use
+   cases that compose it, and the navigation flow between them in
+   the wrap-up session report so the user has the material to
+   author the `context` page (Screens section) separately.
 
 ## Mock generation (optional)
 
@@ -50,11 +47,10 @@ the user can react to a concrete visual.
      `/tmp/workflow-mocks/<screen-slug>/`.
 3. After the agent returns the output path, present the mock to the
    user (file path they can open in a browser). Gather feedback.
-4. **Reflect mock feedback into use cases** the same way as research:
-   either through a follow-up question in the discovery loop or, when
-   the change concerns a knowledge surface, a side-effect `review`
-   item. Do not edit `usecase` issue bodies in place from mock
-   feedback alone — re-confirm with the user first.
+4. **Reflect mock feedback into use cases** through a follow-up
+   question in the discovery loop. Do not edit `usecase` issue
+   bodies in place from mock feedback alone — re-confirm with the
+   user first.
 
 ## Anti-patterns
 

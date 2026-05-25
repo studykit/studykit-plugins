@@ -30,7 +30,7 @@ if _SCRIPTS_DIR not in sys.path:
     sys.path.insert(0, _SCRIPTS_DIR)
 
 from workflow_command import CommandRunner  # noqa: E402
-from authoring_resolver import authoring_relative_path  # noqa: E402
+from mustread import authoring_relative_path  # noqa: E402
 from workflow_hook import (  # noqa: E402
     EditTarget,
     block_provider_cache_body_write,

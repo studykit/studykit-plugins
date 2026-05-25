@@ -74,7 +74,7 @@ resolver block.
   protection enforces this. Never bypass; refresh through the matching
   fetch script.
 - **Authoring read-tracking scope is `../authoring/` only.**
-  `authoring_resolver.authoring_relative_path` defines the surface. A new
+  `mustread.authoring_relative_path` defines the surface. A new
   reference doc that needs re-read tracking belongs under
   `../authoring/`, not under `./context/`.
 - **Injected text is consumer-facing.** The main agent calls scripts; it
