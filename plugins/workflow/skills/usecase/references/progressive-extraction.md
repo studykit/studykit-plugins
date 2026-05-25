@@ -65,7 +65,7 @@ Resolve the `usecase` authoring docs through the
 this skill writes the issue-side surface only:
 
 ```bash
-workflow authoring_resolver.py --type usecase --role issue
+workflow mustread --type usecase --role issue --purpose author
 ```
 
 Read the files the resolver returns. They define:
@@ -101,8 +101,6 @@ and:
 
 - Add a task `"Discovery: UC-<ref> <title>"` and mark it completed.
 - Mention the published ref back to the user so they can open it.
-- Run `./knowledge-side-effects.md` to surface any side effects this
-  use case implies.
 
 ## Anti-patterns
 

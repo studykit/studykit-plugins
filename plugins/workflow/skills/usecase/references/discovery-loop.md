@@ -22,14 +22,21 @@ case will name in the `Actors` section):
 1. Confirm with the user — name, type (`person` / `system`), short
    description, and the privilege level the actor needs for this use
    case if relevant.
-2. Record the actor in your working notes for the session. Reuse the
-   same actor name across use cases when referring to the same role,
-   so the actors story stays consistent on every issue body.
-3. If the project's knowledge backend has an `actors` page, treat the
-   new actor as a knowledge side effect — see
-   `./knowledge-side-effects.md` for the `review`-item path. **Do not
-   edit the `actors` page from this skill**; the skill's surface is
-   issue-only.
+2. Locate the project's actors registry — the actors authoring
+   contract is bundled with `workflow mustread --type usecase --role
+   issue --purpose author`. Resolve the page path from the project's
+   PRD-paths file (e.g., `wiki/prd/usecases/actors.md` for GitHub
+   knowledge). TODO: pending dedicated PRD-path script.
+3. If the actor is already on the registry, reuse the canonical name
+   verbatim across this and future use case issues.
+4. If the actor is missing, pick a canonical name that fits the
+   registry's naming conventions and list it in the use case issue
+   body's `Actors` section; do not write identity into the issue
+   body. The wrap-up `usecase-reviewer` surfaces the
+   missing-from-registry alignment as a `review` item.
+
+**Do not edit the actors page from this skill** — the skill's
+surface is issue-only.
 
 ## Anti-patterns
 

@@ -9,7 +9,7 @@ Read after:
 
 ## Scope
 
-Use this rule for `context`, `usecase`, `nfr`, `spec`, and `domain` knowledge pages stored in this repository.
+Use this rule for `context`, `actors`, `usecase`, `nfr`, `spec`, and `domain` knowledge pages stored in this repository.
 
 ## Storage path
 
@@ -19,7 +19,7 @@ Place every PRD-component page under:
 wiki/prd/
 ```
 
-Use type-based subdirectories (`wiki/prd/usecases/`, `wiki/prd/specs/`, `wiki/prd/nfr/`, `wiki/prd/domain/`) when more than one page of a type is expected. A single `context` page can live at `wiki/prd/context.md` directly.
+Use type-based subdirectories (`wiki/prd/usecases/`, `wiki/prd/specs/`, `wiki/prd/nfr/`, `wiki/prd/domain/`) when more than one page of a type is expected. A single `context` page can live at `wiki/prd/context.md` directly. The single `actors` registry lives at `wiki/prd/usecases/actors.md` (1-per-project) — inside the `usecases/` subdirectory because the registry is consumed by use cases.
 
 ## Identity
 

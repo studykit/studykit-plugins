@@ -46,17 +46,24 @@ The SubagentStart hook wraps every injected block in
 ## Authoring contracts (read once at startup)
 
 Subagents do not inherit the main session's authoring-read state.
-Read the resolver-returned files for `review` once at startup, then
-do not re-read between findings:
+Read the resolver-returned files once at startup, then do not
+re-read between findings:
 
 ```bash
-workflow authoring_resolver.py --type review
+workflow mustread --type usecase --role issue --purpose review
+# TODO: actors page path lookup
+# (pending dedicated PRD-path script)
 ```
 
-The resolver returns the `review` contract files — body shape and
-target-selection rules for the findings you publish. Criterion §6
-and the §9 `Suggested Fix` rewrites lean on the abstraction docs
-listed at those criteria; read them on demand if you need them.
+The call returns both review criteria files bundled together —
+`common/review/usecase-issue-review-criteria.md` (use case quality)
+and `common/review/actors-review-criteria.md` (registry quality) —
+plus the review issue authoring chain you need to publish findings
+(`common/issue-body.md`, `common/issue-authoring.md`,
+`common/review-authoring.md`, and the provider-specific review
+authoring + convention + relationship + anti-pattern files). The
+criteria files are the authoritative rules you apply to every use
+case and (when present) to the actors registry.
 
 ## What you read
 
@@ -70,109 +77,57 @@ For every ref in `prior-review-refs`, fetch the same way and read
 the body. You use the prior refs only to skip duplicates; you do
 not modify them.
 
+Also read the project's actors registry once at startup if it
+exists:
+
+1. Resolve the actors page path from the project's PRD-paths file
+   (e.g., `wiki/prd/usecases/actors.md` for GitHub knowledge).
+   TODO: pending dedicated PRD-path script.
+2. If the file exists, read it. Use the registry content to apply
+   criterion 11 of the use case criteria and every criterion from
+   the actors criteria file.
+3. If the file does not exist, skip those checks entirely for this
+   run; record `actors_registry: absent` in the return summary.
+
 Do not fetch issues you were not named — broader context-pulling is
 out of scope.
 
 ## Review criteria
 
-Evaluate every use case against the criteria below. Each criterion
-that yields a non-OK verdict becomes one `review` issue (subject to
-the deduplication rule below).
+The review criteria files resolved at startup are the source of
+truth. Do not duplicate or paraphrase them here — apply them as
+written.
 
-### 1. Size
+- `common/review/usecase-issue-review-criteria.md` — criteria 1–11
+  applied to every ref in `usecase-refs`. Each criterion that
+  yields a non-OK verdict becomes one `review` issue (subject to
+  deduplication). Criterion 11 (Actor registry alignment) is a
+  knowledge-side finding — see Knowledge-side findings below.
+- `common/review/actors-review-criteria.md` — criteria applied
+  once to the actors registry when present. Every finding from
+  this file is a knowledge-side finding.
 
-A use case is too large when:
-
-- The flow has steps that serve independent goals.
-- The expected outcome describes two or more unrelated results.
-- The situation covers multiple distinct scenarios that don't always
-  occur together.
-- Different actors are involved in different parts of the flow.
-
-Body's `Suggested Fix` proposes the split (child titles + the goal
-each child owns).
-
-### 2. Actor specificity
-
-- The actor must be a specific person or system, not a generic
-  "user" or "the team".
-- Every actor in the `Actors` section should be reusable across use
-  cases — same name for the same role.
-
-### 3. Goal concreteness
-
-- One thing the actor wants to achieve.
-- "and" in the goal usually signals a split candidate, not a goal
-  refinement.
-
-### 4. Situation concreteness
-
-- Bad: "When managing data."
-- Good: "After finishing a 30-minute meeting with three absent
-  teammates."
-
-### 5. Flow completeness
-
-- Numbered user-level actions.
-- No missing steps between situation and outcome.
-- Logical order.
-- Stays at user level (see Abstraction below).
-
-### 6. Abstraction discipline
-
-**Critical.** Flag implementation terms anywhere in the use case
-body. The rule lives in
-`${WORKFLOW_PLUGIN_ROOT}/authoring/common/usecase-authoring.md` under
-**Abstraction discipline**; the conversion table (before/after
-rewrites) lives in
-`${WORKFLOW_PLUGIN_ROOT}/authoring/common/usecase-abstraction-guard.md`.
-Read either on demand when wording a finding.
-
-When raising the finding, cite the specific leaked phrase in
-`Description`'s body paragraphs (and in the `Quote` section) and
-propose the user-level rewrite in `Suggested Fix`.
-
-### 7. Outcome measurability
-
-- Bad: "things work better".
-- Good: "absent teammates receive a 3-line summary within two
-  minutes".
-
-### 8. Overlap
-
-Flag use cases that cover the same actor / goal / situation as
-another use case in the set. The body should name the overlapping
-ref(s) and recommend whether to merge, supersede, or differentiate.
-
-### 9. Validation / error precision
-
-For use cases that have validation or error-handling content:
-
-- Are constraints user-visible and specific? ("Empty messages
-  cannot be sent; maximum 100 KB diagram source") not "validates
-  input".
-- Are error states described from the user's perspective?
-  ("Displays error message with retry option") not "returns 500".
-
-For use cases that have no validation / error section but clearly
-have meaningful failure modes: flag the missing precision.
-
-### 10. Cross-use-case consistency
-
-- A use case referenced by another use case's `Related Work` must
-  still exist. Flag stale references.
-- Same noun across multiple use cases should be named consistently
-  (singular/plural, same role/actor name). Flag inconsistencies.
+When the actors registry is absent, skip criterion 11 of the use
+case criteria and every actors criterion. Record `actors_registry:
+absent` in the return summary.
 
 ## Knowledge-side findings
 
-When a finding actually concerns a knowledge surface (`domain`,
-`actors`, `nfr`, `context`, `architecture`, `spec`), publish the
-`review` issue with that knowledge surface named in the
-`Description` and with the causing `usecase` ref linked via
-`--related`. The `target:` field in the resolver-returned `review`
-shape, when present, takes the knowledge surface name. Do not edit
-the knowledge page from this agent.
+This agent produces knowledge-side findings only for the actors
+page:
+
+- Criterion 11 of the use case criteria (Actor registry alignment)
+  — name the actors page in `Description` and link the causing
+  use case via `--related <usecase-ref>`.
+- Every actors criterion finding — name the actors page in
+  `Description`; omit `--related` because the concern is with the
+  registry itself, not with a specific use case.
+
+Pass `--label usecase-reviewer-knowledge` on every knowledge-side
+finding so it is filterable apart from use-case findings. The
+`target:` field in the resolver-returned `review` shape, when
+present, takes the actors page name. Do not edit the actors page
+from this agent.
 
 ## Output — per-finding `review` issue
 
@@ -192,9 +147,7 @@ For each finding (after deduplication, below):
      Required when the concern is about specific prose.
    - In `Suggested Fix` for criterion 6 (Abstraction) and criterion
      9 (Validation / error precision), include the user-level
-     rewrite, modeled on the conversion table in
-     `${WORKFLOW_PLUGIN_ROOT}/authoring/common/usecase-abstraction-guard.md`
-     (read on demand when wording the rewrite).
+     rewrite, modeled on the examples in the use case criteria file.
 
 2. **Publish the `review` issue** via `workflow issue new --type
    review` (verb syntax at `<runbook>`'s `issue-new` intent). Pass:
@@ -334,6 +287,7 @@ trailing prose.
 - skipped_dedup_prior: <count>              # findings deduped against a prior open review (comment trail appended on each)
 - skipped_dedup_in_run: <count>             # findings deduped against a review published earlier in the same run
 - knowledge_findings: <count>               # findings whose target is a knowledge surface
+- actors_registry: present | absent         # absent skips criterion 11 and all actors criteria
 - notes: <one short sentence, optional>
 </report>
 ```

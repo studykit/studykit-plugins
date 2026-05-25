@@ -21,7 +21,7 @@ The workflow issue body should summarize discovery state and link to the curated
 Recommended sections:
 
 - `Description` — why this use case is being explored and who needs it.
-- `Actors` — list of actors that participate in this use case, one per bullet.
+- `Actors` — list of actor canonical names that participate in this use case, one per bullet. Identity (general role, type, privileges) is defined on the actors registry — see `./actors-authoring.md`.
 - `Current Draft` — short current summary or link to the curated page draft.
 - `Open Questions` — outstanding questions, one per bullet.
 
@@ -32,6 +32,14 @@ Optional reusable sections (see `./issue-body.md`):
 - `Resume` — current-state snapshot while shaping.
 
 Use comments for conversation, interview notes, and feedback threads.
+
+## Actor citation
+
+Cite each `Actors` entry by the canonical name from the project's actors registry. Before naming an actor in a new use case issue:
+
+1. The actors authoring contract is bundled with the usecase issue authoring contract returned by `workflow mustread --type usecase --role issue --purpose author`. Locate the actors page path from the project's PRD-paths file (e.g., `wiki/prd/usecases/actors.md` for GitHub knowledge). TODO: pending dedicated PRD-path script.
+2. If the actor already exists in the registry, reuse the canonical name verbatim.
+3. If the actor is missing, pick a canonical name that fits the registry's naming conventions and list it in the `Actors` bullet. Do not write identity into the issue body; the registry is the only place identity lives.
 
 ## Knowledge side effects
 

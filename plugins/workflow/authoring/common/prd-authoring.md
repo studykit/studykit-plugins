@@ -9,6 +9,7 @@ This file is an index, not a separate artifact type. The authoring resolver does
 | Component | Authoring | Storage role | Cardinality | Purpose |
 | --- | --- | --- | --- | --- |
 | `context` | `./context-authoring.md` | Knowledge | 1 per project | Original idea, problem framing, scope, coarse success. |
+| `actors` | `./actors-authoring.md` | Knowledge | 1 per project | Canonical identity of every person and system that participates in use cases. |
 | `usecase` | `./usecase-authoring.md` (+ `-issue` / `-knowledge` side files) | Issue + knowledge | N per project | How an actor achieves a goal in a specific situation. |
 | `nfr` | `./nfr-authoring.md` | Knowledge | N per project | Non-functional targets. |
 | `spec` | `./spec-authoring.md` | Knowledge | N per project | Implementation contracts. |
@@ -21,10 +22,11 @@ This file is an index, not a separate artifact type. The authoring resolver does
 A typical sequence:
 
 1. Capture `context` first — original idea and problem framing.
-2. Add `usecase` items as actor goals become clear. Workflow issue first; curated page once the flow is stable.
-3. Add `domain` pages when shared vocabulary appears across use cases.
-4. Add `nfr` pages when non-functional targets are decided.
-5. Add `spec` pages when implementation contracts are decided.
+2. Add `actors` entries as use case discovery surfaces new participants; the registry grows alongside use cases rather than being defined up front.
+3. Add `usecase` items as actor goals become clear. Workflow issue first; curated page once the flow is stable.
+4. Add `domain` pages when shared vocabulary appears across use cases.
+5. Add `nfr` pages when non-functional targets are decided.
+6. Add `spec` pages when implementation contracts are decided.
 
 Each component evolves independently. The PRD has no single draft-to-publish lifecycle — every page and issue follows its own publishing rule.
 

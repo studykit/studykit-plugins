@@ -22,12 +22,12 @@ Place a metadata line immediately under the page title that points back to the p
 Required body sections:
 
 - `Goal` — what the actor wants to accomplish.
-- `Actors` — every actor that participates in this use case, with each actor's role.
+- `Actors` — every actor that participates in this use case, with each actor's role *in this flow*. Identity (general role, type, privileges) lives on the actors registry (`./actors-authoring.md`); name actors here by their canonical names from that page.
 - `Situation` — trigger and context.
 - `Flow` — ordered list of user-visible steps and responses.
 - `Expected Outcome` — observable successful outcome.
 
-List every actor that participates in this use case under the `Actors` section. Use the same actor name across use cases when referring to the same role, so the actor catalog can be read off the curated pages.
+Cite each actor by the canonical name from the actors registry. The `Actors` section on this curated page records *participation in this flow* — what the actor does here, in one line. The actor's general identity belongs to the registry, not duplicated here.
 
 Optional sections:
 
@@ -38,6 +38,10 @@ Optional sections:
 - `Change Log` — required for material updates. See `./knowledge-body.md`.
 
 Do not include raw discovery discussion in the curated page; it belongs in the workflow issue or its comments.
+
+## Actor citation
+
+The actors authoring contract is bundled with the usecase knowledge authoring contract returned by `workflow mustread --type usecase --role knowledge --purpose author`. Locate the actors page path from the project's PRD-paths file (e.g., `wiki/prd/usecases/actors.md` for GitHub knowledge). TODO: pending dedicated PRD-path script. Cite each `Actors` entry by canonical name with the per-flow role on the curated page. Do not define new actor identity on this curated page; the registry is the only place identity lives.
 
 ## Publishing rule
 

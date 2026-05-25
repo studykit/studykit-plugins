@@ -41,9 +41,11 @@ task `completed`, then run the End-Iteration procedure below.
    The reviewer evaluates every use case against quality criteria
    (size, actor specificity, goal concreteness, situation
    concreteness, flow completeness, abstraction discipline,
-   measurable outcome, overlap, validation/error precision) and
-   publishes one `review` issue per finding via `workflow issue new
-   --type review`, linked `--related` to the target use case.
+   measurable outcome, overlap, validation/error precision,
+   cross-use-case consistency, and — when an actors registry exists
+   — actor registry alignment and registry quality) and publishes
+   one `review` issue per finding via `workflow issue new --type
+   review`, linked `--related` to the target use case.
 
 4. **Walk findings with the user** — for each `review` ref the
    reviewer published, present the finding to the user. Resolve
