@@ -81,18 +81,20 @@ class PrdPathResolution:
         )
 
 
-def resolve_prd_path(
-    component: str,
-    *,
-    project: Path | None = None,
-) -> PrdPathResolution:
-    normalized_component = component.strip().lower()
-    if normalized_component not in COMPONENT_PATHS:
-        choices = ", ".join(sorted(COMPONENT_PATHS))
-        raise PrdPathError(
-            f"unknown PRD component: {component}. Choose one of: {choices}"
-        )
+@dataclass(frozen=True)
+class PrdPathListing:
+    base: Path
+    entries: list[tuple[str, str]]
 
+    def to_markdown(self) -> str:
+        lines = ["<prd_path>", f"Base: {self.base}"]
+        for component, relative in self.entries:
+            lines.append(f"- {component}: {relative}")
+        lines.append("</prd_path>")
+        return "\n".join(lines) + "\n"
+
+
+def _resolve_base(project: Path | None = None) -> Path:
     project_dir = (project or Path.cwd()).expanduser().resolve()
 
     try:
@@ -123,7 +125,22 @@ def resolve_prd_path(
     base_path = config.root / knowledge_path
     if prd_subdir:
         base_path = base_path / prd_subdir
-    base = base_path.resolve()
+    return base_path.resolve()
+
+
+def resolve_prd_path(
+    component: str,
+    *,
+    project: Path | None = None,
+) -> PrdPathResolution:
+    normalized_component = component.strip().lower()
+    if normalized_component not in COMPONENT_PATHS:
+        choices = ", ".join(sorted(COMPONENT_PATHS))
+        raise PrdPathError(
+            f"unknown PRD component: {component}. Choose one of: {choices}"
+        )
+
+    base = _resolve_base(project)
     relative = COMPONENT_PATHS[normalized_component]
     return PrdPathResolution(
         component=normalized_component,
@@ -132,11 +149,27 @@ def resolve_prd_path(
     )
 
 
+def resolve_all_prd_paths(
+    *,
+    project: Path | None = None,
+) -> PrdPathListing:
+    base = _resolve_base(project)
+    entries = [(name, COMPONENT_PATHS[name]) for name in sorted(COMPONENT_PATHS)]
+    return PrdPathListing(base=base, entries=entries)
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "component",
+        nargs="?",
         help="PRD component name: actors, context, usecase, spec, nfr, or domain",
+    )
+    parser.add_argument(
+        "--list",
+        dest="list_all",
+        action="store_true",
+        help="enumerate all components with their resolved paths",
     )
     parser.add_argument(
         "--project",
@@ -151,16 +184,24 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
 
+    if args.list_all and args.component:
+        parser.error("--list cannot be combined with a component argument")
+    if not args.list_all and not args.component:
+        parser.error("provide a component name or pass --list")
+
     try:
-        resolution = resolve_prd_path(
-            args.component,
-            project=args.project,
-        )
+        if args.list_all:
+            output = resolve_all_prd_paths(project=args.project).to_markdown()
+        else:
+            output = resolve_prd_path(
+                args.component,
+                project=args.project,
+            ).to_markdown()
     except PrdPathError as exc:
         print(f"prd_path error: {exc}", file=sys.stderr)
         return 2
 
-    print(resolution.to_markdown(), end="")
+    print(output, end="")
     return 0
 
 
