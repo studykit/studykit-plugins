@@ -511,8 +511,9 @@ def test_review_target_usecase_issue_bundles_actors_companion() -> None:
 
     assert resolution.target == "usecase"
     assert _rel_paths(resolution.files) == [
-        "common/review/usecase-issue-review-criteria.md",
-        "common/review/actors-review-criteria.md",
+        "common/quality/usecase-issue-criteria.md",
+        "common/usecase-abstraction-guard.md",
+        "common/quality/actors-criteria.md",
         "common/issue-body.md",
         "common/issue-authoring.md",
         "common/review-authoring.md",
@@ -532,7 +533,6 @@ def test_review_target_omits_target_type_authoring_files() -> None:
 
     assert "common/usecase-authoring.md" not in rels
     assert "common/usecase-issue-authoring.md" not in rels
-    assert "common/usecase-abstraction-guard.md" not in rels
     assert "providers/github-issue-usecase-authoring.md" not in rels
 
 
@@ -577,7 +577,7 @@ def test_bare_review_returns_authoring_contract_without_review_files() -> None:
     rels = _rel_paths(resolution.files)
     assert "common/issue-authoring.md" in rels
     assert "common/review-authoring.md" in rels
-    assert "common/review/usecase-issue-review-criteria.md" not in rels
+    assert "common/quality/usecase-issue-criteria.md" not in rels
     assert resolution.reading_anchor == "review-issue"
 
 
