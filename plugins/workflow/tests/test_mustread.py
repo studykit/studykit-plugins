@@ -209,25 +209,6 @@ def test_dual_type_common_authoring_precedes_role_specific(
     assert rels.index(common) < rels.index(role_specific)
 
 
-@pytest.mark.parametrize(
-    "artifact_type",
-    ["context", "usecase", "nfr", "spec", "domain"],
-)
-def test_github_knowledge_prd_paths_included_for_prd_components(artifact_type: str) -> None:
-    resolution = resolve_authoring(artifact_type, role="knowledge", provider="github", purpose="author")
-    assert "providers/github-knowledge-prd-paths.md" in _rel_paths(resolution.files)
-
-
-def test_github_knowledge_prd_paths_excluded_for_non_prd_type() -> None:
-    resolution = resolve_authoring("architecture", role="knowledge", provider="github", purpose="author")
-    assert "providers/github-knowledge-prd-paths.md" not in _rel_paths(resolution.files)
-
-
-def test_usecase_issue_role_does_not_include_github_prd_paths() -> None:
-    resolution = resolve_authoring("usecase", role="issue", provider="github", purpose="author")
-    assert "providers/github-knowledge-prd-paths.md" not in _rel_paths(resolution.files)
-
-
 def test_provider_can_be_inferred_from_workflow_config(tmp_path: Path) -> None:
     _config_path(tmp_path).write_text(
         """

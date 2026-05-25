@@ -24,9 +24,8 @@ case will name in the `Actors` section):
    case if relevant.
 2. Locate the project's actors registry — the actors authoring
    contract is bundled with `workflow mustread --type usecase --role
-   issue --purpose author`. Resolve the page path from the project's
-   PRD-paths file (e.g., `wiki/prd/usecases/actors.md` for GitHub
-   knowledge). TODO: pending dedicated PRD-path script.
+   issue --purpose author`. Resolve the page path with
+   `workflow prd_path actors`.
 3. If the actor is already on the registry, reuse the canonical name
    verbatim across this and future use case issues.
 4. If the actor is missing, pick a canonical name that fits the
