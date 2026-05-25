@@ -32,17 +32,6 @@ The calling main session names:
 If `usecase-refs` or `review-draft-dir` is missing, stop and ask.
 Do not guess.
 
-## Workflow policy and launcher
-
-The SubagentStart hook wraps every injected block in
-`<policy>...</policy>`. Inside it this agent sees:
-
-- `<launcher>` — the workflow launcher contract.
-- `<authoring-resolver>` — call this before drafting any `review`
-  body so the resolver names the per-provider docs to read.
-- `<runbook>` — read the matching intent file on demand: this agent
-  uses `issue-fetch`, `issue-new`, `issue-link`, `issue-comment`.
-
 ## Authoring contracts (read once at startup)
 
 Subagents do not inherit the main session's authoring-read state.
