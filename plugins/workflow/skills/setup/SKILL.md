@@ -54,7 +54,13 @@ workflow workflow_config.py --project <project-root> --require
    example `wiki/<project>`, `docs/workflow`, or `knowledge/`) and pass
    the confirmed value through `--github-wiki-path`. Do not assume,
    suggest, or fall back to `wiki/workflow` or any other path the user
-   has not named.
+   has not named. Then ask whether PRD-component pages should live in a
+   dedicated subdirectory inside that knowledge folder. If yes, collect
+   the subdirectory name (for example `prd`) and pass it through
+   `--github-wiki-prd-path`; the value must be relative to
+   `--github-wiki-path` and must not contain `..`. When the user wants
+   PRD pages at the knowledge folder root, omit
+   `--github-wiki-prd-path`.
 5. If the issue provider is `jira`, run the Jira site profiling flow before
    `capabilities` or `build-config`. Collect representative sample issue keys,
    inspect relationship surfaces, ask the user to confirm exact mappings, and
@@ -110,6 +116,10 @@ workflow workflow_config.py --project <project-root> --require
   assume, suggest, or fall back to `wiki/workflow` or any other path
   the user has not named. If the knowledge/wiki repository host differs
   from the issue repository host, use `--github-wiki-host`.
+  `--github-wiki-prd-path` is optional and locates PRD-component pages
+  inside the knowledge folder. The value must be relative to
+  `--github-wiki-path` and must not contain `..`. When omitted, PRD
+  pages sit at the knowledge folder root.
 - Jira setup targets Data Center or Server only. Reject or report Cloud,
   including `*.atlassian.net` sites.
 - Jira issue setup requires explicit `providers.issues.relationship_mappings`

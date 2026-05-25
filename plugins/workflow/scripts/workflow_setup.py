@@ -46,6 +46,7 @@ from workflow_config import (  # noqa: E402
 )
 from workflow_env import workflow_project_dir_from_env  # noqa: E402
 from workflow_github import GitHubRepositoryError, parse_github_remote_url  # noqa: E402
+from prd_path import PrdPathError, normalize_prd_path  # noqa: E402
 from workflow_jira_data_center_client import (  # noqa: E402
     jira_data_center_createmeta_path,
     jira_data_center_issue_path,
@@ -354,6 +355,7 @@ def build_config(
     github_wiki_repo: str | None = None,
     github_wiki_host: str | None = None,
     github_wiki_path: str | None = None,
+    github_wiki_prd_path: str | None = None,
     jira_site: str | None = None,
     jira_deployment: str | None = "data_center",
     jira_api_version: str | None = "2",
@@ -415,11 +417,16 @@ def build_config(
         jira_snapshot_hidden_comment_markers=jira_snapshot_hidden_comment_markers,
         filesystem_path=filesystem_issues_path,
     )
+    try:
+        normalized_prd_path = normalize_prd_path(github_wiki_prd_path)
+    except PrdPathError as exc:
+        raise WorkflowSetupError(str(exc)) from exc
     knowledge = _knowledge_provider_config(
         knowledge_provider,
         github_repo=github_wiki_repo or github_repo or probed_repo,
         github_host=knowledge_github_host,
         github_path=github_wiki_path,
+        github_prd_path=normalized_prd_path or None,
     )
 
     if issue_provider == "jira":
@@ -821,6 +828,14 @@ def _add_config_build_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--github-wiki-repo", help="GitHub knowledge repository slug when different from issue repo")
     parser.add_argument("--github-wiki-host", help="GitHub knowledge/wiki repository host when it differs from the issue host")
     parser.add_argument("--github-wiki-path", help="GitHub knowledge repository directory path (required for the github knowledge provider; no default is assumed)")
+    parser.add_argument(
+        "--github-wiki-prd-path",
+        help=(
+            "GitHub knowledge PRD subdirectory, relative to --github-wiki-path. "
+            "Optional; when omitted, PRD pages sit at the knowledge folder root. "
+            "Must not be absolute and must not contain '..'."
+        ),
+    )
     parser.add_argument("--jira-site", help="Jira Data Center or Server base URL")
     parser.add_argument("--jira-deployment", default="data_center", help="Jira deployment; Cloud is unsupported")
     parser.add_argument("--jira-api-version", default="2", help="Jira REST API version")
@@ -880,6 +895,7 @@ def _config_from_args(args: argparse.Namespace) -> dict[str, Any]:
         github_wiki_repo=args.github_wiki_repo,
         github_wiki_host=args.github_wiki_host,
         github_wiki_path=args.github_wiki_path,
+        github_wiki_prd_path=args.github_wiki_prd_path,
         jira_site=args.jira_site,
         jira_deployment=args.jira_deployment,
         jira_api_version=args.jira_api_version,
@@ -974,12 +990,14 @@ def _knowledge_provider_config(
     github_repo: str | None,
     github_host: str | None,
     github_path: str | None,
+    github_prd_path: str | None = None,
 ) -> dict[str, Any]:
     settings: dict[str, Any] = {"kind": provider}
     if provider == "github":
         _set_if_text(settings, "repo", github_repo)
         _set_if_text(settings, "host", github_host)
         _set_if_text(settings, "path", github_path)
+        _set_if_text(settings, "prd_path", github_prd_path)
     return settings
 
 
@@ -1722,6 +1740,7 @@ def _merge_profile_mapping(defaults: dict[str, Any], mapping: Mapping[str, Any])
         _set_default(defaults, "github_wiki_repo", _text(knowledge.get("repo") or knowledge.get("repository") or knowledge.get("slug")))
         _set_default(defaults, "github_wiki_host", _text(knowledge.get("host") or knowledge.get("hostname")))
         _set_default(defaults, "github_wiki_path", _text(knowledge.get("path")))
+        _set_default(defaults, "github_wiki_prd_path", _text(knowledge.get("prd_path")))
 
     _set_default(defaults, "commit_ref_style", _dig_text(mapping, ("commit_refs", "style")))
 
