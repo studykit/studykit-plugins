@@ -51,12 +51,12 @@ do not re-read between findings:
 
 ```bash
 workflow authoring_resolver.py --type review
-workflow authoring_resolver.py --type usecase --role issue
 ```
 
-The resolver returns the contract files (common + provider) for
-each. They define the `review` body shape, the target-selection
-rules, and the `usecase` body shape you are evaluating against.
+The resolver returns the `review` contract files — body shape and
+target-selection rules for the findings you publish. Criterion §6
+and the §9 `Suggested Fix` rewrites lean on the abstraction docs
+listed at those criteria; read them on demand if you need them.
 
 ## What you read
 
@@ -121,8 +121,12 @@ each child owns).
 ### 6. Abstraction discipline
 
 **Critical.** Flag implementation terms anywhere in the use case
-body. The contract and the conversion table live in the
-resolver-returned `usecase` authoring docs.
+body. The rule lives in
+`${WORKFLOW_PLUGIN_ROOT}/authoring/common/usecase-authoring.md` under
+**Abstraction discipline**; the conversion table (before/after
+rewrites) lives in
+`${WORKFLOW_PLUGIN_ROOT}/authoring/common/usecase-abstraction-guard.md`.
+Read either on demand when wording a finding.
 
 When raising the finding, cite the specific leaked phrase in
 `Description`'s body paragraphs (and in the `Quote` section) and
@@ -188,8 +192,9 @@ For each finding (after deduplication, below):
      Required when the concern is about specific prose.
    - In `Suggested Fix` for criterion 6 (Abstraction) and criterion
      9 (Validation / error precision), include the user-level
-     rewrite, modeled on the abstraction guard's conversion table
-     from your startup read set.
+     rewrite, modeled on the conversion table in
+     `${WORKFLOW_PLUGIN_ROOT}/authoring/common/usecase-abstraction-guard.md`
+     (read on demand when wording the rewrite).
 
 2. **Publish the `review` issue** via `workflow issue new --type
    review` (verb syntax at `<runbook>`'s `issue-new` intent). Pass:

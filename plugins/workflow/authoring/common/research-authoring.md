@@ -6,11 +6,6 @@ Research is a dual-role type: it has an **issue side** (scope, questions, status
 
 This file carries the rules that apply across both sides. Role-specific rules live in the companion contracts.
 
-Companion contracts:
-
-- Issue side: `./research-issue-authoring.md`
-- Knowledge side: `./research-knowledge-authoring.md`
-
 ## When research is warranted
 
 Use research when the next step is evidence-gathering, not implementation.
