@@ -8,6 +8,17 @@ Read with:
 - `./task.md` when the parent is task-shaped
 - `./epic.md` when the parent is coordination-only
 
+## When to decompose
+
+A single task is too large when it spans any of:
+
+- Unrelated code areas.
+- Independent acceptance criteria with no shared invariant.
+- Independent test surfaces (different test files, fixtures, or runtimes).
+- Work that can be assigned or sequenced independently.
+
+If none of these signals fire, the work is correctly sized as a single task; do not decompose. If at least one fires, pick the shape using the Decision rule below.
+
 ## Three patterns
 
 When a single task is too large, decomposition takes one of three shapes. The shapes are mutually exclusive and the choice is body-shape-driven, not size-driven alone.
@@ -73,6 +84,27 @@ Pick in this order:
 5. Otherwise, the work is probably a single task; do not decompose.
 
 The body-shape check at step 3 is the key discriminator between parent-task and epic. If the parent body cannot stand as a task without inventing filler content, the parent is an epic.
+
+## Shared narrative
+
+When a batch of work coordinates under a shared anchor, the shared context has a single home and member bodies do not duplicate it.
+
+The shared home holds:
+
+- Decisions across members.
+- Integration constraints and integration-level outcomes.
+- Shared blockers and sequencing choices.
+- Scope changes that affect several members.
+
+Member bodies record only the scope, acceptance criteria, and implementation notes specific to that member.
+
+Where the shared home lives depends on the decomposition pattern:
+
+- **Epic with member issues**: the epic body is the coordination summary; member issues link to it when their approach depends on epic-level narrative.
+- **Parent task with subtasks**: the parent body owns the joined `Description`, the integration `Unit Test Strategy`, and the observable `Acceptance Criteria` at parent level.
+- **Sibling tasks under a shared anchor** (use case, spec, parent task, or epic): the anchor is the shared home; sibling bodies stay scoped to their slice.
+
+Use comments — on whichever issue owns the shared narrative — for discussion. Keep bodies as the current structured summary, not transcripts.
 
 ## Sibling relationships
 
