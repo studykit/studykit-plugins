@@ -41,18 +41,6 @@ Cite each `Actors` entry by the canonical name from the project's actors registr
 2. If the actor already exists in the registry, reuse the canonical name verbatim.
 3. If the actor is missing, pick a canonical name that fits the registry's naming conventions and list it in the `Actors` bullet. Do not write identity into the issue body; the registry is the only place identity lives.
 
-## Knowledge side effects
-
-Authoring or revising a use case may require updates to other knowledge pages:
-
-- New domain concept → `domain` page.
-- Scope or problem framing change → `context` page.
-- New screen or interaction group → `context` or product-facing page.
-- New non-functional requirement → `nfr` page.
-- New implementation contract → `spec` page.
-
-If the update is deferred, create a `review` item targeting the affected knowledge page and the causing use case issue/page; describe the missing knowledge content in prose.
-
 ## Splitting a use case
 
 Split a use case when the actor goal forks or the flow contains multiple independent goals.
