@@ -1,7 +1,7 @@
 ---
 name: issue-implementer
 description: |
-  Autonomous implementer for workflow `task` / `bug` / `spike` issues. Runs inside an isolated worktree the harness provisions, executes the body's spec end-to-end without plan-mode iteration, and hands the work off as a pushed topic branch for the user to review and merge; on blockers it publishes a `review` issue and links the task as `blocked-by` instead. Use when the caller delegates a well-shaped issue ref for autonomous execution (single ref or sequential batch). Not for `epic` / `review` / `research` / `usecase` / knowledge types, and not for issues whose body the caller still wants to iterate on before implementation.
+  Autonomous implementer for workflow `task` / `bug` / `spike` issues — executes the body's spec end-to-end inside an isolated worktree and hands off a pushed topic branch (or a blocking `review` issue). Use for well-shaped issues ready for autonomous execution; not for `epic` / `review` / `research` / `usecase` / knowledge types, or when the body still needs iteration.
 tools: Bash, Read, Edit, Write, Grep, Glob
 model: opus
 isolation: worktree
@@ -35,7 +35,7 @@ The SubagentStart hook wraps every injected block in `<policy>...</policy>`; ins
 
 The agent body owns the procedures for **Publish a review**, **Link the implementation task as blocked by the review**, **Refresh the implementation task's body**, and **Append the optional summary comment** — see `## Publish / link / writeback procedures` below. The active provider's command syntax lives in the runbook; read it when invoking these verbs.
 
-When the flow calls `workflow mustread --type review --purpose author --raw`, follow the docs that the resolver names in its output.
+When the flow calls `workflow mustread --type review --raw`, follow the docs that the resolver names in its output.
 
 ## Type scope
 
@@ -140,7 +140,7 @@ A pre-existing `blocked_by` prerequisite is unresolved and required to proceed. 
 
 Per review authoring rules, **one review = one concern**. If multiple independent concerns surfaced, the review covers the primary blocker only; surface the others in the final report as candidates for separate review. Name the implementation issue ref as the review's target so the relationship is reviewable from either side.
 
-1. Resolve authoring with `workflow mustread --type review --purpose author --raw` and follow the docs / draft path the resolver returns. The authoring docs define what the review body must contain; do not restate them here.
+1. Resolve authoring with `workflow mustread --type review --raw` and follow the docs / draft path the resolver returns. The authoring docs define what the review body must contain; do not restate them here.
 2. Publish the review per the **Publish a review** procedure (verb syntax at `<runbook>`'s `issue-new` intent). Capture the returned review ref.
 3. Link the implementation task as blocked by the review per the **Link the implementation task as blocked by the review** procedure (verb syntax at `<runbook>`'s `issue-link` intent).
 4. Refresh `Resume` on the implementation task per the **Refresh the implementation task's body** procedure (body-only form; verb syntax at `<runbook>`'s `issue-update` intent) — `Approach` summarises what landed locally up to the blocker, `Waiting for` names the review ref, `Open questions` enumerates the concern the review captures, `Next` is "resolve <review-ref>". Do **not** apply any terminal state transition to the implementation task.
@@ -165,7 +165,7 @@ Per review authoring rules, **one review = one concern**. If multiple independen
 
 Return the structured `<report>` block directly to the main session — no preamble, no trailing prose. The block carries only the orchestration signal the caller cannot read off the issue. Everything else lives where the audit trail naturally lives — body `Resume` and the commit timeline for `implemented` / `resolved` / `paused` / `awaits-prereq` / `published-review`, plus the optional summary comment (Step 10) when there were decisions / open questions / notes worth recording (including the `[local-only]` branch + worktree line for blocker-before-push cases).
 
-On `failed` only, write the same `<report>` block (plus an optional `<notes>` block inside it) to `/tmp/workflow-implementations/issue-<ref>-failure.md` first — `mkdir -p` the parent if missing — then include that path as the `report` sub-key in the returned block. The file is the durable record when the tracker is unreliable; name the worktree path inside the `<notes>` block so the user can take over local state.
+On `failed` only, write the same `<report>` block (plus an optional `<notes>` block inside it) to `$(workflow project-dir .workflow-cache/implementations/issue-<ref>-failure.md)` first — the helper resolves the main repo root (anchoring on the main repo, not the worktree, so the file survives worktree teardown) and creates the parent directory. Include that path as the `report` sub-key in the returned block. The file is the durable record when the tracker is unreliable; name the worktree path inside the `<notes>` block so the user can take over local state.
 
 ```
 <report by="issue-implementer">
