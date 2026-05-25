@@ -1,7 +1,7 @@
 ---
 name: usecase-reviewer
 description: |
-  Reviews workflow `usecase` issues for quality and publishes one workflow `review` issue per finding, linked `--related` to the targeted use case (deduplicating against prior open reviews). Invoked by the `workflow:usecase` skill at wrap-up.
+  Reviews workflow `usecase` issues for quality and publishes one workflow `review` issue per finding that blocks the targeted use case (deduplicating against prior open reviews). Invoked by the `workflow:usecase` skill at wrap-up.
 tools: Bash, Read, Write, Grep, Glob
 model: opus
 color: yellow
@@ -43,15 +43,11 @@ workflow mustread --type review --target usecase --side issue
 workflow prd_path actors
 ```
 
-The call returns both review criteria files bundled together —
-`contracts/quality/usecase-issue-criteria.md` (use case quality)
-and `contracts/quality/actors-criteria.md` (registry quality) —
-plus the review issue authoring chain you need to publish findings
-(`contracts/issue/body.md`, `contracts/issue/common.md`,
-`contracts/issue/review.md`, and the provider-specific review
-authoring + convention + relationship + anti-pattern files). The
-criteria files are the authoritative rules you apply to every use
-case and (when present) to the actors registry.
+The call returns the review criteria files (use case quality +
+actors registry quality) bundled with the review issue authoring
+chain needed to publish findings. The criteria files are the
+authoritative rules you apply to every use case and (when present)
+to the actors registry.
 
 ## What you read
 
@@ -106,11 +102,11 @@ This agent produces knowledge-side findings only for the actors
 page:
 
 - Criterion 11 of the use case criteria (Actor registry alignment)
-  — name the actors page in `Description` and link the causing
-  use case via `--related <usecase-ref>`.
+  — name the actors page in `Description` and add the relationship
+  so the causing use case is `blocked_by` the review.
 - Every actors criterion finding — name the actors page in
-  `Description`; omit `--related` because the concern is with the
-  registry itself, not with a specific use case.
+  `Description`; do not add any relationship to a use case because
+  the concern is with the registry itself.
 
 Pass `--label usecase-reviewer-knowledge` on every knowledge-side
 finding so it is filterable apart from use-case findings. The
@@ -118,57 +114,9 @@ finding so it is filterable apart from use-case findings. The
 present, takes the actors page name. Do not edit the actors page
 from this agent.
 
-## Output — per-finding `review` issue
-
-For each finding (after deduplication, below):
-
-1. **Draft the `review` body** under
-   `<review-draft-dir>/<finding-slug>.md`. Follow the resolver-returned
-   review body shape; agent-specific points beyond that:
-
-   - In `Description`, name the targeted `usecase` ref(s) and (for
-     overlap or cross-use-case findings) the related refs.
-   - In `Criterion`, write the review criterion this finding fired
-     (e.g., "Abstraction discipline", "Outcome measurability",
-     "Cross-use-case consistency").
-   - In `Quote`, paste the verbatim phrase from the targeted use
-     case body with a section pointer ("`## Flow` step 3").
-     Required when the concern is about specific prose.
-   - In `Suggested Fix` for criterion 6 (Abstraction) and criterion
-     9 (Validation / error precision), include the user-level
-     rewrite, modeled on the examples in the use case criteria file.
-
-2. **Publish the `review` issue** via `workflow issue new --type
-   review` (verb syntax at `<runbook>`'s `issue-new` intent). Pass:
-
-   - `--title` — short concern phrase ("UC-<ref>: vague situation",
-     "UC-<ref>: implementation leak in flow").
-   - `--body-file` — the draft from step 1.
-   - `--related <usecase-ref>` for the use case the concern targets.
-     Repeat for every use case the finding spans (overlap findings
-     name multiple).
-   - `--label usecase-reviewer` when the configured backend supports
-     labels; this is how `source` is encoded at publish time when the
-     provider doesn't carry a `source` field natively.
-   - When the finding targets a knowledge surface (see **Knowledge-side
-     findings** above), additionally pass `--label
-     usecase-reviewer-knowledge` so the resulting `review` is
-     filterable apart from use-case-level findings. The two batches
-     have different resolution paths (knowledge edit vs. use case
-     body update); the label keeps them separable in the queue.
-
-3. **Capture the published `review` ref** from the script's JSON
-   output for the return summary and for the session-summary review
-   in step 5.
-
-Do not append a comment on the `usecase` issue from this agent —
-the `--related` link is sufficient. The invoking skill walks the
-findings with the user and may comment on the use case as part of
-the resolution.
-
 ## Deduplication
 
-Before publishing each finding:
+Before drafting and publishing each finding:
 
 1. Check the prior open `review` issues from `prior-review-refs`
    (when supplied). Skip the finding when an existing open `review`
@@ -203,6 +151,56 @@ duplicate counter for the return summary.
 
 Track the count of dedup hits per case in the return summary's
 `skipped_dedup_prior` and `skipped_dedup_in_run` fields.
+
+## Output — per-finding `review` issue
+
+For each finding that survived deduplication:
+
+1. **Draft the `review` body** under
+   `<review-draft-dir>/<finding-slug>.md`. Follow the resolver-returned
+   review body shape; agent-specific points beyond that:
+
+   - In `Description`, name the targeted `usecase` ref(s) and (for
+     overlap or cross-use-case findings) the related refs.
+   - In `Criterion`, write the review criterion this finding fired
+     (e.g., "Abstraction discipline", "Outcome measurability",
+     "Cross-use-case consistency").
+   - In `Quote`, paste the verbatim phrase from the targeted use
+     case body with a section pointer ("`## Flow` step 3").
+     Required when the concern is about specific prose.
+   - In `Suggested Fix` for criterion 6 (Abstraction) and criterion
+     9 (Validation / error precision), include the user-level
+     rewrite, modeled on the examples in the use case criteria file.
+
+2. **Publish the `review` issue** via `workflow issue new --type
+   review` (verb syntax at `<runbook>`'s `issue-new` intent). Pass:
+
+   - `--title` — short concern phrase ("UC-<ref>: vague situation",
+     "UC-<ref>: implementation leak in flow").
+   - `--body-file` — the draft from step 1.
+   - For each use case the concern targets, add the relationship
+     so the use case is `blocked_by` the new review. Apply it per
+     the provider relationships convention and the runbook's
+     `issue-new` intent. Overlap findings target every use case
+     the finding spans.
+   - `--label usecase-reviewer` when the configured backend supports
+     labels; this is how `source` is encoded at publish time when the
+     provider doesn't carry a `source` field natively.
+   - When the finding targets a knowledge surface (see **Knowledge-side
+     findings** above), additionally pass `--label
+     usecase-reviewer-knowledge` so the resulting `review` is
+     filterable apart from use-case-level findings. The two batches
+     have different resolution paths (knowledge edit vs. use case
+     body update); the label keeps them separable in the queue.
+
+3. **Capture the published `review` ref** from the script's JSON
+   output for the return summary and for the session-summary review
+   in step 5.
+
+Do not append a comment on the `usecase` issue from this agent —
+the `blocked_by` relationship is sufficient. The invoking skill
+walks the findings with the user and may comment on the use case
+as part of the resolution.
 
 ## Session-summary review
 
@@ -243,11 +241,12 @@ Publish the summary via `workflow issue new --type review`. Pass:
   sentence on the dominant criterion category, if any.>
   ```
 
-- `--related <each-published-review-ref>` — link every per-finding
-  review published this run so the summary anchors the full set.
-- `--related <each-usecase-ref>` — link every use case the run
-  reviewed, so a reader landing on the summary can navigate to the
-  source material.
+- Reference each per-finding review published this run and each
+  reviewed use case from the summary using the `related` intent.
+  Apply it per the provider relationships convention — natively
+  when the provider supports `related`; otherwise list the refs
+  in a `Related` body section in the summary draft per
+  `contracts/issue/body.md`.
 - `--label usecase-reviewer` and additionally
   `--label usecase-reviewer-session-summary` when the configured
   backend supports labels; the second label distinguishes the
