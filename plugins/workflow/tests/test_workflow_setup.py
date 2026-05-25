@@ -105,6 +105,55 @@ def test_build_config_records_commit_refs(tmp_path: Path) -> None:
     assert raw["commit_refs"] == {"enabled": False, "style": "disabled"}
 
 
+def test_build_config_includes_prd_path_when_provided(tmp_path: Path) -> None:
+    raw = build_config(
+        project=tmp_path,
+        issue_provider="github",
+        knowledge_provider="github",
+        github_repo="example/repo",
+        github_wiki_path="wiki/workflow",
+        github_wiki_prd_path="prd",
+    )
+
+    assert raw["providers"]["knowledge"]["prd_path"] == "prd"
+
+
+def test_build_config_omits_prd_path_when_not_provided(tmp_path: Path) -> None:
+    raw = build_config(
+        project=tmp_path,
+        issue_provider="github",
+        knowledge_provider="github",
+        github_repo="example/repo",
+        github_wiki_path="wiki/workflow",
+    )
+
+    assert "prd_path" not in raw["providers"]["knowledge"]
+
+
+def test_build_config_rejects_absolute_prd_path(tmp_path: Path) -> None:
+    with pytest.raises(WorkflowSetupError, match="relative path"):
+        build_config(
+            project=tmp_path,
+            issue_provider="github",
+            knowledge_provider="github",
+            github_repo="example/repo",
+            github_wiki_path="wiki/workflow",
+            github_wiki_prd_path="/etc",
+        )
+
+
+def test_build_config_rejects_prd_path_with_dotdot(tmp_path: Path) -> None:
+    with pytest.raises(WorkflowSetupError, match="escape"):
+        build_config(
+            project=tmp_path,
+            issue_provider="github",
+            knowledge_provider="github",
+            github_repo="example/repo",
+            github_wiki_path="wiki/workflow",
+            github_wiki_prd_path="prd/../leak",
+        )
+
+
 def test_build_config_defaults_issue_id_format_to_provider_native(tmp_path: Path) -> None:
     raw = build_config(
         project=tmp_path,
