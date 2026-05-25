@@ -5,7 +5,7 @@ Jira can store hierarchy, issue links, and remote links as provider-native relat
 Read this with:
 
 - `../../../contracts/issue/body.md`
-- `../../../contracts/issue/authoring.md`
+- `../../../contracts/issue/common.md`
 - `./convention.md`
 - `./relationships.md`
 

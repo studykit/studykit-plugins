@@ -7,7 +7,7 @@ Common rules that apply across both sides (definition, dual-role overview, when 
 Companion contracts:
 
 - `./body.md`
-- Issue rules: `./authoring.md`
+- Issue rules: `./common.md`
 - Research rules common to both sides: `../research.md`
 
 ## Storage role (issue side)

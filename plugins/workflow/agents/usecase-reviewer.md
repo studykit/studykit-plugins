@@ -47,7 +47,7 @@ The call returns both review criteria files bundled together —
 `contracts/quality/usecase-issue-criteria.md` (use case quality)
 and `contracts/quality/actors-criteria.md` (registry quality) —
 plus the review issue authoring chain you need to publish findings
-(`contracts/issue/body.md`, `contracts/issue/authoring.md`,
+(`contracts/issue/body.md`, `contracts/issue/common.md`,
 `contracts/issue/review.md`, and the provider-specific review
 authoring + convention + relationship + anti-pattern files). The
 criteria files are the authoritative rules you apply to every use

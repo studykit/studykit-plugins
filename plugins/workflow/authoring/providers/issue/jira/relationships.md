@@ -2,7 +2,7 @@
 
 Provider-specific relationship rules for issue-backed items stored as Jira issues.
 
-Read with `../../../contracts/issue/authoring.md`, `./convention.md`.
+Read with `../../../contracts/issue/common.md`, `./convention.md`.
 
 ## Boundary
 

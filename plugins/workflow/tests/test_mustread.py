@@ -46,7 +46,7 @@ def test_bare_review_resolution_uses_absolute_authoring_files() -> None:
     assert resolution.provider == "github"
     assert _rel_paths(resolution.files) == [
         "contracts/issue/body.md",
-        "contracts/issue/authoring.md",
+        "contracts/issue/common.md",
         "contracts/issue/review.md",
         "providers/issue/github/convention.md",
         "providers/issue/github/relationships.md",
@@ -229,7 +229,7 @@ providers:
     knowledge_resolution = resolve_authoring("architecture", project=tmp_path)
 
     assert issue_resolution.provider == "jira"
-    assert "contracts/issue/authoring.md" in _rel_paths(issue_resolution.files)
+    assert "contracts/issue/common.md" in _rel_paths(issue_resolution.files)
     assert "providers/issue/jira/convention.md" in _rel_paths(issue_resolution.files)
     assert "providers/issue/jira/relationships.md" in _rel_paths(issue_resolution.files)
     assert "providers/issue/jira/task.md" in _rel_paths(issue_resolution.files)
@@ -517,7 +517,7 @@ def test_review_target_usecase_issue_bundles_actors_companion() -> None:
         "contracts/usecase-abstraction-guard.md",
         "contracts/quality/actors-criteria.md",
         "contracts/issue/body.md",
-        "contracts/issue/authoring.md",
+        "contracts/issue/common.md",
         "contracts/issue/review.md",
         "providers/issue/github/convention.md",
         "providers/issue/github/relationships.md",
@@ -577,7 +577,7 @@ def test_bare_review_returns_authoring_contract_without_review_files() -> None:
 
     assert resolution.target is None
     rels = _rel_paths(resolution.files)
-    assert "contracts/issue/authoring.md" in rels
+    assert "contracts/issue/common.md" in rels
     assert "contracts/issue/review.md" in rels
     assert "contracts/quality/usecase-issue-criteria.md" not in rels
     assert resolution.reading_anchor == "review-issue"

@@ -4,7 +4,7 @@ Provider-neutral guidance for choosing how to decompose work that is too large f
 
 Read with:
 
-- `./authoring.md`
+- `./common.md`
 - `./task.md` when the parent is task-shaped
 - `./epic.md` when the parent is coordination-only
 

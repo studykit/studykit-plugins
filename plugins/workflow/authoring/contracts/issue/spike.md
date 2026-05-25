@@ -7,7 +7,7 @@ Use `research` for written investigation without throwaway code. Use `task` when
 Companion contracts:
 
 - `./body.md`
-- Issue rules: `./authoring.md`
+- Issue rules: `./common.md`
 
 ## Spike vs task vs research
 

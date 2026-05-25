@@ -142,4 +142,4 @@ If workflow tooling creates local files as projections of external issues, do no
 
 ## Cross-references
 
-- `./authoring.md` — issue-backed item rules.
+- `./common.md` — issue-backed item rules.
