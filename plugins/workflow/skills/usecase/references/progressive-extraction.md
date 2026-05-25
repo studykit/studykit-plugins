@@ -17,14 +17,12 @@ Every draft must name:
 - **Expected outcome** — observable, ideally measurable.
 
 Abstraction discipline: stay at the user level. The contract is in
-`${CLAUDE_PLUGIN_ROOT}/authoring/common/usecase-authoring.md`
-under **Abstraction discipline**; the conversion table (before/after
-rewrites for the most common leaks) and per-field obligations are in
-the companion guard at
-`${CLAUDE_PLUGIN_ROOT}/authoring/common/usecase-abstraction-guard.md`.
-Apply the guard before presenting any draft to the user — rewriting
-a leaked phrase mid-draft is cheaper than fixing it after the user
-has already reacted to the wrong wording.
+the **Abstraction discipline** section of the `usecase` authoring
+contract; the conversion table (before/after rewrites for the most
+common leaks) and per-field obligations are in the companion
+abstraction guard. Apply the guard before presenting any draft to
+the user — rewriting a leaked phrase mid-draft is cheaper than
+fixing it after the user has already reacted to the wrong wording.
 
 ## How to present the draft
 
@@ -55,17 +53,17 @@ question at a time:
   timeouts.
 
 Capture whichever apply. Skip when the use case has no meaningful
-constraints or failure modes — these sections are optional in
-`usecase-issue-authoring.md`.
+constraints or failure modes — these sections are optional in the
+issue authoring contract.
 
 ## Resolve authoring before publishing
 
 Resolve the `usecase` authoring docs through the
-`<authoring-resolver>`. Pass `--type usecase` and `--role issue` since
+`<authoring-resolver>`. Pass `--type usecase` and `--side issue` since
 this skill writes the issue-side surface only:
 
 ```bash
-workflow mustread --type usecase --role issue --purpose author
+workflow mustread --type usecase --side issue
 ```
 
 Read the files the resolver returns. They define:
@@ -84,7 +82,7 @@ Use `workflow issue new --type usecase` per the verb syntax at
 - `--title` — a short imperative phrase matching the actor's goal
   ("Share meeting summary").
 - `--body-file` — a temp body file you drafted under
-  `/tmp/workflow-usecase-drafts/<slug>.md`. Body sections follow the
+  `$(workflow project-dir .workflow-cache/usecase-drafts/<slug>.md)`. Body sections follow the
   resolver-returned issue-side `usecase` authoring shape. Place the
   user's outstanding questions in the `Open Questions` section so
   they travel with the issue.
@@ -93,13 +91,13 @@ Use `workflow issue new --type usecase` per the verb syntax at
 - `--related <ref>` — when this use case is part of a discovery
   session that produced earlier sibling use cases, link them
   pairwise. Sibling relationships use `related`, not `parent`; see
-  `${CLAUDE_PLUGIN_ROOT}/authoring/common/issue-authoring.md` for the
-  canonical relationship intents.
+  the canonical relationship intents in the `issue` authoring
+  contract.
 
 After publish, capture the returned ref from the script's JSON output
 and:
 
-- Add a task `"Discovery: UC-<ref> <title>"` and mark it completed.
+- Add a task `"Discovery: <ref> <title>"` and mark it completed.
 - Mention the published ref back to the user so they can open it.
 
 ## Anti-patterns
@@ -110,7 +108,6 @@ and:
 - Packing multiple actor goals into one use case. Split first
   (`./usecase-splitting.md`), then publish each child.
 - Inlining implementation choices into the body. Push those into
-  `Open Questions` or surface them as a knowledge side effect
-  targeting `spec` or `architecture`.
+  `Open Questions`.
 - Skipping the resolver call. The body shape and provider markup
   change between providers — never assume.

@@ -7,6 +7,17 @@ Files in this directory define provider-neutral workflow authoring contracts onl
 - Put provider-specific guidance in `../providers/`.
 - Keep common files semantic; the authoring resolver supplies provider-specific files separately when needed.
 
+## Backend-agnostic prose
+
+Write common file prose so a reader unfamiliar with the selected backend can still understand the rule. Do not name specific backends (GitHub, Jira, filesystem, etc.) and do not use "provider" as authoring vocabulary inside contract files. Reach for neutral substitutes such as:
+
+- "the configured issue backend" / "the configured knowledge backend"
+- "the matching rendering convention"
+- "native link form from the rendering convention"
+- "backend fields" / "backend status" / "backend workflow"
+
+"Provider" remains a valid term when describing the `../providers/` directory boundary in this AGENTS file — that is a structural term, not authoring vocabulary.
+
 ## Body markup boundary
 
 Common files describe **section meaning** (what a section is for, when it is required, what it must contain). They do not define the literal markup form used to render that section.

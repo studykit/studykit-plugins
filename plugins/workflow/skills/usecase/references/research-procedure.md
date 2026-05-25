@@ -5,8 +5,8 @@ in the session and the user wants to ground further discovery in how
 similar systems handle the same problem. The output is a workflow
 `research` issue, optionally followed by a curated knowledge research
 report once findings stabilize. The skill never drafts the curated
-report itself — that flow lives in a separate session per
-`${CLAUDE_PLUGIN_ROOT}/authoring/common/research-knowledge-authoring.md`.
+report itself — that flow lives in a separate session per the
+`research` knowledge authoring contract.
 
 ## When to dispatch
 
@@ -19,9 +19,8 @@ specific.
 
 Skip this procedure when the next step is exploratory code (use a
 `spike` issue) or when the answer is already known (write a `spec`).
-The guidance in
-`${CLAUDE_PLUGIN_ROOT}/authoring/common/research-authoring.md`
-under **When research is warranted** is the contract.
+The **When research is warranted** section of the `research`
+authoring contract is the contract.
 
 ## Procedure
 
@@ -36,7 +35,7 @@ under **When research is warranted** is the contract.
 2. **Resolve `research` authoring.** Call:
 
    ```bash
-   workflow mustread --type research --role issue --purpose author
+   workflow mustread --type research --side issue
    ```
 
    The resolver returns the issue-side body shape (`Description`,
@@ -44,7 +43,7 @@ under **When research is warranted** is the contract.
    `Scope`, `Sources To Check`, `Resume`).
 
 3. **Publish the research issue.** Draft the body under
-   `/tmp/workflow-usecase-research/<slug>.md` and publish via
+   `$(workflow project-dir .workflow-cache/usecase-research/<slug>.md)` and publish via
    `workflow issue new --type research` (verb syntax at `<runbook>`'s
    `issue-new` intent). Pass:
 
@@ -74,8 +73,8 @@ under **When research is warranted** is the contract.
    (verb syntax at `<runbook>`'s `issue-comment` intent). Keep raw
    notes in comments, not in the body — the body stays scoped to the
    research question and current state. **Stay decision-neutral**:
-   record evidence, not prescriptions. See
-   `research-authoring.md` under **Decision neutrality**.
+   record evidence, not prescriptions. See **Decision neutrality**
+   in the `research` authoring contract.
 
 6. **Reflect findings back into use cases.** When the research
    surfaces a pattern the use cases should adopt (a new actor, a
@@ -90,7 +89,7 @@ under **When research is warranted** is the contract.
 - Letting the research issue make decisions ("therefore we should
   use X"). Decisions go in `spec` issues; research records evidence.
 - Drafting the curated knowledge research report in this session.
-  The publishing rule in `research-knowledge-authoring.md` keeps
-  the report separate from the discovery flow.
+  The publishing rule in the `research` knowledge authoring contract
+  keeps the report separate from the discovery flow.
 - Stuffing all option evidence into a single comment. Split by
   option or by source so the timeline reads cleanly.

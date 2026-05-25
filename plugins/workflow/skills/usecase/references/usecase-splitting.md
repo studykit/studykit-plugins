@@ -1,9 +1,8 @@
 # Use Case Splitting
 
 Split a use case when the actor goal forks or the flow contains
-multiple independent goals. The contract is in
-`${CLAUDE_PLUGIN_ROOT}/authoring/common/usecase-issue-authoring.md`
-under **Splitting a use case**.
+multiple independent goals. The contract is in the **Splitting a
+use case** section of the `usecase` issue authoring contract.
 
 ## Split signals
 
@@ -28,8 +27,8 @@ The candidate use case probably needs to split when:
 3. **Link siblings**. After each child is published, link them
    pairwise as `--related` via `workflow issue link` (verb syntax at
    `<runbook>`'s `issue-link` intent). Do not use `parent` between
-   siblings; per `issue-authoring.md` the `parent` intent is for
-   epic-style coordination, not sibling pairing.
+   siblings; per the `issue` authoring contract, the `parent` intent
+   is for parent/child coordination, not sibling pairing.
 4. **Do not use supersession** unless an older published use case is
    being replaced. A first-time split does not supersede anything —
    the parent was a draft, not a prior publication.

@@ -49,7 +49,7 @@ Subagents do not inherit the main session's authoring-read state.
 Read the resolver-returned files once at startup:
 
 ```bash
-workflow mustread --type usecase --role issue --purpose author
+workflow mustread --type usecase --side issue
 ```
 
 The resolver returns the common + provider contract files for the

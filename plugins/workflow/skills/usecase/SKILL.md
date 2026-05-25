@@ -1,6 +1,6 @@
 ---
 name: usecase
-description: "Shape a rough product idea into concrete workflow `usecase` issues through a Socratic, one-question-at-a-time interview. Publishes each confirmed use case as its own workflow `usecase` issue, surfaces knowledge side effects as `review` items, and at wrap-up dispatches `usecase-explorer` then `usecase-reviewer` for gap finding and quality review."
+description: "Shape a rough product idea into concrete workflow `usecase` issues through a Socratic, one-question-at-a-time interview. Publishes each confirmed use case as its own workflow `usecase` issue, and at wrap-up dispatches `usecase-explorer` then `usecase-reviewer` for gap finding and quality review."
 argument-hint: "<idea or vague concept to turn into use cases, or 'iterate' to resume>"
 disable-model-invocation: true
 allowed-tools:
@@ -19,48 +19,29 @@ allowed-tools:
 
 A Socratic interviewer that helps the user discover what to build
 through one-question-at-a-time dialogue. Confirmed use cases are
-published as standalone workflow `usecase` issues; knowledge side
-effects surface as separate `review` items rather than knowledge-page
-edits in this session.
+published as standalone workflow `usecase` issues; knowledge-page
+edits are out of scope for this session.
 
 Discover use cases for: **$ARGUMENTS**
 
 ## Scope
 
 In scope: producing **workflow `usecase` issues** (the discovery
-surface defined in `${CLAUDE_PLUGIN_ROOT}/authoring/common/usecase-issue-authoring.md`).
+surface defined by the `usecase` issue authoring contract).
 
 Out of scope in this skill:
 
 - Curated knowledge-side `usecase` pages — defer to a separate session
-  when the flow is stable per the publishing rule in
-  `${CLAUDE_PLUGIN_ROOT}/authoring/common/usecase-knowledge-authoring.md`.
-- Editing knowledge pages (`domain`, `actors`, `nfr`, `context`,
+  when the flow is stable per the publishing rule in the `usecase`
+  knowledge authoring contract.
+- Editing knowledge pages (`domain`, `nfr`, `context`,
   `architecture`, `spec`) — out of scope. The skill produces use
-  case issues only; cross-surface alignment is left to the wrap-up
-  `usecase-reviewer` (for actors) and to the user (for other
-  knowledge surfaces).
+  case issues only; cross-surface alignment is left to the user.
+  Actors are intrinsic to use case discovery and captured inline in
+  each use case's `Actors` section; the actors registry page itself
+  is not edited from this skill.
 - Implementation work — handed off to `task` / `bug` / `spike` issues
   authored separately once a use case is stable.
-
-## Workflow policy and launcher
-
-The SessionStart hook wraps every injected block in
-`<policy>...</policy>`. Inside it this skill sees:
-
-- `<launcher>` — the workflow launcher contract. Every workflow
-  operation (issue fetch / new / comment / update / link) runs through it.
-- `<authoring-resolver>` — the resolver invocation. Call it before
-  drafting any `usecase` issue body, any `review` issue body, or any
-  comment, to learn which authoring docs to read.
-- `<runbook>` — reference docs (read on demand) at
-  `${WORKFLOW_PLUGIN_ROOT}/authoring/runbook/<intent>/<provider>.md`.
-  This skill uses `issue-fetch`, `issue-new`, `issue-comment`,
-  `issue-update`, and `issue-link`. Read the matching intent file on
-  demand for verb syntax and flag sets — never restate.
-
-When the user has not been assigned by the caller, publish issues with
-`--assignee me` so the user owns each created issue by default.
 
 ## Modes
 
@@ -99,7 +80,7 @@ backlog to seed.
 
 **Conditional tasks** — add when the corresponding step fires:
 
-- `"Discovery: UC-<ref> <title>"` — one per confirmed and published use case.
+- `"Discovery: <ref> <title>"` — one per confirmed and published use case.
 - `"Research: <topic>"` — when a similar-systems research dispatch fires.
 - `"UI screen grouping"` — when the user agrees to group UI-related use cases.
 - `"Mock: <screen slug>"` — when mock generation is requested.
@@ -112,10 +93,7 @@ Restate the idea back in one sentence to confirm understanding. Then:
 
 1. Note the framing in the session task list — do **not** publish an
    anchor issue. The first publication is the first confirmed use case,
-   not a wrapper. If a single epic-style anchor is wanted later, the
-   user can publish an `epic` issue separately via `workflow issue
-   new --type epic` per the runbook's `issue-new` intent and link the
-   discovered use cases as `--child` from that epic.
+   not a wrapper.
 2. Mark "Step 1" completed. Mark "Discovery: Use cases" in_progress.
 
 ### Steps 2–11: Interview phases
@@ -152,7 +130,7 @@ not agent memory.
 - **Mock generator** — `Agent(subagent_type: "workflow:mock-html-generator")`.
   Pass the participating use case refs, screen-group label, layout
   requirements, and an absolute output directory under
-  `/tmp/workflow-mocks/<screen-slug>/`.
+  `$(workflow project-dir .workflow-cache/mocks/<screen-slug>/)`.
 
 **Execution order in Wrap Up:** explorer first (find candidates the
 existing set missed), then reviewer (validate the full set).
@@ -164,10 +142,7 @@ interactive interview. The session's durable outputs are:
 
 - Each confirmed use case → one workflow `usecase` issue (the
   `Description`, `Actors`, `Current Draft`, `Open Questions` sections
-  defined by `usecase-issue-authoring.md`).
-- Each knowledge side effect → one workflow `review` issue with
-  `target:` set to the affected knowledge surface (or to the causing
-  use case ref when the issue text itself is the problem).
+  defined by the `usecase` issue authoring contract).
 - Each quality finding from the wrap-up reviewer → one workflow
   `review` issue, linked `--related` to the use case it targets.
 - Optional: one `research` issue per similar-systems investigation,

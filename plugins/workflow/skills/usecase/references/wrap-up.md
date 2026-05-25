@@ -13,7 +13,7 @@ task `completed`, then run the End-Iteration procedure below.
    "workflow:usecase-explorer")`. Pass:
    - The list of `usecase` issue refs created or refined this session.
    - An absolute output path for the advisory exploration report
-     under `/tmp/workflow-usecase-explorations/<session-slug>.md`.
+     under `$(workflow project-dir .workflow-cache/usecase-explorations/<session-slug>.md)`.
 
    The explorer reads each referenced `usecase` issue via `workflow
    issue fetch`, evaluates the set from fresh perspectives (usage
@@ -34,7 +34,7 @@ task `completed`, then run the End-Iteration procedure below.
      candidates reflected in step 2).
    - The absolute draft directory for per-finding `review` issue
      bodies under
-     `/tmp/workflow-usecase-reviewer/<session-slug>/`.
+     `$(workflow project-dir .workflow-cache/usecase-reviewer/<session-slug>/)`.
    - Optionally, refs of prior open `review` issues whose `source`
      is `usecase-reviewer` so the reviewer can deduplicate.
 
@@ -64,7 +64,6 @@ task `completed`, then run the End-Iteration procedure below.
 5. **Session report** — present a concise summary in dialogue:
    - `usecase` issues confirmed this session — refs and titles.
    - `usecase` issues that still carry non-empty `Open Questions`.
-   - Knowledge side-effect `review` issues filed mid-session — refs.
    - Reviewer findings published — refs, with resolved vs deferred
      counts.
    - Research issues opened — refs.
@@ -79,16 +78,6 @@ Explorer first (find gaps and new use case candidates), then
 reviewer (validate the full set, including any reflected candidates).
 Running the reviewer before the explorer wastes a review pass on a
 set that is about to grow.
-
-## Cross-cutting findings
-
-If the explorer or reviewer surfaces a concern that touches
-knowledge surfaces this skill does not own (`domain`,
-`architecture`, `spec`, `nfr`, `context`), the **subagent** itself
-files the side-effect `review` item per its own per-agent rules.
-The main-session walk in step 4 only handles use-case-scoped
-findings — knowledge-side findings are walked separately, or in a
-later iteration session focused on the affected knowledge surface.
 
 ## When the user re-opens discovery mid-wrap-up
 

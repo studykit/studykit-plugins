@@ -43,9 +43,11 @@ KNOWLEDGE_TYPES = {"spec", "architecture", "domain", "context", "nfr", "ci"}
 DUAL_TYPES = {"usecase", "research"}
 ALL_TYPES = ISSUE_TYPES | KNOWLEDGE_TYPES | DUAL_TYPES
 AUTHORING_SCOPES = {"content", "comment"}
-AUTHORING_PURPOSES = {"author", "review"}
+REVIEW_TARGETS = ALL_TYPES - {"review"}
 
 PRD_COMPONENT_TYPES = {"context", "usecase", "nfr", "spec", "domain"}
+
+DECOMPOSITION_TYPES = {"task", "epic"}
 
 PLAN_MODE_TYPES = {"task", "bug"}
 
@@ -109,26 +111,18 @@ def _anchor_scope_suffix(scope: str) -> str:
     return "-comment" if scope == "comment" else ""
 
 
-def _anchor_purpose_suffix(purpose: str) -> str:
-    return "-review" if purpose == "review" else ""
-
-
 def reading_anchor(
-    artifact_type: str, role: str, scope: str, purpose: str
+    artifact_type: str, side: str, scope: str, target: str | None
 ) -> str:
-    return (
-        f"{artifact_type}-{role}"
-        f"{_anchor_purpose_suffix(purpose)}{_anchor_scope_suffix(scope)}"
-    )
+    if artifact_type == "review" and target is not None:
+        return f"{target}-{side}-review{_anchor_scope_suffix(scope)}"
+    return f"{artifact_type}-{side}{_anchor_scope_suffix(scope)}"
 
 
 def notes_anchor(
-    artifact_type: str, role: str, scope: str, purpose: str
+    artifact_type: str, side: str, scope: str, target: str | None
 ) -> str:
-    return (
-        f"{artifact_type}-{role}"
-        f"{_anchor_purpose_suffix(purpose)}{_anchor_scope_suffix(scope)}"
-    )
+    return reading_anchor(artifact_type, side, scope, target)
 
 
 @dataclass(frozen=True)
@@ -136,23 +130,23 @@ class Resolution:
     """Resolved authoring contract set."""
 
     artifact_type: str
-    role: str
+    side: str
     provider: str | None
     scope: str
-    purpose: str
+    target: str | None
     files: tuple[Path, ...]
     notes: tuple[str, ...] = ()
 
     @property
     def reading_anchor(self) -> str:
         return reading_anchor(
-            self.artifact_type, self.role, self.scope, self.purpose
+            self.artifact_type, self.side, self.scope, self.target
         )
 
     @property
     def notes_anchor(self) -> str:
         return notes_anchor(
-            self.artifact_type, self.role, self.scope, self.purpose
+            self.artifact_type, self.side, self.scope, self.target
         )
 
     def to_markdown(self) -> str:
@@ -202,26 +196,38 @@ def normalize_type(value: str) -> str:
     return normalized
 
 
-def normalize_role(value: str | None, artifact_type: str) -> str:
+def normalize_side(
+    value: str | None, artifact_type: str, target: str | None = None
+) -> str:
+    """Normalize the side axis (issue or knowledge).
+
+    When ``target`` is set the side refers to the target's side (the
+    artifact being reviewed). Otherwise the side refers to the
+    artifact_type being authored.
+    """
+    effective_type = target if target is not None else artifact_type
     if value is None:
-        if artifact_type in ISSUE_TYPES:
+        if effective_type in ISSUE_TYPES:
             return "issue"
-        if artifact_type in KNOWLEDGE_TYPES:
+        if effective_type in KNOWLEDGE_TYPES:
             return "knowledge"
         raise ResolverError(
-            f"artifact type '{artifact_type}' can be issue or knowledge; specify --role"
+            f"artifact type '{effective_type}' can be issue or knowledge; specify --side"
         )
 
     normalized = value.strip().lower().replace("_", "-")
     if normalized in {"page", "wiki", "doc", "document"}:
         normalized = "knowledge"
+    if normalized in {"role"}:
+        # legacy callers that still pass --side role — treat as missing
+        raise ResolverError(f"unsupported artifact side: {value}")
     if normalized not in {"issue", "knowledge"}:
-        raise ResolverError(f"unsupported artifact role: {value}")
+        raise ResolverError(f"unsupported artifact side: {value}")
 
-    if artifact_type in ISSUE_TYPES and normalized != "issue":
-        raise ResolverError(f"artifact type '{artifact_type}' is issue-backed")
-    if artifact_type in KNOWLEDGE_TYPES and normalized != "knowledge":
-        raise ResolverError(f"artifact type '{artifact_type}' is knowledge-backed")
+    if effective_type in ISSUE_TYPES and normalized != "issue":
+        raise ResolverError(f"artifact type '{effective_type}' is issue-backed")
+    if effective_type in KNOWLEDGE_TYPES and normalized != "knowledge":
+        raise ResolverError(f"artifact type '{effective_type}' is knowledge-backed")
     return normalized
 
 
@@ -238,30 +244,32 @@ def normalize_scope(value: str | None) -> str:
     return normalized
 
 
-def normalize_purpose(value: str | None) -> str:
+def normalize_target(value: str | None, artifact_type: str) -> str | None:
     if value is None:
-        raise ResolverError(
-            "authoring purpose is required; pass --purpose author or --purpose review"
-        )
+        return None
+    if artifact_type != "review":
+        raise ResolverError("--target is only valid with --type review")
     normalized = value.strip().lower().replace("_", "-")
-    if normalized in {"authoring", "write", "writer"}:
-        normalized = "author"
-    if normalized in {"reviewing", "reviewer", "criteria", "review-criteria"}:
-        normalized = "review"
-    if normalized not in AUTHORING_PURPOSES:
-        raise ResolverError(f"unsupported authoring purpose: {value}")
+    if normalized == "use-case":
+        normalized = "usecase"
+    if normalized == "review":
+        raise ResolverError("--target review is not supported")
+    if normalized not in REVIEW_TARGETS:
+        raise ResolverError(f"unsupported target type: {value}")
     return normalized
 
 
-def _actors_companion_parts(provider: str | None, purpose: str) -> list[str]:
+def _actors_companion_parts(
+    provider: str | None, *, for_review: bool
+) -> list[str]:
     """Actors registry files bundled with usecase work.
 
     The actors registry is a knowledge page co-authored alongside use
     case issues and the use case wiki page; it has no dedicated
-    `--type actors` axis. Returns the contract files when authoring
+    ``--type actors`` axis. Returns the contract files when authoring
     and the criteria file when reviewing.
     """
-    if purpose == "review":
+    if for_review:
         return ["common/review/actors-review-criteria.md"]
     parts = ["common/actors-authoring.md"]
     if provider in KNOWLEDGE_PROVIDER_TYPE_PATTERNS:
@@ -274,9 +282,9 @@ def _actors_companion_parts(provider: str | None, purpose: str) -> list[str]:
 def _review_issue_authoring_parts(provider: str | None) -> list[str]:
     """Files needed to author a review-type issue body.
 
-    Mirrors what `resolve_authoring("review", role="issue",
-    purpose="author", provider=...)` would compute, so review-purpose
-    callers receive the contract used to publish findings without a
+    Equivalent to what ``resolve_authoring("review", side="issue",
+    provider=...)`` would compute, so callers that resolve a review's
+    target receive the contract used to publish findings without a
     second resolver call. Kept narrow on purpose: review is not a PRD
     component and not in DUAL_TYPES, so the full author chain reduces
     to these entries.
@@ -329,21 +337,21 @@ def is_authoring_file(path: Path, *, plugin_root: Path | None = None) -> bool:
 def resolve_authoring(
     artifact_type: str,
     *,
-    purpose: str,
-    role: str | None = None,
+    side: str | None = None,
+    target: str | None = None,
     provider: str | None = None,
     project: Path | None = None,
     require_config: bool = False,
     scope: str = "content",
 ) -> Resolution:
     normalized_type = normalize_type(artifact_type)
-    normalized_role = normalize_role(role, normalized_type)
+    normalized_target = normalize_target(target, normalized_type)
+    normalized_side = normalize_side(side, normalized_type, normalized_target)
     normalized_scope = normalize_scope(scope)
-    normalized_purpose = normalize_purpose(purpose)
 
-    if normalized_purpose == "review" and normalized_scope == "comment":
+    if normalized_target is not None and normalized_scope == "comment":
         raise ResolverError(
-            "purpose 'review' does not apply to comment scope; "
+            "--target does not apply to comment scope; "
             "review-criteria files only describe content-level review"
         )
 
@@ -354,26 +362,26 @@ def resolve_authoring(
         except WorkflowConfigError as exc:
             raise ResolverError(str(exc)) from exc
         if config is not None:
-            config_provider = config.provider_for_role(normalized_role)
+            config_provider = config.provider_for_role(normalized_side)
 
     normalized_provider = normalize_provider(provider) or config_provider
     if normalized_provider is not None:
         try:
-            validate_provider_for_role(normalized_role, normalized_provider)
+            validate_provider_for_role(normalized_side, normalized_provider)
         except WorkflowConfigError as exc:
             raise ResolverError(str(exc)) from exc
 
-    if normalized_purpose == "review":
+    if normalized_target is not None:
         parts: list[str] = []
-        if normalized_type in DUAL_TYPES:
+        if normalized_target in DUAL_TYPES:
             parts.append(
-                f"common/review/{normalized_type}-{normalized_role}-review-criteria.md"
+                f"common/review/{normalized_target}-{normalized_side}-review-criteria.md"
             )
         else:
-            parts.append(f"common/review/{normalized_type}-review-criteria.md")
-        if normalized_type == "usecase":
+            parts.append(f"common/review/{normalized_target}-review-criteria.md")
+        if normalized_target == "usecase":
             for companion in _actors_companion_parts(
-                normalized_provider, "review"
+                normalized_provider, for_review=True
             ):
                 if companion not in parts:
                     parts.append(companion)
@@ -382,29 +390,29 @@ def resolve_authoring(
                 parts.append(review_part)
         return Resolution(
             artifact_type=normalized_type,
-            role=normalized_role,
+            side=normalized_side,
             provider=normalized_provider,
             scope=normalized_scope,
+            target=normalized_target,
             files=absolute_authoring_paths(parts),
-            purpose=normalized_purpose,
         )
 
     parts: list[str] = []
     if normalized_scope == "comment":
-        if normalized_role == "issue" and normalized_provider in ISSUE_PROVIDER_FILES:
+        if normalized_side == "issue" and normalized_provider in ISSUE_PROVIDER_FILES:
             parts.append(ISSUE_PROVIDER_FILES[normalized_provider])
-        if normalized_role == "knowledge" and normalized_provider in KNOWLEDGE_PROVIDER_FILES:
+        if normalized_side == "knowledge" and normalized_provider in KNOWLEDGE_PROVIDER_FILES:
             parts.append(KNOWLEDGE_PROVIDER_FILES[normalized_provider])
         return Resolution(
             artifact_type=normalized_type,
-            role=normalized_role,
+            side=normalized_side,
             provider=normalized_provider,
             scope=normalized_scope,
+            target=None,
             files=absolute_authoring_paths(parts),
-            purpose=normalized_purpose,
         )
 
-    if normalized_role == "issue":
+    if normalized_side == "issue":
         parts.append("common/issue-body.md")
         parts.append("common/issue-authoring.md")
     else:
@@ -412,15 +420,19 @@ def resolve_authoring(
     if normalized_type in PRD_COMPONENT_TYPES:
         parts.append("common/prd-authoring.md")
     parts.append(f"common/{normalized_type}-authoring.md")
+    if normalized_type in DECOMPOSITION_TYPES:
+        parts.append("common/decomposition-patterns.md")
     if normalized_type in DUAL_TYPES:
-        parts.append(f"common/{normalized_type}-{normalized_role}-authoring.md")
+        parts.append(f"common/{normalized_type}-{normalized_side}-authoring.md")
     if normalized_type == "usecase":
         parts.append("common/usecase-abstraction-guard.md")
-        for companion in _actors_companion_parts(normalized_provider, "author"):
+        for companion in _actors_companion_parts(
+            normalized_provider, for_review=False
+        ):
             if companion not in parts:
                 parts.append(companion)
 
-    if normalized_role == "issue" and normalized_provider in ISSUE_PROVIDER_FILES:
+    if normalized_side == "issue" and normalized_provider in ISSUE_PROVIDER_FILES:
         parts.append(ISSUE_PROVIDER_FILES[normalized_provider])
         parts.append(ISSUE_PROVIDER_RELATIONSHIP_FILES[normalized_provider])
         parts.append(
@@ -428,7 +440,7 @@ def resolve_authoring(
                 artifact_type=normalized_type
             )
         )
-    if normalized_role == "knowledge" and normalized_provider in KNOWLEDGE_PROVIDER_FILES:
+    if normalized_side == "knowledge" and normalized_provider in KNOWLEDGE_PROVIDER_FILES:
         parts.append(KNOWLEDGE_PROVIDER_FILES[normalized_provider])
         parts.append(
             KNOWLEDGE_PROVIDER_TYPE_PATTERNS[normalized_provider].format(
@@ -436,14 +448,16 @@ def resolve_authoring(
             )
         )
     if normalized_provider is not None:
-        parts.extend(PROVIDER_EXTRA_FILES.get((normalized_role, normalized_provider), ()))
+        parts.extend(
+            PROVIDER_EXTRA_FILES.get((normalized_side, normalized_provider), ())
+        )
 
     notes_list: list[str] = []
-    if normalized_role == "issue" and normalized_type in PLAN_MODE_TYPES:
+    if normalized_side == "issue" and normalized_type in PLAN_MODE_TYPES:
         notes_list.append(PLAN_MODE_TRIGGER_NOTE)
-    if normalized_role == "issue" and normalized_type in TASK_AUDIT_TYPES:
+    if normalized_side == "issue" and normalized_type in TASK_AUDIT_TYPES:
         notes_list.append(TASK_AUDIT_TRIGGER_NOTE)
-    if normalized_role == "issue" and normalized_type in PLAN_MODE_TYPES:
+    if normalized_side == "issue" and normalized_type in PLAN_MODE_TYPES:
         retroactive_note = RETROACTIVE_PUBLISH_STATE_NOTES.get(normalized_provider)
         if retroactive_note is not None:
             notes_list.append(retroactive_note)
@@ -451,35 +465,32 @@ def resolve_authoring(
 
     return Resolution(
         artifact_type=normalized_type,
-        role=normalized_role,
+        side=normalized_side,
         provider=normalized_provider,
         scope=normalized_scope,
+        target=None,
         files=absolute_authoring_paths(parts),
         notes=notes,
-        purpose=normalized_purpose,
     )
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--type", required=True, help="workflow artifact type")
-    parser.add_argument("--role", help="issue or knowledge; required for usecase/research")
+    parser.add_argument(
+        "--side",
+        help="issue or knowledge; required for usecase/research, defaults otherwise",
+    )
+    parser.add_argument(
+        "--target",
+        help="artifact type being reviewed; only valid with --type review",
+    )
     parser.add_argument("--provider", help="provider override, such as github or jira")
     parser.add_argument(
         "--scope",
         choices=sorted(AUTHORING_SCOPES),
         default="content",
         help="authoring surface to resolve; use comment for comment-only work",
-    )
-    parser.add_argument(
-        "--purpose",
-        choices=sorted(AUTHORING_PURPOSES),
-        required=True,
-        help=(
-            "audience for the resolved files; 'author' returns the authoring "
-            "contract, 'review' returns the review-criteria file used to "
-            "evaluate an already-written artifact"
-        ),
     )
     parser.add_argument(
         "--project",
@@ -503,12 +514,12 @@ def main(argv: list[str] | None = None) -> int:
     try:
         resolution = resolve_authoring(
             args.type,
-            role=args.role,
+            side=args.side,
+            target=args.target,
             provider=args.provider,
             project=args.project,
             require_config=args.require_config,
             scope=args.scope,
-            purpose=args.purpose,
         )
     except ResolverError as exc:
         print(f"authoring resolver error: {exc}", file=sys.stderr)
@@ -577,17 +588,17 @@ def _resolve_session() -> tuple[str, str]:
 def _resolution_key(resolution: Resolution) -> dict[str, str | None]:
     return {
         "type": resolution.artifact_type,
-        "role": resolution.role,
+        "side": resolution.side,
         "provider": resolution.provider,
         "scope": resolution.scope,
-        "purpose": resolution.purpose,
+        "target": resolution.target,
     }
 
 
 def _keys_equal(left: object, right: dict[str, str | None]) -> bool:
     if not isinstance(left, dict):
         return False
-    fields = ("type", "role", "provider", "scope", "purpose")
+    fields = ("type", "side", "provider", "scope", "target")
     return all(left.get(field) == right.get(field) for field in fields)
 
 

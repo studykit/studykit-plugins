@@ -11,8 +11,8 @@ question; do not ask more than one question per turn.
 
 Follow the conversation naturally. Stop probing a gap once it is
 concrete enough to draft a use case at the right level of abstraction
-(see the abstraction discipline in
-`${CLAUDE_PLUGIN_ROOT}/authoring/common/usecase-authoring.md`).
+(see the **Abstraction discipline** section of the `usecase`
+authoring contract).
 
 ## Actor capture
 
@@ -23,8 +23,8 @@ case will name in the `Actors` section):
    description, and the privilege level the actor needs for this use
    case if relevant.
 2. Locate the project's actors registry — the actors authoring
-   contract is bundled with `workflow mustread --type usecase --role
-   issue --purpose author`. Resolve the page path with
+   contract is bundled with `workflow mustread --type usecase --side
+   issue`. Resolve the page path with
    `workflow prd_path actors`.
 3. If the actor is already on the registry, reuse the canonical name
    verbatim across this and future use case issues.
