@@ -31,18 +31,6 @@ The calling main session names:
 If `usecase-refs` or `report-path` is missing, stop and ask. Do not
 guess.
 
-## Workflow policy and launcher
-
-The SubagentStart hook wraps every injected block in
-`<policy>...</policy>`. Inside it this agent sees:
-
-- `<launcher>` — the workflow launcher contract.
-- `<authoring-resolver>` — call this once at startup to read the
-  `usecase` issue contract so your candidates respect the right body
-  shape and abstraction discipline.
-- `<runbook>` — read the matching intent file on demand: this agent
-  uses `issue-fetch` only.
-
 ## Authoring contracts (read once at startup)
 
 Subagents do not inherit the main session's authoring-read state.

@@ -22,18 +22,6 @@ The calling session names:
 
 If neither `issue-ref` nor `issue-cache-path` is supplied, stop and ask. Do not guess.
 
-## Workflow policy and launcher
-
-The SubagentStart hook wraps every injected block in `<policy>...</policy>`; inside it the agent sees these tags:
-
-- `<launcher>` — the workflow launcher contract. Every workflow operation runs through it.
-- `<authoring-resolver>` — call the resolver invocation inside to learn which authoring docs to read before drafting any issue body or review.
-- `<runbook>` — reference docs (read on demand) at `${WORKFLOW_PLUGIN_ROOT}/authoring/runbook/<intent>/<provider>.md`. The tag lists the intents this agent uses (`issue-fetch`, `issue-write`, `issue-new`, `issue-comment`, `issue-link`, `issue-update`). Read the matching intent file on demand for verb syntax and flag sets.
-
-The agent body owns the procedures for **Publish a review**, **Link the planning task as blocked-by the review**, **Refresh the body**, and **Append the terminal-state comment** — see `## Publish / link / writeback procedures` below.
-
-When the flow calls `workflow mustread --type review --raw`, follow the docs that the resolver names in its output.
-
 ## Type scope
 
 In scope: `task`, `bug`, `spike`. The type lives in the cached issue body's frontmatter.

@@ -19,6 +19,9 @@ The mock is throwaway. It exists so the user can react to a
 concrete visual; the durable artifacts are the use case issues,
 not the mock.
 
+You do not draft any issue bodies, so the `<authoring-resolver>`
+tag the runtime injects does not apply to this agent.
+
 ## Inputs
 
 The calling main session names:
@@ -39,17 +42,6 @@ The calling main session names:
 
 If any required input is missing, stop and ask. Do not guess
 layout, palette, or content from a thin caller message.
-
-## Workflow policy and launcher
-
-The SubagentStart hook wraps every injected block in
-`<policy>...</policy>`. Inside it this agent sees:
-
-- `<launcher>` — the workflow launcher contract.
-- `<runbook>` — read on demand: this agent uses `issue-fetch` only.
-
-This agent does not draft `usecase` or `review` bodies, so it does
-not call the authoring resolver.
 
 ## What you read
 
