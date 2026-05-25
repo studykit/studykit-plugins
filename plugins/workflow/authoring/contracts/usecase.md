@@ -1,4 +1,4 @@
-# Workflow Use Case Authoring — Common
+# Use Case Authoring — Common
 
 A workflow use case describes **how an actor interacts with the system to achieve a goal in a specific situation**, with a user-visible flow and expected outcome.
 

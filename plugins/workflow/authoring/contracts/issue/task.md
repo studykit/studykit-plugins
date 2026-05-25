@@ -1,4 +1,4 @@
-# Workflow Task Authoring
+# Task Authoring
 
 A workflow task records regular implementation work: new functionality,
 extension, refactor, or other planned code change.

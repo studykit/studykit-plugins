@@ -1,4 +1,4 @@
-# Workflow Architecture Authoring
+# Architecture Authoring
 
 An architecture page is a **knowledge-backed design-intent reference** for the current system shape: components, responsibilities, integration boundaries, technology stack, and test strategy.
 

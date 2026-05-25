@@ -1,4 +1,4 @@
-# Workflow Issue Body Conventions
+# Issue Body Conventions
 
 Body-level rules for issue-backed items stored in an issue backend.
 

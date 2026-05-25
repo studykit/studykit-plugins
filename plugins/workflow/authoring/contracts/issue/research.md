@@ -1,4 +1,4 @@
-# Workflow Research Authoring — Issue Side
+# Research Authoring — Issue Side
 
 This file covers the **issue side** of `research`: the workflow issue used for scope, questions, discussion, status, and review.
 

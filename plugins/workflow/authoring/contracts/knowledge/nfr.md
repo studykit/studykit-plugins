@@ -1,4 +1,4 @@
-# Workflow NFR Authoring
+# NFR Authoring
 
 An NFR page is a **knowledge-backed non-functional requirements reference**. It records measurable cross-cutting properties such as performance, security, scalability, accessibility, reliability, privacy, compliance, and operational constraints.
 

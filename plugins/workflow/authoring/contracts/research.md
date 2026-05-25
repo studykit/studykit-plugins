@@ -1,4 +1,4 @@
-# Workflow Research Authoring — Common
+# Research Authoring — Common
 
 A workflow research item is a **time-boxed investigation** of a question, technical topic, product question, or comparison of alternatives.
 

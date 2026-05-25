@@ -1,4 +1,4 @@
-# Workflow Context Authoring
+# Context Authoring
 
 A context page is a **knowledge-backed framing reference**. It records the original idea, problem framing, scope boundaries, and optional UI/navigation framing that other work items and knowledge pages assume.
 

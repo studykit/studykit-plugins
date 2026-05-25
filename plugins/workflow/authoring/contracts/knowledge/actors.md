@@ -1,4 +1,4 @@
-# Workflow Actors Authoring
+# Actors Authoring
 
 An actors page is a **knowledge-backed actor registry**. It catalogs every person and system that participates in this project's use cases, so each actor has a single canonical identity that other artifacts can cite.
 

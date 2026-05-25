@@ -1,4 +1,4 @@
-# Workflow Bug Authoring
+# Bug Authoring
 
 A workflow bug is an **issue-backed defect fix** against expected behavior. It tracks production behavior that is wrong, missing, regressed, or inconsistent with a use case, spec, test expectation, or user-visible contract.
 

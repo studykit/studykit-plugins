@@ -1,4 +1,4 @@
-# Workflow Use Case Authoring — Issue Side
+# Use Case Authoring — Issue Side
 
 This file covers the **issue side** of `usecase`: the workflow issue used for discovery, questions, discussion, status, and feedback.
 

@@ -1,4 +1,4 @@
-# Workflow Decomposition Patterns
+# Decomposition Patterns
 
 Provider-neutral guidance for choosing how to decompose work that is too large for a single task but still cohesive.
 

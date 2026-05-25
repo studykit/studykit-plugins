@@ -1,4 +1,4 @@
-# Workflow CI Authoring
+# CI Authoring
 
 Authoring contract for the `ci` knowledge page.
 

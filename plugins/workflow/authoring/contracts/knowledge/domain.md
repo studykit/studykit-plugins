@@ -1,4 +1,4 @@
-# Workflow Domain Authoring
+# Domain Authoring
 
 A domain page is a **knowledge-backed shared vocabulary reference**. It catalogs cross-cutting product and business concepts used by use cases, specs, architecture, tasks, reviews, and research.
 
