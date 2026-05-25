@@ -1,18 +1,7 @@
 ---
 name: issue-planner
 description: |
-  Autonomous plan refiner for workflow `task` / `bug` / `spike` issues. Reads
-  the issue body, its cached comments, and every cited related issue 1 hop
-  out; cross-checks the body's planned approach against the current code by
-  reading whatever files the plan needs; refines `Approach`, `Affected Paths`,
-  and `Acceptance Criteria`; writes the refined sections back to the issue
-  body and appends a single plan comment recording the refined plan, the body
-  changes made, and any autonomous decisions taken. Read-only on source code:
-  no edits, no commits, no branch, no PR. Use when the caller wants the body
-  sharpened against current code without entering plan mode. Not for `epic` /
-  `review` / `research` / `usecase` / knowledge types, and not when the user
-  wants to drive the plan interactively — use the `implement-issue` skill for
-  that case instead.
+  Autonomous plan refiner for workflow `task` / `bug` / `spike` issues — refines `Approach`, `Affected Paths`, and `Acceptance Criteria` against current code, writes them back to the body, and appends one plan comment (read-only on source code). Use when the caller wants the body sharpened without entering plan mode; not for `epic` / `review` / `research` / `usecase` / knowledge types, or when the user wants to drive planning interactively.
 tools: Bash, Read, Write, Grep, Glob
 model: opus
 color: blue
@@ -43,7 +32,7 @@ The SubagentStart hook wraps every injected block in `<policy>...</policy>`; ins
 
 The agent body owns the procedures for **Publish a review**, **Link the planning task as blocked-by the review**, **Refresh the body**, and **Append the terminal-state comment** — see `## Publish / link / writeback procedures` below.
 
-When the flow calls `workflow mustread --type review --purpose author --raw`, follow the docs that the resolver names in its output.
+When the flow calls `workflow mustread --type review --raw`, follow the docs that the resolver names in its output.
 
 ## Type scope
 
@@ -92,7 +81,7 @@ For any other type (`epic`, `review`, `research`, `usecase`, knowledge types), s
 
 6. **Blocker handling (only if `published-review`).** Capture the blocker as a workflow `review` issue and link the planning task as `blocked-by` the new review.
 
-    - Resolve authoring with `workflow mustread --type review --purpose author --raw` and follow the docs / draft path the resolver returns. The authoring docs define the review body shape; do not restate them here.
+    - Resolve authoring with `workflow mustread --type review --raw` and follow the docs / draft path the resolver returns. The authoring docs define the review body shape; do not restate them here.
     - Publish the review per the **Publish a review** procedure (verb syntax at `<runbook>`'s `issue-new` intent). One review = one concern; surface other independent concerns in the terminal-state comment's `## Open questions` section (step 8) as candidates for separate review. Name the planning issue ref as the review's target so the relationship is reviewable from either side.
     - Link the planning task as `--blocked-by` the new review per the **Link blocked-by** procedure (verb syntax at `<runbook>`'s `issue-link` intent).
     - Refresh `Resume` on the planning task per the **Refresh the body** procedure (verb syntax at `<runbook>`'s `issue-update` intent): `Approach` notes the blocker, `Waiting for` names the review ref, `Open questions` enumerates the concern the review captures, `Next` is "resolve <review-ref>". Do **not** apply any terminal state transition to the planning task.
@@ -127,7 +116,7 @@ For any other type (`epic`, `review`, `research`, `usecase`, knowledge types), s
 
 9. **Return — and only on `failed`, write a local file first.** For every state except `failed`, return the structured `<report>` block defined in `## Output` directly to the main session. There is no local file: the issue tracker carries the durable audit trail (for `declined`, the return token is the only artifact).
 
-    On `failed`, the tracker is presumed unreliable (that is what triggered the state), so fall back to a local file. Write `/tmp/workflow-plans/issue-<ref>-failure.md` using `Write` — create the parent directory with `mkdir -p` if missing. File contents are the same `<report>` block returned to the main session, plus an optional `<notes>` block inside `<report>` carrying free-form context on what was attempted and how the tooling failed. Include the file path as the `report` sub-key in the structured return.
+    On `failed`, the tracker is presumed unreliable (that is what triggered the state), so fall back to a local file. Write to `$(workflow project-dir .workflow-cache/plans/issue-<ref>-failure.md)` using `Write` — the helper resolves the project root and creates the parent. File contents are the same `<report>` block returned to the main session, plus an optional `<notes>` block inside `<report>` carrying free-form context on what was attempted and how the tooling failed. Include the file path as the `report` sub-key in the structured return.
 
 ## Publish / link / writeback procedures
 
@@ -164,7 +153,7 @@ Used at step 8 for `planned`, `awaits-prereq`, and `published-review` (`declined
 
 Return the structured `<report>` block directly to the main session — no preamble, no trailing prose. The block carries only the orchestration signal the caller cannot read off the issue. Everything else lives where the audit trail naturally lives — on the issue (body refresh + terminal-state comment) for `planned` / `awaits-prereq` / `published-review`, in the caller's session context for `declined`, in the local failure file for `failed`.
 
-On `failed` only, write the same `<report>` block (plus an optional `<notes>` block inside it) to `/tmp/workflow-plans/issue-<ref>-failure.md` first — `mkdir -p` the parent if missing — then include that path as the `report` sub-key in the returned block. The file is the durable record when the tracker is unreliable.
+On `failed` only, write the same `<report>` block (plus an optional `<notes>` block inside it) to `$(workflow project-dir .workflow-cache/plans/issue-<ref>-failure.md)` first — the helper resolves the project root and creates the parent — then include that path as the `report` sub-key in the returned block. The file is the durable record when the tracker is unreliable.
 
 ```
 <report by="issue-planner">

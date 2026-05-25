@@ -1,7 +1,7 @@
 ---
 name: mock-html-generator
 description: |
-  Generates self-contained HTML/CSS mockup files for a screen group derived from a set of workflow `usecase` issues. Fetches the named use cases via `workflow issue fetch`, reads their flows, and writes a polished `index.html` + `style.css` (or Tailwind CDN variant) into the caller-named output directory. Throwaway visual support for use case discovery — the mock is not a deliverable. Invoked by the `workflow:usecase` skill at user opt-in. Do not invoke directly.
+  Generates throwaway self-contained HTML/CSS mockups for a screen group derived from workflow `usecase` issues, as visual support for use case discovery. Invoked by the `workflow:usecase` skill at user opt-in; do not invoke directly.
 tools: Bash, Read, Write, Edit
 model: sonnet
 color: magenta

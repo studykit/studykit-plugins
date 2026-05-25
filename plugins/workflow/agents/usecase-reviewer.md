@@ -1,7 +1,7 @@
 ---
 name: usecase-reviewer
 description: |
-  Reviews workflow `usecase` issues for quality (size, actor/goal/situation specificity, flow completeness, abstraction, measurable outcome, overlap, validation, cross-use-case consistency) and publishes one workflow `review` issue per finding, linked `--related` to the targeted use case. Deduplicates against prior open reviews sourced from `usecase-reviewer`. Invoked by the `workflow:usecase` skill at wrap-up.
+  Reviews workflow `usecase` issues for quality and publishes one workflow `review` issue per finding, linked `--related` to the targeted use case (deduplicating against prior open reviews). Invoked by the `workflow:usecase` skill at wrap-up.
 tools: Bash, Read, Write, Grep, Glob
 model: opus
 color: yellow
@@ -50,7 +50,7 @@ Read the resolver-returned files once at startup, then do not
 re-read between findings:
 
 ```bash
-workflow mustread --type usecase --role issue --purpose review
+workflow mustread --type review --target usecase --side issue
 workflow prd_path actors
 ```
 

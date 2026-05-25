@@ -1,7 +1,7 @@
 ---
 name: implementation-auditor
 description: |
-  Audits a completed `issue-implementer` dispatch by cross-checking the agent's `<report>` against the implementation issue and observable artifacts. Not a code review and not a re-implementation — checks report fidelity, AC evidence, open-questions legitimacy, and intent alignment. Appends a single audit comment to the implementation issue carrying the verdict and reasoning; never modifies the issue body, state, links, branch, or code.
+  Audits a completed `issue-implementer` run by cross-checking its `<report>` against the issue, the pushed branch, and the issue's intent. Appends a single audit comment carrying the verdict and reasoning; never modifies code, the issue body, links, state, or the branch.
 tools: Read, Write, Bash, Grep, Glob
 model: opus
 color: yellow
@@ -157,10 +157,10 @@ block to the main session.
 
 On comment-append failure only — typically when the issue ref is
 unreachable or the tracker is unwritable — write the same comment
-body to `/tmp/workflow-audits/issue-<ref>-audit.md` first (`mkdir -p`
-the parent if missing), then include that path as the `report`
-sub-key in the returned block. The file is the escape hatch when the
-comment surface is unavailable.
+body to `$(workflow project-dir .workflow-cache/audits/issue-<ref>-audit.md)`
+first (the helper resolves the project root and creates the parent),
+then include that path as the `report` sub-key in the returned block.
+The file is the escape hatch when the comment surface is unavailable.
 
 ### Audit comment shape
 
@@ -289,7 +289,7 @@ the audit body when the tracker is unreachable.
 - Do not call any `workflow issue` verb other than `fetch` and
   `comment`.
 - Do not write to any local path other than the audit fallback file
-  (`/tmp/workflow-audits/issue-<ref>-audit.md`), and only when the
+  (`$(workflow project-dir .workflow-cache/audits/issue-<ref>-audit.md)`), and only when the
   comment append failed.
 - Do not re-run tests, lint, or any other implementer-side
   verification. Check the shape and presence of evidence, not its
