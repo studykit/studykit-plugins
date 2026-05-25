@@ -99,10 +99,6 @@ KNOWLEDGE_PROVIDER_TYPE_PATTERNS = {
     "github": "providers/github-knowledge-{artifact_type}-authoring.md",
 }
 
-KNOWLEDGE_PROVIDER_PRD_FILES = {
-    "github": "providers/github-knowledge-prd-paths.md",
-}
-
 PROVIDER_EXTRA_FILES = {
     ("issue", "github"): ("providers/github-issue-anti-patterns.md",),
     ("issue", "jira"): ("providers/jira-issue-anti-patterns.md",),
@@ -439,11 +435,6 @@ def resolve_authoring(
                 artifact_type=normalized_type
             )
         )
-        if (
-            normalized_type in PRD_COMPONENT_TYPES
-            and normalized_provider in KNOWLEDGE_PROVIDER_PRD_FILES
-        ):
-            parts.append(KNOWLEDGE_PROVIDER_PRD_FILES[normalized_provider])
     if normalized_provider is not None:
         parts.extend(PROVIDER_EXTRA_FILES.get((normalized_role, normalized_provider), ()))
 

@@ -41,7 +41,7 @@ Do not include raw discovery discussion in the curated page; it belongs in the w
 
 ## Actor citation
 
-The actors authoring contract is bundled with the usecase knowledge authoring contract returned by `workflow mustread --type usecase --role knowledge --purpose author`. Locate the actors page path from the project's PRD-paths file (e.g., `wiki/prd/usecases/actors.md` for GitHub knowledge). TODO: pending dedicated PRD-path script. Cite each `Actors` entry by canonical name with the per-flow role on the curated page. Do not define new actor identity on this curated page; the registry is the only place identity lives.
+The actors authoring contract is bundled with the usecase knowledge authoring contract returned by `workflow mustread --type usecase --role knowledge --purpose author`. Resolve the actors page path with `workflow prd_path actors`. Cite each `Actors` entry by canonical name with the per-flow role on the curated page. Do not define new actor identity on this curated page; the registry is the only place identity lives.
 
 ## Publishing rule
 

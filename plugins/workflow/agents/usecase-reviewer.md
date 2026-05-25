@@ -51,8 +51,7 @@ re-read between findings:
 
 ```bash
 workflow mustread --type usecase --role issue --purpose review
-# TODO: actors page path lookup
-# (pending dedicated PRD-path script)
+workflow prd_path actors
 ```
 
 The call returns both review criteria files bundled together —
@@ -80,9 +79,10 @@ not modify them.
 Also read the project's actors registry once at startup if it
 exists:
 
-1. Resolve the actors page path from the project's PRD-paths file
-   (e.g., `wiki/prd/usecases/actors.md` for GitHub knowledge).
-   TODO: pending dedicated PRD-path script.
+1. Resolve the actors page path with `workflow prd_path actors`. The
+   script returns a `<prd_path>` block whose `Base:` line gives the
+   absolute base directory and whose bullet gives the project-relative
+   file location.
 2. If the file exists, read it. Use the registry content to apply
    criterion 11 of the use case criteria and every criterion from
    the actors criteria file.
