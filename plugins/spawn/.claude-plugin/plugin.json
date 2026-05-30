@@ -1,5 +1,0 @@
-{
-  "name": "spawn",
-  "version": "0.2.1",
-  "description": "Spawn and orchestrate child Claude Code sessions in iTerm2 — session lifecycle management via session-tree.json"
-}

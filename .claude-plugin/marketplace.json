@@ -129,18 +129,6 @@
       "keywords": ["d2", "d2lang", "diagram", "architecture", "flowchart", "erd", "sequence", "visualization"]
     },
     {
-      "name": "spawn",
-      "source": "./plugins/spawn",
-      "description": "Spawn and orchestrate child Claude Code sessions in iTerm2 with session lifecycle management",
-      "author": {
-        "name": "studykit"
-      },
-      "repository": "https://github.com/studykit/studykit-plugins",
-      "license": "MIT",
-      "category": "development",
-      "keywords": ["session", "spawn", "iterm2", "orchestrator", "child-session", "multi-session"]
-    },
-    {
       "name": "dev-rules",
       "source": "./plugins/dev-rules",
       "description": "Gate file edits via a PreToolUse deny + reason that points to the project's coding rule sets (logging conventions; extensible by category) and tells the model to Read them before retrying. Rulesets are organized as `rulesets/<category>/<key>.md`; the hook lists absolute pointer paths (not bodies) in the deny reason so the model Reads the rule files itself, landing them in the transcript as its own tool-result. Per `<category>:<key>` dedup keeps each pointer to once per session.",
