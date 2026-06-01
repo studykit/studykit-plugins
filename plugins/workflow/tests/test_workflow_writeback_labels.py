@@ -127,8 +127,11 @@ class WritebackLabelRunner:
 
     def __call__(self, request: CommandRequest) -> CommandResult:
         self.requests.append(request)
-        if request.args == gh_issue_view_args(39, "number,updatedAt"):
-            return result(request.args, stdout=json.dumps({"number": 39, "updatedAt": "2026-05-13T12:00:00Z"}))
+        if request.args == gh_issue_view_args(39, "number,title,body"):
+            return result(
+                request.args,
+                stdout=json.dumps({"number": 39, "title": "Cached title", "body": "Cached body."}),
+            )
         if request.args == gh_issue_view_args(39, "number,labels"):
             return result(
                 request.args,

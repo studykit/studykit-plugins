@@ -96,16 +96,22 @@ def git_args(project: Path, *args: str) -> tuple[str, ...]:
 
 
 def gh_issue_freshness_args(issue: int | str) -> tuple[str, ...]:
-    return (
-        "gh",
-        "issue",
-        "view",
-        str(issue),
-        "--repo",
-        "studykit/studykit-plugins",
-        "--json",
-        "number,updatedAt",
-    )
+    """Content-fingerprint freshness fetch (title + body)."""
+
+    return gh_issue_view_args(issue, "number,title,body")
+
+
+def gh_comments_freshness_args(issue: int | str) -> tuple[str, ...]:
+    """Comments-fingerprint freshness fetch."""
+
+    return gh_issue_view_args(issue, "number,comments")
+
+
+# Cached content matching the seeded ``cached_issue_payload`` — returning this
+# from the content freshness fetch keeps the fingerprint fresh.
+_FRESH_CONTENT = {"number": 39, "title": "Write-back freshness checks", "body": "Cached body."}
+# Diverged content drives the freshness conflict path.
+_CONFLICT_CONTENT = {"number": 39, "title": "Write-back freshness checks", "body": "Provider changed body."}
 
 
 def gh_issue_view_args(issue: int | str, fields: str) -> tuple[str, ...]:
@@ -311,7 +317,7 @@ def test_github_issue_update_can_request_freshness_check_before_mutation(tmp_pat
             return CommandResult(
                 request=request,
                 returncode=0,
-                stdout=json.dumps({"number": 39, "updatedAt": "2026-05-13T12:00:00Z"}),
+                stdout=json.dumps(_FRESH_CONTENT),
             )
         if request.args[:3] == ("gh", "issue", "edit"):
             events.append("edit")
@@ -385,7 +391,7 @@ def test_github_issue_update_blocks_stale_freshness_before_mutation(tmp_path: Pa
             return CommandResult(
                 request=request,
                 returncode=0,
-                stdout=json.dumps({"number": 39, "updatedAt": "2026-05-13T13:00:00Z"}),
+                stdout=json.dumps(_CONFLICT_CONTENT),
             )
         if request.args == gh_issue_view_args(39, ",".join(DEFAULT_ISSUE_FIELDS)):
             events.append("refresh")
@@ -425,11 +431,12 @@ def test_github_issue_update_blocks_stale_freshness_before_mutation(tmp_path: Pa
         )
     )
 
-    assert response.payload["status"] == "blocked"
-    assert response.payload["reason"] == "stale_cache"
+    assert response.payload["status"] == "conflict"
+    assert response.payload["reason"] == "provider_changed"
     assert response.payload["reread_required"] is True
     assert response.payload["cache_refreshed"] is True
-    assert response.payload["freshness"]["status"] == "stale"
+    assert all(not path.endswith("/.meta.json") for path in response.payload["reread_paths"])
+    assert response.payload["conflict"]["status"] == "conflict"
     assert events == ["freshness", "refresh"]
 
 
@@ -455,7 +462,7 @@ def test_github_issue_update_applies_inline_state_change_and_refreshes_cache(
             return CommandResult(
                 request=request,
                 returncode=0,
-                stdout=json.dumps({"number": 39, "updatedAt": "2026-05-13T12:00:00Z"}),
+                stdout=json.dumps(_FRESH_CONTENT),
             )
         if request.args[:3] == ("gh", "issue", "edit"):
             events.append("edit")
@@ -679,7 +686,7 @@ def test_github_issue_fields_close_checks_freshness_and_refreshes_cache(
             return CommandResult(
                 request=request,
                 returncode=0,
-                stdout=json.dumps({"number": 39, "updatedAt": "2026-05-13T12:00:00Z"}),
+                stdout=json.dumps(_FRESH_CONTENT),
             )
         if request.args == (
             "gh",
@@ -755,14 +762,14 @@ def test_github_issue_add_comment_inline_body_dispatches_and_refreshes_cache(
             return CommandResult(
                 request=request,
                 returncode=0,
-                stdout=json.dumps({"number": 39, "updatedAt": "2026-05-13T12:00:00Z"}),
+                stdout=json.dumps(_FRESH_CONTENT),
             )
-        if request.args == gh_issue_view_args(39, "number,updatedAt,comments"):
+        if request.args == gh_comments_freshness_args(39):
             events.append("freshness-comments")
             return CommandResult(
                 request=request,
                 returncode=0,
-                stdout=json.dumps({"number": 39, "updatedAt": "2026-05-13T12:00:00Z", "comments": []}),
+                stdout=json.dumps({"number": 39, "comments": []}),
             )
         if request.args[:3] == ("gh", "issue", "comment"):
             events.append("comment")
@@ -830,7 +837,7 @@ def test_github_issue_add_comment_inline_body_blocks_on_stale_issue_freshness(
             return CommandResult(
                 request=request,
                 returncode=0,
-                stdout=json.dumps({"number": 39, "updatedAt": "2026-05-14T00:10:00Z"}),
+                stdout=json.dumps(_CONFLICT_CONTENT),
             )
         if request.args == gh_issue_view_args(39, ",".join(DEFAULT_ISSUE_FIELDS)):
             events.append("refresh")
@@ -867,8 +874,8 @@ def test_github_issue_add_comment_inline_body_blocks_on_stale_issue_freshness(
     )
 
     assert response.payload["operation"] == "append_comment"
-    assert response.payload["status"] == "blocked"
-    assert response.payload["reason"] == "stale_cache"
+    assert response.payload["status"] == "conflict"
+    assert response.payload["reason"] == "provider_changed"
     assert response.payload["target"] == "issue"
     assert response.payload["reread_required"] is True
     assert "comment" not in events
@@ -879,9 +886,21 @@ def test_github_issue_apply_relationships_from_inline_intent_dispatches_and_refr
 ) -> None:
     write_config(tmp_path)
     cache = GitHubIssueCache.for_project(tmp_path, configured_repo=github_repo())
+    # The relationships freshness check compares the cached relationship
+    # fingerprint against the provider's current relationships (read via REST).
+    # Seed the cache to match the runner's relationship endpoints so the apply
+    # proceeds instead of conflicting.
     cache.write_issue_bundle(
         github_repo(),
-        {**cached_issue_payload(updated_at="2026-05-14T00:00:00Z"), "number": 44},
+        {
+            **cached_issue_payload(updated_at="2026-05-14T00:00:00Z"),
+            "number": 44,
+            "parent": {"number": 36},
+            "dependencies": {
+                "blocked_by": [{"number": 33}],
+                "blocking": [{"number": 45}],
+            },
+        },
         fetched_at="2026-05-14T00:00:00Z",
     )
     events: list[str] = []
@@ -1092,3 +1111,51 @@ def test_default_registry_registers_github_native_issue_provider() -> None:
     provider = registry.resolve(role="issue", kind="github")
 
     assert provider.transport == TRANSPORT_NATIVE
+
+
+def test_github_issue_update_overwrite_bypasses_freshness_conflict(tmp_path: Path) -> None:
+    """--overwrite skips the freshness gate entirely: no provider freshness
+    fetch happens, even if the provider content has diverged, and the write
+    proceeds."""
+
+    GitHubIssueCache.for_project(tmp_path).write_issue_bundle(
+        github_repo(),
+        cached_issue_payload(),
+        fetched_at="2026-05-13T12:34:56Z",
+    )
+    events: list[str] = []
+
+    def runner(request: CommandRequest) -> CommandResult:
+        if request.args == git_args(tmp_path, "remote", "get-url", "origin"):
+            return CommandResult(
+                request=request,
+                returncode=0,
+                stdout="git@github.com:studykit/studykit-plugins.git\n",
+            )
+        if request.args == gh_issue_freshness_args(39):
+            # Diverged content; must never be fetched because --overwrite is set.
+            events.append("freshness")
+            return CommandResult(request=request, returncode=0, stdout=json.dumps(_CONFLICT_CONTENT))
+        if request.args[:3] == ("gh", "issue", "edit"):
+            events.append("edit")
+            return CommandResult(request=request, returncode=0)
+        if request.args == gh_issue_view_args(39, "body"):
+            return CommandResult(request=request, returncode=0, stdout=json.dumps({"body": "Updated body."}))
+        return CommandResult(request=request, returncode=127, stderr="unexpected command")
+
+    dispatcher = ProviderDispatcher(default_provider_registry(runner=runner))
+
+    response = dispatcher.dispatch(
+        ProviderRequest(
+            role="issue",
+            kind="github",
+            operation="update",
+            context=ProviderContext(project=tmp_path, artifact_type="task", session_id="s1"),
+            payload={"issue": 39, "body": "Updated body.", "freshness_check": True, "overwrite": True},
+        )
+    )
+
+    assert response.payload["operation"] == "update_issue"
+    assert response.payload.get("status") != "conflict"
+    assert "freshness" not in events
+    assert "edit" in events

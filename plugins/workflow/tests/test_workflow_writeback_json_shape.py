@@ -326,11 +326,11 @@ def test_jira_update_writeback_json_omits_operation_and_verified(tmp_path: Path)
     assert payload["body_file_removed"] is True
 
 
-def test_github_update_freshness_drift_blocked_branch_is_unchanged(tmp_path: Path) -> None:
-    """The freshness-drift ``status == "blocked"`` branch must remain
+def test_github_update_freshness_conflict_branch_is_unchanged(tmp_path: Path) -> None:
+    """The freshness-conflict ``status == "conflict"`` branch must remain
     unchanged by the targeted writeback-payload cleanup.
 
-    The blocked branch echoes the provider payload verbatim (with
+    The conflict branch echoes the provider payload verbatim (with
     ``body_file`` / ``body_file_removed`` overlaid) and returns exit code
     3. The fix to the success result dict must not touch this branch, so
     we pin its observable contract: ``status``, ``reason``,
@@ -341,9 +341,9 @@ def test_github_update_freshness_drift_blocked_branch_is_unchanged(tmp_path: Pat
     _write_github_config(tmp_path)
     _seed_github_cached_issue(tmp_path)
     body_file = _write_body_file(tmp_path, "Updated body.\n", name="update.md")
-    # provider_issue_updated_at newer than the seeded cache triggers the
-    # freshness drift branch.
-    runner = GitHubUpdateIssueRunner(provider_issue_updated_at="2026-05-15T00:00:00Z")
+    # Provider content diverging from the seeded cache fingerprint triggers
+    # the freshness conflict branch.
+    runner = GitHubUpdateIssueRunner(conflict=True)
     stdout = io.StringIO()
 
     code = issue_update_main(
@@ -362,9 +362,10 @@ def test_github_update_freshness_drift_blocked_branch_is_unchanged(tmp_path: Pat
 
     payload = json.loads(stdout.getvalue())
     assert code == 3
-    assert payload["status"] == "blocked"
-    assert payload["reason"] == "stale_cache"
+    assert payload["status"] == "conflict"
+    assert payload["reason"] == "provider_changed"
     assert payload["reread_required"] is True
+    assert all(not path.endswith("/.meta.json") for path in payload["reread_paths"])
     assert payload["body_file"] == str(body_file)
     assert payload["body_file_removed"] is False
     assert body_file.exists()
