@@ -62,8 +62,7 @@ _CACHE_FETCH_POLICIES = (CACHE_POLICY_DEFAULT, CACHE_POLICY_REFRESH)
 _RESERVED_FIELDS_VERBS = frozenset({"assign", "unassign", "set-type"})
 
 _LIFECYCLE_NOTE = (
-    "Lifecycle verbs come from providers.issues.state_transitions; "
-    "configure one with `workflow_setup.py build-config "
+    "To add a lifecycle verb, run `workflow_setup.py build-config "
     "--jira-state-transition <verb>=<transition>`."
 )
 
