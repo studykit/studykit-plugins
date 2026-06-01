@@ -21,6 +21,7 @@ class IssueFetchContext:
     provider_kind: str = "github"
     issue_file: str = "issue.md"
     comments: tuple[str, ...] = ()
+    relationships: str | None = None
 
     def to_json(self, basedir: str = "") -> dict[str, Any]:
         issue_dir = ensure_trailing_slash(self.issue_dir.strip())
@@ -31,6 +32,13 @@ class IssueFetchContext:
             "state": self.state,
             "cache_refreshed": self.cache_refreshed,
         }
+        if self.relationships:
+            relationships = self.relationships
+            payload["relationships"] = (
+                relationships[len(basedir):]
+                if basedir and relationships.startswith(basedir)
+                else relationships
+            )
         if self.comments:
             payload["comments"] = [
                 comment[len(basedir):] if basedir and comment.startswith(basedir) else comment
@@ -124,6 +132,14 @@ def format_issue_cache_context(
         issue_ref = f"#{context.number}" if context.provider_kind == "github" else context.number
         suffix = " (refreshed)" if context.cache_refreshed is True else ""
         lines.append(f"- {issue_ref} → `{issue_path}`{suffix}")
+        if context.relationships:
+            relationships = context.relationships
+            relative = (
+                relationships[len(shared_base):]
+                if shared_base and relationships.startswith(shared_base)
+                else relationships
+            )
+            lines.append(f"  - relationships: `{relative}`")
         for comment_path in context.comments:
             relative = comment_path[len(shared_base):] if shared_base and comment_path.startswith(shared_base) else comment_path
             lines.append(f"  - `{relative}`")

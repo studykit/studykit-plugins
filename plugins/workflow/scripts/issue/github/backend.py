@@ -136,6 +136,12 @@ class GitHubIssueBackend:
                     display_project_path(path, config.root)
                     for path in cache.comment_files(repo, issue)
                 )
+                relationships_path = cache.relationships_file(repo, issue)
+                relationships_display = (
+                    display_project_path(relationships_path, config.root)
+                    if relationships_path.is_file()
+                    else None
+                )
                 contexts.append(
                     IssueFetchContext(
                         number=issue,
@@ -149,6 +155,7 @@ class GitHubIssueBackend:
                         ),
                         provider_kind="github",
                         comments=comment_paths,
+                        relationships=relationships_display,
                     )
                 )
         except Exception as exc:  # noqa: BLE001
@@ -1318,6 +1325,12 @@ def fetch_cache_payload(
             display_project_path(path, config.root)
             for path in cache.comment_files(repo, issue)
         )
+        relationships_path = cache.relationships_file(repo, issue)
+        relationships_display = (
+            display_project_path(relationships_path, config.root)
+            if relationships_path.is_file()
+            else None
+        )
         contexts.append(
             IssueFetchContext(
                 number=issue,
@@ -1331,6 +1344,7 @@ def fetch_cache_payload(
                 ),
                 provider_kind="github",
                 comments=comment_paths,
+                relationships=relationships_display,
             )
         )
 

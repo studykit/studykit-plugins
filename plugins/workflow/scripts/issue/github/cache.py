@@ -62,24 +62,30 @@ def _comment_fingerprint_items(source: Mapping[str, Any]) -> list[dict[str, str 
 def is_github_issue_cache_body_path(path: Path, project: Path) -> bool:
     """Return whether ``path`` is a read-only GitHub issue content projection.
 
-    Recognizes the ``issue.md`` body, ``relationships.json``, and any
-    ``comment-*.md`` sibling in the flat per-issue directory layout.
-    Configured-repo issues sit at ``.workflow-cache/issues/<n>/`` and external
-    repos are namespaced under
+    Recognizes the ``issue.md`` body, the readable ``relationships.md``
+    projection, and any ``comment-*.md`` sibling in the flat per-issue
+    directory layout. Configured-repo issues sit at
+    ``.workflow-cache/issues/<n>/`` and external repos are namespaced under
     ``.workflow-cache/<host>/<owner>/<repo>/issues/<n>/``. The internal
-    ``.meta.json`` is matched by :func:`is_github_issue_cache_meta_path`.
+    ``.meta.json`` / ``.relationships.json`` machine sources are matched by
+    :func:`is_github_issue_cache_meta_path`.
     """
 
     name = path.name
-    if name not in {"issue.md", "relationships.json"} and not _COMMENT_FILENAME_RE.match(name):
+    if name not in {"issue.md", "relationships.md"} and not _COMMENT_FILENAME_RE.match(name):
         return False
     return _github_issue_cache_dir_match(path, project)
 
 
 def is_github_issue_cache_meta_path(path: Path, project: Path) -> bool:
-    """Return whether ``path`` is the internal GitHub ``.meta.json`` projection."""
+    """Return whether ``path`` is an internal GitHub cache projection.
 
-    if path.name != ".meta.json":
+    Covers the ``.meta.json`` bookkeeping file and the ``.relationships.json``
+    machine source. Both are dotfiles the dispatchers maintain; readers consume
+    ``issue.md`` / ``relationships.md`` instead.
+    """
+
+    if path.name not in {".meta.json", ".relationships.json"}:
         return False
     return _github_issue_cache_dir_match(path, project)
 
@@ -155,7 +161,10 @@ class GitHubIssueCache:
         return self.issue_dir(repo, issue) / ".meta.json"
 
     def relationships_file(self, repo: GitHubRepository, issue: int | str) -> Path:
-        return self.issue_dir(repo, issue) / "relationships.json"
+        return self.issue_dir(repo, issue) / "relationships.md"
+
+    def relationships_source_file(self, repo: GitHubRepository, issue: int | str) -> Path:
+        return self.issue_dir(repo, issue) / ".relationships.json"
 
     def freshness_file(self, repo: GitHubRepository, issue: int | str, target: str) -> Path:
         normalized = _normalize_freshness_target(target)
@@ -324,7 +333,7 @@ class GitHubIssueCache:
         }
 
     def read_relationships(self, repo: GitHubRepository, issue: int | str) -> dict[str, Any]:
-        rel_path = self.relationships_file(repo, issue)
+        rel_path = self.relationships_source_file(repo, issue)
         if not rel_path.is_file():
             raise WorkflowCacheMiss(f"relationships cache does not exist: {rel_path}")
         rel = _read_json_mapping(rel_path)
@@ -340,7 +349,7 @@ class GitHubIssueCache:
         issue: int | str,
         relationship_payload: Mapping[str, Any],
     ) -> Path:
-        """Rewrite ``relationships.json`` and only the relationships fingerprint.
+        """Rewrite the relationship projection and only the relationships fingerprint.
 
         The content fingerprint in ``.meta.json`` is left untouched, so a link
         operation can never make a later body write look conflicted.
@@ -366,7 +375,7 @@ class GitHubIssueCache:
         *,
         fetched_at: str | None = None,
     ) -> CacheWriteResult:
-        """Write the body, ``.meta.json``, ``relationships.json``, and comments."""
+        """Write the body, ``.meta.json``, relationship projection, and comments."""
 
         issue_number = normalize_issue_number(issue.get("number") or issue.get("issue") or "")
         now = fetched_at or _utc_now()
@@ -458,10 +467,15 @@ class GitHubIssueCache:
     def _write_relationships_file(
         self, repo: GitHubRepository, issue: int | str, compact: Mapping[str, Any]
     ) -> Path:
-        rel_path = self.relationships_file(repo, issue)
+        # ``.relationships.json`` is the machine source ``read_relationships``
+        # parses back; ``relationships.md`` is the readable projection surfaced
+        # to fetch callers and the LLM.
+        source_path = self.relationships_source_file(repo, issue)
         data: dict[str, Any] = {"schema_version": SCHEMA_VERSION}
         data.update(compact)
-        _atomic_write_text(rel_path, _dump_json(data))
+        _atomic_write_text(source_path, _dump_json(data))
+        rel_path = self.relationships_file(repo, issue)
+        _atomic_write_text(rel_path, _render_github_relationships_markdown(repo, issue, compact))
         return rel_path
 
     def _update_meta_fingerprint(self, meta_path: Path, key: str, value: str) -> None:
@@ -528,8 +542,56 @@ class GitHubIssueCache:
                 path.unlink()
 
 
+_GITHUB_RELATIONSHIP_SECTIONS: tuple[tuple[str, str], ...] = (
+    ("parent", "Parent"),
+    ("children", "Children"),
+    ("blocked_by", "Blocked by"),
+    ("blocking", "Blocking"),
+    ("related", "Related"),
+)
+
+
+def _render_github_relationships_markdown(
+    repo: GitHubRepository, issue: int | str, compact: Mapping[str, Any]
+) -> str:
+    """Render the compact relationship projection as readable markdown.
+
+    Mirrors the per-issue layout the LLM follows to reach linked issues. The
+    machine source stays in ``.relationships.json``; this is the human/LLM view.
+    """
+
+    heading = f"# Relationships — {repo.owner}/{repo.name}#{normalize_issue_number(issue)}"
+    lines: list[str] = [heading, ""]
+    rendered_any = False
+    for key, label in _GITHUB_RELATIONSHIP_SECTIONS:
+        refs = compact.get(key)
+        if refs is None:
+            continue
+        ref_list = refs if isinstance(refs, list) else [refs]
+        bullets = [f"- {_github_relationship_ref_text(ref)}" for ref in ref_list if ref is not None]
+        if not bullets:
+            continue
+        rendered_any = True
+        lines.append(f"## {label}")
+        lines.extend(bullets)
+        lines.append("")
+    if not rendered_any:
+        lines.append("_No linked issues._")
+        lines.append("")
+    return "\n".join(lines).rstrip("\n") + "\n"
+
+
+def _github_relationship_ref_text(ref: Any) -> str:
+    if isinstance(ref, int):
+        return f"#{ref}"
+    text = str(ref).strip()
+    if text.isdigit():
+        return f"#{text}"
+    return text
+
+
 def _compact_relationships_for_frontmatter(current: Mapping[str, Any]) -> dict[str, Any]:
-    """Return the compact relationship projection stored in ``relationships.json``."""
+    """Return the compact relationship projection stored in ``.relationships.json``."""
 
     compact: dict[str, Any] = {}
 

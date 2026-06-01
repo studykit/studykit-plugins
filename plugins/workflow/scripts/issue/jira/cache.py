@@ -35,6 +35,7 @@ from issue.jira.relationships import (
 from issue.jira.snapshot import (
     _jira_person_display_name,
     jira_relationship_fingerprint_block,
+    render_jira_relationships_markdown,
 )
 from workflow_jira_data_center_client import JiraDataCenterSite
 
@@ -45,14 +46,15 @@ _COMMENT_FILENAME_RE = re.compile(r"^comment-.*\.md$")
 def is_jira_issue_cache_body_path(path: Path, project: Path) -> bool:
     """Return whether ``path`` is a read-only Jira issue content projection.
 
-    Recognizes ``issue.md`` and sibling ``comment-*.md`` files under the Jira
-    issue cache directory layout ``<project>/.workflow-cache/issues/<key>/``.
-    The internal ``.meta.json`` is matched by
-    :func:`is_jira_issue_cache_meta_path`.
+    Recognizes ``issue.md``, the readable ``relationships.md`` projection, and
+    sibling ``comment-*.md`` files under the Jira issue cache directory layout
+    ``<project>/.workflow-cache/issues/<key>/``. The internal ``.meta.json`` is
+    matched by :func:`is_jira_issue_cache_meta_path`; the native ``issue.json``
+    / ``remote-links.json`` machine sources are not editable projections.
     """
 
     name = path.name
-    if name != "issue.md" and not _COMMENT_FILENAME_RE.match(name):
+    if name not in {"issue.md", "relationships.md"} and not _COMMENT_FILENAME_RE.match(name):
         return False
     return _jira_issue_cache_dir_match(path, project)
 
@@ -99,6 +101,9 @@ class JiraDataCenterIssueCache:
 
     def remote_links_json_file(self, site: JiraDataCenterSite, issue_key: str) -> Path:
         return self.issue_dir(site, issue_key) / "remote-links.json"
+
+    def relationships_file(self, site: JiraDataCenterSite, issue_key: str) -> Path:
+        return self.issue_dir(site, issue_key) / "relationships.md"
 
     def has_issue_projection(self, site: JiraDataCenterSite, issue_key: str) -> bool:
         return self.issue_json_file(site, issue_key).is_file()
@@ -219,9 +224,17 @@ class JiraDataCenterIssueCache:
         issue_md_path = self.issue_file(site, key)
         meta_path = self.meta_file(site, key)
 
+        relationships = normalized.get("relationships")
         _atomic_write_text(issue_json_path, _format_json(issue))
         _atomic_write_text(remote_links_path, _format_json(links))
         _atomic_write_text(issue_md_path, str(normalized.get("body") or ""))
+        _atomic_write_text(
+            self.relationships_file(site, key),
+            render_jira_relationships_markdown(
+                relationships if isinstance(relationships, Mapping) else {},
+                issue_key=key,
+            ),
+        )
         meta = {
             "schema_version": SCHEMA_VERSION,
             "fingerprints": jira_fingerprints(
@@ -240,6 +253,7 @@ class JiraDataCenterIssueCache:
             "issue_dir": str(issue_dir),
             "issue_file": str(issue_md_path),
             "meta_file": str(meta_path),
+            "relationships_file": str(self.relationships_file(site, key)),
         }
 
     def _write_comment_files(
