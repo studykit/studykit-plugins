@@ -24,6 +24,122 @@ def jira_relationship_fingerprint_block(relationships: Mapping[str, Any]) -> dic
 
 _RESERVED_WORKFLOW_KEYS = {"parent", "issue_links", "external_links"}
 
+_JIRA_MARKDOWN_RESERVED = {"parent", "children", "issue_links", "external_links"}
+
+
+def render_jira_relationships_markdown(
+    relationships: Mapping[str, Any], *, issue_key: str
+) -> str:
+    """Render the normalized Jira relationship block as readable markdown.
+
+    Jira keeps its machine source in the native ``issue.json`` /
+    ``remote-links.json``; this is the human/LLM view written to
+    ``relationships.md`` so an agent can follow linked issues from a fetch.
+    The sections follow Jira's relationship model (parent / children / mapped
+    link buckets / unmapped issue links / external links) and intentionally
+    differ from GitHub's projection.
+    """
+
+    workflow = relationships.get("workflow") if isinstance(relationships, Mapping) else None
+    workflow = workflow if isinstance(workflow, Mapping) else {}
+
+    lines: list[str] = [f"# Relationships — {issue_key}", ""]
+    rendered_any = False
+
+    parent = _jira_ref_text(workflow.get("parent"))
+    if parent:
+        rendered_any = True
+        lines.extend(["## Parent", f"- {parent}", ""])
+
+    children = _jira_ref_texts(workflow.get("children"))
+    if children:
+        rendered_any = True
+        lines.append("## Children")
+        lines.extend(f"- {child}" for child in children)
+        lines.append("")
+
+    for name in sorted(workflow):
+        if name in _JIRA_MARKDOWN_RESERVED:
+            continue
+        refs = _jira_ref_texts(workflow.get(name))
+        if refs:
+            rendered_any = True
+            lines.append(f"## {name}")
+            lines.extend(f"- {ref}" for ref in refs)
+            lines.append("")
+
+    issue_link_bullets = _jira_issue_link_bullets(workflow.get("issue_links"))
+    if issue_link_bullets:
+        rendered_any = True
+        lines.append("## Issue links")
+        lines.extend(issue_link_bullets)
+        lines.append("")
+
+    external_bullets = _jira_external_link_bullets(workflow.get("external_links"))
+    if external_bullets:
+        rendered_any = True
+        lines.append("## External links")
+        lines.extend(external_bullets)
+        lines.append("")
+
+    if not rendered_any:
+        lines.extend(["_No linked issues._", ""])
+    return "\n".join(lines).rstrip("\n") + "\n"
+
+
+def _jira_ref_text(value: Any) -> str | None:
+    if isinstance(value, Mapping):
+        ref = value.get("key") or value.get("issue") or value.get("id")
+        if not ref:
+            return None
+        title = _normalize_optional(value.get("title"))
+        return f"{ref} — {title}" if title else str(ref)
+    return _workflow_ref(value)
+
+
+def _jira_ref_texts(value: Any) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    refs: list[str] = []
+    for item in value:
+        text = _jira_ref_text(item)
+        if text:
+            refs.append(text)
+    return refs
+
+
+def _jira_issue_link_bullets(value: Any) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    bullets: list[str] = []
+    for link in value:
+        if not isinstance(link, Mapping):
+            continue
+        target = _jira_ref_text(link.get("target"))
+        if not target:
+            continue
+        label = _normalize_optional(link.get("type")) or "link"
+        direction = _normalize_optional(link.get("direction"))
+        suffix = f" ({direction})" if direction else ""
+        bullets.append(f"- {label} → {target}{suffix}")
+    return bullets
+
+
+def _jira_external_link_bullets(value: Any) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    bullets: list[str] = []
+    for link in value:
+        if not isinstance(link, Mapping):
+            continue
+        url = _normalize_optional(link.get("url"))
+        title = _normalize_optional(link.get("title")) or url
+        if url:
+            bullets.append(f"- [{title}]({url})")
+        elif title:
+            bullets.append(f"- {title}")
+    return bullets
+
 
 def _build_relationship_frontmatter_block(
     relationships: Mapping[str, Any],

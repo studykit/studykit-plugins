@@ -47,8 +47,11 @@ def test_jira_issue_cache_body_path_recognizer_matches_issue_md_and_comments(tmp
     comment = tmp_path / ".workflow-cache" / "issues" / "TEST-1234" / "comment-2026-05-15T093000Z-1.md"
     issue_json = tmp_path / ".workflow-cache" / "issues" / "TEST-1234" / "issue.json"
 
+    relationships_md = tmp_path / ".workflow-cache" / "issues" / "TEST-1234" / "relationships.md"
+
     assert is_jira_issue_cache_body_path(issue_md, tmp_path)
     assert is_jira_issue_cache_body_path(comment, tmp_path)
+    assert is_jira_issue_cache_body_path(relationships_md, tmp_path)
     assert not is_jira_issue_cache_body_path(issue_json, tmp_path)
     assert not is_jira_issue_cache_body_path(tmp_path / "issue.md", tmp_path)
     assert not is_jira_issue_cache_body_path(
@@ -119,8 +122,76 @@ def test_jira_write_issue_bundle_response_omits_internal_json_paths(tmp_path: Pa
 
     # The native source JSON (issue.json / remote-links.json) must never be
     # surfaced; the internal .meta.json path may appear (it is dropped before
-    # CLI output) but issue.md stays the readable projection.
-    assert set(written) == {"issue_dir", "issue_file", "meta_file"}
+    # CLI output). issue.md and relationships.md are the readable projections.
+    assert set(written) == {"issue_dir", "issue_file", "meta_file", "relationships_file"}
+    assert written["relationships_file"].endswith("/relationships.md")
+
+
+def test_jira_write_issue_bundle_renders_relationships_markdown(tmp_path: Path) -> None:
+    # relationships.md is the LLM-readable view; its sections follow Jira's
+    # relationship model (parent / unmapped issue links / external links) and
+    # need not match GitHub's projection.
+    cache = JiraDataCenterIssueCache.for_project(tmp_path)
+    site = jira_site()
+
+    payload = _jira_issue_payload("Open")
+    fields = payload["fields"]
+    assert isinstance(fields, dict)
+    fields["parent"] = {
+        "key": "TEST-1000",
+        "fields": {"summary": "Parent epic", "status": {"name": "Open"}},
+    }
+    fields["issuelinks"] = [
+        {
+            "id": "5001",
+            "type": {"name": "Blocks", "inward": "is blocked by", "outward": "blocks"},
+            "outwardIssue": {
+                "key": "TEST-2000",
+                "fields": {"summary": "Downstream", "status": {"name": "Open"}},
+            },
+        }
+    ]
+    # write_issue_bundle receives already-normalized remote links (the provider
+    # runs normalize_jira_remote_links via get_remote_links).
+    remote_links = [
+        {
+            "id": "9001",
+            "relationship": "mentioned in",
+            "url": "https://example.test/design",
+            "title": "Design doc",
+        }
+    ]
+
+    cache.write_issue_bundle(
+        site,
+        payload,
+        remote_links=remote_links,
+        fetched_at="2026-05-15T10:00:00.000+0900",
+    )
+
+    md = cache.relationships_file(site, "TEST-1234").read_text(encoding="utf-8")
+    assert md.startswith("# Relationships — TEST-1234")
+    assert "## Parent" in md
+    assert "TEST-1000" in md
+    assert "## Issue links" in md
+    assert "TEST-2000" in md
+    assert "## External links" in md
+    assert "[Design doc](https://example.test/design)" in md
+
+
+def test_jira_write_issue_bundle_relationships_markdown_empty_when_no_links(tmp_path: Path) -> None:
+    cache = JiraDataCenterIssueCache.for_project(tmp_path)
+    site = jira_site()
+
+    cache.write_issue_bundle(
+        site,
+        _jira_issue_payload("Open"),
+        fetched_at="2026-05-15T10:00:00.000+0900",
+    )
+
+    md = cache.relationships_file(site, "TEST-1234").read_text(encoding="utf-8")
+    assert md.startswith("# Relationships — TEST-1234")
+    assert "_No linked issues._" in md
 
 
 def _payload_with_assignee(assignee: object) -> dict[str, object]:

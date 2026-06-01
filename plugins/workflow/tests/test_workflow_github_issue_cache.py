@@ -21,7 +21,11 @@ from workflow_cache import (  # noqa: E402
     check_provider_freshness,
     require_provider_freshness,
 )
-from issue.github.cache import GitHubIssueCache, is_github_issue_cache_body_path  # noqa: E402
+from issue.github.cache import (  # noqa: E402
+    GitHubIssueCache,
+    is_github_issue_cache_body_path,
+    is_github_issue_cache_meta_path,
+)
 from workflow_command import CommandRequest, CommandResult  # noqa: E402
 from workflow_github import DEFAULT_ISSUE_FIELDS, GitHubRepository  # noqa: E402
 from workflow_providers import (  # noqa: E402
@@ -95,6 +99,14 @@ def test_github_issue_cache_body_path_recognizer_matches_issue_and_comment_layou
     assert is_github_issue_cache_body_path(configured_comment, tmp_path)
     assert is_github_issue_cache_body_path(external_issue, tmp_path)
     assert is_github_issue_cache_body_path(external_comment, tmp_path)
+    # The readable relationships.md is a body projection; the machine source
+    # .relationships.json is internal (matched as a meta path, not a body path).
+    assert is_github_issue_cache_body_path(configured_issue.with_name("relationships.md"), tmp_path)
+    assert not is_github_issue_cache_body_path(configured_issue.with_name(".relationships.json"), tmp_path)
+    assert is_github_issue_cache_meta_path(configured_issue.with_name(".relationships.json"), tmp_path)
+    assert is_github_issue_cache_meta_path(configured_issue.with_name(".meta.json"), tmp_path)
+    # The pre-clean-break readable relationships.json no longer exists in the layout.
+    assert not is_github_issue_cache_body_path(configured_issue.with_name("relationships.json"), tmp_path)
     assert not is_github_issue_cache_body_path(configured_issue.with_name("metadata.yml"), tmp_path)
     assert not is_github_issue_cache_body_path(configured_issue.with_name("notes.md"), tmp_path)
     assert not is_github_issue_cache_body_path(
@@ -183,14 +195,24 @@ def test_github_issue_cache_writes_flat_layout_with_meta_and_relationships(tmp_p
     assert "updated_at" not in meta
     assert "fetched_at" not in meta
 
-    # Relationships live in their own JSON projection (compact refs).
-    rel = json.loads(write.relationship_location.read_text(encoding="utf-8"))
-    assert write.relationship_location == write.issue_dir / "relationships.json"
+    # The readable projection is markdown the LLM follows to reach linked issues.
+    assert write.relationship_location == write.issue_dir / "relationships.md"
+    rel_md = write.relationship_location.read_text(encoding="utf-8")
+    assert "## Parent" in rel_md
+    assert "- #28" in rel_md
+    assert "## Children" in rel_md and "- #41" in rel_md
+    assert "## Blocked by" in rel_md and "- #32" in rel_md
+    assert "## Blocking" in rel_md and "- #36" in rel_md
+
+    # The machine source stays in the internal .relationships.json dotfile.
+    source = write.issue_dir / ".relationships.json"
+    rel = json.loads(source.read_text(encoding="utf-8"))
     assert rel["schema_version"] == 1
     assert rel["parent"] == 28
     assert rel["children"] == [41]
     assert rel["blocked_by"] == [32]
     assert rel["blocking"] == [36]
+    assert not (write.issue_dir / "relationships.json").exists()
 
     assert not (write.issue_dir / "metadata.yml").exists()
     assert not (write.issue_dir / "comments").exists()

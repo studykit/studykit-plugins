@@ -157,6 +157,12 @@ class JiraIssueBackend:
                     display_project_path(path, config.root)
                     for path in cache.comment_files(site, issue_key)
                 )
+                relationships_path = cache.relationships_file(site, issue_key)
+                relationships_display = (
+                    display_project_path(relationships_path, config.root)
+                    if relationships_path.is_file()
+                    else None
+                )
                 contexts.append(
                     IssueFetchContext(
                         number=issue_key,
@@ -170,6 +176,7 @@ class JiraIssueBackend:
                         ),
                         provider_kind="jira",
                         comments=comment_paths,
+                        relationships=relationships_display,
                     )
                 )
         except Exception as exc:  # noqa: BLE001
@@ -1325,6 +1332,12 @@ def fetch_cache_payload(
             display_project_path(path, config.root)
             for path in cache.comment_files(site, issue_key)
         )
+        relationships_path = cache.relationships_file(site, issue_key)
+        relationships_display = (
+            display_project_path(relationships_path, config.root)
+            if relationships_path.is_file()
+            else None
+        )
         contexts.append(
             IssueFetchContext(
                 number=issue_key,
@@ -1338,6 +1351,7 @@ def fetch_cache_payload(
                 ),
                 provider_kind="jira",
                 comments=comment_paths,
+                relationships=relationships_display,
             )
         )
 

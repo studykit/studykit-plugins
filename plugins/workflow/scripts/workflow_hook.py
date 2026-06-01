@@ -261,7 +261,12 @@ def is_provider_issue_cache_body(path: Path, config: WorkflowConfig) -> bool:
 
 
 def is_provider_issue_cache_meta(path: Path, config: WorkflowConfig) -> bool:
-    """Return whether ``path`` is the internal ``.meta.json`` projection."""
+    """Return whether ``path`` is an internal cache projection.
+
+    Internal projections are the dotfiles the dispatchers own (``.meta.json``
+    and, for GitHub, the ``.relationships.json`` machine source); both are
+    blocked for read and write.
+    """
 
     if config.issues.kind == "github":
         return is_github_issue_cache_meta_path(path, config.root)
@@ -280,11 +285,12 @@ def provider_cache_body_write_reason(target: EditTarget, config: WorkflowConfig)
 
     if is_meta:
         return (
-            "workflow cache protection blocked a write to an internal cache metadata file "
-            "(.meta.json).\n\n"
+            "workflow cache protection blocked a write to an internal cache file "
+            "(.meta.json / .relationships.json).\n\n"
             f"Target: {target.path}\n\n"
-            "This file holds projection bookkeeping (freshness fingerprints) only. Never "
-            "edit it; the workflow dispatchers maintain it. Use the body-file flow "
+            "These files hold projection bookkeeping (freshness fingerprints, the "
+            "machine relationship source) only. Never edit them; the workflow "
+            "dispatchers maintain them. Use the body-file flow "
             "(`workflow issue update` / `workflow issue comment --body-file <path>`)."
         )
 
@@ -317,12 +323,13 @@ def provider_cache_meta_read_reason(path: Path, config: WorkflowConfig) -> str |
     if not is_provider_issue_cache_meta(path, config):
         return None
     return (
-        "workflow cache protection blocked reading an internal cache metadata file "
-        "(.meta.json).\n\n"
+        "workflow cache protection blocked reading an internal cache file "
+        "(.meta.json / .relationships.json).\n\n"
         f"Target: {path}\n\n"
-        "This file holds projection bookkeeping (freshness fingerprints) only — it is not "
-        "issue content. Read issue.md / relationships.json / comment-*.md for the issue, or "
-        "refresh with `workflow issue fetch`."
+        "These files hold projection bookkeeping (freshness fingerprints, the machine "
+        "relationship source) only — they are not issue content. Read issue.md / "
+        "relationships.md / comment-*.md for the issue, or refresh with "
+        "`workflow issue fetch`."
     )
 
 
