@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # /// script
-# dependencies = ["PyYAML", "python-frontmatter"]
+# dependencies = ["PyYAML"]
 # ///
 """Resolve workflow authoring contracts for workflow artifacts.
 
