@@ -17,6 +17,7 @@ from workflow_cache import (
     WorkflowCacheError,
     WorkflowCacheMiss,
     _atomic_write_text,
+    _dump_json,
     _format_markdown,
     _label_names,
     _normalize_freshness_target,
@@ -24,29 +25,66 @@ from workflow_cache import (
     _normalize_state,
     _normalize_state_reason,
     _read_frontmatter_markdown,
+    _read_json_mapping,
     _require_schema,
     _safe_file_segment,
     _safe_path_segment,
     _utc_now,
+    comments_fingerprint,
+    content_fingerprint,
+    relationships_fingerprint,
 )
 from workflow_github import GitHubRepository, normalize_issue_number
 
 
 _COMMENT_FILENAME_RE = re.compile(r"^comment-.*\.md$")
 
+# The fingerprint builders (``content_fingerprint`` / ``relationships_fingerprint``
+# / ``comments_fingerprint``) are shared from ``workflow_cache`` so cache writes
+# and provider write-back checks normalize identically. The per-comment item
+# extraction below is GitHub-specific (provider comment ids).
+
+
+def _comment_fingerprint_items(source: Mapping[str, Any]) -> list[dict[str, str | None]]:
+    """Stable per-comment identity+revision tuples for the comments fingerprint."""
+
+    items: list[dict[str, str | None]] = []
+    for position, comment in enumerate(_comments_from_issue(source), start=1):
+        provider_comment_id, _node = _comment_ids(comment, fallback=str(position))
+        revision = _normalize_optional(
+            comment.get("updatedAt") or comment.get("updated_at")
+        ) or _normalize_optional(comment.get("createdAt") or comment.get("created_at"))
+        items.append({"id": str(provider_comment_id), "updated_at": revision})
+    items.sort(key=lambda item: (item["id"], item["updated_at"] or ""))
+    return items
+
 
 def is_github_issue_cache_body_path(path: Path, project: Path) -> bool:
-    """Return whether ``path`` is a GitHub issue body cache projection.
+    """Return whether ``path`` is a read-only GitHub issue content projection.
 
-    Recognizes the ``issue.md`` body and any ``comment-*.md`` sibling in the
-    flat per-issue directory layout. Configured-repo issues sit at
-    ``.workflow-cache/issues/<n>/`` and external repos are namespaced under
-    ``.workflow-cache/<host>/<owner>/<repo>/issues/<n>/``.
+    Recognizes the ``issue.md`` body, ``relationships.json``, and any
+    ``comment-*.md`` sibling in the flat per-issue directory layout.
+    Configured-repo issues sit at ``.workflow-cache/issues/<n>/`` and external
+    repos are namespaced under
+    ``.workflow-cache/<host>/<owner>/<repo>/issues/<n>/``. The internal
+    ``.meta.json`` is matched by :func:`is_github_issue_cache_meta_path`.
     """
 
     name = path.name
-    if name != "issue.md" and not _COMMENT_FILENAME_RE.match(name):
+    if name not in {"issue.md", "relationships.json"} and not _COMMENT_FILENAME_RE.match(name):
         return False
+    return _github_issue_cache_dir_match(path, project)
+
+
+def is_github_issue_cache_meta_path(path: Path, project: Path) -> bool:
+    """Return whether ``path`` is the internal GitHub ``.meta.json`` projection."""
+
+    if path.name != ".meta.json":
+        return False
+    return _github_issue_cache_dir_match(path, project)
+
+
+def _github_issue_cache_dir_match(path: Path, project: Path) -> bool:
     try:
         parts = path.expanduser().resolve(strict=False).relative_to(
             project.expanduser().resolve(strict=False) / CACHE_ROOT_NAME
@@ -67,12 +105,14 @@ class CacheWriteResult:
 
     issue_dir: Path
     issue_file: Path
+    meta_file: Path
     relationship_location: Path
 
     def to_json(self) -> dict[str, str]:
         return {
             "issue_dir": str(self.issue_dir),
             "issue_file": str(self.issue_file),
+            "meta_file": str(self.meta_file),
             "relationship_location": str(self.relationship_location),
         }
 
@@ -111,14 +151,20 @@ class GitHubIssueCache:
     def issue_file(self, repo: GitHubRepository, issue: int | str) -> Path:
         return self.issue_dir(repo, issue) / "issue.md"
 
+    def meta_file(self, repo: GitHubRepository, issue: int | str) -> Path:
+        return self.issue_dir(repo, issue) / ".meta.json"
+
+    def relationships_file(self, repo: GitHubRepository, issue: int | str) -> Path:
+        return self.issue_dir(repo, issue) / "relationships.json"
+
     def freshness_file(self, repo: GitHubRepository, issue: int | str, target: str) -> Path:
         normalized = _normalize_freshness_target(target)
         if normalized not in {"issue", "comments", "relationships"}:
             raise WorkflowCacheError(f"unsupported freshness target: {target}")
-        return self.issue_file(repo, issue)
+        return self.meta_file(repo, issue)
 
     def has_issue_projection(self, repo: GitHubRepository, issue: int | str) -> bool:
-        return self.issue_file(repo, issue).is_file()
+        return self.meta_file(repo, issue).is_file()
 
     def comment_files(self, repo: GitHubRepository, issue: int | str) -> list[Path]:
         """Return cached comment files sorted by filename (chronological)."""
@@ -135,58 +181,27 @@ class GitHubIssueCache:
         *,
         target: str = "issue",
     ) -> FreshnessMetadata:
-        """Read freshness metadata from ``issue.md`` frontmatter for one target."""
+        """Read the per-target fingerprint from ``.meta.json``."""
 
         normalized = _normalize_freshness_target(target)
         if normalized not in {"issue", "comments", "relationships"}:
             raise WorkflowCacheError(f"unsupported freshness target: {target}")
 
-        issue_path = self.issue_file(repo, issue)
-        if not issue_path.is_file():
-            raise WorkflowCacheMiss(f"freshness cache does not exist: {issue_path}")
+        meta_path = self.meta_file(repo, issue)
+        if not meta_path.is_file():
+            raise WorkflowCacheMiss(f"freshness cache does not exist: {meta_path}")
 
-        frontmatter, _body = _read_frontmatter_markdown(issue_path)
-        _require_schema(frontmatter, issue_path)
-        issue_source = _normalize_optional(frontmatter.get("updated_at"))
-        issue_fetched = _normalize_optional(frontmatter.get("fetched_at"))
-        if normalized == "issue":
-            source: str | None = issue_source
-            fetched: str | None = issue_fetched
-        elif normalized == "comments":
-            source = self._latest_cached_comment_timestamp(repo, issue) or issue_source
-            fetched = issue_fetched
-        else:
-            block = frontmatter.get(normalized)
-            if isinstance(block, Mapping):
-                source = _normalize_optional(block.get("updated_at"))
-                fetched = _normalize_optional(block.get("fetched_at"))
-            elif block is not None:
-                raise WorkflowCacheCorrupt(
-                    f"{normalized} freshness frontmatter must be a mapping: {issue_path}"
-                )
-            else:
-                source = None
-                fetched = None
+        meta = _read_json_mapping(meta_path)
+        _require_schema(meta, meta_path)
+        fingerprints = meta.get("fingerprints")
+        if not isinstance(fingerprints, Mapping):
+            raise WorkflowCacheCorrupt(f"missing fingerprints in {meta_path}")
+        key = "content" if normalized == "issue" else normalized
         return FreshnessMetadata(
-            updated_at=source,
-            fetched_at=fetched,
-            path=issue_path,
+            fingerprint=_normalize_optional(fingerprints.get(key)),
+            path=meta_path,
             target=normalized,
         )
-
-    def _latest_cached_comment_timestamp(self, repo: GitHubRepository, issue: int | str) -> str | None:
-        latest: str | None = None
-        for comment_path in self.comment_files(repo, issue):
-            try:
-                comment_frontmatter, _body = _read_frontmatter_markdown(comment_path)
-            except WorkflowCacheError:
-                continue
-            updated = _normalize_optional(comment_frontmatter.get("updated_at")) or _normalize_optional(
-                comment_frontmatter.get("created_at")
-            )
-            if updated is not None and (latest is None or updated > latest):
-                latest = updated
-        return latest
 
     def read_issue(
         self,
@@ -204,47 +219,44 @@ class GitHubIssueCache:
         treat them as misses.
         """
 
-        issue_path = self.issue_file(repo, issue)
-        if not issue_path.is_file():
-            raise WorkflowCacheMiss(f"issue cache does not exist: {issue_path}")
+        meta_path = self.meta_file(repo, issue)
+        if not meta_path.is_file():
+            raise WorkflowCacheMiss(f"issue cache does not exist: {meta_path}")
 
         try:
-            frontmatter, body = _read_frontmatter_markdown(issue_path)
-            _require_schema(frontmatter, issue_path)
-            for key in ("title", "state", "state_reason", "labels", "updated_at"):
-                if key not in frontmatter:
-                    raise WorkflowCacheCorrupt(f"missing issue frontmatter field {key}: {issue_path}")
+            meta = _read_json_mapping(meta_path)
+            _require_schema(meta, meta_path)
+            for key in ("title", "state", "state_reason", "labels"):
+                if key not in meta:
+                    raise WorkflowCacheCorrupt(f"missing issue meta field {key}: {meta_path}")
 
-            labels = frontmatter.get("labels")
+            labels = meta.get("labels")
             if labels is None:
                 labels = []
             if not isinstance(labels, list):
-                raise WorkflowCacheCorrupt(f"issue labels must be a list: {issue_path}")
+                raise WorkflowCacheCorrupt(f"issue labels must be a list: {meta_path}")
 
-            updated_at = _normalize_optional(frontmatter.get("updated_at"))
-            fetched_at = _normalize_optional(frontmatter.get("fetched_at"))
+            issue_path = self.issue_file(repo, issue)
             cache_metadata: dict[str, Any] = {
                 "hit": True,
                 "issue_file": str(issue_path),
-                "fetchedAt": fetched_at,
-                "sourceUpdatedAt": updated_at,
+                "meta_file": str(meta_path),
             }
 
             payload: dict[str, Any] = {
                 "number": int(normalize_issue_number(issue)),
-                "title": str(frontmatter.get("title") or ""),
-                "state": frontmatter.get("state"),
-                "stateReason": frontmatter.get("state_reason"),
+                "title": str(meta.get("title") or ""),
+                "state": meta.get("state"),
+                "stateReason": meta.get("state_reason"),
                 "labels": [str(label) for label in labels],
-                "updatedAt": updated_at,
                 "repository": repo.to_json(),
                 "cache": cache_metadata,
             }
-            projects = _project_items_for_frontmatter(frontmatter.get("projects"))
+            projects = meta.get("projects")
             if projects:
                 payload["projects"] = projects
             if include_body:
-                payload["body"] = body
+                payload["body"] = issue_path.read_text(encoding="utf-8") if issue_path.is_file() else ""
             if include_comments:
                 payload["comments"] = self.read_comments(repo, issue, include_body=include_body)["comments"]
             if include_relationships:
@@ -253,7 +265,7 @@ class GitHubIssueCache:
         except WorkflowCacheError:
             raise
         except Exception as exc:
-            raise WorkflowCacheCorrupt(f"could not read issue cache {issue_path}: {exc}") from exc
+            raise WorkflowCacheCorrupt(f"could not read issue cache {meta_path}: {exc}") from exc
 
     def read_comments(
         self,
@@ -262,11 +274,11 @@ class GitHubIssueCache:
         *,
         include_body: bool = True,
     ) -> dict[str, Any]:
-        issue_path = self.issue_file(repo, issue)
-        if not issue_path.is_file():
-            raise WorkflowCacheMiss(f"comments cache does not exist: {issue_path}")
-        frontmatter, _body = _read_frontmatter_markdown(issue_path)
-        _require_schema(frontmatter, issue_path)
+        meta_path = self.meta_file(repo, issue)
+        if not meta_path.is_file():
+            raise WorkflowCacheMiss(f"comments cache does not exist: {meta_path}")
+        meta = _read_json_mapping(meta_path)
+        _require_schema(meta, meta_path)
 
         result_comments: list[dict[str, Any]] = []
         for comment_path in self.comment_files(repo, issue):
@@ -300,33 +312,26 @@ class GitHubIssueCache:
                 comment["body"] = comment_body
             result_comments.append(comment)
 
-        comments_freshness = self.read_freshness_metadata(repo, issue, target="comments")
         return {
             "repository": repo.to_json(),
             "issue": normalize_issue_number(issue),
             "comments": result_comments,
             "cache": {
                 "hit": True,
-                "issue_file": str(issue_path),
-                "fetchedAt": comments_freshness.fetched_at,
-                "sourceUpdatedAt": comments_freshness.updated_at,
+                "issue_file": str(self.issue_file(repo, issue)),
+                "meta_file": str(meta_path),
             },
         }
 
     def read_relationships(self, repo: GitHubRepository, issue: int | str) -> dict[str, Any]:
-        issue_path = self.issue_file(repo, issue)
-        frontmatter_current = _read_frontmatter_current_relationships(issue_path)
-        if frontmatter_current is None:
-            raise WorkflowCacheMiss(f"relationship frontmatter does not exist: {issue_path}")
+        rel_path = self.relationships_file(repo, issue)
+        if not rel_path.is_file():
+            raise WorkflowCacheMiss(f"relationships cache does not exist: {rel_path}")
+        rel = _read_json_mapping(rel_path)
+        _require_schema(rel, rel_path)
+        compact = {key: value for key, value in rel.items() if key != "schema_version"}
         data: dict[str, Any] = {"schema_version": SCHEMA_VERSION}
-        try:
-            freshness = self.read_freshness_metadata(repo, issue, target="relationships")
-        except WorkflowCacheError:
-            freshness = None
-        if freshness is not None:
-            data["updated_at"] = freshness.updated_at
-            data["fetched_at"] = freshness.fetched_at
-        data.update(frontmatter_current)
+        data.update(_relationships_from_issue(compact))
         return data
 
     def write_relationships_projection(
@@ -334,27 +339,25 @@ class GitHubIssueCache:
         repo: GitHubRepository,
         issue: int | str,
         relationship_payload: Mapping[str, Any],
-        *,
-        fetched_at: str | None = None,
     ) -> Path:
-        """Write only the current relationship projection for one issue."""
+        """Rewrite ``relationships.json`` and only the relationships fingerprint.
 
-        now = fetched_at or _utc_now()
+        The content fingerprint in ``.meta.json`` is left untouched, so a link
+        operation can never make a later body write look conflicted.
+        """
+
         issue_number = normalize_issue_number(issue)
-        issue_path = self.issue_file(repo, issue_number)
-        if not issue_path.is_file():
-            raise WorkflowCacheMiss(f"issue cache does not exist: {issue_path}")
-        current = _relationships_from_issue(relationship_payload)
-        updated_at = _normalize_optional(
-            relationship_payload.get("updatedAt") or relationship_payload.get("updated_at")
-        ) or now
-        self._update_issue_frontmatter(
-            issue_path,
-            relationships_current=current,
-            relationships_updated_at=updated_at,
-            relationships_fetched_at=now,
+        meta_path = self.meta_file(repo, issue_number)
+        if not meta_path.is_file():
+            raise WorkflowCacheMiss(f"issue cache does not exist: {meta_path}")
+        compact = _compact_relationships_for_frontmatter(
+            _relationships_from_issue(relationship_payload)
         )
-        return issue_path
+        self._write_relationships_file(repo, issue_number, compact)
+        self._update_meta_fingerprint(
+            meta_path, "relationships", relationships_fingerprint(compact)
+        )
+        return self.relationships_file(repo, issue_number)
 
     def write_issue_bundle(
         self,
@@ -363,45 +366,125 @@ class GitHubIssueCache:
         *,
         fetched_at: str | None = None,
     ) -> CacheWriteResult:
-        """Write issue, comments, and relationships projections atomically per file."""
+        """Write the body, ``.meta.json``, ``relationships.json``, and comments."""
 
         issue_number = normalize_issue_number(issue.get("number") or issue.get("issue") or "")
         now = fetched_at or _utc_now()
         issue_dir = self.issue_dir(repo, issue_number)
         issue_dir.mkdir(parents=True, exist_ok=True)
-        updated_at = _normalize_optional(issue.get("updatedAt") or issue.get("updated_at")) or now
-        current_relationships = _relationships_from_issue(issue)
+        body = str(issue.get("body") or "")
+        compact_relationships = _compact_relationships_for_frontmatter(
+            _relationships_from_issue(issue)
+        )
 
+        meta_path = self.meta_file(repo, issue_number)
         if _has_comment_projection_payload(issue):
             self._write_comment_files(repo, issue_number, issue, fetched_at=now)
+            comments_fp = comments_fingerprint(_comment_fingerprint_items(issue))
+        else:
+            comments_fp = self._existing_meta_fingerprint(meta_path, "comments")
 
-        issue_frontmatter: dict[str, Any] = {
+        issue_path = self.issue_file(repo, issue_number)
+        _atomic_write_text(issue_path, body)
+        self._write_relationships_file(repo, issue_number, compact_relationships)
+
+        meta: dict[str, Any] = {
             "schema_version": SCHEMA_VERSION,
             "title": str(issue.get("title") or ""),
             "state": _normalize_state(issue.get("state")),
             "state_reason": _normalize_state_reason(issue.get("stateReason") or issue.get("state_reason")),
             "assignees": _github_assignees(issue.get("assignees")),
             "labels": _label_names(issue.get("labels")),
-            "updated_at": updated_at,
-            "fetched_at": now,
+            "fingerprints": {
+                "content": content_fingerprint(issue.get("title"), body),
+                "relationships": relationships_fingerprint(compact_relationships),
+                "comments": comments_fp,
+            },
         }
         projects = _project_items_for_frontmatter(issue.get("projectItems") or issue.get("projects"))
         if projects:
-            issue_frontmatter["projects"] = projects
-        issue_frontmatter["relationships"] = _relationship_frontmatter_block(
-            current=current_relationships,
-            updated_at=updated_at,
-            fetched_at=now,
-        )
-
-        issue_path = self.issue_file(repo, issue_number)
-        _atomic_write_text(issue_path, _format_markdown(issue_frontmatter, str(issue.get("body") or "")))
+            meta["projects"] = projects
+        _atomic_write_text(meta_path, _dump_json(meta))
 
         return CacheWriteResult(
             issue_dir=issue_dir,
             issue_file=issue_path,
-            relationship_location=issue_path,
+            meta_file=meta_path,
+            relationship_location=self.relationships_file(repo, issue_number),
         )
+
+    def promote_body(
+        self,
+        repo: GitHubRepository,
+        issue: int | str,
+        *,
+        title: str | None,
+        body: str,
+    ) -> CacheWriteResult:
+        """Reuse a just-written body as the cache projection without re-fetching.
+
+        Safe only when the provider stores the body verbatim (GitHub). Rewrites
+        ``issue.md`` and the ``content`` fingerprint (and title) in ``.meta.json``;
+        the relationships and comments fingerprints are left untouched. Callers
+        must fall back to :meth:`write_issue_bundle` when metadata (labels, state,
+        assignees) also changed, since those are not refreshed here.
+        """
+
+        issue_number = normalize_issue_number(issue)
+        meta_path = self.meta_file(repo, issue_number)
+        if not meta_path.is_file():
+            raise WorkflowCacheMiss(f"issue cache does not exist: {meta_path}")
+        issue_path = self.issue_file(repo, issue_number)
+        _atomic_write_text(issue_path, str(body or ""))
+
+        meta = _read_json_mapping(meta_path)
+        _require_schema(meta, meta_path)
+        if title is not None:
+            meta["title"] = str(title or "")
+        fingerprints = meta.get("fingerprints")
+        if not isinstance(fingerprints, dict):
+            fingerprints = {}
+        fingerprints["content"] = content_fingerprint(meta.get("title"), body)
+        meta["fingerprints"] = fingerprints
+        _atomic_write_text(meta_path, _dump_json(meta))
+
+        return CacheWriteResult(
+            issue_dir=self.issue_dir(repo, issue_number),
+            issue_file=issue_path,
+            meta_file=meta_path,
+            relationship_location=self.relationships_file(repo, issue_number),
+        )
+
+    def _write_relationships_file(
+        self, repo: GitHubRepository, issue: int | str, compact: Mapping[str, Any]
+    ) -> Path:
+        rel_path = self.relationships_file(repo, issue)
+        data: dict[str, Any] = {"schema_version": SCHEMA_VERSION}
+        data.update(compact)
+        _atomic_write_text(rel_path, _dump_json(data))
+        return rel_path
+
+    def _update_meta_fingerprint(self, meta_path: Path, key: str, value: str) -> None:
+        meta = _read_json_mapping(meta_path)
+        _require_schema(meta, meta_path)
+        fingerprints = meta.get("fingerprints")
+        if not isinstance(fingerprints, dict):
+            fingerprints = {}
+        fingerprints[key] = value
+        meta["fingerprints"] = fingerprints
+        _atomic_write_text(meta_path, _dump_json(meta))
+
+    def _existing_meta_fingerprint(self, meta_path: Path, key: str) -> str | None:
+        if not meta_path.is_file():
+            return None
+        try:
+            meta = _read_json_mapping(meta_path)
+        except WorkflowCacheError:
+            return None
+        fingerprints = meta.get("fingerprints")
+        if not isinstance(fingerprints, Mapping):
+            return None
+        return _normalize_optional(fingerprints.get(key))
 
     def _write_comment_files(
         self,
@@ -444,76 +527,9 @@ class GitHubIssueCache:
             if path.name not in expected_files:
                 path.unlink()
 
-    def _update_issue_frontmatter(
-        self,
-        issue_path: Path,
-        *,
-        relationships_current: Mapping[str, Any] | None = None,
-        relationships_updated_at: str | None = None,
-        relationships_fetched_at: str | None = None,
-    ) -> None:
-        frontmatter, body = _read_frontmatter_markdown(issue_path)
-        existing_relationships = _frontmatter_relationship_block(frontmatter, issue_path, create=True)
-        if relationships_current is None:
-            relationships_current = existing_relationships
-        if relationships_updated_at is None:
-            relationships_updated_at = _normalize_optional(
-                existing_relationships.get("updated_at")
-            )
-        if relationships_fetched_at is None:
-            relationships_fetched_at = _normalize_optional(existing_relationships.get("fetched_at"))
-        frontmatter["relationships"] = _relationship_frontmatter_block(
-            current=relationships_current,
-            updated_at=relationships_updated_at,
-            fetched_at=relationships_fetched_at,
-        )
-        _atomic_write_text(issue_path, _format_markdown(frontmatter, body))
-
-
-def _frontmatter_relationship_block(
-    frontmatter: dict[str, Any],
-    path: Path,
-    *,
-    create: bool,
-) -> dict[str, Any] | None:
-    raw = frontmatter.get("relationships")
-    if raw is None:
-        if not create:
-            return None
-        raw = {}
-        frontmatter["relationships"] = raw
-    if not isinstance(raw, dict):
-        raise WorkflowCacheCorrupt(f"issue relationships frontmatter must be a mapping: {path}")
-    return raw
-
-
-def _read_frontmatter_current_relationships(path: Path) -> dict[str, Any] | None:
-    if not path.is_file():
-        return None
-    frontmatter, _body = _read_frontmatter_markdown(path)
-    relationships = _frontmatter_relationship_block(frontmatter, path, create=False)
-    if relationships is None:
-        return None
-    return _relationships_from_issue(relationships)
-
-
-def _relationship_frontmatter_block(
-    *,
-    current: Mapping[str, Any],
-    updated_at: str | None,
-    fetched_at: str | None,
-) -> dict[str, Any]:
-    block: dict[str, Any] = {}
-    if updated_at is not None:
-        block["updated_at"] = updated_at
-    if fetched_at is not None:
-        block["fetched_at"] = fetched_at
-    block.update(_compact_relationships_for_frontmatter(current))
-    return block
-
 
 def _compact_relationships_for_frontmatter(current: Mapping[str, Any]) -> dict[str, Any]:
-    """Return the human-authored relationship projection stored in issue frontmatter."""
+    """Return the compact relationship projection stored in ``relationships.json``."""
 
     compact: dict[str, Any] = {}
 
@@ -771,18 +787,6 @@ def _github_assignees(value: Any) -> list[str]:
         if resolved is not None:
             names.append(resolved)
     return names
-
-
-def _latest_comment_timestamp(comments: list[Mapping[str, Any]]) -> str | None:
-    values = [
-        str(value)
-        for comment in comments
-        for value in (comment.get("updatedAt"), comment.get("updated_at"), comment.get("createdAt"), comment.get("created_at"))
-        if value
-    ]
-    if not values:
-        return None
-    return max(values)
 
 
 def _relationships_from_issue(issue: Mapping[str, Any]) -> dict[str, Any]:

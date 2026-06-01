@@ -29,11 +29,17 @@ from workflow_edit_target import EditTarget  # noqa: E402
 from workflow_config import WorkflowConfig, WorkflowConfigError, load_workflow_config  # noqa: E402
 from workflow_github import GitHubRepository, GitHubRepositoryError, normalize_issue_number  # noqa: E402
 from workflow_github import resolve_github_repository  # noqa: E402
-from issue.github.cache import is_github_issue_cache_body_path  # noqa: E402
+from issue.github.cache import (  # noqa: E402
+    is_github_issue_cache_body_path,
+    is_github_issue_cache_meta_path,
+)
 from issue.github.context import cache_github_issue_references  # noqa: E402
 from issue.github.refs import extract_issue_numbers as extract_github_issue_numbers  # noqa: E402
 from issue.cli_output import format_issue_cache_context  # noqa: E402
-from issue.jira.cache import is_jira_issue_cache_body_path  # noqa: E402
+from issue.jira.cache import (  # noqa: E402
+    is_jira_issue_cache_body_path,
+    is_jira_issue_cache_meta_path,
+)
 from issue.jira.context import cache_jira_issue_references  # noqa: E402
 from issue.jira.refs import jira_issue_keys_from_references  # noqa: E402
 from issue.jira.refs import normalize_jira_issue_key  # noqa: E402
@@ -245,7 +251,7 @@ def github_repo_for_config(
 
 
 def is_provider_issue_cache_body(path: Path, config: WorkflowConfig) -> bool:
-    """Return whether ``path`` is a provider issue body cache projection."""
+    """Return whether ``path`` is a read-only provider issue content projection."""
 
     if config.issues.kind == "github":
         return is_github_issue_cache_body_path(path, config.root)
@@ -254,35 +260,89 @@ def is_provider_issue_cache_body(path: Path, config: WorkflowConfig) -> bool:
     return False
 
 
-def provider_cache_body_write_reason(target: EditTarget, config: WorkflowConfig) -> str | None:
-    """Block provider cache body writes that create or alter provider metadata."""
+def is_provider_issue_cache_meta(path: Path, config: WorkflowConfig) -> bool:
+    """Return whether ``path`` is the internal ``.meta.json`` projection."""
 
-    if not is_provider_issue_cache_body(target.path, config):
+    if config.issues.kind == "github":
+        return is_github_issue_cache_meta_path(path, config.root)
+    if config.issues.kind == "jira":
+        return is_jira_issue_cache_meta_path(path, config.root)
+    return False
+
+
+def provider_cache_body_write_reason(target: EditTarget, config: WorkflowConfig) -> str | None:
+    """Block writes to read-only provider cache projections (content or meta)."""
+
+    is_body = is_provider_issue_cache_body(target.path, config)
+    is_meta = is_provider_issue_cache_meta(target.path, config)
+    if not (is_body or is_meta):
         return None
+
+    if is_meta:
+        return (
+            "workflow cache protection blocked a write to an internal cache metadata file "
+            "(.meta.json).\n\n"
+            f"Target: {target.path}\n\n"
+            "This file holds projection bookkeeping (freshness fingerprints) only. Never "
+            "edit it; the workflow dispatchers maintain it. Use the body-file flow "
+            "(`workflow issue update` / `workflow issue comment --body-file <path>`)."
+        )
 
     if not target.path.is_file():
         return (
-            "workflow cache protection blocked a provider cache issue body write "
-            "because the projection has not been prepared yet.\n\n"
+            "workflow cache protection blocked a write to a provider cache projection that "
+            "has not been prepared yet.\n\n"
             f"Target: {target.path}\n\n"
-            "Refresh the cache projection with the workflow fetch dispatcher "
-            "(`workflow issue fetch`), "
-            "then edit only the Markdown body below the existing YAML frontmatter."
+            "Refresh the projection with the workflow fetch dispatcher "
+            "(`workflow issue fetch`), then use the body-file flow — never edit cache files "
+            "directly."
         )
 
     if target.content is None:
         return None
 
     return (
-        "workflow cache protection blocked a provider cache issue body write "
-        "because the projection is read-only; use the body-file flow.\n\n"
+        "workflow cache protection blocked a write because provider cache projections are "
+        "read-only.\n\n"
         f"Target: {target.path}\n\n"
-        "Write the new body or comment to a caller-chosen temp file and run the "
-        "matching workflow dispatcher with `--body-file <path>` "
-        "(`workflow issue update` or "
-        "`workflow issue comment`) "
-        "instead of editing the cached file in place."
+        "Write the new body or comment to a caller-chosen temp file and run the matching "
+        "workflow dispatcher with `--body-file <path>` (`workflow issue update` or "
+        "`workflow issue comment`) instead of editing the cached file in place."
     )
+
+
+def provider_cache_meta_read_reason(path: Path, config: WorkflowConfig) -> str | None:
+    """Block reads of the internal ``.meta.json`` projection."""
+
+    if not is_provider_issue_cache_meta(path, config):
+        return None
+    return (
+        "workflow cache protection blocked reading an internal cache metadata file "
+        "(.meta.json).\n\n"
+        f"Target: {path}\n\n"
+        "This file holds projection bookkeeping (freshness fingerprints) only — it is not "
+        "issue content. Read issue.md / relationships.json / comment-*.md for the issue, or "
+        "refresh with `workflow issue fetch`."
+    )
+
+
+def block_provider_cache_meta_read(
+    *,
+    project_dir: Path | None,
+    path: Path | None,
+    stdout: TextIO | None = None,
+) -> int:
+    """Block a read of the internal ``.meta.json`` cache projection."""
+
+    if path is None:
+        return 0
+    config = workflow_config_for_project(project_dir)
+    if config is None:
+        return 0
+    reason = provider_cache_meta_read_reason(path, config)
+    if reason:
+        emit_json({"decision": "block", "reason": reason}, stdout=stdout)
+    return 0
 
 
 def _ordered_issue_union(*groups: list[str], issue_id_format: str = "github") -> list[str]:

@@ -186,6 +186,11 @@ class GitHubIssueBackend:
             "--state-reason",
             choices=["completed", "not_planned", "reopened"],
         )
+        append.add_argument(
+            "--overwrite",
+            action="store_true",
+            help="replace the provider copy even if it changed since the last fetch",
+        )
 
     def run_comments(
         self,
@@ -205,6 +210,7 @@ class GitHubIssueBackend:
                     body_file=args.body_file,
                     state=args.state,
                     state_reason=args.state_reason,
+                    overwrite=args.overwrite,
                     runner=runner,
                 )
             else:
@@ -214,7 +220,7 @@ class GitHubIssueBackend:
             return 2
 
         print(json.dumps(payload, indent=2, sort_keys=False), file=stdout)
-        if payload.get("status") == "blocked":
+        if payload.get("status") == "conflict":
             return 3
         return 0
 
@@ -227,6 +233,7 @@ class GitHubIssueBackend:
         body_file: Path,
         state: str | None,
         state_reason: str | None,
+        overwrite: bool = False,
         runner: CommandRunner | None,
     ) -> dict[str, object]:
         artifact_type = _required_text(artifact_type, "artifact type")
@@ -254,6 +261,8 @@ class GitHubIssueBackend:
             payload["state"] = state.strip().lower()
         if state_reason:
             payload["state_reason"] = state_reason.strip()
+        if overwrite:
+            payload["overwrite"] = True
 
         provider = GitHubIssueNativeProvider(runner=runner)
         response = provider.call(
@@ -267,7 +276,7 @@ class GitHubIssueBackend:
         )
 
         provider_payload = dict(response.payload)
-        if provider_payload.get("status") == "blocked":
+        if provider_payload.get("status") == "conflict":
             provider_payload["body_file"] = str(body_path)
             provider_payload["body_file_removed"] = False
             return provider_payload
@@ -553,6 +562,11 @@ class GitHubIssueBackend:
             "--state-reason",
             choices=["completed", "not_planned", "reopened"],
         )
+        update.add_argument(
+            "--overwrite",
+            action="store_true",
+            help="replace the provider copy even if it changed since the last fetch",
+        )
         parent_group = update.add_mutually_exclusive_group()
         parent_group.add_argument(
             "--parent", help="add parent (errors if a parent already exists)"
@@ -641,6 +655,7 @@ class GitHubIssueBackend:
                     state=args.state,
                     state_reason=args.state_reason,
                     relationship_intent=self._writeback_relationship_intent(args),
+                    overwrite=args.overwrite,
                     runner=runner,
                 )
             else:
@@ -650,7 +665,7 @@ class GitHubIssueBackend:
             return 2
 
         print(json.dumps(payload, indent=2, sort_keys=False), file=stdout)
-        if payload.get("status") == "blocked":
+        if payload.get("status") == "conflict":
             return 3
         return 0
 
@@ -695,6 +710,7 @@ class GitHubIssueBackend:
         state: str | None,
         state_reason: str | None,
         relationship_intent: dict[str, object],
+        overwrite: bool = False,
         runner: CommandRunner | None,
     ) -> dict[str, object]:
         artifact_type = _required_text(artifact_type, "artifact type")
@@ -734,6 +750,8 @@ class GitHubIssueBackend:
             "body": body,
             "freshness_check": True,
         }
+        if overwrite:
+            payload["overwrite"] = True
         if title is not None:
             payload["title"] = title
         if normalized_set is not None:
@@ -759,7 +777,7 @@ class GitHubIssueBackend:
         )
 
         provider_payload = dict(response.payload)
-        if provider_payload.get("status") == "blocked":
+        if provider_payload.get("status") == "conflict":
             provider_payload["body_file"] = str(body_path)
             provider_payload["body_file_removed"] = False
             return provider_payload
@@ -986,6 +1004,11 @@ class GitHubIssueBackend:
 
     def add_fields_args(self, parser: argparse.ArgumentParser) -> None:
         parser.add_argument("--type", default="task", help="workflow artifact type")
+        parser.add_argument(
+            "--overwrite",
+            action="store_true",
+            help="replace the provider copy even if it changed since the last fetch",
+        )
         subparsers = parser.add_subparsers(dest="verb", required=True)
 
         p_close = subparsers.add_parser("close", help="close an issue")
@@ -1037,6 +1060,7 @@ class GitHubIssueBackend:
                 comment=getattr(args, "comment", None),
                 user=getattr(args, "user", None),
                 new_type=getattr(args, "new_type", None),
+                overwrite=getattr(args, "overwrite", False),
                 runner=runner,
             )
         except Exception as exc:  # noqa: BLE001
@@ -1044,7 +1068,7 @@ class GitHubIssueBackend:
             return 2
 
         print(json.dumps(payload, indent=2, sort_keys=False), file=stdout)
-        if payload.get("status") == "blocked":
+        if payload.get("status") == "conflict":
             return 3
         return 0
 
@@ -1059,6 +1083,7 @@ class GitHubIssueBackend:
         comment: str | None,
         user: str | None,
         new_type: str | None,
+        overwrite: bool = False,
         runner: CommandRunner | None,
     ) -> dict[str, Any]:
         try:
@@ -1083,6 +1108,8 @@ class GitHubIssueBackend:
                 "freshness_check": True,
                 "freshness_target": "issue",
             }
+            if overwrite:
+                payload["overwrite"] = True
             if verb == "close" and reason is not None:
                 payload["reason"] = reason
             if comment is not None:
@@ -1143,6 +1170,8 @@ class GitHubIssueBackend:
         else:
             raise IssueBackendError(f"unsupported verb: {verb}")
 
+        if overwrite:
+            payload["overwrite"] = True
         response = provider.call(
             ProviderRequest(
                 role="issue",
@@ -1316,6 +1345,7 @@ def append_comment(
     body_file: Path,
     state: str | None = None,
     state_reason: str | None = None,
+    overwrite: bool = False,
     runner: CommandRunner | None = None,
 ) -> dict[str, object]:
     """Post one comment from an opaque body file to one GitHub issue."""
@@ -1328,6 +1358,7 @@ def append_comment(
         body_file=body_file,
         state=state,
         state_reason=state_reason,
+        overwrite=overwrite,
         runner=runner,
     )
 
@@ -1375,6 +1406,7 @@ def update_issue(
     state: str | None = None,
     state_reason: str | None = None,
     relationship_intent: dict[str, object] | None = None,
+    overwrite: bool = False,
     runner: CommandRunner | None = None,
 ) -> dict[str, object]:
     """Update one GitHub issue body from an opaque caller-owned body file."""
@@ -1392,6 +1424,7 @@ def update_issue(
         state=state,
         state_reason=state_reason,
         relationship_intent=relationship_intent or {},
+        overwrite=overwrite,
         runner=runner,
     )
 
@@ -1426,6 +1459,7 @@ def fields_payload(
     comment: str | None = None,
     user: str | None = None,
     new_type: str | None = None,
+    overwrite: bool = False,
     runner: CommandRunner | None = None,
 ) -> dict[str, Any]:
     """Apply a body-less GitHub issue field mutation."""
@@ -1440,6 +1474,7 @@ def fields_payload(
         comment=comment,
         user=user,
         new_type=new_type,
+        overwrite=overwrite,
         runner=runner,
     )
 

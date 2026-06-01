@@ -17,7 +17,7 @@ from workflow_cache import (
     relationship_operations_from_intent,
     require_provider_freshness,
 )
-from issue.jira.cache import JiraDataCenterIssueCache
+from issue.jira.cache import JiraDataCenterIssueCache, jira_target_fingerprint
 from issue.jira.refs import JiraProviderError, normalize_jira_issue_key
 from issue.jira.relationships import (
     filter_jira_payload,
@@ -332,7 +332,7 @@ class JiraDataCenterIssueNativeProvider(IssueProvider):
         try:
             self._require_write_freshness(request, site, cache, issue_key, target="issue")
         except ProviderFreshnessError as exc:
-            return self._stale_cache_block_payload(
+            return self._conflict_payload(
                 site=site,
                 cache=cache,
                 project=request.context.project,
@@ -453,7 +453,7 @@ class JiraDataCenterIssueNativeProvider(IssueProvider):
             try:
                 self._require_write_freshness(request, site, cache, issue_key, target=target)
             except ProviderFreshnessError as exc:
-                return self._stale_cache_block_payload(
+                return self._conflict_payload(
                     site=site,
                     cache=cache,
                     project=request.context.project,
@@ -640,6 +640,8 @@ class JiraDataCenterIssueNativeProvider(IssueProvider):
         *,
         target: str,
     ) -> Mapping[str, Any] | None:
+        if _truthy(request.payload.get("overwrite")):
+            return get_issue(site, issue_key, runner=self.runner)
         freshness_flag = request.payload.get("freshness_check")
         if freshness_flag is None:
             freshness_flag = request.payload.get("check_freshness")
@@ -650,18 +652,49 @@ class JiraDataCenterIssueNativeProvider(IssueProvider):
             metadata = cache.read_freshness_metadata(site, issue_key, target=target)
         except WorkflowCacheError:
             metadata = FreshnessMetadata(
-                updated_at=None,
-                fetched_at=None,
-                path=cache.issue_file(site, issue_key),
+                fingerprint=None,
+                path=cache.meta_file(site, issue_key),
                 target=target,
             )
         provider_current = get_issue(site, issue_key, runner=self.runner)
-        provider_updated_at = _provider_updated_at(provider_current)
+        provider_fingerprint = self._provider_fingerprint(
+            request, site, provider_current, target=target
+        )
         try:
-            require_provider_freshness(metadata, provider_updated_at=provider_updated_at, artifact=artifact)
+            require_provider_freshness(
+                metadata, provider_fingerprint=provider_fingerprint, artifact=artifact
+            )
         except WorkflowFreshnessConflict as exc:
             raise ProviderFreshnessError(str(exc), result=exc.result) from exc
         return provider_current
+
+    def _provider_fingerprint(
+        self,
+        request: ProviderRequest,
+        site: Any,
+        provider_current: Mapping[str, Any],
+        *,
+        target: str,
+    ) -> str | None:
+        """Recompute the provider's current fingerprint for one freshness target.
+
+        Normalizes the freshly-fetched issue the same way the cache does at write
+        time, so an unchanged artifact yields an identical fingerprint. Remote
+        links are irrelevant to every fingerprint target, so they are skipped.
+        """
+
+        settings = _jira_issue_provider_settings(request.context.project)
+        normalized = normalize_jira_data_center_issue(
+            provider_current,
+            site=site,
+            remote_links=[],
+            relationship_mappings=_relationship_mappings(settings),
+        )
+        return jira_target_fingerprint(
+            normalized,
+            target,
+            hidden_comment_markers=_jira_snapshot_hidden_comment_markers(settings),
+        )
 
     def _refresh_cache(
         self,
@@ -681,7 +714,7 @@ class JiraDataCenterIssueNativeProvider(IssueProvider):
             relationship_mappings=_relationship_mappings(settings),
         )
 
-    def _stale_cache_block_payload(
+    def _conflict_payload(
         self,
         *,
         site: Any,
@@ -697,16 +730,18 @@ class JiraDataCenterIssueNativeProvider(IssueProvider):
             "operation": operation,
             "issue": issue_key,
             "key": issue_key,
-            "status": "blocked",
-            "reason": "stale_cache",
+            "status": "conflict",
+            "reason": "provider_changed",
             "message": (
-                f"{operation} blocked because Jira issue {issue_key} {target} changed on the provider. "
-                "The cache was refreshed; reread the listed paths before retrying."
+                f"{operation} stopped: Jira issue {issue_key} {target} changed on the provider "
+                "since it was last fetched. The cache was refreshed — reread the listed paths and "
+                "reapply your change, or retry with --overwrite to replace the provider copy."
             ),
             "target": target,
-            "freshness": error.to_json(),
+            "conflict": error.to_json(),
             "reread_required": True,
             "reread_paths": self._reread_paths(cache, site, issue_key),
+            "overwrite_hint": "--overwrite",
         }
         if pending_files is not None:
             payload["pending_files"] = pending_files
@@ -1197,14 +1232,6 @@ def _truthy(value: Any) -> bool:
     if isinstance(value, str):
         return value.strip().lower() not in {"", "0", "false", "no", "off"}
     return bool(value)
-
-
-def _provider_updated_at(issue: Mapping[str, Any]) -> str | None:
-    fields = issue.get("fields") if isinstance(issue.get("fields"), Mapping) else {}
-    if not isinstance(fields, Mapping):
-        return None
-    value = fields.get("updated")
-    return str(value).strip() if value else None
 
 
 def _jira_issue_provider_settings(project: Any) -> Mapping[str, Any]:

@@ -6,70 +6,20 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
-from workflow_cache import (
-    SCHEMA_VERSION,
-    _format_markdown,
-)
+def jira_relationship_fingerprint_block(relationships: Mapping[str, Any]) -> dict[str, Any]:
+    """Relationship fields used for the Jira ``relationships`` fingerprint.
 
-
-def render_jira_snapshot(
-    issue: Mapping[str, Any],
-    *,
-    updated_at: str | None,
-    fetched_at: str,
-) -> str:
-    """Render a Jira issue projection as YAML frontmatter plus issue body.
-
-    Metadata, relationships, and remote links live in the frontmatter; the
-    Markdown body is the description verbatim. Comments live in sibling
-    ``comment-*.md`` files.
+    Reuses the relationship block builder but strips the freshness timestamps so
+    cache-write and write-back-check compute an identical value for the same
+    provider state.
     """
 
-    frontmatter = build_jira_snapshot_frontmatter(
-        issue,
-        updated_at=updated_at,
-        fetched_at=fetched_at,
-    )
-    body = str(issue.get("body") or "")
-    return _format_markdown(frontmatter, body)
-
-
-def build_jira_snapshot_frontmatter(
-    issue: Mapping[str, Any],
-    *,
-    updated_at: str | None,
-    fetched_at: str,
-) -> dict[str, Any]:
-    """Return the frontmatter mapping written into issue.md."""
-
-    frontmatter: dict[str, Any] = {
-        "schema_version": SCHEMA_VERSION,
-        "title": str(issue.get("title") or ""),
-        "state": _normalize_optional(issue.get("state")),
-        "state_reason": _normalize_optional(issue.get("stateReason")),
-        "assignee": _jira_person_display_name(issue.get("assignee")),
-        "labels": [str(label) for label in issue.get("labels") or []],
-        "updated_at": updated_at,
-        "fetched_at": fetched_at,
-        "url": _normalize_optional(issue.get("url")),
-    }
-
-    relationships = issue.get("relationships") if isinstance(issue.get("relationships"), Mapping) else {}
-    assert isinstance(relationships, Mapping)
-
-    remote_links = _compact_remote_links(relationships.get("remote_links"))
-    if remote_links:
-        frontmatter["remote_links"] = remote_links
-
-    relationship_block = _build_relationship_frontmatter_block(
-        relationships,
-        updated_at=updated_at,
-        fetched_at=fetched_at,
-    )
-    if relationship_block:
-        frontmatter["relationships"] = relationship_block
-
-    return frontmatter
+    if not isinstance(relationships, Mapping):
+        return {}
+    block = _build_relationship_frontmatter_block(relationships, updated_at=None, fetched_at="")
+    block.pop("updated_at", None)
+    block.pop("fetched_at", None)
+    return block
 
 
 _RESERVED_WORKFLOW_KEYS = {"parent", "issue_links", "external_links"}
@@ -134,31 +84,6 @@ def _workflow_ref(value: Any) -> str | None:
         return None
     text = str(value).strip()
     return text or None
-
-
-def _compact_remote_links(value: Any) -> list[dict[str, Any]]:
-    if not isinstance(value, list):
-        return []
-    links: list[dict[str, Any]] = []
-    for item in value:
-        if not isinstance(item, Mapping):
-            continue
-        entry: dict[str, Any] = {}
-        title = _normalize_optional(item.get("title"))
-        if title is not None:
-            entry["title"] = title
-        url = _normalize_optional(item.get("url"))
-        if url is not None:
-            entry["url"] = url
-        relationship = _normalize_optional(item.get("relationship"))
-        if relationship is not None:
-            entry["relationship"] = relationship
-        global_id = _normalize_optional(item.get("global_id"))
-        if global_id is not None:
-            entry["global_id"] = global_id
-        if entry:
-            links.append(entry)
-    return links
 
 
 def _compact_unmapped_issue_links(value: Any) -> list[dict[str, Any]]:

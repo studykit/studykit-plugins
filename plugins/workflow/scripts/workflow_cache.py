@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 import os
 import re
 import tempfile
@@ -16,8 +18,57 @@ import frontmatter as frontmatter_lib
 
 
 CACHE_ROOT_NAME = ".workflow-cache"
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 1
+FINGERPRINT_LENGTH = 8
 _FRONTMATTER_HANDLER = frontmatter_lib.YAMLHandler()
+
+
+def fingerprint(value: Any) -> str:
+    """Return a short stable fingerprint of a normalized cache payload.
+
+    The first ``FINGERPRINT_LENGTH`` hex chars of the SHA-256 over a canonical
+    JSON encoding (sorted keys, no insignificant whitespace). Used to detect
+    whether a provider-side artifact changed since it was cached. The same value
+    must be computed at cache-write time and at write-back check time, so callers
+    must pass an already-normalized structure — never a raw provider payload.
+    """
+
+    canonical = json.dumps(
+        value,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+        default=str,
+    )
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:FINGERPRINT_LENGTH]
+
+
+def content_fingerprint(title: Any, body: Any) -> str:
+    """Fingerprint of an issue's authored content (title + body)."""
+
+    return fingerprint({"title": str(title or ""), "body": str(body or "")})
+
+
+def comments_fingerprint(items: list[dict[str, str | None]]) -> str:
+    """Fingerprint of a normalized ``[{id, updated_at}]`` comment-set list."""
+
+    return fingerprint(items)
+
+
+def relationships_fingerprint(compact: Mapping[str, Any]) -> str:
+    """Fingerprint of a compact relationship projection (order-independent)."""
+
+    return fingerprint(_canonical_relationships(compact))
+
+
+def _canonical_relationships(compact: Mapping[str, Any]) -> dict[str, Any]:
+    canonical: dict[str, Any] = {}
+    for key, value in compact.items():
+        if isinstance(value, list):
+            canonical[key] = sorted(str(item) for item in value)
+        else:
+            canonical[key] = str(value)
+    return canonical
 
 
 class WorkflowCacheError(RuntimeError):
@@ -73,18 +124,16 @@ class PendingIssueRelationshipOperation:
 
 @dataclass(frozen=True)
 class FreshnessMetadata:
-    """Local cache freshness metadata for one write-back target."""
+    """Local cache fingerprint for one write-back target."""
 
-    updated_at: str | None
-    fetched_at: str | None
+    fingerprint: str | None
     path: Path | None = None
     target: str = "artifact"
 
     def to_json(self) -> dict[str, str | None]:
         result: dict[str, str | None] = {
             "target": self.target,
-            "updated_at": self.updated_at,
-            "fetched_at": self.fetched_at,
+            "fingerprint": self.fingerprint,
         }
         if self.path is not None:
             result["path"] = str(self.path)
@@ -93,15 +142,14 @@ class FreshnessMetadata:
 
 @dataclass(frozen=True)
 class FreshnessCheckResult:
-    """Result of comparing local cache metadata with provider state."""
+    """Result of comparing the cached fingerprint with current provider state."""
 
     ok: bool
     status: str
     message: str
     artifact: str
-    updated_at: str | None = None
-    fetched_at: str | None = None
-    provider_updated_at: str | None = None
+    cached_fingerprint: str | None = None
+    provider_fingerprint: str | None = None
 
     def to_json(self) -> dict[str, Any]:
         return {
@@ -109,114 +157,98 @@ class FreshnessCheckResult:
             "status": self.status,
             "message": self.message,
             "artifact": self.artifact,
-            "updated_at": self.updated_at,
-            "fetched_at": self.fetched_at,
-            "provider_updated_at": self.provider_updated_at,
+            "cached_fingerprint": self.cached_fingerprint,
+            "provider_fingerprint": self.provider_fingerprint,
         }
 
 
 def check_provider_freshness(
     metadata: FreshnessMetadata | None,
     *,
-    provider_updated_at: str | None,
+    provider_fingerprint: str | None,
     artifact: str,
     pending_new: bool = False,
 ) -> FreshnessCheckResult:
-    """Compare local cache metadata with the current provider timestamp."""
+    """Compare the cached fingerprint with the current provider fingerprint.
+
+    A mismatch is reported as a ``conflict`` (the provider changed since the
+    artifact was last fetched), not a hard error: callers refresh the cache,
+    guide the operator to reread it, and offer an explicit overwrite. The
+    fingerprint is provider-clock-independent, so there is no skew or precision
+    false positive to defend against.
+    """
 
     if pending_new:
         return FreshnessCheckResult(
             ok=True,
             status="pending_new",
-            message=f"{artifact} is pending creation; no provider freshness check is required.",
+            message=f"{artifact} is pending creation; no provider conflict check is required.",
             artifact=artifact,
-            provider_updated_at=provider_updated_at,
+            provider_fingerprint=provider_fingerprint,
         )
 
-    if metadata is None or not metadata.updated_at or not metadata.fetched_at:
+    if metadata is None or not metadata.fingerprint:
         return FreshnessCheckResult(
             ok=False,
-            status="missing_metadata",
+            status="missing_fingerprint",
             message=(
-                f"Cannot safely write {artifact}: cache freshness metadata is missing. "
-                "Refresh the provider cache before writing."
+                f"Cannot safely write {artifact}: no cached fingerprint to compare against. "
+                "Fetch the issue before writing."
             ),
             artifact=artifact,
-            updated_at=metadata.updated_at if metadata else None,
-            fetched_at=metadata.fetched_at if metadata else None,
-            provider_updated_at=provider_updated_at,
+            cached_fingerprint=metadata.fingerprint if metadata else None,
+            provider_fingerprint=provider_fingerprint,
         )
 
-    source_dt = _parse_freshness_timestamp(metadata.updated_at)
-    fetched_dt = _parse_freshness_timestamp(metadata.fetched_at)
-    if source_dt is None or fetched_dt is None:
-        return FreshnessCheckResult(
-            ok=False,
-            status="invalid_metadata",
-            message=(
-                f"Cannot safely write {artifact}: cache freshness timestamps are invalid. "
-                "Refresh the provider cache before writing."
-            ),
-            artifact=artifact,
-            updated_at=metadata.updated_at,
-            fetched_at=metadata.fetched_at,
-            provider_updated_at=provider_updated_at,
-        )
-
-    provider_dt = _parse_freshness_timestamp(provider_updated_at)
-    if provider_dt is None:
+    if provider_fingerprint is None:
         return FreshnessCheckResult(
             ok=True,
-            status="provider_timestamp_unavailable",
+            status="provider_fingerprint_unavailable",
             message=(
-                f"{artifact} provider timestamp is unavailable; no stale-cache conflict "
+                f"{artifact} provider fingerprint is unavailable; no overwrite conflict "
                 "could be detected."
             ),
             artifact=artifact,
-            updated_at=metadata.updated_at,
-            fetched_at=metadata.fetched_at,
-            provider_updated_at=provider_updated_at,
+            cached_fingerprint=metadata.fingerprint,
+            provider_fingerprint=None,
         )
 
-    if provider_dt > fetched_dt or provider_dt > source_dt:
+    if metadata.fingerprint != provider_fingerprint:
         return FreshnessCheckResult(
             ok=False,
-            status="stale",
+            status="conflict",
             message=(
-                f"Stale workflow cache for {artifact}: provider timestamp "
-                f"{provider_updated_at} is newer than cached updated_at "
-                f"{metadata.updated_at} or fetched_at {metadata.fetched_at}. "
-                "Refresh the provider cache before writing."
+                f"{artifact} changed on the provider since it was last fetched "
+                f"(cached {metadata.fingerprint}, provider {provider_fingerprint}). "
+                "The cache was refreshed — reread it and reapply, or pass --overwrite to replace it."
             ),
             artifact=artifact,
-            updated_at=metadata.updated_at,
-            fetched_at=metadata.fetched_at,
-            provider_updated_at=provider_updated_at,
+            cached_fingerprint=metadata.fingerprint,
+            provider_fingerprint=provider_fingerprint,
         )
 
     return FreshnessCheckResult(
         ok=True,
         status="fresh",
-        message=f"{artifact} cache is fresh enough for write-back.",
+        message=f"{artifact} cache matches the provider; safe to write.",
         artifact=artifact,
-        updated_at=metadata.updated_at,
-        fetched_at=metadata.fetched_at,
-        provider_updated_at=provider_updated_at,
+        cached_fingerprint=metadata.fingerprint,
+        provider_fingerprint=provider_fingerprint,
     )
 
 
 def require_provider_freshness(
     metadata: FreshnessMetadata | None,
     *,
-    provider_updated_at: str | None,
+    provider_fingerprint: str | None,
     artifact: str,
     pending_new: bool = False,
 ) -> FreshnessCheckResult:
-    """Return freshness status or raise when a write-back should be blocked."""
+    """Return the freshness result or raise when a write-back conflicts."""
 
     result = check_provider_freshness(
         metadata,
-        provider_updated_at=provider_updated_at,
+        provider_fingerprint=provider_fingerprint,
         artifact=artifact,
         pending_new=pending_new,
     )
@@ -720,17 +752,18 @@ def _normalize_freshness_target(target: str) -> str:
     return aliases.get(normalized, normalized)
 
 
-def _parse_freshness_timestamp(value: str | None) -> datetime | None:
-    text = _normalize_optional(value)
-    if text is None:
-        return None
+def _dump_json(data: Mapping[str, Any]) -> str:
+    return json.dumps(dict(data), indent=2, sort_keys=False, ensure_ascii=False) + "\n"
+
+
+def _read_json_mapping(path: Path) -> dict[str, Any]:
     try:
-        parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
-    except ValueError:
-        return None
-    if parsed.tzinfo is None:
-        return parsed.replace(tzinfo=UTC)
-    return parsed.astimezone(UTC)
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        raise WorkflowCacheCorrupt(f"could not parse JSON: {path}: {exc}") from exc
+    if not isinstance(value, dict):
+        raise WorkflowCacheCorrupt(f"JSON must be a mapping: {path}")
+    return value
 
 
 def _read_yaml_mapping(path: Path) -> dict[str, Any]:

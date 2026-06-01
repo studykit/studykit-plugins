@@ -40,7 +40,15 @@ from workflow_github import (
     resolve_github_repository,
     view_issue,
 )
-from issue.github.cache import GitHubIssueCache
+from issue.github.cache import (
+    GitHubIssueCache,
+    _comment_fingerprint_items,
+    _compact_relationships_for_frontmatter,
+    _relationships_from_issue,
+    comments_fingerprint,
+    content_fingerprint,
+    relationships_fingerprint,
+)
 from workflow_providers import (
     CACHE_POLICY_BYPASS,
     CACHE_POLICY_DEFAULT,
@@ -51,7 +59,6 @@ from workflow_providers import (
     ProviderRequest,
     _close_reason_from_state_reason,
     _freshness_spec,
-    _latest_provider_comment_timestamp,
     _optional_string,
     _optional_workflow_config,
     _payload_has_relationship_projection,
@@ -235,7 +242,7 @@ class GitHubIssueNativeProvider(IssueProvider):
         try:
             self._require_write_freshness(request, issue_number, default_target="issue")
         except ProviderFreshnessError as exc:
-            return self._stale_cache_block_payload(
+            return self._conflict_payload(
                 request=request,
                 repo=repo,
                 cache=cache,
@@ -289,15 +296,33 @@ class GitHubIssueNativeProvider(IssueProvider):
                 runner=self.runner,
             )
 
-        refreshed = view_issue(issue_number, project=request.context.project, runner=self.runner)
-        write_result = cache.write_issue_bundle(
-            repo,
-            self._payload_with_relationship_projection(
-                request,
-                issue=issue_number,
-                payload=refreshed,
-            ),
+        metadata_changed = (
+            label_set is not None
+            or bool(label_add)
+            or bool(label_remove)
+            or assignee is not None
+            or unassign
+            or normalized_state is not None
         )
+        if body is not None and not metadata_changed:
+            # GitHub stores the body verbatim, so reuse the body we just wrote
+            # as the cache projection instead of paying for a re-fetch.
+            write_result = cache.promote_body(
+                repo,
+                issue_number,
+                title=str(title) if title is not None else None,
+                body=str(body),
+            )
+        else:
+            refreshed = view_issue(issue_number, project=request.context.project, runner=self.runner)
+            write_result = cache.write_issue_bundle(
+                repo,
+                self._payload_with_relationship_projection(
+                    request,
+                    issue=issue_number,
+                    payload=refreshed,
+                ),
+            )
         return {
             "operation": "update_issue",
             "issue": issue_number,
@@ -337,7 +362,7 @@ class GitHubIssueNativeProvider(IssueProvider):
                     default_target=target,
                 )
             except ProviderFreshnessError as exc:
-                return self._stale_cache_block_payload(
+                return self._conflict_payload(
                     request=request,
                     repo=repo,
                     cache=cache,
@@ -546,7 +571,7 @@ class GitHubIssueNativeProvider(IssueProvider):
             ),
         )
 
-    def _stale_cache_block_payload(
+    def _conflict_payload(
         self,
         *,
         request: ProviderRequest,
@@ -561,16 +586,18 @@ class GitHubIssueNativeProvider(IssueProvider):
         payload: dict[str, Any] = {
             "operation": operation,
             "issue": issue_number,
-            "status": "blocked",
-            "reason": "stale_cache",
+            "status": "conflict",
+            "reason": "provider_changed",
             "message": (
-                f"{operation} blocked because GitHub issue #{issue_number} {target} changed on the provider. "
-                "The cache was refreshed; reread the listed paths before retrying."
+                f"{operation} stopped: GitHub issue #{issue_number} {target} changed on the "
+                "provider since it was last fetched. The cache was refreshed — reread the listed "
+                "paths and reapply your change, or retry with --overwrite to replace the provider copy."
             ),
             "target": target,
-            "freshness": error.to_json(),
+            "conflict": error.to_json(),
             "reread_required": True,
             "reread_paths": self._reread_paths(cache, repo, issue_number, target=target),
+            "overwrite_hint": "--overwrite",
         }
         if pending_files is not None:
             payload["pending_files"] = pending_files
@@ -592,9 +619,12 @@ class GitHubIssueNativeProvider(IssueProvider):
         *,
         target: str,
     ) -> list[str]:
-        paths: list[Path] = [cache.issue_file(repo, issue_number)]
-        if target == "comments":
-            paths.extend(cache.comment_files(repo, issue_number))
+        if target == "relationships":
+            paths: list[Path] = [cache.relationships_file(repo, issue_number)]
+        elif target == "comments":
+            paths = [cache.issue_file(repo, issue_number), *cache.comment_files(repo, issue_number)]
+        else:
+            paths = [cache.issue_file(repo, issue_number)]
         return [str(path) for index, path in enumerate(paths) if path not in paths[:index]]
 
     def _validate_relationship_operations(self, operations: list[_ResolvedRelationshipOperation]) -> None:
@@ -728,7 +758,7 @@ class GitHubIssueNativeProvider(IssueProvider):
                 default_target="issue",
             )
         except ProviderFreshnessError as exc:
-            return self._stale_cache_block_payload(
+            return self._conflict_payload(
                 request=request,
                 repo=repo,
                 cache=cache,
@@ -767,7 +797,7 @@ class GitHubIssueNativeProvider(IssueProvider):
                 default_target="issue",
             )
         except ProviderFreshnessError as exc:
-            return self._stale_cache_block_payload(
+            return self._conflict_payload(
                 request=request,
                 repo=repo,
                 cache=cache,
@@ -833,6 +863,8 @@ class GitHubIssueNativeProvider(IssueProvider):
         *,
         default_target: str,
     ) -> None:
+        if _truthy(request.payload.get("overwrite")):
+            return
         spec = _freshness_spec(request.payload, default_target=default_target)
         if spec is None:
             return
@@ -842,7 +874,7 @@ class GitHubIssueNativeProvider(IssueProvider):
         if spec["pending_new"]:
             require_provider_freshness(
                 None,
-                provider_updated_at=None,
+                provider_fingerprint=None,
                 artifact=artifact,
                 pending_new=True,
             )
@@ -855,13 +887,12 @@ class GitHubIssueNativeProvider(IssueProvider):
             metadata = cache.read_freshness_metadata(repo, issue_number, target=spec["target"])
         except WorkflowCacheError:
             metadata = FreshnessMetadata(
-                updated_at=None,
-                fetched_at=None,
+                fingerprint=None,
                 path=cache.freshness_file(repo, issue_number, spec["target"]),
                 target=spec["target"],
             )
 
-        provider_updated_at = self._provider_freshness_timestamp(
+        provider_fingerprint = self._provider_fingerprint(
             issue_number,
             request=request,
             target=spec["target"],
@@ -869,31 +900,47 @@ class GitHubIssueNativeProvider(IssueProvider):
         try:
             require_provider_freshness(
                 metadata,
-                provider_updated_at=provider_updated_at,
+                provider_fingerprint=provider_fingerprint,
                 artifact=artifact,
             )
         except WorkflowFreshnessConflict as exc:
             raise ProviderFreshnessError(str(exc), result=exc.result) from exc
 
-    def _provider_freshness_timestamp(
+    def _provider_fingerprint(
         self,
         issue: str,
         *,
         request: ProviderRequest,
         target: str,
     ) -> str | None:
-        fields = ("number", "updatedAt")
-        if target == "comments":
-            fields = ("number", "updatedAt", "comments")
+        """Recompute the provider's current fingerprint for one freshness target.
 
+        Routes through the same cache builders used at write time, so an
+        unchanged artifact always produces an identical fingerprint.
+        """
+
+        if target == "comments":
+            payload = view_issue(
+                issue,
+                project=request.context.project,
+                fields=("number", "comments"),
+                runner=self.runner,
+            )
+            return comments_fingerprint(_comment_fingerprint_items(payload))
+        if target == "relationships":
+            relationships = issue_relationships(
+                issue,
+                project=request.context.project,
+                runner=self.runner,
+            )
+            compact = _compact_relationships_for_frontmatter(
+                _relationships_from_issue(relationships)
+            )
+            return relationships_fingerprint(compact)
         payload = view_issue(
             issue,
             project=request.context.project,
-            fields=fields,
+            fields=("number", "title", "body"),
             runner=self.runner,
         )
-        if target == "comments":
-            return _latest_provider_comment_timestamp(payload.get("comments")) or _optional_string(
-                payload.get("updatedAt")
-            )
-        return _optional_string(payload.get("updatedAt"))
+        return content_fingerprint(payload.get("title"), payload.get("body"))
