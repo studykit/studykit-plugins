@@ -6,7 +6,7 @@
 
 <runbook>
 
-Per-verb syntax (flags, body-file lifecycle, freshness-drift handling)
+Per-verb syntax (flags, body-file lifecycle, conflict handling)
 lives in the runbook at
 `{{WORKFLOW_RUNBOOK_DIR}}/<intent>/{{WORKFLOW_ISSUE_PROVIDER}}.md`:
 

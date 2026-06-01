@@ -312,14 +312,15 @@ class GitHubAppendCommentRunner:
     def __init__(
         self,
         *,
-        provider_issue_updated_at: str = "2026-05-14T00:00:00Z",
-        provider_comments_updated_at: str = "2026-05-14T00:00:00Z",
+        conflict_target: str | None = None,
         state_after: str = "OPEN",
         state_reason_after: object = None,
     ) -> None:
         self.requests: list[CommandRequest] = []
-        self.provider_issue_updated_at = provider_issue_updated_at
-        self.provider_comments_updated_at = provider_comments_updated_at
+        # ``conflict_target`` ("issue" or "comments") makes the matching
+        # provider fingerprint diverge from the seeded cache, which drives the
+        # freshness conflict path. ``None`` keeps every target fresh.
+        self.conflict_target = conflict_target
         self.state_after = state_after
         self.state_reason_after = state_reason_after
         self.posted_bodies: list[str] = []
@@ -333,23 +334,34 @@ class GitHubAppendCommentRunner:
                 returncode=0,
                 stdout="git@github.com:studykit/studykit-plugins.git\n",
             )
-        if request.args == _gh_issue_view_args(72, "number,updatedAt"):
-            return CommandResult(
-                request=request,
-                returncode=0,
-                stdout=json.dumps({"number": 72, "updatedAt": self.provider_issue_updated_at}),
-            )
-        if request.args == _gh_issue_view_args(72, "number,updatedAt,comments"):
+        if request.args == _gh_issue_view_args(72, "number,title,body"):
+            body = "Provider-changed body." if self.conflict_target == "issue" else "Cached body."
             return CommandResult(
                 request=request,
                 returncode=0,
                 stdout=json.dumps(
-                    {
-                        "number": 72,
-                        "updatedAt": self.provider_comments_updated_at,
-                        "comments": [],
-                    }
+                    {"number": 72, "title": "Issue with appended comment", "body": body}
                 ),
+            )
+        if request.args == _gh_issue_view_args(72, "number,comments"):
+            comments = (
+                [
+                    {
+                        "id": "IC_provider_only",
+                        "url": "https://github.com/studykit/studykit-plugins/issues/72#issuecomment-9900001",
+                        "author": {"login": "studykit"},
+                        "body": "Provider-side comment.\n",
+                        "createdAt": "2026-05-14T00:05:00Z",
+                        "updatedAt": "2026-05-14T00:05:00Z",
+                    }
+                ]
+                if self.conflict_target == "comments"
+                else []
+            )
+            return CommandResult(
+                request=request,
+                returncode=0,
+                stdout=json.dumps({"number": 72, "comments": comments}),
             )
         if request.args[:3] == ("gh", "issue", "comment"):
             body_file = Path(request.args[request.args.index("--body-file") + 1])
@@ -539,7 +551,7 @@ def test_github_append_preserves_body_file_on_freshness_block(tmp_path: Path) ->
     _write_config(tmp_path)
     _seed_cached_issue(tmp_path)
     body_file = _write_body_file(tmp_path, "Comment body.\n", name="comment.md")
-    runner = GitHubAppendCommentRunner(provider_issue_updated_at="2026-05-15T00:00:00Z")
+    runner = GitHubAppendCommentRunner(conflict_target="issue")
     stdout = io.StringIO()
 
     code = github_issue_comments_main(
@@ -560,9 +572,10 @@ def test_github_append_preserves_body_file_on_freshness_block(tmp_path: Path) ->
 
     payload = json.loads(stdout.getvalue())
     assert code == 3
-    assert payload["status"] == "blocked"
-    assert payload["reason"] == "stale_cache"
+    assert payload["status"] == "conflict"
+    assert payload["reason"] == "provider_changed"
     assert payload["reread_required"] is True
+    assert all(not path.endswith("/.meta.json") for path in payload["reread_paths"])
     assert payload["body_file_removed"] is False
     assert payload["body_file"] == str(body_file)
     assert body_file.exists()
@@ -612,13 +625,15 @@ class GitHubUpdateIssueRunner:
     def __init__(
         self,
         *,
-        provider_issue_updated_at: str = "2026-05-14T00:00:00Z",
+        conflict: bool = False,
         state_after: str = "OPEN",
         state_reason_after: object = None,
         labels_after: tuple[str, ...] = ("task",),
     ) -> None:
         self.requests: list[CommandRequest] = []
-        self.provider_issue_updated_at = provider_issue_updated_at
+        # ``conflict=True`` returns provider content that diverges from the
+        # seeded cache fingerprint, driving the freshness conflict path.
+        self.conflict = conflict
         self.state_after = state_after
         self.state_reason_after = state_reason_after
         self.labels_after = labels_after
@@ -635,11 +650,14 @@ class GitHubUpdateIssueRunner:
                 returncode=0,
                 stdout="git@github.com:studykit/studykit-plugins.git\n",
             )
-        if request.args == _gh_issue_view_args(72, "number,updatedAt"):
+        if request.args == _gh_issue_view_args(72, "number,title,body"):
+            body = "Provider-changed body." if self.conflict else "Cached body."
             return CommandResult(
                 request=request,
                 returncode=0,
-                stdout=json.dumps({"number": 72, "updatedAt": self.provider_issue_updated_at}),
+                stdout=json.dumps(
+                    {"number": 72, "title": "Issue with appended comment", "body": body}
+                ),
             )
         if request.args == _gh_issue_view_args(72, "number,labels"):
             return CommandResult(
@@ -842,7 +860,7 @@ def test_github_update_preserves_body_file_on_freshness_block(tmp_path: Path) ->
     _write_config(tmp_path)
     _seed_cached_issue(tmp_path)
     body_file = _write_body_file(tmp_path, "Updated body.\n", name="update.md")
-    runner = GitHubUpdateIssueRunner(provider_issue_updated_at="2026-05-15T00:00:00Z")
+    runner = GitHubUpdateIssueRunner(conflict=True)
     stdout = io.StringIO()
 
     code = github_issue_writeback_main(
@@ -861,9 +879,10 @@ def test_github_update_preserves_body_file_on_freshness_block(tmp_path: Path) ->
 
     payload = json.loads(stdout.getvalue())
     assert code == 3
-    assert payload["status"] == "blocked"
-    assert payload["reason"] == "stale_cache"
+    assert payload["status"] == "conflict"
+    assert payload["reason"] == "provider_changed"
     assert payload["reread_required"] is True
+    assert all(not path.endswith("/.meta.json") for path in payload["reread_paths"])
     assert payload["body_file_removed"] is False
     assert payload["body_file"] == str(body_file)
     assert body_file.exists()

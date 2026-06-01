@@ -34,6 +34,7 @@ from mustread import authoring_relative_path  # noqa: E402
 from workflow_hook import (  # noqa: E402
     EditTarget,
     block_provider_cache_body_write,
+    block_provider_cache_meta_read,
     build_session_start_context,
     build_subagent_start_context,
     inject_prompt_issue_context,
@@ -457,6 +458,12 @@ def pre_tool_use(
 ) -> int:
     """Handle a Claude ``PreToolUse`` hook invocation."""
 
+    if event_payload.tool_name == "Read":
+        return block_provider_cache_meta_read(
+            project_dir=_project_dir(),
+            path=_read_target(event_payload.tool_input),
+            stdout=stdout,
+        )
     return pre_write(event_payload, stdout=stdout)
 
 

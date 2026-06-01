@@ -16,8 +16,10 @@ if str(_SCRIPTS_DIR) not in sys.path:
 from workflow_cache import (  # noqa: E402
     FreshnessMetadata,
     WorkflowFreshnessConflict,
-    _utc_now,
     check_provider_freshness,
+    comments_fingerprint,
+    content_fingerprint,
+    relationships_fingerprint,
     require_provider_freshness,
 )
 
@@ -26,13 +28,10 @@ def test_gitignore_excludes_workflow_cache_root() -> None:
     assert ".workflow-cache/" in (_REPO_ROOT / ".gitignore").read_text(encoding="utf-8")
 
 
-def test_provider_freshness_allows_clean_cache_metadata() -> None:
+def test_provider_freshness_allows_matching_fingerprint() -> None:
     result = require_provider_freshness(
-        FreshnessMetadata(
-            updated_at="2026-05-13T12:00:00Z",
-            fetched_at="2026-05-13T12:34:56Z",
-        ),
-        provider_updated_at="2026-05-13T12:00:00Z",
+        FreshnessMetadata(fingerprint="abc12345", target="issue"),
+        provider_fingerprint="abc12345",
         artifact="GitHub issue #39 issue",
     )
 
@@ -40,50 +39,47 @@ def test_provider_freshness_allows_clean_cache_metadata() -> None:
     assert result.status == "fresh"
 
 
-def test_provider_freshness_blocks_stale_provider_timestamp() -> None:
+def test_provider_freshness_conflicts_on_fingerprint_mismatch() -> None:
     with pytest.raises(WorkflowFreshnessConflict) as excinfo:
         require_provider_freshness(
-            FreshnessMetadata(
-                updated_at="2026-05-13T12:00:00Z",
-                fetched_at="2026-05-13T12:34:56Z",
-            ),
-            provider_updated_at="2026-05-13T13:00:00Z",
+            FreshnessMetadata(fingerprint="abc12345", target="issue"),
+            provider_fingerprint="def67890",
             artifact="GitHub issue #39 issue",
         )
 
-    assert excinfo.value.result.status == "stale"
-    assert "Refresh the provider cache before writing" in str(excinfo.value)
+    result = excinfo.value.result
+    assert result.status == "conflict"
+    assert result.cached_fingerprint == "abc12345"
+    assert result.provider_fingerprint == "def67890"
+    assert "changed on the provider" in str(excinfo.value)
 
 
-def test_provider_freshness_blocks_missing_local_metadata() -> None:
+def test_provider_freshness_blocks_missing_cached_fingerprint() -> None:
     result = check_provider_freshness(
-        FreshnessMetadata(updated_at=None, fetched_at="2026-05-13T12:34:56Z"),
-        provider_updated_at="2026-05-13T12:00:00Z",
+        FreshnessMetadata(fingerprint=None, target="issue"),
+        provider_fingerprint="abc12345",
         artifact="GitHub issue #39 issue",
     )
 
     assert result.ok is False
-    assert result.status == "missing_metadata"
+    assert result.status == "missing_fingerprint"
 
 
-def test_provider_freshness_allows_missing_provider_timestamp() -> None:
+def test_provider_freshness_allows_missing_provider_fingerprint() -> None:
     result = require_provider_freshness(
-        FreshnessMetadata(
-            updated_at="2026-05-13T12:00:00Z",
-            fetched_at="2026-05-13T12:34:56Z",
-        ),
-        provider_updated_at=None,
+        FreshnessMetadata(fingerprint="abc12345", target="issue"),
+        provider_fingerprint=None,
         artifact="GitHub issue #39 issue",
     )
 
     assert result.ok is True
-    assert result.status == "provider_timestamp_unavailable"
+    assert result.status == "provider_fingerprint_unavailable"
 
 
 def test_provider_freshness_skips_pending_new_artifact() -> None:
     result = require_provider_freshness(
         None,
-        provider_updated_at=None,
+        provider_fingerprint=None,
         artifact="GitHub issue pending creation",
         pending_new=True,
     )
@@ -92,36 +88,34 @@ def test_provider_freshness_skips_pending_new_artifact() -> None:
     assert result.status == "pending_new"
 
 
-def test_utc_now_preserves_subsecond_precision() -> None:
-    """Regression: `_utc_now()` must keep sub-second precision so cache
-    `fetched_at` is comparable to provider timestamps that carry milliseconds.
-    Truncating to whole seconds previously caused a false stale-cache flip
-    on in-flight publish when provider and cache referred to the same instant
-    (see issue #97)."""
+def test_content_fingerprint_is_deterministic_and_content_sensitive() -> None:
+    """The fingerprint is provider-clock-independent: identical title+body
+    always hash the same, and any change flips the value. This replaces the
+    issue #97 timestamp-precision regression, which no longer applies."""
 
-    stamp = _utc_now()
+    base = content_fingerprint("Title", "Body")
 
-    assert stamp.endswith("Z")
-    # ISO-8601 fractional component after the seconds field is the signal that
-    # microsecond/millisecond precision survived.
-    seconds_segment = stamp.split("T", 1)[1][: -1]
-    assert "." in seconds_segment, stamp
+    assert base == content_fingerprint("Title", "Body")
+    assert base != content_fingerprint("Title", "Body changed")
+    assert base != content_fingerprint("Title changed", "Body")
 
 
-def test_provider_freshness_allows_subsecond_precision_match() -> None:
-    """Regression for issue #97: in-flight publish writes the cache and then
-    re-asks the provider for the same instant. The provider returns a
-    timestamp with milliseconds; `fetched_at` must keep enough precision that
-    the strict `>` comparison does not flip on a truncation boundary."""
+def test_relationships_fingerprint_is_order_independent() -> None:
+    """Per-target relationship fingerprints normalize list order so a
+    reordered provider projection never produces a spurious conflict."""
 
-    result = require_provider_freshness(
-        FreshnessMetadata(
-            updated_at="2026-05-19T09:44:23.314000+00:00",
-            fetched_at="2026-05-19T09:44:23.314000+00:00",
-        ),
-        provider_updated_at="2026-05-19T18:44:23.314+0900",
-        artifact="Jira issue TEST-1 relationships",
+    assert relationships_fingerprint(
+        {"blocked_by": [1, 2, 3], "parent": 9}
+    ) == relationships_fingerprint({"parent": 9, "blocked_by": [3, 1, 2]})
+
+
+def test_comments_fingerprint_tracks_identity_and_revision() -> None:
+    items = [{"id": "1", "updated_at": "2026-05-14T00:00:00Z"}]
+
+    assert comments_fingerprint(items) == comments_fingerprint(
+        [{"id": "1", "updated_at": "2026-05-14T00:00:00Z"}]
     )
-
-    assert result.ok is True
-    assert result.status == "fresh"
+    assert comments_fingerprint(items) != comments_fingerprint(
+        [{"id": "1", "updated_at": "2026-05-14T00:09:00Z"}]
+    )
+    assert comments_fingerprint([]) != comments_fingerprint(items)

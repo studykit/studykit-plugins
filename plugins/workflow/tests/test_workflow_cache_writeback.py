@@ -288,8 +288,9 @@ def test_jira_update_preserves_body_file_on_freshness_block(tmp_path: Path) -> N
 
     payload = json.loads(stdout.getvalue())
     assert code == 3
-    assert payload["status"] == "blocked"
-    assert payload["reason"] == "stale_cache"
+    assert payload["status"] == "conflict"
+    assert payload["reason"] == "provider_changed"
+    assert all(not path.endswith("/.meta.json") for path in payload["reread_paths"])
     assert payload["body_file_removed"] is False
     assert payload["body_file"] == str(body_file)
     assert body_file.exists()

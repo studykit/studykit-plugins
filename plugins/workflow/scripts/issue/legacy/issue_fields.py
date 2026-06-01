@@ -4,12 +4,11 @@
 # ///
 """Issue body-less field mutation dispatcher.
 
-Loads ``.workflow/config.yml`` and dispatches to the backend driver
-matching ``providers.issues.kind`` (``github`` or ``jira``). ``--help``
-reflects the active backend's option surface; backend-exclusive
+Dispatches to the active issue backend (``github`` or ``jira``).
+``--help`` reflects that backend's option surface; backend-exclusive
 subcommands from the other provider are hidden. Jira's lifecycle
-subcommands are discovered dynamically from
-``providers.issues.state_transitions`` and only appear when configured.
+subcommands are listed below and appear only when the project
+configures them.
 """
 
 from __future__ import annotations

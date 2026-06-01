@@ -118,7 +118,13 @@ def _seed_cache(project: Path, *, labels: list[str] | None = None) -> GitHubIssu
 
 
 def _freshness_args() -> tuple[str, ...]:
-    return gh_issue_view_args(39, "number,updatedAt")
+    return gh_issue_view_args(39, "number,title,body")
+
+
+# Provider content matching the seeded cache — keeps the content fingerprint fresh.
+_FRESH_CONTENT = {"number": 39, "title": "Cached title", "body": "Cached body."}
+# Diverged content drives the freshness conflict path.
+_CONFLICT_CONTENT = {"number": 39, "title": "Cached title", "body": "Provider changed body."}
 
 
 def _refresh_args() -> tuple[str, ...]:
@@ -160,7 +166,7 @@ def test_set_type_preserves_non_type_labels_and_swaps_type_label(tmp_path: Path)
     )
     refreshed = issue_payload(labels=["bug", "workflow"])
     responses = {
-        _freshness_args(): result(_freshness_args(), stdout=json.dumps({"number": 39, "updatedAt": "2026-05-13T12:00:00Z"})),
+        _freshness_args(): result(_freshness_args(), stdout=json.dumps(_FRESH_CONTENT)),
         gh_issue_view_args(39, "number,labels"): result(
             gh_issue_view_args(39, "number,labels"),
             stdout=json.dumps({"number": 39, "labels": [{"name": "task"}, {"name": "workflow"}]}),
@@ -206,7 +212,7 @@ def test_assign_me_resolves_via_gh_api_user(tmp_path: Path) -> None:
     )
     responses = {
         me_args: result(me_args, stdout="studykit-bot\n"),
-        _freshness_args(): result(_freshness_args(), stdout=json.dumps({"number": 39, "updatedAt": "2026-05-13T12:00:00Z"})),
+        _freshness_args(): result(_freshness_args(), stdout=json.dumps(_FRESH_CONTENT)),
         edit_args: result(edit_args),
         gh_issue_view_args(39, "title,labels"): result(
             gh_issue_view_args(39, "title,labels"),
@@ -249,7 +255,7 @@ def test_unassign_clears_all_current_assignees(tmp_path: Path) -> None:
         "bob",
     )
     responses = {
-        _freshness_args(): result(_freshness_args(), stdout=json.dumps({"number": 39, "updatedAt": "2026-05-13T12:00:00Z"})),
+        _freshness_args(): result(_freshness_args(), stdout=json.dumps(_FRESH_CONTENT)),
         assignees_args: result(
             assignees_args,
             stdout=json.dumps({"assignees": [{"login": "alice"}, {"login": "bob"}]}),
@@ -316,10 +322,7 @@ def test_close_returns_flat_envelope(tmp_path: Path) -> None:
     refreshed["state"] = "CLOSED"
     refreshed["stateReason"] = "COMPLETED"
     responses = {
-        _freshness_args(): result(
-            _freshness_args(),
-            stdout=json.dumps({"number": 39, "updatedAt": "2026-05-13T12:00:00Z"}),
-        ),
+        _freshness_args(): result(_freshness_args(), stdout=json.dumps(_FRESH_CONTENT)),
         _close_args(): result(_close_args()),
         _verify_state_args(): result(
             _verify_state_args(),
@@ -353,10 +356,7 @@ def test_reopen_returns_flat_envelope(tmp_path: Path) -> None:
     cache.write_issue_bundle(repo(), closed, fetched_at="2026-05-13T12:34:56Z")
     refreshed = issue_payload()
     responses = {
-        _freshness_args(): result(
-            _freshness_args(),
-            stdout=json.dumps({"number": 39, "updatedAt": "2026-05-13T12:00:00Z"}),
-        ),
+        _freshness_args(): result(_freshness_args(), stdout=json.dumps(_FRESH_CONTENT)),
         _reopen_args(): result(_reopen_args()),
         _verify_state_args(): result(
             _verify_state_args(),
@@ -379,16 +379,12 @@ def test_reopen_returns_flat_envelope(tmp_path: Path) -> None:
     assert _reopen_args() in {request.args for request in runner.requests}
 
 
-def test_close_on_stale_cache_returns_blocked_envelope_and_exit_3(tmp_path: Path) -> None:
+def test_close_on_provider_conflict_returns_conflict_envelope_and_exit_3(tmp_path: Path) -> None:
     write_github_config(tmp_path)
     _seed_cache(tmp_path)
-    # Provider reports a newer updated_at than the cached projection.
-    drifted_freshness = result(
-        _freshness_args(),
-        stdout=json.dumps({"number": 39, "updatedAt": "2026-05-13T13:00:00Z"}),
-    )
+    # Provider content diverges from the cached projection's content fingerprint.
+    drifted_freshness = result(_freshness_args(), stdout=json.dumps(_CONFLICT_CONTENT))
     refreshed = issue_payload()
-    refreshed["updatedAt"] = "2026-05-13T13:00:00Z"
     responses = {
         _freshness_args(): drifted_freshness,
         _refresh_args(): result(_refresh_args(), stdout=json.dumps(refreshed)),
@@ -407,9 +403,10 @@ def test_close_on_stale_cache_returns_blocked_envelope_and_exit_3(tmp_path: Path
 
     assert exit_code == 3, stderr.getvalue()
     payload = json.loads(stdout.getvalue())
-    assert payload["status"] == "blocked"
-    assert payload["reason"]
+    assert payload["status"] == "conflict"
+    assert payload["reason"] == "provider_changed"
     assert payload["reread_required"] is True
     assert payload["reread_paths"]
+    assert all(not path.endswith("/.meta.json") for path in payload["reread_paths"])
     # Provider close was not issued because the freshness gate blocked first.
     assert _close_args() not in {request.args for request in runner.requests}

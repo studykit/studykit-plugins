@@ -266,8 +266,7 @@ def test_jira_append_preserves_body_file_on_freshness_block(tmp_path: Path) -> N
     write_jira_config(tmp_path)
     _seed_cached_issue(tmp_path)
     body_file = _write_body_file(tmp_path, "Inline comment body.\n")
-    newer = jira_issue_payload()
-    newer["fields"]["updated"] = "2026-05-15T11:00:00.000+0900"  # type: ignore[index]
+    newer = jira_issue_payload(body="Newer provider body.")
     runner = FakeRunner(
         {
             curl_args(jira_issue_url()): [
@@ -298,7 +297,9 @@ def test_jira_append_preserves_body_file_on_freshness_block(tmp_path: Path) -> N
 
     payload = json.loads(stdout.getvalue())
     assert code == 3
-    assert payload["status"] == "blocked"
+    assert payload["status"] == "conflict"
+    assert payload["reason"] == "provider_changed"
+    assert all(not path.endswith("/.meta.json") for path in payload["reread_paths"])
     assert payload["body_file_removed"] is False
     assert body_file.exists()
     assert all(request.args != curl_write_args() for request in runner.requests)
