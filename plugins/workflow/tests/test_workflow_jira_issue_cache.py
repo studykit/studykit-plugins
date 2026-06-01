@@ -47,7 +47,7 @@ def test_jira_issue_cache_body_path_recognizer_matches_issue_md_and_comments(tmp
     comment = tmp_path / ".workflow-cache" / "issues" / "TEST-1234" / "comment-2026-05-15T093000Z-1.md"
     issue_json = tmp_path / ".workflow-cache" / "issues" / "TEST-1234" / "issue.json"
 
-    relationships_md = tmp_path / ".workflow-cache" / "issues" / "TEST-1234" / "relationships.md"
+    relationships_md = tmp_path / ".workflow-cache" / "issues" / "TEST-1234" / "relation.md"
 
     assert is_jira_issue_cache_body_path(issue_md, tmp_path)
     assert is_jira_issue_cache_body_path(comment, tmp_path)
@@ -122,13 +122,13 @@ def test_jira_write_issue_bundle_response_omits_internal_json_paths(tmp_path: Pa
 
     # The native source JSON (issue.json / remote-links.json) must never be
     # surfaced; the internal .meta.json path may appear (it is dropped before
-    # CLI output). issue.md and relationships.md are the readable projections.
+    # CLI output). issue.md and relation.md are the readable projections.
     assert set(written) == {"issue_dir", "issue_file", "meta_file", "relationships_file"}
-    assert written["relationships_file"].endswith("/relationships.md")
+    assert written["relationships_file"].endswith("/relation.md")
 
 
 def test_jira_write_issue_bundle_renders_relationships_markdown(tmp_path: Path) -> None:
-    # relationships.md is the LLM-readable view; its sections follow Jira's
+    # relation.md is the LLM-readable view; its sections follow Jira's
     # relationship model (parent / unmapped issue links / external links) and
     # need not match GitHub's projection.
     cache = JiraDataCenterIssueCache.for_project(tmp_path)
@@ -170,13 +170,12 @@ def test_jira_write_issue_bundle_renders_relationships_markdown(tmp_path: Path) 
     )
 
     md = cache.relationships_file(site, "TEST-1234").read_text(encoding="utf-8")
-    assert md.startswith("# Relationships — TEST-1234")
-    assert "## Parent" in md
-    assert "TEST-1000" in md
-    assert "## Issue links" in md
-    assert "TEST-2000" in md
-    assert "## External links" in md
-    assert "[Design doc](https://example.test/design)" in md
+    assert md.startswith("# Relation — TEST-1234")
+    # Concise: one line per relationship kind, no per-section headings.
+    assert "- parent: TEST-1000" in md
+    assert "- Blocks: TEST-2000 (outward)" in md
+    assert "- external: [Design doc](https://example.test/design)" in md
+    assert "## " not in md
 
 
 def test_jira_write_issue_bundle_relationships_markdown_empty_when_no_links(tmp_path: Path) -> None:
@@ -190,7 +189,7 @@ def test_jira_write_issue_bundle_relationships_markdown_empty_when_no_links(tmp_
     )
 
     md = cache.relationships_file(site, "TEST-1234").read_text(encoding="utf-8")
-    assert md.startswith("# Relationships — TEST-1234")
+    assert md.startswith("# Relation — TEST-1234")
     assert "_No linked issues._" in md
 
 

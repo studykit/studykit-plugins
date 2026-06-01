@@ -46,7 +46,7 @@ _COMMENT_FILENAME_RE = re.compile(r"^comment-.*\.md$")
 def is_jira_issue_cache_body_path(path: Path, project: Path) -> bool:
     """Return whether ``path`` is a read-only Jira issue content projection.
 
-    Recognizes ``issue.md``, the readable ``relationships.md`` projection, and
+    Recognizes ``issue.md``, the readable ``relation.md`` projection, and
     sibling ``comment-*.md`` files under the Jira issue cache directory layout
     ``<project>/.workflow-cache/issues/<key>/``. The internal ``.meta.json`` is
     matched by :func:`is_jira_issue_cache_meta_path`; the native ``issue.json``
@@ -54,7 +54,7 @@ def is_jira_issue_cache_body_path(path: Path, project: Path) -> bool:
     """
 
     name = path.name
-    if name not in {"issue.md", "relationships.md"} and not _COMMENT_FILENAME_RE.match(name):
+    if name not in {"issue.md", "relation.md"} and not _COMMENT_FILENAME_RE.match(name):
         return False
     return _jira_issue_cache_dir_match(path, project)
 
@@ -103,7 +103,7 @@ class JiraDataCenterIssueCache:
         return self.issue_dir(site, issue_key) / "remote-links.json"
 
     def relationships_file(self, site: JiraDataCenterSite, issue_key: str) -> Path:
-        return self.issue_dir(site, issue_key) / "relationships.md"
+        return self.issue_dir(site, issue_key) / "relation.md"
 
     def has_issue_projection(self, site: JiraDataCenterSite, issue_key: str) -> bool:
         return self.issue_json_file(site, issue_key).is_file()
