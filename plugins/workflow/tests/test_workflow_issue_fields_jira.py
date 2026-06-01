@@ -282,14 +282,14 @@ def test_unassign_sets_fields_assignee_null(tmp_path: Path) -> None:
     assert any('\\"assignee\\":null' in str(request.input_text) for request in write_requests)
 
 
-def test_assign_refreshes_snapshot_frontmatter_with_new_assignee(tmp_path: Path) -> None:
-    """End-to-end: after assign, the refreshed issue.md shows the new assignee.
+def test_assign_refreshes_cache_with_new_assignee(tmp_path: Path) -> None:
+    """End-to-end: after assign, the refreshed cache shows the new assignee.
 
     The writeback's `_refresh_cache` re-fetches the issue after the curl
     write succeeds and replays `write_issue_bundle`, so the second
     `curl_args(jira_issue_url())` response in the queue is what lands in
-    the on-disk snapshot. Returning an assignee-bearing payload there
-    asserts AC4 / AC1 hold without a manual `--cache-policy refresh`.
+    the native issue.json projection. Reading it back surfaces the new
+    assignee without a manual `--cache-policy refresh`.
     """
 
     write_jira_config(tmp_path)
@@ -316,11 +316,8 @@ def test_assign_refreshes_snapshot_frontmatter_with_new_assignee(tmp_path: Path)
     )
 
     cache = JiraDataCenterIssueCache.for_project(tmp_path)
-    issue_md = cache.issue_file(jira_site(tmp_path), "TEST-1234")
-    import frontmatter as frontmatter_lib
-
-    parsed = frontmatter_lib.loads(issue_md.read_text(encoding="utf-8"))
-    assert parsed.metadata["assignee"] == "Alice Anderson"
+    payload = cache.read_issue(jira_site(tmp_path), "TEST-1234")
+    assert payload["assignee"] == {"name": "alice", "displayName": "Alice Anderson"}
 
 
 def test_reopen_uses_configured_reopen_transition(tmp_path: Path) -> None:
@@ -480,12 +477,12 @@ def test_reserved_verbs_work_without_state_transitions(tmp_path: Path) -> None:
     assert any('\\"assignee\\":null' in str(request.input_text) for request in write_requests)
 
 
-def test_unassign_on_stale_cache_returns_blocked_envelope_and_exit_3(tmp_path: Path) -> None:
+def test_unassign_on_provider_conflict_returns_conflict_envelope_and_exit_3(tmp_path: Path) -> None:
     write_jira_config(tmp_path)
     _seed_cache(tmp_path, payload=jira_issue_payload(assignee="alice"))
-    # Provider reports a newer updated than the cached projection's fetched_at.
+    # Provider content (body) diverges from the cached content fingerprint.
     newer = jira_issue_payload(assignee="alice")
-    newer["fields"]["updated"] = "2026-05-15T11:00:00.000+0900"  # type: ignore[index]
+    newer["fields"]["description"] = "Provider changed body."  # type: ignore[index]
     runner = FakeRunner(
         {
             curl_args(jira_issue_url()): [
@@ -510,9 +507,10 @@ def test_unassign_on_stale_cache_returns_blocked_envelope_and_exit_3(tmp_path: P
 
     assert exit_code == 3, stderr.getvalue()
     payload = json.loads(stdout.getvalue())
-    assert payload["status"] == "blocked"
-    assert payload["reason"]
+    assert payload["status"] == "conflict"
+    assert payload["reason"] == "provider_changed"
     assert payload["reread_required"] is True
     assert payload["reread_paths"]
+    assert all(not path.endswith("/.meta.json") for path in payload["reread_paths"])
     # No PUT/POST issued because the freshness gate blocked first.
     assert all(request.args != curl_write_args() for request in runner.requests)

@@ -5,7 +5,6 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-import frontmatter as frontmatter_lib
 import pytest
 
 _PLUGIN_ROOT = Path(__file__).resolve().parent.parent
@@ -19,6 +18,7 @@ from issue.jira.cache import (  # noqa: E402
     _comment_author_name,
     is_jira_issue_cache_body_path,
 )
+from issue.jira.snapshot import _jira_person_display_name  # noqa: E402
 
 
 def jira_site() -> JiraDataCenterSite:
@@ -67,7 +67,7 @@ def test_jira_issue_cache_paths_are_provider_specific(tmp_path: Path) -> None:
     assert cache.issue_file(site, "TEST-1234").name == "issue.md"
 
 
-def test_jira_issue_frontmatter_records_native_state(tmp_path: Path) -> None:
+def test_jira_read_issue_records_native_state(tmp_path: Path) -> None:
     cache = JiraDataCenterIssueCache.for_project(tmp_path)
     site = jira_site()
 
@@ -77,11 +77,10 @@ def test_jira_issue_frontmatter_records_native_state(tmp_path: Path) -> None:
         fetched_at="2026-05-15T10:00:00.000+0900",
     )
 
-    parsed = frontmatter_lib.loads(cache.issue_file(site, "TEST-1234").read_text(encoding="utf-8"))
-    assert parsed.metadata["state"] == "In Progress"
+    assert cache.read_issue(site, "TEST-1234")["state"] == "In Progress"
 
 
-def test_jira_issue_frontmatter_state_round_trips_closed(tmp_path: Path) -> None:
+def test_jira_read_issue_state_round_trips_closed(tmp_path: Path) -> None:
     cache = JiraDataCenterIssueCache.for_project(tmp_path)
     site = jira_site()
 
@@ -91,8 +90,7 @@ def test_jira_issue_frontmatter_state_round_trips_closed(tmp_path: Path) -> None
         fetched_at="2026-05-15T10:00:00.000+0900",
     )
 
-    parsed = frontmatter_lib.loads(cache.issue_file(site, "TEST-1234").read_text(encoding="utf-8"))
-    assert parsed.metadata["state"] == "Closed"
+    assert cache.read_issue(site, "TEST-1234")["state"] == "Closed"
 
 
 def test_jira_write_issue_bundle_does_not_emit_metadata_file(tmp_path: Path) -> None:
@@ -119,7 +117,10 @@ def test_jira_write_issue_bundle_response_omits_internal_json_paths(tmp_path: Pa
         fetched_at="2026-05-15T10:00:00.000+0900",
     )
 
-    assert set(written) == {"issue_dir", "issue_file"}
+    # The native source JSON (issue.json / remote-links.json) must never be
+    # surfaced; the internal .meta.json path may appear (it is dropped before
+    # CLI output) but issue.md stays the readable projection.
+    assert set(written) == {"issue_dir", "issue_file", "meta_file"}
 
 
 def _payload_with_assignee(assignee: object) -> dict[str, object]:
@@ -130,7 +131,9 @@ def _payload_with_assignee(assignee: object) -> dict[str, object]:
     return payload
 
 
-def test_snapshot_frontmatter_includes_assignee_display_name(tmp_path: Path) -> None:
+def test_read_issue_preserves_native_assignee(tmp_path: Path) -> None:
+    # issue.md is now the pure body; the native assignee object round-trips
+    # through issue.json and surfaces verbatim on read (no snapshot frontmatter).
     cache = JiraDataCenterIssueCache.for_project(tmp_path)
     site = jira_site()
 
@@ -140,8 +143,8 @@ def test_snapshot_frontmatter_includes_assignee_display_name(tmp_path: Path) -> 
         fetched_at="2026-05-15T10:00:00.000+0900",
     )
 
-    parsed = frontmatter_lib.loads(cache.issue_file(site, "TEST-1234").read_text(encoding="utf-8"))
-    assert parsed.metadata["assignee"] == "Alice Anderson"
+    payload = cache.read_issue(site, "TEST-1234")
+    assert payload["assignee"] == {"displayName": "Alice Anderson", "name": "alice"}
 
 
 @pytest.mark.parametrize(
@@ -156,25 +159,14 @@ def test_snapshot_frontmatter_includes_assignee_display_name(tmp_path: Path) -> 
         ({"accountId": "acc-1"}, "acc-1"),
     ],
 )
-def test_snapshot_frontmatter_assignee_falls_back_through_keys(
-    tmp_path: Path,
+def test_jira_person_display_name_falls_back_through_keys(
     assignee_field: dict[str, object],
     expected: str,
 ) -> None:
-    cache = JiraDataCenterIssueCache.for_project(tmp_path)
-    site = jira_site()
-
-    cache.write_issue_bundle(
-        site,
-        _payload_with_assignee(assignee_field),
-        fetched_at="2026-05-15T10:00:00.000+0900",
-    )
-
-    parsed = frontmatter_lib.loads(cache.issue_file(site, "TEST-1234").read_text(encoding="utf-8"))
-    assert parsed.metadata["assignee"] == expected
+    assert _jira_person_display_name(assignee_field) == expected
 
 
-def test_snapshot_frontmatter_assignee_is_null_when_unassigned(tmp_path: Path) -> None:
+def test_read_issue_assignee_is_null_when_unassigned(tmp_path: Path) -> None:
     cache = JiraDataCenterIssueCache.for_project(tmp_path)
     site = jira_site()
 
@@ -184,12 +176,12 @@ def test_snapshot_frontmatter_assignee_is_null_when_unassigned(tmp_path: Path) -
         fetched_at="2026-05-15T10:00:00.000+0900",
     )
 
-    parsed = frontmatter_lib.loads(cache.issue_file(site, "TEST-1234").read_text(encoding="utf-8"))
-    assert "assignee" in parsed.metadata
-    assert parsed.metadata["assignee"] is None
+    payload = cache.read_issue(site, "TEST-1234")
+    assert "assignee" in payload
+    assert payload["assignee"] is None
 
 
-def test_existing_snapshot_payload_still_renders_without_assignee_field(tmp_path: Path) -> None:
+def test_read_issue_assignee_is_null_when_field_absent(tmp_path: Path) -> None:
     cache = JiraDataCenterIssueCache.for_project(tmp_path)
     site = jira_site()
 
@@ -204,9 +196,9 @@ def test_existing_snapshot_payload_still_renders_without_assignee_field(tmp_path
         fetched_at="2026-05-15T10:00:00.000+0900",
     )
 
-    parsed = frontmatter_lib.loads(cache.issue_file(site, "TEST-1234").read_text(encoding="utf-8"))
-    assert "assignee" in parsed.metadata
-    assert parsed.metadata["assignee"] is None
+    payload = cache.read_issue(site, "TEST-1234")
+    assert "assignee" in payload
+    assert payload["assignee"] is None
 
 
 def test_comment_author_name_still_uses_shared_jira_display_name_fallback() -> None:

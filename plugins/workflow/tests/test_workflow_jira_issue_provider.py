@@ -16,6 +16,10 @@ if str(_SCRIPTS_DIR) not in sys.path:
 
 from workflow_command import CommandRequest, CommandResult  # noqa: E402
 from issue.jira.cache import JiraDataCenterIssueCache  # noqa: E402
+from issue.jira.provider import (  # noqa: E402
+    _jira_issue_provider_settings,
+    _relationship_mappings,
+)
 from workflow_jira_data_center_client import jira_data_center_site_from_provider_config  # noqa: E402
 from workflow_providers import (  # noqa: E402
     CACHE_POLICY_BYPASS,
@@ -391,31 +395,11 @@ def test_data_center_provider_fetches_issue_remote_links_and_writes_llm_snapshot
     assert (issue_dir / "remote-links.json").is_file()
 
     issue_md_text = (issue_dir / "issue.md").read_text(encoding="utf-8")
-    frontmatter_text, body = _split_issue_md(issue_md_text)
-    issue_md_frontmatter = yaml.safe_load(frontmatter_text)
-    assert "key" not in issue_md_frontmatter
-    assert issue_md_frontmatter["title"] == "Support Jira Data Center"
-    assert issue_md_frontmatter["state"] == "In Progress"
-    assert issue_md_frontmatter["labels"] == ["workflow", "jira"]
-    assert issue_md_frontmatter["remote_links"] == [
-        {"title": "Design note", "url": "https://example.com/design", "relationship": "mentioned in"}
-    ]
-    relationships_block = issue_md_frontmatter["relationships"]
-    assert "current" not in relationships_block
-    assert "dependencies" not in relationships_block
-    assert "issue_links" not in relationships_block
-    assert relationships_block["parent"] == "TEST-1200"
-    assert relationships_block["children"] == ["TEST-1237"]
-    assert relationships_block["blocked_by"] == ["TEST-1233"]
-    assert relationships_block["blocking"] == ["TEST-1235"]
-    assert relationships_block["related"] == ["TEST-1236"]
-    assert body.strip() == "Data Center description."
+    # issue.md is the pure authored body; title / state / labels / relationships
+    # are served from the native issue.json + remote-links.json projections and
+    # are already asserted via the GET response above.
+    assert issue_md_text == "Data Center description."
     assert "Please keep Data Center first." not in issue_md_text
-    assert "## Description" not in issue_md_text
-    assert "## Comments" not in issue_md_text
-    assert "## Remote Links" not in issue_md_text
-    assert "## Workflow Relationships" not in issue_md_text
-    assert "## Issue Links" not in issue_md_text
     assert not (issue_dir / "metadata.yml").exists()
 
     comment_files = cache.comment_files(site, "TEST-1234")
@@ -465,19 +449,6 @@ def test_data_center_field_surface_string_relationship_surfaces_in_workflow(
     assert workflow["epic"] == [{"provider": "jira", "key": "TEST-EPIC-1", "issue": "TEST-EPIC-1"}]
     _assert_existing_workflow_buckets_unchanged(workflow)
 
-    cache = JiraDataCenterIssueCache.for_project(tmp_path)
-    site = jira_site(tmp_path)
-    issue_md_text = (cache.issue_dir(site, "TEST-1234") / "issue.md").read_text(encoding="utf-8")
-    frontmatter_text, _body = _split_issue_md(issue_md_text)
-    frontmatter = yaml.safe_load(frontmatter_text)
-    relationships_block = frontmatter["relationships"]
-    assert relationships_block["epic"] == ["TEST-EPIC-1"]
-    assert relationships_block["parent"] == "TEST-1200"
-    assert relationships_block["children"] == ["TEST-1237"]
-    assert relationships_block["blocked_by"] == ["TEST-1233"]
-    assert relationships_block["blocking"] == ["TEST-1235"]
-    assert relationships_block["related"] == ["TEST-1236"]
-
 
 def test_data_center_field_surface_key_object_relationship_surfaces_in_workflow(
     tmp_path: Path,
@@ -508,13 +479,6 @@ def test_data_center_field_surface_key_object_relationship_surfaces_in_workflow(
     assert workflow["epic"] == [{"provider": "jira", "key": "TEST-EPIC-1", "issue": "TEST-EPIC-1"}]
     _assert_existing_workflow_buckets_unchanged(workflow)
 
-    cache = JiraDataCenterIssueCache.for_project(tmp_path)
-    site = jira_site(tmp_path)
-    issue_md_text = (cache.issue_dir(site, "TEST-1234") / "issue.md").read_text(encoding="utf-8")
-    frontmatter_text, _body = _split_issue_md(issue_md_text)
-    frontmatter = yaml.safe_load(frontmatter_text)
-    assert frontmatter["relationships"]["epic"] == ["TEST-EPIC-1"]
-
 
 def test_data_center_field_surface_absent_field_is_omitted(
     tmp_path: Path,
@@ -540,13 +504,6 @@ def test_data_center_field_surface_absent_field_is_omitted(
     workflow = response.payload["relationships"]["workflow"]
     assert "epic" not in workflow
     _assert_existing_workflow_buckets_unchanged(workflow)
-
-    cache = JiraDataCenterIssueCache.for_project(tmp_path)
-    site = jira_site(tmp_path)
-    issue_md_text = (cache.issue_dir(site, "TEST-1234") / "issue.md").read_text(encoding="utf-8")
-    frontmatter_text, _body = _split_issue_md(issue_md_text)
-    frontmatter = yaml.safe_load(frontmatter_text)
-    assert "epic" not in frontmatter["relationships"]
 
 
 def test_data_center_snapshot_hides_comments_with_configured_markers(
@@ -1375,11 +1332,14 @@ def test_data_center_issue_link_relationships_are_applied_from_inline_intent(tmp
     write_jira_config(tmp_path, relationship_mappings=issue_link_relationship_mappings())
     site = jira_site(tmp_path)
     cache = JiraDataCenterIssueCache.for_project(tmp_path)
+    # Seed with the configured relationship mappings so the cached relationships
+    # fingerprint matches the provider's freshness re-compute (which uses them).
     cache.write_issue_bundle(
         site,
         jira_issue_payload(),
         remote_links=remote_links_payload(),
         fetched_at="2026-05-15T10:00:00.000+0900",
+        relationship_mappings=_relationship_mappings(_jira_issue_provider_settings(tmp_path)),
     )
     runner = FakeRunner(
         {
@@ -1675,12 +1635,13 @@ def test_data_center_stale_cache_blocks_write_before_put(tmp_path: Path) -> None
     )
 
     assert response.payload["operation"] == "update_issue"
-    assert response.payload["status"] == "blocked"
-    assert response.payload["reason"] == "stale_cache"
+    assert response.payload["status"] == "conflict"
+    assert response.payload["reason"] == "provider_changed"
     assert response.payload["reread_required"] is True
     assert response.payload["cache_refreshed"] is True
-    assert response.payload["freshness"]["status"] == "stale"
+    assert response.payload["conflict"]["status"] == "conflict"
     assert "issue.md" in "\n".join(response.payload["reread_paths"])
+    assert all(not path.endswith("/.meta.json") for path in response.payload["reread_paths"])
     assert all(request.args != curl_write_args() for request in runner.requests)
 
 
@@ -1716,6 +1677,7 @@ def test_data_center_comment_stale_cache_blocks_and_refreshes_before_post(tmp_pa
     )
 
     assert response.payload["operation"] == "add_comment"
-    assert response.payload["status"] == "blocked"
+    assert response.payload["status"] == "conflict"
+    assert response.payload["reason"] == "provider_changed"
     assert response.payload["reread_required"] is True
     assert all(request.args != curl_write_args() for request in runner.requests)

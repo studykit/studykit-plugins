@@ -249,7 +249,15 @@ def test_relationships_cli_no_flag_returns_no_op(tmp_path: Path) -> None:
 def test_relationships_cli_dispatches_inline_intent(tmp_path: Path) -> None:
     write_config(tmp_path)
     cache = GitHubIssueCache.for_project(tmp_path, configured_repo=repo())
-    cache.write_issue_bundle(repo(), issue_payload(), fetched_at="2026-05-14T00:10:00Z")
+    # The relationships freshness check compares the cached relationship
+    # fingerprint against the provider's current relationships. Seed the cache
+    # to match the runner's relationship endpoints (child #45 present) so the
+    # apply proceeds instead of conflicting.
+    cache.write_issue_bundle(
+        repo(),
+        {**issue_payload(), "children": [{"number": 45}]},
+        fetched_at="2026-05-14T00:10:00Z",
+    )
 
     def runner(request: CommandRequest) -> CommandResult:
         if request.args == gh_issue_view_args(44, "number,updatedAt"):

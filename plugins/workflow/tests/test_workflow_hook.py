@@ -1728,7 +1728,6 @@ def test_user_prompt_lists_issue_path_when_frontmatter_has_relationships(
                 "blocking": [{"number": 45}],
             },
         },
-        fetched_at="2026-05-14T00:00:00Z",
     )
 
     captured = io.StringIO()
@@ -1852,8 +1851,8 @@ Current body.
     payload = json.loads(captured.getvalue())
     reason = payload["reason"]
     assert payload["decision"] == "block"
-    assert "projection is read-only" in reason
-    assert "body-file flow" in reason
+    assert "projections are read-only" in reason
+    assert "--body-file" in reason
     assert f"Target: {issue_file}" in reason
 
 
@@ -1904,8 +1903,8 @@ Existing comment body.
     payload = json.loads(captured.getvalue())
     reason = payload["reason"]
     assert payload["decision"] == "block"
-    assert "projection is read-only" in reason
-    assert "body-file flow" in reason
+    assert "projections are read-only" in reason
+    assert "--body-file" in reason
     assert f"Target: {comment_file}" in reason
 
 
@@ -1945,7 +1944,7 @@ Updated body.
     payload = json.loads(captured.getvalue())
     reason = payload["reason"]
     assert payload["decision"] == "block"
-    assert "projection has not been prepared yet" in reason
+    assert "has not been prepared yet" in reason
     assert f"Target: {issue_file}" in reason
     assert "workflow issue fetch" in reason
 
@@ -2020,8 +2019,8 @@ Current body.
     payload = json.loads(captured.getvalue())
     reason = payload["reason"]
     assert payload["decision"] == "block"
-    assert "projection is read-only" in reason
-    assert "body-file flow" in reason
+    assert "projections are read-only" in reason
+    assert "--body-file" in reason
 
 
 def test_claude_pre_write_blocks_jira_cache_snapshot_edits(
@@ -2064,8 +2063,8 @@ def test_claude_pre_write_blocks_jira_cache_snapshot_edits(
     payload = json.loads(captured.getvalue())
     reason = payload["reason"]
     assert payload["decision"] == "block"
-    assert "projection is read-only" in reason
-    assert "body-file flow" in reason
+    assert "projections are read-only" in reason
+    assert "--body-file" in reason
 
 
 def test_claude_pre_write_blocks_github_cache_comment_create_when_no_projection(
@@ -2102,7 +2101,95 @@ def test_claude_pre_write_blocks_github_cache_comment_create_when_no_projection(
     payload = json.loads(captured.getvalue())
     reason = payload["reason"]
     assert payload["decision"] == "block"
-    assert "projection has not been prepared" in reason
+    assert "has not been prepared" in reason
+
+
+def test_claude_pre_write_blocks_github_cache_meta_json(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _write_config(tmp_path)
+    monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(tmp_path))
+    monkeypatch.setenv("CLAUDE_PLUGIN_ROOT", str(_PLUGIN_ROOT))
+
+    meta_file = tmp_path / ".workflow-cache" / "issues" / "39" / ".meta.json"
+    meta_file.parent.mkdir(parents=True)
+    meta_file.write_text('{"schema_version": 1, "fingerprints": {}}\n', encoding="utf-8")
+
+    captured = io.StringIO()
+    assert claude_main(
+        payload={
+            "session_id": "meta-write-protection",
+            "cwd": str(tmp_path),
+            "hook_event_name": "PreToolUse",
+            "tool_name": "Write",
+            "tool_input": {"file_path": str(meta_file), "content": "{}\n"},
+        },
+        stdout=captured,
+    ) == 0
+
+    payload = json.loads(captured.getvalue())
+    assert payload["decision"] == "block"
+    assert ".meta.json" in payload["reason"]
+    assert f"Target: {meta_file}" in payload["reason"]
+
+
+def test_claude_pre_read_blocks_github_cache_meta_json(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _write_config(tmp_path)
+    monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(tmp_path))
+    monkeypatch.setenv("CLAUDE_PLUGIN_ROOT", str(_PLUGIN_ROOT))
+
+    meta_file = tmp_path / ".workflow-cache" / "issues" / "39" / ".meta.json"
+    meta_file.parent.mkdir(parents=True)
+    meta_file.write_text('{"schema_version": 1, "fingerprints": {}}\n', encoding="utf-8")
+
+    captured = io.StringIO()
+    assert claude_main(
+        payload={
+            "session_id": "meta-read-protection",
+            "cwd": str(tmp_path),
+            "hook_event_name": "PreToolUse",
+            "tool_name": "Read",
+            "tool_input": {"file_path": str(meta_file)},
+        },
+        stdout=captured,
+    ) == 0
+
+    payload = json.loads(captured.getvalue())
+    assert payload["decision"] == "block"
+    assert ".meta.json" in payload["reason"]
+
+
+def test_claude_pre_read_allows_github_cache_issue_md(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """issue.md is a readable projection — only edits are blocked, not reads."""
+
+    _write_config(tmp_path)
+    monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(tmp_path))
+    monkeypatch.setenv("CLAUDE_PLUGIN_ROOT", str(_PLUGIN_ROOT))
+
+    issue_file = tmp_path / ".workflow-cache" / "issues" / "39" / "issue.md"
+    issue_file.parent.mkdir(parents=True)
+    issue_file.write_text("Issue body.\n", encoding="utf-8")
+
+    captured = io.StringIO()
+    assert claude_main(
+        payload={
+            "session_id": "issue-read-allowed",
+            "cwd": str(tmp_path),
+            "hook_event_name": "PreToolUse",
+            "tool_name": "Read",
+            "tool_input": {"file_path": str(issue_file)},
+        },
+        stdout=captured,
+    ) == 0
+
+    assert captured.getvalue() == ""
 
 
 def test_session_start_emits_nothing_for_invalid_config(

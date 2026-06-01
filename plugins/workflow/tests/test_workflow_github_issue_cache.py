@@ -16,6 +16,7 @@ if str(_SCRIPTS_DIR) not in sys.path:
 
 from workflow_cache import (  # noqa: E402
     FreshnessMetadata,
+    WorkflowCacheCorrupt,
     WorkflowFreshnessConflict,
     check_provider_freshness,
     require_provider_freshness,
@@ -159,29 +160,40 @@ def test_gitignore_excludes_workflow_cache_root() -> None:
     assert ".workflow-cache/" in (_REPO_ROOT / ".gitignore").read_text(encoding="utf-8")
 
 
-def test_github_issue_cache_writes_flat_layout_with_frontmatter_freshness(tmp_path: Path) -> None:
+def test_github_issue_cache_writes_flat_layout_with_meta_and_relationships(tmp_path: Path) -> None:
     cache = GitHubIssueCache.for_project(tmp_path)
 
     write = cache.write_issue_bundle(repo(), issue_payload(), fetched_at="2026-05-13T12:34:56Z")
 
     assert write.issue_dir == tmp_path / ".workflow-cache" / "issues" / "39"
+
+    # issue.md is the pure authored body — no frontmatter, no relationships.
     issue_text = write.issue_file.read_text(encoding="utf-8")
-    assert "title: Add local cache for workflow provider reads" in issue_text
-    assert "updated_at: '2026-05-13T12:00:00Z'" in issue_text
-    assert "fetched_at: '2026-05-13T12:34:56Z'" in issue_text
-    assert "relationships:\n  updated_at:" in issue_text
-    assert "\n  parent: 28\n" in issue_text
-    assert "\n  children:\n  - 41\n" in issue_text
-    assert "\n  blocked_by:\n  - 32\n" in issue_text
-    assert "current:" not in issue_text
-    assert "dependencies:" not in issue_text
-    assert "\ncomments:\n" not in issue_text
-    assert "# Issue" not in issue_text
-    assert issue_text.endswith("Raw issue body.")
+    assert issue_text == "Raw issue body."
+
+    # Metadata, including the per-target fingerprints, lives in .meta.json.
+    meta = json.loads(write.meta_file.read_text(encoding="utf-8"))
+    assert write.meta_file == write.issue_dir / ".meta.json"
+    assert meta["schema_version"] == 1
+    assert meta["title"] == "Add local cache for workflow provider reads"
+    assert meta["state"] == "open"
+    assert meta["labels"] == ["task", "workflow"]
+    assert set(meta["fingerprints"]) == {"content", "relationships", "comments"}
+    assert all(meta["fingerprints"].values())
+    assert "updated_at" not in meta
+    assert "fetched_at" not in meta
+
+    # Relationships live in their own JSON projection (compact refs).
+    rel = json.loads(write.relationship_location.read_text(encoding="utf-8"))
+    assert write.relationship_location == write.issue_dir / "relationships.json"
+    assert rel["schema_version"] == 1
+    assert rel["parent"] == 28
+    assert rel["children"] == [41]
+    assert rel["blocked_by"] == [32]
+    assert rel["blocking"] == [36]
 
     assert not (write.issue_dir / "metadata.yml").exists()
     assert not (write.issue_dir / "comments").exists()
-    assert not (write.issue_dir / "comments-pending").exists()
 
     comment_file = write.issue_dir / "comment-2026-05-13T112053Z-4440388606.md"
     assert comment_file.is_file()
@@ -194,7 +206,7 @@ def test_github_issue_cache_writes_flat_layout_with_frontmatter_freshness(tmp_pa
     assert comment_text.endswith("Raw provider comment body.")
 
     relationships = cache.read_relationships(repo(), 39)
-    assert relationships["fetched_at"] == "2026-05-13T12:34:56Z"
+    assert "fetched_at" not in relationships
     assert relationships["parent"]["number"] == 28
     assert relationships["children"][0]["number"] == 41
     assert relationships["blocked_by"][0] == {"number": 32}
@@ -216,7 +228,7 @@ def test_github_issue_cache_preserves_comments_when_provider_payload_omits_comme
     assert comment_file.read_text(encoding="utf-8") == initial_comment_text
 
 
-def test_github_issue_cache_writes_project_membership_status_to_frontmatter(tmp_path: Path) -> None:
+def test_github_issue_cache_writes_project_membership_status_to_meta(tmp_path: Path) -> None:
     cache = GitHubIssueCache.for_project(tmp_path)
 
     project_items = [
@@ -245,13 +257,17 @@ def test_github_issue_cache_writes_project_membership_status_to_frontmatter(tmp_
         fetched_at="2026-05-13T12:34:56Z",
     )
 
-    issue_text = write.issue_file.read_text(encoding="utf-8")
-    assert "projects:" in issue_text
-    assert "owner: studykit" in issue_text
-    assert "number: 1" in issue_text
-    assert "title: Workflow" in issue_text
-    assert "item_id: PVTI_project_item" in issue_text
-    assert "status: In progress" in issue_text
+    meta = json.loads(write.meta_file.read_text(encoding="utf-8"))
+    assert meta["projects"] == [
+        {
+            "owner": "studykit",
+            "number": 1,
+            "title": "Workflow",
+            "url": "https://github.com/orgs/studykit/projects/1",
+            "item_id": "PVTI_project_item",
+            "status": "In progress",
+        }
+    ]
 
     cached = cache.read_issue(repo(), 39, include_body=False, include_comments=False, include_relationships=False)
     assert cached["projects"] == [
@@ -298,26 +314,26 @@ def test_cache_read_can_skip_raw_markdown_bodies(tmp_path: Path) -> None:
     assert cached["comments"][0]["id"] == "4440388606"
 
 
-def test_freshness_metadata_reads_from_issue_frontmatter(tmp_path: Path) -> None:
+def test_freshness_metadata_reads_per_target_fingerprints_from_meta(tmp_path: Path) -> None:
     cache = GitHubIssueCache.for_project(tmp_path)
     write = cache.write_issue_bundle(repo(), issue_payload(), fetched_at="2026-05-13T12:34:56Z")
+    fingerprints = json.loads(write.meta_file.read_text(encoding="utf-8"))["fingerprints"]
 
     issue_meta = cache.read_freshness_metadata(repo(), 39, target="issue")
     comments_meta = cache.read_freshness_metadata(repo(), 39, target="comments")
     relationships_meta = cache.read_freshness_metadata(repo(), 39, target="relationships")
     cached = cache.read_issue(repo(), 39, include_body=False, include_comments=False, include_relationships=False)
 
-    assert issue_meta.path == write.issue_file
-    assert issue_meta.updated_at == "2026-05-13T12:00:00Z"
-    assert issue_meta.fetched_at == "2026-05-13T12:34:56Z"
-    assert comments_meta.path == write.issue_file
-    assert comments_meta.fetched_at == "2026-05-13T12:34:56Z"
-    assert comments_meta.updated_at == "2026-05-13T11:21:00Z"
-    assert relationships_meta.path == write.issue_file
-    assert relationships_meta.fetched_at == "2026-05-13T12:34:56Z"
-    assert relationships_meta.updated_at == "2026-05-13T12:00:00Z"
+    # Every freshness target resolves to the internal .meta.json, never issue.md.
+    assert issue_meta.path == write.meta_file
+    assert issue_meta.target == "issue"
+    assert issue_meta.fingerprint == fingerprints["content"]
+    assert comments_meta.path == write.meta_file
+    assert comments_meta.fingerprint == fingerprints["comments"]
+    assert relationships_meta.path == write.meta_file
+    assert relationships_meta.fingerprint == fingerprints["relationships"]
     assert cached["cache"]["issue_file"] == str(write.issue_file)
-    assert cached["cache"]["fetchedAt"] == "2026-05-13T12:34:56Z"
+    assert cached["cache"]["meta_file"] == str(write.meta_file)
 
 
 def test_default_cache_policy_uses_cache_hit_without_remote_issue_view(tmp_path: Path) -> None:
@@ -434,9 +450,11 @@ def _payload_with_assignees(value: object) -> dict[str, object]:
     return payload
 
 
-def test_github_snapshot_frontmatter_includes_assignee_display_name(tmp_path: Path) -> None:
-    import frontmatter as frontmatter_lib
+def _meta_assignees(write) -> list[str]:
+    return json.loads(write.meta_file.read_text(encoding="utf-8"))["assignees"]
 
+
+def test_github_meta_includes_assignee_display_name(tmp_path: Path) -> None:
     cache = GitHubIssueCache.for_project(tmp_path)
     write = cache.write_issue_bundle(
         repo(),
@@ -444,13 +462,10 @@ def test_github_snapshot_frontmatter_includes_assignee_display_name(tmp_path: Pa
         fetched_at="2026-05-13T12:34:56Z",
     )
 
-    parsed = frontmatter_lib.loads(write.issue_file.read_text(encoding="utf-8"))
-    assert parsed.metadata["assignees"] == ["Alice Anderson"]
+    assert _meta_assignees(write) == ["Alice Anderson"]
 
 
-def test_github_snapshot_frontmatter_assignees_fall_back_to_login(tmp_path: Path) -> None:
-    import frontmatter as frontmatter_lib
-
+def test_github_meta_assignees_fall_back_to_login(tmp_path: Path) -> None:
     cache = GitHubIssueCache.for_project(tmp_path)
     write = cache.write_issue_bundle(
         repo(),
@@ -458,13 +473,10 @@ def test_github_snapshot_frontmatter_assignees_fall_back_to_login(tmp_path: Path
         fetched_at="2026-05-13T12:34:56Z",
     )
 
-    parsed = frontmatter_lib.loads(write.issue_file.read_text(encoding="utf-8"))
-    assert parsed.metadata["assignees"] == ["alice"]
+    assert _meta_assignees(write) == ["alice"]
 
 
-def test_github_snapshot_frontmatter_assignees_empty_when_unassigned(tmp_path: Path) -> None:
-    import frontmatter as frontmatter_lib
-
+def test_github_meta_assignees_empty_when_unassigned(tmp_path: Path) -> None:
     cache = GitHubIssueCache.for_project(tmp_path)
 
     write_empty = cache.write_issue_bundle(
@@ -472,8 +484,7 @@ def test_github_snapshot_frontmatter_assignees_empty_when_unassigned(tmp_path: P
         _payload_with_assignees([]),
         fetched_at="2026-05-13T12:34:56Z",
     )
-    parsed_empty = frontmatter_lib.loads(write_empty.issue_file.read_text(encoding="utf-8"))
-    assert parsed_empty.metadata["assignees"] == []
+    assert _meta_assignees(write_empty) == []
 
     payload_without_key = issue_payload()
     payload_without_key.pop("assignees", None)
@@ -482,14 +493,10 @@ def test_github_snapshot_frontmatter_assignees_empty_when_unassigned(tmp_path: P
         payload_without_key,
         fetched_at="2026-05-13T12:34:56Z",
     )
-    parsed_missing = frontmatter_lib.loads(write_missing.issue_file.read_text(encoding="utf-8"))
-    assert "assignees" in parsed_missing.metadata
-    assert parsed_missing.metadata["assignees"] == []
+    assert _meta_assignees(write_missing) == []
 
 
-def test_github_snapshot_frontmatter_assignees_preserves_multiple(tmp_path: Path) -> None:
-    import frontmatter as frontmatter_lib
-
+def test_github_meta_assignees_preserves_multiple(tmp_path: Path) -> None:
     cache = GitHubIssueCache.for_project(tmp_path)
     write = cache.write_issue_bundle(
         repo(),
@@ -503,5 +510,44 @@ def test_github_snapshot_frontmatter_assignees_preserves_multiple(tmp_path: Path
         fetched_at="2026-05-13T12:34:56Z",
     )
 
-    parsed = frontmatter_lib.loads(write.issue_file.read_text(encoding="utf-8"))
-    assert parsed.metadata["assignees"] == ["Alice Anderson", "bob", "Carol Carter"]
+    assert _meta_assignees(write) == ["Alice Anderson", "bob", "Carol Carter"]
+
+
+def test_cache_with_unsupported_schema_version_is_rejected(tmp_path: Path) -> None:
+    """Clean break: SCHEMA_VERSION is 1; any other schema is rejected on read."""
+
+    import json as _json
+
+    cache = GitHubIssueCache.for_project(tmp_path)
+    write = cache.write_issue_bundle(repo(), issue_payload(), fetched_at="2026-05-13T12:34:56Z")
+
+    meta = _json.loads(write.meta_file.read_text(encoding="utf-8"))
+    meta["schema_version"] = 999
+    write.meta_file.write_text(_json.dumps(meta), encoding="utf-8")
+
+    with pytest.raises(WorkflowCacheCorrupt):
+        cache.read_issue(repo(), 39)
+    with pytest.raises(WorkflowCacheCorrupt):
+        cache.read_freshness_metadata(repo(), 39, target="issue")
+
+
+def test_link_only_update_does_not_change_content_fingerprint(tmp_path: Path) -> None:
+    """A relationships-only write must leave the content fingerprint untouched,
+    so a later body write can never look conflicted because of a prior link."""
+
+    import json as _json
+
+    cache = GitHubIssueCache.for_project(tmp_path)
+    write = cache.write_issue_bundle(repo(), issue_payload(), fetched_at="2026-05-13T12:34:56Z")
+    before = _json.loads(write.meta_file.read_text(encoding="utf-8"))["fingerprints"]
+
+    cache.write_relationships_projection(
+        repo(),
+        39,
+        {"parent": {"number": 99}, "blocked_by": [{"number": 100}]},
+    )
+
+    after = _json.loads(write.meta_file.read_text(encoding="utf-8"))["fingerprints"]
+    assert after["content"] == before["content"]
+    assert after["comments"] == before["comments"]
+    assert after["relationships"] != before["relationships"]
