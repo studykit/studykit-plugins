@@ -17,7 +17,7 @@ re-fetch.
 On `status=conflict` the targeted artifact changed on the provider
 since it was last fetched. The script refreshes the cache, preserves
 the body file, and returns `reread_paths` — the readable projections
-(`issue.md` / `relationships.md` / `comment-*.md`). Reread those paths,
+(`issue.md` / `relation.md` / `comment-*.md`). Reread those paths,
 reapply your change to the body file, and retry; or rerun the same verb
 with `--overwrite` to replace the provider copy without rereading.
 

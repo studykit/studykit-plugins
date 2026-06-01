@@ -99,11 +99,11 @@ def test_github_issue_cache_body_path_recognizer_matches_issue_and_comment_layou
     assert is_github_issue_cache_body_path(configured_comment, tmp_path)
     assert is_github_issue_cache_body_path(external_issue, tmp_path)
     assert is_github_issue_cache_body_path(external_comment, tmp_path)
-    # The readable relationships.md is a body projection; the machine source
-    # .relationships.json is internal (matched as a meta path, not a body path).
-    assert is_github_issue_cache_body_path(configured_issue.with_name("relationships.md"), tmp_path)
-    assert not is_github_issue_cache_body_path(configured_issue.with_name(".relationships.json"), tmp_path)
-    assert is_github_issue_cache_meta_path(configured_issue.with_name(".relationships.json"), tmp_path)
+    # The readable relation.md is a body projection; the machine source
+    # .relation.json is internal (matched as a meta path, not a body path).
+    assert is_github_issue_cache_body_path(configured_issue.with_name("relation.md"), tmp_path)
+    assert not is_github_issue_cache_body_path(configured_issue.with_name(".relation.json"), tmp_path)
+    assert is_github_issue_cache_meta_path(configured_issue.with_name(".relation.json"), tmp_path)
     assert is_github_issue_cache_meta_path(configured_issue.with_name(".meta.json"), tmp_path)
     # The pre-clean-break readable relationships.json no longer exists in the layout.
     assert not is_github_issue_cache_body_path(configured_issue.with_name("relationships.json"), tmp_path)
@@ -195,17 +195,18 @@ def test_github_issue_cache_writes_flat_layout_with_meta_and_relationships(tmp_p
     assert "updated_at" not in meta
     assert "fetched_at" not in meta
 
-    # The readable projection is markdown the LLM follows to reach linked issues.
-    assert write.relationship_location == write.issue_dir / "relationships.md"
+    # The readable projection is concise markdown the LLM follows to linked issues:
+    # one line per relationship kind, refs comma-joined.
+    assert write.relationship_location == write.issue_dir / "relation.md"
     rel_md = write.relationship_location.read_text(encoding="utf-8")
-    assert "## Parent" in rel_md
-    assert "- #28" in rel_md
-    assert "## Children" in rel_md and "- #41" in rel_md
-    assert "## Blocked by" in rel_md and "- #32" in rel_md
-    assert "## Blocking" in rel_md and "- #36" in rel_md
+    assert "- parent: #28" in rel_md
+    assert "- children: #41" in rel_md
+    assert "- blocked_by: #32" in rel_md
+    assert "- blocking: #36" in rel_md
+    assert "## " not in rel_md
 
-    # The machine source stays in the internal .relationships.json dotfile.
-    source = write.issue_dir / ".relationships.json"
+    # The machine source stays in the internal .relation.json dotfile.
+    source = write.issue_dir / ".relation.json"
     rel = json.loads(source.read_text(encoding="utf-8"))
     assert rel["schema_version"] == 1
     assert rel["parent"] == 28

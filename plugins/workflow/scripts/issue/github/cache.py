@@ -62,17 +62,17 @@ def _comment_fingerprint_items(source: Mapping[str, Any]) -> list[dict[str, str 
 def is_github_issue_cache_body_path(path: Path, project: Path) -> bool:
     """Return whether ``path`` is a read-only GitHub issue content projection.
 
-    Recognizes the ``issue.md`` body, the readable ``relationships.md``
+    Recognizes the ``issue.md`` body, the readable ``relation.md``
     projection, and any ``comment-*.md`` sibling in the flat per-issue
     directory layout. Configured-repo issues sit at
     ``.workflow-cache/issues/<n>/`` and external repos are namespaced under
     ``.workflow-cache/<host>/<owner>/<repo>/issues/<n>/``. The internal
-    ``.meta.json`` / ``.relationships.json`` machine sources are matched by
+    ``.meta.json`` / ``.relation.json`` machine sources are matched by
     :func:`is_github_issue_cache_meta_path`.
     """
 
     name = path.name
-    if name not in {"issue.md", "relationships.md"} and not _COMMENT_FILENAME_RE.match(name):
+    if name not in {"issue.md", "relation.md"} and not _COMMENT_FILENAME_RE.match(name):
         return False
     return _github_issue_cache_dir_match(path, project)
 
@@ -80,12 +80,12 @@ def is_github_issue_cache_body_path(path: Path, project: Path) -> bool:
 def is_github_issue_cache_meta_path(path: Path, project: Path) -> bool:
     """Return whether ``path`` is an internal GitHub cache projection.
 
-    Covers the ``.meta.json`` bookkeeping file and the ``.relationships.json``
+    Covers the ``.meta.json`` bookkeeping file and the ``.relation.json``
     machine source. Both are dotfiles the dispatchers maintain; readers consume
-    ``issue.md`` / ``relationships.md`` instead.
+    ``issue.md`` / ``relation.md`` instead.
     """
 
-    if path.name not in {".meta.json", ".relationships.json"}:
+    if path.name not in {".meta.json", ".relation.json"}:
         return False
     return _github_issue_cache_dir_match(path, project)
 
@@ -161,10 +161,10 @@ class GitHubIssueCache:
         return self.issue_dir(repo, issue) / ".meta.json"
 
     def relationships_file(self, repo: GitHubRepository, issue: int | str) -> Path:
-        return self.issue_dir(repo, issue) / "relationships.md"
+        return self.issue_dir(repo, issue) / "relation.md"
 
     def relationships_source_file(self, repo: GitHubRepository, issue: int | str) -> Path:
-        return self.issue_dir(repo, issue) / ".relationships.json"
+        return self.issue_dir(repo, issue) / ".relation.json"
 
     def freshness_file(self, repo: GitHubRepository, issue: int | str, target: str) -> Path:
         normalized = _normalize_freshness_target(target)
@@ -467,8 +467,8 @@ class GitHubIssueCache:
     def _write_relationships_file(
         self, repo: GitHubRepository, issue: int | str, compact: Mapping[str, Any]
     ) -> Path:
-        # ``.relationships.json`` is the machine source ``read_relationships``
-        # parses back; ``relationships.md`` is the readable projection surfaced
+        # ``.relation.json`` is the machine source ``read_relationships``
+        # parses back; ``relation.md`` is the readable projection surfaced
         # to fetch callers and the LLM.
         source_path = self.relationships_source_file(repo, issue)
         data: dict[str, Any] = {"schema_version": SCHEMA_VERSION}
@@ -542,42 +542,38 @@ class GitHubIssueCache:
                 path.unlink()
 
 
-_GITHUB_RELATIONSHIP_SECTIONS: tuple[tuple[str, str], ...] = (
-    ("parent", "Parent"),
-    ("children", "Children"),
-    ("blocked_by", "Blocked by"),
-    ("blocking", "Blocking"),
-    ("related", "Related"),
+# Relationship kinds in display order; the key doubles as the inline label.
+_GITHUB_RELATIONSHIP_KINDS: tuple[str, ...] = (
+    "parent",
+    "children",
+    "blocked_by",
+    "blocking",
+    "related",
 )
 
 
 def _render_github_relationships_markdown(
     repo: GitHubRepository, issue: int | str, compact: Mapping[str, Any]
 ) -> str:
-    """Render the compact relationship projection as readable markdown.
+    """Render the compact relationship projection as concise markdown.
 
-    Mirrors the per-issue layout the LLM follows to reach linked issues. The
-    machine source stays in ``.relationships.json``; this is the human/LLM view.
+    One line per relationship kind (refs comma-joined) so the LLM can scan
+    linked issues at a glance. The machine source stays in
+    ``.relation.json``; this is the human/LLM view.
     """
 
-    heading = f"# Relationships — {repo.owner}/{repo.name}#{normalize_issue_number(issue)}"
+    heading = f"# Relation — {repo.owner}/{repo.name}#{normalize_issue_number(issue)}"
     lines: list[str] = [heading, ""]
-    rendered_any = False
-    for key, label in _GITHUB_RELATIONSHIP_SECTIONS:
+    rendered: list[str] = []
+    for key in _GITHUB_RELATIONSHIP_KINDS:
         refs = compact.get(key)
         if refs is None:
             continue
         ref_list = refs if isinstance(refs, list) else [refs]
-        bullets = [f"- {_github_relationship_ref_text(ref)}" for ref in ref_list if ref is not None]
-        if not bullets:
-            continue
-        rendered_any = True
-        lines.append(f"## {label}")
-        lines.extend(bullets)
-        lines.append("")
-    if not rendered_any:
-        lines.append("_No linked issues._")
-        lines.append("")
+        texts = [_github_relationship_ref_text(ref) for ref in ref_list if ref is not None]
+        if texts:
+            rendered.append(f"- {key}: {', '.join(texts)}")
+    lines.extend(rendered if rendered else ["_No linked issues._"])
     return "\n".join(lines).rstrip("\n") + "\n"
 
 
@@ -591,7 +587,7 @@ def _github_relationship_ref_text(ref: Any) -> str:
 
 
 def _compact_relationships_for_frontmatter(current: Mapping[str, Any]) -> dict[str, Any]:
-    """Return the compact relationship projection stored in ``.relationships.json``."""
+    """Return the compact relationship projection stored in ``.relation.json``."""
 
     compact: dict[str, Any] = {}
 

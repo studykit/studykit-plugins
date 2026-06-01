@@ -276,7 +276,7 @@ def test_cache_fetch_uses_cache_hit_without_remote_issue_view(tmp_path: Path) ->
         "relationships",
     }
     assert payload["issues"][0]["issue"] == "42/issue.md"
-    assert payload["issues"][0]["relationships"] == "42/relationships.md"
+    assert payload["issues"][0]["relationships"] == "42/relation.md"
     assert payload["issues"][0]["cache_refreshed"] is False
     assert runner.requests == []
 
@@ -372,7 +372,7 @@ def test_cache_fetch_refresh_reads_remote_and_updates_cache(tmp_path: Path) -> N
     assert relationships["parent"]["number"] == 40
     assert relationships["children"][0]["number"] == 43
     assert relationships["blocked_by"][0]["number"] == 41
-    assert payload["issues"][0]["relationships"] == "42/relationships.md"
+    assert payload["issues"][0]["relationships"] == "42/relation.md"
 
 
 def test_cache_fetch_uses_jira_cache_hit_without_remote_read(tmp_path: Path) -> None:
@@ -400,7 +400,7 @@ def test_cache_fetch_uses_jira_cache_hit_without_remote_read(tmp_path: Path) -> 
     assert payload["basedir"] == ".workflow-cache/issues/"
     assert payload["issues"][0]["issue"] == "TEST-1234/issue.md"
     assert payload["issues"][0]["cache_refreshed"] is False
-    assert payload["issues"][0]["relationships"] == "TEST-1234/relationships.md"
+    assert payload["issues"][0]["relationships"] == "TEST-1234/relation.md"
     assert runner.requests == []
 
 

@@ -264,7 +264,7 @@ def is_provider_issue_cache_meta(path: Path, config: WorkflowConfig) -> bool:
     """Return whether ``path`` is an internal cache projection.
 
     Internal projections are the dotfiles the dispatchers own (``.meta.json``
-    and, for GitHub, the ``.relationships.json`` machine source); both are
+    and, for GitHub, the ``.relation.json`` machine source); both are
     blocked for read and write.
     """
 
@@ -286,7 +286,7 @@ def provider_cache_body_write_reason(target: EditTarget, config: WorkflowConfig)
     if is_meta:
         return (
             "workflow cache protection blocked a write to an internal cache file "
-            "(.meta.json / .relationships.json).\n\n"
+            "(.meta.json / .relation.json).\n\n"
             f"Target: {target.path}\n\n"
             "These files hold projection bookkeeping (freshness fingerprints, the "
             "machine relationship source) only. Never edit them; the workflow "
@@ -324,11 +324,11 @@ def provider_cache_meta_read_reason(path: Path, config: WorkflowConfig) -> str |
         return None
     return (
         "workflow cache protection blocked reading an internal cache file "
-        "(.meta.json / .relationships.json).\n\n"
+        "(.meta.json / .relation.json).\n\n"
         f"Target: {path}\n\n"
         "These files hold projection bookkeeping (freshness fingerprints, the machine "
         "relationship source) only — they are not issue content. Read issue.md / "
-        "relationships.md / comment-*.md for the issue, or refresh with "
+        "relation.md / comment-*.md for the issue, or refresh with "
         "`workflow issue fetch`."
     )
 

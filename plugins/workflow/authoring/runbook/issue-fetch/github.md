@@ -6,7 +6,7 @@ workflow issue fetch <issue> [<issue> ...] \
 ```
 
 The script returns the issue `title`/`state` inline plus paths to the
-local `issue.md` body, the `relationships.md` projection, and any
+local `issue.md` body, the `relation.md` projection, and any
 `comment-*.md` files — open those files to read the cached content.
 `issue.md` is the pure body (no frontmatter). Default cache policy
 reuses the local copy when fresh; pass `--cache-policy refresh` to
@@ -17,5 +17,5 @@ References are GitHub issue numbers or configured-repo references
 `https://github.com/<owner>/<repo>/issues/123`).
 
 When the output carries a `relationships` path, read that
-`relationships.md` to follow linked issues (parent, children,
+`relation.md` to follow linked issues (parent, children,
 blocked-by, blocking, related) and fetch them too.
