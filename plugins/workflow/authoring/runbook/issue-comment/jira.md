@@ -8,12 +8,10 @@ workflow issue comment \
   [--state <verb>] \
 ```
 
-Required: `--issue`, `--body-file`. `--state` is a free-form verb
-keyed in `providers.issues.state_transitions.<verb>`; the script POSTs
-the configured transition after the comment is added. Discover and
-confirm verbs through the setup skill's State Transition Profiling
-step before relying on `--state` writes; an unknown verb raises
-`ProviderOperationError`.
+Required: `--issue`, `--body-file`. `--state` is a verb whose
+configured transition the script POSTs after the comment is added. Run
+`workflow issue state --help` to list the configured verbs before
+relying on `--state`; an unknown verb raises `ProviderOperationError`.
 
 See `../issue-write/jira.md` for the shared body-bearing write
 procedure.
