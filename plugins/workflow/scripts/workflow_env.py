@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # /// script
+# dependencies = ["python-frontmatter"]
 # ///
 """Workflow shell environment contract helpers.
 
