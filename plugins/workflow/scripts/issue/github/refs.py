@@ -6,7 +6,7 @@ from __future__ import annotations
 import re
 from collections.abc import Sequence
 
-from workflow_github import GitHubRepository, normalize_issue_number
+from issue.github.gh import GitHubRepository, normalize_issue_number
 
 MAX_ISSUE_REFS = 20
 

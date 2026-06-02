@@ -21,8 +21,8 @@ github_issue_writeback_main = partial(run_intent, WRITEBACK)
 jira_issue_drafts_main = partial(run_intent, DRAFTS)
 from workflow_command import CommandRequest, CommandResult  # noqa: E402
 from issue.github.cache import GitHubIssueCache  # noqa: E402
-from workflow_github import DEFAULT_ISSUE_FIELDS  # noqa: E402
-from workflow_github import GitHubRepository  # noqa: E402
+from issue.github.gh import DEFAULT_ISSUE_FIELDS  # noqa: E402
+from issue.github.gh import GitHubRepository  # noqa: E402
 from workflow_jira_data_center_client import resolve_jira_data_center_site  # noqa: E402
 from issue.jira.cache import JiraDataCenterIssueCache  # noqa: E402
 

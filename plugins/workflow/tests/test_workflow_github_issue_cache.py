@@ -27,7 +27,7 @@ from issue.github.cache import (  # noqa: E402
     is_github_issue_cache_meta_path,
 )
 from workflow_command import CommandRequest, CommandResult  # noqa: E402
-from workflow_github import DEFAULT_ISSUE_FIELDS, GitHubRepository  # noqa: E402
+from issue.github.gh import DEFAULT_ISSUE_FIELDS, GitHubRepository  # noqa: E402
 from workflow_providers import (  # noqa: E402
     CACHE_POLICY_BYPASS,
     CACHE_POLICY_REFRESH,

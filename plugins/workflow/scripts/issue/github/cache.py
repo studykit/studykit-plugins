@@ -34,7 +34,7 @@ from workflow_cache import (
     content_fingerprint,
     relationships_fingerprint,
 )
-from workflow_github import GitHubRepository, normalize_issue_number
+from issue.github.gh import GitHubRepository, normalize_issue_number
 
 
 _COMMENT_FILENAME_RE = re.compile(r"^comment-.*\.md$")

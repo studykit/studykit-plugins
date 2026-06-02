@@ -12,8 +12,8 @@ from urllib.parse import quote, urlparse
 
 from workflow_command import CommandRunner, WorkflowCommandError
 from workflow_config import ProviderConfig, WorkflowConfig, normalize_role
-from workflow_github import GitHubRepository, GitHubRepositoryError, parse_github_remote_url
-from workflow_github import resolve_github_repository
+from issue.github.gh import GitHubRepository, GitHubRepositoryError, parse_github_remote_url
+from issue.github.gh import resolve_github_repository
 
 GITHUB_HASH_RE = re.compile(r"^#(?P<number>[1-9]\d*)$")
 GITHUB_REPO_RE = re.compile(

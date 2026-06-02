@@ -19,7 +19,7 @@ from workflow_cache import (
 )
 from workflow_command import CommandRunner
 from workflow_config import WorkflowConfigError, load_workflow_config
-from workflow_github import (
+from issue.github.gh import (
     DEFAULT_ISSUE_FIELDS,
     add_issue_dependency,
     add_sub_issue,
@@ -87,7 +87,7 @@ class _ResolvedRelationshipOperation:
 
 
 class GitHubIssueNativeProvider(IssueProvider):
-    """Native GitHub Issues provider backed by ``workflow_github.py``."""
+    """Native GitHub Issues provider backed by ``issue/github/gh.py``."""
 
     def __init__(self, *, runner: CommandRunner | None = None):
         super().__init__(kind="github", transport=TRANSPORT_NATIVE)
