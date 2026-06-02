@@ -65,9 +65,9 @@ Generic supported update intents:
 
 - Issue reference, plus desired title when changing the GitHub issue title.
 - Issue reference, plus desired workflow type when explicitly changing the workflow type
-  (`issue.py set-type`).
+  (`issue set-type`).
 - Issue reference, plus assignee login (or the literal `me`) when changing
-  the assignee (`issue.py assign|unassign`).
+  the assignee (`issue assign|unassign`).
 
 Do not ask for generic status, priority, tag, label, or GitHub Project field
 writes from this contract. Those writes require a separate project-specific

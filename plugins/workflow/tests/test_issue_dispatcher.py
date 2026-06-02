@@ -1,8 +1,8 @@
 """Issue dispatcher integration tests.
 
-Covers the dispatcher contract that ties the six per-intent modules
-under ``issue.legacy.*`` together (now exposed through the unified
-``issue.py``):
+Covers the dispatcher contract that ties the per-intent runs in
+``issue.dispatch`` together (exposed through the ``issue`` package entry
+point, ``issue/__main__.py``):
 
 - ``--help`` reflects only the active backend's option surface for the
   configured ``providers.issues.kind`` (backend-exclusive flags from the
@@ -30,13 +30,26 @@ _SCRIPTS_DIR = _PLUGIN_ROOT / "scripts"
 if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
-from issue.legacy.issue_attach import main as issue_attach_main  # noqa: E402
-from issue.legacy.issue_comments import main as issue_comments_main  # noqa: E402
-from issue.legacy.issue_new import main as issue_drafts_main  # noqa: E402
-from issue.legacy.issue_fetch import main as issue_fetch_main  # noqa: E402
-from issue.legacy.issue_fields import main as issue_fields_main  # noqa: E402
-from issue.legacy.issue_link import main as issue_relationships_main  # noqa: E402
-from issue.legacy.issue_update import main as issue_writeback_main  # noqa: E402
+from functools import partial  # noqa: E402
+
+from issue.dispatch import (  # noqa: E402
+    ATTACH,
+    COMMENTS,
+    DRAFTS,
+    FETCH,
+    FIELDS,
+    RELATIONSHIPS,
+    WRITEBACK,
+    run_intent,
+)
+
+issue_attach_main = partial(run_intent, ATTACH)
+issue_comments_main = partial(run_intent, COMMENTS)
+issue_drafts_main = partial(run_intent, DRAFTS)
+issue_fetch_main = partial(run_intent, FETCH)
+issue_fields_main = partial(run_intent, FIELDS)
+issue_relationships_main = partial(run_intent, RELATIONSHIPS)
+issue_writeback_main = partial(run_intent, WRITEBACK)
 
 
 _GITHUB_CONFIG = """

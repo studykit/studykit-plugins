@@ -72,13 +72,13 @@ Generic supported update intents:
 
 - Issue key, plus desired summary/title when changing the Jira issue title.
 - Issue key, plus the workflow type whose Jira issuetype to apply when
-  swapping the issuetype (`issue.py set-type`). The script
+  swapping the issuetype (`issue set-type`). The script
   resolves the native Jira issuetype name via the `artifact_issue_types`
   mapping.
 - Issue key, plus assignee username (or the literal `me`) when changing
-  the assignee (`issue.py assign|unassign`).
+  the assignee (`issue assign|unassign`).
 - Issue key, plus the configured `state_transitions` mapping when closing
-  or reopening (`issue.py state <KEY> close|reopen` or any configured verb).
+  or reopening (`issue state <KEY> close|reopen` or any configured verb).
 
 Do not ask for generic status or priority changes from this contract.
 Those writes require a separate project-specific workflow extension that

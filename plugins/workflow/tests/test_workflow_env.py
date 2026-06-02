@@ -288,7 +288,7 @@ def test_workflow_wrapper_uses_terminal_defaults_without_runtime_marker(tmp_path
     assert payload["WORKFLOW_SESSION_ID"] is None
 
 
-def test_workflow_wrapper_resolves_bare_name_to_py_script(tmp_path: Path) -> None:
+def test_workflow_wrapper_resolves_bare_name_to_runnable(tmp_path: Path) -> None:
     proc = subprocess.run(
         [str(_SCRIPTS_DIR / "workflow"), "issue", "--help"],
         check=True,
@@ -299,7 +299,7 @@ def test_workflow_wrapper_resolves_bare_name_to_py_script(tmp_path: Path) -> Non
         text=True,
     )
 
-    assert "usage: issue.py <verb>" in proc.stdout
+    assert "usage: issue <verb>" in proc.stdout
 
 
 def test_workflow_wrapper_terminal_defaults_use_launcher_plugin_root(tmp_path: Path) -> None:

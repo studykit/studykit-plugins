@@ -20,6 +20,10 @@ exec_workflow_command() {
   if [[ "$command" != */* ]]; then
     if [[ "$command" != *.* && -f "$SCRIPT_DIR/$command.py" ]]; then
       candidate="$SCRIPT_DIR/$command.py"
+    elif [[ "$command" != *.* && -f "$SCRIPT_DIR/$command/__main__.py" ]]; then
+      # Package-style command: run its `__main__.py` (carries PEP 723 deps and
+      # bootstraps sys.path so its absolute `<pkg>.*` imports resolve).
+      candidate="$SCRIPT_DIR/$command/__main__.py"
     else
       candidate="$SCRIPT_DIR/$command"
     fi

@@ -105,7 +105,7 @@ The `Write` tool is permitted only for creating or overwriting the sidecar audit
 
 - Do not modify the draft body file.
 - Do not write to any path other than the sidecar audit report (`<body_file_path>.audit.md`).
-- Do not call `issue.py new`, `issue.py update`, or any other write-side `issue.py` verb.
+- Do not call `issue new`, `issue update`, or any other write-side `issue` verb.
 - Do not fetch issues.
 - Do not issue a verdict outside the four in the taxonomy (`ok`, `split`, `parent-task-candidate`, `epic-candidate`).
 - Do not skip reading the authority documents at the start of the audit.

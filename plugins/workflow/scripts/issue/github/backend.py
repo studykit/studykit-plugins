@@ -3,9 +3,9 @@
 
 Ports the per-intent logic from the (now-deleted) ``github_issue_*.py``
 CLI scripts onto a single :class:`GitHubIssueBackend` driver consumed by
-the dispatcher scripts under ``scripts/issue_*.py``. The backend keeps
-the original argument surface and emitted JSON payload shapes; the only
-moved seam is the config-kind guard, which the dispatcher owns.
+the :mod:`issue.dispatch` dispatcher. The backend keeps the original
+argument surface and emitted JSON payload shapes; the only moved seam is
+the config-kind guard, which the dispatcher owns.
 """
 
 from __future__ import annotations
