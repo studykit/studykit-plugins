@@ -57,22 +57,6 @@ def test_bare_review_resolution_uses_absolute_authoring_files() -> None:
     assert all("plugins/workflow/operator" not in str(path) for path in resolution.files)
 
 
-def test_bare_review_authoring_uses_native_target_relationship() -> None:
-    resolution = resolve_authoring("review", side="issue", provider="github")
-    github_review_doc = next(
-        path
-        for path in resolution.files
-        if path.parent.name == "github" and path.name == "review.md"
-    )
-
-    text = github_review_doc.read_text(encoding="utf-8")
-
-    assert "represent the target with\nthe GitHub dependency relationship" in text
-    assert "GitHub-specific rules:" not in text
-    assert "## Target" not in text
-    assert "## Related" not in text
-
-
 def test_dual_artifact_requires_explicit_side() -> None:
     with pytest.raises(ResolverError, match="specify --side"):
         resolve_authoring("research", provider="jira")

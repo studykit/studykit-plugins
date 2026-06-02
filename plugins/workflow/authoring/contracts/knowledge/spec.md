@@ -2,17 +2,11 @@
 
 A workflow spec is a **knowledge-backed prescriptive implementation contract** for a single implementation surface: an API shape, schema, protocol, renderer rule, CLI surface, file format, integration contract, or other downstream implementation shape.
 
-Specs are curated knowledge pages. They are stored in the configured knowledge backend, not the issue backend.
+Specs are curated knowledge pages, stored in the configured knowledge backend, not the issue backend. Issue-backed work may create, review, or apply a spec, but the spec itself is a knowledge page.
 
 Companion contracts:
 
 - `./body.md`
-
-## Storage role
-
-`spec` is stored in the knowledge backend.
-
-Issue-backed work may create, review, or apply a spec, but the spec itself is a knowledge page.
 
 ## Supersession
 
@@ -58,10 +52,6 @@ Do not introduce a separate decisions page for routine spec-local rationale.
 Specs may be informed by research, use cases, tasks, reviews, and architecture/domain pages. Use canonical references in the `Related Work` section, one item per bullet, using the provider's link form.
 
 Research should provide evidence. The spec makes the decision.
-
-## Change log
-
-Every material update should add a concise `Change Log` entry linking to the causing work item. Do not duplicate issue discussion or review threads in the spec.
 
 ## Readiness rule
 

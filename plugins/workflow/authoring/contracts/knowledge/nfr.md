@@ -1,48 +1,25 @@
 # NFR Authoring
 
-An NFR page is a **knowledge-backed non-functional requirements reference**. It records measurable cross-cutting properties such as performance, security, scalability, accessibility, reliability, privacy, compliance, and operational constraints.
+An NFR page is a **knowledge-backed non-functional requirements reference**, recording measurable cross-cutting properties such as performance, security, scalability, accessibility, reliability, privacy, compliance, and operational constraints. It is curated knowledge, stored in the configured knowledge backend, not the issue backend. Issue-backed work may cause NFR updates, but the page itself is a knowledge page.
 
-NFR is curated knowledge. It is stored in the configured knowledge backend, not the issue backend.
-
-Companion contracts:
-
-- `./body.md`
-
-## Storage role
-
-`nfr` is stored in the knowledge backend.
-
-Issue-backed work may cause NFR updates, but the NFR page itself is a knowledge page.
+Companion contract: `./body.md`.
 
 ## Purpose
 
-Use NFR for measurable cross-cutting requirements:
+Use NFR for measurable cross-cutting requirements: performance targets, security requirements, scalability bounds, accessibility requirements, reliability/availability targets, privacy or compliance constraints, and operational constraints. NFRs should affect use cases, architecture, specs, tests, or implementation priorities.
 
-- Performance targets.
-- Security requirements.
-- Scalability bounds.
-- Accessibility requirements.
-- Reliability and availability targets.
-- Privacy or compliance constraints.
-- Operational constraints.
-
-NFRs should affect use cases, architecture, specs, tests, or implementation priorities.
-
-Do not use NFR for functional behavior. Functional behavior belongs in use cases and specs.
+Do not use NFR for functional behavior; that belongs in use cases and specs.
 
 ## Body shape
 
-Required sections:
+Required section:
 
-- `Requirements` — a table of NFR entries. The provider convention defines the literal table form.
-
-Recommended `Requirements` columns:
-
-- **ID** — stable short identifier, useful for references.
-- **Description** — concise requirement statement.
-- **Affected Scope** — use cases, specs, systems, or `(all)`.
-- **Measurable Criteria** — threshold, standard, check, or measurable condition.
-- **Verification** — how the requirement is verified.
+- `Requirements` — a table of NFR entries (the provider convention defines the literal table form). Recommended columns:
+  - **ID** — stable short identifier for references.
+  - **Description** — concise requirement statement.
+  - **Affected Scope** — use cases, specs, systems, or `(all)`.
+  - **Measurable Criteria** — threshold, standard, check, or measurable condition.
+  - **Verification** — how the requirement is verified.
 
 Optional sections:
 
@@ -52,53 +29,32 @@ Optional sections:
 
 ## Measurability rule
 
-Every NFR should be measurable.
-
-Avoid vague requirements:
-
-- "The app should be fast."
-- "Security should be strong."
-- "The UI should be accessible."
-
-Prefer measurable forms:
+Every NFR should be measurable. Avoid vague forms ("the app should be fast", "security should be strong"); prefer measurable ones:
 
 - "p95 response latency under 200 ms for authenticated search."
 - "All admin actions require audit log entries with actor, timestamp, action, and target."
 - "UI meets WCAG 2.2 AA for the onboarding flow."
 
-If a requirement cannot yet be measured, create a `review` item describing the open question or the missing measurement basis rather than adding an aspirational NFR.
+If a requirement cannot yet be measured, create a `review` item describing the open question or missing measurement basis rather than adding an aspirational NFR.
+
+## Verification
+
+Each NFR should have a verification path: automated test, CI check, monitoring query, audit process, manual review procedure, or compliance evidence. If verification is not yet known, mark it as an open question and create a review item if it blocks work.
 
 ## Content boundaries
 
 NFR records the target.
 
-- `architecture` records the design response.
-- `ci` records how tests/checks run.
-- `spec` records precise contracts when an NFR affects an API, schema, protocol, or format.
+- `architecture` — the design response.
+- `ci` — how tests/checks run.
+- `spec` — precise contracts when an NFR affects an API, schema, protocol, or format.
 
-Do not put implementation strategies in the NFR page unless they are part of the requirement itself.
-
-## Verification
-
-Each NFR should have a verification path:
-
-- Automated test.
-- CI check.
-- Monitoring query.
-- Audit process.
-- Manual review procedure.
-- Compliance evidence.
-
-If verification is not yet known, mark it as an open question and create a review item if it blocks work.
-
-## Change log
-
-Every material NFR change should include a `Change Log` entry linking to the causing work item. Do not duplicate issue discussion in the page.
+Do not put implementation strategy in the NFR page unless it is part of the requirement itself.
 
 ## Common mistakes
 
 - Missing the `Requirements` section.
-- Writing aspirational requirements without measurable criteria.
-- Putting functional behavior here instead of use cases/specs.
-- Putting implementation strategy here instead of architecture/spec.
-- Adding NFRs with no verification path or follow-up review item.
+- Aspirational requirements without measurable criteria.
+- Functional behavior here instead of use cases/specs.
+- Implementation strategy here instead of architecture/spec.
+- NFRs with no verification path or follow-up review item.

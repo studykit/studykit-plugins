@@ -12,12 +12,6 @@ Companion contracts:
 - Issue rules: `./common.md`
 - Decomposition choice: `./decomposition-patterns.md`
 
-## Storage role
-
-`epic` is stored in the issue backend.
-
-Use canonical issue identity. Do not use local integer ids.
-
 ## When to create an epic
 
 Create an epic only when the work matches one of these canonical scopes:

@@ -22,7 +22,7 @@ When running `workflow issue link` to apply a Jira relationship, supply the sour
 
 Use these canonical intents:
 
-- `parent`: the source issue should be under the target issue in the configured Jira hierarchy surface.
+- `parent`: the source issue should be under the target issue in the configured Jira hierarchy surface. Jira stores sub-issue parenting (the `parent` field) and epic membership (the Epic Link field) in separate fields; an issue belongs under an epic or under a parent task, not both.
 - `blocked_by`: the source issue is blocked by the target issue.
 - `related`: the source issue has a configured related-work link to the target.
 
