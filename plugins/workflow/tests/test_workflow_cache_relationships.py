@@ -12,7 +12,7 @@ _SCRIPTS_DIR = _PLUGIN_ROOT / "scripts"
 if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
-from workflow_cache import relationship_operations_from_intent  # noqa: E402
+from issue.cache import relationship_operations_from_intent  # noqa: E402
 from functools import partial  # noqa: E402
 
 from issue.github.cache import GitHubIssueCache  # noqa: E402
@@ -186,7 +186,7 @@ def test_github_provider_rejects_epic_relationship_operation(tmp_path: Path) -> 
     import pytest
 
     from issue.github.provider import GitHubIssueNativeProvider
-    from workflow_providers import ProviderContext, ProviderOperationError, ProviderRequest
+    from issue.providers import ProviderContext, ProviderOperationError, ProviderRequest
 
     write_config(tmp_path)
     cache = GitHubIssueCache.for_project(tmp_path, configured_repo=repo())

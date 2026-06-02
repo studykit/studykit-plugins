@@ -9,7 +9,7 @@ from typing import Any
 
 from pathlib import Path
 
-from workflow_cache import (
+from issue.cache import (
     FreshnessMetadata,
     PendingIssueRelationshipOperation,
     WorkflowCacheError,
@@ -49,7 +49,7 @@ from issue.github.cache import (
     content_fingerprint,
     relationships_fingerprint,
 )
-from workflow_providers import (
+from issue.providers import (
     CACHE_POLICY_BYPASS,
     CACHE_POLICY_DEFAULT,
     TRANSPORT_NATIVE,
