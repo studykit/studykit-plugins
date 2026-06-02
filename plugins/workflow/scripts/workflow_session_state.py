@@ -32,7 +32,7 @@ _SCRIPTS_DIR = str(Path(__file__).resolve().parent)
 if _SCRIPTS_DIR not in sys.path:
     sys.path.insert(0, _SCRIPTS_DIR)
 
-from issue.github.cache import GitHubIssueCache
+from workflow_cache import CACHE_ROOT_NAME  # noqa: E402
 from workflow_github import normalize_issue_number  # noqa: E402
 from issue.jira.refs import normalize_jira_issue_key  # noqa: E402
 
@@ -45,7 +45,8 @@ _MAX_SESSION_SLUG_LEN = 120
 
 
 def workflow_hook_state_dir(project: Path) -> Path:
-    return GitHubIssueCache.for_project(project).root / HOOK_STATE_DIR_NAME
+    cache_root = project.expanduser().resolve(strict=False) / CACHE_ROOT_NAME
+    return cache_root / HOOK_STATE_DIR_NAME
 
 
 def session_state_path(project: Path, runtime: str, session_id: str) -> Path | None:
