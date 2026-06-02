@@ -199,6 +199,8 @@ def test_github_issue_cache_writes_flat_layout_with_meta_and_relationships(tmp_p
     # one line per relationship kind, refs comma-joined.
     assert write.relationship_location == write.issue_dir / "relation.md"
     rel_md = write.relationship_location.read_text(encoding="utf-8")
+    # First line is the issue identifier, then relationship lines with no blank line.
+    assert rel_md.startswith("#39\n- ")
     assert "- parent: #28" in rel_md
     assert "- children: #41" in rel_md
     assert "- blocked_by: #32" in rel_md
@@ -233,6 +235,37 @@ def test_github_issue_cache_writes_flat_layout_with_meta_and_relationships(tmp_p
     assert relationships["parent"]["number"] == 28
     assert relationships["children"][0]["number"] == 41
     assert relationships["blocked_by"][0] == {"number": 32}
+
+
+def _issue_payload_without_links() -> dict[str, object]:
+    payload = issue_payload()
+    for key in ("parent", "children", "dependencies"):
+        payload.pop(key, None)
+    return payload
+
+
+def test_github_issue_cache_omits_relation_md_when_no_links(tmp_path: Path) -> None:
+    cache = GitHubIssueCache.for_project(tmp_path)
+
+    write = cache.write_issue_bundle(
+        repo(), _issue_payload_without_links(), fetched_at="2026-05-13T12:34:56Z"
+    )
+
+    # No relationships → no relation.md, but the machine source still exists.
+    assert not (write.issue_dir / "relation.md").is_file()
+    assert (write.issue_dir / ".relation.json").is_file()
+
+
+def test_github_issue_cache_removes_stale_relation_md_when_links_cleared(tmp_path: Path) -> None:
+    cache = GitHubIssueCache.for_project(tmp_path)
+
+    write = cache.write_issue_bundle(repo(), issue_payload(), fetched_at="2026-05-13T12:34:56Z")
+    assert (write.issue_dir / "relation.md").is_file()
+
+    rewrite = cache.write_issue_bundle(
+        repo(), _issue_payload_without_links(), fetched_at="2026-05-13T13:00:00Z"
+    )
+    assert not (rewrite.issue_dir / "relation.md").is_file()
 
 
 def test_github_issue_cache_preserves_comments_when_provider_payload_omits_comments(tmp_path: Path) -> None:

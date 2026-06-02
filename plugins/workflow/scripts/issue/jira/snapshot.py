@@ -29,7 +29,7 @@ _JIRA_MARKDOWN_RESERVED = {"parent", "children", "issue_links", "external_links"
 
 def render_jira_relationships_markdown(
     relationships: Mapping[str, Any], *, issue_key: str
-) -> str:
+) -> str | None:
     """Render the normalized Jira relationship block as concise markdown.
 
     One line per relationship kind (issue keys comma-joined) so an agent can
@@ -37,13 +37,13 @@ def render_jira_relationships_markdown(
     native ``issue.json`` / ``remote-links.json``; this is the human/LLM view.
     The kinds follow Jira's relationship model (parent / children / mapped link
     buckets / unmapped issue links / external links) and intentionally differ
-    from GitHub's projection.
+    from GitHub's projection. Returns ``None`` when the issue has no links so
+    the caller skips writing ``relation.md``.
     """
 
     workflow = relationships.get("workflow") if isinstance(relationships, Mapping) else None
     workflow = workflow if isinstance(workflow, Mapping) else {}
 
-    lines: list[str] = [f"# Relation — {issue_key}", ""]
     rendered: list[str] = []
 
     parent = _jira_ref_key(workflow.get("parent"))
@@ -64,8 +64,9 @@ def render_jira_relationships_markdown(
     rendered.extend(_jira_issue_link_lines(workflow.get("issue_links")))
     rendered.extend(_jira_external_link_lines(workflow.get("external_links")))
 
-    lines.extend(rendered if rendered else ["_No linked issues._"])
-    return "\n".join(lines).rstrip("\n") + "\n"
+    if not rendered:
+        return None
+    return "\n".join([issue_key, *rendered]) + "\n"
 
 
 def _jira_ref_key(value: Any) -> str | None:

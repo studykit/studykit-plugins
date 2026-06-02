@@ -170,7 +170,7 @@ def test_jira_write_issue_bundle_renders_relationships_markdown(tmp_path: Path) 
     )
 
     md = cache.relationships_file(site, "TEST-1234").read_text(encoding="utf-8")
-    assert md.startswith("# Relation — TEST-1234")
+    assert md.startswith("TEST-1234")
     # Concise: one line per relationship kind, no per-section headings.
     assert "- parent: TEST-1000" in md
     assert "- Blocks: TEST-2000 (outward)" in md
@@ -178,7 +178,7 @@ def test_jira_write_issue_bundle_renders_relationships_markdown(tmp_path: Path) 
     assert "## " not in md
 
 
-def test_jira_write_issue_bundle_relationships_markdown_empty_when_no_links(tmp_path: Path) -> None:
+def test_jira_write_issue_bundle_omits_relation_md_when_no_links(tmp_path: Path) -> None:
     cache = JiraDataCenterIssueCache.for_project(tmp_path)
     site = jira_site()
 
@@ -188,9 +188,8 @@ def test_jira_write_issue_bundle_relationships_markdown_empty_when_no_links(tmp_
         fetched_at="2026-05-15T10:00:00.000+0900",
     )
 
-    md = cache.relationships_file(site, "TEST-1234").read_text(encoding="utf-8")
-    assert md.startswith("# Relation — TEST-1234")
-    assert "_No linked issues._" in md
+    # No relationships → no relation.md at all (not even a placeholder).
+    assert not cache.relationships_file(site, "TEST-1234").is_file()
 
 
 def _payload_with_assignee(assignee: object) -> dict[str, object]:
