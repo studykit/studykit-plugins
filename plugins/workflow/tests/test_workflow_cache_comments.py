@@ -12,7 +12,11 @@ _SCRIPTS_DIR = _PLUGIN_ROOT / "scripts"
 if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
-from issue.legacy.issue_comments import main as jira_issue_comments_main  # noqa: E402
+from functools import partial  # noqa: E402
+
+from issue.dispatch import COMMENTS, run_intent  # noqa: E402
+
+jira_issue_comments_main = partial(run_intent, COMMENTS)
 from workflow_command import CommandRequest, CommandResult  # noqa: E402
 from workflow_config import load_workflow_config  # noqa: E402
 from issue.jira.cache import JiraDataCenterIssueCache  # noqa: E402

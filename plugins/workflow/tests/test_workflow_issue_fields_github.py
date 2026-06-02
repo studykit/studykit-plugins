@@ -21,7 +21,11 @@ from issue.github.backend import (  # noqa: E402
     GitHubIssueFieldsError,
     fields_payload,
 )
-from issue.legacy.issue_fields import main as github_issue_fields_main  # noqa: E402
+from functools import partial  # noqa: E402
+
+from issue.dispatch import FIELDS, run_intent  # noqa: E402
+
+github_issue_fields_main = partial(run_intent, FIELDS)
 
 
 _DROPPED_FIELD_KEYS = ("provider", "cache", "repository", "operation", "role", "kind", "verified")

@@ -20,7 +20,11 @@ from workflow_jira_data_center_client import jira_data_center_site_from_provider
 from issue.jira.cache import JiraDataCenterIssueCache  # noqa: E402
 from workflow_providers import ProviderOperationError  # noqa: E402
 from issue.jira.backend import JiraIssueFieldsError, fields_payload  # noqa: E402
-from issue.legacy.issue_fields import main  # noqa: E402
+from functools import partial  # noqa: E402
+
+from issue.dispatch import FIELDS, run_intent  # noqa: E402
+
+main = partial(run_intent, FIELDS)
 
 
 _DROPPED_FIELD_KEYS = ("provider", "cache", "site", "operation", "role", "kind", "verified", "key")
