@@ -268,15 +268,16 @@ def test_cache_fetch_uses_cache_hit_without_remote_issue_view(tmp_path: Path) ->
     assert code == 0
     assert set(payload) == {"basedir", "issues"}
     assert payload["basedir"] == ".workflow-cache/issues/"
+    # The payload has no relationships, so relation.md is never written and the
+    # fetch entry omits the relationships key entirely.
     assert set(payload["issues"][0]) == {
         "issue",
         "title",
         "state",
         "cache_refreshed",
-        "relationships",
     }
     assert payload["issues"][0]["issue"] == "42/issue.md"
-    assert payload["issues"][0]["relationships"] == "42/relation.md"
+    assert "relationships" not in payload["issues"][0]
     assert payload["issues"][0]["cache_refreshed"] is False
     assert runner.requests == []
 

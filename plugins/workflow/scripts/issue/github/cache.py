@@ -475,7 +475,11 @@ class GitHubIssueCache:
         data.update(compact)
         _atomic_write_text(source_path, _dump_json(data))
         rel_path = self.relationships_file(repo, issue)
-        _atomic_write_text(rel_path, _render_github_relationships_markdown(repo, issue, compact))
+        markdown = _render_github_relationships_markdown(issue, compact)
+        if markdown is None:
+            rel_path.unlink(missing_ok=True)
+        else:
+            _atomic_write_text(rel_path, markdown)
         return rel_path
 
     def _update_meta_fingerprint(self, meta_path: Path, key: str, value: str) -> None:
@@ -553,17 +557,16 @@ _GITHUB_RELATIONSHIP_KINDS: tuple[str, ...] = (
 
 
 def _render_github_relationships_markdown(
-    repo: GitHubRepository, issue: int | str, compact: Mapping[str, Any]
-) -> str:
+    issue: int | str, compact: Mapping[str, Any]
+) -> str | None:
     """Render the compact relationship projection as concise markdown.
 
     One line per relationship kind (refs comma-joined) so the LLM can scan
     linked issues at a glance. The machine source stays in
-    ``.relation.json``; this is the human/LLM view.
+    ``.relation.json``; this is the human/LLM view. Returns ``None`` when the
+    issue has no relationships so the caller skips writing ``relation.md``.
     """
 
-    heading = f"# Relation — {repo.owner}/{repo.name}#{normalize_issue_number(issue)}"
-    lines: list[str] = [heading, ""]
     rendered: list[str] = []
     for key in _GITHUB_RELATIONSHIP_KINDS:
         refs = compact.get(key)
@@ -573,8 +576,10 @@ def _render_github_relationships_markdown(
         texts = [_github_relationship_ref_text(ref) for ref in ref_list if ref is not None]
         if texts:
             rendered.append(f"- {key}: {', '.join(texts)}")
-    lines.extend(rendered if rendered else ["_No linked issues._"])
-    return "\n".join(lines).rstrip("\n") + "\n"
+    if not rendered:
+        return None
+    heading = f"#{normalize_issue_number(issue)}"
+    return "\n".join([heading, *rendered]) + "\n"
 
 
 def _github_relationship_ref_text(ref: Any) -> str:

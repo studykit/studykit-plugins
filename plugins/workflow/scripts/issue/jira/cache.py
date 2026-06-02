@@ -228,13 +228,15 @@ class JiraDataCenterIssueCache:
         _atomic_write_text(issue_json_path, _format_json(issue))
         _atomic_write_text(remote_links_path, _format_json(links))
         _atomic_write_text(issue_md_path, str(normalized.get("body") or ""))
-        _atomic_write_text(
-            self.relationships_file(site, key),
-            render_jira_relationships_markdown(
-                relationships if isinstance(relationships, Mapping) else {},
-                issue_key=key,
-            ),
+        relationships_md = render_jira_relationships_markdown(
+            relationships if isinstance(relationships, Mapping) else {},
+            issue_key=key,
         )
+        relationships_path = self.relationships_file(site, key)
+        if relationships_md is None:
+            relationships_path.unlink(missing_ok=True)
+        else:
+            _atomic_write_text(relationships_path, relationships_md)
         meta = {
             "schema_version": SCHEMA_VERSION,
             "fingerprints": jira_fingerprints(
