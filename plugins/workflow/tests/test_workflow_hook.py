@@ -75,6 +75,13 @@ def main_context_fragment(name: str) -> str:
     return (_MAIN_CONTEXT_ROOT / name).read_text(encoding="utf-8").strip()
 
 
+def optional_main_context_fragment(name: str) -> str:
+    path = _MAIN_CONTEXT_ROOT / name
+    if not path.exists():
+        return ""
+    return path.read_text(encoding="utf-8").strip()
+
+
 def _composed_snippet(group: str, provider: str) -> str:
     """Mirror :func:`workflow_main_context._read_snippet` for assertion helpers.
 
@@ -117,6 +124,9 @@ def expected_session_start_context(
         "SNIPPET_LAUNCHER": launcher_block,
         "SNIPPET_AUTHORING": main_context_fragment("snippets/authoring.md"),
         "SNIPPET_PRD_PATH": main_context_fragment("snippets/prd-path.md"),
+        "SNIPPET_PROVIDER_RUNBOOK": optional_main_context_fragment(
+            f"snippets/runbook/{issue_kind}.md"
+        ),
         "WORKFLOW_RUNBOOK_DIR": str(runbook_dir),
         "WORKFLOW_ISSUE_PROVIDER": issue_kind,
     })
@@ -1191,8 +1201,25 @@ def test_session_start_uses_jira_provider_writes_pointer_for_jira_config(
     assert f"{runbook_dir}/<intent>/jira.md" in context
     assert "- `issue-fetch`" in context
     assert "- `issue-write`" in context
+    # issue-attach is a Jira-only intent — injected only under the Jira provider.
+    assert "- `issue-attach`" in context
     assert "github.md" not in context
     assert "filesystem.md" not in context
+
+
+def test_session_start_omits_issue_attach_intent_for_github_config(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _write_config(tmp_path)
+
+    out = _run_session_start(tmp_path, monkeypatch, runtime="codex")
+
+    payload = json.loads(out)
+    context = payload["hookSpecificOutput"]["additionalContext"]
+    # Attachments are Jira-only; the GitHub session must not learn the intent exists.
+    assert "- `issue-fetch`" in context
+    assert "issue-attach" not in context
 
 
 def test_session_start_skips_claude_subagent_payload(

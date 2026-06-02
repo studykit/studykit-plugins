@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import json
 import os
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -127,6 +127,11 @@ def jira_data_center_comments_path(site: JiraDataCenterSite, issue_key: str) -> 
     return f"/rest/api/{site.api_version}/issue/{escaped_key}/comment"
 
 
+def jira_data_center_attachments_path(site: JiraDataCenterSite, issue_key: str) -> str:
+    escaped_key = quote(normalize_jira_issue_key(issue_key), safe="")
+    return f"/rest/api/{site.api_version}/issue/{escaped_key}/attachments"
+
+
 def jira_data_center_transitions_path(site: JiraDataCenterSite, issue_key: str) -> str:
     escaped_key = quote(normalize_jira_issue_key(issue_key), safe="")
     return f"/rest/api/{site.api_version}/issue/{escaped_key}/transitions"
@@ -182,6 +187,38 @@ def jira_send_json(
     stdout = result.stdout.strip()
     if not stdout:
         return {}
+    try:
+        return json.loads(stdout)
+    except json.JSONDecodeError as exc:
+        raise JiraProviderError(f"Jira response was not valid JSON for {url}: {exc}") from exc
+
+
+def jira_upload_attachments(
+    site: JiraDataCenterSite,
+    issue_key: str,
+    file_paths: Iterable[str],
+    *,
+    runner: CommandRunner | None = None,
+) -> Any:
+    """Upload one or more local files to a Jira issue as multipart attachments.
+
+    Jira's attachment endpoint is multipart/form-data (form field ``file``,
+    repeatable) and requires the ``X-Atlassian-Token: no-check`` header to
+    bypass the XSRF guard — neither fits the JSON mutation helper above.
+    """
+
+    paths = [str(path) for path in file_paths]
+    if not paths:
+        raise JiraProviderError("at least one attachment file is required")
+    url = f"{site.base_url}{jira_data_center_attachments_path(site, issue_key)}"
+    result = run_command(
+        ("curl", "--silent", "--show-error", "--fail", "--config", "-"),
+        input_text=_curl_multipart_config(url=url, file_paths=paths),
+        runner=runner,
+    )
+    stdout = result.stdout.strip()
+    if not stdout:
+        return []
     try:
         return json.loads(stdout)
     except json.JSONDecodeError as exc:
@@ -257,6 +294,19 @@ def _curl_json_config(*, method: str, url: str, payload: Mapping[str, Any]) -> s
             f'data-binary = "{_curl_quote(_format_json_compact(payload))}"',
         ]
     )
+    return "\n".join(lines) + "\n"
+
+
+def _curl_multipart_config(*, url: str, file_paths: Iterable[str]) -> str:
+    lines = _curl_base_config_lines()
+    lines.extend(
+        [
+            'header = "X-Atlassian-Token: no-check"',
+            'request = "POST"',
+            f'url = "{_curl_quote(url)}"',
+        ]
+    )
+    lines.extend(f'form = "file=@{_curl_quote(path)}"' for path in file_paths)
     return "\n".join(lines) + "\n"
 
 

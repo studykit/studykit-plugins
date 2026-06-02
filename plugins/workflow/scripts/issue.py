@@ -41,6 +41,7 @@ from typing import TextIO
 from workflow_command import CommandRunner
 
 from issue.legacy import (
+    issue_attach,
     issue_comments,
     issue_new,
     issue_fetch,
@@ -55,6 +56,7 @@ _VERBS = (
     "update",
     "fetch",
     "comment",
+    "attach",
     "link",
     "state",
     "assign",
@@ -71,6 +73,7 @@ _USAGE = (
     "  update     update title / body / labels / state (legacy: issue_update update)\n"
     "  fetch      fetch one or more issues into the cache (legacy: issue_fetch)\n"
     "  comment    append a comment from a body file (legacy: issue_comments append)\n"
+    "  attach     attach local file(s) to an issue (Jira provider only)\n"
     "  link       add / remove / replace relationships (legacy: issue_link)\n"
     "  state      change lifecycle state (e.g. `state <ref> close`)\n"
     "  assign     assign an issue to a user (e.g. `assign <ref> me`)\n"
@@ -117,6 +120,8 @@ def main(
         return issue_fetch.main(rest, **kwargs)
     if verb == "comment":
         return issue_comments.main(["append", *rest], **kwargs)
+    if verb == "attach":
+        return issue_attach.main(rest, **kwargs)
     if verb == "link":
         return issue_link.main(rest, **kwargs)
     if verb == "state":
