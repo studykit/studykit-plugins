@@ -16,12 +16,12 @@ if str(_SCRIPTS_DIR) not in sys.path:
 
 from workflow_command import CommandRequest, CommandResult, MissingCommandError  # noqa: E402
 from workflow_command import WorkflowCommandError  # noqa: E402
-from workflow_github import DEFAULT_ISSUE_FIELDS, GitHubParseError  # noqa: E402
-from workflow_github import GitHubVerificationError  # noqa: E402
-from workflow_github import close_issue, comment_issue, create_issue, edit_issue, edit_issue_body  # noqa: E402
-from workflow_github import issue_body_edit_history, issue_timeline  # noqa: E402
-from workflow_github import parse_github_remote_url, resolve_github_repository, view_issue  # noqa: E402
-from workflow_github import reopen_issue  # noqa: E402
+from issue.github.gh import DEFAULT_ISSUE_FIELDS, GitHubParseError  # noqa: E402
+from issue.github.gh import GitHubVerificationError  # noqa: E402
+from issue.github.gh import close_issue, comment_issue, create_issue, edit_issue, edit_issue_body  # noqa: E402
+from issue.github.gh import issue_body_edit_history, issue_timeline  # noqa: E402
+from issue.github.gh import parse_github_remote_url, resolve_github_repository, view_issue  # noqa: E402
+from issue.github.gh import reopen_issue  # noqa: E402
 
 
 class FakeRunner:

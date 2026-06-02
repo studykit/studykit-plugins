@@ -20,7 +20,7 @@ from issue.dispatch import RELATIONSHIPS, run_intent  # noqa: E402
 
 github_issue_relationships_main = partial(run_intent, RELATIONSHIPS)
 from workflow_command import CommandRequest, CommandResult  # noqa: E402
-from workflow_github import GitHubRepository  # noqa: E402
+from issue.github.gh import GitHubRepository  # noqa: E402
 
 
 def repo() -> GitHubRepository:

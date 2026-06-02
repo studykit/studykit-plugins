@@ -27,8 +27,8 @@ if _SCRIPTS_DIR not in sys.path:
 from workflow_command import CommandRunner  # noqa: E402
 from workflow_edit_target import EditTarget  # noqa: E402
 from workflow_config import WorkflowConfig, WorkflowConfigError, load_workflow_config  # noqa: E402
-from workflow_github import GitHubRepository, GitHubRepositoryError, normalize_issue_number  # noqa: E402
-from workflow_github import resolve_github_repository  # noqa: E402
+from issue.github.gh import GitHubRepository, GitHubRepositoryError, normalize_issue_number  # noqa: E402
+from issue.github.gh import resolve_github_repository  # noqa: E402
 from issue.github.cache import (  # noqa: E402
     is_github_issue_cache_body_path,
     is_github_issue_cache_meta_path,

@@ -26,7 +26,7 @@ from workflow_main_context import (  # noqa: E402
 )
 from workflow_command import CommandRequest, CommandResult  # noqa: E402
 from issue.github.cache import GitHubIssueCache  # noqa: E402
-from workflow_github import DEFAULT_ISSUE_FIELDS, GitHubRepository  # noqa: E402
+from issue.github.gh import DEFAULT_ISSUE_FIELDS, GitHubRepository  # noqa: E402
 from issue.github.refs import extract_issue_numbers as extract_github_issue_numbers  # noqa: E402
 from issue.jira.refs import jira_issue_keys_from_references  # noqa: E402
 from hook_claude import (  # noqa: E402

@@ -21,7 +21,7 @@ import frontmatter as frontmatter_lib
 from workflow_cache import WorkflowCacheError
 from workflow_command import CommandRunner
 from workflow_config import WorkflowConfig
-from workflow_github import (
+from issue.github.gh import (
     DEFAULT_ISSUE_FIELDS,  # noqa: F401  (imported for downstream tests)
     GitHubRepositoryError,
     get_github_login,

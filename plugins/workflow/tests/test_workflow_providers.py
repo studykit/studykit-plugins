@@ -18,7 +18,7 @@ from issue.github.backend import fields_payload  # noqa: E402
 from issue.github.cache import GitHubIssueCache  # noqa: E402
 from workflow_command import CommandRequest, CommandResult  # noqa: E402
 from workflow_config import parse_workflow_config  # noqa: E402
-from workflow_github import DEFAULT_ISSUE_FIELDS, GitHubRepository  # noqa: E402
+from issue.github.gh import DEFAULT_ISSUE_FIELDS, GitHubRepository  # noqa: E402
 from workflow_providers import (  # noqa: E402
     CACHE_POLICY_REFRESH,
     ISSUE_PROVIDER_OPERATIONS,

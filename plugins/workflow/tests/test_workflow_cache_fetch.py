@@ -21,7 +21,7 @@ jira_issue_fetch_main = partial(run_intent, FETCH)
 from workflow_command import CommandRequest, CommandResult  # noqa: E402
 from workflow_config import load_workflow_config  # noqa: E402
 from issue.github.cache import GitHubIssueCache  # noqa: E402
-from workflow_github import DEFAULT_ISSUE_FIELDS, GitHubRepository  # noqa: E402
+from issue.github.gh import DEFAULT_ISSUE_FIELDS, GitHubRepository  # noqa: E402
 from issue.github.refs import issue_numbers_from_references  # noqa: E402
 from issue.jira.cache import JiraDataCenterIssueCache  # noqa: E402
 from workflow_jira_data_center_client import jira_data_center_site_from_provider_config  # noqa: E402

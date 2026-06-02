@@ -45,7 +45,7 @@ from workflow_config import (  # noqa: E402
     validate_provider_for_role,
 )
 from workflow_env import workflow_project_dir_from_env  # noqa: E402
-from workflow_github import GitHubRepositoryError, parse_github_remote_url  # noqa: E402
+from issue.github.gh import GitHubRepositoryError, parse_github_remote_url  # noqa: E402
 from prd_path import PrdPathError, normalize_prd_path  # noqa: E402
 from workflow_jira_data_center_client import (  # noqa: E402
     jira_data_center_createmeta_path,
