@@ -27,7 +27,7 @@ from issue.jira.relationships import (
 )
 from workflow_command import CommandRunner
 from workflow_config import WorkflowConfigError, load_workflow_config
-from workflow_jira_data_center_client import (
+from issue.jira.client import (
     jira_download_attachment,
     jira_upload_attachments,
     jira_data_center_comments_path,

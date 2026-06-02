@@ -10,7 +10,7 @@ from workflow_config import WorkflowConfig
 from issue.cli_output import IssueFetchContext, cache_refreshed_from_payload, display_project_path
 from issue.jira.cache import JiraDataCenterIssueCache
 from issue.jira.refs import normalize_jira_issue_key
-from workflow_jira_data_center_client import resolve_jira_data_center_site
+from issue.jira.client import resolve_jira_data_center_site
 from workflow_providers import CACHE_POLICY_DEFAULT, ProviderContext, ProviderRequest
 
 

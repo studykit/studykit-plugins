@@ -7,7 +7,7 @@ from collections.abc import Mapping
 from typing import Any
 
 from issue.jira.refs import normalize_jira_issue_key
-from workflow_jira_data_center_client import JiraDataCenterSite
+from issue.jira.client import JiraDataCenterSite
 
 def normalize_jira_data_center_issue(
     issue: Mapping[str, Any],
