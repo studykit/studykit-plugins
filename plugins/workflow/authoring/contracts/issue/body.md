@@ -1,39 +1,20 @@
 # Issue Body Conventions
 
-Body-level rules for issue-backed items stored in an issue backend.
+Body-level rules for issue-backed items (`task`, `bug`, `spike`, `epic`, `review`, and the issue side of `usecase` and `research`). Covers body structure, readability, reusable sections, and references for the visible issue body. Type-specific authoring files define each type's required body shape.
 
-Issue-backed item types include `task`, `bug`, `spike`, `epic`, `review`, and the workflow issue side of `usecase` and `research`.
-
-## Scope
-
-These rules apply to the visible issue body.
-
-Type-specific authoring files define the required body shape for each item type. This file defines body structure, readability, reusable sections, and references for issue-backed items.
-
-This file uses canonical section names only and does not embed literal markup. The literal markup form for headings, lists, inline emphasis, links, code, tables, and checklists is defined by the matching rendering convention.
+Use canonical Title Case section names only; the matching rendering convention defines the literal markup for headings, lists, inline emphasis, links, code, tables, and checklists.
 
 ## Section structure
 
-An issue body is organized as a sequence of named sections.
+An issue body is a sequence of named sections.
 
-Rules:
-
-- Each section has a canonical Title Case name (`Description`, `Acceptance Criteria`, `Unit Test Strategy`, etc.).
-- Each section starts with a level-2 heading rendered in the rendering convention's heading form. Subsections may appear inside a section using deeper heading levels.
-- Do not put a top-level title heading inside the body when the issue title is stored separately.
-- Avoid stray content above the first section unless the selected type template requires a short summary block.
+- Each section has a canonical Title Case name (`Description`, `Acceptance Criteria`, `Unit Test Strategy`, etc.) and starts with a level-2 heading. Subsections use deeper heading levels.
+- Do not put a top-level title heading in the body when the issue title is stored separately.
+- Avoid stray content above the first section unless the type template requires a short summary block.
 
 ## Tailoring the body
 
-Beyond the required sections defined by the item's type-specific
-authoring file, each issue author may add purpose-specific sections
-when the issue has natural structure that the type-defined sections
-do not capture. Pick short, descriptive Title Case section names;
-keep each section narrow (one named thing per section); and keep
-the overall body short — a custom section earns its place only when
-its content would otherwise have to be folded awkwardly into an
-existing section. If the content fits naturally into an existing
-section, fold it back in instead of adding a new heading.
+Beyond the required sections, an author may add purpose-specific Title Case sections when the issue has natural structure the type-defined sections do not capture. Keep each section narrow (one named thing) and the overall body short. A custom section earns its place only when its content would otherwise fold awkwardly into an existing one; if it fits naturally, fold it back in instead.
 
 ## Reference form
 
@@ -45,93 +26,53 @@ Use stable, readable references in body text.
 | Knowledge page | Page, document, or file reference from the selected knowledge backend |
 | External source | Native link form from the rendering convention |
 
-Rules:
-
-- Prefer the shortest reference that is unambiguous in the configured project.
-- Use full URLs when a short reference would be ambiguous outside its source system.
+- Prefer the shortest reference unambiguous in the configured project; use full URLs when a short reference would be ambiguous outside its source system.
 - Do not require local file paths for targets whose canonical identity is not a local file.
 - Do not introduce workflow-local numeric IDs when canonical identity already exists.
+- Keep one referenced item per bullet in relationship lists.
 
-## Relationship body sections
+## Relationship sections
 
-Issue relationship body sections are defined by the type-specific authoring file or the matching rendering convention. Do not invent new relationship sections unless the selected authoring files require them.
+Relationship body sections are defined by the type-specific authoring file or the matching rendering convention. Do not invent new relationship sections unless the selected authoring files require them.
 
 ## Optional reusable sections
 
-The named sections defined below (`Related`, `Resume`, `Why
-Discarded`, `Out of Scope`, `Alternatives Considered`, `Risks`)
-are optional reusable building blocks for any issue type. Include
-each only when its per-section guidance applies; otherwise omit
-it. A type-specific authoring file may pin one of them as required
-for a particular type — in that case the type contract overrides
-this file's optional framing.
+`Related`, `Resume`, `Why Discarded`, `Out of Scope`, `Alternatives Considered`, and `Risks` are optional building blocks for any issue type. Include each only when its per-section guidance applies. A type-specific authoring file may pin one as required for a type, overriding this file's optional framing.
 
-### `Related` section
+### `Related`
 
-Use for references that help interpret the issue but are not stored as native backend relationships. Express each reference using the native reference form from the configured issue or knowledge backend.
+References that help interpret the issue but are not stored as native backend relationships. Use the native reference form of the configured issue or knowledge backend.
 
-### `Resume` section
+### `Resume`
 
-Purpose: current-state snapshot for a future session.
-
-Use when an issue-backed item is mid-flight and the current state is not obvious from the existing body.
+Current-state snapshot for a future session. Use when an item is mid-flight and its state is not obvious from the body. Rewrite in place; do not preserve history.
 
 Suggested slots:
 
 - **Approach.** Current strategy.
 - **Waiting for.** External input or sequencing note.
-- **Open questions.** Items left open for downstream resolution — questions awaiting input (decisions or info needed), deferred work tracked elsewhere, follow-up candidates surfaced during this work, or lateral concerns observed but not addressed within this issue's scope.
+- **Open questions.** Items left open for downstream resolution — questions awaiting input, deferred work tracked elsewhere, follow-up candidates surfaced during this work, or lateral concerns observed but not addressed within this issue's scope.
 - **Next.** Next concrete step.
 
-Rewrite the `Resume` section in place. Do not preserve history there.
+### `Why Discarded`
 
-### `Why Discarded` section
+Use when an issue is intentionally abandoned and backend status alone does not explain why. One dated bullet per reason, citing the cause when relevant.
 
-Use when an issue is intentionally abandoned and backend status alone does not explain why.
+### `Out of Scope`
 
-The section should hold one dated bullet per reason, citing the cause when relevant.
+Name what the issue explicitly does not cover. Use when the title or `Description` could read as covering broader work, or when a related concern was deliberately deferred to a follow-up. Skip when scope is already obvious from `Description` and `Affected Paths`, or when the only deferred item is a generic disclaimer with no concrete follow-up. One deferred item per bullet with a short reason or follow-up link.
 
-### `Out of Scope` section
+### `Alternatives Considered`
 
-Purpose: name what the issue explicitly does not cover.
+Record evaluated-but-rejected options with the rejection reason. Use when the chosen approach is non-obvious and a reviewer is likely to suggest a rejected option. Skip when no real alternatives were considered, or when the reasoning belongs in a curated knowledge page (update that page instead). One alternative per bullet; do not re-litigate the accepted decision.
 
-Use when the issue title or `Description` could be read as covering broader work, or when a related concern was deliberately deferred to a follow-up.
+### `Risks`
 
-Do not use when the body is small enough that scope is obvious from `Description` and `Affected Paths`, or when the only deferred item is a generic disclaimer with no concrete follow-up.
-
-List one deferred item per bullet with a short reason or link to the follow-up.
-
-### `Alternatives Considered` section
-
-Purpose: record design or implementation options that were evaluated but not chosen, with the rejection reason.
-
-Use when the chosen approach is non-obvious and a reviewer is likely to suggest one of the rejected options.
-
-Do not use when no real alternatives were considered, or when the reasoning belongs in a curated knowledge page (create or update that page instead).
-
-List one alternative per bullet with the rejection reason. Do not re-litigate the accepted decision here.
-
-### `Risks` section
-
-Purpose: name technical risks, regression hazards, or operational concerns specific to this issue.
-
-Use when the change touches load-bearing code, migrations, contracts, or behavior with non-trivial blast radius, and the risk is not already covered by `Acceptance Criteria` or the test strategy.
-
-Do not use when the change is small and routine, or when the risk is already represented by an `Open Questions` entry or test scenario.
-
-List one risk per bullet with the mitigation or detection plan when known.
-
-## Relationship lists
-
-Relationship lists should keep one referenced item per bullet.
+Name technical risks, regression hazards, or operational concerns specific to this issue. Use when the change touches load-bearing code, migrations, contracts, or behavior with non-trivial blast radius and the risk is not already covered by `Acceptance Criteria` or the test strategy. Skip for small routine changes, or when the risk is already represented by an `Open Questions` entry or test scenario. One risk per bullet with the mitigation or detection plan when known.
 
 ## Comments versus body
 
-Use the issue body for the current structured issue content.
-
-Use comments, work notes, discussions, or history for conversation, progress notes, review conversations, raw investigation notes, and audit facts.
-
-Do not copy long comment threads into the body. Summarize the resulting decision or current state in the relevant body section instead.
+Use the body for the current structured issue content. Use comments, work notes, discussions, or history for conversation, progress notes, review threads, raw investigation notes, and audit facts. Do not copy long comment threads into the body — summarize the resulting decision or current state in the relevant body section.
 
 ## Filesystem projections
 

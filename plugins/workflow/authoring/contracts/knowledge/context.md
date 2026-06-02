@@ -2,15 +2,11 @@
 
 A context page is a **knowledge-backed framing reference**. It records the original idea, problem framing, scope boundaries, and optional UI/navigation framing that other work items and knowledge pages assume.
 
-Context is curated knowledge. It is stored in the configured knowledge backend, not the issue backend.
+Context is curated knowledge, stored in the configured knowledge backend, not the issue backend.
 
 Companion contracts:
 
 - `./body.md`
-
-## Storage role
-
-Context pages are knowledge pages. Do not store context pages in the issue backend.
 
 ## Purpose
 
@@ -72,10 +68,6 @@ Each screen entry should include:
 - Optional mockup or prototype link.
 
 Do not embed large mockups inline. Link to design artifacts or generated previews.
-
-## Change log
-
-Every material context change should include a `Change Log` entry linking to the causing work item. Do not duplicate issue discussion in the page.
 
 ## Content boundaries
 

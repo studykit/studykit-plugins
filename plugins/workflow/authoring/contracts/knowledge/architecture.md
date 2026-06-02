@@ -2,17 +2,11 @@
 
 An architecture page is a **knowledge-backed design-intent reference** for the current system shape: components, responsibilities, integration boundaries, technology stack, and test strategy.
 
-Architecture is curated knowledge. It is stored in the configured knowledge backend, not the issue backend.
+Architecture is curated knowledge, stored in the configured knowledge backend, not the issue backend. Issue-backed work may cause architecture updates, but the page itself is a knowledge page.
 
 Companion contracts:
 
 - `./body.md`
-
-## Storage role
-
-`architecture` is stored in the knowledge backend.
-
-Issue-backed tasks, bugs, spikes, reviews, use cases, and research may cause architecture updates, but the architecture page itself is a knowledge page.
 
 ## Purpose
 
@@ -68,10 +62,6 @@ Do not silently rename component headings.
 Architecture records the current shape. Durable rationale belongs in specs, especially the spec's `Decision Log` or `Rejected Alternatives` sections.
 
 A short rationale sentence is acceptable when it helps readers understand the current shape. Long comparisons and rejected options belong in a spec or research report.
-
-## Change log
-
-Every material architecture change should include a `Change Log` entry linking to the causing work item. Do not duplicate the issue discussion in the page.
 
 ## Content boundaries
 

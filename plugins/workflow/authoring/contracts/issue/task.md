@@ -1,7 +1,6 @@
 # Task Authoring
 
-A workflow task records regular implementation work: new functionality,
-extension, refactor, or other planned code change.
+A workflow task records regular implementation work: new functionality, extension, refactor, or other planned code change.
 
 Companion contracts:
 
@@ -11,60 +10,42 @@ Companion contracts:
 
 ## Task title
 
-Use a short human-readable title that names the intended change and the main
-target area.
+Short and human-readable, naming the intended change and the main target area.
 
 ## Anchors and scope
 
-A task should usually have at least one acceptance source:
+A task should usually have at least one acceptance source: a use case or requirement it delivers, a spec or knowledge page defining the implementation contract, or an epic/parent issue coordinating a batch.
 
-- A use case or requirement the task delivers.
-- A spec or knowledge page that defines the implementation contract.
-- An epic or parent issue that coordinates a batch of work.
+Anchorless tasks are allowed for small, obvious changes, but should pass a smell check:
 
-Anchorless tasks are allowed for small, obvious changes, but they should pass a smell check:
+- User-facing behavior with no use case → create or link a use case.
+- A protocol, schema, API shape, or architectural decision with no spec → create or link a spec.
+- Exploratory work with missing evidence → use `spike` or `research` instead.
 
-- If the task implies user-facing behavior with no use case, create or link a use case.
-- If the task implies a protocol, schema, API shape, or architectural decision with no spec, create or link a spec.
-- If the task is exploratory and evidence is missing, use `spike` or `research` instead.
-
-Do not hide design decisions only in the task body when they should become curated knowledge.
+Do not hide design decisions in the task body when they should become curated knowledge.
 
 ## Body shape
 
 Required sections:
 
-- `Description` — what is changing and why. State the motivation explicitly for removals, boundary changes, agent responsibility changes, schema or contract changes, and work that prevents a known regression.
+- `Description` — what is changing and why. State the motivation explicitly for removals, boundary changes, agent responsibility changes, schema/contract changes, and work that prevents a known regression.
 - `Unit Test Strategy` — scenarios, isolation strategy, and expected test locations.
-- `Acceptance Criteria` — one or more observable completion conditions, expressed as completion-oriented checklist items.
+- `Acceptance Criteria` — one or more observable completion conditions as completion-oriented checklist items. Required even when the task links to use cases or specs.
 
-The `Acceptance Criteria` section must exist even when the task has issue links to use cases or specs.
-
-Use the `Approach` section to record the implementation strategy and the `Affected Paths` section for the expected file scope when present. Do not hide the motivation only in those sections. If the rationale is a long-lived design decision, create or update the relevant knowledge page instead of embedding the full decision record in the task body.
-
-Acceptance criteria should be grounded in:
-
-- Linked use case flow, validation, and error handling.
-- Linked spec specification.
-- Linked architecture/domain context.
-- Explicit user request when no curated page exists yet.
+Ground acceptance criteria in: linked use case flow/validation/error handling, linked spec, linked architecture/domain context, or an explicit user request when no curated page exists yet.
 
 Optional sections:
 
-- `Approach` — implementation strategy: how the work will be done, including sequencing and architectural choices.
+- `Approach` — implementation strategy: how the work is done, including sequencing and architectural choices.
 - `Affected Paths` — forward-looking scope fence naming files, packages, APIs, or migration steps expected to change.
 - `Interface Contracts` — contracts this task consumes or provides.
-- `Out of Scope` — work explicitly excluded from this issue. See `./body.md`.
-- `Alternatives Considered` — design options evaluated but not chosen. See `./body.md`.
-- `Risks` — technical or operational risks specific to this work. See `./body.md`.
-- `Resume` — current-state snapshot while mid-flight. See `./body.md`.
-- `Why Discarded` — reason when discarded. See `./body.md`.
+- `Out of Scope`, `Alternatives Considered`, `Risks`, `Resume`, `Why Discarded` — see `./body.md`.
+
+Do not hide the motivation only in `Approach` or `Affected Paths`. If the rationale is a long-lived design decision, create or update the relevant knowledge page instead of embedding the full record in the task body.
 
 ## Evidence-readiness
 
-A task that is ready for implementation should be actionable as a handoff.
-
-Before treating a task as ready, check that the issue body or linked references provide enough evidence for implementation:
+A task ready for implementation should be actionable as a handoff. Before treating it as ready, check that the body or linked references supply enough evidence:
 
 - Reproduction or invocation command when relevant.
 - Code coordinates or expected implementation area.
@@ -72,26 +53,17 @@ Before treating a task as ready, check that the issue body or linked references 
 - Current baseline behavior.
 - Test fixture or test strategy.
 
-If two or more evidence categories are unknown, consider `spike` or `research` instead of `task`.
+If two or more of these are unknown, consider `spike` or `research` instead of `task`.
 
 ## Artifacts
 
-Issue-backed tasks usually do not need a local evidence directory.
+Issue-backed tasks usually do not need a local evidence directory. Use linked external evidence only when it has evidentiary or comparative value (before/after screenshots, sample inputs/outputs, migration dry-run output, benchmark data).
 
-Use linked external evidence only when they have evidentiary or comparative value, such as:
-
-- Before/after screenshots.
-- Sample inputs and outputs.
-- Migration dry-run output.
-- Benchmark data.
-
-Production source paths are recorded by git history. Mention planned source changes in the `Affected Paths` section when they help scope the work.
+Production source paths are recorded by git history. Mention planned source changes in `Affected Paths` when they help scope the work.
 
 ## Completion criteria
 
-A task is complete when:
-
-- Required tests or verification steps have passed, or the issue explains why they are not applicable.
+A task is complete when required tests or verification steps have passed, or the issue explains why they are not applicable.
 
 ## Common mistakes
 

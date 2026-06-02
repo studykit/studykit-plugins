@@ -76,7 +76,7 @@ Keep the issue body structured and current. Do not turn it into a transcript.
 
 ## Write workflow
 
-Resolve and read the required authoring files before drafting issue-backed item changes. Provider/cache write commands perform the requested mutation and verification; they do not enforce hidden authoring read state.
+Resolve and read the required authoring files before drafting issue-backed changes. Write commands perform the mutation and verification only; they do not enforce that the authoring files were read.
 
 ## Completion baseline (all issue-backed types)
 

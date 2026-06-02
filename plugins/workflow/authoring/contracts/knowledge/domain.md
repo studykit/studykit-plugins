@@ -2,17 +2,11 @@
 
 A domain page is a **knowledge-backed shared vocabulary reference**. It catalogs cross-cutting product and business concepts used by use cases, specs, architecture, tasks, reviews, and research.
 
-Domain is curated knowledge. It is stored in the configured knowledge backend, not the issue backend.
+Domain is curated knowledge, stored in the configured knowledge backend, not the issue backend. Issue-backed work may cause domain updates, but the page itself is a knowledge page.
 
 Companion contracts:
 
 - `./body.md`
-
-## Storage role
-
-`domain` is stored in the knowledge backend.
-
-Issue-backed work may cause domain updates, but the domain page itself is a knowledge page.
 
 ## Purpose
 
@@ -85,10 +79,6 @@ Use these boundaries to place domain content. Do not encode these as metadata re
 If a concept appears repeatedly in use cases, specs, architecture, or tasks but is missing from domain, create a `review` item targeting the domain page and the causing work item; describe the missing concept in prose.
 
 If architecture uses a domain term differently from this page, create a `review` item targeting both pages; describe the inconsistency in prose.
-
-## Change log
-
-Every material domain change should include a `Change Log` entry linking to the causing work item. Do not duplicate the issue discussion in the page.
 
 ## Common mistakes
 
