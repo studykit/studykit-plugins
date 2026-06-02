@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
-from workflow_cache import (
+from issue.cache import (
     FreshnessMetadata,
     PendingIssueRelationshipOperation,
     WorkflowCacheError,
@@ -43,7 +43,7 @@ from issue.jira.client import (
     jira_send_json,
     resolve_jira_data_center_site,
 )
-from workflow_providers import (
+from issue.providers import (
     CACHE_POLICY_BYPASS,
     CACHE_POLICY_DEFAULT,
     TRANSPORT_NATIVE,

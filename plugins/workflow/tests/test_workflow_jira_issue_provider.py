@@ -21,7 +21,7 @@ from issue.jira.provider import (  # noqa: E402
     _relationship_mappings,
 )
 from issue.jira.client import jira_data_center_site_from_provider_config  # noqa: E402
-from workflow_providers import (  # noqa: E402
+from issue.providers import (  # noqa: E402
     CACHE_POLICY_BYPASS,
     CACHE_POLICY_REFRESH,
     ProviderContext,

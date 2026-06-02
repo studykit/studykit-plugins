@@ -45,7 +45,7 @@ from issue.jira.refs import (
     jira_issue_keys_from_references,
     normalize_jira_issue_key,
 )
-from workflow_providers import (
+from issue.providers import (
     CACHE_POLICY_DEFAULT,
     CACHE_POLICY_REFRESH,
     ProviderContext,

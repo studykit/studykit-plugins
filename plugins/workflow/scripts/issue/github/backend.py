@@ -18,7 +18,7 @@ from typing import Any, TextIO
 
 import frontmatter as frontmatter_lib
 
-from workflow_cache import WorkflowCacheError
+from issue.cache import WorkflowCacheError
 from workflow_command import CommandRunner
 from workflow_config import WorkflowConfig
 from issue.github.gh import (
@@ -38,7 +38,7 @@ from issue.cli_output import (
 from issue.github.cache import GitHubIssueCache
 from issue.github.provider import GitHubIssueNativeProvider
 from issue.github.refs import issue_numbers_from_references
-from workflow_providers import (
+from issue.providers import (
     CACHE_POLICY_DEFAULT,
     CACHE_POLICY_REFRESH,
     ProviderContext,

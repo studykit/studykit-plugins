@@ -18,7 +18,7 @@ from workflow_command import CommandRequest, CommandResult  # noqa: E402
 from workflow_config import load_workflow_config  # noqa: E402
 from issue.jira.client import jira_data_center_site_from_provider_config  # noqa: E402
 from issue.jira.cache import JiraDataCenterIssueCache  # noqa: E402
-from workflow_providers import ProviderOperationError  # noqa: E402
+from issue.providers import ProviderOperationError  # noqa: E402
 from issue.jira.backend import JiraIssueFieldsError, fields_payload  # noqa: E402
 from functools import partial  # noqa: E402
 

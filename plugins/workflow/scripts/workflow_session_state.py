@@ -32,7 +32,7 @@ _SCRIPTS_DIR = str(Path(__file__).resolve().parent)
 if _SCRIPTS_DIR not in sys.path:
     sys.path.insert(0, _SCRIPTS_DIR)
 
-from workflow_cache import CACHE_ROOT_NAME  # noqa: E402
+from issue.cache import CACHE_ROOT_NAME  # noqa: E402
 from issue.keys import normalize_issue_number  # noqa: E402
 from issue.jira.refs import normalize_jira_issue_key  # noqa: E402
 

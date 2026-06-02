@@ -13,7 +13,7 @@ _REPO_ROOT = _PLUGIN_ROOT.parent.parent
 if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
-from workflow_cache import (  # noqa: E402
+from issue.cache import (  # noqa: E402
     FreshnessMetadata,
     WorkflowFreshnessConflict,
     check_provider_freshness,

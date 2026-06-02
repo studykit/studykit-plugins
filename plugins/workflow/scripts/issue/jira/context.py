@@ -11,7 +11,7 @@ from issue.cli_output import IssueFetchContext, cache_refreshed_from_payload, di
 from issue.jira.cache import JiraDataCenterIssueCache
 from issue.jira.refs import normalize_jira_issue_key
 from issue.jira.client import resolve_jira_data_center_site
-from workflow_providers import CACHE_POLICY_DEFAULT, ProviderContext, ProviderRequest
+from issue.providers import CACHE_POLICY_DEFAULT, ProviderContext, ProviderRequest
 
 
 def cache_jira_issue_references(
