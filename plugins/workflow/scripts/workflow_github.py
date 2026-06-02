@@ -18,6 +18,7 @@ from urllib.parse import urlparse
 from workflow_command import CommandRunner, WorkflowCommandError, run_command
 from workflow_config import WorkflowConfigError, load_workflow_config
 from workflow_env import workflow_project_dir_from_env
+from issue.keys import normalize_issue_number
 
 
 DEFAULT_ISSUE_FIELDS = (
@@ -966,17 +967,6 @@ def issue_body_edit_history(
         "issue": issue_number,
         "body_edit_history": issue_data,
     }
-
-
-def normalize_issue_number(issue: int | str) -> str:
-    """Normalize a same-repository issue number."""
-
-    value = str(issue).strip()
-    if value.startswith("#"):
-        value = value[1:]
-    if not value.isdigit():
-        raise GitHubParseError(f"issue number must be numeric or #number: {issue}")
-    return value
 
 
 def _github_repository_from_config(project: Path) -> GitHubRepository | None:

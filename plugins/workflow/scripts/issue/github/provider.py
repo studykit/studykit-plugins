@@ -68,7 +68,7 @@ from workflow_providers import (
     _string_list,
     _truthy,
 )
-from workflow_refs import ProviderReferenceError, normalize_provider_reference
+from issue.refs import ProviderReferenceError, normalize_provider_reference
 
 @dataclass(frozen=True)
 class _ResolvedRelationshipOperation:

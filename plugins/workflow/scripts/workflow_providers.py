@@ -14,7 +14,7 @@ from typing import Any
 
 from workflow_command import CommandRunner
 from workflow_config import ProviderConfig, WorkflowConfig, WorkflowConfigError, load_workflow_config, normalize_role
-from workflow_refs import ProviderReferenceError, normalize_provider_reference
+from issue.refs import ProviderReferenceError, normalize_provider_reference
 
 ROLE_ISSUE = "issue"
 ROLE_KNOWLEDGE = "knowledge"

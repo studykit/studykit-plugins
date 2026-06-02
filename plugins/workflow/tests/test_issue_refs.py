@@ -14,7 +14,7 @@ if str(_SCRIPTS_DIR) not in sys.path:
 
 from workflow_config import load_workflow_config  # noqa: E402
 from workflow_command import CommandRequest, CommandResult  # noqa: E402
-from workflow_refs import (  # noqa: E402
+from issue.refs import (  # noqa: E402
     ProviderReferenceAmbiguityError,
     ProviderReferenceMismatchError,
     normalize_provider_reference,
