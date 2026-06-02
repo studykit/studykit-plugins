@@ -9,7 +9,7 @@ from typing import Any
 
 from pathlib import Path
 
-from workflow_cache import (
+from issue.cache import (
     FreshnessMetadata,
     PendingIssueRelationshipOperation,
     WorkflowCacheError,
@@ -19,7 +19,7 @@ from workflow_cache import (
 )
 from workflow_command import CommandRunner
 from workflow_config import WorkflowConfigError, load_workflow_config
-from workflow_github import (
+from issue.github.gh import (
     DEFAULT_ISSUE_FIELDS,
     add_issue_dependency,
     add_sub_issue,
@@ -49,7 +49,7 @@ from issue.github.cache import (
     content_fingerprint,
     relationships_fingerprint,
 )
-from workflow_providers import (
+from issue.providers import (
     CACHE_POLICY_BYPASS,
     CACHE_POLICY_DEFAULT,
     TRANSPORT_NATIVE,
@@ -68,7 +68,7 @@ from workflow_providers import (
     _string_list,
     _truthy,
 )
-from workflow_refs import ProviderReferenceError, normalize_provider_reference
+from issue.refs import ProviderReferenceError, normalize_provider_reference
 
 @dataclass(frozen=True)
 class _ResolvedRelationshipOperation:
@@ -87,7 +87,7 @@ class _ResolvedRelationshipOperation:
 
 
 class GitHubIssueNativeProvider(IssueProvider):
-    """Native GitHub Issues provider backed by ``workflow_github.py``."""
+    """Native GitHub Issues provider backed by ``issue/github/gh.py``."""
 
     def __init__(self, *, runner: CommandRunner | None = None):
         super().__init__(kind="github", transport=TRANSPORT_NATIVE)

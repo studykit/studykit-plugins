@@ -20,8 +20,8 @@ from issue.jira.provider import (  # noqa: E402
     _jira_issue_provider_settings,
     _relationship_mappings,
 )
-from workflow_jira_data_center_client import jira_data_center_site_from_provider_config  # noqa: E402
-from workflow_providers import (  # noqa: E402
+from issue.jira.client import jira_data_center_site_from_provider_config  # noqa: E402
+from issue.providers import (  # noqa: E402
     CACHE_POLICY_BYPASS,
     CACHE_POLICY_REFRESH,
     ProviderContext,
@@ -1187,7 +1187,7 @@ def attachments_payload() -> list[dict[str, object]]:
 
 
 def test_curl_multipart_config_sets_token_and_repeated_form_lines() -> None:
-    from workflow_jira_data_center_client import _curl_multipart_config
+    from issue.jira.client import _curl_multipart_config
 
     config = _curl_multipart_config(
         url="https://jira.example.test/rest/api/2/issue/TEST-1234/attachments",

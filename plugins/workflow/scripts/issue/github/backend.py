@@ -3,9 +3,9 @@
 
 Ports the per-intent logic from the (now-deleted) ``github_issue_*.py``
 CLI scripts onto a single :class:`GitHubIssueBackend` driver consumed by
-the dispatcher scripts under ``scripts/issue_*.py``. The backend keeps
-the original argument surface and emitted JSON payload shapes; the only
-moved seam is the config-kind guard, which the dispatcher owns.
+the :mod:`issue.dispatch` dispatcher. The backend keeps the original
+argument surface and emitted JSON payload shapes; the only moved seam is
+the config-kind guard, which the dispatcher owns.
 """
 
 from __future__ import annotations
@@ -18,10 +18,10 @@ from typing import Any, TextIO
 
 import frontmatter as frontmatter_lib
 
-from workflow_cache import WorkflowCacheError
+from issue.cache import WorkflowCacheError
 from workflow_command import CommandRunner
 from workflow_config import WorkflowConfig
-from workflow_github import (
+from issue.github.gh import (
     DEFAULT_ISSUE_FIELDS,  # noqa: F401  (imported for downstream tests)
     GitHubRepositoryError,
     get_github_login,
@@ -38,7 +38,7 @@ from issue.cli_output import (
 from issue.github.cache import GitHubIssueCache
 from issue.github.provider import GitHubIssueNativeProvider
 from issue.github.refs import issue_numbers_from_references
-from workflow_providers import (
+from issue.providers import (
     CACHE_POLICY_DEFAULT,
     CACHE_POLICY_REFRESH,
     ProviderContext,

@@ -11,15 +11,19 @@ _SCRIPTS_DIR = Path(__file__).resolve().parent.parent / "scripts"
 if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
-from issue.legacy.issue_comments import main as github_issue_comments_main  # noqa: E402
-from issue.legacy.issue_new import main as github_issue_drafts_main  # noqa: E402
-from issue.legacy.issue_update import main as github_issue_writeback_main  # noqa: E402
-from issue.legacy.issue_new import main as jira_issue_drafts_main  # noqa: E402
+from functools import partial  # noqa: E402
+
+from issue.dispatch import COMMENTS, DRAFTS, WRITEBACK, run_intent  # noqa: E402
+
+github_issue_comments_main = partial(run_intent, COMMENTS)
+github_issue_drafts_main = partial(run_intent, DRAFTS)
+github_issue_writeback_main = partial(run_intent, WRITEBACK)
+jira_issue_drafts_main = partial(run_intent, DRAFTS)
 from workflow_command import CommandRequest, CommandResult  # noqa: E402
 from issue.github.cache import GitHubIssueCache  # noqa: E402
-from workflow_github import DEFAULT_ISSUE_FIELDS  # noqa: E402
-from workflow_github import GitHubRepository  # noqa: E402
-from workflow_jira_data_center_client import resolve_jira_data_center_site  # noqa: E402
+from issue.github.gh import DEFAULT_ISSUE_FIELDS  # noqa: E402
+from issue.github.gh import GitHubRepository  # noqa: E402
+from issue.jira.client import resolve_jira_data_center_site  # noqa: E402
 from issue.jira.cache import JiraDataCenterIssueCache  # noqa: E402
 
 

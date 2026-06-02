@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """Issue backend driver protocol and factory.
 
-Each dispatcher script under ``scripts/issue_*.py`` resolves the active
-backend via :func:`get_backend` and delegates intent-specific argparse
-registration plus execution to the returned driver. Drivers wrap the body
-of the (now-deleted) per-backend CLI scripts; the dispatcher owns the
-shared parser, the config guard, and the JSON emission policy.
+The :mod:`issue.dispatch` dispatcher resolves the active backend via
+:func:`get_backend` and delegates intent-specific argparse registration
+plus execution to the returned driver. Drivers wrap the body of the
+(now-deleted) per-backend CLI scripts; the dispatcher owns the shared
+parser, the config guard, and the JSON emission policy.
 """
 
 from __future__ import annotations

@@ -3,9 +3,9 @@
 
 Ports the per-intent logic from the (now-deleted) ``jira_issue_*.py`` CLI
 scripts onto a single :class:`JiraIssueBackend` driver consumed by the
-dispatcher scripts under ``scripts/issue_*.py``. The backend keeps the
-original argument surface and emitted JSON payload shapes; the only moved
-seam is the config-kind guard, which the dispatcher owns.
+:mod:`issue.dispatch` dispatcher. The backend keeps the original argument
+surface and emitted JSON payload shapes; the only moved seam is the
+config-kind guard, which the dispatcher owns.
 """
 
 from __future__ import annotations
@@ -22,7 +22,7 @@ import frontmatter as frontmatter_lib
 
 from workflow_command import CommandRunner
 from workflow_config import WorkflowConfig, WorkflowConfigError
-from workflow_jira_data_center_client import resolve_jira_data_center_site
+from issue.jira.client import resolve_jira_data_center_site
 from issue.backend import IssueBackendError
 from issue.cli_output import (
     IssueFetchContext,
@@ -45,7 +45,7 @@ from issue.jira.refs import (
     jira_issue_keys_from_references,
     normalize_jira_issue_key,
 )
-from workflow_providers import (
+from issue.providers import (
     CACHE_POLICY_DEFAULT,
     CACHE_POLICY_REFRESH,
     ProviderContext,
@@ -1257,9 +1257,8 @@ class JiraIssueBackend:
     def discover_state_verbs(self, config: WorkflowConfig) -> list[str]:
         """Return the configured Jira state-transition verbs.
 
-        Used by the ``issue.py`` dispatcher (via the legacy ``issue_fields``
-        module) so the parser only knows about the active project's
-        transitions.
+        Used by the :mod:`issue.dispatch` dispatcher's ``fields`` intent so
+        the parser only knows about the active project's transitions.
         """
 
         try:

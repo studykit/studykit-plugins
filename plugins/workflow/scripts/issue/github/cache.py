@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from workflow_cache import (
+from issue.cache import (
     CACHE_ROOT_NAME,
     SCHEMA_VERSION,
     FreshnessMetadata,
@@ -34,13 +34,13 @@ from workflow_cache import (
     content_fingerprint,
     relationships_fingerprint,
 )
-from workflow_github import GitHubRepository, normalize_issue_number
+from issue.github.gh import GitHubRepository, normalize_issue_number
 
 
 _COMMENT_FILENAME_RE = re.compile(r"^comment-.*\.md$")
 
 # The fingerprint builders (``content_fingerprint`` / ``relationships_fingerprint``
-# / ``comments_fingerprint``) are shared from ``workflow_cache`` so cache writes
+# / ``comments_fingerprint``) are shared from ``issue.cache`` so cache writes
 # and provider write-back checks normalize identically. The per-comment item
 # extraction below is GitHub-specific (provider comment ids).
 

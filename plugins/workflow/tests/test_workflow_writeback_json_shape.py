@@ -27,8 +27,12 @@ _SCRIPTS_DIR = Path(__file__).resolve().parent.parent / "scripts"
 if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
-from issue.legacy.issue_new import main as issue_new_main  # noqa: E402
-from issue.legacy.issue_update import main as issue_update_main  # noqa: E402
+from functools import partial  # noqa: E402
+
+from issue.dispatch import DRAFTS, WRITEBACK, run_intent  # noqa: E402
+
+issue_new_main = partial(run_intent, DRAFTS)
+issue_update_main = partial(run_intent, WRITEBACK)
 from workflow_command import CommandRequest, CommandResult  # noqa: E402
 
 from test_workflow_cache_issue_drafts import (  # noqa: E402

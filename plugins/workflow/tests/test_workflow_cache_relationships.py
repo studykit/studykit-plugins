@@ -12,11 +12,15 @@ _SCRIPTS_DIR = _PLUGIN_ROOT / "scripts"
 if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
-from workflow_cache import relationship_operations_from_intent  # noqa: E402
+from issue.cache import relationship_operations_from_intent  # noqa: E402
+from functools import partial  # noqa: E402
+
 from issue.github.cache import GitHubIssueCache  # noqa: E402
-from issue.legacy.issue_link import main as github_issue_relationships_main  # noqa: E402
+from issue.dispatch import RELATIONSHIPS, run_intent  # noqa: E402
+
+github_issue_relationships_main = partial(run_intent, RELATIONSHIPS)
 from workflow_command import CommandRequest, CommandResult  # noqa: E402
-from workflow_github import GitHubRepository  # noqa: E402
+from issue.github.gh import GitHubRepository  # noqa: E402
 
 
 def repo() -> GitHubRepository:
@@ -182,7 +186,7 @@ def test_github_provider_rejects_epic_relationship_operation(tmp_path: Path) -> 
     import pytest
 
     from issue.github.provider import GitHubIssueNativeProvider
-    from workflow_providers import ProviderContext, ProviderOperationError, ProviderRequest
+    from issue.providers import ProviderContext, ProviderOperationError, ProviderRequest
 
     write_config(tmp_path)
     cache = GitHubIssueCache.for_project(tmp_path, configured_repo=repo())
@@ -328,7 +332,7 @@ issue_id_format: jira
 
 
 def test_jira_relationships_cli_no_flag_returns_flat_no_op(tmp_path: Path) -> None:
-    from issue.legacy.issue_link import main as jira_issue_relationships_main  # noqa: E402
+    jira_issue_relationships_main = partial(run_intent, RELATIONSHIPS)
 
     write_jira_config(tmp_path)
 

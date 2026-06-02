@@ -7,10 +7,10 @@ from collections.abc import Sequence
 
 from workflow_command import CommandRunner
 from workflow_config import WorkflowConfig
-from workflow_github import GitHubRepository, normalize_issue_number
+from issue.github.gh import GitHubRepository, normalize_issue_number
 from issue.cli_output import IssueFetchContext, cache_refreshed_from_payload, display_project_path
 from issue.github.cache import GitHubIssueCache
-from workflow_providers import CACHE_POLICY_DEFAULT, ProviderContext, ProviderRequest
+from issue.providers import CACHE_POLICY_DEFAULT, ProviderContext, ProviderRequest
 
 
 def cache_github_issue_references(
