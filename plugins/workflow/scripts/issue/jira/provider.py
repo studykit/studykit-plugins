@@ -27,6 +27,7 @@ from issue.jira.relationships import (
 from workflow_command import CommandRunner
 from workflow_config import WorkflowConfigError, load_workflow_config
 from workflow_jira_data_center_client import (
+    jira_upload_attachments,
     jira_data_center_comments_path,
     jira_data_center_issue_path,
     jira_data_center_issue_link_path,
@@ -372,6 +373,29 @@ class JiraDataCenterIssueNativeProvider(IssueProvider):
         state = _optional_string(request.payload.get("state"))
         normalized_state = state.lower() if state is not None else None
         return self._append_comment(request, issue_key, body, state=normalized_state)
+
+    def add_attachment(self, request: ProviderRequest) -> Mapping[str, Any]:
+        issue_key = normalize_jira_issue_key(_required_payload_value(request, "issue"))
+        raw_files = request.payload.get("files")
+        if not isinstance(raw_files, (list, tuple)) or not raw_files:
+            raise ProviderOperationError("add_attachment requires a non-empty 'files' payload")
+        files = [str(path) for path in raw_files]
+
+        site = resolve_jira_data_center_site(request.context.project)
+        cache = JiraDataCenterIssueCache.for_project(request.context.project)
+        uploaded = upload_attachments(site, issue_key, files, runner=self.runner)
+        # Attachments are additive — they never conflict with a stale body
+        # edit — so no freshness gate. Refresh the cache so the projection and
+        # per-target fingerprints stay current for the next body-bearing write.
+        write_result = self._refresh_cache(request.context.project, site, cache, issue_key)
+        return {
+            "operation": "add_attachment",
+            "issue": issue_key,
+            "key": issue_key,
+            "attachments": [_attachment_summary(item) for item in uploaded],
+            "cache_refreshed": True,
+            "cache": write_result,
+        }
 
     def apply_relationships(self, request: ProviderRequest) -> Mapping[str, Any]:
         issue_key = normalize_jira_issue_key(_required_payload_value(request, "issue"))
@@ -991,6 +1015,34 @@ def add_comment(
     if not isinstance(result, Mapping):
         return {}
     return result
+
+
+def upload_attachments(
+    site: Any,
+    issue_key: str,
+    file_paths: list[str],
+    *,
+    runner: CommandRunner | None = None,
+) -> list[Mapping[str, Any]]:
+    """Upload local files to a Jira issue and return the created attachments."""
+
+    raw = jira_upload_attachments(site, issue_key, file_paths, runner=runner)
+    if not isinstance(raw, list):
+        return []
+    return [item for item in raw if isinstance(item, Mapping)]
+
+
+def _attachment_summary(item: Mapping[str, Any]) -> dict[str, Any]:
+    """Project the consumer-facing fields of one Jira attachment object."""
+
+    return {
+        "id": item.get("id"),
+        "filename": item.get("filename"),
+        "size": item.get("size"),
+        "mime_type": item.get("mimeType"),
+        "content": item.get("content"),
+        "created": item.get("created"),
+    }
 
 
 def get_transitions(

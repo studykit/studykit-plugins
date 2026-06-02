@@ -21,6 +21,10 @@ Template placeholders use ``{{NAME}}`` (double braces) so they stay visually
 distinct from real ``$NAME`` shell variables in the same text.
 ``{{SNIPPET_AUTHORING}}``, ``{{SNIPPET_LAUNCHER}}``, and
 ``{{SNIPPET_PRD_PATH}}`` substitute the three inlined snippet files;
+``{{SNIPPET_PROVIDER_RUNBOOK}}`` (main session only) substitutes
+provider-keyed runbook intents from ``snippets/runbook/<provider>.md``
+so provider-only intents (e.g. Jira ``issue-attach``) are never injected
+on providers that cannot honor them;
 ``{{WORKFLOW_RUNBOOK_DIR}}`` resolves to
 ``<plugin_root>/authoring/runbook``; ``{{WORKFLOW_ISSUE_PROVIDER}}`` resolves
 to the active issue provider (``github``/``jira``/``filesystem``). Fetch /
@@ -87,6 +91,7 @@ def build_session_policy_context(
         "SNIPPET_LAUNCHER": _build_launcher_block(runtime, resolved_plugin_root),
         "SNIPPET_AUTHORING": _read_fragment("snippets/authoring.md").strip(),
         "SNIPPET_PRD_PATH": _read_fragment("snippets/prd-path.md").strip(),
+        "SNIPPET_PROVIDER_RUNBOOK": _build_provider_runbook_block(issue_provider),
         "WORKFLOW_RUNBOOK_DIR": str(runbook_dir),
         "WORKFLOW_ISSUE_PROVIDER": issue_provider,
     })
@@ -198,6 +203,19 @@ def _agent_type_segment(agent_type: str | None) -> str | None:
     if ":" in text:
         text = text.rsplit(":", 1)[-1]
     return text or None
+
+
+def _build_provider_runbook_block(issue_provider: str) -> str:
+    """Return provider-only runbook intents appended to the main runbook list.
+
+    Some intents exist for one provider only (e.g. ``issue-attach`` is
+    Jira-only — GitHub issues have no attachment REST surface). Keeping the
+    bullet in a provider-keyed fragment means the LLM is never told the
+    intent exists on providers that cannot honor it. Missing fragment →
+    empty string, so non-Jira providers inject nothing.
+    """
+
+    return _read_fragment(f"snippets/runbook/{issue_provider}.md").strip()
 
 
 def _build_launcher_block(runtime: str | None, plugin_root: Path) -> str:

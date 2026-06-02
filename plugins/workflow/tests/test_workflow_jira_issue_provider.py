@@ -1169,6 +1169,84 @@ def test_data_center_update_writes_body_and_refreshes_cache(tmp_path: Path) -> N
     assert '\\"description\\":\\"Updated body.\\"' in str(write_request.input_text)
 
 
+def attachments_url(issue: str = "TEST-1234") -> str:
+    return f"https://jira.example.test/rest/api/2/issue/{issue}/attachments"
+
+
+def attachments_payload() -> list[dict[str, object]]:
+    return [
+        {
+            "id": "40001",
+            "filename": "report.pdf",
+            "size": 2048,
+            "mimeType": "application/pdf",
+            "content": "https://jira.example.test/secure/attachment/40001/report.pdf",
+            "created": "2026-06-02T10:00:00.000+0900",
+        }
+    ]
+
+
+def test_curl_multipart_config_sets_token_and_repeated_form_lines() -> None:
+    from workflow_jira_data_center_client import _curl_multipart_config
+
+    config = _curl_multipart_config(
+        url="https://jira.example.test/rest/api/2/issue/TEST-1234/attachments",
+        file_paths=["/tmp/a.png", "/tmp/b.pdf"],
+    )
+    assert 'header = "X-Atlassian-Token: no-check"' in config
+    assert 'request = "POST"' in config
+    assert 'form = "file=@/tmp/a.png"' in config
+    assert 'form = "file=@/tmp/b.pdf"' in config
+    # multipart sets its own Content-Type/boundary — never override it
+    assert "Content-Type" not in config
+
+
+def test_data_center_add_attachment_uploads_and_refreshes_cache(tmp_path: Path) -> None:
+    write_jira_config(tmp_path)
+    site = jira_site(tmp_path)
+    cache = JiraDataCenterIssueCache.for_project(tmp_path)
+    runner = FakeRunner(
+        {
+            curl_write_args(): result(curl_write_args(), stdout=json.dumps(attachments_payload())),
+            curl_args(issue_url()): result(curl_args(issue_url()), stdout=json.dumps(jira_issue_payload())),
+            curl_args(remote_links_url()): result(curl_args(remote_links_url()), stdout=json.dumps(remote_links_payload())),
+        }
+    )
+
+    response = dispatch_write(
+        tmp_path,
+        runner,
+        "add_attachment",
+        issue="TEST-1234",
+        files=["/tmp/report.pdf"],
+    )
+
+    assert response.payload["operation"] == "add_attachment"
+    assert response.payload["issue"] == "TEST-1234"
+    assert response.payload["cache_refreshed"] is True
+    assert response.payload["attachments"][0]["filename"] == "report.pdf"
+    assert response.payload["attachments"][0]["id"] == "40001"
+
+    upload_request = runner.requests[0]
+    assert upload_request.args == curl_write_args()
+    text = str(upload_request.input_text)
+    assert 'header = "X-Atlassian-Token: no-check"' in text
+    assert 'request = "POST"' in text
+    assert f'url = "{attachments_url()}"' in text
+    assert 'form = "file=@/tmp/report.pdf"' in text
+    assert cache.issue_json_file(site, "TEST-1234").is_file()
+
+
+def test_data_center_add_attachment_requires_files(tmp_path: Path) -> None:
+    write_jira_config(tmp_path)
+    runner = FakeRunner({})
+
+    with pytest.raises(ProviderOperationError, match="non-empty 'files'"):
+        dispatch_write(tmp_path, runner, "add_attachment", issue="TEST-1234", files=[])
+
+    assert runner.requests == []
+
+
 def test_data_center_update_rejects_empty_payload(tmp_path: Path) -> None:
     write_jira_config(tmp_path)
     site = jira_site(tmp_path)

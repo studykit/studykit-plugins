@@ -66,10 +66,13 @@ block, and the PRD-path resolver block.
 - **Placeholders use `{{NAME}}`, not `$NAME`.** Substituted in
   `../scripts/workflow_main_context.py`. Adding a new placeholder
   requires wiring it there in the same change as the template wording.
-  Three snippet placeholders exist: `{{SNIPPET_AUTHORING}}` ↔
+  Snippet placeholders: `{{SNIPPET_AUTHORING}}` ↔
   `snippets/authoring.md`, `{{SNIPPET_LAUNCHER}}` ↔
-  `snippets/launcher/<runtime>.md`, and `{{SNIPPET_PRD_PATH}}` ↔
-  `snippets/prd-path.md`. Other usage (fetch / write / link /
+  `snippets/launcher/<runtime>.md`, `{{SNIPPET_PRD_PATH}}` ↔
+  `snippets/prd-path.md`, and (main session only)
+  `{{SNIPPET_PROVIDER_RUNBOOK}}` ↔ `snippets/runbook/<provider>.md` for
+  provider-only runbook intents (e.g. Jira `issue-attach`; missing
+  fragment → nothing injected). Other usage (fetch / write / link /
   etc.) is referenced via `{{WORKFLOW_RUNBOOK_DIR}}` +
   `{{WORKFLOW_ISSUE_PROVIDER}}` pointing at
   `authoring/runbook/<intent>/<provider>.md`.

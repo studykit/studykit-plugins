@@ -334,6 +334,99 @@ class JiraIssueBackend:
         }
 
     # ------------------------------------------------------------------
+    # attachments (Jira-only — not part of the shared IssueBackend protocol)
+    # ------------------------------------------------------------------
+
+    def add_attach_args(self, parser: argparse.ArgumentParser) -> None:
+        parser.add_argument("--type", default="task", help="workflow artifact type")
+        parser.add_argument("--issue", required=True, help="Jira issue key")
+        parser.add_argument(
+            "files",
+            nargs="+",
+            type=Path,
+            help="local file path(s) to attach to the issue",
+        )
+
+    def run_attach(
+        self,
+        args: argparse.Namespace,
+        *,
+        config: WorkflowConfig,
+        runner: CommandRunner | None,
+        stdout: TextIO,
+        stderr: TextIO,
+    ) -> int:
+        try:
+            payload = self._upload_attachments(
+                config=config,
+                artifact_type=args.type,
+                issue=args.issue,
+                files=args.files,
+                runner=runner,
+            )
+        except Exception as exc:  # noqa: BLE001
+            print(f"Jira issue attach error: {exc}", file=stderr)
+            return 2
+
+        print(json.dumps(payload, indent=2, sort_keys=False), file=stdout)
+        return 0
+
+    def _upload_attachments(
+        self,
+        *,
+        config: WorkflowConfig,
+        artifact_type: str,
+        issue: str,
+        files: Iterable[Path],
+        runner: CommandRunner | None,
+    ) -> dict[str, object]:
+        artifact_type = _required_text(artifact_type, "artifact type")
+        try:
+            issue_key = normalize_jira_issue_key(issue)
+        except JiraProviderError as exc:
+            raise IssueBackendError(str(exc)) from exc
+
+        resolved: list[str] = []
+        for raw in files:
+            path = Path(raw).expanduser()
+            if not path.is_file():
+                raise IssueBackendError(f"attachment file does not exist: {path}")
+            resolved.append(str(path))
+        if not resolved:
+            raise IssueBackendError("at least one attachment file is required")
+
+        provider = JiraDataCenterIssueNativeProvider(runner=runner)
+        response = provider.call(
+            ProviderRequest(
+                role="issue",
+                kind="jira",
+                operation="add_attachment",
+                context=ProviderContext(project=config.root, artifact_type=artifact_type),
+                payload={"issue": issue_key, "files": resolved},
+            )
+        )
+
+        provider_payload = dict(response.payload)
+        cache_payload = (
+            provider_payload.get("cache")
+            if isinstance(provider_payload.get("cache"), dict)
+            else {}
+        )
+        issue_file = (
+            cache_payload.get("issue_file") if isinstance(cache_payload, dict) else None
+        )
+        return {
+            "operation": "add_attachment",
+            "kind": "jira",
+            "issue": provider_payload.get("issue") or provider_payload.get("key"),
+            "key": provider_payload.get("key"),
+            "attachments": provider_payload.get("attachments", []),
+            "files": resolved,
+            "issue_file": issue_file,
+            "cache_refreshed": bool(provider_payload.get("cache_refreshed")),
+        }
+
+    # ------------------------------------------------------------------
     # drafts (publish)
     # ------------------------------------------------------------------
 

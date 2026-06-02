@@ -32,6 +32,7 @@ Reference docs (read on demand) at
 - `issue-update` — update body, title, labels, or state
 - `issue-link` — relationships
 - `issue-state` — body-less verbs (state, assign, unassign, set-type)
+{{SNIPPET_PROVIDER_RUNBOOK}}
 
 </runbook>
 

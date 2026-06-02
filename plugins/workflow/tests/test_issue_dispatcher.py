@@ -30,6 +30,7 @@ _SCRIPTS_DIR = _PLUGIN_ROOT / "scripts"
 if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
+from issue.legacy.issue_attach import main as issue_attach_main  # noqa: E402
 from issue.legacy.issue_comments import main as issue_comments_main  # noqa: E402
 from issue.legacy.issue_new import main as issue_drafts_main  # noqa: E402
 from issue.legacy.issue_fetch import main as issue_fetch_main  # noqa: E402
@@ -331,3 +332,42 @@ def test_fetch_without_config_emits_setup_hint(tmp_path: Path) -> None:
     assert code == 2
     assert ".workflow/config.yml" in err
     assert "configure first" in err
+
+
+# ---------------------------------------------------------------------------
+# attach: Jira-only verb
+# ---------------------------------------------------------------------------
+
+
+def test_attach_under_github_is_refused(tmp_path: Path) -> None:
+    _write_config(tmp_path, _GITHUB_CONFIG)
+    sample = tmp_path / "report.pdf"
+    sample.write_text("pdf\n", encoding="utf-8")
+    code, _, err = _capture_help(
+        issue_attach_main,
+        ["--project", str(tmp_path), "--issue", "1", str(sample)],
+    )
+    assert code == 2
+    assert "only supported by the Jira" in err
+
+
+def test_attach_help_under_jira_lists_issue_and_files(tmp_path: Path) -> None:
+    _write_config(tmp_path, _JIRA_CONFIG)
+    code, stdout, _ = _capture_help(
+        issue_attach_main,
+        ["--project", str(tmp_path), "--help"],
+    )
+    assert code == 0
+    assert "--issue" in stdout
+    assert "files" in stdout
+
+
+def test_attach_under_jira_rejects_missing_file(tmp_path: Path) -> None:
+    _write_config(tmp_path, _JIRA_CONFIG)
+    missing = tmp_path / "nope.pdf"
+    code, _, err = _capture_help(
+        issue_attach_main,
+        ["--project", str(tmp_path), "--issue", "TEST-1", str(missing)],
+    )
+    assert code == 2
+    assert "does not exist" in err
