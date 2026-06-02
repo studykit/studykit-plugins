@@ -58,11 +58,38 @@ def normalize_jira_data_center_issue(
         "jira": {**site.to_json(), "key": key},
         "comments": comments,
     }
+    attachments = [_normalize_attachment(item) for item in _mapping_list(fields.get("attachment"))]
     if payload["id"] is None:
         payload.pop("id")
     if relationships:
         payload["relationships"] = relationships
+    if attachments:
+        payload["attachments"] = attachments
     return payload
+
+
+def _normalize_attachment(item: Mapping[str, Any]) -> dict[str, Any]:
+    """Project the consumer-facing fields of one Jira attachment object."""
+
+    entry: dict[str, Any] = {
+        "id": _normalize_optional(item.get("id")),
+        "filename": _normalize_optional(item.get("filename")),
+        "size": item.get("size") if isinstance(item.get("size"), int) else None,
+        "mimeType": _normalize_optional(item.get("mimeType")),
+        "created": _normalize_optional(item.get("created")),
+        "author": _attachment_author(item.get("author")),
+        "content": _normalize_optional(item.get("content")),
+    }
+    return {key: value for key, value in entry.items() if value is not None}
+
+
+def _attachment_author(value: Any) -> str | None:
+    if isinstance(value, Mapping):
+        for key in ("displayName", "name", "key", "accountId"):
+            raw = value.get(key)
+            if raw:
+                return str(raw)
+    return None
 
 
 def normalize_jira_remote_links(raw_links: Any) -> list[dict[str, Any]]:

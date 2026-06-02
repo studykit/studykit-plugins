@@ -163,6 +163,12 @@ class JiraIssueBackend:
                     if relationships_path.is_file()
                     else None
                 )
+                attachments_path = cache.attachments_file(site, issue_key)
+                attachments_display = (
+                    display_project_path(attachments_path, config.root)
+                    if attachments_path.is_file()
+                    else None
+                )
                 contexts.append(
                     IssueFetchContext(
                         number=issue_key,
@@ -177,6 +183,7 @@ class JiraIssueBackend:
                         provider_kind="jira",
                         comments=comment_paths,
                         relationships=relationships_display,
+                        attachments=attachments_display,
                     )
                 )
         except Exception as exc:  # noqa: BLE001
@@ -338,13 +345,47 @@ class JiraIssueBackend:
     # ------------------------------------------------------------------
 
     def add_attach_args(self, parser: argparse.ArgumentParser) -> None:
-        parser.add_argument("--type", default="task", help="workflow artifact type")
-        parser.add_argument("--issue", required=True, help="Jira issue key")
-        parser.add_argument(
+        subparsers = parser.add_subparsers(dest="command", required=True)
+
+        add = subparsers.add_parser("add", help="upload local file(s) as attachments")
+        add.add_argument("--type", default="task", help="workflow artifact type")
+        add.add_argument("--issue", required=True, help="Jira issue key")
+        add.add_argument(
             "files",
             nargs="+",
             type=Path,
             help="local file path(s) to attach to the issue",
+        )
+
+        get = subparsers.add_parser("get", help="download attachment(s) to local disk")
+        get.add_argument("--type", default="task", help="workflow artifact type")
+        get.add_argument("--issue", required=True, help="Jira issue key")
+        selector = get.add_mutually_exclusive_group(required=True)
+        selector.add_argument(
+            "--id",
+            dest="ids",
+            action="append",
+            metavar="ID",
+            help="attachment id (repeatable); see attachment.md",
+        )
+        selector.add_argument(
+            "--name",
+            dest="names",
+            action="append",
+            metavar="FILENAME",
+            help="attachment filename (repeatable)",
+        )
+        selector.add_argument(
+            "--all",
+            dest="download_all",
+            action="store_true",
+            help="download every attachment on the issue",
+        )
+        get.add_argument(
+            "--out",
+            type=Path,
+            default=None,
+            help="output directory (default: the issue cache dir's attachments/ subdir)",
         )
 
     def run_attach(
@@ -357,13 +398,27 @@ class JiraIssueBackend:
         stderr: TextIO,
     ) -> int:
         try:
-            payload = self._upload_attachments(
-                config=config,
-                artifact_type=args.type,
-                issue=args.issue,
-                files=args.files,
-                runner=runner,
-            )
+            if args.command == "add":
+                payload = self._upload_attachments(
+                    config=config,
+                    artifact_type=args.type,
+                    issue=args.issue,
+                    files=args.files,
+                    runner=runner,
+                )
+            elif args.command == "get":
+                payload = self._download_attachments(
+                    config=config,
+                    artifact_type=args.type,
+                    issue=args.issue,
+                    ids=args.ids or [],
+                    names=args.names or [],
+                    download_all=args.download_all,
+                    out=args.out,
+                    runner=runner,
+                )
+            else:
+                raise IssueBackendError(f"unsupported attach command: {args.command}")
         except Exception as exc:  # noqa: BLE001
             print(f"Jira issue attach error: {exc}", file=stderr)
             return 2
@@ -424,6 +479,51 @@ class JiraIssueBackend:
             "files": resolved,
             "issue_file": issue_file,
             "cache_refreshed": bool(provider_payload.get("cache_refreshed")),
+        }
+
+    def _download_attachments(
+        self,
+        *,
+        config: WorkflowConfig,
+        artifact_type: str,
+        issue: str,
+        ids: list[str],
+        names: list[str],
+        download_all: bool,
+        out: Path | None,
+        runner: CommandRunner | None,
+    ) -> dict[str, object]:
+        artifact_type = _required_text(artifact_type, "artifact type")
+        try:
+            issue_key = normalize_jira_issue_key(issue)
+        except JiraProviderError as exc:
+            raise IssueBackendError(str(exc)) from exc
+
+        provider = JiraDataCenterIssueNativeProvider(runner=runner)
+        response = provider.call(
+            ProviderRequest(
+                role="issue",
+                kind="jira",
+                operation="get_attachment",
+                context=ProviderContext(project=config.root, artifact_type=artifact_type),
+                payload={
+                    "issue": issue_key,
+                    "ids": ids,
+                    "names": names,
+                    "all": download_all,
+                    "out": str(out.expanduser()) if out else None,
+                },
+            )
+        )
+
+        provider_payload = dict(response.payload)
+        return {
+            "operation": "get_attachment",
+            "kind": "jira",
+            "issue": provider_payload.get("issue") or provider_payload.get("key"),
+            "key": provider_payload.get("key"),
+            "out_dir": provider_payload.get("out_dir"),
+            "downloaded": provider_payload.get("downloaded", []),
         }
 
     # ------------------------------------------------------------------

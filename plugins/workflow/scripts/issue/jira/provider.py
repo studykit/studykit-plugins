@@ -6,6 +6,7 @@ from __future__ import annotations
 import hashlib
 from collections.abc import Mapping
 from dataclasses import dataclass, replace
+from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
@@ -27,6 +28,7 @@ from issue.jira.relationships import (
 from workflow_command import CommandRunner
 from workflow_config import WorkflowConfigError, load_workflow_config
 from workflow_jira_data_center_client import (
+    jira_download_attachment,
     jira_upload_attachments,
     jira_data_center_comments_path,
     jira_data_center_issue_path,
@@ -395,6 +397,55 @@ class JiraDataCenterIssueNativeProvider(IssueProvider):
             "attachments": [_attachment_summary(item) for item in uploaded],
             "cache_refreshed": True,
             "cache": write_result,
+        }
+
+    def get_attachment(self, request: ProviderRequest) -> Mapping[str, Any]:
+        issue_key = normalize_jira_issue_key(_required_payload_value(request, "issue"))
+        ids = [str(value) for value in request.payload.get("ids") or []]
+        names = [str(value) for value in request.payload.get("names") or []]
+        want_all = bool(request.payload.get("all"))
+        out_override = _optional_string(request.payload.get("out"))
+
+        site = resolve_jira_data_center_site(request.context.project)
+        raw_issue = get_issue(site, issue_key, runner=self.runner)
+        fields = raw_issue.get("fields") if isinstance(raw_issue.get("fields"), Mapping) else {}
+        attachments = [item for item in (fields.get("attachment") or []) if isinstance(item, Mapping)]
+        selected = _select_attachments(attachments, ids=ids, names=names, want_all=want_all)
+        if not selected:
+            raise ProviderOperationError(
+                f"no matching attachment found on Jira issue {issue_key}"
+            )
+
+        if out_override:
+            out_dir = Path(out_override).expanduser()
+        else:
+            cache = JiraDataCenterIssueCache.for_project(request.context.project)
+            out_dir = cache.issue_dir(site, issue_key) / "attachments"
+        out_dir.mkdir(parents=True, exist_ok=True)
+
+        downloaded: list[dict[str, Any]] = []
+        for attachment in selected:
+            content_url = _optional_string(attachment.get("content"))
+            if not content_url:
+                continue
+            filename = _optional_string(attachment.get("filename")) or f"attachment-{attachment.get('id')}"
+            dest = out_dir / filename
+            jira_download_attachment(site, content_url, str(dest), runner=self.runner)
+            downloaded.append(
+                {
+                    "id": _optional_string(attachment.get("id")),
+                    "filename": filename,
+                    "size": attachment.get("size") if isinstance(attachment.get("size"), int) else None,
+                    "path": str(dest),
+                }
+            )
+
+        return {
+            "operation": "get_attachment",
+            "issue": issue_key,
+            "key": issue_key,
+            "out_dir": str(out_dir),
+            "downloaded": downloaded,
         }
 
     def apply_relationships(self, request: ProviderRequest) -> Mapping[str, Any]:
@@ -1030,6 +1081,28 @@ def upload_attachments(
     if not isinstance(raw, list):
         return []
     return [item for item in raw if isinstance(item, Mapping)]
+
+
+def _select_attachments(
+    attachments: list[Mapping[str, Any]],
+    *,
+    ids: list[str],
+    names: list[str],
+    want_all: bool,
+) -> list[Mapping[str, Any]]:
+    """Filter raw Jira attachment objects by id / filename, or take all."""
+
+    if want_all:
+        return list(attachments)
+    id_set = {value for value in ids if value}
+    name_set = {value for value in names if value}
+    selected: list[Mapping[str, Any]] = []
+    for item in attachments:
+        item_id = str(item.get("id")) if item.get("id") is not None else None
+        item_name = item.get("filename")
+        if (item_id is not None and item_id in id_set) or (item_name in name_set):
+            selected.append(item)
+    return selected
 
 
 def _attachment_summary(item: Mapping[str, Any]) -> dict[str, Any]:

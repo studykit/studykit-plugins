@@ -1247,6 +1247,113 @@ def test_data_center_add_attachment_requires_files(tmp_path: Path) -> None:
     assert runner.requests == []
 
 
+def _issue_payload_with_attachments() -> dict[str, object]:
+    return {
+        "id": "10001",
+        "key": "TEST-1234",
+        "fields": {
+            "summary": "x",
+            "description": "y",
+            "status": {"name": "Open", "statusCategory": {"key": "new"}},
+            "attachment": [
+                {
+                    "id": "40001",
+                    "filename": "report.pdf",
+                    "size": 2048,
+                    "content": "https://jira.example.test/secure/attachment/40001/report.pdf",
+                },
+                {
+                    "id": "40002",
+                    "filename": "notes.txt",
+                    "size": 12,
+                    "content": "https://jira.example.test/secure/attachment/40002/notes.txt",
+                },
+            ],
+        },
+    }
+
+
+_DOWNLOAD_ARGS = ("curl", "--silent", "--show-error", "--fail", "--location", "--config", "-")
+
+
+def test_data_center_get_attachment_resolves_id_and_downloads(tmp_path: Path) -> None:
+    write_jira_config(tmp_path)
+    runner = FakeRunner(
+        {
+            curl_args(issue_url()): result(curl_args(issue_url()), stdout=json.dumps(_issue_payload_with_attachments())),
+            _DOWNLOAD_ARGS: result(_DOWNLOAD_ARGS, stdout=""),
+        }
+    )
+    out_dir = tmp_path / "dl"
+
+    response = dispatch_write(
+        tmp_path,
+        runner,
+        "get_attachment",
+        issue="TEST-1234",
+        ids=["40001"],
+        names=[],
+        all=False,
+        out=str(out_dir),
+    )
+
+    downloaded = response.payload["downloaded"]
+    assert response.payload["operation"] == "get_attachment"
+    assert [item["id"] for item in downloaded] == ["40001"]
+    assert downloaded[0]["filename"] == "report.pdf"
+    assert downloaded[0]["path"].endswith("/report.pdf")
+
+    download_request = next(req for req in runner.requests if req.args == _DOWNLOAD_ARGS)
+    text = str(download_request.input_text)
+    assert "secure/attachment/40001/report.pdf" in text
+    assert "40002" not in text
+
+
+def test_data_center_get_attachment_all_downloads_every_file(tmp_path: Path) -> None:
+    write_jira_config(tmp_path)
+    runner = FakeRunner(
+        {
+            curl_args(issue_url()): result(curl_args(issue_url()), stdout=json.dumps(_issue_payload_with_attachments())),
+            _DOWNLOAD_ARGS: result(_DOWNLOAD_ARGS, stdout=""),
+        }
+    )
+
+    response = dispatch_write(
+        tmp_path,
+        runner,
+        "get_attachment",
+        issue="TEST-1234",
+        ids=[],
+        names=[],
+        all=True,
+        out=str(tmp_path / "dl"),
+    )
+
+    assert {item["id"] for item in response.payload["downloaded"]} == {"40001", "40002"}
+    assert sum(1 for req in runner.requests if req.args == _DOWNLOAD_ARGS) == 2
+
+
+def test_data_center_get_attachment_no_match_raises(tmp_path: Path) -> None:
+    write_jira_config(tmp_path)
+    runner = FakeRunner(
+        {
+            curl_args(issue_url()): result(curl_args(issue_url()), stdout=json.dumps(_issue_payload_with_attachments())),
+        }
+    )
+
+    with pytest.raises(ProviderOperationError, match="no matching attachment"):
+        dispatch_write(
+            tmp_path,
+            runner,
+            "get_attachment",
+            issue="TEST-1234",
+            ids=["99999"],
+            names=[],
+            all=False,
+            out=str(tmp_path / "dl"),
+        )
+
+
 def test_data_center_update_rejects_empty_payload(tmp_path: Path) -> None:
     write_jira_config(tmp_path)
     site = jira_site(tmp_path)

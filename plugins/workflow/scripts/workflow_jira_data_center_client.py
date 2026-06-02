@@ -225,6 +225,30 @@ def jira_upload_attachments(
         raise JiraProviderError(f"Jira response was not valid JSON for {url}: {exc}") from exc
 
 
+def jira_download_attachment(
+    site: JiraDataCenterSite,
+    content_url: str,
+    out_path: str,
+    *,
+    runner: CommandRunner | None = None,
+) -> None:
+    """Download one Jira attachment by its absolute content URL to ``out_path``.
+
+    The attachment ``content`` URL is an absolute Jira link (often a redirect
+    to a streaming endpoint), so this follows redirects (``--location``) and
+    writes the raw bytes out (``--output``). Auth reuses the same token / basic
+    credentials as the JSON helpers; the JSON ``Accept`` header is dropped so
+    the binary body is not negotiated away.
+    """
+
+    _ = site  # auth comes from the environment; the URL is absolute
+    run_command(
+        ("curl", "--silent", "--show-error", "--fail", "--location", "--config", "-"),
+        input_text=_curl_download_config(url=content_url, out_path=out_path),
+        runner=runner,
+    )
+
+
 def jira_delete(
     site: JiraDataCenterSite,
     path: str,
@@ -310,6 +334,17 @@ def _curl_multipart_config(*, url: str, file_paths: Iterable[str]) -> str:
     return "\n".join(lines) + "\n"
 
 
+def _curl_download_config(*, url: str, out_path: str) -> str:
+    lines = _curl_auth_lines()
+    lines.extend(
+        [
+            f'output = "{_curl_quote(out_path)}"',
+            f'url = "{_curl_quote(url)}"',
+        ]
+    )
+    return "\n".join(lines) + "\n"
+
+
 def _curl_method_config(*, method: str, url: str) -> str:
     lines = _curl_base_config_lines()
     lines.extend(
@@ -322,7 +357,11 @@ def _curl_method_config(*, method: str, url: str) -> str:
 
 
 def _curl_base_config_lines() -> list[str]:
-    lines = ['header = "Accept: application/json"']
+    return ['header = "Accept: application/json"', *_curl_auth_lines()]
+
+
+def _curl_auth_lines() -> list[str]:
+    lines: list[str] = []
     personal_token = _first_env("JIRA_PERSONAL_TOKEN", "JIRA_PAT")
     username = _first_env("JIRA_USERNAME", "JIRA_USER")
     password = _first_env("JIRA_PASSWORD")

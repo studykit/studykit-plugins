@@ -69,6 +69,36 @@ def render_jira_relationships_markdown(
     return "\n".join([issue_key, *rendered]) + "\n"
 
 
+def render_jira_attachments_markdown(
+    attachments: Any, *, issue_key: str
+) -> str | None:
+    """Render the normalized Jira attachment list as concise markdown.
+
+    One line per attachment (``- <id>: <filename> (<size> bytes)``) so an
+    agent can see what is attached from a fetch and pass the id to
+    ``issue attach get`` for download. Kept in a sibling ``attachment.md``
+    rather than ``issue.md`` frontmatter or body so the authored issue
+    content stays unpolluted. Returns ``None`` when the issue has no
+    attachments so the caller skips writing the file.
+    """
+
+    if not isinstance(attachments, list):
+        return None
+    lines: list[str] = []
+    for item in attachments:
+        if not isinstance(item, Mapping):
+            continue
+        attachment_id = _normalize_optional(item.get("id"))
+        filename = _normalize_optional(item.get("filename")) or "(unnamed)"
+        size = item.get("size")
+        size_suffix = f" ({size} bytes)" if isinstance(size, int) else ""
+        prefix = f"- {attachment_id}: " if attachment_id else "- "
+        lines.append(f"{prefix}{filename}{size_suffix}")
+    if not lines:
+        return None
+    return "\n".join([issue_key, *lines]) + "\n"
+
+
 def _jira_ref_key(value: Any) -> str | None:
     if isinstance(value, Mapping):
         ref = value.get("key") or value.get("issue") or value.get("id")
