@@ -38,7 +38,7 @@ from issue.jira.snapshot import (
     render_jira_attachments_markdown,
     render_jira_relationships_markdown,
 )
-from workflow_jira_data_center_client import JiraDataCenterSite
+from issue.jira.client import JiraDataCenterSite
 
 
 _COMMENT_FILENAME_RE = re.compile(r"^comment-.*\.md$")

@@ -22,7 +22,7 @@ import frontmatter as frontmatter_lib
 
 from workflow_command import CommandRunner
 from workflow_config import WorkflowConfig, WorkflowConfigError
-from workflow_jira_data_center_client import resolve_jira_data_center_site
+from issue.jira.client import resolve_jira_data_center_site
 from issue.backend import IssueBackendError
 from issue.cli_output import (
     IssueFetchContext,

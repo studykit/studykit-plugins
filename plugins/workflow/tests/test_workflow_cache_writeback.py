@@ -20,7 +20,7 @@ jira_issue_writeback_main = partial(run_intent, WRITEBACK)
 from workflow_command import CommandRequest, CommandResult  # noqa: E402
 from workflow_config import load_workflow_config  # noqa: E402
 from issue.jira.cache import JiraDataCenterIssueCache  # noqa: E402
-from workflow_jira_data_center_client import jira_data_center_site_from_provider_config  # noqa: E402
+from issue.jira.client import jira_data_center_site_from_provider_config  # noqa: E402
 
 
 class FakeRunner:
