@@ -73,7 +73,7 @@ _USAGE = (
     "  update     update title / body / labels / state (legacy: issue_update update)\n"
     "  fetch      fetch one or more issues into the cache (legacy: issue_fetch)\n"
     "  comment    append a comment from a body file (legacy: issue_comments append)\n"
-    "  attach     attach local file(s) to an issue (Jira provider only)\n"
+    "  attach     add/get issue file attachments (Jira provider only)\n"
     "  link       add / remove / replace relationships (legacy: issue_link)\n"
     "  state      change lifecycle state (e.g. `state <ref> close`)\n"
     "  assign     assign an issue to a user (e.g. `assign <ref> me`)\n"

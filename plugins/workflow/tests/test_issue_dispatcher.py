@@ -351,23 +351,47 @@ def test_attach_under_github_is_refused(tmp_path: Path) -> None:
     assert "only supported by the Jira" in err
 
 
-def test_attach_help_under_jira_lists_issue_and_files(tmp_path: Path) -> None:
+def test_attach_help_under_jira_lists_add_and_get_subcommands(tmp_path: Path) -> None:
     _write_config(tmp_path, _JIRA_CONFIG)
     code, stdout, _ = _capture_help(
         issue_attach_main,
         ["--project", str(tmp_path), "--help"],
     )
     assert code == 0
+    assert "add" in stdout
+    assert "get" in stdout
+
+
+def test_attach_add_help_under_jira_lists_issue_and_files(tmp_path: Path) -> None:
+    _write_config(tmp_path, _JIRA_CONFIG)
+    code, stdout, _ = _capture_help(
+        issue_attach_main,
+        ["--project", str(tmp_path), "add", "--help"],
+    )
+    assert code == 0
     assert "--issue" in stdout
     assert "files" in stdout
 
 
-def test_attach_under_jira_rejects_missing_file(tmp_path: Path) -> None:
+def test_attach_get_help_under_jira_lists_selectors(tmp_path: Path) -> None:
+    _write_config(tmp_path, _JIRA_CONFIG)
+    code, stdout, _ = _capture_help(
+        issue_attach_main,
+        ["--project", str(tmp_path), "get", "--help"],
+    )
+    assert code == 0
+    assert "--id" in stdout
+    assert "--name" in stdout
+    assert "--all" in stdout
+    assert "--out" in stdout
+
+
+def test_attach_add_under_jira_rejects_missing_file(tmp_path: Path) -> None:
     _write_config(tmp_path, _JIRA_CONFIG)
     missing = tmp_path / "nope.pdf"
     code, _, err = _capture_help(
         issue_attach_main,
-        ["--project", str(tmp_path), "--issue", "TEST-1", str(missing)],
+        ["--project", str(tmp_path), "add", "--issue", "TEST-1", str(missing)],
     )
     assert code == 2
     assert "does not exist" in err

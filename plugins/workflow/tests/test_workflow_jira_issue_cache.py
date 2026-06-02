@@ -122,9 +122,17 @@ def test_jira_write_issue_bundle_response_omits_internal_json_paths(tmp_path: Pa
 
     # The native source JSON (issue.json / remote-links.json) must never be
     # surfaced; the internal .meta.json path may appear (it is dropped before
-    # CLI output). issue.md and relation.md are the readable projections.
-    assert set(written) == {"issue_dir", "issue_file", "meta_file", "relationships_file"}
+    # CLI output). issue.md, relation.md, and attachment.md are the readable
+    # projections.
+    assert set(written) == {
+        "issue_dir",
+        "issue_file",
+        "meta_file",
+        "relationships_file",
+        "attachments_file",
+    }
     assert written["relationships_file"].endswith("/relation.md")
+    assert written["attachments_file"].endswith("/attachment.md")
 
 
 def test_jira_write_issue_bundle_renders_relationships_markdown(tmp_path: Path) -> None:
@@ -190,6 +198,54 @@ def test_jira_write_issue_bundle_omits_relation_md_when_no_links(tmp_path: Path)
 
     # No relationships → no relation.md at all (not even a placeholder).
     assert not cache.relationships_file(site, "TEST-1234").is_file()
+
+
+def test_jira_write_issue_bundle_renders_attachments_markdown(tmp_path: Path) -> None:
+    # attachment.md is the LLM-readable list; one line per attachment with the
+    # stable id the download verb consumes. Kept out of issue.md / frontmatter.
+    cache = JiraDataCenterIssueCache.for_project(tmp_path)
+    site = jira_site()
+
+    payload = _jira_issue_payload("Open")
+    fields = payload["fields"]
+    assert isinstance(fields, dict)
+    fields["attachment"] = [
+        {
+            "id": "40001",
+            "filename": "report.pdf",
+            "size": 2048,
+            "mimeType": "application/pdf",
+            "content": "https://jira.example.test/secure/attachment/40001/report.pdf",
+            "created": "2026-06-02T10:00:00.000+0900",
+            "author": {"displayName": "Example User", "name": "example"},
+        }
+    ]
+
+    cache.write_issue_bundle(
+        site,
+        payload,
+        fetched_at="2026-05-15T10:00:00.000+0900",
+    )
+
+    md = cache.attachments_file(site, "TEST-1234").read_text(encoding="utf-8")
+    assert md.startswith("TEST-1234")
+    assert "- 40001: report.pdf (2048 bytes)" in md
+    # No frontmatter — the list is a plain sibling projection.
+    assert not md.startswith("---")
+
+
+def test_jira_write_issue_bundle_omits_attachment_md_when_none(tmp_path: Path) -> None:
+    cache = JiraDataCenterIssueCache.for_project(tmp_path)
+    site = jira_site()
+
+    cache.write_issue_bundle(
+        site,
+        _jira_issue_payload("Open"),
+        fetched_at="2026-05-15T10:00:00.000+0900",
+    )
+
+    # No attachments → no attachment.md at all.
+    assert not cache.attachments_file(site, "TEST-1234").is_file()
 
 
 def _payload_with_assignee(assignee: object) -> dict[str, object]:

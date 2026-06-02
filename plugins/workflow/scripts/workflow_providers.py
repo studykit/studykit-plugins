@@ -23,7 +23,7 @@ TRANSPORT_NATIVE = "native"
 TRANSPORT_MCP = "mcp"
 TRANSPORT_PRIORITY = (TRANSPORT_NATIVE, TRANSPORT_MCP)
 
-ISSUE_READ_OPERATIONS = frozenset({"get", "search", "comments", "logs"})
+ISSUE_READ_OPERATIONS = frozenset({"get", "search", "comments", "logs", "get_attachment"})
 ISSUE_WRITE_OPERATIONS = frozenset(
     {
         "create",
@@ -225,8 +225,8 @@ class IssueProvider(ProviderTransport):
     """Issue provider interface.
 
     Covered operations: create, update, get, search, comments, logs,
-    add_comment, add_attachment, set_parent, set_dependency, close, and
-    reopen.
+    add_comment, add_attachment, get_attachment, set_parent,
+    set_dependency, close, and reopen.
     """
 
     role = ROLE_ISSUE
@@ -255,6 +255,9 @@ class IssueProvider(ProviderTransport):
 
     def add_attachment(self, request: ProviderRequest) -> Mapping[str, Any]:
         raise ProviderOperationError("issue add_attachment is not implemented")
+
+    def get_attachment(self, request: ProviderRequest) -> Mapping[str, Any]:
+        raise ProviderOperationError("issue get_attachment is not implemented")
 
     def set_parent(self, request: ProviderRequest) -> Mapping[str, Any]:
         raise ProviderOperationError("issue set_parent is not implemented")

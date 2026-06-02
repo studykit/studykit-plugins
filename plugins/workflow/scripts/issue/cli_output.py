@@ -22,6 +22,7 @@ class IssueFetchContext:
     issue_file: str = "issue.md"
     comments: tuple[str, ...] = ()
     relationships: str | None = None
+    attachments: str | None = None
 
     def to_json(self, basedir: str = "") -> dict[str, Any]:
         issue_dir = ensure_trailing_slash(self.issue_dir.strip())
@@ -38,6 +39,13 @@ class IssueFetchContext:
                 relationships[len(basedir):]
                 if basedir and relationships.startswith(basedir)
                 else relationships
+            )
+        if self.attachments:
+            attachments = self.attachments
+            payload["attachments"] = (
+                attachments[len(basedir):]
+                if basedir and attachments.startswith(basedir)
+                else attachments
             )
         if self.comments:
             payload["comments"] = [
@@ -140,6 +148,14 @@ def format_issue_cache_context(
                 else relationships
             )
             lines.append(f"  - relationships: `{relative}`")
+        if context.attachments:
+            attachments = context.attachments
+            relative = (
+                attachments[len(shared_base):]
+                if shared_base and attachments.startswith(shared_base)
+                else attachments
+            )
+            lines.append(f"  - attachments: `{relative}`")
         for comment_path in context.comments:
             relative = comment_path[len(shared_base):] if shared_base and comment_path.startswith(shared_base) else comment_path
             lines.append(f"  - `{relative}`")
