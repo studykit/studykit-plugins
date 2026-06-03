@@ -67,14 +67,16 @@ Once configured, the plugin exposes these slash commands:
   issues. At wrap-up the skill dispatches the explorer and reviewer
   subagents to find gaps and quality issues. Run with `iterate` (or an
   existing `usecase` ref) to resume an earlier discovery session.
-- `/implement-issue <issue-ref> [extra requirements]` — Execute an
-  approved plan for a `task`, `bug`, or `spike` issue. Converge the plan
-  with Claude in plan mode first; then this command hands it to an
-  implementer subagent that implements, verifies the acceptance
-  criteria, commits, and pushes a topic branch for you to review and
-  merge, after which an auditor subagent cross-checks the result and
-  leaves an audit comment on the issue. Pass extra requirements after
-  the ref to steer execution.
+- `/implement-issue <issue-ref> [extra requirements]` — Execute the
+  plan recorded in a `task`, `bug`, or `spike` issue. The issue body
+  already carries the plan from when it was created in plan mode; refresh
+  it in plan mode only if it has drifted from the current code. This
+  command hands the issue (and any refreshed plan) to an implementer
+  subagent that implements, verifies the acceptance criteria, commits,
+  and pushes a topic branch for you to review and merge, after which an
+  auditor subagent cross-checks the result and leaves an audit comment
+  on the issue. Pass extra requirements after the ref to steer
+  execution.
 - `/handoff` — Wrap up a session by refreshing the `Resume` section of
   every in-flight issue and, if needed, publishing `review`-type issues
   for residual findings, gaps, or questions.

@@ -1,6 +1,6 @@
 ---
 name: implement-issue
-description: "Hand an approved plan for a workflow `task`, `bug`, or `spike` issue to `issue-implementer` for execution, then `implementation-auditor` to verify the result. Converge the plan in plan mode first; this skill dispatches and passes the reports through."
+description: "Execute the plan recorded in a workflow `task`, `bug`, or `spike` issue: dispatch `issue-implementer` (which adopts the issue body's plan, or a plan-mode refresh you pass in), then `implementation-auditor` to verify the result. This skill dispatches and passes the reports through."
 argument-hint: "<issue-ref> [additional requirements]"
 disable-model-invocation: true
 allowed-tools:
@@ -9,10 +9,12 @@ allowed-tools:
 
 # Implement
 
-Dispatcher for executing an **already-approved plan**. Converge the plan
-with the user in plan mode *before* running this skill — the skill does
-not plan. It hands the approved plan to `issue-implementer` (which
-executes it in an isolated worktree and pushes a topic branch), then to
+Dispatcher for executing an issue's approved plan. The plan of record is
+the issue body's `Approach` / `Affected Paths` / `Acceptance Criteria`,
+authored in plan mode when the task was created. This skill does not
+plan; it hands the issue — and, when you refreshed the plan in plan
+mode, the refreshed plan — to `issue-implementer` (which adopts the plan,
+executes it in an isolated worktree, and pushes a topic branch), then to
 `implementation-auditor` (which cross-checks the result, read-only). The
 skill owns dispatch only — the agents' bodies are the source of truth
 for what they do and which states they return.
@@ -24,16 +26,19 @@ for what they do and which states they return.
    <issue-ref> [additional requirements]`. Everything past the ref is
    extra requirements, forwarded verbatim.
 
-2. **Capture the approved plan.** Use the plan just converged with the
-   user in this session's plan mode — the approach, the files to touch,
-   the per-Acceptance-Criterion verification, and the commit split. If
-   no plan has been agreed in the conversation, stop and tell the user
-   to plan first (enter plan mode, converge a plan, approve), then
-   re-run the skill.
+2. **Settle the plan.** The plan of record is the issue body's
+   `Approach` / `Affected Paths` / `Acceptance Criteria`. Normally pass
+   nothing extra — the implementer adopts the body's plan and checks it
+   against the current code itself, reporting `paused` with what drifted
+   and a suggested direction if it has. Converge a refreshed plan with
+   the user in plan mode and carry it forward as an override only when
+   you already know the body plan needs sharpening, or in response to a
+   prior `paused`-for-drift report.
 
 3. **Dispatch `issue-implementer`.** Call `Agent` with `subagent_type:
-   workflow:issue-implementer`, passing the issue ref, the approved plan
-   (inline), and the extra requirements verbatim. It executes in its own
+   workflow:issue-implementer`, passing the issue ref, the extra
+   requirements verbatim, and — only when you refreshed the plan in
+   step 2 — the refreshed plan as an override. It executes in its own
    isolated worktree and returns a `<report>` whose `state` is
    `implemented`, `paused`, or `failed`.
 
