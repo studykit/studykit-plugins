@@ -85,7 +85,6 @@ Link follow-ups visibly in the issue body or comments.
 ## Common mistakes
 
 - Using `spike` for production implementation work.
-- Missing the `Hypothesis` or `Validation Method` section.
 - Treating the spike as complete without evidence.
 - Letting throwaway PoC code become production code without a follow-up task.
 - Using spike when a written `research` item would be enough.

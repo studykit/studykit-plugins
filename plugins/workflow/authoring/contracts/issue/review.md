@@ -63,7 +63,6 @@ This mirrors the verdict-comment shape the workflow auditors use (`agents/implem
 ## Common mistakes
 
 - Missing target identity for a target-specific review.
-- Burying the conclusion under a heading, a bullet list, or reasoning paragraphs.
 - Packing several unrelated concerns into one review item.
 - Using a page comment instead of a review item for feedback that needs workflow tracking.
 - Treating a review as complete before the target item was updated.

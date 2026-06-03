@@ -80,7 +80,6 @@ Create a `review` item targeting the actors page (describing the issue in prose)
 
 ## Common mistakes
 
-- Missing the `Actors` section.
 - Defining actor identity inside use case bodies instead of citing the canonical name from this page.
 - Generic actor names (`User`, `The System`) that conflate distinct roles.
 - Mixing per-flow role description into the identity entry here.

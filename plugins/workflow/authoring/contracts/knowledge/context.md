@@ -81,8 +81,6 @@ Use these boundaries to place framing content. Do not encode these as metadata r
 
 ## Common mistakes
 
-- Missing the `Original Idea` or `Problem Framing` section.
-- Rewriting the original idea until the starting point is lost.
 - Putting detailed use case flows in context.
 - Putting domain concepts or actor rosters in context.
 - Using context as a roadmap or task list.
