@@ -59,7 +59,7 @@ Only the adapter layer should know host-specific details.
 - Hook-invoked scripts, skill-invoked scripts, and assistant shell tool commands do not have the same runtime context. Do not copy variable assumptions from one context into another.
 - Cross-runtime hooks should normally use runtime-specific entrypoints (`hook_claude.py`, `hook_codex.py`) that call a shared hook module with concrete values.
 - If shared code needs `${CLAUDE_PLUGIN_ROOT}`, `${CLAUDE_SKILL_DIR}`, `${PLUGIN_ROOT}`, `CODEX_THREAD_ID`, `CLAUDE_CODE_SESSION_ID`, a raw hook payload, or a host-specific tool name, move that concern into an adapter first.
-- Plugin-owned normalized environment contracts, such as workflow's `WORKFLOW_*` values, may be read by script entrypoints as defaults, but deeper shared logic should still receive concrete values.
+- Plugin-owned normalized environment contracts, such as workflow's `SPEC_TRACK_*` values, may be read by script entrypoints as defaults, but deeper shared logic should still receive concrete values.
 
 ## Layering Rule
 

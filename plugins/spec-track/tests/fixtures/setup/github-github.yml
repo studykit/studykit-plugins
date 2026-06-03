@@ -1,0 +1,14 @@
+version: 1
+mode: remote-native
+providers:
+  issues:
+    kind: github
+    repo: studykit/studykit-plugins
+  knowledge:
+    kind: github
+    repo: studykit/studykit-plugins
+    path: wiki/spec-track
+issue_id_format: github
+commit_refs:
+  enabled: true
+  style: provider-native
