@@ -87,7 +87,7 @@ For cross-runtime hooks, use this concrete file split:
 
 - `plugins/<name>/hooks/scripts/hook_claude.py` for Claude hook dispatch, payload parsing, environment lookup, and Claude output.
 - `plugins/<name>/hooks/scripts/hook_codex.py` for Codex hook dispatch, payload parsing, environment lookup, Codex transcript metadata, and Codex output.
-- `plugins/<name>/scripts/<plugin>_hook.py` for shared hook behavior as plain functions only. For example, the workflow plugin uses `plugins/workflow/scripts/workflow_hook.py`.
+- `plugins/<name>/scripts/<plugin>_hook.py` for shared hook behavior as plain functions only. For example, the SpecTrack plugin uses `plugins/spec-track/scripts/hook.py`.
 - `plugins/<name>/scripts/util.py` for host-neutral helpers only.
 
 Do not put an abstract `Hook` class, runtime factory, host detector, or shared hook `main` in the shared hook module.

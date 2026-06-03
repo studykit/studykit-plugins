@@ -14,7 +14,7 @@ Bump the SemVer version of a single marketplace plugin's manifest files. This sk
 
 ## Inputs
 
-- `$plugin` — plugin directory name under `plugins/` (e.g., `workflow`, `a4`, `doc`).
+- `$plugin` — plugin directory name under `plugins/` (e.g., `spec-track`, `a4`, `doc`).
 - `$level` — one of `patch`, `minor`, `major`, or an explicit version string in `X.Y.Z` form.
 
 If either argument is missing, stop and ask the user. If `$plugin` does not resolve to a directory under `plugins/`, stop and report the mismatch — do not guess the intended plugin.
