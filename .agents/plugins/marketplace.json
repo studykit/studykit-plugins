@@ -77,10 +77,10 @@
       "category": "Coding"
     },
     {
-      "name": "workflow",
+      "name": "spec-track",
       "source": {
         "source": "local",
-        "path": "./plugins/workflow"
+        "path": "./plugins/spec-track"
       },
       "policy": {
         "installation": "AVAILABLE",
