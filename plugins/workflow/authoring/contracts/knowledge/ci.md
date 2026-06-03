@@ -62,7 +62,6 @@ A CI page update is done when required sections are present, commands are verifi
 
 ## Common mistakes
 
-- Presenting un-run commands as verified.
 - Duplicating architecture rationale instead of linking to architecture.
 - Adding task-specific verification details that belong in a task or bug.
 - Relying on a legacy local CI file as canonical identity when the CI page is knowledge-backed.

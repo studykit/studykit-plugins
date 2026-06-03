@@ -82,8 +82,6 @@ A bug is complete when:
 
 ## Common mistakes
 
-- Missing the `Reproduction` section.
-- Missing the `Unit Test Strategy` section or regression test plan.
 - Treating a vague symptom as ready for fix before reproduction is clear.
 - Treating comments as the only source of expected behavior.
 - Marking a bug complete without a regression test or documented manual verification.

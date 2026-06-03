@@ -75,7 +75,6 @@ Use these boundaries to place architecture content. Do not encode these as metad
 
 ## Common mistakes
 
-- Missing the `Overview`, `Components`, `Technology Stack`, or `Test Strategy` section.
 - Writing executable test commands here instead of `ci`.
 - Using architecture as a roadmap or milestone plan.
 - Listing considered options in `Technology Stack` instead of recording chosen stack only.

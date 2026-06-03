@@ -67,7 +67,6 @@ A task is complete when required tests or verification steps have passed, or the
 
 ## Common mistakes
 
-- Missing the `Description`, `Unit Test Strategy`, or `Acceptance Criteria` section.
 - Creating an anchorless task for work that really needs a use case or spec.
 - Treating comments as the only source of acceptance criteria.
 - Treating a task as complete without updating affected knowledge pages.

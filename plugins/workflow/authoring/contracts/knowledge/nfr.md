@@ -53,8 +53,6 @@ Do not put implementation strategy in the NFR page unless it is part of the requ
 
 ## Common mistakes
 
-- Missing the `Requirements` section.
-- Aspirational requirements without measurable criteria.
 - Functional behavior here instead of use cases/specs.
 - Implementation strategy here instead of architecture/spec.
 - NFRs with no verification path or follow-up review item.

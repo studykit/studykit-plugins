@@ -65,7 +65,6 @@ A spec should not be used as an implementation contract until:
 
 ## Common mistakes
 
-- Missing the `Context` or `Specification` section.
 - Treating the spec as a discussion thread instead of a curated contract.
 - Packing several unrelated contracts into one spec.
 - Hiding implementation decisions in task issues instead of updating or creating a spec.

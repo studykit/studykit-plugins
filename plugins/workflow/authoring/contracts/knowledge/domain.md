@@ -82,8 +82,6 @@ If architecture uses a domain term differently from this page, create a `review`
 
 ## Common mistakes
 
-- Missing the `Concepts` section.
 - Putting architecture components or framework constructs in domain.
 - Renaming concepts without managing downstream references.
 - Defining the same concept with different names.
-- Writing relationship/state diagrams as long prose.
