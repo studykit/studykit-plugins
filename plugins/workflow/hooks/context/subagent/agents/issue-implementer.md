@@ -10,14 +10,9 @@ Per-verb syntax (flags, body-file lifecycle, conflict handling)
 lives in the runbook at
 `{{WORKFLOW_RUNBOOK_DIR}}/<intent>/{{WORKFLOW_ISSUE_PROVIDER}}.md`:
 
-- `issue-fetch` — fetch issues + cache projections
-- `issue-write` — shared body-bearing write procedure
-- `issue-new` — publish a new issue (used for the review publish flow)
-- `issue-comment` — append the optional summary comment when there are
-  decisions / open questions / notes worth recording (Step 10)
-- `issue-link` — relationships (used for the blocked-by link)
-- `issue-update` — update body and state (used for the writeback)
-- `issue-state` — provider terminal-transition verbs (when combining
-  `--state` on update)
+- `issue-fetch` — fetch the issue + cache projections (only when an
+  `issue-ref` is supplied, for spec context)
+- `issue-update` — refresh the issue body's `Resume` at handoff
+  (body-only writeback; this agent never transitions issue state)
 
 </runbook>
