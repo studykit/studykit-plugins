@@ -13,7 +13,10 @@
     ".pytest_cache": true,
     ".claude/tmp": false,
     "**/CLAUDE.md": false,
-    "**/*.lock": true
+    "**/*.lock": true,
+    "**/__pycache__": true,
+    "**/.pytest_cache": true,
+    "**/.cache": true
   },
   "explorerExclude.backup": {}
 }
