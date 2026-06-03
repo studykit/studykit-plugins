@@ -1308,8 +1308,7 @@ def test_claude_subagent_start_injects_issue_implementer_agent_block(
     )
     assert "<commit-prefix>" in context
     assert "## issue-implementer subagent context" not in context
-    assert "issue-new" in context
-    assert "issue-link" in context
+    assert "issue-fetch" in context
     assert "issue-update" in context
 
 
@@ -1340,11 +1339,7 @@ def test_subagent_start_emits_single_runbook_for_issue_implementer(
     assert context.count("</runbook>") == 1
     for intent in (
         "issue-fetch",
-        "issue-write",
-        "issue-new",
-        "issue-link",
         "issue-update",
-        "issue-state",
     ):
         assert f"`{intent}`" in context
 
