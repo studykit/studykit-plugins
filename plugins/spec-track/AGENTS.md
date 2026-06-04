@@ -51,6 +51,29 @@ Skipping this leaves the doc duplicating runtime-injected text, restating
 it stale, or — worse — assuming context that isn't actually injected on
 that surface and leaving the runtime instance missing what it needs.
 
+The fastest way to read the injected text is the `preview_context`
+launcher command — it calls the same `main_context` build functions the
+hooks call, so its output is byte-for-byte what the runtime receives:
+
+```bash
+# All surfaces for the project's configured provider
+spec-track preview_context
+
+# One surface, one provider/runtime
+spec-track preview_context --surface session --provider jira
+spec-track preview_context --surface subagent --provider github \
+  --agent issue-implementer
+spec-track preview_context --surface commit
+
+# Enumerate per-agent block names
+spec-track preview_context --list-agents
+```
+
+`--surface` is `session` (main), `subagent`, `commit`, or `all` (default).
+Omit `--provider` to load the project's `.spec-track/config.yml`; pass it
+to preview a provider without a configured project. `--agent all` dumps
+every per-agent SubagentStart block.
+
 Where the injected text comes from:
 
 - **Skills run in the main session** — `SessionStart` injects from
