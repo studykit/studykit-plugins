@@ -77,10 +77,10 @@
       "category": "Coding"
     },
     {
-      "name": "spec-track",
+      "name": "spectrack",
       "source": {
         "source": "local",
-        "path": "./plugins/spec-track"
+        "path": "./plugins/spectrack"
       },
       "policy": {
         "installation": "AVAILABLE",
