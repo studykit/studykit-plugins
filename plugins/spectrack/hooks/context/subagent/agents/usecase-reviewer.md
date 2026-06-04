@@ -5,7 +5,8 @@ lives in the runbook at
 `{{SPECTRACK_RUNBOOK_DIR}}/<intent>/{{SPECTRACK_ISSUE_PROVIDER}}.md`:
 
 - `issue-fetch` — fetch every `usecase` ref the caller named, plus
-  every `prior-review-refs` entry. Read the cached body for use
+  every `prior-review-refs` entry, in a single `issue-fetch` call
+  (the verb accepts multiple refs). Read the cached body for use
   cases and (for prior reviews) the body only — comments are not
   needed for deduplication.
 - `issue-new` — publish the per-finding `review` issue (one finding

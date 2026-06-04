@@ -13,10 +13,10 @@ task `completed`, then run the End-Iteration procedure below.
    "spectrack:usecase-explorer")`. Pass:
    - The list of `usecase` issue refs created or refined this session.
    - An absolute output path for the advisory exploration report
-     under `$(workflow project-dir .spectrack-cache/usecase-explorations/<session-slug>.md)`.
+     under `$(spectrack project-dir .spectrack-cache/usecase-explorations/<session-slug>.md)`.
 
-   The explorer reads each referenced `usecase` issue via `workflow
-   issue fetch`, evaluates the set from fresh perspectives (usage
+   The explorer reads the referenced `usecase` issues via a single
+   `spectrack issue fetch` call, evaluates the set from fresh perspectives (usage
    environment, user proficiency, collaboration, error handling,
    security/privacy), and writes the advisory report to the named
    path. It does **not** publish any issues.
@@ -34,7 +34,7 @@ task `completed`, then run the End-Iteration procedure below.
      candidates reflected in step 2).
    - The absolute draft directory for per-finding `review` issue
      bodies under
-     `$(workflow project-dir .spectrack-cache/usecase-reviewer/<session-slug>/)`.
+     `$(spectrack project-dir .spectrack-cache/usecase-reviewer/<session-slug>/)`.
    - Optionally, refs of prior open `review` issues whose `source`
      is `usecase-reviewer` so the reviewer can deduplicate.
 

@@ -82,7 +82,7 @@ Use `spectrack issue new --type usecase` per the verb syntax at
 - `--title` — a short imperative phrase matching the actor's goal
   ("Share meeting summary").
 - `--body-file` — a temp body file you drafted under
-  `$(workflow project-dir .spectrack-cache/usecase-drafts/<slug>.md)`. Body sections follow the
+  `$(spectrack project-dir .spectrack-cache/usecase-drafts/<slug>.md)`. Body sections follow the
   resolver-returned issue-side `usecase` authoring shape. Place the
   user's outstanding questions in the `Open Questions` section so
   they travel with the issue.

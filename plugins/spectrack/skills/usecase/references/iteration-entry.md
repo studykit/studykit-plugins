@@ -13,9 +13,9 @@ can pick where to resume.
 
 1. Run `spectrack issue list --type usecase` (verb syntax at
    `<runbook>`'s `issue-fetch` intent if the launcher exposes
-   listing through that intent). When the launcher requires a fetch
-   per ref instead of a list verb, fetch the refs the user named
-   directly.
+   listing through that intent). When the launcher offers no list
+   verb, fetch the refs the user named directly — pass them all to a
+   single `issue-fetch` call (the verb accepts multiple refs).
 2. For each issue, capture: ref, title, current state, and whether
    the body's `Open Questions` section is non-empty.
 

@@ -41,7 +41,7 @@ Long-lived user or project preferences belong in durable project guidance (`CLAU
 
 ### Stage 2 — residual check
 
-Ask: can the next session reach every mid-flight issue's next step by running `spectrack issue fetch <ref>` for each touched ref, reading the resulting `issue.md` (Resume section plus the recent `comment-*.md` tail), plus `git log --oneline origin/main..HEAD` and commit messages?
+Ask: can the next session reach every mid-flight issue's next step by running `spectrack issue fetch <ref> [<ref> ...]` once for the touched refs, reading the resulting `issue.md` (Resume section plus the recent `comment-*.md` tail), plus `git log --oneline origin/main..HEAD` and commit messages?
 
 - If yes, stop. Report pre-handoff commit(s) or `skipped`, the issue refs whose `Resume` and / or comments were updated, and `no session-level residual — no review issues published`.
 - If no, identify each residual concern as a single `finding`, `gap`, or `question`, and publish one review issue per concern.
