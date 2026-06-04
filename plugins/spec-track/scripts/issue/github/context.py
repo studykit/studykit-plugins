@@ -55,6 +55,12 @@ def cache_github_issue_references(
             comment_paths = tuple(
                 display_project_path(path, config.root) for path in cache.comment_files(repo, normalized)
             )
+            relationships_path = cache.relationships_file(repo, normalized)
+            relationships_display = (
+                display_project_path(relationships_path, config.root)
+                if relationships_path.is_file()
+                else None
+            )
             contexts.append(
                 IssueFetchContext(
                     number=normalized,
@@ -64,6 +70,7 @@ def cache_github_issue_references(
                     cache_refreshed=cache_refreshed_from_payload(response.payload, default=True),
                     provider_kind="github",
                     comments=comment_paths,
+                    relationships=relationships_display,
                 )
             )
         except Exception:

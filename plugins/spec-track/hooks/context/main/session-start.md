@@ -1,3 +1,9 @@
+<issue-provider>
+
+Issue provider for this project: `{{SPEC_TRACK_ISSUE_PROVIDER}}`.
+
+</issue-provider>
+
 <launcher>
 
 {{SNIPPET_LAUNCHER}}
