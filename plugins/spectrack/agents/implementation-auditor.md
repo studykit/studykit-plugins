@@ -124,7 +124,7 @@ the main session.
 
 On comment-append failure only — typically when the issue ref is
 unreachable or the tracker is unwritable — write the same comment body
-to `$(workflow project-dir .spectrack-cache/audits/issue-<ref>-audit.md)`
+to `$(spectrack project-dir .spectrack-cache/audits/issue-<ref>-audit.md)`
 first (the helper resolves the project root and creates the parent),
 then include that path as the `report` sub-key in the returned block.
 The file is the escape hatch when the comment surface is unavailable.
@@ -235,7 +235,7 @@ unreachable.
   the single audit comment defined in `## Output`.
 - Do not call any `spectrack issue` verb other than `fetch` and `comment`.
 - Do not write to any local path other than the audit fallback file
-  (`$(workflow project-dir .spectrack-cache/audits/issue-<ref>-audit.md)`),
+  (`$(spectrack project-dir .spectrack-cache/audits/issue-<ref>-audit.md)`),
   and only when the comment append failed.
 - Do not re-run tests, lint, or any other implementer-side verification.
   Check the shape and presence of evidence, not its passing.

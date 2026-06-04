@@ -130,7 +130,7 @@ not agent memory.
 - **Mock generator** — `Agent(subagent_type: "spectrack:mock-html-generator")`.
   Pass the participating use case refs, screen-group label, layout
   requirements, and an absolute output directory under
-  `$(workflow project-dir .spectrack-cache/mocks/<screen-slug>/)`.
+  `$(spectrack project-dir .spectrack-cache/mocks/<screen-slug>/)`.
 
 **Execution order in Wrap Up:** explorer first (find candidates the
 existing set missed), then reviewer (validate the full set).

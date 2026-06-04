@@ -44,7 +44,7 @@ the user can react to a concrete visual.
    - The screen-group label.
    - Layout requirements (the user's wording verbatim).
    - An absolute output directory under
-     `$(workflow project-dir .spectrack-cache/mocks/<screen-slug>/)`.
+     `$(spectrack project-dir .spectrack-cache/mocks/<screen-slug>/)`.
 3. After the agent returns the output path, present the mock to the
    user (file path they can open in a browser). Gather feedback.
 4. **Reflect mock feedback into use cases** through a follow-up

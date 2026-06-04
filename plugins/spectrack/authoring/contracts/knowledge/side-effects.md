@@ -32,7 +32,7 @@ Each `review` item contains **one concern** — do not pack several side effects
 
    Follow the body shape the resolver returns. `review-authoring.md` keeps the body deliberately compact: required `Description`, optional `Suggested Fix`, `Evidence`, `Resume`.
 
-2. Draft the `review` body under a scratch path the originating skill / agent picks (e.g., `$(workflow project-dir .spectrack-cache/<originator>-side-effects/<slug>.md)` — the helper resolves the project root and creates the parent, anchoring on the main repo so the draft survives worktree teardown). Include in `Description`:
+2. Draft the `review` body under a scratch path the originating skill / agent picks (e.g., `$(spectrack project-dir .spectrack-cache/<originator>-side-effects/<slug>.md)` — the helper resolves the project root and creates the parent, anchoring on the main repo so the draft survives worktree teardown). Include in `Description`:
 
    - What is missing or wrong on the knowledge surface.
    - Why it matters (one or two sentences, grounded in the originating work).

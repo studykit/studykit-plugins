@@ -43,7 +43,7 @@ authoring contract is the contract.
    `Scope`, `Sources To Check`, `Resume`).
 
 3. **Publish the research issue.** Draft the body under
-   `$(workflow project-dir .spectrack-cache/usecase-research/<slug>.md)` and publish via
+   `$(spectrack project-dir .spectrack-cache/usecase-research/<slug>.md)` and publish via
    `spectrack issue new --type research` (verb syntax at `<runbook>`'s
    `issue-new` intent). Pass:
 
