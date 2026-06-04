@@ -1,3 +1,9 @@
+<issue-provider>
+
+Issue provider for this project: `{{SPEC_TRACK_ISSUE_PROVIDER}}`.
+
+</issue-provider>
+
 <launcher>
 
 This subagent runs inside a workflow-configured project. The main session's

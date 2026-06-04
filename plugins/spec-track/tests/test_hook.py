@@ -1729,7 +1729,7 @@ def test_user_prompt_dedupes_announced_issue_paths_within_session(
     assert second.getvalue() == ""
 
 
-def test_user_prompt_lists_issue_path_when_frontmatter_has_relationships(
+def test_user_prompt_lists_relationships_path_when_frontmatter_has_relationships(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -1767,7 +1767,44 @@ def test_user_prompt_lists_issue_path_when_frontmatter_has_relationships(
 
     payload = json.loads(captured.getvalue())
     context = payload["hookSpecificOutput"]["additionalContext"]
-    assert context == "## Workflow issue cache\n\n- #39 → `.spec-track-cache/issues/39/issue.md`"
+    assert context == (
+        "## Workflow issue cache\n\n"
+        "- #39 → `.spec-track-cache/issues/39/issue.md`\n"
+        "  - relationships: `.spec-track-cache/issues/39/relation.md`"
+    )
+
+
+def test_user_prompt_reports_relationships_none_when_issue_has_no_links(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _write_config(tmp_path)
+    _hook_env(monkeypatch, tmp_path)
+    repo = GitHubRepository(host="github.com", owner="studykit", name="studykit-plugins")
+    cache = GitHubIssueCache.for_project(tmp_path, configured_repo=repo)
+    # No relationships → relation.md is never written.
+    cache.write_issue_bundle(repo, issue_payload(39, title="Requested issue"))
+
+    captured = io.StringIO()
+    event_payload = parse_codex_event_payload(
+        {
+            "session_id": "s1",
+            "turn_id": "turn-1",
+            "cwd": str(tmp_path),
+            "hook_event_name": "UserPromptSubmit",
+            "prompt": "#39 작업 내용 확인",
+        },
+    )
+    assert isinstance(event_payload, CodexUserPromptSubmitPayload)
+    assert user_prompt_submit(event_payload, stdout=captured, runner=FakeRunner({})) == 0
+
+    payload = json.loads(captured.getvalue())
+    context = payload["hookSpecificOutput"]["additionalContext"]
+    assert context == (
+        "## Workflow issue cache\n\n"
+        "- #39 → `.spec-track-cache/issues/39/issue.md`\n"
+        "  - relationships: none"
+    )
 
 
 def test_stop_does_not_carry_issue_refs_to_next_user_prompt(

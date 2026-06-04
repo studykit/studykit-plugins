@@ -8,7 +8,6 @@ spec-track issue new \
   [--label <label> ...] \
   [--issue-type <jira-issue-type>] \
   [--subtask-parent <PARENT-KEY>] \
-  [--project-key <PROJECT>] \
   [--epic-name <X>] \
   [--assignee <user>] \
   [--parent <KEY>] [--epic <KEY>] [--blocked-by <KEY> ...] [--blocking <KEY> ...] \

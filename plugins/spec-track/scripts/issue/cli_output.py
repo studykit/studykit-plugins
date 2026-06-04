@@ -40,6 +40,10 @@ class IssueFetchContext:
                 if basedir and relationships.startswith(basedir)
                 else relationships
             )
+        else:
+            # No relation.md ⟺ the issue has no links. State it explicitly so
+            # the reader knows there are none, rather than probing the cache dir.
+            payload["relationships"] = "none"
         if self.attachments:
             attachments = self.attachments
             payload["attachments"] = (
@@ -148,6 +152,8 @@ def format_issue_cache_context(
                 else relationships
             )
             lines.append(f"  - relationships: `{relative}`")
+        else:
+            lines.append("  - relationships: none")
         if context.attachments:
             attachments = context.attachments
             relative = (

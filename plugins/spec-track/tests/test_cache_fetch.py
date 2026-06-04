@@ -272,16 +272,18 @@ def test_cache_fetch_uses_cache_hit_without_remote_issue_view(tmp_path: Path) ->
     assert code == 0
     assert set(payload) == {"basedir", "issues"}
     assert payload["basedir"] == ".spec-track-cache/issues/"
-    # The payload has no relationships, so relation.md is never written and the
-    # fetch entry omits the relationships key entirely.
+    # The payload has no relationships, so relation.md is never written; the
+    # fetch entry reports relationships explicitly as "none" rather than
+    # omitting the key (so the reader knows there are none, not unknown).
     assert set(payload["issues"][0]) == {
         "issue",
         "title",
         "state",
         "cache_refreshed",
+        "relationships",
     }
     assert payload["issues"][0]["issue"] == "42/issue.md"
-    assert "relationships" not in payload["issues"][0]
+    assert payload["issues"][0]["relationships"] == "none"
     assert payload["issues"][0]["cache_refreshed"] is False
     assert runner.requests == []
 
