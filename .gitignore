@@ -222,6 +222,6 @@ session-tree.lock
 /work-audit-*.md
 
 # Workflow provider read cache
-.spec-track-cache/
+.spectrack-cache/
 .cache/
 .handoff/

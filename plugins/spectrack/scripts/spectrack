@@ -1,0 +1,82 @@
+#!/usr/bin/env bash
+# spectrack script launcher. Uses Claude's persisted environment as-is, sources
+# Codex's hook-generated environment, or falls back to local terminal defaults.
+
+set -euo pipefail
+
+SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+PLUGIN_ROOT="$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd -P)"
+
+if [ "$#" -lt 1 ]; then
+  echo "usage: spectrack <script.py|command> [args...]" >&2
+  exit 2
+fi
+
+exec_workflow_command() {
+  local command="$1"
+  shift
+
+  local candidate
+  if [[ "$command" != */* ]]; then
+    if [[ "$command" != *.* && -f "$SCRIPT_DIR/$command.py" ]]; then
+      candidate="$SCRIPT_DIR/$command.py"
+    elif [[ "$command" != *.* && -f "$SCRIPT_DIR/$command/__main__.py" ]]; then
+      # Package-style command: run its `__main__.py` (carries PEP 723 deps and
+      # bootstraps sys.path so its absolute `<pkg>.*` imports resolve).
+      candidate="$SCRIPT_DIR/$command/__main__.py"
+    else
+      candidate="$SCRIPT_DIR/$command"
+    fi
+  else
+    candidate="$command"
+  fi
+
+  if [[ "$candidate" == *.py && -f "$candidate" ]]; then
+    exec uv run --script "$candidate" "$@"
+  fi
+
+  exec "$candidate" "$@"
+}
+
+resolve_project_dir() {
+  if [ -n "${SPECTRACK_PROJECT_DIR:-}" ]; then
+    printf '%s\n' "$SPECTRACK_PROJECT_DIR"
+    return 0
+  fi
+  if git_root="$(git rev-parse --show-toplevel 2>/dev/null)"; then
+    printf '%s\n' "$git_root"
+    return 0
+  fi
+  pwd -P
+}
+
+source_codex_env_file() {
+  local project_dir
+  project_dir="$(resolve_project_dir)"
+
+  local env_exports
+  env_exports="$(uv run --script "$SCRIPT_DIR/env.py" codex-env-exports --project "$project_dir" --session "$CODEX_THREAD_ID")"
+  if [ -n "$env_exports" ]; then
+    eval "$env_exports"
+  fi
+}
+
+apply_terminal_environment() {
+  export SPECTRACK="$SCRIPT_DIR/spectrack"
+  export SPECTRACK_PLUGIN_ROOT="$PLUGIN_ROOT"
+  export SPECTRACK_PROJECT_DIR="${SPECTRACK_PROJECT_DIR:-$(resolve_project_dir)}"
+}
+
+COMMAND="$1"
+shift
+
+if [ -n "${CLAUDE_CODE_SESSION_ID:-}" ]; then
+  exec_workflow_command "$COMMAND" "$@"
+fi
+if [ -n "${CODEX_THREAD_ID:-}" ]; then
+  source_codex_env_file
+  exec_workflow_command "$COMMAND" "$@"
+fi
+
+apply_terminal_environment
+exec_workflow_command "$COMMAND" "$@"
