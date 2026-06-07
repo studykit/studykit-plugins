@@ -220,7 +220,9 @@ def test_jira_write_issue_bundle_renders_relationships_markdown(tmp_path: Path) 
     assert md.startswith("TEST-1234")
     # Concise: one line per relationship kind, no per-section headings.
     assert "- parent: TEST-1000" in md
-    assert "- Blocks: TEST-2000 (outward)" in md
+    # outwardIssue holds the far issue, so TEST-1234 is the inward end:
+    # the link's direction from TEST-1234's perspective is inward.
+    assert "- Blocks: TEST-2000 (inward)" in md
     assert "- external: [Design doc](https://example.test/design)" in md
     assert "## " not in md
 

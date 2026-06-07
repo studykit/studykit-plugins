@@ -185,11 +185,13 @@ def jira_issue_payload(*, body: str = "Data Center description.") -> dict[str, o
                     "fields": {"summary": "Subtask", "status": {"name": "To Do"}},
                 }
             ],
+            # Real Jira GET shape: the populated side holds the *other* issue's
+            # role (TEST-1234 blocks TEST-1235; TEST-1234 is blocked by TEST-1233).
             "issuelinks": [
                 {
                     "id": "30001",
                     "type": {"name": "Blocks", "outward": "blocks", "inward": "is blocked by"},
-                    "outwardIssue": {
+                    "inwardIssue": {
                         "id": "10002",
                         "key": "TEST-1235",
                         "fields": {"summary": "Follow-up", "status": {"name": "Open"}},
@@ -198,7 +200,7 @@ def jira_issue_payload(*, body: str = "Data Center description.") -> dict[str, o
                 {
                     "id": "30002",
                     "type": {"name": "Blocks", "outward": "blocks", "inward": "is blocked by"},
-                    "inwardIssue": {
+                    "outwardIssue": {
                         "id": "10003",
                         "key": "TEST-1233",
                         "fields": {"summary": "Blocking predecessor", "status": {"name": "In Progress"}},
