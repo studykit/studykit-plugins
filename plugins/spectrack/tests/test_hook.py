@@ -2251,6 +2251,66 @@ def test_claude_pre_read_allows_github_cache_issue_md(
     assert captured.getvalue() == ""
 
 
+def test_claude_pre_read_blocks_jira_cache_native_json(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The native .issue.json source is internal — reads are blocked."""
+
+    _write_jira_config(tmp_path)
+    monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(tmp_path))
+    monkeypatch.setenv("CLAUDE_PLUGIN_ROOT", str(_PLUGIN_ROOT))
+
+    native = tmp_path / ".spectrack-cache" / "issues" / "TEST-1234" / ".issue.json"
+    native.parent.mkdir(parents=True)
+    native.write_text('{"key": "TEST-1234"}\n', encoding="utf-8")
+
+    captured = io.StringIO()
+    assert claude_main(
+        payload={
+            "session_id": "jira-native-read-protection",
+            "cwd": str(tmp_path),
+            "hook_event_name": "PreToolUse",
+            "tool_name": "Read",
+            "tool_input": {"file_path": str(native)},
+        },
+        stdout=captured,
+    ) == 0
+
+    payload = json.loads(captured.getvalue())
+    assert payload["decision"] == "block"
+    assert ".issue.json" in payload["reason"]
+
+
+def test_claude_pre_read_allows_jira_cache_state_md(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """state.md is a readable projection — reads are allowed."""
+
+    _write_jira_config(tmp_path)
+    monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(tmp_path))
+    monkeypatch.setenv("CLAUDE_PLUGIN_ROOT", str(_PLUGIN_ROOT))
+
+    state_file = tmp_path / ".spectrack-cache" / "issues" / "TEST-1234" / "state.md"
+    state_file.parent.mkdir(parents=True)
+    state_file.write_text("---\nstatus: Open\n---\n\nTEST-1234 — Open.\n", encoding="utf-8")
+
+    captured = io.StringIO()
+    assert claude_main(
+        payload={
+            "session_id": "jira-state-read-allowed",
+            "cwd": str(tmp_path),
+            "hook_event_name": "PreToolUse",
+            "tool_name": "Read",
+            "tool_input": {"file_path": str(state_file)},
+        },
+        stdout=captured,
+    ) == 0
+
+    assert captured.getvalue() == ""
+
+
 def test_session_start_emits_nothing_for_invalid_config(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

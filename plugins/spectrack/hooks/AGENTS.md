@@ -78,11 +78,11 @@ block, and the PRD-path resolver block.
   `authoring/runbook/<intent>/<provider>.md`.
 - **Provider cache projections are read-only; dotfile sources are internal.**
   `PreToolUse` write protection blocks edits to the readable projections
-  (`issue.md` / `relation.md` / `comment-*.md`); refresh those
+  (`issue.md` / `state.md` / `relation.md` / `comment-*.md`); refresh those
   through the matching fetch script rather than editing in place. The
-  internal dotfiles — `.meta.json` (per-target freshness fingerprints) and,
-  for GitHub, `.relation.json` (the machine relationship source the
-  readable `relation.md` is rendered from) — are blocked for both read
+  internal dotfiles — `.meta.json` (per-target freshness fingerprints) for
+  both providers, plus GitHub's `.relation.json` and Jira's `.issue.json` /
+  `.remote-links.json` native machine sources — are blocked for both read
   and write; they are projection bookkeeping, not issue content.
 - **Authoring read-tracking scope is `../authoring/` only.**
   `mustread.authoring_relative_path` defines the surface. A new

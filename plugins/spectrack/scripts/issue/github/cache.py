@@ -62,9 +62,9 @@ def _comment_fingerprint_items(source: Mapping[str, Any]) -> list[dict[str, str 
 def is_github_issue_cache_body_path(path: Path, project: Path) -> bool:
     """Return whether ``path`` is a read-only GitHub issue content projection.
 
-    Recognizes the ``issue.md`` body, the readable ``relation.md``
-    projection, and any ``comment-*.md`` sibling in the flat per-issue
-    directory layout. Configured-repo issues sit at
+    Recognizes the ``issue.md`` body, the readable ``state.md`` and
+    ``relation.md`` projections, and any ``comment-*.md`` sibling in the flat
+    per-issue directory layout. Configured-repo issues sit at
     ``.spectrack-cache/issues/<n>/`` and external repos are namespaced under
     ``.spectrack-cache/<host>/<owner>/<repo>/issues/<n>/``. The internal
     ``.meta.json`` / ``.relation.json`` machine sources are matched by
@@ -72,7 +72,7 @@ def is_github_issue_cache_body_path(path: Path, project: Path) -> bool:
     """
 
     name = path.name
-    if name not in {"issue.md", "relation.md"} and not _COMMENT_FILENAME_RE.match(name):
+    if name not in {"issue.md", "state.md", "relation.md"} and not _COMMENT_FILENAME_RE.match(name):
         return False
     return _github_issue_cache_dir_match(path, project)
 
@@ -111,6 +111,7 @@ class CacheWriteResult:
 
     issue_dir: Path
     issue_file: Path
+    state_file: Path
     meta_file: Path
     relationship_location: Path
 
@@ -118,6 +119,7 @@ class CacheWriteResult:
         return {
             "issue_dir": str(self.issue_dir),
             "issue_file": str(self.issue_file),
+            "state_file": str(self.state_file),
             "meta_file": str(self.meta_file),
             "relationship_location": str(self.relationship_location),
         }
@@ -159,6 +161,9 @@ class GitHubIssueCache:
 
     def meta_file(self, repo: GitHubRepository, issue: int | str) -> Path:
         return self.issue_dir(repo, issue) / ".meta.json"
+
+    def state_file(self, repo: GitHubRepository, issue: int | str) -> Path:
+        return self.issue_dir(repo, issue) / "state.md"
 
     def relationships_file(self, repo: GitHubRepository, issue: int | str) -> Path:
         return self.issue_dir(repo, issue) / "relation.md"
@@ -249,6 +254,7 @@ class GitHubIssueCache:
             cache_metadata: dict[str, Any] = {
                 "hit": True,
                 "issue_file": str(issue_path),
+                "state_file": str(self.state_file(repo, issue)),
                 "meta_file": str(meta_path),
             }
 
@@ -415,9 +421,22 @@ class GitHubIssueCache:
             meta["projects"] = projects
         _atomic_write_text(meta_path, _dump_json(meta))
 
+        state_path = self.state_file(repo, issue_number)
+        _atomic_write_text(
+            state_path,
+            _render_github_state_markdown(
+                issue_number,
+                state=meta["state"],
+                state_reason=meta["state_reason"],
+                assignees=meta["assignees"],
+                labels=meta["labels"],
+            ),
+        )
+
         return CacheWriteResult(
             issue_dir=issue_dir,
             issue_file=issue_path,
+            state_file=state_path,
             meta_file=meta_path,
             relationship_location=self.relationships_file(repo, issue_number),
         )
@@ -460,6 +479,7 @@ class GitHubIssueCache:
         return CacheWriteResult(
             issue_dir=self.issue_dir(repo, issue_number),
             issue_file=issue_path,
+            state_file=self.state_file(repo, issue_number),
             meta_file=meta_path,
             relationship_location=self.relationships_file(repo, issue_number),
         )
@@ -554,6 +574,34 @@ _GITHUB_RELATIONSHIP_KINDS: tuple[str, ...] = (
     "blocking",
     "related",
 )
+
+
+def _render_github_state_markdown(
+    issue: int | str,
+    *,
+    state: str,
+    state_reason: str | None,
+    assignees: list[str],
+    labels: list[str],
+) -> str:
+    """Render native GitHub state as a readable ``state.md`` projection.
+
+    Surfaces ``state`` / ``state_reason`` / ``assignees`` / ``labels`` so a
+    fetch caller (and the LLM) can read lifecycle state without opening the
+    internal ``.meta.json``. Frontmatter carries the machine-readable fields;
+    the body is a one-line human summary. Always written.
+    """
+
+    frontmatter: dict[str, Any] = {
+        "state": state,
+        "state_reason": state_reason,
+        "assignees": list(assignees),
+        "labels": list(labels),
+    }
+    reason = f" ({state_reason})" if state_reason else ""
+    who = ", ".join(assignees) if assignees else "unassigned"
+    summary = f"#{issue} — {state}{reason}, assignee {who}"
+    return _format_markdown(frontmatter, summary + "\n")
 
 
 def _render_github_relationships_markdown(

@@ -391,12 +391,12 @@ def test_data_center_provider_fetches_issue_remote_links_and_writes_llm_snapshot
     site = jira_site(tmp_path)
     issue_dir = cache.issue_dir(site, "TEST-1234")
     assert issue_dir == tmp_path / ".spectrack-cache" / "issues" / "TEST-1234"
-    assert (issue_dir / "issue.json").is_file()
-    assert (issue_dir / "remote-links.json").is_file()
+    assert (issue_dir / ".issue.json").is_file()
+    assert (issue_dir / ".remote-links.json").is_file()
 
     issue_md_text = (issue_dir / "issue.md").read_text(encoding="utf-8")
     # issue.md is the pure authored body; title / state / labels / relationships
-    # are served from the native issue.json + remote-links.json projections and
+    # are served from the native .issue.json + .remote-links.json projections and
     # are already asserted via the GET response above.
     assert issue_md_text == "Data Center description."
     assert "Please keep Data Center first." not in issue_md_text
@@ -555,7 +555,7 @@ def test_data_center_snapshot_hides_comments_with_configured_markers(
     cache = JiraDataCenterIssueCache.for_project(tmp_path)
     site = jira_site(tmp_path)
     issue_dir = cache.issue_dir(site, "TEST-1234")
-    assert "!git-event" in (issue_dir / "issue.json").read_text(encoding="utf-8")
+    assert "!git-event" in (issue_dir / ".issue.json").read_text(encoding="utf-8")
 
     comment_file_names = {path.name for path in cache.comment_files(site, "TEST-1234")}
     assert comment_file_names == {

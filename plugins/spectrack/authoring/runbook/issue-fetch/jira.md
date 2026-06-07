@@ -6,11 +6,12 @@ spectrack issue fetch <issue> [<issue> ...] \
 ```
 
 The script returns the issue `title`/`state` inline plus paths to the
-local `issue.md` body, a `relation.md` projection when the issue has
-links, and any `comment-*.md` files — open those files to read the
-cached content.
-`issue.md` is the pure body (no frontmatter). Default cache policy
-reuses the local copy when fresh; pass `--cache-policy refresh` to
+local `issue.md` body, a `state.md` projection, a `relation.md`
+projection when the issue has links, and any `comment-*.md` files —
+open those files to read the cached content.
+`issue.md` is the pure body (no frontmatter); `state.md` carries native
+state (`status` / `resolution` / `assignee` / `labels`). Default cache
+policy reuses the local copy when fresh; pass `--cache-policy refresh` to
 force a remote re-read. Never edit the returned files in place.
 
 References are Jira issue keys (e.g., `PROJ-123`) or text containing

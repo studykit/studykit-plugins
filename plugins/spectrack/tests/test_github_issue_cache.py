@@ -102,6 +102,8 @@ def test_github_issue_cache_body_path_recognizer_matches_issue_and_comment_layou
     # The readable relation.md is a body projection; the machine source
     # .relation.json is internal (matched as a meta path, not a body path).
     assert is_github_issue_cache_body_path(configured_issue.with_name("relation.md"), tmp_path)
+    # The readable state.md is a body projection too.
+    assert is_github_issue_cache_body_path(configured_issue.with_name("state.md"), tmp_path)
     assert not is_github_issue_cache_body_path(configured_issue.with_name(".relation.json"), tmp_path)
     assert is_github_issue_cache_meta_path(configured_issue.with_name(".relation.json"), tmp_path)
     assert is_github_issue_cache_meta_path(configured_issue.with_name(".meta.json"), tmp_path)
@@ -170,6 +172,35 @@ def dispatch_get(tmp_path: Path, runner: FakeRunner, *, cache_policy: str = "def
 
 def test_gitignore_excludes_workflow_cache_root() -> None:
     assert ".spectrack-cache/" in (_REPO_ROOT / ".gitignore").read_text(encoding="utf-8")
+
+
+def test_github_write_issue_bundle_renders_state_markdown(tmp_path: Path) -> None:
+    cache = GitHubIssueCache.for_project(tmp_path)
+
+    payload = issue_payload()
+    payload["state"] = "CLOSED"
+    payload["stateReason"] = "COMPLETED"
+    payload["assignees"] = [{"login": "studykit"}]
+
+    write = cache.write_issue_bundle(repo(), payload, fetched_at="2026-05-13T12:34:56Z")
+
+    assert write.state_file == write.issue_dir / "state.md"
+    state_text = write.state_file.read_text(encoding="utf-8")
+    assert "state: closed" in state_text
+    assert "state_reason: completed" in state_text
+    assert "studykit" in state_text
+    assert "task" in state_text and "workflow" in state_text
+    assert "#39 — closed (completed), assignee studykit" in state_text
+
+
+def test_github_state_markdown_marks_unassigned(tmp_path: Path) -> None:
+    cache = GitHubIssueCache.for_project(tmp_path)
+
+    write = cache.write_issue_bundle(repo(), issue_payload(), fetched_at="2026-05-13T12:34:56Z")
+
+    state_text = write.state_file.read_text(encoding="utf-8")
+    # OPEN issue, no assignees, no state_reason suffix.
+    assert "#39 — open, assignee unassigned" in state_text
 
 
 def test_github_issue_cache_writes_flat_layout_with_meta_and_relationships(tmp_path: Path) -> None:

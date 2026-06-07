@@ -26,6 +26,8 @@ def normalize_jira_data_center_issue(
     assert isinstance(status, Mapping)
     status_category = status.get("statusCategory") if isinstance(status.get("statusCategory"), Mapping) else {}
     assert isinstance(status_category, Mapping)
+    resolution = fields.get("resolution") if isinstance(fields.get("resolution"), Mapping) else {}
+    assert isinstance(resolution, Mapping)
 
     raw_comments = fields.get("comment") if isinstance(fields.get("comment"), Mapping) else {}
     assert isinstance(raw_comments, Mapping)
@@ -50,6 +52,7 @@ def normalize_jira_data_center_issue(
         "body": _text_field(fields.get("description")),
         "state": _normalize_optional(status.get("name")) or "unknown",
         "stateReason": _normalize_optional(status_category.get("key")),
+        "resolution": _normalize_optional(resolution.get("name")),
         "labels": [str(label) for label in fields.get("labels") or [] if label is not None],
         "assignee": assignee,
         "createdAt": _normalize_optional(fields.get("created")),
