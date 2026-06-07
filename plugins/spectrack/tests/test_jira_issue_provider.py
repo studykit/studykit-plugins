@@ -18,8 +18,11 @@ from command import CommandRequest, CommandResult  # noqa: E402
 from issue.jira.cache import JiraDataCenterIssueCache  # noqa: E402
 from issue.jira.provider import (  # noqa: E402
     _jira_issue_provider_settings,
+    _relationship_mapping,
     _relationship_mappings,
+    create_issue_link,
 )
+from issue.jira.relationships import normalize_jira_data_center_issue  # noqa: E402
 from issue.jira.client import jira_data_center_site_from_provider_config  # noqa: E402
 from issue.providers import (  # noqa: E402
     CACHE_POLICY_BYPASS,
@@ -121,11 +124,15 @@ def jira_issue_payload(*, body: str = "Data Center description.") -> dict[str, o
                     }
                 ]
             },
+            # Real Jira GET shape: the populated side holds the *other* issue's
+            # role. TEST-1234 blocks TEST-1235 -> TEST-1235 is the inward
+            # (blocked) end; TEST-1234 is blocked by TEST-1233 -> TEST-1233 is
+            # the outward (blocker) end.
             "issuelinks": [
                 {
                     "id": "30001",
                     "type": {"name": "Blocks", "outward": "blocks", "inward": "is blocked by"},
-                    "outwardIssue": {
+                    "inwardIssue": {
                         "id": "10002",
                         "key": "TEST-1235",
                         "fields": {
@@ -137,7 +144,7 @@ def jira_issue_payload(*, body: str = "Data Center description.") -> dict[str, o
                 {
                     "id": "30002",
                     "type": {"name": "Blocks", "outward": "blocks", "inward": "is blocked by"},
-                    "inwardIssue": {
+                    "outwardIssue": {
                         "id": "10003",
                         "key": "TEST-1233",
                         "fields": {
@@ -149,7 +156,9 @@ def jira_issue_payload(*, body: str = "Data Center description.") -> dict[str, o
                 {
                     "id": "30003",
                     "type": {"name": "Relates", "outward": "relates to", "inward": "relates to"},
-                    "outwardIssue": {
+                    # related is configured direction: outward, so from TEST-1234's
+                    # perspective the far issue sits on the inward side.
+                    "inwardIssue": {
                         "id": "10004",
                         "key": "TEST-1236",
                         "fields": {
@@ -418,6 +427,92 @@ def _assert_existing_workflow_buckets_unchanged(workflow: dict) -> None:
     assert workflow["blocking"][0]["key"] == "TEST-1235"
     assert workflow["blocked_by"][0]["key"] == "TEST-1233"
     assert workflow["related"][0]["key"] == "TEST-1236"
+
+
+@pytest.mark.parametrize("relationship", ["blocked_by", "blocking", "related"])
+def test_data_center_issue_link_write_read_round_trips(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    relationship: str,
+) -> None:
+    """A relationship written via create_issue_link must read back into the
+    same workflow bucket. This couples the write direction (create_issue_link)
+    to the read direction (normalize) so neither can silently invert blocking /
+    blocked_by again — see issue #131 and the read fixtures above, which are
+    hand-authored and could otherwise drift from real Jira output.
+    """
+
+    source = "TEST-1234"
+    target = "TEST-2001"
+    write_jira_config(tmp_path, relationship_mappings=issue_link_relationship_mappings())
+    site = jira_site(tmp_path)
+    settings = _jira_issue_provider_settings(tmp_path)
+    mappings = _relationship_mappings(settings)
+    mapping = _relationship_mapping(settings, relationship)
+
+    # Capture the body create_issue_link would POST without serializing to curl.
+    captured: dict[str, object] = {}
+
+    def fake_send(_site, _method, _path, payload, *, runner=None):
+        captured["payload"] = payload
+        return {}
+
+    monkeypatch.setattr("issue.jira.provider.jira_send_json", fake_send)
+    create_issue_link(
+        site,
+        source_issue=source,
+        target_issue=target,
+        link_type=mapping.link_type or "",
+        direction=mapping.direction or "",
+    )
+    payload = captured["payload"]
+    assert isinstance(payload, dict)
+    inward_key = payload["inwardIssue"]["key"]
+    outward_key = payload["outwardIssue"]["key"]
+
+    # Jira's GET projection drops the current issue's own side and keeps the
+    # far issue under its real role field. Build that shape from the POST body.
+    if inward_key == source:
+        far_side, far_key = "outwardIssue", outward_key
+    else:
+        far_side, far_key = "inwardIssue", inward_key
+    assert far_key == target
+
+    link_entry = {
+        "id": "70001",
+        "type": {
+            "name": mapping.link_type,
+            "inward": "is blocked by",
+            "outward": "blocks",
+        },
+        far_side: {
+            "key": target,
+            "fields": {"summary": "Far issue", "status": {"name": "Open"}},
+        },
+    }
+    issue = {
+        "id": "10001",
+        "key": source,
+        "fields": {
+            "summary": "Round trip",
+            "description": "body",
+            "status": {"name": "Open", "statusCategory": {"key": "new"}},
+            "issuelinks": [link_entry],
+        },
+    }
+
+    normalized = normalize_jira_data_center_issue(
+        issue,
+        site=site,
+        relationship_mappings=mappings,
+    )
+    workflow = normalized["relationships"]["workflow"]
+    assert workflow.get(relationship, []) and workflow[relationship][0]["key"] == target
+    # The relationship must not leak into the opposite bucket or stay unmapped.
+    opposite = {"blocked_by": "blocking", "blocking": "blocked_by"}.get(relationship)
+    if opposite:
+        assert opposite not in workflow
+    assert "issue_links" not in workflow
 
 
 def test_data_center_field_surface_string_relationship_surfaces_in_workflow(
