@@ -142,7 +142,7 @@ spectrack config.py --project <project-root> --require
   `providers.issues.snapshot.hidden_comment_markers` only when the user or
   provider profile supplies exact body markers. The markers skip writing
   matching comments as cached `comment-*.md` projections; the raw provider
-  `issue.json` cache still retains the original comments.
+  `.issue.json` cache still retains the original comments.
 - Jira labels are opt-in. Do not copy local labels into Jira unless the user or
   provider profile explicitly asks for label writes.
 - Jira Epic configuration (`providers.issues.epic_fields.{name,link,status}`

@@ -263,9 +263,10 @@ def is_provider_issue_cache_body(path: Path, config: WorkflowConfig) -> bool:
 def is_provider_issue_cache_meta(path: Path, config: WorkflowConfig) -> bool:
     """Return whether ``path`` is an internal cache projection.
 
-    Internal projections are the dotfiles the dispatchers own (``.meta.json``
-    and, for GitHub, the ``.relation.json`` machine source); both are
-    blocked for read and write.
+    Internal projections are the dotfiles the dispatchers own: ``.meta.json``
+    for both providers, plus GitHub's ``.relation.json`` and Jira's
+    ``.issue.json`` / ``.remote-links.json`` machine sources. All are blocked
+    for read and write.
     """
 
     if config.issues.kind == "github":
@@ -273,6 +274,14 @@ def is_provider_issue_cache_meta(path: Path, config: WorkflowConfig) -> bool:
     if config.issues.kind == "jira":
         return is_jira_issue_cache_meta_path(path, config.root)
     return False
+
+
+def _internal_cache_file_label(config: WorkflowConfig) -> str:
+    """Name the provider's internal cache dotfiles for block messages."""
+
+    if config.issues.kind == "jira":
+        return ".meta.json / .issue.json / .remote-links.json"
+    return ".meta.json / .relation.json"
 
 
 def provider_cache_body_write_reason(target: EditTarget, config: WorkflowConfig) -> str | None:
@@ -286,11 +295,11 @@ def provider_cache_body_write_reason(target: EditTarget, config: WorkflowConfig)
     if is_meta:
         return (
             "workflow cache protection blocked a write to an internal cache file "
-            "(.meta.json / .relation.json).\n\n"
+            f"({_internal_cache_file_label(config)}).\n\n"
             f"Target: {target.path}\n\n"
-            "These files hold projection bookkeeping (freshness fingerprints, the "
-            "machine relationship source) only. Never edit them; the workflow "
-            "dispatchers maintain them. Use the body-file flow "
+            "These files hold internal projection bookkeeping (freshness "
+            "fingerprints and native machine sources) only. Never edit them; the "
+            "workflow dispatchers maintain them. Use the body-file flow "
             "(`spectrack issue update` / `spectrack issue comment --body-file <path>`)."
         )
 
@@ -318,18 +327,18 @@ def provider_cache_body_write_reason(target: EditTarget, config: WorkflowConfig)
 
 
 def provider_cache_meta_read_reason(path: Path, config: WorkflowConfig) -> str | None:
-    """Block reads of the internal ``.meta.json`` projection."""
+    """Block reads of the provider's internal cache dotfiles."""
 
     if not is_provider_issue_cache_meta(path, config):
         return None
     return (
         "workflow cache protection blocked reading an internal cache file "
-        "(.meta.json / .relation.json).\n\n"
+        f"({_internal_cache_file_label(config)}).\n\n"
         f"Target: {path}\n\n"
-        "These files hold projection bookkeeping (freshness fingerprints, the machine "
-        "relationship source) only — they are not issue content. Read issue.md / "
-        "relation.md / comment-*.md for the issue, or refresh with "
-        "`spectrack issue fetch`."
+        "These files hold internal projection bookkeeping (freshness fingerprints "
+        "and native machine sources) only — they are not issue content. Read "
+        "issue.md / state.md / relation.md / comment-*.md for the issue, or refresh "
+        "with `spectrack issue fetch`."
     )
 
 

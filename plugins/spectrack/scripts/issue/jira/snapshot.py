@@ -6,6 +6,37 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
+from issue.cache import _format_markdown
+
+
+def render_jira_state_markdown(
+    normalized: Mapping[str, Any], *, issue_key: str
+) -> str:
+    """Render native Jira state as a readable ``state.md`` projection.
+
+    Surfaces ``status`` / ``resolution`` / ``assignee`` / ``labels`` so a fetch
+    caller (and the LLM) can read lifecycle state without opening the internal
+    native ``.issue.json``. Frontmatter carries the machine-readable fields; the
+    body is a one-line human summary. Always written — every issue has a status.
+    """
+
+    status = _normalize_optional(normalized.get("state")) or "unknown"
+    resolution = _normalize_optional(normalized.get("resolution"))
+    assignee = _jira_person_display_name(normalized.get("assignee"))
+    labels = [str(label) for label in normalized.get("labels") or [] if label is not None]
+    frontmatter: dict[str, Any] = {
+        "status": status,
+        "resolution": resolution,
+        "assignee": assignee,
+        "labels": labels,
+    }
+    summary = (
+        f"{issue_key} — {status} ({resolution or 'unresolved'}), "
+        f"assignee {assignee or 'unassigned'}"
+    )
+    return _format_markdown(frontmatter, summary + "\n")
+
+
 def jira_relationship_fingerprint_block(relationships: Mapping[str, Any]) -> dict[str, Any]:
     """Relationship fields used for the Jira ``relationships`` fingerprint.
 
@@ -34,7 +65,7 @@ def render_jira_relationships_markdown(
 
     One line per relationship kind (issue keys comma-joined) so an agent can
     follow linked issues from a fetch. Jira keeps its machine source in the
-    native ``issue.json`` / ``remote-links.json``; this is the human/LLM view.
+    native ``.issue.json`` / ``.remote-links.json``; this is the human/LLM view.
     The kinds follow Jira's relationship model (parent / children / mapped link
     buckets / unmapped issue links / external links) and intentionally differ
     from GitHub's projection. Returns ``None`` when the issue has no links so

@@ -44,12 +44,14 @@ def _jira_issue_payload(status_name: str) -> dict[str, object]:
 
 def test_jira_issue_cache_body_path_recognizer_matches_issue_md_and_comments(tmp_path: Path) -> None:
     issue_md = tmp_path / ".spectrack-cache" / "issues" / "TEST-1234" / "issue.md"
+    state_md = tmp_path / ".spectrack-cache" / "issues" / "TEST-1234" / "state.md"
     comment = tmp_path / ".spectrack-cache" / "issues" / "TEST-1234" / "comment-2026-05-15T093000Z-1.md"
-    issue_json = tmp_path / ".spectrack-cache" / "issues" / "TEST-1234" / "issue.json"
+    issue_json = tmp_path / ".spectrack-cache" / "issues" / "TEST-1234" / ".issue.json"
 
     relationships_md = tmp_path / ".spectrack-cache" / "issues" / "TEST-1234" / "relation.md"
 
     assert is_jira_issue_cache_body_path(issue_md, tmp_path)
+    assert is_jira_issue_cache_body_path(state_md, tmp_path)
     assert is_jira_issue_cache_body_path(comment, tmp_path)
     assert is_jira_issue_cache_body_path(relationships_md, tmp_path)
     assert not is_jira_issue_cache_body_path(issue_json, tmp_path)
@@ -66,8 +68,9 @@ def test_jira_issue_cache_paths_are_provider_specific(tmp_path: Path) -> None:
     assert cache.issue_dir(site, "test-1234") == (
         tmp_path / ".spectrack-cache" / "issues" / "TEST-1234"
     )
-    assert cache.issue_json_file(site, "TEST-1234").name == "issue.json"
+    assert cache.issue_json_file(site, "TEST-1234").name == ".issue.json"
     assert cache.issue_file(site, "TEST-1234").name == "issue.md"
+    assert cache.state_file(site, "TEST-1234").name == "state.md"
 
 
 def test_jira_read_issue_records_native_state(tmp_path: Path) -> None:
@@ -96,6 +99,40 @@ def test_jira_read_issue_state_round_trips_closed(tmp_path: Path) -> None:
     assert cache.read_issue(site, "TEST-1234")["state"] == "Closed"
 
 
+def test_jira_write_issue_bundle_renders_state_markdown(tmp_path: Path) -> None:
+    cache = JiraDataCenterIssueCache.for_project(tmp_path)
+    site = jira_site()
+
+    payload = _jira_issue_payload("Resolved")
+    payload["fields"]["resolution"] = {"name": "Done"}
+    payload["fields"]["assignee"] = {"displayName": "Pascal", "name": "pascal"}
+    payload["fields"]["labels"] = ["backend", "infra"]
+
+    cache.write_issue_bundle(
+        site, payload, fetched_at="2026-05-15T10:00:00.000+0900"
+    )
+
+    state_text = cache.state_file(site, "TEST-1234").read_text(encoding="utf-8")
+    assert "status: Resolved" in state_text
+    assert "resolution: Done" in state_text
+    assert "assignee: Pascal" in state_text
+    assert "backend" in state_text and "infra" in state_text
+    assert "TEST-1234 — Resolved (Done), assignee Pascal" in state_text
+
+
+def test_jira_state_markdown_marks_unresolved_and_unassigned(tmp_path: Path) -> None:
+    cache = JiraDataCenterIssueCache.for_project(tmp_path)
+    site = jira_site()
+
+    cache.write_issue_bundle(
+        site, _jira_issue_payload("Open"), fetched_at="2026-05-15T10:00:00.000+0900"
+    )
+
+    state_text = cache.state_file(site, "TEST-1234").read_text(encoding="utf-8")
+    assert "resolution:" in state_text  # null, not omitted
+    assert "TEST-1234 — Open (unresolved), assignee unassigned" in state_text
+
+
 def test_jira_write_issue_bundle_does_not_emit_metadata_file(tmp_path: Path) -> None:
     cache = JiraDataCenterIssueCache.for_project(tmp_path)
     site = jira_site()
@@ -120,18 +157,20 @@ def test_jira_write_issue_bundle_response_omits_internal_json_paths(tmp_path: Pa
         fetched_at="2026-05-15T10:00:00.000+0900",
     )
 
-    # The native source JSON (issue.json / remote-links.json) must never be
+    # The native source JSON (.issue.json / .remote-links.json) must never be
     # surfaced; the internal .meta.json path may appear (it is dropped before
-    # CLI output). issue.md, relation.md, and attachment.md are the readable
-    # projections.
+    # CLI output). issue.md, state.md, relation.md, and attachment.md are the
+    # readable projections.
     assert set(written) == {
         "issue_dir",
         "issue_file",
+        "state_file",
         "meta_file",
         "relationships_file",
         "attachments_file",
     }
     assert written["relationships_file"].endswith("/relation.md")
+    assert written["state_file"].endswith("/state.md")
     assert written["attachments_file"].endswith("/attachment.md")
 
 

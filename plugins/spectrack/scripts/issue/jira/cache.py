@@ -37,6 +37,7 @@ from issue.jira.snapshot import (
     jira_relationship_fingerprint_block,
     render_jira_attachments_markdown,
     render_jira_relationships_markdown,
+    render_jira_state_markdown,
 )
 from issue.jira.client import JiraDataCenterSite
 
@@ -47,24 +48,30 @@ _COMMENT_FILENAME_RE = re.compile(r"^comment-.*\.md$")
 def is_jira_issue_cache_body_path(path: Path, project: Path) -> bool:
     """Return whether ``path`` is a read-only Jira issue content projection.
 
-    Recognizes ``issue.md``, the readable ``relation.md`` and
+    Recognizes ``issue.md``, the readable ``state.md``, ``relation.md`` and
     ``attachment.md`` projections, and sibling ``comment-*.md`` files under
     the Jira issue cache directory layout
-    ``<project>/.spectrack-cache/issues/<key>/``. The internal ``.meta.json`` is
-    matched by :func:`is_jira_issue_cache_meta_path`; the native ``issue.json``
-    / ``remote-links.json`` machine sources are not editable projections.
+    ``<project>/.spectrack-cache/issues/<key>/``. The internal dotfiles
+    (``.meta.json`` and the native ``.issue.json`` / ``.remote-links.json``
+    machine sources) are matched by :func:`is_jira_issue_cache_meta_path` and
+    are not editable projections.
     """
 
     name = path.name
-    if name not in {"issue.md", "relation.md", "attachment.md"} and not _COMMENT_FILENAME_RE.match(name):
+    if name not in {"issue.md", "state.md", "relation.md", "attachment.md"} and not _COMMENT_FILENAME_RE.match(name):
         return False
     return _jira_issue_cache_dir_match(path, project)
 
 
 def is_jira_issue_cache_meta_path(path: Path, project: Path) -> bool:
-    """Return whether ``path`` is the internal Jira ``.meta.json`` projection."""
+    """Return whether ``path`` is an internal Jira cache dotfile.
 
-    if path.name != ".meta.json":
+    Covers the ``.meta.json`` bookkeeping file and the native
+    ``.issue.json`` / ``.remote-links.json`` machine sources. All are dotfiles
+    the dispatchers maintain; readers consume the ``*.md`` projections instead.
+    """
+
+    if path.name not in {".meta.json", ".issue.json", ".remote-links.json"}:
         return False
     return _jira_issue_cache_dir_match(path, project)
 
@@ -95,14 +102,17 @@ class JiraDataCenterIssueCache:
     def issue_file(self, site: JiraDataCenterSite, issue_key: str) -> Path:
         return self.issue_dir(site, issue_key) / "issue.md"
 
+    def state_file(self, site: JiraDataCenterSite, issue_key: str) -> Path:
+        return self.issue_dir(site, issue_key) / "state.md"
+
     def meta_file(self, site: JiraDataCenterSite, issue_key: str) -> Path:
         return self.issue_dir(site, issue_key) / ".meta.json"
 
     def issue_json_file(self, site: JiraDataCenterSite, issue_key: str) -> Path:
-        return self.issue_dir(site, issue_key) / "issue.json"
+        return self.issue_dir(site, issue_key) / ".issue.json"
 
     def remote_links_json_file(self, site: JiraDataCenterSite, issue_key: str) -> Path:
-        return self.issue_dir(site, issue_key) / "remote-links.json"
+        return self.issue_dir(site, issue_key) / ".remote-links.json"
 
     def relationships_file(self, site: JiraDataCenterSite, issue_key: str) -> Path:
         return self.issue_dir(site, issue_key) / "relation.md"
@@ -180,6 +190,7 @@ class JiraDataCenterIssueCache:
                 "hit": True,
                 "issue_dir": str(self.issue_dir(site, key)),
                 "issue_file": str(issue_md_path),
+                "state_file": str(self.state_file(site, key)),
                 "meta_file": str(meta_path),
             }
             return filter_jira_payload(
@@ -210,7 +221,7 @@ class JiraDataCenterIssueCache:
         hidden_comment_markers: Sequence[str] = (),
         relationship_mappings: Mapping[str, Any] | None = None,
     ) -> dict[str, str]:
-        """Write native JSON, metadata, generated snapshot, and per-comment files."""
+        """Write native JSON, metadata, body/state snapshots, and per-comment files."""
 
         key = normalize_jira_issue_key(issue.get("key") or "")
         links = [dict(item) for item in (remote_links or [])]
@@ -233,6 +244,10 @@ class JiraDataCenterIssueCache:
         _atomic_write_text(issue_json_path, _format_json(issue))
         _atomic_write_text(remote_links_path, _format_json(links))
         _atomic_write_text(issue_md_path, str(normalized.get("body") or ""))
+        state_path = self.state_file(site, key)
+        _atomic_write_text(
+            state_path, render_jira_state_markdown(normalized, issue_key=key)
+        )
         relationships_md = render_jira_relationships_markdown(
             relationships if isinstance(relationships, Mapping) else {},
             issue_key=key,
@@ -268,6 +283,7 @@ class JiraDataCenterIssueCache:
         return {
             "issue_dir": str(issue_dir),
             "issue_file": str(issue_md_path),
+            "state_file": str(state_path),
             "meta_file": str(meta_path),
             "relationships_file": str(self.relationships_file(site, key)),
             "attachments_file": str(self.attachments_file(site, key)),

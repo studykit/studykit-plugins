@@ -43,6 +43,6 @@ Reference docs (read on demand) at
 </runbook>
 
 Don't quote, paraphrase, or summarize issue bodies, comments, or knowledge
-documents beyond what the user asked for. The cached `issue.md` and
-`comment-*.md` files are projection-owned and read-only — refresh them
+documents beyond what the user asked for. The cached `issue.md`, `state.md`,
+and `comment-*.md` files are projection-owned and read-only — refresh them
 via the matching fetch script; never edit them in place.
