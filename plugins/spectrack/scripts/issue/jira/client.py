@@ -113,6 +113,23 @@ def jira_data_center_remote_link_path(site: JiraDataCenterSite, issue_key: str, 
     return f"/rest/api/{site.api_version}/issue/{escaped_key}/remotelink/{escaped_link_id}"
 
 
+def jira_data_center_search_path(
+    site: JiraDataCenterSite,
+    *,
+    jql: str,
+    max_results: int,
+    fields: Iterable[str] = (),
+) -> str:
+    params = [
+        f"jql={quote(jql, safe='')}",
+        f"maxResults={int(max_results)}",
+    ]
+    field_list = [field for field in fields if field]
+    if field_list:
+        params.append(f"fields={quote(','.join(field_list), safe='')}")
+    return f"/rest/api/{site.api_version}/search?{'&'.join(params)}"
+
+
 def jira_data_center_issue_links_path(site: JiraDataCenterSite) -> str:
     return f"/rest/api/{site.api_version}/issueLink"
 

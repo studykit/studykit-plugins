@@ -24,8 +24,9 @@ class IssueBackendError(RuntimeError):
 class IssueBackend(Protocol):
     """Backend driver contract used by the dispatcher scripts.
 
-    Every intent (``fetch``, ``comments``, ``drafts``, ``writeback``,
-    ``relationships``, ``fields``) is split into two halves on each driver:
+    Every intent (``fetch``, ``search``, ``comments``, ``drafts``,
+    ``writeback``, ``relationships``, ``fields``) is split into two halves
+    on each driver:
 
     - ``add_<intent>_args(parser)`` registers backend-specific options on a
       pre-built shared parser. The dispatcher already supplies the common
@@ -49,6 +50,20 @@ class IssueBackend(Protocol):
     def add_fetch_args(self, parser: argparse.ArgumentParser) -> None: ...
 
     def run_fetch(
+        self,
+        args: argparse.Namespace,
+        *,
+        config: WorkflowConfig,
+        runner: CommandRunner | None,
+        stdout: TextIO,
+        stderr: TextIO,
+    ) -> int: ...
+
+    # --- search ---------------------------------------------------------
+
+    def add_search_args(self, parser: argparse.ArgumentParser) -> None: ...
+
+    def run_search(
         self,
         args: argparse.Namespace,
         *,

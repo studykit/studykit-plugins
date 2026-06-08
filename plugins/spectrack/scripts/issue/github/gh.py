@@ -37,6 +37,14 @@ DEFAULT_ISSUE_FIELDS = (
     "closedAt",
 )
 
+SEARCH_ISSUE_FIELDS = (
+    "number",
+    "title",
+    "state",
+    "assignees",
+    "url",
+)
+
 BODY_EDIT_HISTORY_QUERY = """
 query($owner:String!, $repo:String!, $number:Int!) {
   repository(owner:$owner, name:$repo) {
@@ -164,6 +172,44 @@ def _view_issue_with_repo(
         runner=runner,
     )
     return _loads_json_object(result.stdout, "gh issue view")
+
+
+def search_issues(
+    query: str,
+    *,
+    project: Path,
+    limit: int = 30,
+    fields: tuple[str, ...] = SEARCH_ISSUE_FIELDS,
+    runner: CommandRunner | None = None,
+) -> list[dict[str, Any]]:
+    """Search the configured repository through ``gh issue list --search``.
+
+    ``query`` is passed verbatim to ``--search`` (GitHub's native issue
+    search syntax). ``--state all`` keeps open and closed issues both in
+    scope; the caller narrows state through the query string when desired.
+    """
+
+    repo = resolve_github_repository(project, runner=runner)
+    result = _gh(
+        [
+            "issue",
+            "list",
+            "--repo",
+            repo.slug,
+            "--search",
+            query,
+            "--state",
+            "all",
+            "--json",
+            ",".join(fields),
+            "--limit",
+            str(limit),
+        ],
+        project=project,
+        runner=runner,
+    )
+    items = _loads_json_items(result.stdout, "gh issue list --search")
+    return [item for item in items if isinstance(item, dict)]
 
 
 def create_issue(

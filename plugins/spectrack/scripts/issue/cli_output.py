@@ -180,6 +180,29 @@ def format_issue_cache_json(
     }
 
 
+def format_issue_search_json(
+    *,
+    kind: str,
+    query: str,
+    issues: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    """Build compact JSON for provider issue search output.
+
+    Each entry is a lightweight ref the caller feeds back to ``issue fetch``
+    (``issue`` is the bare GitHub number / Jira key); no cache files are
+    written by search. The shape is shared across backends so a reader can
+    treat results uniformly regardless of the configured provider.
+    """
+
+    issue_list = [dict(issue) for issue in issues]
+    return {
+        "kind": kind,
+        "query": query,
+        "count": len(issue_list),
+        "issues": issue_list,
+    }
+
+
 def shared_basedir(contexts: Sequence[IssueFetchContext]) -> str:
     """Return the directory shared by every context's issue_dir."""
 

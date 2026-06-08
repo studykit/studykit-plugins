@@ -98,6 +98,8 @@ then run `/clear` (or start a new session) for it to take effect.
 
 - Looks up issues by provider-native reference (`#123`, `KEY-456`, etc.)
   and surfaces a readable issue body inside the session.
+- Searches issues with the provider's native query (GitHub search syntax
+  or Jira JQL) and returns a concise list of matching issues to drill into.
 - Drafts and publishes new issues, comments, body updates, and
   relationship links through the configured provider.
 - Keeps commit subjects prefixed with the related issue reference and the
