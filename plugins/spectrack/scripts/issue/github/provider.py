@@ -38,6 +38,7 @@ from issue.github.gh import (
     remove_sub_issue,
     reopen_issue,
     resolve_github_repository,
+    search_issues,
     view_issue,
 )
 from issue.github.cache import (
@@ -65,6 +66,7 @@ from issue.providers import (
     _relationship_action,
     _relationship_values,
     _required_payload_value,
+    _search_limit,
     _string_list,
     _truthy,
 )
@@ -84,6 +86,29 @@ class _ResolvedRelationshipOperation:
             "target_issue": self.target_issue,
             "replace_parent": self.replace_parent,
         }
+
+
+def _github_search_result(item: Mapping[str, Any]) -> dict[str, Any]:
+    """Project one ``gh issue list --json`` row to the shared search shape."""
+
+    number = item.get("number")
+    assignees: list[str] = []
+    raw_assignees = item.get("assignees")
+    if isinstance(raw_assignees, list):
+        for entry in raw_assignees:
+            if isinstance(entry, Mapping):
+                login = entry.get("login")
+                if isinstance(login, str) and login:
+                    assignees.append(login)
+            elif isinstance(entry, str) and entry:
+                assignees.append(entry)
+    return {
+        "issue": str(number) if number is not None else "",
+        "title": str(item.get("title") or ""),
+        "state": str(item.get("state") or "").upper(),
+        "assignees": assignees,
+        "url": str(item.get("url") or ""),
+    }
 
 
 class GitHubIssueNativeProvider(IssueProvider):
@@ -126,6 +151,20 @@ class GitHubIssueNativeProvider(IssueProvider):
             )
             cache.write_issue_bundle(repo, payload_for_cache)
         return payload
+
+    def search(self, request: ProviderRequest) -> Mapping[str, Any]:
+        query = str(_required_payload_value(request, "query"))
+        limit = _search_limit(request.payload.get("limit"))
+        raw = search_issues(
+            query,
+            project=request.context.project,
+            limit=limit,
+            runner=self.runner,
+        )
+        issues = [
+            _github_search_result(item) for item in raw if isinstance(item, Mapping)
+        ]
+        return {"query": query, "issues": issues}
 
     def _payload_with_relationship_projection(
         self,

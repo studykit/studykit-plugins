@@ -19,6 +19,7 @@ Verb mapping
 ``new ...``                     ``DRAFTS`` with ``["publish", ...]``
 ``update ...``                  ``WRITEBACK`` with ``["update", ...]``
 ``fetch ...``                   ``FETCH`` with ``[...]``
+``search ...``                  ``SEARCH`` with ``[...]``
 ``comment ...``                 ``COMMENTS`` with ``["append", ...]``
 ``attach ...``                  ``ATTACH`` with ``[...]`` (Jira only)
 ``link ...``                    ``RELATIONSHIPS`` with ``[...]``
@@ -72,6 +73,7 @@ class IntentSpec:
 
 
 FETCH = IntentSpec("issue fetch", "add_fetch_args", "run_fetch")
+SEARCH = IntentSpec("issue search", "add_search_args", "run_search")
 COMMENTS = IntentSpec("issue comment", "add_comments_args", "run_comments")
 DRAFTS = IntentSpec("issue draft", "add_drafts_args", "run_drafts")
 WRITEBACK = IntentSpec("issue update", "add_writeback_args", "run_writeback")
@@ -171,6 +173,7 @@ _VERBS = (
     "new",
     "update",
     "fetch",
+    "search",
     "comment",
     "attach",
     "link",
@@ -188,6 +191,7 @@ _USAGE = (
     "  new        create a new issue\n"
     "  update     update title / body / labels / state\n"
     "  fetch      fetch one or more issues into the cache\n"
+    "  search     search issues with the backend's native query\n"
     "  comment    append a comment from a body file\n"
     "  attach     add/get issue file attachments (Jira provider only)\n"
     "  link       add / remove / replace relationships\n"
@@ -234,6 +238,8 @@ def main(
         return run_intent(WRITEBACK, ["update", *rest], **kwargs)
     if verb == "fetch":
         return run_intent(FETCH, rest, **kwargs)
+    if verb == "search":
+        return run_intent(SEARCH, rest, **kwargs)
     if verb == "comment":
         return run_intent(COMMENTS, ["append", *rest], **kwargs)
     if verb == "attach":

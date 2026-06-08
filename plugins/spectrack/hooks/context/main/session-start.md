@@ -32,6 +32,7 @@ Reference docs (read on demand) at
 `{{SPECTRACK_RUNBOOK_DIR}}/<intent>/{{SPECTRACK_ISSUE_PROVIDER}}.md`:
 
 - `issue-fetch` — fetch issues + cache projections
+- `issue-search` — search issues with the backend's native query
 - `issue-write` — body-bearing writes (publish / comment / update) — procedure index
 - `issue-new` — publish a new issue
 - `issue-comment` — append a comment

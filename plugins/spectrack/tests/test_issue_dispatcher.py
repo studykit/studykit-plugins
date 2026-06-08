@@ -39,6 +39,7 @@ from issue.dispatch import (  # noqa: E402
     FETCH,
     FIELDS,
     RELATIONSHIPS,
+    SEARCH,
     WRITEBACK,
     run_intent,
 )
@@ -49,6 +50,7 @@ issue_drafts_main = partial(run_intent, DRAFTS)
 issue_fetch_main = partial(run_intent, FETCH)
 issue_fields_main = partial(run_intent, FIELDS)
 issue_relationships_main = partial(run_intent, RELATIONSHIPS)
+issue_search_main = partial(run_intent, SEARCH)
 issue_writeback_main = partial(run_intent, WRITEBACK)
 
 
@@ -306,6 +308,19 @@ def test_fetch_help_lists_cache_policy_on_both_backends(
     assert "--cache-policy" in stdout
     assert "default" in stdout
     assert "refresh" in stdout
+
+
+@pytest.mark.parametrize("config_body", [_GITHUB_CONFIG, _JIRA_CONFIG])
+def test_search_help_lists_query_and_limit_on_both_backends(
+    tmp_path: Path, config_body: str
+) -> None:
+    _write_config(tmp_path, config_body)
+    code, stdout, _ = _capture_help(
+        issue_search_main, ["--project", str(tmp_path), "--help"]
+    )
+    assert code == 0
+    assert "--limit" in stdout
+    assert "query" in stdout
 
 
 @pytest.mark.parametrize(

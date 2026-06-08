@@ -30,6 +30,7 @@ from issue.cli_output import (
     display_project_path,
     flatten_provider_envelope,
     format_issue_cache_json,
+    format_issue_search_json,
 )
 from issue.jira.cache import JiraDataCenterIssueCache
 from issue.jira.provider import (
@@ -191,6 +192,54 @@ class JiraIssueBackend:
             return 2
 
         payload = format_issue_cache_json(contexts)
+        print(json.dumps(payload, indent=2, sort_keys=False), file=stdout)
+        return 0
+
+    # ------------------------------------------------------------------
+    # search
+    # ------------------------------------------------------------------
+
+    def add_search_args(self, parser: argparse.ArgumentParser) -> None:
+        parser.add_argument(
+            "--limit",
+            type=int,
+            default=30,
+            help="maximum number of results (default: 30)",
+        )
+        parser.add_argument(
+            "query",
+            help="Jira JQL query (passed to the Jira search endpoint)",
+        )
+
+    def run_search(
+        self,
+        args: argparse.Namespace,
+        *,
+        config: WorkflowConfig,
+        runner: CommandRunner | None,
+        stdout: TextIO,
+        stderr: TextIO,
+    ) -> int:
+        provider = JiraDataCenterIssueNativeProvider(runner=runner)
+        try:
+            response = provider.call(
+                ProviderRequest(
+                    role="issue",
+                    kind="jira",
+                    operation="search",
+                    context=ProviderContext(project=config.root, artifact_type="task"),
+                    payload={"query": args.query, "limit": args.limit},
+                )
+            )
+        except Exception as exc:  # noqa: BLE001
+            print(f"Jira issue search error: {exc}", file=stderr)
+            return 2
+
+        payload = format_issue_search_json(
+            kind="jira",
+            query=args.query,
+            issues=response.payload.get("issues", []),
+        )
         print(json.dumps(payload, indent=2, sort_keys=False), file=stdout)
         return 0
 

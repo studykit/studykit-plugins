@@ -34,6 +34,7 @@ from issue.cli_output import (
     display_project_path,
     flatten_provider_envelope,
     format_issue_cache_json,
+    format_issue_search_json,
 )
 from issue.github.cache import GitHubIssueCache
 from issue.github.provider import GitHubIssueNativeProvider
@@ -163,6 +164,54 @@ class GitHubIssueBackend:
             return 2
 
         payload = format_issue_cache_json(contexts)
+        print(json.dumps(payload, indent=2, sort_keys=False), file=stdout)
+        return 0
+
+    # ------------------------------------------------------------------
+    # search
+    # ------------------------------------------------------------------
+
+    def add_search_args(self, parser: argparse.ArgumentParser) -> None:
+        parser.add_argument(
+            "--limit",
+            type=int,
+            default=30,
+            help="maximum number of results (default: 30)",
+        )
+        parser.add_argument(
+            "query",
+            help="GitHub issue search query (passed to `gh issue list --search`)",
+        )
+
+    def run_search(
+        self,
+        args: argparse.Namespace,
+        *,
+        config: WorkflowConfig,
+        runner: CommandRunner | None,
+        stdout: TextIO,
+        stderr: TextIO,
+    ) -> int:
+        provider = GitHubIssueNativeProvider(runner=runner)
+        try:
+            response = provider.call(
+                ProviderRequest(
+                    role="issue",
+                    kind="github",
+                    operation="search",
+                    context=ProviderContext(project=config.root, artifact_type="task"),
+                    payload={"query": args.query, "limit": args.limit},
+                )
+            )
+        except Exception as exc:  # noqa: BLE001
+            print(f"GitHub issue search error: {exc}", file=stderr)
+            return 2
+
+        payload = format_issue_search_json(
+            kind="github",
+            query=args.query,
+            issues=response.payload.get("issues", []),
+        )
         print(json.dumps(payload, indent=2, sort_keys=False), file=stdout)
         return 0
 

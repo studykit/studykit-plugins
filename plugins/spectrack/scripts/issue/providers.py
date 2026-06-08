@@ -597,3 +597,24 @@ def _truthy(value: Any) -> bool:
     if isinstance(value, str):
         return value.strip().lower() in {"1", "true", "yes", "on"}
     return bool(value)
+
+
+_SEARCH_LIMIT_DEFAULT = 30
+
+
+def _search_limit(value: Any) -> int:
+    """Normalize a search result limit, defaulting when unset.
+
+    Raises :class:`ProviderOperationError` for non-integer or non-positive
+    values so the dispatcher surfaces a clean CLI error.
+    """
+
+    if value is None or value == "":
+        return _SEARCH_LIMIT_DEFAULT
+    try:
+        limit = int(value)
+    except (TypeError, ValueError) as exc:
+        raise ProviderOperationError(f"issue search limit must be an integer: {value!r}") from exc
+    if limit <= 0:
+        raise ProviderOperationError("issue search limit must be positive")
+    return limit

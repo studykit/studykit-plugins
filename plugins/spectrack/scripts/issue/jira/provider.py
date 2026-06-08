@@ -37,6 +37,7 @@ from issue.jira.client import (
     jira_data_center_remote_link_global_id_path,
     jira_data_center_remote_link_path,
     jira_data_center_remote_links_path,
+    jira_data_center_search_path,
     jira_data_center_transitions_path,
     jira_delete,
     jira_get_json,
@@ -51,6 +52,7 @@ from issue.providers import (
     ProviderFreshnessError,
     ProviderOperationError,
     ProviderRequest,
+    _search_limit,
 )
 
 
@@ -200,6 +202,19 @@ class JiraDataCenterIssueNativeProvider(IssueProvider):
     def comments(self, request: ProviderRequest) -> Mapping[str, Any]:
         issue = self.get(request)
         return {"comments": issue.get("comments", [])}
+
+    def search(self, request: ProviderRequest) -> Mapping[str, Any]:
+        query = str(_required_payload_value(request, "query"))
+        max_results = _search_limit(request.payload.get("limit"))
+        try:
+            site = resolve_jira_data_center_site(request.context.project)
+            raw_issues = search_issues(
+                site, jql=query, max_results=max_results, runner=self.runner
+            )
+        except JiraProviderError as exc:
+            raise ProviderOperationError(str(exc)) from exc
+        issues = [_jira_search_result(item, site=site) for item in raw_issues]
+        return {"query": query, "issues": issues}
 
     def create(self, request: ProviderRequest) -> Mapping[str, Any]:
         site = resolve_jira_data_center_site(request.context.project)
@@ -865,6 +880,57 @@ def get_remote_links(
 
     raw_links = jira_get_json(site, jira_data_center_remote_links_path(site, issue_key), runner=runner)
     return normalize_jira_remote_links(raw_links)
+
+
+JIRA_SEARCH_FIELDS = ("summary", "status", "assignee")
+
+
+def search_issues(
+    site: Any,
+    *,
+    jql: str,
+    max_results: int = 30,
+    runner: CommandRunner | None = None,
+) -> list[Mapping[str, Any]]:
+    """Search Jira Data Center issues through the JQL search endpoint.
+
+    ``jql`` is passed verbatim to ``/rest/api/<v>/search`` (the site's native
+    JQL). Only the lightweight fields needed for the ref list are requested.
+    """
+
+    path = jira_data_center_search_path(
+        site, jql=jql, max_results=max_results, fields=JIRA_SEARCH_FIELDS
+    )
+    raw = jira_get_json(site, path, runner=runner)
+    if not isinstance(raw, Mapping):
+        raise JiraProviderError("Jira search response was not an object")
+    issues = raw.get("issues")
+    return [item for item in issues or [] if isinstance(item, Mapping)]
+
+
+def _jira_search_result(item: Mapping[str, Any], *, site: Any) -> dict[str, Any]:
+    """Project one Jira search row to the shared search shape."""
+
+    fields = item.get("fields")
+    fields = fields if isinstance(fields, Mapping) else {}
+    status = fields.get("status")
+    status = status if isinstance(status, Mapping) else {}
+    assignee = fields.get("assignee")
+    assignees: list[str] = []
+    if isinstance(assignee, Mapping):
+        name = assignee.get("name") or assignee.get("displayName")
+        if name:
+            assignees.append(str(name))
+    key = str(item.get("key") or "")
+    base_url = str(getattr(site, "base_url", "") or "").rstrip("/")
+    url = f"{base_url}/browse/{key}" if base_url and key else ""
+    return {
+        "issue": key,
+        "title": str(fields.get("summary") or ""),
+        "state": str(status.get("name") or "").upper(),
+        "assignees": assignees,
+        "url": url,
+    }
 
 
 def create_issue(
