@@ -1025,12 +1025,18 @@ def create_issue_link(
 
     source_key = normalize_jira_issue_key(source_issue)
     target_key = normalize_jira_issue_key(target_issue)
+    # Per Atlassian's issue-linking model, the POST `inwardIssue` is the issue
+    # that performs the link type's *outward* verb (e.g. for "Blocks":
+    # inwardIssue "blocks", outwardIssue "is blocked by"). A mapping direction of
+    # "outward" means the source performs the outward verb (e.g. `blocking`), so
+    # the source must go in inwardIssue. See
+    # https://developer.atlassian.com/cloud/jira/platform/issue-linking-model/
     if direction == "outward":
-        outward_issue = source_key
-        inward_issue = target_key
-    elif direction == "inward":
-        outward_issue = target_key
         inward_issue = source_key
+        outward_issue = target_key
+    elif direction == "inward":
+        inward_issue = target_key
+        outward_issue = source_key
     else:
         raise JiraProviderError(f"unsupported Jira issue link direction: {direction}")
     result = jira_send_json(
