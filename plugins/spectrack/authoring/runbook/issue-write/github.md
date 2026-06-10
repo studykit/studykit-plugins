@@ -8,6 +8,23 @@ Every body-bearing write (publish / comment / update) shares this shape:
    user and wait for approval.
 3. Run the matching `spectrack issue <verb>` invocation.
 
+When presenting, narrate the write — do not dump mechanics:
+
+- Open with the verb and any state transition in one line — e.g. "The
+  verb is resolve — posting the body update + resolve transition."
+- Name the planned invocation as inline shorthand — `(issue update
+  --issue <ref> --body-file …)`. Never show the temp-file shell script
+  or the full command block; the shorthand is all the command surface
+  the user needs.
+- For updates, say what stays verbatim and what changes, then give the
+  substance of the changed or added sections. Do not restate unchanged
+  body text.
+- Do not describe what the script will do internally — the freshness
+  check, cache refresh, temp-file cleanup, and conflict flow run
+  without narration; surface them only when one actually fails.
+- Do not recount which runbook or contract files were read or restate
+  their rules; apply them silently.
+
 The script runs a per-target content fingerprint check, applies the
 mutation, refreshes the cache, deletes the body file on success, and
 returns the cached `issue.md` path with the issue ref. A body-only

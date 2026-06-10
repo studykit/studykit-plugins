@@ -55,6 +55,18 @@ A task ready for implementation should be actionable as a handoff. Before treati
 
 If two or more of these are unknown, consider `spike` or `research` instead of `task`.
 
+## Retroactive tasks
+
+A retroactive task records work that is already done — the change exists in the working tree or history before the issue does. The body states facts, not intent: `Description` says what changed and why, `Approach` records how it was actually done, and `Acceptance Criteria` record the verification that already ran.
+
+Because there is no upcoming implementation to plan or scope:
+
+- Skip the planning pass that would author a forward-looking plan; the landed change is the plan of record.
+- Skip the size audit (`task-size-auditor`) — sizing guards work that has not happened yet, and the actual size is already fixed.
+- Publish (or apply the body update) together with the transition to the backend's resolved state, rather than opening the issue and leaving it pending.
+
+The diagnosis audit still applies: a retroactive draft's recorded cause and fix can be validated against the landed change (`resolution-auditor`, draft mode).
+
 ## Artifacts
 
 Issue-backed tasks usually do not need a local evidence directory. Use linked external evidence only when it has evidentiary or comparative value (before/after screenshots, sample inputs/outputs, migration dry-run output, benchmark data).
