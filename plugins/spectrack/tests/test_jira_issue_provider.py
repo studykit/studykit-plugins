@@ -124,15 +124,17 @@ def jira_issue_payload(*, body: str = "Data Center description.") -> dict[str, o
                     }
                 ]
             },
-            # Real Jira GET shape: the populated side holds the *other* issue's
-            # role. TEST-1234 blocks TEST-1235 -> TEST-1235 is the inward
-            # (blocked) end; TEST-1234 is blocked by TEST-1233 -> TEST-1233 is
-            # the outward (blocker) end.
+            # Real Jira GET shape: the populated side holds the *far* issue under
+            # its own role. Per Atlassian's issue-linking model the inwardIssue
+            # performs the link's outward verb, so: TEST-1234 blocks TEST-1235 ->
+            # TEST-1235 sits in the outward field (current "blocks" it); TEST-1234
+            # is blocked by TEST-1233 -> TEST-1233 sits in the inward field
+            # (current "is blocked by" it).
             "issuelinks": [
                 {
                     "id": "30001",
                     "type": {"name": "Blocks", "outward": "blocks", "inward": "is blocked by"},
-                    "inwardIssue": {
+                    "outwardIssue": {
                         "id": "10002",
                         "key": "TEST-1235",
                         "fields": {
@@ -144,7 +146,7 @@ def jira_issue_payload(*, body: str = "Data Center description.") -> dict[str, o
                 {
                     "id": "30002",
                     "type": {"name": "Blocks", "outward": "blocks", "inward": "is blocked by"},
-                    "outwardIssue": {
+                    "inwardIssue": {
                         "id": "10003",
                         "key": "TEST-1233",
                         "fields": {
@@ -157,8 +159,8 @@ def jira_issue_payload(*, body: str = "Data Center description.") -> dict[str, o
                     "id": "30003",
                     "type": {"name": "Relates", "outward": "relates to", "inward": "relates to"},
                     # related is configured direction: outward, so from TEST-1234's
-                    # perspective the far issue sits on the inward side.
-                    "inwardIssue": {
+                    # perspective the far issue sits on the outward side.
+                    "outwardIssue": {
                         "id": "10004",
                         "key": "TEST-1236",
                         "fields": {
@@ -1657,14 +1659,17 @@ def test_data_center_issue_link_relationships_are_applied_from_inline_intent(tmp
     assert 'request = "POST"' in blocked_by_request
     assert f'url = "{issue_link_url()}"' in blocked_by_request
     assert '\\"type\\":{\\"name\\":\\"Blocks\\"}' in blocked_by_request
-    assert '\\"inwardIssue\\":{\\"key\\":\\"TEST-1234\\"}' in blocked_by_request
-    assert '\\"outwardIssue\\":{\\"key\\":\\"TEST-1233\\"}' in blocked_by_request
+    # Atlassian semantics: the POST inwardIssue performs the outward verb. So a
+    # `blocked_by` (source is blocked) puts the source in outwardIssue and the
+    # blocker (target) in inwardIssue; `blocking` is the mirror.
+    assert '\\"inwardIssue\\":{\\"key\\":\\"TEST-1233\\"}' in blocked_by_request
+    assert '\\"outwardIssue\\":{\\"key\\":\\"TEST-1234\\"}' in blocked_by_request
     blocking_request = str(write_requests[1].input_text)
-    assert '\\"inwardIssue\\":{\\"key\\":\\"TEST-1235\\"}' in blocking_request
-    assert '\\"outwardIssue\\":{\\"key\\":\\"TEST-1234\\"}' in blocking_request
+    assert '\\"inwardIssue\\":{\\"key\\":\\"TEST-1234\\"}' in blocking_request
+    assert '\\"outwardIssue\\":{\\"key\\":\\"TEST-1235\\"}' in blocking_request
     related_request = str(write_requests[2].input_text)
     assert '\\"type\\":{\\"name\\":\\"Relates\\"}' in related_request
-    assert '\\"inwardIssue\\":{\\"key\\":\\"TEST-1236\\"}' in related_request
+    assert '\\"inwardIssue\\":{\\"key\\":\\"TEST-1234\\"}' in related_request
 
 
 def test_data_center_epic_link_relationship_writes_bare_key_string(tmp_path: Path) -> None:

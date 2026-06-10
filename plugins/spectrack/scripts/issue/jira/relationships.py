@@ -311,15 +311,18 @@ def _inverse_issue_link_mapping(
 
 def _issue_link_target_and_label(link: Mapping[str, Any]) -> tuple[Mapping[str, Any] | None, str, str | None]:
     # Jira populates exactly one of inward_issue/outward_issue per link entry:
-    # the side holding the *other* issue. So when the far issue sits in
-    # outward_issue, the current issue is the inward end of the link (and vice
-    # versa). Relationship mappings and create_issue_link both key "direction"
-    # on the *current/source* issue's side, so return that side here — invert
-    # the populated field — to keep read direction consistent with write.
+    # the side holding the *other* (far) issue, stored under that far issue's own
+    # role. So when the far issue sits in outward_issue, the current issue relates
+    # to it via the link's *outward* verb (e.g. the current issue "blocks" it);
+    # when the far issue sits in inward_issue, the current issue relates via the
+    # *inward* verb (e.g. the current issue "is blocked by" it). Mapping
+    # "direction" is keyed on the current/source issue's verb, so return the
+    # populated field's own direction. See
+    # https://developer.atlassian.com/cloud/jira/platform/issue-linking-model/
     if isinstance(link.get("outward_issue"), Mapping):
-        return link["outward_issue"], "inward", _normalize_optional(link.get("inward"))
+        return link["outward_issue"], "outward", _normalize_optional(link.get("outward"))
     if isinstance(link.get("inward_issue"), Mapping):
-        return link["inward_issue"], "outward", _normalize_optional(link.get("outward"))
+        return link["inward_issue"], "inward", _normalize_optional(link.get("inward"))
     return None, "unknown", None
 
 
