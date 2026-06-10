@@ -14,6 +14,7 @@ if str(_SCRIPTS_DIR) not in sys.path:
 
 from mustread import (  # noqa: E402
     PLAN_MODE_TRIGGER_NOTE,
+    RESOLUTION_AUDIT_TRIGGER_NOTE,
     TASK_AUDIT_TRIGGER_NOTE,
     ResolverError,
     authoring_relative_path,
@@ -311,6 +312,19 @@ def test_task_emits_audit_trigger_note() -> None:
 def test_bug_omits_audit_trigger_note() -> None:
     resolution = resolve_authoring("bug")
     assert TASK_AUDIT_TRIGGER_NOTE not in resolution.notes
+
+
+@pytest.mark.parametrize("artifact_type", ["task", "bug"])
+def test_diagnosis_types_emit_resolution_audit_note(artifact_type: str) -> None:
+    resolution = resolve_authoring(artifact_type)
+    assert RESOLUTION_AUDIT_TRIGGER_NOTE in resolution.notes
+    assert "resolution-auditor" in RESOLUTION_AUDIT_TRIGGER_NOTE
+
+
+@pytest.mark.parametrize("artifact_type", ["spike", "epic"])
+def test_non_diagnosis_types_omit_resolution_audit_note(artifact_type: str) -> None:
+    resolution = resolve_authoring(artifact_type)
+    assert RESOLUTION_AUDIT_TRIGGER_NOTE not in resolution.notes
 
 
 @pytest.mark.parametrize(
