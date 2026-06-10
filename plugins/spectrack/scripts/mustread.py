@@ -67,6 +67,19 @@ TASK_AUDIT_TRIGGER_NOTE = (
     "work already done."
 )
 
+RESOLUTION_AUDIT_TYPES = {"task", "bug"}
+
+RESOLUTION_AUDIT_TRIGGER_NOTE = (
+    "After the body file is drafted, before invoking the publish script, "
+    "ask the user via AskUserQuestion whether to run the resolution-auditor "
+    "subagent against the draft. Pass it the draft body file path and the "
+    "artifact type; it validates the recorded root cause and proposed "
+    "approach against the actual code and git history (for retroactive "
+    "issues, against the change that already landed) and writes its verdict "
+    "to a sidecar file beside the draft. Spawn resolution-auditor only when "
+    "the user accepts."
+)
+
 RETROACTIVE_PUBLISH_STATE_GITHUB = (
     "Retroactive issues that track work already done should be "
     "published in the closed state."
@@ -375,6 +388,8 @@ def _common_notes(
         notes.append(PLAN_MODE_TRIGGER_NOTE)
     if artifact_type in TASK_AUDIT_TYPES:
         notes.append(TASK_AUDIT_TRIGGER_NOTE)
+    if artifact_type in RESOLUTION_AUDIT_TYPES:
+        notes.append(RESOLUTION_AUDIT_TRIGGER_NOTE)
     return notes
 
 
