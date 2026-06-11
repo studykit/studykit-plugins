@@ -36,7 +36,7 @@ Ground acceptance criteria in: linked use case flow/validation/error handling, l
 
 Optional sections:
 
-- `Approach` — implementation strategy: how the work is done, including sequencing and architectural choices.
+- `Approach` — implementation strategy: how the work is done, including sequencing and architectural choices. Treat it as a falsifiable hypothesis, not a fixed spec: whoever implements it — even the authoring session — re-verifies its load-bearing premises against the current code, and re-grounds any runtime-grounded premise (see `./body.md`) by running it before building on it, revising the Approach on mismatch.
 - `Affected Paths` — forward-looking scope fence naming files, packages, APIs, or migration steps expected to change.
 - `Interface Contracts` — contracts this task consumes or provides.
 - `Out of Scope`, `Alternatives Considered`, `Risks`, `Resume`, `Why Discarded` — see `./body.md`.
@@ -52,6 +52,8 @@ A task ready for implementation should be actionable as a handoff. Before treati
 - Data flow or API contract when relevant.
 - Current baseline behavior.
 - Test fixture or test strategy.
+
+Any load-bearing claim about runtime behavior must be runtime-grounded per `./body.md` — recorded with the command that produced it and its captured result, and re-confirmed by running it (or by adding temporary logging at the decisive point and observing) before implementation. A premise asserted from reasoning but never executed counts as unknown evidence here, even when the author feels certain of it.
 
 If two or more of these are unknown, consider `spike` or `research` instead of `task`.
 
