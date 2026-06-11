@@ -29,8 +29,9 @@ Types:
 
 - Issue: `task`, `bug`, `spike`, `epic`, `review`. Dual-side with the
   `issue` side: `research`, `usecase`.
-- Knowledge: `architecture`, `ci`, `context`, `domain`, `nfr`, `spec`.
-  Dual-side with the `knowledge` side: `research`, `usecase`.
+- Knowledge: `architecture`, `ci`, `context`, `decision-index`,
+  `domain`, `nfr`, `spec`. Dual-side with the `knowledge` side:
+  `research`, `usecase`.
 
 Knowledge pages live under `wiki/` — edit the resolver-returned file
 and commit.

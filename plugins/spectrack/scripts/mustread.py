@@ -39,7 +39,7 @@ PLUGIN_ROOT = Path(__file__).resolve().parent.parent
 AUTHORING_DIR = PLUGIN_ROOT / "authoring"
 
 ISSUE_TYPES = {"task", "bug", "spike", "epic", "review"}
-KNOWLEDGE_TYPES = {"spec", "architecture", "domain", "context", "nfr", "ci"}
+KNOWLEDGE_TYPES = {"spec", "architecture", "domain", "context", "nfr", "ci", "decision-index"}
 DUAL_TYPES = {"usecase", "research"}
 ALL_TYPES = ISSUE_TYPES | KNOWLEDGE_TYPES | DUAL_TYPES
 AUTHORING_SCOPES = {"content", "comment"}

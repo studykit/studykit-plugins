@@ -60,7 +60,7 @@ Use when an issue is intentionally abandoned and backend status alone does not e
 
 ### `Out of Scope`
 
-Name what the issue explicitly does not cover. Use when the title or `Description` could read as covering broader work, or when a related concern was deliberately deferred to a follow-up. Skip when scope is already obvious from `Description` and `Affected Paths`, or when the only deferred item is a generic disclaimer with no concrete follow-up. One deferred item per bullet with a short reason or follow-up link.
+Name what the issue explicitly does not cover. Use when the title or `Description` could read as covering broader work, or when a related concern was deliberately deferred to a follow-up. Skip when scope is already obvious from `Description` and `Implementation Steps`, or when the only deferred item is a generic disclaimer with no concrete follow-up. One deferred item per bullet with a short reason or follow-up link.
 
 ### `Alternatives Considered`
 

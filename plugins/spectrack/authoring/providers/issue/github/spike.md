@@ -27,8 +27,7 @@ Common required sections are defined by `../../../contracts/issue/spike.md`:
 Common optional sections are defined by `../../../contracts/issue/spike.md` and `../../../contracts/issue/body.md`:
 
 - `## Artifact Links`
-- `## Approach`
-- `## Affected Paths`
+- `## Implementation Steps`
 - `## Resume`
 - `## Why Discarded`
 

@@ -22,8 +22,6 @@ Anchorless tasks are allowed for small, obvious changes, but should pass a smell
 - A protocol, schema, API shape, or architectural decision with no spec → create or link a spec.
 - Exploratory work with missing evidence → use `spike` or `research` instead.
 
-Do not hide design decisions in the task body when they should become curated knowledge.
-
 ## Body shape
 
 Required sections:
@@ -36,12 +34,14 @@ Ground acceptance criteria in: linked use case flow/validation/error handling, l
 
 Optional sections:
 
-- `Approach` — implementation strategy: how the work is done, including sequencing and architectural choices. Treat it as a falsifiable hypothesis, not a fixed spec: whoever implements it — even the authoring session — re-verifies its load-bearing premises against the current code, and re-grounds any runtime-grounded premise (see `./body.md`) by running it before building on it, revising the Approach on mismatch.
-- `Affected Paths` — forward-looking scope fence naming files, packages, APIs, or migration steps expected to change.
+- `Context` — the backdrop a reader needs before the change makes sense: the anchoring use case or constraint, what the current code already provides, and the gap this task closes. Place it first, before `Description`. Keep it to durable framing; link the curated knowledge `context` / `architecture` page rather than restating it, and fold it into `Description` instead when the two would say the same thing. Distinct from `Description` (what is changing) — this is the situation the change sits in.
+- `Design Decision` — key design decisions this task commits to: the choice made, why, and the main alternatives rejected. Scope each to this change; a durable cross-cutting decision still earns a spec (see the Anchors and scope smell check), and a decision with lasting reference value is also linked from the Design Decision Index knowledge page (`../knowledge/decision-index.md`).
+- `Implementation Steps` — the concrete, ordered plan: what is done in what sequence, naming the files, packages, or APIs each step touches (this absorbs the older scope-fence section, so steps carry their own affected paths). Treat the plan as a falsifiable hypothesis, not a fixed spec: whoever implements it — even the authoring session — re-verifies its load-bearing premises against the current code, and re-grounds any runtime-grounded premise (see `./body.md`) by running it before building on it, revising the steps on mismatch.
+- `Verification` — the ordered procedure that establishes completion: the commands, observations, or comparisons run to confirm the `Acceptance Criteria`, each step independently checkable. Distinct from `Acceptance Criteria` (what "done" is) — this is how it is confirmed. Any runtime-grounded check must be runtime-grounded per `./body.md`.
 - `Interface Contracts` — contracts this task consumes or provides.
 - `Out of Scope`, `Alternatives Considered`, `Risks`, `Resume`, `Why Discarded` — see `./body.md`.
 
-Do not hide the motivation only in `Approach` or `Affected Paths`. If the rationale is a long-lived design decision, create or update the relevant knowledge page instead of embedding the full record in the task body.
+Do not bury the motivation only in `Implementation Steps`; state it in `Description` (and, for a design choice, `Design Decision`).
 
 ## Evidence-readiness
 
@@ -59,7 +59,7 @@ If two or more of these are unknown, consider `spike` or `research` instead of `
 
 ## Retroactive tasks
 
-A retroactive task records work that is already done — the change exists in the working tree or history before the issue does. The body states facts, not intent: `Description` says what changed and why, `Approach` records how it was actually done, and `Acceptance Criteria` record the verification that already ran.
+A retroactive task records work that is already done — the change exists in the working tree or history before the issue does. The body states facts, not intent: `Description` says what changed and why, `Implementation Steps` records how it was actually done, and `Acceptance Criteria` plus `Verification` record the checks that already ran.
 
 Because there is no upcoming implementation to plan or scope:
 
@@ -73,7 +73,7 @@ The diagnosis audit still applies: a retroactive draft's recorded cause and fix 
 
 Issue-backed tasks usually do not need a local evidence directory. Use linked external evidence only when it has evidentiary or comparative value (before/after screenshots, sample inputs/outputs, migration dry-run output, benchmark data).
 
-Production source paths are recorded by git history. Mention planned source changes in `Affected Paths` when they help scope the work.
+Production source paths are recorded by git history. Name planned source changes inline in `Implementation Steps` when they help scope the work.
 
 ## Completion criteria
 
@@ -84,4 +84,4 @@ A task is complete when required tests or verification steps have passed, or the
 - Creating an anchorless task for work that really needs a use case or spec.
 - Treating comments as the only source of acceptance criteria.
 - Treating a task as complete without updating affected knowledge pages.
-- Embedding long design decisions in the task body instead of creating or updating a spec.
+- Recording a durable cross-cutting contract only in `Design Decision` when it belongs in a spec.
