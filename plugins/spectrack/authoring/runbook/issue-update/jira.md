@@ -21,5 +21,9 @@ described under comment append. `--overwrite` skips the freshness check
 and replaces the provider copy (see the conflict flow in
 `../issue-write/jira.md`).
 
+To change only part of an existing body, seed the temp `--body-file`
+from the cached `issue.md` (the provider-normalized current body) and
+edit just the affected sections — do not re-author the whole body.
+
 See `../issue-write/jira.md` for the shared body-bearing write
 procedure and `../issue-link/jira.md` for relationship semantics.

@@ -24,5 +24,9 @@ replaces the entire label set (mixing it with `--add-label` or
 succeeds. `--overwrite` skips the freshness check and replaces the
 provider copy (see the conflict flow in `../issue-write/github.md`).
 
+To change only part of an existing body, seed the temp `--body-file`
+from the cached `issue.md` (the verbatim current body) and edit just
+the affected sections — do not re-author the whole body.
+
 See `../issue-write/github.md` for the shared body-bearing write
 procedure and `../issue-link/github.md` for relationship semantics.
