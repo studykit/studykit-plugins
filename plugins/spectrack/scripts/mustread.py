@@ -77,7 +77,15 @@ RESOLUTION_AUDIT_TRIGGER_NOTE = (
     "approach against the actual code and git history (for retroactive "
     "issues, against the change that already landed) and writes its verdict "
     "to a sidecar file beside the draft. Spawn resolution-auditor only when "
-    "the user accepts."
+    "the user accepts. If the verdict is `ok`, continue to publish. If it is "
+    "`wrong-cause`, `ineffective-approach`, or `weak-diagnosis`, do not "
+    "publish: revise the draft's recorded cause and approach to address the "
+    "sidecar's Actionable section (rewrite the cause/approach, or settle the "
+    "named execution-contingent claim), then re-run resolution-auditor "
+    "against the revised draft. Repeat until the verdict is `ok`, up to 3 "
+    "audit rounds total; if it is still not `ok` after the third round, stop "
+    "and surface the latest sidecar to the user. A `unverifiable` verdict is "
+    "not a re-plan trigger — surface it and let the user decide."
 )
 
 RETROACTIVE_PUBLISH_STATE_GITHUB = (
