@@ -90,6 +90,16 @@ RETROACTIVE_PUBLISH_STATE_JIRA = (
     "published in the resolved state."
 )
 
+USECASE_SKILL_PATH = PLUGIN_ROOT / "skills" / "usecase" / "SKILL.md"
+
+USECASE_INTERVIEW_NOTE = (
+    "Workflow `usecase` issues are interview-derived, not hand-authored. To "
+    "produce them, conduct the Socratic, one-question-at-a-time use-case "
+    f"interview: read `{USECASE_SKILL_PATH}` and follow its body as the "
+    "procedure, treating the user's idea/topic as its `$ARGUMENTS`. If you are "
+    "already executing that interview, ignore this note and continue."
+)
+
 
 def _anchor_scope_suffix(scope: str) -> str:
     return "-comment" if scope == "comment" else ""
@@ -384,6 +394,8 @@ def _common_notes(
     if scope == "comment" or target is not None or side != "issue":
         return []
     notes: list[str] = []
+    if artifact_type == "usecase":
+        notes.append(USECASE_INTERVIEW_NOTE)
     if artifact_type in PLAN_MODE_TYPES:
         notes.append(PLAN_MODE_TRIGGER_NOTE)
     if artifact_type in TASK_AUDIT_TYPES:
