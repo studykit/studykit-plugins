@@ -16,6 +16,8 @@ from mustread import (  # noqa: E402
     PLAN_MODE_TRIGGER_NOTE,
     RESOLUTION_AUDIT_TRIGGER_NOTE,
     TASK_AUDIT_TRIGGER_NOTE,
+    USECASE_INTERVIEW_NOTE,
+    USECASE_SKILL_PATH,
     ResolverError,
     authoring_relative_path,
     is_authoring_file,
@@ -334,7 +336,6 @@ def test_non_diagnosis_types_omit_resolution_audit_note(artifact_type: str) -> N
         ("epic", None),
         ("review", None),
         ("research", "issue"),
-        ("usecase", "issue"),
         ("spec", None),
         ("architecture", None),
     ],
@@ -344,6 +345,34 @@ def test_non_implementation_types_omit_plan_mode_note(
 ) -> None:
     resolution = resolve_authoring(artifact_type, side=side)
     assert resolution.notes == ()
+
+
+def test_usecase_issue_emits_interview_note() -> None:
+    resolution = resolve_authoring("usecase", side="issue")
+    assert USECASE_INTERVIEW_NOTE in resolution.notes
+    # The note must point the agent at the use-case skill to follow inline.
+    assert str(USECASE_SKILL_PATH) in USECASE_INTERVIEW_NOTE
+    # The interview replaces hand-authoring; it is not a plan-mode artifact.
+    assert PLAN_MODE_TRIGGER_NOTE not in resolution.notes
+
+
+@pytest.mark.parametrize(
+    "side,scope",
+    [
+        ("issue", "comment"),
+        ("knowledge", "content"),
+    ],
+)
+def test_usecase_omits_interview_note_off_issue_content_surface(
+    side: str, scope: str
+) -> None:
+    resolution = resolve_authoring("usecase", side=side, scope=scope)
+    assert USECASE_INTERVIEW_NOTE not in resolution.notes
+
+
+def test_non_usecase_omits_interview_note() -> None:
+    resolution = resolve_authoring("task", side="issue")
+    assert USECASE_INTERVIEW_NOTE not in resolution.notes
 
 
 def test_task_comment_scope_omits_notes() -> None:
