@@ -70,14 +70,16 @@ TASK_AUDIT_TRIGGER_NOTE = (
 RESOLUTION_AUDIT_TYPES = {"task", "bug"}
 
 RESOLUTION_AUDIT_TRIGGER_NOTE = (
-    "After the body file is drafted, before invoking the publish script, "
-    "ask the user via AskUserQuestion whether to run the resolution-auditor "
-    "subagent against the draft. Pass it the draft body file path and the "
+    "After the body file is drafted, before invoking the publish script, run "
+    "the resolution-auditor subagent against the draft. This is mandatory "
+    "for a task/bug whose change is not yet implemented — do not publish "
+    "without it. For a retroactive issue that tracks work already done, it "
+    "is optional: ask the user via AskUserQuestion first and spawn it only "
+    "when the user accepts. Pass it the draft body file path and the "
     "artifact type; it validates the recorded root cause and proposed "
     "approach against the actual code and git history (for retroactive "
     "issues, against the change that already landed) and writes its verdict "
-    "to a sidecar file beside the draft. Spawn resolution-auditor only when "
-    "the user accepts. If the verdict is `ok`, continue to publish. If it is "
+    "to a sidecar file beside the draft. If the verdict is `ok`, continue to publish. If it is "
     "`wrong-cause`, `ineffective-approach`, or `weak-diagnosis`, do not "
     "publish: revise the draft's recorded cause and approach to address the "
     "sidecar's Actionable section (rewrite the cause/approach, or settle the "
