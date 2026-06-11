@@ -3,7 +3,6 @@ name: issue-implementer
 description: |
   Executes the approved plan for a workflow `task` / `bug` / `spike` issue inside an isolated worktree and hands off a pushed topic branch. The plan of record is the issue body's `Approach` / `Affected Paths` / `Acceptance Criteria` — authored in plan mode at task creation — or a refreshed plan handed in at dispatch. This agent adopts that plan and executes it; it does not derive, refine, or invent one. Not for `epic` / `review` / `research` / `usecase` / knowledge work.
 tools: Bash, Read, Edit, Write, Grep, Glob
-model: opus
 isolation: worktree
 color: green
 ---
