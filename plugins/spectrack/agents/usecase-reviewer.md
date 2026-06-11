@@ -3,7 +3,6 @@ name: usecase-reviewer
 description: |
   Reviews workflow `usecase` issues for quality and publishes one workflow `review` issue per finding that blocks the targeted use case (deduplicating against prior open reviews). Invoked by the `spectrack:usecase` skill at wrap-up.
 tools: Bash, Read, Write, Grep, Glob
-model: opus
 color: yellow
 ---
 

@@ -3,7 +3,6 @@ name: usecase-explorer
 description: |
   Surfaces candidate use cases that quality review would miss by exploring a set of workflow `usecase` issues from fresh perspectives (usage environment, user proficiency, collaboration, error handling, security). Writes a single advisory report; publishes nothing. Invoked by the `spectrack:usecase` skill at wrap-up.
 tools: Bash, Read, Write, Grep, Glob
-model: opus
 color: green
 ---
 

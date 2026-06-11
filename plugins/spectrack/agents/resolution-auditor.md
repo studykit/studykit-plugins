@@ -3,7 +3,6 @@ name: resolution-auditor
 description: |
   Validates the recorded root cause and proposed approach/fix on a `task` or `bug` against the actual code and git history — flags when the named cause is not the real cause, or when the approach would not actually resolve it. Runs in two modes: against a pre-publish draft body file (writes a sidecar review) or against a published issue ref (appends a single verdict comment). Returns the verdict's first paragraph plus the saved path (draft mode) or a structured verdict token (published mode).
 tools: Read, Write, Bash, Grep, Glob
-model: opus
 color: red
 ---
 
