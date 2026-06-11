@@ -625,7 +625,10 @@ class JiraDataCenterIssueNativeProvider(IssueProvider):
             applied.append(self._dispatch_relationship_operation(site, operation))
 
         write_result = self._refresh_cache(request.context.project, site, cache, issue_key)
-        return {
+        target_refreshed, target_errors = self._refresh_relationship_targets(
+            request.context.project, site, cache, issue_key, prepared
+        )
+        payload: dict[str, Any] = {
             "operation": "apply_relationships",
             "issue": issue_key,
             "key": issue_key,
@@ -635,6 +638,50 @@ class JiraDataCenterIssueNativeProvider(IssueProvider):
             "cache_refreshed": True,
             "cache": dict(write_result),
         }
+        if target_refreshed:
+            payload["target_cache_refreshed"] = target_refreshed
+        if target_errors:
+            payload["target_cache_errors"] = target_errors
+        return payload
+
+    def _refresh_relationship_targets(
+        self,
+        project: Any,
+        site: Any,
+        cache: JiraDataCenterIssueCache,
+        source_key: str,
+        operations: list[_ResolvedJiraRelationshipOperation],
+    ) -> tuple[list[str], list[dict[str, str]]]:
+        """Re-project ``relation.md`` for the far endpoint of each relationship.
+
+        A Jira relationship write mutates both endpoints: an issue link is a
+        single object surfaced from both issues, and a parent/epic field change
+        flips the child list on the other key. Refreshing only ``source_key``
+        leaves every target's cached ``relation.md`` stale. Re-project each
+        Jira-issue target that is already tracked locally; never materialize a
+        target that was not cached before (remote-link targets are external
+        URLs with no local projection and are skipped). The provider write has
+        already succeeded for both sides, so a failed target *fetch* is reported
+        rather than raised — it must not roll back the applied relationship.
+        """
+
+        refreshed: list[str] = []
+        errors: list[dict[str, str]] = []
+        seen: set[str] = {source_key}
+        for operation in operations:
+            target_key = operation.target_issue
+            if not target_key or target_key in seen:
+                continue
+            seen.add(target_key)
+            if not cache.has_issue_projection(site, target_key):
+                continue
+            try:
+                self._refresh_cache(project, site, cache, target_key)
+            except Exception as exc:  # noqa: BLE001 — best-effort; report, do not roll back
+                errors.append({"issue": target_key, "error": str(exc)})
+            else:
+                refreshed.append(target_key)
+        return refreshed, errors
 
     def _prepare_relationship_removals(
         self,

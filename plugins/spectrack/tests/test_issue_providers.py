@@ -1008,6 +1008,104 @@ def test_github_issue_apply_relationships_from_inline_intent_dispatches_and_refr
     assert "add-review-blocks-target" in events
 
 
+def test_github_issue_apply_relationships_refreshes_cached_target_relation_md(
+    tmp_path: Path,
+) -> None:
+    """Linking refreshes relation.md for every *already-cached* far endpoint.
+
+    A GitHub dependency write mutates both endpoints — the blocker gains a
+    "blocking" entry — so the target's cached relation.md goes stale unless
+    re-projected. An uncached target is not materialized.
+    """
+
+    write_config(tmp_path)
+    cache = GitHubIssueCache.for_project(tmp_path, configured_repo=github_repo())
+    # Seed #44 so the relationships freshness check matches the provider, and
+    # seed #33 (the blocker) so it is tracked locally. #45 stays untracked.
+    cache.write_issue_bundle(
+        github_repo(),
+        {
+            **cached_issue_payload(updated_at="2026-05-14T00:00:00Z"),
+            "number": 44,
+            "dependencies": {"blocked_by": [{"number": 33}]},
+        },
+        fetched_at="2026-05-14T00:00:00Z",
+    )
+    cache.write_issue_bundle(
+        github_repo(),
+        {
+            **cached_issue_payload(updated_at="2026-05-14T00:00:00Z"),
+            "number": 33,
+            "dependencies": {"blocking": [{"number": 44}]},
+        },
+        fetched_at="2026-05-14T00:00:00Z",
+    )
+    assert cache.has_issue_projection(github_repo(), 33)
+    assert not cache.has_issue_projection(github_repo(), 45)
+
+    def rest_issue(number: int, issue_id: int) -> dict[str, object]:
+        return {
+            "id": issue_id,
+            "number": number,
+            "title": f"Issue {number}",
+            "state": "open",
+            "state_reason": None,
+            "updated_at": "2026-05-14T00:00:00Z",
+        }
+
+    posted: list[str] = []
+
+    def issue_number_in(path: str) -> str:
+        return path.split("/issues/", 1)[1].split("/", 1)[0]
+
+    def runner(request: CommandRequest) -> CommandResult:
+        args = request.args
+        if args[:2] != ("gh", "api"):
+            return CommandResult(request=request, returncode=127, stderr=f"unexpected: {args}")
+        is_post = "POST" in args
+        path = next((a for a in args if a.startswith("repos/")), "")
+        number = issue_number_in(path) if "/issues/" in path else ""
+        if is_post and path.endswith("/dependencies/blocked_by"):
+            posted.append(path)
+            return CommandResult(request=request, returncode=0, stdout=json.dumps(rest_issue(33, 3300)))
+        if path.endswith("/parent"):
+            return CommandResult(request=request, returncode=404, stderr="Not Found")
+        if path.endswith("/sub_issues"):
+            return CommandResult(request=request, returncode=0, stdout="[]")
+        if path.endswith("/dependencies/blocked_by"):
+            body = [rest_issue(33, 3300)] if number == "44" else []
+            return CommandResult(request=request, returncode=0, stdout=json.dumps(body))
+        if path.endswith("/dependencies/blocking"):
+            body = [rest_issue(44, 4400)] if number == "33" else []
+            return CommandResult(request=request, returncode=0, stdout=json.dumps(body))
+        if number == "44":
+            return CommandResult(request=request, returncode=0, stdout=json.dumps(rest_issue(44, 4400)))
+        if number == "33":
+            return CommandResult(request=request, returncode=0, stdout=json.dumps(rest_issue(33, 3300)))
+        return CommandResult(request=request, returncode=127, stderr=f"unexpected: {args}")
+
+    dispatcher = ProviderDispatcher(default_provider_registry(runner=runner))
+    response = dispatcher.dispatch(
+        ProviderRequest(
+            role="issue",
+            kind="github",
+            operation="apply_relationships",
+            context=ProviderContext(project=tmp_path, artifact_type="task", session_id="s1"),
+            payload={"issue": 44, "relationship_intent": {"blocked_by_add": ["#33"]}},
+        )
+    )
+
+    assert response.payload["operation"] == "apply_relationships"
+    assert response.payload["target_relationship_locations"]["33"]
+    assert "target_relationship_errors" not in response.payload
+    # The uncached target is never materialized.
+    assert not cache.has_issue_projection(github_repo(), 45)
+    # The cached target's relation.md was re-projected and points back at the source.
+    target_relation = cache.relationships_file(github_repo(), 33)
+    assert target_relation.is_file()
+    assert "44" in target_relation.read_text(encoding="utf-8")
+
+
 def test_github_issue_apply_relationships_rejects_unsupported_without_mutation(tmp_path: Path) -> None:
     write_config(tmp_path)
     cache = GitHubIssueCache.for_project(tmp_path, configured_repo=github_repo())
