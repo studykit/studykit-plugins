@@ -1672,6 +1672,102 @@ def test_data_center_issue_link_relationships_are_applied_from_inline_intent(tmp
     assert '\\"inwardIssue\\":{\\"key\\":\\"TEST-1234\\"}' in related_request
 
 
+def _jira_target_payload(key: str, *, blocks_key: str) -> dict[str, object]:
+    """A minimal target issue carrying a Blocks link to ``blocks_key``.
+
+    With the ``blocking`` mapping (Blocks/outward) this renders ``blocks_key``
+    into the target's ``relation.md``, so a refreshed projection is observable.
+    """
+
+    return {
+        "id": "10002",
+        "key": key,
+        "fields": {
+            "summary": f"Blocker {key}",
+            "description": "",
+            "status": {"name": "Open", "statusCategory": {"key": "new"}},
+            "issuelinks": [
+                {
+                    "id": "30001",
+                    "type": {"name": "Blocks", "inward": "is blocked by", "outward": "blocks"},
+                    "outwardIssue": {"key": blocks_key, "fields": {"summary": "blocked issue"}},
+                }
+            ],
+        },
+    }
+
+
+def test_data_center_relationship_apply_refreshes_cached_target_relation_md(tmp_path: Path) -> None:
+    """Linking refreshes relation.md for every *already-cached* far endpoint.
+
+    A Jira issue link is one object surfaced from both issues, so the target's
+    cached relation.md goes stale unless re-projected. An uncached target is not
+    materialized.
+    """
+
+    write_jira_config(tmp_path, relationship_mappings=issue_link_relationship_mappings())
+    site = jira_site(tmp_path)
+    cache = JiraDataCenterIssueCache.for_project(tmp_path)
+    mappings = _relationship_mappings(_jira_issue_provider_settings(tmp_path))
+    cache.write_issue_bundle(
+        site,
+        jira_issue_payload(),
+        remote_links=remote_links_payload(),
+        fetched_at="2026-05-15T10:00:00.000+0900",
+        relationship_mappings=mappings,
+    )
+    # TEST-1233 (the blocker) is already tracked locally; TEST-1235 is not.
+    cache.write_issue_bundle(
+        site,
+        _jira_target_payload("TEST-1233", blocks_key="TEST-1234"),
+        remote_links=[],
+        fetched_at="2026-05-15T10:00:00.000+0900",
+        relationship_mappings=mappings,
+    )
+    assert cache.has_issue_projection(site, "TEST-1233")
+    assert not cache.has_issue_projection(site, "TEST-1235")
+
+    runner = FakeRunner(
+        {
+            curl_args(issue_url()): [
+                result(curl_args(issue_url()), stdout=json.dumps(jira_issue_payload())),
+                result(curl_args(issue_url()), stdout=json.dumps(jira_issue_payload())),
+            ],
+            curl_args(remote_links_url()): result(curl_args(remote_links_url()), stdout=json.dumps(remote_links_payload())),
+            curl_args(issue_url("TEST-1233")): result(
+                curl_args(issue_url("TEST-1233")),
+                stdout=json.dumps(_jira_target_payload("TEST-1233", blocks_key="TEST-1234")),
+            ),
+            curl_args(remote_links_url("TEST-1233")): result(curl_args(remote_links_url("TEST-1233")), stdout="[]"),
+            curl_write_args(): [
+                result(curl_write_args(), stdout=""),
+                result(curl_write_args(), stdout=""),
+            ],
+        }
+    )
+
+    response = dispatch_write(
+        tmp_path,
+        runner,
+        "apply_relationships",
+        issue="TEST-1234",
+        relationship_intent={
+            "blocked_by_add": ["TEST-1233"],
+            "blocking_add": ["TEST-1235"],
+        },
+    )
+
+    assert response.payload["target_cache_refreshed"] == ["TEST-1233"]
+    # The uncached target is never fetched or materialized.
+    assert "target_cache_errors" not in response.payload
+    assert not cache.has_issue_projection(site, "TEST-1235")
+    assert not any(req.args == curl_args(issue_url("TEST-1235")) for req in runner.requests)
+    # The cached target's relation.md was re-projected and points back at the source.
+    target_relation = cache.relationships_file(site, "TEST-1233")
+    assert target_relation.is_file()
+    assert "TEST-1234" in target_relation.read_text(encoding="utf-8")
+
+
 def test_data_center_epic_link_relationship_writes_bare_key_string(tmp_path: Path) -> None:
     write_jira_config(
         tmp_path,

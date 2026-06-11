@@ -573,7 +573,10 @@ class GitHubIssueNativeProvider(IssueProvider):
             applied.append(self._dispatch_relationship_operation(issue_number, operation, request=request))
 
         relationship_location = self._refresh_relationship_projection(request, issue_number)
-        return {
+        target_refreshed, target_errors = self._refresh_relationship_targets(
+            request, issue_number, operations
+        )
+        payload: dict[str, Any] = {
             "operation": "apply_relationships",
             "issue": issue_number,
             "applied": len(applied),
@@ -582,6 +585,54 @@ class GitHubIssueNativeProvider(IssueProvider):
             "cache_refreshed": True,
             "relationship_location": str(relationship_location),
         }
+        if target_refreshed:
+            payload["target_relationship_locations"] = target_refreshed
+        if target_errors:
+            payload["target_relationship_errors"] = target_errors
+        return payload
+
+    def _refresh_relationship_targets(
+        self,
+        request: ProviderRequest,
+        source_number: str,
+        operations: list[_ResolvedRelationshipOperation],
+    ) -> tuple[dict[str, str], list[dict[str, str]]]:
+        """Re-project ``relation.md`` for the far endpoint of each relationship.
+
+        A GitHub sub-issue or dependency write mutates both endpoints — the
+        parent gains a child, the blocker gains a "blocking" entry — so
+        refreshing only ``source_number`` leaves every target's cached
+        ``relation.md`` stale. Re-project each target that is already tracked
+        locally; never materialize a target that was not cached before. The
+        provider write has already succeeded for both sides, so a failed target
+        *fetch* is reported rather than raised — it must not roll back the
+        applied relationship.
+        """
+
+        repo = resolve_github_repository(request.context.project, runner=self.runner)
+        cache = GitHubIssueCache.for_project(request.context.project, configured_repo=repo)
+        refreshed: dict[str, str] = {}
+        errors: list[dict[str, str]] = []
+        seen: set[str] = {source_number}
+        for operation in operations:
+            target = operation.target_issue
+            if not target or target in seen:
+                continue
+            seen.add(target)
+            if not cache.has_issue_projection(repo, target):
+                continue
+            try:
+                relationships = issue_relationships(
+                    target,
+                    project=request.context.project,
+                    runner=self.runner,
+                )
+                location = cache.write_relationships_projection(repo, target, relationships)
+            except Exception as exc:  # noqa: BLE001 — best-effort; report, do not roll back
+                errors.append({"issue": target, "error": str(exc)})
+            else:
+                refreshed[target] = str(location)
+        return refreshed, errors
 
     def _refresh_relationship_projection(self, request: ProviderRequest, issue_number: str) -> Path:
         repo = resolve_github_repository(request.context.project, runner=self.runner)
