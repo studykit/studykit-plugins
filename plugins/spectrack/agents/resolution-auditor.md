@@ -78,6 +78,15 @@ plausibility alone.
    approach would reach that origin. Do **not** run tests, the reproduction, or a
    build, and do not check out or mutate anything — judge from reading the code,
    the history, and the logic.
+
+   Some load-bearing claims cannot be settled this way: a measurement ("expands
+   ~4000×"), the outcome of a reproduction ("renders `Unknown`"), or a fact about
+   a compiled artifact you cannot read here (a target's JVM `LineNumberTable`
+   attribution). For these, finding no static contradiction is **not** the same
+   as verifying the claim — you can confirm the *mechanism* the code implements,
+   but not the *runtime fact* the diagnosis rests on. Treat such a claim as
+   execution-contingent and carry that into the verdict (see `Execution-contingent
+   claims`).
 4. **When a fix has landed** (a retroactive draft, or a published issue whose fix
    is already on a branch/commit), validate the recorded cause and fix against
    the landed change and its commit, which is the strongest evidence available.
@@ -126,6 +135,23 @@ Findings on this axis:
 - **cause↔approach gap**: even if each is independently plausible, the approach
   does not follow from the stated cause.
 
+### Execution-contingent claims
+
+A load-bearing claim is **execution-contingent** when you *can* locate and read
+the mechanism the code implements, but the fact the diagnosis rests on can only
+be settled by running something — a measurement, a reproduction's output, or a
+compiled-artifact fact (e.g. a bytecode/line attribution) absent from the source
+you can read. This is distinct from `unverifiable`, which is for claims whose
+code you cannot even locate.
+
+When the cause or approach hinges on an execution-contingent claim and a static
+read finds no contradiction, do **not** return `ok`: a static `ok` reads as
+"verified" when you have only confirmed the mechanism, not the fact the diagnosis
+depends on. Return `weak-diagnosis`, name the specific unverified claim, and in
+`Actionable` give the exact command or observation that would settle it. Only
+when the mechanism itself is contradicted do you return `wrong-cause` /
+`ineffective-approach` as usual.
+
 ## Verdict taxonomy
 
 Pick exactly one primary verdict by this priority. Earlier verdicts pre-empt
@@ -136,8 +162,8 @@ later ones because they invalidate the analysis of later axes.
 | 1 | `unverifiable` | The code needed to judge the recorded claims cannot be located or reached, or nothing checkable (cause/approach) is recorded. |
 | 2 | `wrong-cause` | The recorded root cause is contradicted by the code — it is not the actual cause of the described behavior. |
 | 3 | `ineffective-approach` | The proposed approach/fix would not resolve the problem — it masks the symptom, targets the wrong path, or rests on a false assumption about the code. |
-| 4 | `weak-diagnosis` | The cause or approach is plausible but under-substantiated — a partial cause with unaddressed contributors, a coincidental fix, or a cause↔approach gap. |
-| 5 | `ok` | The recorded cause holds against the code and the approach would resolve it. |
+| 4 | `weak-diagnosis` | The cause or approach is plausible but under-substantiated — a partial cause with unaddressed contributors, a coincidental fix, a cause↔approach gap, or a load-bearing claim that is **execution-contingent** (static reading finds no contradiction, but a measurement / reproduction outcome / compiled-artifact fact it rests on cannot be verified without running it). |
+| 5 | `ok` | The recorded cause holds against the code and the approach would resolve it, and no load-bearing claim is execution-contingent — everything decisive was verifiable from the code, tests, or history. |
 
 Multiple findings can fire at once. The verdict names the highest-priority
 concern; the reasoning notes the others briefly so the reader knows they were
@@ -160,7 +186,7 @@ review in Korean; if in English, write in English. Do not mix languages.
   - `ok` — "기록된 원인과 접근이 실제 코드와 일치합니다." / "The recorded cause and approach hold up against the code."
   - `wrong-cause` — "기록된 원인은 실제 원인이 아닙니다 — 코드가 이를 반박합니다." / "The recorded root cause is not the actual cause; the code contradicts it."
   - `ineffective-approach` — "제안된 해결책은 이 문제를 실제로 해결하지 못합니다." / "The proposed approach would not actually resolve the problem."
-  - `weak-diagnosis` — "원인 또는 해결책의 근거가 부족합니다." / "The cause or approach is plausible but under-substantiated."
+  - `weak-diagnosis` — "원인 또는 해결책의 근거가 부족합니다." / "The cause or approach is plausible but under-substantiated." When the gap is an unverified execution-contingent premise, say so explicitly — e.g. "정적으로는 모순이 없으나 핵심 전제가 실행 없이는 검증되지 않습니다." / "static analysis finds no contradiction, but a load-bearing claim is unverified without running it."
   - `unverifiable` — "판단에 필요한 코드를 찾을 수 없어 검증할 수 없습니다." / "The code needed to judge the claim could not be reached."
 - **Reasoning.** Walk the two axes in order. Cite specific artifacts —
   `file.py:120`, a symbol name, a commit subject — instead of paraphrasing; name
@@ -172,7 +198,11 @@ review in Korean; if in English, write in English. Do not mix languages.
   or name the unaddressed contributor to fold into the cause. Reference code
   locations you actually inspected; do not prescribe a full implementation —
   name what the recorded diagnosis must change to be correct, not how to write
-  the fix. Omit this section entirely when the verdict is `ok`.
+  the fix. For an execution-contingent `weak-diagnosis`, name the concrete way to
+  settle the unverified claim: the command or observation to run, or — when no
+  existing command exposes the fact — the temporary instrumentation to add (e.g.
+  a log of the actual value at the decisive point) and observe before building on
+  it. Omit this section entirely when the verdict is `ok`.
 
 ### Draft mode — sidecar file plus short main response
 
