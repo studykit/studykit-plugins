@@ -10,8 +10,9 @@ allowed-tools:
 # Implement
 
 Dispatcher for executing an issue's approved plan. The plan of record is
-the issue body's `Approach` / `Affected Paths` / `Acceptance Criteria`,
-authored in plan mode when the task was created. This skill does not
+the issue body's `Design Decision` / `Implementation Steps` /
+`Acceptance Criteria` / `Verification`, authored in plan mode when the
+task was created. This skill does not
 plan; it first sends the issue to `resolution-auditor` (which checks the
 recorded root cause and approach against the current code, read-only),
 then hands the issue — and, when you refreshed the plan in plan mode, the
@@ -47,7 +48,8 @@ for what they do and which states they return.
    answer, not a cause/fix for the auditor to validate.
 
 3. **Settle the plan.** The plan of record is the issue body's
-   `Approach` / `Affected Paths` / `Acceptance Criteria`. Normally pass
+   `Design Decision` / `Implementation Steps` / `Acceptance Criteria` /
+   `Verification`. Normally pass
    nothing extra — the implementer adopts the body's plan and checks it
    against the current code itself, reporting `paused` with what drifted
    and a suggested direction if it has. Converge a refreshed plan with

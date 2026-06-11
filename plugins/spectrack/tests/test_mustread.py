@@ -230,6 +230,18 @@ providers:
     ]
 
 
+def test_decision_index_resolution_uses_knowledge_files() -> None:
+    resolution = resolve_authoring("decision-index", provider="github")
+
+    assert resolution.side == "knowledge"
+    assert _rel_paths(resolution.files) == [
+        "contracts/knowledge/body.md",
+        "contracts/knowledge/decision-index.md",
+        "providers/knowledge/github/convention.md",
+        "providers/knowledge/github/decision-index.md",
+    ]
+
+
 def test_comment_scope_github_issue_resolution_uses_only_comment_relevant_files() -> None:
     resolution = resolve_authoring("task", side="issue", provider="github", scope="comment")
 

@@ -41,8 +41,7 @@ Required sections:
 Optional sections:
 
 - `Artifact Links` — branch, gist, repository path, benchmark output, screenshots, or other throwaway evidence.
-- `Approach` — exploration strategy: how the spike will be carried out, including probe sequencing and methodology choices.
-- `Affected Paths` — planned experiment files, temporary branches, scripts, or environments.
+- `Implementation Steps` — the concrete, ordered exploration plan: probe and experiment sequence, naming the files, scripts, branches, or environments each step touches (this absorbs the older scope-fence section, so steps carry their own affected paths). Treat it as a falsifiable hypothesis, not a fixed spec; re-ground any runtime-grounded premise (see `./body.md`) before building on it.
 - `Resume` — current-state snapshot while mid-flight. See `./body.md`.
 - `Why Discarded` — reason when discarded. See `./body.md`.
 

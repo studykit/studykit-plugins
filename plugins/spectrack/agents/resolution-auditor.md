@@ -49,7 +49,7 @@ If the caller names both, or neither, stop and ask. Do not guess the mode.
   or `bug`). If the type is not given, infer it from the body.
 - **Published mode**: the issue ref. Optionally a fix ref / branch / commit
   range when a fix has already landed; otherwise discover it from the issue's
-  links, `Affected Paths`, and ref-prefixed commits.
+  links, `Implementation Steps`, and ref-prefixed commits.
 
 ## Grounding — read the code, not just the prose
 
@@ -65,9 +65,9 @@ plausibility alone.
 
    From that text, identify (a) the problem — the observed/expected behavior a
    `bug` describes, or the goal a `task` states; (b) the recorded root cause,
-   when one is named (usually in `Description` or `Approach`); and (c) the
-   proposed approach/fix (usually `Approach`).
-2. **Locate the code.** Use `Affected Paths`, `Reproduction`, code coordinates,
+   when one is named (usually in `Description` or `Design Decision`); and (c) the
+   proposed approach/fix (usually `Implementation Steps`).
+2. **Locate the code.** Use `Implementation Steps`, `Reproduction`, code coordinates,
    and any symbols named as entry points. Find the real code with `Grep` /
    `Glob` / `Read`. Use read-only `git` via `Bash` — `git log`, `git show`,
    `git blame` — to understand how the suspect code got there and whether a

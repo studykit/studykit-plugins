@@ -37,9 +37,11 @@ The `Acceptance Criteria` section must exist even when the bug is linked to a us
 
 Optional sections:
 
+- `Context` — the backdrop a reader needs before the defect makes sense: the use case or contract the broken behavior violates, what the current code is expected to do, and where the gap sits. Place it first, before `Description`. Keep it to durable framing; link the curated knowledge `context` / `architecture` page rather than restating it, and fold it into `Description` when the two would say the same thing. Distinct from `Description` (what is broken) — this is the situation the defect sits in.
 - `Environment` — version, browser, OS, tenant, data shape, feature flags, or deployment context.
-- `Approach` — fix strategy: how the bug will be addressed, including diagnosis sequencing and architectural choices.
-- `Affected Paths` — forward-looking scope fence naming files, packages, APIs, or migration steps expected to change.
+- `Design Decision` — key design decisions in the fix: the choice made, why, and the main alternatives rejected. A decision with lasting reference value is also linked from the Design Decision Index knowledge page (`../knowledge/decision-index.md`).
+- `Implementation Steps` — the concrete, ordered fix plan: diagnosis and fix sequence, naming the files, packages, or APIs each step touches (this absorbs the older scope-fence section, so steps carry their own affected paths). Treat it as a falsifiable hypothesis, not a fixed spec: whoever implements it re-verifies its load-bearing premises against the current code, and re-grounds any runtime-grounded premise (see `./body.md`) by running it before building on it, revising the steps on mismatch.
+- `Verification` — the ordered procedure that establishes the fix is correct: the commands, observations, or comparisons run to confirm the `Acceptance Criteria` (including that the regression test fails before and passes after), each step independently checkable. Distinct from `Acceptance Criteria` (what "done" is) — this is how it is confirmed.
 - `Interface Contracts` — contracts the fix consumes or restores.
 - `Out of Scope` — work explicitly excluded from this issue. See `./body.md`.
 - `Alternatives Considered` — design options evaluated but not chosen. See `./body.md`.
@@ -71,7 +73,7 @@ Use linked external evidence only when evidence has lasting value, such as:
 - Minimal repro repositories.
 - Problematic input files.
 
-Production source paths are recorded by git history. Mention planned source changes in the `Affected Paths` section when they help scope the fix.
+Production source paths are recorded by git history. Name planned source changes inline in the `Implementation Steps` section when they help scope the fix.
 
 ## Completion criteria
 

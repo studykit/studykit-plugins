@@ -26,9 +26,11 @@ Common required sections are defined by `../../../contracts/issue/bug.md`:
 
 Common optional sections are defined by `../../../contracts/issue/bug.md` and `../../../contracts/issue/body.md`:
 
+- `## Context`
 - `## Environment`
-- `## Approach`
-- `## Affected Paths`
+- `## Design Decision`
+- `## Implementation Steps`
+- `## Verification`
 - `## Interface Contracts`
 - `## Out of Scope`
 - `## Alternatives Considered`
