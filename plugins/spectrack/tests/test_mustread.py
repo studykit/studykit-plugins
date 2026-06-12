@@ -399,12 +399,14 @@ def test_backlog_mode_returns_lightweight_contract(artifact_type: str) -> None:
         "contracts/issue/backlog.md",
         "providers/issue/github/convention.md",
         "providers/issue/github/relationships.md",
+        "providers/issue/github/anti-patterns.md",
     ]
-    # Forward planning contracts are dropped in backlog mode.
+    # Forward planning contracts are dropped in backlog mode, but the
+    # relationship body-boundary guardrail (anti-patterns) is mode-independent
+    # and stays, so native relationships are not mirrored into the body.
     assert f"contracts/issue/{artifact_type}.md" not in rels
     assert "contracts/issue/decomposition-patterns.md" not in rels
     assert f"providers/issue/github/{artifact_type}.md" not in rels
-    assert "providers/issue/github/anti-patterns.md" not in rels
 
 
 @pytest.mark.parametrize("artifact_type", ["task", "bug"])

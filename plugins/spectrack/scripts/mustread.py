@@ -306,7 +306,7 @@ def _resolve_authoring_github_issue(
             ], []
         case _:
             if mode == "backlog":
-                return [convention, relationships], []
+                return [convention, relationships, anti_patterns], []
             parts = [
                 convention,
                 relationships,
@@ -356,7 +356,7 @@ def _resolve_authoring_jira_issue(
             ], []
         case _:
             if mode == "backlog":
-                return [convention, relationships], []
+                return [convention, relationships, anti_patterns], []
             parts = [
                 convention,
                 relationships,
