@@ -26,12 +26,14 @@ spectrack mustread \
   calling, and when it is genuinely ambiguous which one applies, ask the
   user. The resolver returns a different contract set and different notes
   per mode:
-  - `forward` — planning and implementing now. Enter plan mode and author
-    the full plan; the size and resolution audits apply.
+  - `forward` — planning and implementing now. The body records a
+    user-approved plan (via plan mode where available, or a plan already
+    explicitly agreed in the conversation); the size and resolution
+    audits apply.
   - `backlog` — capture the item's intent for a later planning pass. No
-    plan mode; a lighter contract relaxes the required sections down to
-    `Description` and defers the rest. Use when writing a detailed plan
-    now is premature.
+    planning pass now; a lighter contract relaxes the required sections
+    down to `Description` and defers the rest. Use when writing a
+    detailed plan now is premature.
   - `retroactive` — the work already landed; the body records facts, not a
     forward plan.
 
