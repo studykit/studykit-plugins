@@ -19,8 +19,8 @@ is picked up.
 ## Intent
 
 Capture is fast and low-commitment. Record enough for a future reader to know
-what the item is and why it matters — not how it will be built. Do not enter
-plan mode.
+what the item is and why it matters — not how it will be built. Do not run a
+planning pass now.
 
 ## Title
 
@@ -55,7 +55,7 @@ Deferred — do **not** author these now:
   that they are pending the planning pass, so the absence is read as deliberate
   deferral rather than an incomplete draft.
 - `Design Decision`, `Implementation Steps`, `Verification` — the forward plan.
-  These are authored in plan mode when the item is picked up.
+  These are authored in the planning pass when the item is picked up.
 
 Keep the body short. A backlog item that already carries a full plan is a
 forward item mislabeled — publish it as `--mode forward` instead.
@@ -74,7 +74,8 @@ waiting to be planned, not completed work.
 ## Picking the item up
 
 When the item is later scheduled for implementation, re-resolve it with
-`--mode forward`, enter plan mode, author the deferred sections
+`--mode forward`, run the planning pass (plan mode where the runtime offers
+it, with the user explicitly approving the plan), author the deferred sections
 (`Acceptance Criteria`, `Unit Test Strategy`, the forward plan, and — for a bug
 — `Reproduction`), run the audits, and proceed as a normal forward item. The
 captured `Description` becomes the starting point, not a finished plan.

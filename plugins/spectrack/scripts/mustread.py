@@ -59,10 +59,14 @@ PLAN_MODE_TYPES = {"task", "bug"}
 AUTHORING_MODES = ("forward", "backlog", "retroactive")
 
 PLAN_MODE_TRIGGER_NOTE = (
-    "Forward mode: the change is not yet implemented. Enter plan mode "
-    "before drafting the body and record the plan approved there as the "
-    "body's Design Decision / Implementation Steps / Acceptance Criteria / "
-    "Verification."
+    "Forward mode: the change is not yet implemented, so the body's Design "
+    "Decision / Implementation Steps / Acceptance Criteria / Verification "
+    "must record a plan the user explicitly approved before publishing. "
+    "Enter plan mode before drafting when the runtime offers it; otherwise "
+    "present the plan and get the user's explicit approval before drafting "
+    "the body. If the user already agreed to a concrete plan in this "
+    "conversation, record that agreed plan instead of re-running a "
+    "planning pass."
 )
 
 BACKLOG_TRIGGER_NOTE = (

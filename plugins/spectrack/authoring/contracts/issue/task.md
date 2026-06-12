@@ -60,7 +60,7 @@ If two or more of these are unknown, consider `spike` or `research` instead of `
 
 ## Backlog tasks
 
-A backlog task captures intent for a later planning pass without a forward plan — use it when entering plan mode to author a full plan now is premature. It is resolved separately in backlog mode (see `./backlog.md`), which relaxes the required sections down to `Description`. Do not hand-author a plan-light task under this forward contract; capture it in backlog mode instead.
+A backlog task captures intent for a later planning pass without a forward plan — use it when authoring a full plan now is premature. It is resolved separately in backlog mode (see `./backlog.md`), which relaxes the required sections down to `Description`. Do not hand-author a plan-light task under this forward contract; capture it in backlog mode instead.
 
 ## Retroactive tasks
 
