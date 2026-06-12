@@ -6,7 +6,6 @@ Read after:
 
 - `../../../contracts/issue/bug.md`
 - `./convention.md`
-- `./relationships.md`
 - `./anti-patterns.md`
 
 ## Scope

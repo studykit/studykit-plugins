@@ -66,7 +66,6 @@ def test_bare_review_resolution_uses_absolute_authoring_files() -> None:
         "contracts/issue/common.md",
         "contracts/issue/review.md",
         "providers/issue/github/convention.md",
-        "providers/issue/github/relationships.md",
         "providers/issue/github/review.md",
         "providers/issue/github/anti-patterns.md",
     ]
@@ -232,7 +231,6 @@ providers:
     assert issue_resolution.provider == "jira"
     assert "contracts/issue/common.md" in _rel_paths(issue_resolution.files)
     assert "providers/issue/jira/convention.md" in _rel_paths(issue_resolution.files)
-    assert "providers/issue/jira/relationships.md" in _rel_paths(issue_resolution.files)
     assert "providers/issue/jira/task.md" in _rel_paths(issue_resolution.files)
     assert "providers/issue/jira/anti-patterns.md" in _rel_paths(issue_resolution.files)
     assert knowledge_resolution.provider == "github"
@@ -398,12 +396,10 @@ def test_backlog_mode_returns_lightweight_contract(artifact_type: str) -> None:
         "contracts/issue/common.md",
         "contracts/issue/backlog.md",
         "providers/issue/github/convention.md",
-        "providers/issue/github/relationships.md",
         "providers/issue/github/anti-patterns.md",
     ]
-    # Forward planning contracts are dropped in backlog mode, but the
-    # relationship body-boundary guardrail (anti-patterns) is mode-independent
-    # and stays, so native relationships are not mirrored into the body.
+    # Forward planning contracts are dropped in backlog mode, but the body
+    # convention and anti-patterns (work-history / markup) still apply.
     assert f"contracts/issue/{artifact_type}.md" not in rels
     assert "contracts/issue/decomposition-patterns.md" not in rels
     assert f"providers/issue/github/{artifact_type}.md" not in rels
@@ -670,7 +666,6 @@ def test_review_target_usecase_issue_bundles_actors_companion() -> None:
         "contracts/issue/common.md",
         "contracts/issue/review.md",
         "providers/issue/github/convention.md",
-        "providers/issue/github/relationships.md",
         "providers/issue/github/review.md",
         "providers/issue/github/anti-patterns.md",
     ]

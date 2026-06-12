@@ -27,6 +27,6 @@ spectrack issue link <source-issue> \
 The same relationship flags also work on `spectrack issue new` to
 apply links in the same call as the create.
 
-See `../../../authoring/providers/issue/jira/relationships.md` for
-canonical intent usage (`parent`, `blocked_by`, `related`; invert
-source/target for `child` / `blocking`).
+See `../../../authoring/contracts/issue/common.md` for canonical intent
+definitions (`parent`, `blocked_by`, `related`; invert source/target for
+`child` / `blocking`).

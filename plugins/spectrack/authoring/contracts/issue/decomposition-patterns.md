@@ -91,9 +91,9 @@ Use comments — on whichever issue owns the shared narrative — for discussion
 
 These apply within any pattern when describing how member issues relate.
 
-- **Sequencing**: use the `blocked_by` relationship intent when one member must merge before another. Sequencing is provider-native; do not encode it in body sections when a native relationship is available.
+- **Sequencing**: use the `blocked_by` relationship intent when one member must merge before another. Sequencing is provider-native, so recording it through the native relationship is required.
 - **Shared anchor**: when siblings deliver toward the same use case, spec, parent task, or epic, each links to that anchor independently — the shared anchor makes them discoverable as a group.
-- **Soft coupling**: use the `Related` body section for non-blocking, human-readable connections. Use sparingly, never to duplicate a native relationship.
+- **Soft coupling**: use the `Related` body section for non-blocking, human-readable connections. Use sparingly.
 
 ## Common mistakes
 
@@ -101,4 +101,4 @@ These apply within any pattern when describing how member issues relate.
 - Using an epic when the decomposition has only two cohesive task slices and the parent is implementation-coherent — use a parent task instead.
 - Splitting into four sibling tasks without a parent — the missing coordination home is itself the signal to promote to epic.
 - Duplicating subtask AC in the parent task body, or member AC in the epic body.
-- Encoding sequencing only in human-readable body sections when a native blocking relationship is available.
+- Encoding sequencing only in human-readable body sections without recording the native blocking relationship.

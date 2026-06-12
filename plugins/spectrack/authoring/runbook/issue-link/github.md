@@ -16,10 +16,12 @@ spectrack issue link <source-issue> \
   `--remove-*` flags remove by ref.
 - The same ref in both add and remove for one relationship is an
   error.
+- GitHub has no native `related` link; record a soft related reference
+  in the body `## Related` section instead.
 
 The same relationship flags also work on `spectrack issue new` and
 `spectrack issue update` to apply links in the same call.
 
-See `../../../authoring/providers/issue/github/relationships.md` for
-canonical intent usage (`parent`, `blocked_by`; invert source/target
-for `child` / `blocking`).
+See `../../../authoring/contracts/issue/common.md` for canonical intent
+definitions (`parent`, `blocked_by`; invert source/target for `child` /
+`blocking`).
