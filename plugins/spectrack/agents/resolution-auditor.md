@@ -65,7 +65,7 @@ plausibility alone.
 
    From that text, identify (a) the problem — the observed/expected behavior a
    `bug` describes, or the goal a `task` states; (b) the recorded root cause,
-   when one is named (usually in `Description` or `Design Decision`); and (c) the
+   when one is named (usually in a `Root Cause` or `Description` section, or `Design Decision`); and (c) the
    proposed approach/fix (usually `Implementation Steps`).
 2. **Locate the code.** Use `Implementation Steps`, `Reproduction`, code coordinates,
    and any symbols named as entry points. Find the real code with `Grep` /
