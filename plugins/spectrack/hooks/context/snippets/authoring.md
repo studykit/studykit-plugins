@@ -23,9 +23,10 @@ spectrack mustread \
 - `--mode` — required for `task`/`bug` content authoring; rejected for
   every other type, scope, or target. Names the authoring intent, which
   the resolver cannot infer — decide it from the user's request before
-  calling, and when it is genuinely ambiguous which one applies, ask the
-  user. The resolver returns a different contract set and different notes
-  per mode:
+  calling; when it is genuinely ambiguous which one applies, default to
+  `backlog` — the lowest-commitment capture, re-resolved as `forward`
+  when the item is later picked up. The resolver returns a different
+  contract set and different notes per mode:
   - `forward` — planning and implementing now. The body records a
     user-approved plan (via plan mode where available, or a plan already
     explicitly agreed in the conversation); the size and resolution
