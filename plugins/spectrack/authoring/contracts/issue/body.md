@@ -47,6 +47,8 @@ References that help interpret the issue but are not stored as native backend re
 
 Current-state snapshot for a future session. Use when an item is mid-flight and its state is not obvious from the body. Rewrite in place; do not preserve history.
 
+Record only the delta against the rest of the body: where the actual state diverges from what the other sections describe, and what a future session could not reconstruct from them. Point at sections by name instead of restating them — when the work landed as the Implementation Steps and Verification sections describe, one line saying so plus any deviations is the whole snapshot, not a past-tense retelling of those sections.
+
 Suggested slots:
 
 - **Approach.** Current strategy.
