@@ -3,6 +3,7 @@ name: implement-issue
 description: "Execute the plan recorded in a workflow `task`, `bug`, or `spike` issue, assuming its recorded diagnosis was already validated (`resolution-auditor` returned `ok`) at authoring time: dispatch `issue-implementer` (which adopts the issue body's plan, or a plan-mode refresh you pass in), then `implementation-auditor` to verify the result. This skill dispatches and passes the reports through."
 argument-hint: "<issue-ref> [additional requirements]"
 disable-model-invocation: true
+model: opus
 allowed-tools:
   - Agent
 ---
