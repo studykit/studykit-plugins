@@ -43,12 +43,13 @@ states they return.
 3. **Dispatch `issue-implementer`.** Call `Agent` with `subagent_type:
    spectrack:issue-implementer` **and `isolation: "worktree"`** —
    the agent's frontmatter does not request isolation itself; this
-   call-time parameter is what provisions the isolated worktree, and
-   the agent refuses to run (`failed`) when dispatched without it.
-   Pass the issue ref, the extra requirements verbatim, and — only
-   when you refreshed the plan in step 2 — the refreshed plan as an
-   override. It executes in its own isolated worktree and returns a
-   `<report>` whose `state` is `implemented`, `paused`, or `failed`.
+   call-time parameter is what provisions the isolated worktree.
+   Omitted, the agent would run in-place in the calling session's
+   checkout — this skill always dispatches worktree mode. Pass the
+   issue ref, the extra requirements verbatim, and — only when you
+   refreshed the plan in step 2 — the refreshed plan as an override.
+   It returns a `<report>` whose `state` is `implemented`, `paused`,
+   or `failed`.
 
 4. **Dispatch `implementation-auditor`** only when the implementer's
    `state` is `implemented` — `paused` and `failed` leave no pushed
