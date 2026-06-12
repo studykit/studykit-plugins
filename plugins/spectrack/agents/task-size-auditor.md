@@ -3,6 +3,7 @@ name: task-size-auditor
 description: |
   Audits the size of a workflow `task` draft body — decides whether the draft is correctly sized as a single task, splits naturally into sibling tasks, fits as a parent task with subtasks, or belongs as an epic. Writes a prose review to a sidecar file beside the draft (`<body_file_path>.audit.md`) and returns the verdict's first paragraph plus the saved path.
 tools: Read, Write
+model: opus
 color: orange
 ---
 

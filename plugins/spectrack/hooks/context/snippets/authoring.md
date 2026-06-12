@@ -3,7 +3,8 @@ spectrack mustread \
   --type <type> \
   [--side issue|knowledge] \
   [--target <type>] \
-  [--scope comment]
+  [--scope comment] \
+  [--mode forward|backlog|retroactive]
 </bash>
 
 - `--type` — required. The artifact type being authored. When `--type
@@ -19,6 +20,20 @@ spectrack mustread \
   Cannot be `review`. Not compatible with `--scope comment`.
 - `--scope comment` — comment-only updates. Returns the Markdown plus
   provider convention files only, not the full type body.
+- `--mode` — required for `task`/`bug` content authoring; rejected for
+  every other type, scope, or target. Names the authoring intent, which
+  the resolver cannot infer — decide it from the user's request before
+  calling, and when it is genuinely ambiguous which one applies, ask the
+  user. The resolver returns a different contract set and different notes
+  per mode:
+  - `forward` — planning and implementing now. Enter plan mode and author
+    the full plan; the size and resolution audits apply.
+  - `backlog` — capture the item's intent for a later planning pass. No
+    plan mode; a lighter contract relaxes the required sections down to
+    `Description` and defers the rest. Use when writing a detailed plan
+    now is premature.
+  - `retroactive` — the work already landed; the body records facts, not a
+    forward plan.
 
 The resolver returns markdown listing files to read before drafting.
 Treat any bullet in a notes section as a binding rule for the calling
