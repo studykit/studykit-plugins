@@ -51,10 +51,41 @@ DECOMPOSITION_TYPES = {"task", "epic"}
 
 PLAN_MODE_TYPES = {"task", "bug"}
 
+# Authoring intent for task/bug content. Unlike side/scope/target, the
+# resolver cannot infer it from the artifact — the author decides which one
+# applies (planning now / capturing for later / recording already-done work).
+# It is therefore required (no default) for task/bug content authoring and
+# rejected on every other surface.
+AUTHORING_MODES = ("forward", "backlog", "retroactive")
+
 PLAN_MODE_TRIGGER_NOTE = (
-    "Enter plan mode before drafting the body when the change is not yet "
-    "implemented. Skip plan mode for retroactive issues that track work "
-    "already done."
+    "Forward mode: the change is not yet implemented. Enter plan mode "
+    "before drafting the body and record the plan approved there as the "
+    "body's Design Decision / Implementation Steps / Acceptance Criteria / "
+    "Verification."
+)
+
+BACKLOG_TRIGGER_NOTE = (
+    "Backlog mode: capture the item's intent for a later planning pass, "
+    "not an implementation plan now. Do not enter plan mode and do not "
+    "author the planning sections (Design Decision, Implementation Steps, "
+    "Verification). Draft Description (and Context when it helps); the "
+    "type's other normally-required sections (Acceptance Criteria, Unit "
+    "Test Strategy, and — for a bug — Reproduction) are deferred until the "
+    "item is planned. Leave a one-line note in the body that they are "
+    "pending the planning pass. Skip the size and resolution audits; they "
+    "run when the item is later picked up in forward mode. Publish in the "
+    "backend's open/unresolved state."
+)
+
+RETROACTIVE_TRIGGER_NOTE = (
+    "Retroactive mode: the work already landed, so the body states facts, "
+    "not intent, and there is no forward plan to author — do not enter "
+    "plan mode. Description says what changed and why; Implementation "
+    "Steps records how it was actually done; Acceptance Criteria and "
+    "Verification record the checks that already ran. Skip the size audit "
+    "(it guards not-yet-done work). Publish together with the transition "
+    "to the backend's resolved state."
 )
 
 TASK_AUDIT_TYPES = {"task"}
@@ -63,8 +94,7 @@ TASK_AUDIT_TRIGGER_NOTE = (
     "After the body file is drafted, before invoking the publish script, "
     "ask the user via AskUserQuestion whether to run the task-size-auditor "
     "subagent against the draft. Spawn task-size-auditor only when the user "
-    "accepts. Skip this step entirely for retroactive issues that track "
-    "work already done."
+    "accepts."
 )
 
 RESOLUTION_AUDIT_TYPES = {"task", "bug"}
@@ -73,12 +103,9 @@ RESOLUTION_AUDIT_TRIGGER_NOTE = (
     "After the body file is drafted, before invoking the publish script, run "
     "the resolution-auditor subagent against the draft. This is mandatory "
     "for a task/bug whose change is not yet implemented — do not publish "
-    "without it. For a retroactive issue that tracks work already done, it "
-    "is optional: ask the user via AskUserQuestion first and spawn it only "
-    "when the user accepts. Pass it the draft body file path and the "
+    "without it. Pass it the draft body file path and the "
     "artifact type; it validates the recorded root cause and proposed "
-    "approach against the actual code and git history (for retroactive "
-    "issues, against the change that already landed) and writes its verdict "
+    "approach against the actual code and git history and writes its verdict "
     "to a sidecar file beside the draft. If the verdict is `ok`, continue to publish. If it is "
     "`wrong-cause`, `ineffective-approach`, or `weak-diagnosis`, do not "
     "publish: revise the draft's recorded cause and approach to address the "
@@ -88,6 +115,20 @@ RESOLUTION_AUDIT_TRIGGER_NOTE = (
     "audit rounds total; if it is still not `ok` after the third round, stop "
     "and surface the latest sidecar to the user. A `unverifiable` verdict is "
     "not a re-plan trigger — surface it and let the user decide."
+)
+
+RESOLUTION_AUDIT_RETRO_NOTE = (
+    "After the body file is drafted, before invoking the publish script, "
+    "the diagnosis audit is optional for this already-landed change: ask "
+    "the user via AskUserQuestion first and spawn resolution-auditor only "
+    "when the user accepts. Pass it the draft body file path and the "
+    "artifact type; it validates the recorded cause and approach against "
+    "the change that already landed and writes its verdict to a sidecar "
+    "beside the draft. Treat a non-`ok` verdict (`wrong-cause`, "
+    "`ineffective-approach`, `weak-diagnosis`) as a prompt to revise the "
+    "recorded cause/approach and re-run, up to 3 rounds total; surface a "
+    "still-failing or `unverifiable` verdict to the user rather than "
+    "blocking publish."
 )
 
 RETROACTIVE_PUBLISH_STATE_GITHUB = (
@@ -140,6 +181,7 @@ class Resolution:
     target: str | None
     files: tuple[Path, ...]
     notes: tuple[str, ...] = ()
+    mode: str | None = None
 
     @property
     def reading_anchor(self) -> str:
@@ -243,7 +285,7 @@ def resolve_side(
 
 
 def _resolve_authoring_github_issue(
-    artifact_type: str, target: str | None, scope: str
+    artifact_type: str, target: str | None, scope: str, mode: str | None
 ) -> tuple[list[str], list[str]]:
     convention = "providers/issue/github/convention.md"
     relationships = "providers/issue/github/relationships.md"
@@ -259,6 +301,8 @@ def _resolve_authoring_github_issue(
                 anti_patterns,
             ], []
         case _:
+            if mode == "backlog":
+                return [convention, relationships], []
             parts = [
                 convention,
                 relationships,
@@ -268,9 +312,7 @@ def _resolve_authoring_github_issue(
             if artifact_type == "usecase":
                 parts.append("providers/knowledge/github/actors.md")
             notes = (
-                [RETROACTIVE_PUBLISH_STATE_GITHUB]
-                if artifact_type in PLAN_MODE_TYPES
-                else []
+                [RETROACTIVE_PUBLISH_STATE_GITHUB] if mode == "retroactive" else []
             )
             return parts, notes
 
@@ -293,7 +335,7 @@ def _resolve_authoring_github_knowledge(
 
 
 def _resolve_authoring_jira_issue(
-    artifact_type: str, target: str | None, scope: str
+    artifact_type: str, target: str | None, scope: str, mode: str | None
 ) -> tuple[list[str], list[str]]:
     convention = "providers/issue/jira/convention.md"
     relationships = "providers/issue/jira/relationships.md"
@@ -309,6 +351,8 @@ def _resolve_authoring_jira_issue(
                 anti_patterns,
             ], []
         case _:
+            if mode == "backlog":
+                return [convention, relationships], []
             parts = [
                 convention,
                 relationships,
@@ -316,9 +360,7 @@ def _resolve_authoring_jira_issue(
                 anti_patterns,
             ]
             notes = (
-                [RETROACTIVE_PUBLISH_STATE_JIRA]
-                if artifact_type in PLAN_MODE_TYPES
-                else []
+                [RETROACTIVE_PUBLISH_STATE_JIRA] if mode == "retroactive" else []
             )
             return parts, notes
 
@@ -354,7 +396,7 @@ def is_authoring_file(path: Path, *, plugin_root: Path | None = None) -> bool:
 
 
 def _common_parts(
-    side: str, artifact_type: str, target: str | None, scope: str
+    side: str, artifact_type: str, target: str | None, scope: str, mode: str | None
 ) -> list[str]:
     match (scope, target, side):
         case ("comment", _, _):
@@ -381,6 +423,13 @@ def _common_parts(
         case _:  # (_, None, "knowledge")
             parts = ["contracts/knowledge/body.md"]
 
+    if mode == "backlog":
+        # Backlog capture defers the forward plan, so the heavy planning
+        # contracts (the type body shape, decomposition guidance) are
+        # replaced by the lightweight backlog contract.
+        parts.append("contracts/issue/backlog.md")
+        return parts
+
     if artifact_type in PRD_COMPONENT_TYPES:
         parts.append("contracts/prd.md")
     if artifact_type in DUAL_TYPES:
@@ -398,8 +447,47 @@ def _common_parts(
     return parts
 
 
-def _common_notes(
+def _mode_applies(
     side: str, artifact_type: str, target: str | None, scope: str
+) -> bool:
+    """Whether ``--mode`` governs this authoring surface.
+
+    Mode only shapes direct task/bug body authoring. Comment scope, review
+    targets, and the knowledge side never carry an implementation intent.
+    """
+    return (
+        scope != "comment"
+        and target is None
+        and side == "issue"
+        and artifact_type in PLAN_MODE_TYPES
+    )
+
+
+def _resolve_mode(
+    value: str | None,
+    side: str,
+    artifact_type: str,
+    target: str | None,
+    scope: str,
+) -> str | None:
+    if not _mode_applies(side, artifact_type, target, scope):
+        if value is not None:
+            raise ResolverError(
+                "--mode only applies to task/bug content authoring"
+            )
+        return None
+    if value is None:
+        raise ResolverError(
+            "task/bug content authoring requires --mode "
+            "(forward, backlog, or retroactive)"
+        )
+    if value not in AUTHORING_MODES:
+        raise ResolverError(f"unsupported authoring mode: {value}")
+    return value
+
+
+def _common_notes(
+    side: str, artifact_type: str, target: str | None, scope: str, mode: str | None
 ) -> list[str]:
     if scope == "comment" or target is not None or side != "issue":
         return []
@@ -407,11 +495,18 @@ def _common_notes(
     if artifact_type == "usecase":
         notes.append(USECASE_INTERVIEW_NOTE)
     if artifact_type in PLAN_MODE_TYPES:
-        notes.append(PLAN_MODE_TRIGGER_NOTE)
-    if artifact_type in TASK_AUDIT_TYPES:
-        notes.append(TASK_AUDIT_TRIGGER_NOTE)
-    if artifact_type in RESOLUTION_AUDIT_TYPES:
-        notes.append(RESOLUTION_AUDIT_TRIGGER_NOTE)
+        if mode == "backlog":
+            notes.append(BACKLOG_TRIGGER_NOTE)
+        elif mode == "retroactive":
+            notes.append(RETROACTIVE_TRIGGER_NOTE)
+            if artifact_type in RESOLUTION_AUDIT_TYPES:
+                notes.append(RESOLUTION_AUDIT_RETRO_NOTE)
+        else:  # forward
+            notes.append(PLAN_MODE_TRIGGER_NOTE)
+            if artifact_type in TASK_AUDIT_TYPES:
+                notes.append(TASK_AUDIT_TRIGGER_NOTE)
+            if artifact_type in RESOLUTION_AUDIT_TYPES:
+                notes.append(RESOLUTION_AUDIT_TRIGGER_NOTE)
     return notes
 
 
@@ -424,6 +519,7 @@ def resolve_authoring(
     project: Path | None = None,
     require_config: bool = False,
     scope: str = "content",
+    mode: str | None = None,
 ) -> Resolution:
     validate_type(artifact_type)
     if target is not None:
@@ -436,6 +532,8 @@ def resolve_authoring(
             "--target does not apply to comment scope; "
             "quality-criteria files only describe content-level review"
         )
+
+    mode = _resolve_mode(mode, side, artifact_type, target, scope)
 
     config_provider: str | None = None
     if project is not None or require_config:
@@ -453,14 +551,14 @@ def resolve_authoring(
         except WorkflowConfigError as exc:
             raise ResolverError(str(exc)) from exc
 
-    parts = _common_parts(side, artifact_type, target, scope)
+    parts = _common_parts(side, artifact_type, target, scope, mode)
     provider_parts: list[str] = []
     provider_notes: list[str] = []
     helper_side = "issue" if target is not None else side
     match (provider, helper_side):
         case ("github", "issue"):
             provider_parts, provider_notes = _resolve_authoring_github_issue(
-                artifact_type, target, scope
+                artifact_type, target, scope, mode
             )
         case ("github", "knowledge"):
             provider_parts, provider_notes = _resolve_authoring_github_knowledge(
@@ -468,7 +566,7 @@ def resolve_authoring(
             )
         case ("jira", "issue"):
             provider_parts, provider_notes = _resolve_authoring_jira_issue(
-                artifact_type, target, scope
+                artifact_type, target, scope, mode
             )
         case _:
             pass
@@ -477,7 +575,7 @@ def resolve_authoring(
         if part not in parts:
             parts.append(part)
 
-    notes = _common_notes(side, artifact_type, target, scope) + provider_notes
+    notes = _common_notes(side, artifact_type, target, scope, mode) + provider_notes
 
     return Resolution(
         artifact_type=artifact_type,
@@ -487,6 +585,7 @@ def resolve_authoring(
         target=target,
         files=absolute_authoring_paths(parts),
         notes=tuple(notes),
+        mode=mode,
     )
 
 
@@ -507,6 +606,15 @@ def build_parser() -> argparse.ArgumentParser:
         choices=sorted(AUTHORING_SCOPES),
         default="content",
         help="authoring surface to resolve; use comment for comment-only work",
+    )
+    parser.add_argument(
+        "--mode",
+        choices=AUTHORING_MODES,
+        help=(
+            "authoring intent; required for task/bug content authoring: "
+            "forward (planning now), backlog (capture for later), or "
+            "retroactive (already done)"
+        ),
     )
     parser.add_argument(
         "--project",
@@ -536,6 +644,7 @@ def main(argv: list[str] | None = None) -> int:
             project=args.project,
             require_config=args.require_config,
             scope=args.scope,
+            mode=args.mode,
         )
     except ResolverError as exc:
         print(f"authoring resolver error: {exc}", file=sys.stderr)
@@ -608,13 +717,14 @@ def _resolution_key(resolution: Resolution) -> dict[str, str | None]:
         "provider": resolution.provider,
         "scope": resolution.scope,
         "target": resolution.target,
+        "mode": resolution.mode,
     }
 
 
 def _keys_equal(left: object, right: dict[str, str | None]) -> bool:
     if not isinstance(left, dict):
         return False
-    fields = ("type", "side", "provider", "scope", "target")
+    fields = ("type", "side", "provider", "scope", "target", "mode")
     return all(left.get(field) == right.get(field) for field in fields)
 
 

@@ -62,6 +62,10 @@ The test should:
 
 If no automated regression test is feasible, document the manual verification path and reason in the `Unit Test Strategy` section.
 
+## Backlog bugs
+
+A backlog bug captures a defect to triage and fix later without a forward plan — use it when authoring `Reproduction`, `Unit Test Strategy`, and a fix plan now is premature. It is resolved separately in backlog mode (see `./backlog.md`), which relaxes the required sections down to `Description`. Do not hand-author a plan-light bug under this forward contract; capture it in backlog mode instead.
+
 ## Artifacts
 
 Issue-backed bugs usually do not need a local evidence directory.
