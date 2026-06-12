@@ -26,6 +26,7 @@ Common required sections are defined by `../../../contracts/issue/task.md`:
 Common optional sections are defined by `../../../contracts/issue/task.md` and `../../../contracts/issue/body.md`:
 
 - `## Context`
+- `## Root Cause`
 - `## Design Decision`
 - `## Implementation Steps`
 - `## Verification`

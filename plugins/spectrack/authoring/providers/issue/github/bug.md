@@ -28,6 +28,7 @@ Common optional sections are defined by `../../../contracts/issue/bug.md` and `.
 
 - `## Context`
 - `## Environment`
+- `## Root Cause`
 - `## Design Decision`
 - `## Implementation Steps`
 - `## Verification`
