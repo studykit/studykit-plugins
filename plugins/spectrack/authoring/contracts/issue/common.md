@@ -53,7 +53,7 @@ or comments using the selected item type and provider conventions.
 
 ## Relationships
 
-Issue relationships are not issue metadata fields. Type-specific authoring files define required and optional relationships. Provider relationship files define native storage and body-boundary rules.
+Record every relationship the configured issue backend natively supports, through the backend's native relationship mechanism. Run `spectrack issue link --help` to see the relationship kinds the configured backend accepts; type-specific authoring files define which relationships an item needs.
 
 Canonical relationship intents used by provider authoring files and the workflow scripts:
 

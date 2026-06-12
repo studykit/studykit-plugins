@@ -6,7 +6,7 @@ Provider-wide convention rules for issue-backed items stored as Jira issues.
 
 Use these rules for issue-backed items stored in Jira.
 
-This file defines Jira-wide issue writing rules only. Provider relationship authoring boundaries belong in `./relationships.md`. Jira body anti-patterns belong in `./anti-patterns.md`. Type-specific body structure and allowed relationship body fallback sections belong in the matching Jira issue type authoring file.
+This file defines Jira-wide issue writing rules only. Jira body anti-patterns belong in `./anti-patterns.md`. Type-specific body structure belongs in the matching Jira issue type authoring file.
 
 ## Body markup
 
@@ -28,38 +28,16 @@ Examples:
 - `[PROJ-123]` in GitHub comments when GitHub for Atlassian should create a Jira link.
 - Full Jira URL when outside Jira/Atlassian-aware contexts or when a portable link is needed.
 
-## Relationships
-
-Read `./relationships.md` for provider relationship storage and body-boundary rules.
-
-Read `./anti-patterns.md` for forbidden relationship body sections.
-
-Allowed body fallback sections for Jira relationships are type-specific and belong in the matching Jira issue type authoring file.
-
 ## `Related` body section
 
 A `Related` section (rendered as `h2. Related`) is available to any Jira issue type.
 
-Use it for human-readable references that are not stored as Jira-native issue links, hierarchy fields, or remote links. This includes implementation anchors, non-Jira review targets, follow-up work, external pages, or other soft references.
-
-Do not use `Related` for parent, child, blocking, dependency, related-work, or remote-link relationships that are stored natively in Jira.
+Use it for human-readable references: implementation anchors, non-Jira review targets, follow-up work, external pages, or other soft references.
 
 When used:
 
 - Start with one bullet (`* …`) per related reference.
 - Keep descriptions short.
-
-## `Dependencies` body fallback
-
-Use Jira issue links or remote links for dependency relationships whenever possible.
-
-Use a `Dependencies` section (rendered as `h2. Dependencies`) only when dependency links cannot be stored natively and the issue body needs human-readable dependency context.
-
-When used:
-
-- Start with one bullet (`* …`) per dependency.
-- Use Jira issue keys or full URLs whenever possible.
-- Keep the section limited to blocking or ordering dependencies.
 
 ## Provider update intent
 

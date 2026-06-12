@@ -292,7 +292,6 @@ def _resolve_authoring_github_issue(
     artifact_type: str, target: str | None, scope: str, mode: str | None
 ) -> tuple[list[str], list[str]]:
     convention = "providers/issue/github/convention.md"
-    relationships = "providers/issue/github/relationships.md"
     anti_patterns = "providers/issue/github/anti-patterns.md"
     match (scope, target):
         case ("comment", _):
@@ -300,16 +299,14 @@ def _resolve_authoring_github_issue(
         case (_, str()):
             return [
                 convention,
-                relationships,
                 "providers/issue/github/review.md",
                 anti_patterns,
             ], []
         case _:
             if mode == "backlog":
-                return [convention, relationships, anti_patterns], []
+                return [convention, anti_patterns], []
             parts = [
                 convention,
-                relationships,
                 f"providers/issue/github/{artifact_type}.md",
                 anti_patterns,
             ]
@@ -342,7 +339,6 @@ def _resolve_authoring_jira_issue(
     artifact_type: str, target: str | None, scope: str, mode: str | None
 ) -> tuple[list[str], list[str]]:
     convention = "providers/issue/jira/convention.md"
-    relationships = "providers/issue/jira/relationships.md"
     anti_patterns = "providers/issue/jira/anti-patterns.md"
     match (scope, target):
         case ("comment", _):
@@ -350,16 +346,14 @@ def _resolve_authoring_jira_issue(
         case (_, str()):
             return [
                 convention,
-                relationships,
                 "providers/issue/jira/review.md",
                 anti_patterns,
             ], []
         case _:
             if mode == "backlog":
-                return [convention, relationships, anti_patterns], []
+                return [convention, anti_patterns], []
             parts = [
                 convention,
-                relationships,
                 f"providers/issue/jira/{artifact_type}.md",
                 anti_patterns,
             ]

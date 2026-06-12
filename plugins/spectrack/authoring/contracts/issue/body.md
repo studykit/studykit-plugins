@@ -33,7 +33,7 @@ Use stable, readable references in body text.
 
 ## Relationship sections
 
-Relationship body sections are defined by the type-specific authoring file or the matching rendering convention. Do not invent new relationship sections unless the selected authoring files require them.
+Relationship body sections are defined by the type-specific authoring file or the matching rendering convention. Use the canonical section and reference forms rather than inventing new section names.
 
 ## Optional reusable sections
 
@@ -41,7 +41,7 @@ Relationship body sections are defined by the type-specific authoring file or th
 
 ### `Related`
 
-References that help interpret the issue but are not stored as native backend relationships. Use the native reference form of the configured issue or knowledge backend.
+References that help interpret the issue. Use the native reference form of the configured issue or knowledge backend.
 
 ### `Resume`
 

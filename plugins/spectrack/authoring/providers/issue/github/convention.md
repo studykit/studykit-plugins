@@ -7,7 +7,6 @@ Provider-wide convention rules for issue-backed items stored as GitHub Issues.
 Use these rules for issue-backed items stored in GitHub Issues.
 
 This file defines GitHub-wide issue writing conventions only.
-Provider relationship boundaries belong in `./relationships.md`.
 GitHub body anti-patterns belong in `./anti-patterns.md`.
 
 ## Body markup
@@ -30,29 +29,13 @@ Use GitHub-native references in visible text.
 
 `## Related` is available to any GitHub issue type.
 
-Use `## Related` for human-readable references that are not stored as
-GitHub-native relationships. This includes implementation anchors, non-issue
+Use `## Related` for human-readable references: implementation anchors, non-issue
 review targets, follow-up work, external pages, or other soft references.
-
-Do not use `## Related` for parent, child, blocking, or dependency
-relationships that are stored as GitHub-native relationships.
 
 When used:
 
 - Start with one bullet per related reference.
 - Keep descriptions short.
-
-## Dependency body fallback
-
-Use GitHub issue dependency relationships for blocking or ordering dependencies whenever possible.
-
-Use `## Dependencies` only when dependency relationships cannot be stored natively and the issue body needs human-readable dependency context.
-
-When used:
-
-- Start with one bullet per dependency.
-- Use GitHub issue references or full URLs whenever possible.
-- Keep the section limited to blocking or ordering dependencies.
 
 ## Provider update intent
 
