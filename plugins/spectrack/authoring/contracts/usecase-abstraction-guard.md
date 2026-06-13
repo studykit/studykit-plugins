@@ -79,8 +79,8 @@ softening the abstraction discipline.
 
 This guard does not police section presence, body shape, or
 provider markup — those live in `./issue/usecase.md`,
-`./knowledge/usecase.md`, `./issue/body.md`,
-`./knowledge/body.md`, and the provider convention files (each side
+`./knowledge/usecase.md`, `./knowledge/body.md`, and the
+provider convention files (each side
 file lists its own body shape; the dual-role overview is in
 `./usecase.md`). The guard polices only the abstraction
 level of the prose in each body section.

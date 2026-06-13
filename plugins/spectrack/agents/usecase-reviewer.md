@@ -241,8 +241,8 @@ Publish the summary via `spectrack issue new --type review`. Pass:
   reviewed use case from the summary using the `related` intent.
   Apply it per the provider relationships convention — natively
   when the provider supports `related`; otherwise list the refs
-  in a `Related` body section in the summary draft per
-  `contracts/issue/body.md`.
+  in a `Related` body section in the summary draft per the
+  provider convention.
 - `--label usecase-reviewer` and additionally
   `--label usecase-reviewer-session-summary` when the configured
   backend supports labels; the second label distinguishes the
