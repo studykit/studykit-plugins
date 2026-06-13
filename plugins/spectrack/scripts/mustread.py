@@ -58,16 +58,37 @@ PLAN_MODE_TYPES = {"task", "bug"}
 # rejected on every other surface.
 AUTHORING_MODES = ("forward", "backlog", "retroactive")
 
-PLAN_MODE_TRIGGER_NOTE = (
-    "Forward mode: the change is not yet implemented, so the body's Design "
-    "Decision / Implementation Steps / Acceptance Criteria / Verification "
-    "must record a plan the user explicitly approved before publishing. "
-    "Enter plan mode before drafting when the runtime offers it; otherwise "
-    "present the plan and get the user's explicit approval before drafting "
-    "the body. If the user already agreed to a concrete plan in this "
-    "conversation, record that agreed plan instead of re-running a "
-    "planning pass."
-)
+def _ask_user_phrase(runtime: str) -> str:
+    """How to prompt the user before spawning an audit subagent.
+
+    Claude exposes the AskUserQuestion tool; Codex has no equivalent, so the
+    note names the plain action there.
+    """
+    return "ask the user" if runtime == "codex" else "ask the user via AskUserQuestion"
+
+
+def _plan_mode_note(runtime: str) -> str:
+    """Forward-mode plan note. Claude can delegate plan design to the Plan
+    subagent; Codex has no planning agent, so it leans on plan mode."""
+    if runtime == "codex":
+        planner = "Use plan mode to design the plan"
+    else:
+        planner = (
+            "Design the plan with a planning agent — spawn the Plan subagent, "
+            "or enter plan mode when the runtime offers it"
+        )
+    return (
+        "Forward mode: the change is not yet implemented, so the body's Design "
+        "Decision / Implementation Steps / Acceptance Criteria / Verification "
+        "must record a plan the user explicitly approved before publishing. "
+        f"{planner}, then present it to the user and get explicit approval "
+        "before drafting the body. If the user already agreed to a concrete "
+        "plan in this conversation, record that agreed plan instead of "
+        "re-running a planning pass."
+    )
+
+
+PLAN_MODE_TRIGGER_NOTE = _plan_mode_note("claude")
 
 BACKLOG_TRIGGER_NOTE = (
     "Backlog mode: capture the item's intent for a later planning pass, "
@@ -94,32 +115,41 @@ RETROACTIVE_TRIGGER_NOTE = (
 
 TASK_AUDIT_TYPES = {"task"}
 
-TASK_AUDIT_TRIGGER_NOTE = (
-    "After the body file is drafted, before invoking the publish script, "
-    "ask the user via AskUserQuestion whether to run the task-size-auditor "
-    "subagent against the draft. Spawn task-size-auditor only when the user "
-    "accepts."
-)
+def _task_audit_note(runtime: str) -> str:
+    return (
+        "After the body file is drafted, before invoking the publish script, "
+        f"{_ask_user_phrase(runtime)} whether to run the task-size-auditor "
+        "subagent against the draft. Spawn task-size-auditor only when the "
+        "user accepts."
+    )
+
+
+TASK_AUDIT_TRIGGER_NOTE = _task_audit_note("claude")
 
 RESOLUTION_AUDIT_TYPES = {"task", "bug"}
 
-RESOLUTION_AUDIT_TRIGGER_NOTE = (
-    "After the body file is drafted, before invoking the publish script, "
-    "ask the user via AskUserQuestion whether to run the resolution-auditor "
-    "subagent against the draft. Spawn resolution-auditor only when the user "
-    "accepts. When the user accepts, pass it the draft body file path and the "
-    "artifact type; it validates the recorded root cause and proposed "
-    "approach against the actual code and git history and writes its verdict "
-    "to a sidecar file beside the draft. If the verdict is `ok`, continue to publish. If it is "
-    "`wrong-cause`, `ineffective-approach`, or `weak-diagnosis`, do not "
-    "publish: revise the draft's recorded cause and approach to address the "
-    "sidecar's Actionable section (rewrite the cause/approach, or settle the "
-    "named execution-contingent claim), then re-run resolution-auditor "
-    "against the revised draft. Repeat until the verdict is `ok`, up to 3 "
-    "audit rounds total; if it is still not `ok` after the third round, stop "
-    "and surface the latest sidecar to the user. A `unverifiable` verdict is "
-    "not a re-plan trigger — surface it and let the user decide."
-)
+def _resolution_audit_note(runtime: str) -> str:
+    return (
+        "After the body file is drafted, before invoking the publish script, "
+        f"{_ask_user_phrase(runtime)} whether to run the resolution-auditor "
+        "subagent against the draft. Spawn resolution-auditor only when the "
+        "user accepts. When the user accepts, pass it the draft body file path "
+        "and the artifact type; it validates the recorded root cause and "
+        "proposed approach against the actual code and git history and writes "
+        "its verdict to a sidecar file beside the draft. If the verdict is "
+        "`ok`, continue to publish. If it is `wrong-cause`, "
+        "`ineffective-approach`, or `weak-diagnosis`, do not publish: revise "
+        "the draft's recorded cause and approach to address the sidecar's "
+        "Actionable section (rewrite the cause/approach, or settle the named "
+        "execution-contingent claim), then re-run resolution-auditor against "
+        "the revised draft. Repeat until the verdict is `ok`, up to 3 audit "
+        "rounds total; if it is still not `ok` after the third round, stop and "
+        "surface the latest sidecar to the user. A `unverifiable` verdict is "
+        "not a re-plan trigger — surface it and let the user decide."
+    )
+
+
+RESOLUTION_AUDIT_TRIGGER_NOTE = _resolution_audit_note("claude")
 
 RETROACTIVE_PUBLISH_STATE_GITHUB = (
     "Retroactive issues that track work already done should be "
@@ -455,7 +485,12 @@ def _resolve_mode(
 
 
 def _common_notes(
-    side: str, artifact_type: str, target: str | None, scope: str, mode: str | None
+    side: str,
+    artifact_type: str,
+    target: str | None,
+    scope: str,
+    mode: str | None,
+    runtime: str,
 ) -> list[str]:
     if scope == "comment" or target is not None or side != "issue":
         return []
@@ -468,11 +503,11 @@ def _common_notes(
         elif mode == "retroactive":
             notes.append(RETROACTIVE_TRIGGER_NOTE)
         else:  # forward
-            notes.append(PLAN_MODE_TRIGGER_NOTE)
+            notes.append(_plan_mode_note(runtime))
             if artifact_type in TASK_AUDIT_TYPES:
-                notes.append(TASK_AUDIT_TRIGGER_NOTE)
+                notes.append(_task_audit_note(runtime))
             if artifact_type in RESOLUTION_AUDIT_TYPES:
-                notes.append(RESOLUTION_AUDIT_TRIGGER_NOTE)
+                notes.append(_resolution_audit_note(runtime))
     return notes
 
 
@@ -486,7 +521,10 @@ def resolve_authoring(
     require_config: bool = False,
     scope: str = "content",
     mode: str | None = None,
+    runtime: str | None = None,
 ) -> Resolution:
+    if runtime is None:
+        runtime = detect_shell_runtime().name
     validate_type(artifact_type)
     if target is not None:
         validate_target(target, artifact_type)
@@ -541,7 +579,10 @@ def resolve_authoring(
         if part not in parts:
             parts.append(part)
 
-    notes = _common_notes(side, artifact_type, target, scope, mode) + provider_notes
+    notes = (
+        _common_notes(side, artifact_type, target, scope, mode, runtime)
+        + provider_notes
+    )
 
     return Resolution(
         artifact_type=artifact_type,
