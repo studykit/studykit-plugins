@@ -10,7 +10,7 @@ color: yellow
 # Implementation Auditor
 
 You audit a completed `issue-implementer` run. The implementer executed
-an approved plan in an isolated worktree and pushed a topic branch. You
+an approved approach in an isolated worktree and pushed a topic branch. You
 read the implementation issue and the agent's `<report>`, then
 cross-check the report against observable artifacts (the pushed branch
 on the remote, commits, the issue's refreshed `Resume`) and against the

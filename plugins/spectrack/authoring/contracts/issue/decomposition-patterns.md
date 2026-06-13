@@ -42,13 +42,13 @@ Use when 2–3 subtasks are slices of one coherent implementation goal whose par
 Signals (all should hold):
 
 - Every subtask is a `task`.
-- The parent body has meaningful `Description`, `Unit Test Strategy`, and `Acceptance Criteria` at parent level — typically the parent UTS is the integration test for the joined goal and the parent AC is the observable outcome of the whole goal.
+- The parent body has meaningful `Description` and `Acceptance Criteria` at parent level — typically the parent AC is the integration-level observable outcome of the joined goal, each criterion operationally checkable and implying the integration scenario.
 - All subtasks land in the same code area within roughly one PR cycle.
 - Natural decomposition is two or three units; four or more disqualifies this pattern.
 
-Layout: the parent is a `task`; each subtask is a `task` linked via the `parent` relationship intent. The parent `Acceptance Criteria` records the joined observable outcome (subtask AC are slices); the parent `Unit Test Strategy` covers the integration scenario (subtask UTS cover their slice only). Do not duplicate subtask details in the parent body.
+Layout: the parent is a `task`; each subtask is a `task` linked via the `parent` relationship intent. The parent `Acceptance Criteria` records the joined observable outcome including the integration-level checks (subtask AC are slices). Do not duplicate subtask details in the parent body.
 
-Do not use when members would mix types (`bug`, `spike`, `research`), the parent UTS makes no sense at parent level, or the work needs four or more units.
+Do not use when members would mix types (`bug`, `spike`, `research`), the parent body cannot stand as a task (no meaningful integration-level `Acceptance Criteria` at parent level), or the work needs four or more units.
 
 ### 3. Epic with member issues
 
@@ -69,7 +69,7 @@ Pick in this order:
 
 1. Four or more units → **epic**.
 2. Members would mix types, or the scope matches a recognized epic pattern → **epic**.
-3. Parent body would naturally pass as a task (`Description`, `Unit Test Strategy`, `Acceptance Criteria` all meaningful at parent level) and all subtasks are tasks → **parent task with subtasks**.
+3. Parent body would naturally pass as a task (`Description` and integration-level `Acceptance Criteria` both meaningful at parent level) and all subtasks are tasks → **parent task with subtasks**.
 4. 2–3 units share no parent-level invariant → **sibling tasks**.
 5. Otherwise the work is probably a single task — do not decompose.
 
@@ -82,7 +82,7 @@ When a batch coordinates under a shared anchor, the shared context has a single 
 Where the shared home lives:
 
 - **Epic with member issues**: the epic body is the coordination summary; members link to it when their approach depends on epic-level narrative.
-- **Parent task with subtasks**: the parent body owns the joined `Description`, the integration `Unit Test Strategy`, and the observable `Acceptance Criteria` at parent level.
+- **Parent task with subtasks**: the parent body owns the joined `Description` and the integration-level observable `Acceptance Criteria` at parent level.
 - **Sibling tasks under a shared anchor** (use case, spec, parent task, or epic): the anchor is the shared home; sibling bodies stay scoped to their slice.
 
 Use comments — on whichever issue owns the shared narrative — for discussion. Keep bodies as the current structured summary, not transcripts.
@@ -97,7 +97,7 @@ These apply within any pattern when describing how member issues relate.
 
 ## Common mistakes
 
-- Using a parent task when the parent body has no meaningful Unit Test Strategy at parent level — promote to epic instead, or keep as a single task.
+- Using a parent task when the parent body has no meaningful integration-level Acceptance Criteria at parent level — promote to epic instead, or keep as a single task.
 - Using an epic when the decomposition has only two cohesive task slices and the parent is implementation-coherent — use a parent task instead.
 - Splitting into four sibling tasks without a parent — the missing coordination home is itself the signal to promote to epic.
 - Duplicating subtask AC in the parent task body, or member AC in the epic body.

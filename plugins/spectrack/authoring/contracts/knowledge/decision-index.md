@@ -18,7 +18,7 @@ Use it to:
 
 Do not use it for:
 
-- The full decision rationale or rejected-alternative analysis — those live at the source (the issue's `Design Decision` section, or a spec's `Decision Log` / `Rejected Alternatives`).
+- The full decision rationale or rejected-alternative analysis — those live at the source (a spec's `Decision Log` / `Rejected Alternatives`, or the issue `Context` that records an issue-local decision's rationale).
 - Raw discussion or a work log.
 - A roadmap or milestone plan.
 
@@ -43,7 +43,7 @@ Optional sections:
 
 ## What to index
 
-- A `Design Decision` recorded in a task or bug body that has lasting cross-cutting reference value beyond its own issue.
+- A durable design decision recorded in a task or bug `Context` that has lasting cross-cutting reference value beyond its own issue (promote it to a spec when it becomes a lasting contract — see `../issue/task.md`).
 - A decision promoted to a spec's `Decision Log`.
 
 Skip purely task-local decisions whose only reader is the originating issue; indexing every trivial choice drowns the durable ones.
