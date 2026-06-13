@@ -4,7 +4,7 @@ spectrack mustread \
   [--side issue|knowledge] \
   [--target <type>] \
   [--scope comment] \
-  [--mode forward|backlog|retroactive]
+  [--mode backlog|retroactive]
 </bash>
 
 - `--type` — required. The artifact type being authored. When `--type
@@ -23,27 +23,23 @@ spectrack mustread \
 - `--mode` — required for `task`/`bug` content authoring; rejected for
   every other type, scope, or target. Names the authoring intent, which
   the resolver cannot infer — decide it from the user's request before
-  calling. First check whether the change has already landed: if the code
-  is already written, committed, or merged and you are documenting it
-  after the fact, the mode is `retroactive` — pick it even when the user
-  never says the word "retroactive". Only when the work is still
-  not-yet-done do `forward` and `backlog` apply; when it is genuinely
-  ambiguous between those two, default to `backlog` — the lowest-commitment
-  capture, re-resolved as `forward` when the item is later picked up. The
-  resolver returns a different contract set and different notes per mode:
-  - `forward` — the work is not yet done; you are planning and
-    implementing it now. The body records a user-approved plan (via plan
-    mode where available, or a plan already explicitly agreed in the
-    conversation); the size and resolution audits apply.
-  - `backlog` — the work is not yet done; you are capturing its intent for
-    a later planning pass. No planning pass now; a lighter contract relaxes
-    the required sections down to `Description` and defers the rest. Use
-    when writing a detailed plan now is premature.
+  calling. Check whether the change has already landed: if the code is
+  already written, committed, or merged and you are documenting it after
+  the fact, the mode is `retroactive` — pick it even when the user never
+  says the word "retroactive". Otherwise the work is not yet done and the
+  mode is `backlog`. Working out the cause, approach, and steps is not an
+  authoring step — that happens against the current code when the item is
+  picked up for implementation. The resolver returns a different contract
+  set and different notes per mode:
+  - `backlog` — the work is not yet done; the issue is the open spec.
+    Record at least `Description`; add `Context`, `Acceptance Criteria`,
+    and (for a bug) `Reproduction` to whatever level of detail is useful —
+    a brief capture and a complete spec are both valid. No cause, approach,
+    or implementation steps in the body.
   - `retroactive` — the work has already landed (already implemented,
     committed, or merged). The body records facts after the fact — what
-    changed and how it was actually done — not a forward plan. This is the
-    mode whenever you are writing the issue for a change that already
-    exists.
+    changed, the cause when relevant, how it was actually done, and the
+    checks that ran — not a plan.
 
 The resolver returns markdown listing files to read before drafting.
 Treat any bullet in a notes section as a binding rule for the calling
