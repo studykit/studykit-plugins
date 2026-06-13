@@ -55,11 +55,20 @@ tests as the source of truth.
 ## Authoring agent and skill docs
 
 Before writing or editing any `agents/<name>.md` or `skills/<name>/SKILL.md`,
-read the context the hooks inject on the surface you are authoring —
-`spectrack preview_context` prints it byte-for-byte. Two rules you must not
-miss: refer to injected blocks by tag and point at `spectrack issue <verb>
---help` for CLI usage instead of restating provider command shapes, and never
-assume cross-surface context (skills see `main/...` blocks, subagents see
-`subagent/...` blocks). The
-injection layout, `preview_context` flags, and the full rules are in
+read the context the hooks inject on the surface you are authoring. Render it
+with `preview_context` — its output is byte-for-byte what the runtime receives.
+Never raw-`cat` the `hooks/context/` templates: their `{{...}}` snippet
+placeholders only expand at build time, so the raw files are not what the
+runtime sees.
+
+```bash
+spectrack preview_context --surface session|subagent|commit|all \
+  [--provider github|jira|filesystem] [--agent <name>|all]
+```
+
+Two rules you must not miss: refer to injected blocks by tag and point at
+`spectrack issue <verb> --help` for CLI usage instead of restating provider
+command shapes, and never assume cross-surface context (skills see `main/...`
+blocks, subagents see `subagent/...` blocks). The injection layout, full
+`preview_context` flag semantics, and the rest of the rules are in
 `dev/authoring-injected-context.md`.

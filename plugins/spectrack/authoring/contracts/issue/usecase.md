@@ -6,7 +6,6 @@ Common rules that apply across both sides (definition, dual-role overview, abstr
 
 Companion contracts:
 
-- `./body.md`
 - Issue rules: `./common.md`
 - Use case rules common to both sides: `../usecase.md`
 
