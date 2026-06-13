@@ -25,7 +25,7 @@ Recommended sections:
 - `Current Draft` — short current summary or link to the curated page draft.
 - `Open Questions` — outstanding questions, one per bullet.
 
-Optional reusable sections (see `./body.md`):
+Optional sections:
 
 - `Related Work` — related tasks, specs, reviews, research, or pages.
 - `Supersedes` — prior use case when replacing one.
