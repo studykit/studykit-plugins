@@ -14,11 +14,8 @@ if str(_SCRIPTS_DIR) not in sys.path:
 
 from mustread import (  # noqa: E402
     BACKLOG_TRIGGER_NOTE,
-    PLAN_MODE_TRIGGER_NOTE,
-    RESOLUTION_AUDIT_TRIGGER_NOTE,
     RETROACTIVE_PUBLISH_STATE_GITHUB,
     RETROACTIVE_TRIGGER_NOTE,
-    TASK_AUDIT_TRIGGER_NOTE,
     USECASE_INTERVIEW_NOTE,
     USECASE_SKILL_PATH,
     ResolverError,
@@ -44,13 +41,13 @@ def _rel_paths(paths: tuple[Path, ...]) -> list[str]:
     return [str(path.relative_to(_PLUGIN_ROOT / "authoring")) for path in paths]
 
 
-def _forward_for(artifact_type: str) -> str | None:
-    """`--mode forward` for task/bug content authoring; ``None`` elsewhere.
+def _mode_for(artifact_type: str) -> str | None:
+    """A valid `--mode` for task/bug content authoring; ``None`` elsewhere.
 
     Lets parametrized tests that mix task/bug with other types supply the
     now-required mode only where it applies.
     """
-    return "forward" if artifact_type in {"task", "bug"} else None
+    return "backlog" if artifact_type in {"task", "bug"} else None
 
 
 def test_bare_review_resolution_uses_absolute_authoring_files() -> None:
@@ -107,7 +104,7 @@ def test_prd_component_includes_prd_index(artifact_type: str, side: str | None) 
     ],
 )
 def test_non_prd_artifact_excludes_prd_index(artifact_type: str, side: str | None) -> None:
-    resolution = resolve_authoring(artifact_type, side=side, mode=_forward_for(artifact_type))
+    resolution = resolve_authoring(artifact_type, side=side, mode=_mode_for(artifact_type))
     assert "contracts/prd.md" not in _rel_paths(resolution.files)
 
 
@@ -138,7 +135,7 @@ def test_usecase_includes_abstraction_guard(side: str) -> None:
 def test_non_usecase_excludes_abstraction_guard(
     artifact_type: str, side: str | None
 ) -> None:
-    resolution = resolve_authoring(artifact_type, side=side, mode=_forward_for(artifact_type))
+    resolution = resolve_authoring(artifact_type, side=side, mode=_mode_for(artifact_type))
     assert "contracts/usecase-abstraction-guard.md" not in _rel_paths(resolution.files)
 
 
@@ -223,7 +220,7 @@ providers:
         encoding="utf-8",
     )
 
-    issue_resolution = resolve_authoring("task", project=tmp_path, mode="forward")
+    issue_resolution = resolve_authoring("task", project=tmp_path, mode="backlog")
     knowledge_resolution = resolve_authoring("architecture", project=tmp_path)
 
     assert issue_resolution.provider == "jira"
@@ -278,7 +275,7 @@ def test_invalid_provider_for_side_is_rejected() -> None:
 
 def test_require_config_fails_when_missing(tmp_path: Path) -> None:
     with pytest.raises(ResolverError, match=".spectrack/config.yml was not found"):
-        resolve_authoring("task", project=tmp_path, require_config=True, mode="forward")
+        resolve_authoring("task", project=tmp_path, require_config=True, mode="backlog")
 
 
 @pytest.mark.parametrize(
@@ -294,7 +291,7 @@ def test_require_config_fails_when_missing(tmp_path: Path) -> None:
 def test_issue_resolution_excludes_decomposition_patterns(
     artifact_type: str, side: str | None
 ) -> None:
-    resolution = resolve_authoring(artifact_type, side=side, mode=_forward_for(artifact_type))
+    resolution = resolve_authoring(artifact_type, side=side, mode=_mode_for(artifact_type))
     assert "contracts/issue/decomposition-patterns.md" not in _rel_paths(resolution.files)
 
 
@@ -302,7 +299,7 @@ def test_issue_resolution_excludes_decomposition_patterns(
 def test_decomposition_eligible_types_include_decomposition_patterns(
     artifact_type: str,
 ) -> None:
-    resolution = resolve_authoring(artifact_type, mode=_forward_for(artifact_type))
+    resolution = resolve_authoring(artifact_type, mode=_mode_for(artifact_type))
     rels = _rel_paths(resolution.files)
     assert "contracts/issue/decomposition-patterns.md" in rels
     assert rels.index(f"contracts/issue/{artifact_type}.md") < rels.index(
@@ -318,55 +315,6 @@ def test_decomposition_patterns_excluded_from_comment_scope(
         artifact_type, side="issue", provider="github", scope="comment"
     )
     assert "contracts/issue/decomposition-patterns.md" not in _rel_paths(resolution.files)
-
-
-@pytest.mark.parametrize("artifact_type", ["task", "bug"])
-def test_implementation_types_emit_plan_mode_note(artifact_type: str) -> None:
-    resolution = resolve_authoring(artifact_type, mode="forward")
-    assert PLAN_MODE_TRIGGER_NOTE in resolution.notes
-
-
-def test_task_emits_audit_trigger_note() -> None:
-    resolution = resolve_authoring("task", mode="forward")
-    assert TASK_AUDIT_TRIGGER_NOTE in resolution.notes
-    assert "task-size-auditor" in TASK_AUDIT_TRIGGER_NOTE
-
-
-def test_bug_omits_audit_trigger_note() -> None:
-    resolution = resolve_authoring("bug", mode="forward")
-    assert TASK_AUDIT_TRIGGER_NOTE not in resolution.notes
-
-
-@pytest.mark.parametrize("artifact_type", ["task", "bug"])
-def test_diagnosis_types_emit_resolution_audit_note(artifact_type: str) -> None:
-    resolution = resolve_authoring(artifact_type, mode="forward")
-    assert RESOLUTION_AUDIT_TRIGGER_NOTE in resolution.notes
-    assert "resolution-auditor" in RESOLUTION_AUDIT_TRIGGER_NOTE
-
-
-@pytest.mark.parametrize("artifact_type", ["task", "bug"])
-def test_forward_notes_are_runtime_specific(artifact_type: str) -> None:
-    claude = "\n".join(
-        resolve_authoring(artifact_type, mode="forward", runtime="claude").notes
-    )
-    codex = "\n".join(
-        resolve_authoring(artifact_type, mode="forward", runtime="codex").notes
-    )
-    # Claude exposes the AskUserQuestion tool and a Plan subagent; Codex has
-    # neither, so its notes must not name them.
-    assert "AskUserQuestion" in claude
-    assert "AskUserQuestion" not in codex
-    assert "Plan subagent" in claude
-    assert "Plan subagent" not in codex
-    # Both runtimes still gate the resolution audit on user consent.
-    assert "resolution-auditor" in claude
-    assert "resolution-auditor" in codex
-
-
-@pytest.mark.parametrize("artifact_type", ["spike", "epic"])
-def test_non_diagnosis_types_omit_resolution_audit_note(artifact_type: str) -> None:
-    resolution = resolve_authoring(artifact_type)
-    assert RESOLUTION_AUDIT_TRIGGER_NOTE not in resolution.notes
 
 
 @pytest.mark.parametrize("artifact_type", ["task", "bug"])
@@ -392,7 +340,7 @@ def test_mode_rejected_where_it_does_not_apply(
     # review so the rejection under test is the mode rejection, not the target.
     art = "review" if kwargs.get("target") else artifact_type
     with pytest.raises(ResolverError, match="only applies to task/bug"):
-        resolve_authoring(art, mode="forward", **kwargs)
+        resolve_authoring(art, mode="backlog", **kwargs)
 
 
 def test_invalid_mode_is_rejected() -> None:
@@ -401,24 +349,23 @@ def test_invalid_mode_is_rejected() -> None:
 
 
 @pytest.mark.parametrize("artifact_type", ["task", "bug"])
-def test_backlog_mode_returns_lightweight_contract(artifact_type: str) -> None:
+def test_backlog_mode_reads_spec_and_backlog_framing(artifact_type: str) -> None:
     resolution = resolve_authoring(
         artifact_type, side="issue", provider="github", mode="backlog"
     )
     rels = _rel_paths(resolution.files)
 
-    assert rels == [
-        "contracts/issue/body.md",
-        "contracts/issue/common.md",
-        "contracts/issue/backlog.md",
-        "providers/issue/github/convention.md",
-        "providers/issue/github/anti-patterns.md",
-    ]
-    # Forward planning contracts are dropped in backlog mode, but the body
-    # convention and anti-patterns (work-history / markup) still apply.
-    assert f"contracts/issue/{artifact_type}.md" not in rels
-    assert "contracts/issue/decomposition-patterns.md" not in rels
-    assert f"providers/issue/github/{artifact_type}.md" not in rels
+    # Backlog is the open spec: it reads the type's spec contract plus the
+    # backlog framing, with the framing after the contract it frames.
+    assert f"contracts/issue/{artifact_type}.md" in rels
+    assert "contracts/issue/backlog.md" in rels
+    assert rels.index(f"contracts/issue/{artifact_type}.md") < rels.index(
+        "contracts/issue/backlog.md"
+    )
+    # Body convention and provider conventions still apply.
+    assert "contracts/issue/body.md" in rels
+    assert "contracts/issue/common.md" in rels
+    assert "providers/issue/github/convention.md" in rels
 
 
 @pytest.mark.parametrize("artifact_type", ["task", "bug"])
@@ -427,9 +374,7 @@ def test_backlog_mode_emits_only_backlog_note(artifact_type: str) -> None:
         artifact_type, side="issue", provider="github", mode="backlog"
     )
     assert BACKLOG_TRIGGER_NOTE in resolution.notes
-    assert PLAN_MODE_TRIGGER_NOTE not in resolution.notes
-    assert RESOLUTION_AUDIT_TRIGGER_NOTE not in resolution.notes
-    assert TASK_AUDIT_TRIGGER_NOTE not in resolution.notes
+    assert RETROACTIVE_TRIGGER_NOTE not in resolution.notes
     assert RETROACTIVE_PUBLISH_STATE_GITHUB not in resolution.notes
 
 
@@ -440,28 +385,21 @@ def test_retroactive_mode_notes(artifact_type: str) -> None:
     )
     assert RETROACTIVE_TRIGGER_NOTE in resolution.notes
     assert RETROACTIVE_PUBLISH_STATE_GITHUB in resolution.notes
-    # Retroactive work is already done — no forward plan-mode authoring and
-    # no resolution audit (it guards not-yet-done work).
-    assert PLAN_MODE_TRIGGER_NOTE not in resolution.notes
-    assert RESOLUTION_AUDIT_TRIGGER_NOTE not in resolution.notes
-    assert TASK_AUDIT_TRIGGER_NOTE not in resolution.notes
-    # The full type contract is still read; only backlog swaps it out.
-    assert f"contracts/issue/{artifact_type}.md" in _rel_paths(resolution.files)
-
-
-def test_forward_mode_omits_retroactive_publish_note() -> None:
-    resolution = resolve_authoring(
-        "task", side="issue", provider="github", mode="forward"
-    )
-    assert RETROACTIVE_PUBLISH_STATE_GITHUB not in resolution.notes
+    assert BACKLOG_TRIGGER_NOTE not in resolution.notes
+    # The type spec contract is read; backlog adds its framing on top.
+    rels = _rel_paths(resolution.files)
+    assert f"contracts/issue/{artifact_type}.md" in rels
+    assert "contracts/issue/backlog.md" not in rels
 
 
 def test_mode_participates_in_cache_key(tmp_path: Path) -> None:
-    forward = resolve_authoring("task", side="issue", provider="github", mode="forward")
+    retroactive = resolve_authoring(
+        "task", side="issue", provider="github", mode="retroactive"
+    )
     backlog = resolve_authoring("task", side="issue", provider="github", mode="backlog")
-    assert forward.mode == "forward"
+    assert retroactive.mode == "retroactive"
     assert backlog.mode == "backlog"
-    assert _resolution_key(forward) != _resolution_key(backlog)
+    assert _resolution_key(retroactive) != _resolution_key(backlog)
 
 
 @pytest.mark.parametrize(
@@ -475,7 +413,7 @@ def test_mode_participates_in_cache_key(tmp_path: Path) -> None:
         ("architecture", None),
     ],
 )
-def test_non_implementation_types_omit_plan_mode_note(
+def test_non_implementation_types_omit_notes(
     artifact_type: str, side: str | None
 ) -> None:
     resolution = resolve_authoring(artifact_type, side=side)
@@ -487,8 +425,6 @@ def test_usecase_issue_emits_interview_note() -> None:
     assert USECASE_INTERVIEW_NOTE in resolution.notes
     # The note must point the agent at the use-case skill to follow inline.
     assert str(USECASE_SKILL_PATH) in USECASE_INTERVIEW_NOTE
-    # The interview replaces hand-authoring; it is not a plan-mode artifact.
-    assert PLAN_MODE_TRIGGER_NOTE not in resolution.notes
 
 
 @pytest.mark.parametrize(
@@ -506,7 +442,7 @@ def test_usecase_omits_interview_note_off_issue_content_surface(
 
 
 def test_non_usecase_omits_interview_note() -> None:
-    resolution = resolve_authoring("task", side="issue", mode="forward")
+    resolution = resolve_authoring("task", side="issue", mode="backlog")
     assert USECASE_INTERVIEW_NOTE not in resolution.notes
 
 
@@ -538,7 +474,7 @@ def test_to_markdown_emits_expected_anchor_tags(
     expected_reading: str,
     expected_notes: str | None,
 ) -> None:
-    mode = "forward" if artifact_type in {"task", "bug"} and scope == "content" else None
+    mode = "backlog" if artifact_type in {"task", "bug"} and scope == "content" else None
     resolution = resolve_authoring(
         artifact_type, side=side, provider="github", scope=scope, mode=mode
     )
@@ -554,7 +490,7 @@ def test_to_markdown_emits_expected_anchor_tags(
 
 
 def test_to_markdown_lists_files_relative_to_a_declared_base() -> None:
-    resolution = resolve_authoring("task", side="issue", provider="github", mode="forward")
+    resolution = resolve_authoring("task", side="issue", provider="github", mode="backlog")
     rendered = resolution.to_markdown()
 
     reading_section, _, _ = rendered.partition("</reading>")
@@ -791,7 +727,7 @@ def _resolver_args(
     mode: str | None = None,
 ) -> list[str]:
     if mode is None and artifact in {"task", "bug"}:
-        mode = "forward"
+        mode = "backlog"
     args = [
         "--type",
         artifact,
@@ -831,7 +767,7 @@ def test_main_first_call_emits_sections_and_persists(
         "provider": "github",
         "scope": "content",
         "target": None,
-        "mode": "forward",
+        "mode": "backlog",
     }
     assert reading_entry["emitted_at"]
 
