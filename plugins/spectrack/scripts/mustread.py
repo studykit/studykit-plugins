@@ -87,9 +87,9 @@ RETROACTIVE_TRIGGER_NOTE = (
     "not intent, and there is no forward plan to author — do not enter "
     "plan mode. Description says what changed and why; Implementation "
     "Steps records how it was actually done; Acceptance Criteria and "
-    "Verification record the checks that already ran. Skip the size audit "
-    "(it guards not-yet-done work). Publish together with the transition "
-    "to the backend's resolved state."
+    "Verification record the checks that already ran. Skip the size and "
+    "resolution audits (they guard not-yet-done work). Publish together "
+    "with the transition to the backend's resolved state."
 )
 
 TASK_AUDIT_TYPES = {"task"}
@@ -104,10 +104,10 @@ TASK_AUDIT_TRIGGER_NOTE = (
 RESOLUTION_AUDIT_TYPES = {"task", "bug"}
 
 RESOLUTION_AUDIT_TRIGGER_NOTE = (
-    "After the body file is drafted, before invoking the publish script, run "
-    "the resolution-auditor subagent against the draft. This is mandatory "
-    "for a task/bug whose change is not yet implemented — do not publish "
-    "without it. Pass it the draft body file path and the "
+    "After the body file is drafted, before invoking the publish script, "
+    "ask the user via AskUserQuestion whether to run the resolution-auditor "
+    "subagent against the draft. Spawn resolution-auditor only when the user "
+    "accepts. When the user accepts, pass it the draft body file path and the "
     "artifact type; it validates the recorded root cause and proposed "
     "approach against the actual code and git history and writes its verdict "
     "to a sidecar file beside the draft. If the verdict is `ok`, continue to publish. If it is "
@@ -119,20 +119,6 @@ RESOLUTION_AUDIT_TRIGGER_NOTE = (
     "audit rounds total; if it is still not `ok` after the third round, stop "
     "and surface the latest sidecar to the user. A `unverifiable` verdict is "
     "not a re-plan trigger — surface it and let the user decide."
-)
-
-RESOLUTION_AUDIT_RETRO_NOTE = (
-    "After the body file is drafted, before invoking the publish script, "
-    "the diagnosis audit is optional for this already-landed change: ask "
-    "the user via AskUserQuestion first and spawn resolution-auditor only "
-    "when the user accepts. Pass it the draft body file path and the "
-    "artifact type; it validates the recorded cause and approach against "
-    "the change that already landed and writes its verdict to a sidecar "
-    "beside the draft. Treat a non-`ok` verdict (`wrong-cause`, "
-    "`ineffective-approach`, `weak-diagnosis`) as a prompt to revise the "
-    "recorded cause/approach and re-run, up to 3 rounds total; surface a "
-    "still-failing or `unverifiable` verdict to the user rather than "
-    "blocking publish."
 )
 
 RETROACTIVE_PUBLISH_STATE_GITHUB = (
@@ -481,8 +467,6 @@ def _common_notes(
             notes.append(BACKLOG_TRIGGER_NOTE)
         elif mode == "retroactive":
             notes.append(RETROACTIVE_TRIGGER_NOTE)
-            if artifact_type in RESOLUTION_AUDIT_TYPES:
-                notes.append(RESOLUTION_AUDIT_RETRO_NOTE)
         else:  # forward
             notes.append(PLAN_MODE_TRIGGER_NOTE)
             if artifact_type in TASK_AUDIT_TYPES:
