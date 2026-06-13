@@ -1,93 +1,33 @@
 # Spike Authoring
 
-A workflow spike is an **issue-backed, time-boxed exploration to unblock a decision**. It may involve throwaway code, a proof of concept, benchmark, integration probe, or focused technical experiment.
+A workflow spike is an issue-backed, time-boxed exploration to unblock a decision — a proof of concept, benchmark, integration probe, or focused experiment, possibly with throwaway code. Read with `./body.md` (body conventions, runtime-grounded claims) and `./common.md` (issue rules, completion baseline).
 
-Use `research` for written investigation without throwaway code. Use `task` when the implementation path is known and production work can begin.
+Choose the type by output:
 
-Companion contracts:
+- `spike` — a runnable experiment or throwaway code answers a question blocked by technical uncertainty; the output is evidence enabling a later task or spec.
+- `task` — the implementation approach is known and work goes into production code.
+- `research` — the output is written evidence, source review, or comparison with no runnable experiment.
 
-- `./body.md`
-- Issue rules: `./common.md`
+## Required sections
 
-## Spike vs task vs research
+- Description — the question being explored, why a spike is needed, and what decision it informs.
+- Hypothesis — what the spike tries to prove, disprove, or measure.
+- Validation Method — the experiment, benchmark, integration probe, prototype, or sample-driven check.
+- Acceptance Criteria — one or more observable outcomes that answer the question.
 
-Use `spike` when:
-
-- A concrete experiment is needed.
-- Throwaway code or a proof of concept may be created.
-- A decision is blocked by technical uncertainty.
-- The output is evidence that enables a later task or spec.
-
-Use `task` when:
-
-- The implementation approach is known.
-- Work should go directly into production code.
-- Acceptance criteria are already clear.
-
-Use `research` when:
-
-- The output is written evidence, source review, or comparison.
-- No throwaway code or runnable experiment is needed.
-
-## Body shape
-
-Required sections:
-
-- `Description` — question being explored, why a spike is needed, and what decision it will inform.
-- `Hypothesis` — what the spike is trying to prove, disprove, or measure.
-- `Validation Method` — experiment, benchmark, integration probe, prototype, or sample-driven check.
-- `Acceptance Criteria` — one or more observable outcomes that answer the question.
-
-Optional sections:
-
-- `Artifact Links` — branch, gist, repository path, benchmark output, screenshots, or other throwaway evidence.
-- `Implementation Steps` — the concrete, ordered exploration plan: probe and experiment sequence, naming the files, scripts, branches, or environments each step touches (this absorbs the older scope-fence section, so steps carry their own affected paths). Treat it as a falsifiable hypothesis, not a fixed spec; re-ground any runtime-grounded premise (see `./body.md`) before building on it.
-- `Resume` — current-state snapshot while mid-flight. See `./body.md`.
-- `Why Discarded` — reason when discarded. See `./body.md`.
-
-## Artifact handling
-
-Issue-backed spikes should link to evidence or output files instead of assuming a local evidence directory.
-
-Acceptable links include:
-
-- A throwaway branch.
-- A gist or scratch repository.
-- A local projection path when explicitly configured.
-- Benchmark output.
-- Screenshots or traces.
-- Prototype code under a clearly marked scratch location.
-
-PoC code should remain throwaway. If the outcome should become production code, create a follow-up `task` rather than turning the spike into the task.
+Add any other sections the exploration needs and fill them in; any premise they rest on must meet the runtime-grounded-claim rule in `./body.md`. Link throwaway evidence (a scratch branch, gist, benchmark output, screenshots, or prototype under a clearly marked scratch location) rather than assuming a local evidence directory.
 
 ## Completion criteria
 
-A spike is complete when:
-
-- The hypothesis is answered or invalidated.
-- Evidence is linked or summarized.
-- The decision impact is clear.
-
-Completion does not mean production code shipped. It means the exploration produced an answer.
+A spike is complete when the hypothesis is answered or invalidated, the evidence is linked or summarized, and the decision impact is clear — not when production code ships. If time expires, record what remains unanswered; expiry alone is not completion.
 
 ## Follow-up work
 
-Common follow-ups:
-
-- `task` — implement the chosen approach.
-- `spec` — record a contract or decision discovered by the spike.
-- `research` — perform deeper written investigation.
-- `review` — capture a gap, question, or finding surfaced by the spike.
-
-Link follow-ups visibly in the issue body or comments.
+PoC code stays throwaway. If the outcome should become production code, create a follow-up `task` rather than turning the spike into it. Common follow-ups: `task` (implement), `spec` (record a discovered contract), `research` (deeper investigation), `review` (a surfaced gap or question). Link follow-ups visibly.
 
 ## Common mistakes
 
 - Using `spike` for production implementation work.
 - Treating the spike as complete without evidence.
-- Letting throwaway PoC code become production code without a follow-up task.
-- Using spike when a written `research` item would be enough.
-
-## Do not
-
-- Do not treat a spike as complete just because time expired; record what remains unanswered.
+- Letting throwaway PoC code become production without a follow-up task.
+- Using `spike` when a written `research` item would be enough.

@@ -25,7 +25,7 @@ Recommended sections:
 - `Mode` — `comparative` or `single`.
 - `Options` — alternatives being compared, one per bullet (required when mode is `comparative`).
 
-Optional reusable sections (see `./body.md`):
+Optional sections:
 
 - `Scope` — in-scope and out-of-scope boundaries.
 - `Sources To Check` — initial source list or search plan.

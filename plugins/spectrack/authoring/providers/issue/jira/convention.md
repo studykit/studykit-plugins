@@ -6,7 +6,7 @@ Provider-wide convention rules for issue-backed items stored as Jira issues.
 
 Use these rules for issue-backed items stored in Jira.
 
-This file defines Jira-wide issue writing rules only. Jira body anti-patterns belong in `./anti-patterns.md`. Type-specific body structure belongs in the matching Jira issue type authoring file.
+This file defines Jira-wide issue writing rules only. Jira body anti-patterns belong in `./anti-patterns.md`.
 
 ## Body markup
 

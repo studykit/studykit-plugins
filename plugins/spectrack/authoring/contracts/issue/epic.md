@@ -45,8 +45,8 @@ Recommended sections:
 Optional sections:
 
 - `Acceptance Criteria` — integration outcome not naturally owned by a single member issue; do not restate per-member criteria.
-- `Resume` — current-state snapshot while open. See `./body.md`.
-- `Why Discarded` — reason when discarded. See `./body.md`.
+- `Resume` — current-state snapshot while open.
+- `Why Discarded` — reason when discarded.
 
 ## Relationship to knowledge pages
 

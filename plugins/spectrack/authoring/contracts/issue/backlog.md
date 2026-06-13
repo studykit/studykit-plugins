@@ -44,8 +44,8 @@ Required:
 Optional:
 
 - `Context` — the backdrop a reader needs before the item makes sense, when it
-  is not obvious from `Description`. See `./body.md`.
-- `Related` — references that help interpret the item. See `./body.md`.
+  is not obvious from `Description`.
+- `Related` — references that help interpret the item.
 
 Deferred — do **not** author these now:
 
