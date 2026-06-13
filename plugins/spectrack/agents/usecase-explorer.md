@@ -47,8 +47,7 @@ issue side of `usecase`. They define the body shape and the
 
 For every ref in `usecase-refs`:
 
-1. Fetch via `spectrack issue fetch <ref>` (verb syntax at
-   `<runbook>`'s `issue-fetch` intent).
+1. Fetch via `spectrack issue fetch <ref>`.
 2. Read the cached issue body. You do not need the comment thread
    for exploration — the body carries the agreed shape.
 

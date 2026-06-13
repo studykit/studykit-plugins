@@ -70,7 +70,7 @@ class GitHubIssueBackend:
             "--cache-policy",
             choices=_CACHE_FETCH_POLICIES,
             default=CACHE_POLICY_DEFAULT,
-            help="provider cache policy",
+            help="default reuses the fresh local copy; refresh forces a remote re-read",
         )
         parser.add_argument(
             "references",
@@ -180,7 +180,7 @@ class GitHubIssueBackend:
         )
         parser.add_argument(
             "query",
-            help="GitHub issue search query (passed to `gh issue list --search`)",
+            help="GitHub issue search query passed to `gh issue list --search`",
         )
 
     def run_search(
@@ -582,6 +582,11 @@ class GitHubIssueBackend:
         update = subparsers.add_parser(
             "update",
             help="update one GitHub issue body from a body file",
+            epilog=(
+                "For a partial edit, seed --body-file from the cached body "
+                "and change only the affected sections rather than "
+                "re-authoring the whole body."
+            ),
         )
         update.add_argument("--type", default="task", help="workflow artifact type")
         update.add_argument(

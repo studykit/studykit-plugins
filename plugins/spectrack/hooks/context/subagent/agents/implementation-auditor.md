@@ -1,14 +1,13 @@
-<runbook>
+<commands>
 
-Per-verb syntax (flags, body-file lifecycle, conflict handling)
-lives in the runbook at
-`{{SPECTRACK_RUNBOOK_DIR}}/<intent>/{{SPECTRACK_ISSUE_PROVIDER}}.md`:
+Per-verb flags and usage: `spectrack issue <verb> --help`. The verbs
+this agent uses:
 
-- `issue-fetch` — fetch the implementation issue. Read the cached body
+- `fetch` — fetch the implementation issue. Read the cached body
   and every `comment-*.md` projection.
-- `issue-comment` — append the single audit comment carrying
+- `comment` — append the single audit comment carrying
   `## Verdict` / `## Reasoning` / `## Actionable` / `## Notes`. This is
   the only write this agent performs; on append failure the agent
   falls back to a local sidecar file.
 
-</runbook>
+</commands>

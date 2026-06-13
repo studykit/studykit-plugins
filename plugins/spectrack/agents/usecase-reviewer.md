@@ -52,8 +52,7 @@ to the actors registry.
 
 For every ref in `usecase-refs`:
 
-1. Fetch via `spectrack issue fetch <ref>` (verb syntax at
-   `<runbook>`'s `issue-fetch` intent).
+1. Fetch via `spectrack issue fetch <ref>`.
 2. Read the cached issue body and every `comment-*.md` projection.
 
 For every ref in `prior-review-refs`, fetch the same way and read
@@ -128,8 +127,7 @@ Before drafting and publishing each finding:
 
 When skipping against a prior open `review` (case 1), append a
 single comment on that prior review naming the new run and the
-duplicate concern. Use `spectrack issue comment` (verb syntax at
-`<runbook>`'s `issue-comment` intent). Comment body shape (first
+duplicate concern. Use `spectrack issue comment`. Comment body shape (first
 line is the conclusion; details follow):
 
 ```markdown
@@ -172,16 +170,15 @@ For each finding that survived deduplication:
      rewrite, modeled on the examples in the use case criteria file.
 
 2. **Publish the `review` issue** via `spectrack issue new --type
-   review` (verb syntax at `<runbook>`'s `issue-new` intent). Pass:
+   review`. Pass:
 
    - `--title` — short concern phrase ("UC-<ref>: vague situation",
      "UC-<ref>: implementation leak in flow").
    - `--body-file` — the draft from step 1.
    - For each use case the concern targets, add the relationship
      so the use case is `blocked_by` the new review. Apply it per
-     the provider relationships convention and the runbook's
-     `issue-new` intent. Overlap findings target every use case
-     the finding spans.
+     the provider relationships convention. Overlap findings target
+     every use case the finding spans.
    - `--label usecase-reviewer` when the configured backend supports
      labels; this is how `source` is encoded at publish time when the
      provider doesn't carry a `source` field natively.

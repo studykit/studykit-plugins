@@ -40,7 +40,7 @@ Each `review` item contains **one concern** — do not pack several side effects
 
    Reference the causing workflow ref in `Description` so the reviewer can trace back without you needing a separate field.
 
-3. Publish via `spectrack issue new --type review` (verb syntax at `<runbook>`'s `issue-new` intent). Pass:
+3. Publish via `spectrack issue new --type review`. Pass:
 
    - `--title` — short concern phrase ("Missing domain concept: meeting summary").
    - `--body-file` — the temp file from step 2.

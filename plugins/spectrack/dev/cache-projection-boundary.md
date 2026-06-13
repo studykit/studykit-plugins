@@ -8,9 +8,9 @@ frontmatter fields, or pending-write shapes.
 
 - Main-facing authoring docs describe only semantic authoring behavior that a
   content-writing assistant needs.
-- Main-session policy detail files under `authoring/runbook/`
-  describe script selection, required inputs, result handoff, and the rule that
-  provider/cache mutations go through workflow scripts.
+- The issue CLI's `--help` output (`spectrack issue <verb> --help`)
+  describes verb selection, required inputs, and result handoff, and carries
+  the rule that provider/cache mutations go through the workflow scripts.
 - Contributor implementation work uses provider/cache code and tests as the
   source of truth for projection shape.
 - If projection shape changes, update the relevant scripts and tests in the same

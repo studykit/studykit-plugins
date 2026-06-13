@@ -52,10 +52,8 @@ task `completed`, then run the End-Iteration procedure below.
    in-session when possible:
 
    - **Resolve in place** — apply the suggested change to the
-     `usecase` issue body via `spectrack issue update` (verb syntax at
-     `<runbook>`'s `issue-update` intent), then close the `review`
-     issue via `spectrack issue update --state closed` (or the
-     equivalent state verb at `<runbook>`'s `issue-state` intent).
+     `usecase` issue body via `spectrack issue update`, then close the `review`
+     issue via `spectrack issue update --state closed`.
      Show the user the before/after wording before applying the
      body change.
    - **Defer** — leave the `review` issue open. The user picks it up

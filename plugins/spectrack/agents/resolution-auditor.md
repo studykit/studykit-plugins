@@ -58,8 +58,7 @@ plausibility alone.
 
 1. **Source the claims.**
    - Draft mode: read the draft body file directly.
-   - Published mode: fetch the issue with `spectrack issue fetch <issue-ref>`
-     (verb syntax at `<runbook>`'s `issue-fetch` intent) and read the cached
+   - Published mode: fetch the issue with `spectrack issue fetch <issue-ref>` and read the cached
      body projection and every `comment-*.md`. The recorded cause/approach may
      live in a comment, not only the body.
 
@@ -217,8 +216,7 @@ reasoning or actionable sections — those live only in the sidecar.
 
 ### Published mode — verdict comment plus structured return
 
-Append a single comment to the issue via `spectrack issue comment` (verb syntax
-at `<runbook>`'s `issue-comment` intent). One comment per run. The comment body
+Append a single comment to the issue via `spectrack issue comment`. One comment per run. The comment body
 is the review above under these headers, in this order:
 
 ```markdown

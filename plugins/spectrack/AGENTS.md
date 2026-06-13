@@ -13,10 +13,12 @@ points at the doc with the full detail.
 All issue verbs route through `scripts/issue/dispatch.py` (verb table in its
 module docstring); provider behavior lives in `scripts/issue/github/` and
 `scripts/issue/jira/`. Hooks enter at `hooks/scripts/hook_claude.py` and
-inject Markdown fragments from `hooks/context/`. A feature change usually
-spans the dispatch surface, the provider drivers, the runbook docs under
-`authoring/runbook/`, tests, and a dual Claude+Codex version bump — module
-responsibilities and the full checklist are in `dev/code-map.md`.
+inject Markdown fragments from `hooks/context/`. CLI usage is self-documenting
+— `spectrack issue --help` lists the backend's verbs and `spectrack issue
+<verb> --help` shows each verb's flags — so a feature change spans the dispatch
+surface, the provider drivers (including their argparse `--help` wording),
+tests, and a dual Claude+Codex version bump — module responsibilities and the
+full checklist are in `dev/code-map.md`.
 
 ## Tests
 
@@ -55,8 +57,9 @@ tests as the source of truth.
 Before writing or editing any `agents/<name>.md` or `skills/<name>/SKILL.md`,
 read the context the hooks inject on the surface you are authoring —
 `spectrack preview_context` prints it byte-for-byte. Two rules you must not
-miss: refer to injected blocks and runbook intents by tag instead of
-restating provider command shapes, and never assume cross-surface context
-(skills see `main/...` blocks, subagents see `subagent/...` blocks). The
+miss: refer to injected blocks by tag and point at `spectrack issue <verb>
+--help` for CLI usage instead of restating provider command shapes, and never
+assume cross-surface context (skills see `main/...` blocks, subagents see
+`subagent/...` blocks). The
 injection layout, `preview_context` flags, and the full rules are in
 `dev/authoring-injected-context.md`.

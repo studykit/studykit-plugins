@@ -21,7 +21,7 @@ if str(_HOOK_SCRIPTS_DIR) not in sys.path:
 
 import hook  # noqa: E402
 from main_context import (  # noqa: E402
-    _merge_runbook_blocks,
+    _merge_commands_blocks,
     render as render_template,
 )
 from command import CommandRequest, CommandResult  # noqa: E402
@@ -75,13 +75,6 @@ def main_context_fragment(name: str) -> str:
     return (_MAIN_CONTEXT_ROOT / name).read_text(encoding="utf-8").strip()
 
 
-def optional_main_context_fragment(name: str) -> str:
-    path = _MAIN_CONTEXT_ROOT / name
-    if not path.exists():
-        return ""
-    return path.read_text(encoding="utf-8").strip()
-
-
 def _composed_snippet(group: str, provider: str) -> str:
     """Mirror :func:`main_context._read_snippet` for assertion helpers.
 
@@ -114,7 +107,6 @@ def expected_session_start_context(
     issue_kind: str = "github",
 ) -> str:
     text = main_context_fragment("main/session-start.md")
-    runbook_dir = _PLUGIN_ROOT / "authoring" / "runbook"
     launcher_block = main_context_fragment(f"snippets/launcher/{runtime}.md")
     if runtime == "codex":
         launcher_block = launcher_block.replace(
@@ -124,10 +116,6 @@ def expected_session_start_context(
         "SNIPPET_LAUNCHER": launcher_block,
         "SNIPPET_AUTHORING": main_context_fragment("snippets/authoring.md"),
         "SNIPPET_PRD_PATH": main_context_fragment("snippets/prd-path.md"),
-        "SNIPPET_PROVIDER_RUNBOOK": optional_main_context_fragment(
-            f"snippets/runbook/{issue_kind}.md"
-        ),
-        "SPECTRACK_RUNBOOK_DIR": str(runbook_dir),
         "SPECTRACK_ISSUE_PROVIDER": issue_kind,
     })
     return _wrap_policy(rendered)
@@ -140,7 +128,6 @@ def expected_subagent_start_context(
     agent_type: str | None = None,
 ) -> str:
     text = main_context_fragment("subagent/session-start.md")
-    runbook_dir = _PLUGIN_ROOT / "authoring" / "runbook"
     launcher_block = main_context_fragment(f"snippets/launcher/{runtime}.md")
     if runtime == "codex":
         launcher_block = launcher_block.replace(
@@ -150,7 +137,6 @@ def expected_subagent_start_context(
         "SNIPPET_LAUNCHER": launcher_block,
         "SNIPPET_AUTHORING": main_context_fragment("snippets/authoring.md"),
         "SNIPPET_PRD_PATH": main_context_fragment("snippets/prd-path.md"),
-        "SPECTRACK_RUNBOOK_DIR": str(runbook_dir),
         "SPECTRACK_ISSUE_PROVIDER": issue_kind,
     })
     agent_name = (agent_type or "").rsplit(":", 1)[-1].strip().lower() if agent_type else ""
@@ -159,10 +145,9 @@ def expected_subagent_start_context(
         template = main_context_fragment("subagent/agents/issue-implementer.md")
         agent_block = render_template(template, {
             "SNIPPET_COMMIT_PREFIX": main_context_fragment("snippets/commit-prefix.md"),
-            "SPECTRACK_RUNBOOK_DIR": str(runbook_dir),
             "SPECTRACK_ISSUE_PROVIDER": issue_kind,
         })
-    merged = _merge_runbook_blocks(rendered, agent_block)
+    merged = _merge_commands_blocks(rendered, agent_block)
     return _wrap_policy(merged)
 
 
@@ -905,13 +890,12 @@ def test_session_start_injects_policy_for_configured_project(
     assert context == expected_session_start_context(
         runtime=runtime, issue_kind="github"
     )
-    runbook_dir = _PLUGIN_ROOT / "authoring" / "runbook"
     assert "<policy>" in context
     assert "</policy>" in context
     assert "<launcher>" in context
     assert "<authoring-resolver>" in context
     assert "<prd-path>" in context
-    assert "<runbook>" in context
+    assert "<commands>" in context
     assert "<bash>" in context
     assert "## workflow policy" not in context
     if runtime == "claude":
@@ -921,18 +905,14 @@ def test_session_start_injects_policy_for_configured_project(
         assert "{{SPECTRACK_PLUGIN_ROOT}}" not in context
     assert "read-only" in context
     assert "spectrack mustread" in context
-    assert f"{runbook_dir}/<intent>/github.md" in context
-    assert "- `issue-fetch`" in context
-    assert "- `issue-write`" in context
-    assert "- `issue-new`" in context
-    assert "- `issue-link`" in context
-    assert "{{SPECTRACK_RUNBOOK_DIR}}" not in context
+    # CLI usage is discovered via --help, not an injected runbook tree.
+    assert "spectrack issue --help" in context
+    assert "spectrack issue <verb> --help" in context
+    assert "authoring/runbook" not in context
     assert "{{SNIPPET_LAUNCHER}}" not in context
     assert "{{SNIPPET_AUTHORING}}" not in context
     assert "{{SNIPPET_PRD_PATH}}" not in context
     assert "{{SPECTRACK_ISSUE_PROVIDER}}" not in context
-    assert "jira.md" not in context
-    assert "filesystem.md" not in context
     assert "workflow-operator" not in context
     assert "Delegate workflow operations" not in context
     assert "codex-operator-reuse" not in context
@@ -1081,10 +1061,8 @@ def test_session_start_uses_filesystem_issue_policy_for_local_artifacts(
     assert context == expected_session_start_context(
         runtime=runtime, issue_kind="filesystem"
     )
-    runbook_dir = _PLUGIN_ROOT / "authoring" / "runbook"
-    assert f"{runbook_dir}/<intent>/filesystem.md" in context
-    assert "github.md" not in context
-    assert "jira.md" not in context
+    assert "spectrack issue --help" in context
+    assert "authoring/runbook" not in context
 
 
 def test_session_start_discovers_config_from_nested_project_path(
@@ -1187,7 +1165,7 @@ def test_session_start_records_codex_subagent_identity_and_emits_nothing(
     assert not subagent_state.exists()
 
 
-def test_session_start_uses_jira_provider_writes_pointer_for_jira_config(
+def test_session_start_emits_commands_pointer_for_jira_config(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -1197,29 +1175,13 @@ def test_session_start_uses_jira_provider_writes_pointer_for_jira_config(
 
     payload = json.loads(out)
     context = payload["hookSpecificOutput"]["additionalContext"]
-    runbook_dir = _PLUGIN_ROOT / "authoring" / "runbook"
-    assert f"{runbook_dir}/<intent>/jira.md" in context
-    assert "- `issue-fetch`" in context
-    assert "- `issue-write`" in context
-    # issue-attach is a Jira-only intent — injected only under the Jira provider.
-    assert "- `issue-attach`" in context
-    assert "github.md" not in context
-    assert "filesystem.md" not in context
-
-
-def test_session_start_omits_issue_attach_intent_for_github_config(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    _write_config(tmp_path)
-
-    out = _run_session_start(tmp_path, monkeypatch, runtime="codex")
-
-    payload = json.loads(out)
-    context = payload["hookSpecificOutput"]["additionalContext"]
-    # Attachments are Jira-only; the GitHub session must not learn the intent exists.
-    assert "- `issue-fetch`" in context
-    assert "issue-attach" not in context
+    # The <commands> block is provider-agnostic: it points at --help, which is
+    # backend-aware on its own. Provider-only verbs (e.g. Jira `attach`) are no
+    # longer enumerated in injected context.
+    assert "<commands>" in context
+    assert "spectrack issue --help" in context
+    assert "spectrack issue <verb> --help" in context
+    assert "authoring/runbook" not in context
 
 
 def test_session_start_skips_claude_subagent_payload(
@@ -1308,11 +1270,11 @@ def test_claude_subagent_start_injects_issue_implementer_agent_block(
     )
     assert "<commit-prefix>" in context
     assert "## issue-implementer subagent context" not in context
-    assert "issue-fetch" in context
-    assert "issue-update" in context
+    assert "- `fetch`" in context
+    assert "- `update`" in context
 
 
-def test_subagent_start_emits_single_runbook_for_issue_implementer(
+def test_subagent_start_emits_single_commands_for_issue_implementer(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -1323,7 +1285,7 @@ def test_subagent_start_emits_single_runbook_for_issue_implementer(
     captured = io.StringIO()
     assert claude_main(
         payload={
-            "session_id": "claude-session-impl-single-runbook",
+            "session_id": "claude-session-impl-single-commands",
             "transcript_path": "/tmp/transcript.jsonl",
             "cwd": str(tmp_path),
             "hook_event_name": "SubagentStart",
@@ -1335,16 +1297,14 @@ def test_subagent_start_emits_single_runbook_for_issue_implementer(
 
     payload = json.loads(captured.getvalue())
     context = payload["hookSpecificOutput"]["additionalContext"]
-    assert context.count("<runbook>") == 1
-    assert context.count("</runbook>") == 1
-    for intent in (
-        "issue-fetch",
-        "issue-update",
-    ):
-        assert f"`{intent}`" in context
+    assert context.count("<commands>") == 1
+    assert context.count("</commands>") == 1
+    # The base <commands> pointer is replaced by the agent's verb-scoped block.
+    for verb in ("fetch", "update"):
+        assert f"- `{verb}`" in context
 
 
-def test_subagent_start_emits_single_runbook_for_generic_agent(
+def test_subagent_start_emits_single_commands_for_generic_agent(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -1355,7 +1315,7 @@ def test_subagent_start_emits_single_runbook_for_generic_agent(
     captured = io.StringIO()
     assert claude_main(
         payload={
-            "session_id": "claude-session-generic-runbook",
+            "session_id": "claude-session-generic-commands",
             "transcript_path": "/tmp/transcript.jsonl",
             "cwd": str(tmp_path),
             "hook_event_name": "SubagentStart",
@@ -1367,24 +1327,25 @@ def test_subagent_start_emits_single_runbook_for_generic_agent(
 
     payload = json.loads(captured.getvalue())
     context = payload["hookSpecificOutput"]["additionalContext"]
-    assert context.count("<runbook>") == 1
-    assert context.count("</runbook>") == 1
-    assert "issue-fetch" in context
-    for intent in ("issue-write", "issue-new", "issue-link", "issue-update", "issue-state"):
-        assert intent not in context
+    assert context.count("<commands>") == 1
+    assert context.count("</commands>") == 1
+    # A generic agent gets the base --help pointer, not per-verb scoping bullets.
+    assert "spectrack issue --help" in context
+    assert "- `fetch`" not in context
+    assert "- `update`" not in context
 
 
-def test_merge_runbook_blocks_drops_empty_runbook() -> None:
+def test_merge_commands_blocks_drops_empty_commands() -> None:
     base = (
         "<launcher>\nlauncher body\n</launcher>\n\n"
-        "<runbook>\nbase runbook body\n</runbook>"
+        "<commands>\nbase commands body\n</commands>"
     )
-    per_agent = "<commit-prefix>\ncommit-prefix body\n</commit-prefix>\n\n<runbook>\n   \n</runbook>"
+    per_agent = "<commit-prefix>\ncommit-prefix body\n</commit-prefix>\n\n<commands>\n   \n</commands>"
 
-    merged = _merge_runbook_blocks(base, per_agent)
+    merged = _merge_commands_blocks(base, per_agent)
 
-    assert "<runbook>" not in merged
-    assert "</runbook>" not in merged
+    assert "<commands>" not in merged
+    assert "</commands>" not in merged
     assert "<commit-prefix>" in merged
     assert "<launcher>" in merged
 
