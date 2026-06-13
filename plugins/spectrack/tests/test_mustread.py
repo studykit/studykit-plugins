@@ -344,6 +344,25 @@ def test_diagnosis_types_emit_resolution_audit_note(artifact_type: str) -> None:
     assert "resolution-auditor" in RESOLUTION_AUDIT_TRIGGER_NOTE
 
 
+@pytest.mark.parametrize("artifact_type", ["task", "bug"])
+def test_forward_notes_are_runtime_specific(artifact_type: str) -> None:
+    claude = "\n".join(
+        resolve_authoring(artifact_type, mode="forward", runtime="claude").notes
+    )
+    codex = "\n".join(
+        resolve_authoring(artifact_type, mode="forward", runtime="codex").notes
+    )
+    # Claude exposes the AskUserQuestion tool and a Plan subagent; Codex has
+    # neither, so its notes must not name them.
+    assert "AskUserQuestion" in claude
+    assert "AskUserQuestion" not in codex
+    assert "Plan subagent" in claude
+    assert "Plan subagent" not in codex
+    # Both runtimes still gate the resolution audit on user consent.
+    assert "resolution-auditor" in claude
+    assert "resolution-auditor" in codex
+
+
 @pytest.mark.parametrize("artifact_type", ["spike", "epic"])
 def test_non_diagnosis_types_omit_resolution_audit_note(artifact_type: str) -> None:
     resolution = resolve_authoring(artifact_type)
