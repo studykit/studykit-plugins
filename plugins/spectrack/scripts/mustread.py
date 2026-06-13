@@ -53,103 +53,28 @@ PLAN_MODE_TYPES = {"task", "bug"}
 
 # Authoring intent for task/bug content. Unlike side/scope/target, the
 # resolver cannot infer it from the artifact — the author decides which one
-# applies (planning now / capturing for later / recording already-done work).
+# applies (capturing not-yet-done work / recording already-done work).
 # It is therefore required (no default) for task/bug content authoring and
 # rejected on every other surface.
-AUTHORING_MODES = ("forward", "backlog", "retroactive")
-
-def _ask_user_phrase(runtime: str) -> str:
-    """How to prompt the user before spawning an audit subagent.
-
-    Claude exposes the AskUserQuestion tool; Codex has no equivalent, so the
-    note names the plain action there.
-    """
-    return "ask the user" if runtime == "codex" else "ask the user via AskUserQuestion"
-
-
-def _plan_mode_note(runtime: str) -> str:
-    """Forward-mode plan note. Claude can delegate plan design to the Plan
-    subagent; Codex has no planning agent, so it leans on plan mode."""
-    if runtime == "codex":
-        planner = "Use plan mode to design the plan"
-    else:
-        planner = (
-            "Design the plan with a planning agent — spawn the Plan subagent, "
-            "or enter plan mode when the runtime offers it"
-        )
-    return (
-        "Forward mode: the change is not yet implemented, so the body's Design "
-        "Decision / Implementation Steps / Acceptance Criteria / Verification "
-        "must record a plan the user explicitly approved before publishing. "
-        f"{planner}, then present it to the user and get explicit approval "
-        "before drafting the body. If the user already agreed to a concrete "
-        "plan in this conversation, record that agreed plan instead of "
-        "re-running a planning pass."
-    )
-
-
-PLAN_MODE_TRIGGER_NOTE = _plan_mode_note("claude")
+AUTHORING_MODES = ("backlog", "retroactive")
 
 BACKLOG_TRIGGER_NOTE = (
-    "Backlog mode: capture the item's intent for a later planning pass, "
-    "not an implementation plan now. Do not enter plan mode and do not "
-    "author the planning sections (Design Decision, Implementation Steps, "
-    "Verification). Draft Description (and Context when it helps); the "
-    "type's other normally-required sections (Acceptance Criteria, Unit "
-    "Test Strategy, and — for a bug — Reproduction) are deferred until the "
-    "item is planned. Leave a one-line note in the body that they are "
-    "pending the planning pass. Skip the size and resolution audits; they "
-    "run when the item is later picked up in forward mode. Publish in the "
-    "backend's open/unresolved state."
+    "Backlog mode: this is the open, not-yet-done spec. Record at least "
+    "Description; add Context, Acceptance Criteria, and — for a bug — "
+    "Reproduction to whatever level of detail is useful, from a brief "
+    "capture to a complete spec (both are valid). Do not work out a cause, "
+    "an approach, or implementation steps in the body — those are decided "
+    "against the current code when the item is picked up for implementation. "
+    "Publish in the backend's open/unresolved state."
 )
 
 RETROACTIVE_TRIGGER_NOTE = (
     "Retroactive mode: the work already landed, so the body states facts, "
-    "not intent, and there is no forward plan to author — do not enter "
-    "plan mode. Description says what changed and why; Implementation "
-    "Steps records how it was actually done; Acceptance Criteria and "
-    "Verification record the checks that already ran. Skip the size and "
-    "resolution audits (they guard not-yet-done work). Publish together "
-    "with the transition to the backend's resolved state."
+    "not intent. Description says what changed and why; record "
+    "the diagnosed cause when relevant and how it was actually done; "
+    "Acceptance Criteria records the checks that ran and their outcomes. "
+    "Publish together with the transition to the backend's resolved state."
 )
-
-TASK_AUDIT_TYPES = {"task"}
-
-def _task_audit_note(runtime: str) -> str:
-    return (
-        "After the body file is drafted, before invoking the publish script, "
-        f"{_ask_user_phrase(runtime)} whether to run the task-size-auditor "
-        "subagent against the draft. Spawn task-size-auditor only when the "
-        "user accepts."
-    )
-
-
-TASK_AUDIT_TRIGGER_NOTE = _task_audit_note("claude")
-
-RESOLUTION_AUDIT_TYPES = {"task", "bug"}
-
-def _resolution_audit_note(runtime: str) -> str:
-    return (
-        "After the body file is drafted, before invoking the publish script, "
-        f"{_ask_user_phrase(runtime)} whether to run the resolution-auditor "
-        "subagent against the draft. Spawn resolution-auditor only when the "
-        "user accepts. When the user accepts, pass it the draft body file path "
-        "and the artifact type; it validates the recorded root cause and "
-        "proposed approach against the actual code and git history and writes "
-        "its verdict to a sidecar file beside the draft. If the verdict is "
-        "`ok`, continue to publish. If it is `wrong-cause`, "
-        "`ineffective-approach`, or `weak-diagnosis`, do not publish: revise "
-        "the draft's recorded cause and approach to address the sidecar's "
-        "Actionable section (rewrite the cause/approach, or settle the named "
-        "execution-contingent claim), then re-run resolution-auditor against "
-        "the revised draft. Repeat until the verdict is `ok`, up to 3 audit "
-        "rounds total; if it is still not `ok` after the third round, stop and "
-        "surface the latest sidecar to the user. A `unverifiable` verdict is "
-        "not a re-plan trigger — surface it and let the user decide."
-    )
-
-
-RESOLUTION_AUDIT_TRIGGER_NOTE = _resolution_audit_note("claude")
 
 RETROACTIVE_PUBLISH_STATE_GITHUB = (
     "Retroactive issues that track work already done should be "
@@ -421,13 +346,6 @@ def _common_parts(
         case _:  # (_, None, "knowledge")
             parts = ["contracts/knowledge/body.md"]
 
-    if mode == "backlog":
-        # Backlog capture defers the forward plan, so the heavy planning
-        # contracts (the type body shape, decomposition guidance) are
-        # replaced by the lightweight backlog contract.
-        parts.append("contracts/issue/backlog.md")
-        return parts
-
     if artifact_type in PRD_COMPONENT_TYPES:
         parts.append("contracts/prd.md")
     if artifact_type in DUAL_TYPES:
@@ -442,6 +360,11 @@ def _common_parts(
             "contracts/usecase-abstraction-guard.md",
             "contracts/knowledge/actors.md",
         ])
+    if mode == "backlog":
+        # A backlog item is the open spec: the type contract above defines the
+        # spec sections; backlog.md frames how to capture them (brief to
+        # detailed, no cause/approach/steps in the body).
+        parts.append("contracts/issue/backlog.md")
     return parts
 
 
@@ -477,7 +400,7 @@ def _resolve_mode(
     if value is None:
         raise ResolverError(
             "task/bug content authoring requires --mode "
-            "(forward, backlog, or retroactive)"
+            "(backlog or retroactive)"
         )
     if value not in AUTHORING_MODES:
         raise ResolverError(f"unsupported authoring mode: {value}")
@@ -502,12 +425,6 @@ def _common_notes(
             notes.append(BACKLOG_TRIGGER_NOTE)
         elif mode == "retroactive":
             notes.append(RETROACTIVE_TRIGGER_NOTE)
-        else:  # forward
-            notes.append(_plan_mode_note(runtime))
-            if artifact_type in TASK_AUDIT_TYPES:
-                notes.append(_task_audit_note(runtime))
-            if artifact_type in RESOLUTION_AUDIT_TYPES:
-                notes.append(_resolution_audit_note(runtime))
     return notes
 
 
@@ -619,7 +536,7 @@ def build_parser() -> argparse.ArgumentParser:
         choices=AUTHORING_MODES,
         help=(
             "authoring intent; required for task/bug content authoring: "
-            "forward (planning now), backlog (capture for later), or "
+            "backlog (open spec, not yet done) or "
             "retroactive (already done)"
         ),
     )
