@@ -36,6 +36,7 @@ def _jira_issue_payload(status_name: str) -> dict[str, object]:
             "created": "2026-05-15T09:00:00.000+0900",
             "updated": "2026-05-15T10:00:00.000+0900",
             "status": {"name": status_name, "statusCategory": {"key": "indeterminate"}},
+            "issuetype": {"name": "Task"},
             "comment": {"comments": []},
             "issuelinks": [],
         },
@@ -114,10 +115,11 @@ def test_jira_write_issue_bundle_renders_state_markdown(tmp_path: Path) -> None:
 
     state_text = cache.state_file(site, "TEST-1234").read_text(encoding="utf-8")
     assert "status: Resolved" in state_text
+    assert "type: Task" in state_text
     assert "resolution: Done" in state_text
     assert "assignee: Pascal" in state_text
     assert "backend" in state_text and "infra" in state_text
-    assert "TEST-1234 — Resolved (Done), assignee Pascal" in state_text
+    assert "TEST-1234 — Task, Resolved (Done), assignee Pascal" in state_text
 
 
 def test_jira_state_markdown_marks_unresolved_and_unassigned(tmp_path: Path) -> None:
@@ -129,8 +131,8 @@ def test_jira_state_markdown_marks_unresolved_and_unassigned(tmp_path: Path) -> 
     )
 
     state_text = cache.state_file(site, "TEST-1234").read_text(encoding="utf-8")
-    assert "resolution:" in state_text  # null, not omitted
-    assert "TEST-1234 — Open (unresolved), assignee unassigned" in state_text
+    assert "resolution: Unresolved" in state_text  # Jira's empty-resolution label, not null
+    assert "TEST-1234 — Task, Open (Unresolved), assignee unassigned" in state_text
 
 
 def test_jira_write_issue_bundle_does_not_emit_metadata_file(tmp_path: Path) -> None:

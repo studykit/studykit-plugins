@@ -14,24 +14,29 @@ def render_jira_state_markdown(
 ) -> str:
     """Render native Jira state as a readable ``state.md`` projection.
 
-    Surfaces ``status`` / ``resolution`` / ``assignee`` / ``labels`` so a fetch
-    caller (and the LLM) can read lifecycle state without opening the internal
-    native ``.issue.json``. Frontmatter carries the machine-readable fields; the
-    body is a one-line human summary. Always written — every issue has a status.
+    Surfaces ``status`` / ``type`` / ``resolution`` / ``assignee`` / ``labels``
+    so a fetch caller (and the LLM) can read lifecycle state and the issue type
+    without opening the internal native ``.issue.json``. Frontmatter carries the
+    machine-readable fields; the body is a one-line human summary. Always
+    written — every issue has a status.
     """
 
     status = _normalize_optional(normalized.get("state")) or "unknown"
-    resolution = _normalize_optional(normalized.get("resolution"))
+    issue_type = _normalize_optional(normalized.get("type"))
+    # Jira leaves resolution unset until an issue is resolved; mirror the UI's
+    # "Unresolved" label (also the JQL token for an empty resolution) instead of null.
+    resolution = _normalize_optional(normalized.get("resolution")) or "Unresolved"
     assignee = _jira_person_display_name(normalized.get("assignee"))
     labels = [str(label) for label in normalized.get("labels") or [] if label is not None]
     frontmatter: dict[str, Any] = {
         "status": status,
+        "type": issue_type,
         "resolution": resolution,
         "assignee": assignee,
         "labels": labels,
     }
     summary = (
-        f"{issue_key} — {status} ({resolution or 'unresolved'}), "
+        f"{issue_key} — {issue_type or 'issue'}, {status} ({resolution}), "
         f"assignee {assignee or 'unassigned'}"
     )
     return _format_markdown(frontmatter, summary + "\n")
