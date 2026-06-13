@@ -52,7 +52,7 @@ Update the CI page when a work item changes the verification contract — e.g., 
 
 - Architecture's `Test Strategy` — why the test layers exist.
 - CI's `How To Run Tests` — how to run them.
-- Task's / Bug's `Unit Test Strategy` — task-specific verification / regression coverage for that bug.
+- Task's / Bug's `Acceptance Criteria` — task-specific verification / regression coverage, captured as a completion criterion.
 
 Do not duplicate the full CI command table into task or architecture bodies; link to the CI page instead.
 

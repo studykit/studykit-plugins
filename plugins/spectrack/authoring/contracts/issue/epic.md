@@ -28,7 +28,7 @@ Do not create an epic when:
 - The decomposition has only 2–3 task-typed slices and the parent body would naturally pass as a task — use a parent task with subtasks per `./decomposition-patterns.md` instead.
 - Members are unrelated and have no shared narrative or anchor.
 
-Parent task vs epic discriminator: the epic body cannot stand as a task. If a draft parent body would have a meaningful `Unit Test Strategy` and `Acceptance Criteria` at the parent level, the parent is a task, not an epic. See `./decomposition-patterns.md`.
+Parent task vs epic discriminator: the epic body cannot stand as a task. If a draft parent body would have meaningful integration-level `Acceptance Criteria` at the parent level, the parent is a task, not an epic. See `./decomposition-patterns.md`.
 
 The epic body is the home for shared narrative across member issues (decisions, integration constraints, shared blockers, sequencing, scope changes). See the Shared narrative section in `./decomposition-patterns.md`.
 
@@ -81,6 +81,6 @@ An epic is complete when:
 
 ## Do not
 
-- Do not put implementation details or unit test strategy in the epic.
+- Do not put implementation details or member-level acceptance criteria in the epic.
 - Do not discard member issues automatically when discarding an epic.
 - Do not store durable design decisions only in the epic; update the relevant knowledge page.

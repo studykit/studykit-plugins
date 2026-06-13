@@ -38,6 +38,8 @@ Use the issue body for durable rationale that defines the current work:
 - Why the selected scope or boundary matters.
 - Why a removal, reversal, or responsibility split should not be undone later.
 
+When the type provides a Context section, that section is the home for this motivation and rationale.
+
 Use comments for rationale that belongs to the work timeline:
 
 - Why implementation direction changed.
