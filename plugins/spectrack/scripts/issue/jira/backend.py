@@ -91,7 +91,7 @@ class JiraIssueBackend:
             "--cache-policy",
             choices=_CACHE_FETCH_POLICIES,
             default=CACHE_POLICY_DEFAULT,
-            help="provider cache policy",
+            help="default reuses the fresh local copy; refresh forces a remote re-read",
         )
         parser.add_argument(
             "references",
@@ -208,7 +208,7 @@ class JiraIssueBackend:
         )
         parser.add_argument(
             "query",
-            help="Jira JQL query (passed to the Jira search endpoint)",
+            help="Jira JQL query passed verbatim to the search endpoint",
         )
 
     def run_search(
@@ -845,6 +845,11 @@ class JiraIssueBackend:
         update = subparsers.add_parser(
             "update",
             help="update one Jira issue body from a body file",
+            epilog=(
+                "For a partial edit, seed --body-file from the cached body "
+                "and change only the affected sections rather than "
+                "re-authoring the whole body."
+            ),
         )
         update.add_argument("--type", default="task", help="workflow artifact type")
         update.add_argument("--issue", required=True, help="Jira issue key")

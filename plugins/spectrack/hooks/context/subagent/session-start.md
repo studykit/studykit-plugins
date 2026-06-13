@@ -29,10 +29,10 @@ Resolve PRD-component page locations before reading or writing them:
 
 </prd-path>
 
-<runbook>
+<commands>
 
-Reference doc (read on demand) at
-`{{SPECTRACK_RUNBOOK_DIR}}/issue-fetch/{{SPECTRACK_ISSUE_PROVIDER}}.md`
-— fetch issues + cache projections.
+Issue CLI. Run `spectrack issue --help` to list the verbs available for
+this project's backend, then `spectrack issue <verb> --help` for a verb's
+flags and usage.
 
-</runbook>
+</commands>

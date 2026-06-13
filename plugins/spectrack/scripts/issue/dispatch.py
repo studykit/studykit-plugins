@@ -169,43 +169,69 @@ def run_intent(
     )
 
 
-_VERBS = (
-    "new",
-    "update",
-    "fetch",
-    "search",
-    "comment",
-    "attach",
-    "link",
-    "state",
-    "assign",
-    "unassign",
-    "set-type",
+# (verb, one-line description, jira_only). Verbs flagged jira_only are
+# listed by `issue --help` only when the configured provider is Jira.
+_VERB_HELP: tuple[tuple[str, str, bool], ...] = (
+    ("new", "create a new issue", False),
+    ("update", "update title / body / labels / state", False),
+    ("fetch", "fetch one or more issues into the cache", False),
+    ("search", "search issues with the backend's native query", False),
+    ("comment", "append a comment from a body file", False),
+    ("attach", "add/get issue file attachments", True),
+    ("link", "add / remove / replace relationships", False),
+    ("state", "change lifecycle state (e.g. `state <ref> close`)", False),
+    ("assign", "assign an issue to a user (e.g. `assign <ref> me`)", False),
+    ("unassign", "clear all assignees (e.g. `unassign <ref>`)", False),
+    ("set-type", "swap the workflow type label (e.g. `set-type <ref> bug`)", False),
 )
 
-
-_USAGE = (
-    "usage: issue <verb> [args...]\n"
-    "\n"
-    "verbs:\n"
-    "  new        create a new issue\n"
-    "  update     update title / body / labels / state\n"
-    "  fetch      fetch one or more issues into the cache\n"
-    "  search     search issues with the backend's native query\n"
-    "  comment    append a comment from a body file\n"
-    "  attach     add/get issue file attachments (Jira provider only)\n"
-    "  link       add / remove / replace relationships\n"
-    "  state      change lifecycle state (e.g. `state <ref> close`)\n"
-    "  assign     assign an issue to a user (e.g. `assign <ref> me`)\n"
-    "  unassign   clear all assignees (e.g. `unassign <ref>`)\n"
-    "  set-type   swap the workflow type label (e.g. `set-type <ref> bug`)\n"
-    "\n"
-    "Run `issue <verb> --help` to see backend-specific options.\n"
-)
+_VERBS = tuple(name for name, _desc, _jira_only in _VERB_HELP)
 
 
-def _print_usage(stream: TextIO) -> None:
-    stream.write(_USAGE)
+def _build_usage(provider: str | None) -> str:
+    rows = [
+        (name, desc)
+        for name, desc, jira_only in _VERB_HELP
+        if not jira_only or provider == "jira"
+    ]
+    width = max(len(name) for name, _desc in rows)
+    verb_lines = "".join(f"  {name.ljust(width)}   {desc}\n" for name, desc in rows)
+    return (
+        "usage: issue <verb> [args...]\n"
+        "\n"
+        "verbs:\n"
+        f"{verb_lines}"
+        "\n"
+        "Run `issue <verb> --help` for each verb's usage.\n"
+    )
+
+
+def _active_provider(argv: list[str]) -> str | None:
+    """Resolve the configured issue provider kind for usage filtering.
+
+    Returns ``None`` when the project or config cannot be resolved, in which
+    case the usage falls back to the provider-neutral verb set.
+    """
+
+    base = argparse.ArgumentParser(add_help=False)
+    base.add_argument("--project", type=Path, default=None)
+    try:
+        known, _ = base.parse_known_args(argv)
+    except SystemExit:
+        return None
+    project = known.project or workflow_project_dir_from_env()
+    try:
+        config = load_workflow_config(project)
+    except Exception:
+        return None
+    if config is None:
+        return None
+    kind = getattr(getattr(config, "issues", None), "kind", None)
+    return str(kind).strip().lower() if kind else None
+
+
+def _print_usage(stream: TextIO, provider: str | None = None) -> None:
+    stream.write(_build_usage(provider))
 
 
 def main(
@@ -220,14 +246,14 @@ def main(
     args = list(sys.argv[1:] if argv is None else argv)
 
     if not args or args[0] in {"-h", "--help"}:
-        _print_usage(out)
+        _print_usage(out, _active_provider(args))
         return 0 if args else 2
 
     verb, rest = args[0], args[1:]
 
     if verb not in _VERBS:
         err.write(f"issue: unknown verb '{verb}'\n\n")
-        _print_usage(err)
+        _print_usage(err, _active_provider(args))
         return 2
 
     kwargs = {"stdout": out, "stderr": err, "runner": runner}

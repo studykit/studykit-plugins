@@ -26,22 +26,13 @@ Resolve PRD-component page locations before reading or writing them:
 
 </prd-path>
 
-<runbook>
+<commands>
 
-Reference docs (read on demand) at
-`{{SPECTRACK_RUNBOOK_DIR}}/<intent>/{{SPECTRACK_ISSUE_PROVIDER}}.md`:
+Issue CLI. Run `spectrack issue --help` to list the verbs available for
+this project's backend, then `spectrack issue <verb> --help` for a verb's
+flags and usage.
 
-- `issue-fetch` — fetch issues + cache projections
-- `issue-search` — search issues with the backend's native query
-- `issue-write` — body-bearing writes (publish / comment / update) — procedure index
-- `issue-new` — publish a new issue
-- `issue-comment` — append a comment
-- `issue-update` — update body, title, labels, or state
-- `issue-link` — relationships
-- `issue-state` — body-less verbs (state, assign, unassign, set-type)
-{{SNIPPET_PROVIDER_RUNBOOK}}
-
-</runbook>
+</commands>
 
 Don't quote, paraphrase, or summarize issue bodies, comments, or knowledge
 documents beyond what the user asked for. The cached `issue.md`, `state.md`,

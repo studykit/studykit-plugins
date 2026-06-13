@@ -48,19 +48,12 @@ every per-agent SubagentStart block.
   invocation), and `hooks/context/snippets/prd-path.md` (PRD-path
   resolver) are the only fragments inlined into the templates above.
   Everything else is referenced on demand.
-- **On-demand reference docs** are *not* injected. The injected
-  `main/session-start.md` and `subagent/session-start.md` only point at them; the
-  agent reads them with `Read` when needed. They live under
-  `authoring/runbook/`, organized by intent:
-  - `authoring/runbook/issue-fetch/<provider>.md`
-  - `authoring/runbook/issue-write/<provider>.md` — shared body-bearing
-    write procedure (intent index for github/jira; full flow for
-    filesystem)
-  - `authoring/runbook/issue-new/<provider>.md` (github / jira)
-  - `authoring/runbook/issue-comment/<provider>.md` (github / jira)
-  - `authoring/runbook/issue-update/<provider>.md` (github / jira)
-  - `authoring/runbook/issue-link/<provider>.md` (github / jira)
-  - `authoring/runbook/issue-state/<provider>.md` (github / jira)
+- **Per-verb CLI usage** is *not* injected and has no on-demand doc tree.
+  The injected `main/session-start.md` and `subagent/session-start.md`
+  carry a `<commands>` block that points the agent at `spectrack issue
+  --help` (backend-aware verb list) and `spectrack issue <verb> --help`
+  (per-verb flags) — the single source of truth for issue-CLI usage. The
+  agent runs `--help` when it needs a verb's flags.
 
 `hooks/hooks.json` and `hooks/scripts/hook_claude.py` are the source of truth
 whenever the layout above looks stale.
@@ -68,12 +61,11 @@ whenever the layout above looks stale.
 ## Rules that follow
 
 - Refer to injected blocks by tag (e.g., `<launcher>`, `<authoring-resolver>`,
-  `<commit-prefix>`, `<runbook>`) and point at runbook intents by tag
-  (e.g., "verb syntax at `<runbook>`'s `issue-new` intent") instead of
-  restating provider-specific command shapes that the runtime will inject
-  anyway. Procedures that span multiple runbook intents belong in the
-  agent body as a named section the body refers to internally — not in
-  the SubagentStart per-agent block, which only carries injected tags.
+  `<commit-prefix>`, `<commands>`) and point at CLI usage via
+  `spectrack issue <verb> --help` instead of restating provider-specific
+  command shapes. Procedures that span multiple verbs belong in the agent
+  body as a named section the body refers to internally — not in the
+  SubagentStart per-agent block, which only carries injected tags.
 - Do not assume cross-surface context. A skill (main session) sees
   `main/...` blocks; a subagent sees `subagent/...` blocks. Crossing the
   boundary leaves the runtime doc missing assumed context — surface the

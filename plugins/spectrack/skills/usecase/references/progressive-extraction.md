@@ -76,8 +76,7 @@ Read the files the resolver returns. They define:
 
 ## Publish the use case
 
-Use `spectrack issue new --type usecase` per the verb syntax at
-`<runbook>`'s `issue-new` intent. Provide:
+Use `spectrack issue new --type usecase`. Provide:
 
 - `--title` — a short imperative phrase matching the actor's goal
   ("Share meeting summary").

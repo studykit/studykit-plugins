@@ -47,8 +47,7 @@ layout, palette, or content from a thin caller message.
 
 For every ref in `usecase-refs`:
 
-1. Fetch via `spectrack issue fetch <ref>` (verb syntax at
-   `<runbook>`'s `issue-fetch` intent).
+1. Fetch via `spectrack issue fetch <ref>`.
 2. Read the cached issue body. Extract from each use case:
    - The actor (drives the page's vantage point).
    - The flow steps (drive the layout regions and primary CTAs).

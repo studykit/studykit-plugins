@@ -20,11 +20,9 @@ For each screen the user names:
    `screen-dashboard`, `screen-meeting-detail`. Use the same label
    across every use case that belongs to the screen.
 2. **Apply the label to participating `usecase` issues.** Use the
-   provider's labelling form via `spectrack issue update` (verb syntax
-   at `<runbook>`'s `issue-update` intent). When the backend doesn't
+   provider's labelling form via `spectrack issue update`. When the backend doesn't
    support custom labels for this issue type, append a comment on
-   each participating issue naming the screen group instead — comment
-   syntax at `<runbook>`'s `issue-comment` intent.
+   each participating issue naming the screen group instead.
 3. **Note the screen narrative.** Capture screen purpose, the use
    cases that compose it, and the navigation flow between them in
    the wrap-up session report so the user has the material to

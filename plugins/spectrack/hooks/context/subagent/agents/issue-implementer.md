@@ -4,15 +4,14 @@
 
 </commit-prefix>
 
-<runbook>
+<commands>
 
-Per-verb syntax (flags, body-file lifecycle, conflict handling)
-lives in the runbook at
-`{{SPECTRACK_RUNBOOK_DIR}}/<intent>/{{SPECTRACK_ISSUE_PROVIDER}}.md`:
+Per-verb flags and usage: `spectrack issue <verb> --help`. The verbs
+this agent uses:
 
-- `issue-fetch` — fetch the issue + cache projections (only when an
+- `fetch` — fetch the issue + cache projections (only when an
   `issue-ref` is supplied, for spec context)
-- `issue-update` — refresh the issue body's `Resume` at handoff
+- `update` — refresh the issue body's `Resume` at handoff
   (body-only writeback; this agent never transitions issue state)
 
-</runbook>
+</commands>

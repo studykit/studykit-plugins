@@ -34,7 +34,7 @@ For `bug`, add the regression test first and confirm it fails on the unfixed cod
 
 ## Flow
 
-1. **Fetch the issue and adopt the plan.** Fetch `issue-ref` via `spectrack issue fetch` (verb syntax at `<runbook>`'s `issue-fetch` intent) and read the body plus cached `comment-*.md` projections. Adopt the plan: when a `plan` override was handed in, it is authoritative; otherwise the body's `Design Decision` / `Implementation Steps` / `Acceptance Criteria` / `Verification` is the plan. Treat the adopted plan as the spec for what to build. If neither source yields a concrete, actionable plan, stop with `paused` — do not invent one.
+1. **Fetch the issue and adopt the plan.** Fetch `issue-ref` via `spectrack issue fetch` and read the body plus cached `comment-*.md` projections. Adopt the plan: when a `plan` override was handed in, it is authoritative; otherwise the body's `Design Decision` / `Implementation Steps` / `Acceptance Criteria` / `Verification` is the plan. Treat the adopted plan as the spec for what to build. If neither source yields a concrete, actionable plan, stop with `paused` — do not invent one.
 
 2. **Check the plan against the current code — you are the drift detector.** You open the plan's files to implement anyway, so do it first. Compare the plan's assumptions — the files, signatures, module structure, and surrounding helpers named in `Implementation Steps` — against the current code. On material drift (the plan rests on code that has since changed), **stop with `paused`** and report both *what drifted* (the specific assumption versus the current reality) and *a suggested direction* for the re-plan (what a refreshed plan should account for). Do **not** silently adapt the plan to the new code — the user refreshes it in plan mode and re-runs. When the plan and the code agree, proceed.
 
@@ -46,7 +46,7 @@ For `bug`, add the regression test first and confirm it fails on the unfixed cod
 
 6. **Commit.** Stage only the files the plan covered. Split into meaningful commits (implementation, tests, scaffolding, tooling) and follow the injected commit-prefix policy on every subject. In worktree mode, always push the worktree's branch to the remote — the worktree is temporary, and the pushed branch is how the work reaches the user for review, PR, or merge. In in-place mode, the commits land on the current branch — no branch creation; whether they are pushed follows the project's own conventions. Do not list commit SHAs in issue bodies or comments — the provider's timeline already links commits via the ref-prefixed subject.
 
-7. **Refresh `Resume`.** Body-only writeback via `spectrack issue update` (verb syntax at `<runbook>`'s `issue-update` intent): `Approach` summarises what landed, `Waiting for` is "user review/merge", `Open questions` enumerates any deferred AC, `Next` is "review and merge". Do not name the branch in the body; do not transition issue state — the user resolves the issue after merge.
+7. **Refresh `Resume`.** Body-only writeback via `spectrack issue update`: `Approach` summarises what landed, `Waiting for` is "user review/merge", `Open questions` enumerates any deferred AC, `Next` is "review and merge". Do not name the branch in the body; do not transition issue state — the user resolves the issue after merge.
 
 8. **Report.** Return the structured `<report>` block (see `## Output`).
 

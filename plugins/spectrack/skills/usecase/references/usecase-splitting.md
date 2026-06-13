@@ -25,8 +25,8 @@ The candidate use case probably needs to split when:
    child is its own draft, with its own actor, goal, situation, flow,
    expected outcome — and its own published `usecase` issue.
 3. **Link siblings**. After each child is published, link them
-   pairwise as `--related` via `spectrack issue link` (verb syntax at
-   `<runbook>`'s `issue-link` intent). Do not use `parent` between
+   pairwise as `--related` via `spectrack issue link` (verb syntax:
+   run `spectrack issue link --help`). Do not use `parent` between
    siblings; per the `issue` authoring contract, the `parent` intent
    is for parent/child coordination, not sibling pairing.
 4. **Do not use supersession** unless an older published use case is
@@ -42,11 +42,9 @@ place to one of the children. Instead:
 1. Publish each child as a new `usecase` issue per
    `./progressive-extraction.md`.
 2. Add `--related` links from each child to the original.
-3. On the original, append a comment via `spectrack issue comment`
-   (verb syntax at `<runbook>`'s `issue-comment` intent) explaining
+3. On the original, append a comment via `spectrack issue comment` explaining
    the split decision and naming the child refs.
-4. Update the original's body via `spectrack issue update` (verb
-   syntax at `<runbook>`'s `issue-update` intent) so its `Current
+4. Update the original's body via `spectrack issue update` so its `Current
    Draft` section names the child refs and its `Open Questions`
    section is cleared if every open question was distributed across
    the children. Do not retitle the original — the original ref is

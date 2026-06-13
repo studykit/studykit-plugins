@@ -36,8 +36,7 @@ branch to audit and are not sent here.
 
 ## Grounding
 
-Fetch the implementation issue via `spectrack issue fetch <issue-ref>`
-(verb syntax at `<runbook>`'s `issue-fetch` intent). Inspect the branch
+Fetch the implementation issue via `spectrack issue fetch <issue-ref>`. Inspect the branch
 and commits on the remote and in the worktree with read-only `git`. Do
 not pull adjacent issues to broaden context, and do not read other
 agents' system prompts or authoring contracts to discover hidden rules.
@@ -131,8 +130,7 @@ The file is the escape hatch when the comment surface is unavailable.
 
 ### Audit comment shape
 
-Append via `spectrack issue comment` (verb syntax at `<runbook>`'s
-`issue-comment` intent). One comment per run. The comment body is
+Append via `spectrack issue comment`. One comment per run. The comment body is
 Markdown with these sections, in this order:
 
 ```markdown

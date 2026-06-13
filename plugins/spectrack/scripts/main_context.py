@@ -11,28 +11,20 @@ fragments live under ``hooks/context/main/``; subagent fragments live under
 ``SessionStart`` and ``SubagentStart``) and
 ``hooks/context/snippets/launcher/<runtime>.md`` (runtime-keyed), and
 ``hooks/context/snippets/prd-path.md`` (single file, used at both
-``SessionStart`` and ``SubagentStart``). On-demand reference docs that the
-assistant ``Read``s when the injected text points at them live under
-``authoring/runbook/`` (not under ``hooks/context/``), so they sit on the
-same ``authoring/`` read-tracking contract as the rest of the authoring
-tree.
+``SessionStart`` and ``SubagentStart``).
+
+Per-verb CLI usage is not injected at all: the ``<commands>`` block points
+the agent at ``spectrack issue --help`` (backend-aware verb list) and
+``spectrack issue <verb> --help`` (per-verb flags), which are the single
+source of truth for issue-CLI usage.
 
 Template placeholders use ``{{NAME}}`` (double braces) so they stay visually
 distinct from real ``$NAME`` shell variables in the same text.
 ``{{SNIPPET_AUTHORING}}``, ``{{SNIPPET_LAUNCHER}}``, and
 ``{{SNIPPET_PRD_PATH}}`` substitute the three inlined snippet files;
-``{{SNIPPET_PROVIDER_RUNBOOK}}`` (main session only) substitutes
-provider-keyed runbook intents from ``snippets/runbook/<provider>.md``
-so provider-only intents (e.g. Jira ``issue-attach``) are never injected
-on providers that cannot honor them;
-``{{SPECTRACK_RUNBOOK_DIR}}`` resolves to
-``<plugin_root>/authoring/runbook``; ``{{SPECTRACK_ISSUE_PROVIDER}}`` resolves
-to the active issue provider (``github``/``jira``/``filesystem``). Fetch /
-write / link / etc. usage is *not* inlined — both ``main/session-start.md``
-and ``subagent/session-start.md`` point at intent-keyed runbook docs
-(``authoring/runbook/<intent>/<provider>.md``) which the agent reads on
-demand. The Codex launcher snippet additionally has
-``{{SPECTRACK_PLUGIN_ROOT}}`` resolved to the absolute plugin root before
+``{{SPECTRACK_ISSUE_PROVIDER}}`` resolves to the active issue provider
+(``github``/``jira``/``filesystem``). The Codex launcher snippet additionally
+has ``{{SPECTRACK_PLUGIN_ROOT}}`` resolved to the absolute plugin root before
 injection so Codex shell tool calls can use literal paths.
 """
 
@@ -85,14 +77,11 @@ def build_session_policy_context(
     if plugin_root is None:
         return _wrap_policy(text)
     resolved_plugin_root = plugin_root.expanduser().resolve()
-    runbook_dir = resolved_plugin_root / "authoring" / "runbook"
     issue_provider = _provider_segment(config, "issues", _KNOWN_ISSUE_PROVIDERS)
     rendered = render(text, {
         "SNIPPET_LAUNCHER": _build_launcher_block(runtime, resolved_plugin_root),
         "SNIPPET_AUTHORING": _read_fragment("snippets/authoring.md").strip(),
         "SNIPPET_PRD_PATH": _read_fragment("snippets/prd-path.md").strip(),
-        "SNIPPET_PROVIDER_RUNBOOK": _build_provider_runbook_block(issue_provider),
-        "SPECTRACK_RUNBOOK_DIR": str(runbook_dir),
         "SPECTRACK_ISSUE_PROVIDER": issue_provider,
     })
     return _wrap_policy(rendered)
@@ -111,51 +100,49 @@ def build_subagent_policy_context(
     if plugin_root is None:
         return _wrap_policy(text)
     resolved_plugin_root = plugin_root.expanduser().resolve()
-    runbook_dir = resolved_plugin_root / "authoring" / "runbook"
     issue_provider = _provider_segment(config, "issues", _KNOWN_ISSUE_PROVIDERS)
     rendered = render(text, {
         "SNIPPET_LAUNCHER": _build_launcher_block(runtime, resolved_plugin_root),
         "SNIPPET_AUTHORING": _read_fragment("snippets/authoring.md").strip(),
         "SNIPPET_PRD_PATH": _read_fragment("snippets/prd-path.md").strip(),
-        "SPECTRACK_RUNBOOK_DIR": str(runbook_dir),
         "SPECTRACK_ISSUE_PROVIDER": issue_provider,
     })
-    agent_block = _build_agent_context_block(agent_type, issue_provider, runbook_dir)
-    merged = _merge_runbook_blocks(rendered, agent_block)
+    agent_block = _build_agent_context_block(agent_type, issue_provider)
+    merged = _merge_commands_blocks(rendered, agent_block)
     return _wrap_policy(merged)
 
 
-_RUNBOOK_BLOCK_RE = re.compile(
-    r"\n?<runbook>\s*\n?(?P<body>.*?)\n?\s*</runbook>\n?",
+_COMMANDS_BLOCK_RE = re.compile(
+    r"\n?<commands>\s*\n?(?P<body>.*?)\n?\s*</commands>\n?",
     re.DOTALL,
 )
 
 
-def _merge_runbook_blocks(base: str, per_agent: str) -> str:
+def _merge_commands_blocks(base: str, per_agent: str) -> str:
     """Combine a base subagent context with an optional per-agent block.
 
-    If ``per_agent`` carries its own ``<runbook>...</runbook>`` block, the
-    base's ``<runbook>`` is stripped first so the merged text emits a
-    single ``<runbook>``. Any empty ``<runbook>`` (whitespace-only body)
-    is removed from the combined text — agents without listed intents
+    If ``per_agent`` carries its own ``<commands>...</commands>`` block, the
+    base's ``<commands>`` is stripped first so the merged text emits a
+    single ``<commands>``. Any empty ``<commands>`` (whitespace-only body)
+    is removed from the combined text — agents without listed verbs
     do not get an empty tag injected.
     """
 
-    def has_runbook(text: str) -> bool:
-        return _RUNBOOK_BLOCK_RE.search(text) is not None
+    def has_commands(text: str) -> bool:
+        return _COMMANDS_BLOCK_RE.search(text) is not None
 
-    def strip_empty_runbooks(text: str) -> str:
+    def strip_empty_commands(text: str) -> str:
         def replace(match: re.Match[str]) -> str:
             body = match.group("body").strip()
             return "" if not body else match.group(0)
 
-        return _RUNBOOK_BLOCK_RE.sub(replace, text)
+        return _COMMANDS_BLOCK_RE.sub(replace, text)
 
-    if per_agent and has_runbook(per_agent):
-        base = _RUNBOOK_BLOCK_RE.sub("\n\n", base, count=1)
+    if per_agent and has_commands(per_agent):
+        base = _COMMANDS_BLOCK_RE.sub("\n\n", base, count=1)
         base = base.rstrip()
     combined = f"{base}\n\n{per_agent}" if per_agent else base
-    combined = strip_empty_runbooks(combined)
+    combined = strip_empty_commands(combined)
     # Collapse 3+ consecutive newlines that the strip-and-merge can leave behind.
     combined = re.sub(r"\n{3,}", "\n\n", combined)
     return combined.strip()
@@ -168,7 +155,6 @@ def _wrap_policy(text: str) -> str:
 def _build_agent_context_block(
     agent_type: str | None,
     issue_provider: str,
-    runbook_dir: Path,
 ) -> str:
     """Build the agent-specific context block appended at SubagentStart."""
 
@@ -181,7 +167,6 @@ def _build_agent_context_block(
     except OSError:
         return ""
     substitutions = {
-        "SPECTRACK_RUNBOOK_DIR": str(runbook_dir),
         "SPECTRACK_ISSUE_PROVIDER": issue_provider,
     }
     if name == "issue-implementer":
@@ -203,19 +188,6 @@ def _agent_type_segment(agent_type: str | None) -> str | None:
     if ":" in text:
         text = text.rsplit(":", 1)[-1]
     return text or None
-
-
-def _build_provider_runbook_block(issue_provider: str) -> str:
-    """Return provider-only runbook intents appended to the main runbook list.
-
-    Some intents exist for one provider only (e.g. ``issue-attach`` is
-    Jira-only — GitHub issues have no attachment REST surface). Keeping the
-    bullet in a provider-keyed fragment means the LLM is never told the
-    intent exists on providers that cannot honor it. Missing fragment →
-    empty string, so non-Jira providers inject nothing.
-    """
-
-    return _read_fragment(f"snippets/runbook/{issue_provider}.md").strip()
 
 
 def _build_launcher_block(runtime: str | None, plugin_root: Path) -> str:

@@ -36,7 +36,7 @@ def _render(surface: str, provider: str, *, agent: str | None = None) -> str:
 def test_session_surface_is_policy_wrapped() -> None:
     text = _render("session", "github")
     assert "<policy>" in text and "</policy>" in text
-    assert "<launcher>" in text and "<runbook>" in text
+    assert "<launcher>" in text and "<commands>" in text
 
 
 def test_session_output_matches_runtime_builder() -> None:
@@ -49,15 +49,18 @@ def test_session_output_matches_runtime_builder() -> None:
     assert direct in _render("session", "github")
 
 
-def test_provider_keyed_fragment_is_provider_specific() -> None:
-    assert "issue-attach" in _render("session", "jira")
-    assert "issue-attach" not in _render("session", "github")
+def test_session_commands_block_is_provider_agnostic() -> None:
+    # The <commands> block points at --help (backend-aware on its own), so the
+    # injected text no longer differs by provider.
+    assert "spectrack issue --help" in _render("session", "jira")
+    assert "spectrack issue --help" in _render("session", "github")
+    assert "issue-attach" not in _render("session", "jira")
 
 
-def test_subagent_agent_block_merges_one_runbook() -> None:
+def test_subagent_agent_block_merges_one_commands() -> None:
     text = _render("subagent", "github", agent="issue-implementer")
     assert "<commit-prefix>" in text
-    assert text.count("<runbook>") == 1
+    assert text.count("<commands>") == 1
 
 
 def test_subagent_base_has_no_agent_block() -> None:

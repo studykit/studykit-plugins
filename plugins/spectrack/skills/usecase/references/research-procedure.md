@@ -44,8 +44,7 @@ authoring contract is the contract.
 
 3. **Publish the research issue.** Draft the body under
    `$(spectrack project-dir .spectrack-cache/usecase-research/<slug>.md)` and publish via
-   `spectrack issue new --type research` (verb syntax at `<runbook>`'s
-   `issue-new` intent). Pass:
+   `spectrack issue new --type research`. Pass:
 
    - `--title` — short question phrase ("Compare meeting-summary
      tools for 5-person teams").
@@ -69,8 +68,7 @@ authoring contract is the contract.
 
 5. **Run inline (optional).** When running inline, use `WebSearch`
    and `WebFetch` to gather evidence. Append each batch of findings
-   as a comment on the `research` issue via `spectrack issue comment`
-   (verb syntax at `<runbook>`'s `issue-comment` intent). Keep raw
+   as a comment on the `research` issue via `spectrack issue comment`. Keep raw
    notes in comments, not in the body — the body stays scoped to the
    research question and current state. **Stay decision-neutral**:
    record evidence, not prescriptions. See **Decision neutrality**

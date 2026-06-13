@@ -11,11 +11,9 @@ without re-asking questions the prior session already settled.
 List the issues that exist on the configured backend so the user
 can pick where to resume.
 
-1. Run `spectrack issue list --type usecase` (verb syntax at
-   `<runbook>`'s `issue-fetch` intent if the launcher exposes
-   listing through that intent). When the launcher offers no list
-   verb, fetch the refs the user named directly — pass them all to a
-   single `issue-fetch` call (the verb accepts multiple refs).
+1. Run `spectrack issue list --type usecase`. When the launcher offers
+   no list verb, fetch the refs the user named directly — pass them all
+   to a single `fetch` call (the verb accepts multiple refs).
 2. For each issue, capture: ref, title, current state, and whether
    the body's `Open Questions` section is non-empty.
 
@@ -78,12 +76,10 @@ unchanged. In addition:
   Re-publication creates a duplicate; the ref the original was first
   published under is the canonical handle.
 - **Preserve the audit trail.** Append a comment to the use case
-  before changing the body so the change rationale is recorded
-  (verb syntax at `<runbook>`'s `issue-comment` intent); then call
+  before changing the body so the change rationale is recorded; then call
   `spectrack issue update` to apply the body change. Two operations,
   in that order.
 - **Resolve `review` items by updating their state** through
-  `spectrack issue update --state closed` (or the equivalent state
-  verb at `<runbook>`'s `issue-state` intent) once the resolution
+  `spectrack issue update --state closed` once the resolution
   has landed on the target. Closing the review without updating the
   target leaves the finding unresolved.

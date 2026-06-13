@@ -36,9 +36,9 @@ A new or changed issue verb/intent usually touches, in one change:
 
 1. the verb/intent surface in `scripts/issue/dispatch.py` and the provider
    drivers in `scripts/issue/<provider>/backend.py`;
-2. the on-demand runbook doc(s) under
-   `authoring/runbook/<intent>/<provider>.md` that tell the runtime agent
-   how to invoke it;
+2. the verb's argparse `--help` wording (`description`/`epilog`) in those
+   same files — `spectrack issue <verb> --help` is the runtime agent's
+   usage reference;
 3. injected context under `hooks/context/` — only when a pointer or policy
    line there changes;
 4. tests under `tests/`;

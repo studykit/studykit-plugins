@@ -31,16 +31,13 @@ shared functions — do not duplicate them here.
 All of the above are composed into the templates above via `{{...}}`
 substitution in `../scripts/main_context.py`.
 
-On-demand reference docs the injected text *points at* — intent-keyed
-runbook pages (`issue-fetch/<provider>.md`, `issue-write/<provider>.md`,
-`issue-new/<provider>.md`, `issue-comment/<provider>.md`,
-`issue-update/<provider>.md`, `issue-link/<provider>.md`,
-`issue-state/<provider>.md`) — live under `../authoring/runbook/`, not
-in this tree. `hooks/context/` holds only what hooks read for injection.
-Both main session and subagents resolve verb syntax and flag sets by
-reading those runbook files on demand; the inlined snippets are
-deliberately limited to the launcher invocation, the authoring resolver
-block, and the PRD-path resolver block.
+Per-verb CLI usage is *not* injected and has no on-demand doc tree. The
+`<commands>` block in both `session-start.md` templates points the agent
+at `spectrack issue --help` (backend-aware verb list) and `spectrack issue
+<verb> --help` (per-verb flags), which are the single source of truth for
+issue-CLI usage. `hooks/context/` holds only what hooks read for injection;
+the inlined snippets are deliberately limited to the launcher invocation,
+the authoring resolver block, and the PRD-path resolver block.
 
 ## Invariants
 
@@ -55,9 +52,9 @@ block, and the PRD-path resolver block.
 - **Stdout is JSON or empty.** Empty stdout = no-op. Never emit plain text.
 - **Subagents inherit env, not policy.** SubagentStart injection stays
   narrow (launcher + authoring resolver + PRD-path resolver + the same
-  runbook reference list as the main session, plus per-agent flow blocks
-  for `issue-implementer`). Verb syntax lives in the runbook for both
-  main session and subagents.
+  `<commands>` `--help` pointer as the main session, plus per-agent flow
+  blocks for `issue-implementer`). Per-verb CLI usage lives in
+  `spectrack issue <verb> --help` for both main session and subagents.
 - **Codex cannot persist env from SessionStart.** `hook_codex.py` records
   session state under `.spectrack-cache/hook-state/`; the
   `../scripts/spectrack` wrapper sources the exports later via
@@ -69,13 +66,9 @@ block, and the PRD-path resolver block.
   Snippet placeholders: `{{SNIPPET_AUTHORING}}` ↔
   `snippets/authoring.md`, `{{SNIPPET_LAUNCHER}}` ↔
   `snippets/launcher/<runtime>.md`, `{{SNIPPET_PRD_PATH}}` ↔
-  `snippets/prd-path.md`, and (main session only)
-  `{{SNIPPET_PROVIDER_RUNBOOK}}` ↔ `snippets/runbook/<provider>.md` for
-  provider-only runbook intents (e.g. Jira `issue-attach`; missing
-  fragment → nothing injected). Other usage (fetch / write / link /
-  etc.) is referenced via `{{SPECTRACK_RUNBOOK_DIR}}` +
-  `{{SPECTRACK_ISSUE_PROVIDER}}` pointing at
-  `authoring/runbook/<intent>/<provider>.md`.
+  `snippets/prd-path.md`. `{{SPECTRACK_ISSUE_PROVIDER}}` resolves to the
+  active provider. Per-verb CLI usage is not placeholder-injected — the
+  `<commands>` block points at `spectrack issue <verb> --help` instead.
 - **Provider cache projections are read-only; dotfile sources are internal.**
   `PreToolUse` write protection blocks edits to the readable projections
   (`issue.md` / `state.md` / `relation.md` / `comment-*.md`); refresh those
@@ -95,7 +88,7 @@ block, and the PRD-path resolver block.
   field schemas, env-var contracts the agent doesn't set, dispatcher
   routing prose, script filenames (`*.py`, `_dispatch.py`), output
   section-anchor regexes, or any "how the script does it" detail. Those
-  belong in source code or the runbook, not in injected text.
+  belong in source code or the verb's `--help`, not in injected text.
 
 ## Where to make changes
 
@@ -105,4 +98,4 @@ block, and the PRD-path resolver block.
 | New SessionStart wording | `context/main/session-start.md`, with a `{{...}}` placeholder if provider/runtime-specific |
 | New SubagentStart wording | `context/subagent/session-start.md` or `context/subagent/agents/<agent-name>.md` |
 | New provider/runtime snippet variant | `context/snippets/<group>/<key>.md`; wire the placeholder in `../scripts/main_context.py` |
-| New on-demand reference doc | `../authoring/runbook/...`; point at it from injected text via `{{SPECTRACK_RUNBOOK_DIR}}/...` |
+| New/changed verb CLI usage | the verb's argparse `--help` wording in `../scripts/issue/dispatch.py` + `../scripts/issue/<provider>/backend.py` (not injected text) |
