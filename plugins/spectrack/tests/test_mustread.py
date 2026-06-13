@@ -15,7 +15,6 @@ if str(_SCRIPTS_DIR) not in sys.path:
 from mustread import (  # noqa: E402
     BACKLOG_TRIGGER_NOTE,
     PLAN_MODE_TRIGGER_NOTE,
-    RESOLUTION_AUDIT_RETRO_NOTE,
     RESOLUTION_AUDIT_TRIGGER_NOTE,
     RETROACTIVE_PUBLISH_STATE_GITHUB,
     RETROACTIVE_TRIGGER_NOTE,
@@ -421,10 +420,11 @@ def test_retroactive_mode_notes(artifact_type: str) -> None:
         artifact_type, side="issue", provider="github", mode="retroactive"
     )
     assert RETROACTIVE_TRIGGER_NOTE in resolution.notes
-    assert RESOLUTION_AUDIT_RETRO_NOTE in resolution.notes
     assert RETROACTIVE_PUBLISH_STATE_GITHUB in resolution.notes
-    # Retroactive work is already done — no forward plan-mode authoring.
+    # Retroactive work is already done — no forward plan-mode authoring and
+    # no resolution audit (it guards not-yet-done work).
     assert PLAN_MODE_TRIGGER_NOTE not in resolution.notes
+    assert RESOLUTION_AUDIT_TRIGGER_NOTE not in resolution.notes
     assert TASK_AUDIT_TRIGGER_NOTE not in resolution.notes
     # The full type contract is still read; only backlog swaps it out.
     assert f"contracts/issue/{artifact_type}.md" in _rel_paths(resolution.files)

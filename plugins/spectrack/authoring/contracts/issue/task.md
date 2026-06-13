@@ -30,7 +30,7 @@ A task ready for implementation is actionable as a handoff. Check the body or li
 ## Modes
 
 - Backlog — capture intent for a later planning pass without a forward plan; resolved in backlog mode (`./backlog.md`), which relaxes required sections to Description. Do not hand-author a plan-light task under this forward contract.
-- Retroactive — the change already landed; the body records facts (what changed, how it was done, the checks that ran), skips the forward planning pass and the size audit, and publishes together with the transition to the resolved state. The diagnosis audit still applies.
+- Retroactive — the change already landed; the body records facts (what changed, how it was done, the checks that ran), skips the forward planning pass, the size audit, and the diagnosis audit, and publishes together with the transition to the resolved state.
 
 ## Common mistakes
 
