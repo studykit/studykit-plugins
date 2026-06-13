@@ -6,7 +6,6 @@ Common rules that apply across both sides (definition, dual-role overview, abstr
 
 Companion contracts:
 
-- `./body.md`
 - Issue rules: `./common.md`
 - Use case rules common to both sides: `../usecase.md`
 
@@ -25,7 +24,7 @@ Recommended sections:
 - `Current Draft` — short current summary or link to the curated page draft.
 - `Open Questions` — outstanding questions, one per bullet.
 
-Optional reusable sections (see `./body.md`):
+Optional sections:
 
 - `Related Work` — related tasks, specs, reviews, research, or pages.
 - `Supersedes` — prior use case when replacing one.

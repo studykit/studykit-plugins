@@ -2,10 +2,6 @@
 
 Common semantic rules for issue-backed items.
 
-Read this with the semantic authoring file for the item type, plus:
-
-- `./body.md`
-
 ## Scope
 
 Use these rules for issue-backed items:
@@ -54,13 +50,6 @@ or comments using the selected item type and provider conventions.
 ## Relationships
 
 Record every relationship the configured issue backend natively supports, through the backend's native relationship mechanism. Run `spectrack issue link --help` to see the relationship kinds the configured backend accepts; type-specific authoring files define which relationships an item needs.
-
-Canonical relationship intents used by provider authoring files and the workflow scripts:
-
-- `parent` — epic or parent work item that coordinates this item.
-- `blocked_by` — the source item is blocked by the target item. Aliases `depends_on`, `dependency`, `blockedBy`, and `blockedby` are normalized to `blocked_by`.
-- `blocking` — the source item blocks the target item. Read-back counterpart of `blocked_by`; the alias `blocks` normalizes to `blocking`.
-- `related` — useful non-blocking relationship between items.
 
 ## Comments and history
 

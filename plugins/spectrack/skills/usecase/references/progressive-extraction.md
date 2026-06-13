@@ -89,9 +89,9 @@ Use `spectrack issue new --type usecase`. Provide:
   discovered. The caller may override with a different assignee.
 - `--related <ref>` — when this use case is part of a discovery
   session that produced earlier sibling use cases, link them
-  pairwise. Sibling relationships use `related`, not `parent`; see
-  the canonical relationship intents in the `issue` authoring
-  contract.
+  pairwise. Sibling relationships use `related`, not `parent`; run
+  `spectrack issue link --help` for the relationship kinds the
+  configured backend accepts.
 
 After publish, capture the returned ref from the script's JSON output
 and:

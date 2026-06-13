@@ -15,7 +15,6 @@ if str(_SCRIPTS_DIR) not in sys.path:
 from mustread import (  # noqa: E402
     BACKLOG_TRIGGER_NOTE,
     PLAN_MODE_TRIGGER_NOTE,
-    RESOLUTION_AUDIT_RETRO_NOTE,
     RESOLUTION_AUDIT_TRIGGER_NOTE,
     RETROACTIVE_PUBLISH_STATE_GITHUB,
     RETROACTIVE_TRIGGER_NOTE,
@@ -66,7 +65,6 @@ def test_bare_review_resolution_uses_absolute_authoring_files() -> None:
         "contracts/issue/common.md",
         "contracts/issue/review.md",
         "providers/issue/github/convention.md",
-        "providers/issue/github/review.md",
         "providers/issue/github/anti-patterns.md",
     ]
     assert all(path.is_absolute() for path in resolution.files)
@@ -231,7 +229,6 @@ providers:
     assert issue_resolution.provider == "jira"
     assert "contracts/issue/common.md" in _rel_paths(issue_resolution.files)
     assert "providers/issue/jira/convention.md" in _rel_paths(issue_resolution.files)
-    assert "providers/issue/jira/task.md" in _rel_paths(issue_resolution.files)
     assert "providers/issue/jira/anti-patterns.md" in _rel_paths(issue_resolution.files)
     assert knowledge_resolution.provider == "github"
     assert _rel_paths(knowledge_resolution.files) == [
@@ -347,6 +344,25 @@ def test_diagnosis_types_emit_resolution_audit_note(artifact_type: str) -> None:
     assert "resolution-auditor" in RESOLUTION_AUDIT_TRIGGER_NOTE
 
 
+@pytest.mark.parametrize("artifact_type", ["task", "bug"])
+def test_forward_notes_are_runtime_specific(artifact_type: str) -> None:
+    claude = "\n".join(
+        resolve_authoring(artifact_type, mode="forward", runtime="claude").notes
+    )
+    codex = "\n".join(
+        resolve_authoring(artifact_type, mode="forward", runtime="codex").notes
+    )
+    # Claude exposes the AskUserQuestion tool and a Plan subagent; Codex has
+    # neither, so its notes must not name them.
+    assert "AskUserQuestion" in claude
+    assert "AskUserQuestion" not in codex
+    assert "Plan subagent" in claude
+    assert "Plan subagent" not in codex
+    # Both runtimes still gate the resolution audit on user consent.
+    assert "resolution-auditor" in claude
+    assert "resolution-auditor" in codex
+
+
 @pytest.mark.parametrize("artifact_type", ["spike", "epic"])
 def test_non_diagnosis_types_omit_resolution_audit_note(artifact_type: str) -> None:
     resolution = resolve_authoring(artifact_type)
@@ -423,10 +439,11 @@ def test_retroactive_mode_notes(artifact_type: str) -> None:
         artifact_type, side="issue", provider="github", mode="retroactive"
     )
     assert RETROACTIVE_TRIGGER_NOTE in resolution.notes
-    assert RESOLUTION_AUDIT_RETRO_NOTE in resolution.notes
     assert RETROACTIVE_PUBLISH_STATE_GITHUB in resolution.notes
-    # Retroactive work is already done — no forward plan-mode authoring.
+    # Retroactive work is already done — no forward plan-mode authoring and
+    # no resolution audit (it guards not-yet-done work).
     assert PLAN_MODE_TRIGGER_NOTE not in resolution.notes
+    assert RESOLUTION_AUDIT_TRIGGER_NOTE not in resolution.notes
     assert TASK_AUDIT_TRIGGER_NOTE not in resolution.notes
     # The full type contract is still read; only backlog swaps it out.
     assert f"contracts/issue/{artifact_type}.md" in _rel_paths(resolution.files)
@@ -666,7 +683,6 @@ def test_review_target_usecase_issue_bundles_actors_companion() -> None:
         "contracts/issue/common.md",
         "contracts/issue/review.md",
         "providers/issue/github/convention.md",
-        "providers/issue/github/review.md",
         "providers/issue/github/anti-patterns.md",
     ]
     assert resolution.notes == ()

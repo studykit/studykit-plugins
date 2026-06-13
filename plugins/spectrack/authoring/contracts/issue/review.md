@@ -46,7 +46,7 @@ Required section:
 
 - `Description` — the concern, why it matters, and what would resolve it. The first paragraph is the conclusion (see below). For a cross-cutting review with no specific target, `Description` must explain why.
 
-Beyond `Description`, each author chooses sections per `./body.md`'s tailoring guidance.
+Beyond `Description`, each author adds sections as the concern needs (see `./body.md`).
 
 ## Description and the conclusion paragraph
 
