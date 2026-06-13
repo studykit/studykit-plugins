@@ -2,10 +2,6 @@
 
 Common semantic rules for issue-backed items.
 
-Read this with the semantic authoring file for the item type, plus:
-
-- `./body.md`
-
 ## Scope
 
 Use these rules for issue-backed items:
