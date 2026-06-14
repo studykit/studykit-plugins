@@ -2,15 +2,11 @@
 
 A backlog item is a `task` or `bug` recorded as an **open spec** — the
 not-yet-done work captured now, to be picked up for implementation later. It is
-not a retroactive item (work already done). Use this contract only when the
-resolver was invoked with `--mode backlog`, alongside the type spec contract
-(`./task.md` or `./bug.md`), which defines the spec sections this framing tells
-you how to fill.
+not a retroactive item (work already done).
 
 Companion contracts:
 
-- `./body.md`
-- Issue rules: `./common.md`
+- Issue rules and body conventions: `./common.md`
 - Type spec: `./task.md` or `./bug.md`
 
 ## Intent
@@ -57,15 +53,3 @@ Skip the size audit (`task-size-auditor`) and the resolution audit
 (`resolution-auditor`) at capture. They validate an implementation approach or a
 landed change; a backlog spec has neither yet. They run at implementation time
 when the item is picked up.
-
-## Publish state
-
-Publish in the backend's open / unresolved state. A backlog item is future work
-waiting to be picked up, not completed work.
-
-## Picking the item up
-
-When the item is scheduled for implementation, the approach and concrete steps
-are decided against the current code at that point, and the size and resolution
-audits run then. The captured spec is the starting point, not a finished plan;
-nothing in the body is re-authored into a stored plan.

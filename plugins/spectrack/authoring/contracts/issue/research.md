@@ -6,8 +6,7 @@ Common rules that apply across both sides (definition, dual-role overview, when 
 
 Companion contracts:
 
-- `./body.md`
-- Issue rules: `./common.md`
+- Issue rules and body conventions: `./common.md`
 - Research rules common to both sides: `../research.md`
 
 ## Storage role (issue side)
@@ -22,14 +21,15 @@ Recommended sections:
 
 - `Description` — why this research is needed and how the result will be used.
 - `Research Question` — single question or comparison objective.
-- `Mode` — `comparative` or `single`.
-- `Options` — alternatives being compared, one per bullet (required when mode is `comparative`).
+- `Options` — alternatives being compared, one per bullet; include when the research compares two or more named options.
 
-Optional sections:
+Common optional sections — add when useful, and these are examples, not a closed set:
 
 - `Scope` — in-scope and out-of-scope boundaries.
 - `Sources To Check` — initial source list or search plan.
 - `Resume` — current-state snapshot while in progress.
+
+Add any other section the investigation needs and fill it in; keep each section narrow and use canonical Title Case names (`./common.md`).
 
 Use comments for ongoing notes, links discovered midstream, and review discussion. Promote stable findings into the curated report when ready.
 
@@ -39,7 +39,7 @@ Before marking research `done`, perform or request a quality review for:
 
 - Source quality.
 - Claim grounding.
-- Option balance in comparative mode.
+- Option balance when alternatives are compared.
 - Missing criteria.
 - Bias or premature decision-making.
 - Clear limitations.

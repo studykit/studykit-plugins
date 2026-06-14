@@ -1,16 +1,16 @@
 # Task Authoring
 
-A workflow task records a unit of implementation work — new functionality, extension, refactor, or other intended code change — as a **spec**: what the work is, why it matters, and what "done" means. It does not record *how* to build it; the approach and the concrete steps are decided against the current code at implementation time, where they would only go stale if frozen into the body. Read with `./body.md` (body conventions, runtime-grounded claims, reusable sections) and `./common.md` (issue rules, motivation, completion baseline); choose decomposition via `./decomposition-patterns.md`.
+A workflow task records a unit of implementation work — new functionality, extension, refactor, or other intended code change — as a **spec**: what the work is, why it matters, and what "done" means. It does not record *how* to build it; the approach and the concrete steps are decided against the current code at implementation time, where they would only go stale if frozen into the body. Read with `./common.md` (issue rules, body conventions) and `./runtime-grounded-claims.md` (grounding rule for runtime claims); choose decomposition via `./decomposition-patterns.md`.
 
 Use `spike` or `research` instead when the path is still uncertain (see Evidence-readiness).
 
 ## Required sections
 
-- Context — the backdrop a reader who was not in the room needs before the work makes sense: the current state of the affected area, what triggered the work now, the constraints, invariants, and prior decisions or anchors it builds on. This is the durable direction a cold implementer leans on while deciding the mechanism against current code, and the home for the motivation and rationale (`./common.md`).
+- Context — the backdrop a reader who was not in the room needs before the work makes sense: the current state of the affected area, what triggered the work now, the constraints, invariants, and prior decisions or anchors it builds on. This is the durable direction a cold implementer leans on while deciding the mechanism against current code, and the home for the work's motivation and rationale.
 - Description — what the work is: the change itself and its scope.
 - Acceptance Criteria — what "done" is, with each criterion stated in operational, independently checkable terms — the observation, command, or comparison that would demonstrate it. Required even when the task links to a use case or spec; ground each criterion in the linked use case flow/validation, linked spec, linked architecture/domain context, or an explicit user request when no curated page exists. Include the test coverage the work needs as a criterion (the behavior a regression or coverage test must pin); the implementer derives the test layout and confirms it.
 
-Add any other sections the work needs and fill them in; any premise they rest on must meet the runtime-grounded-claim rule in `./body.md`. Do not record the implementation approach or a step sequence in the body — those are worked out against the current code at implementation time, and a frozen plan only goes stale and misleads.
+Add any other sections the work needs and fill them in; any premise they rest on must meet the runtime-grounded-claim rule in `./runtime-grounded-claims.md`. Do not record the implementation approach or a step sequence in the body — those are worked out against the current code at implementation time, and a frozen plan only goes stale and misleads.
 
 ## Anchors and scope
 
@@ -24,7 +24,7 @@ A durable, cross-cutting design decision likewise earns a spec rather than livin
 
 ## Evidence-readiness
 
-A task ready for implementation is actionable as a handoff: the body alone — with no local plan file — must let a cold implementer reach done and derive the approach and concrete edit sequence against the current code. Check the body or linked references supply: reproduction or invocation command when relevant, code coordinates or expected area, data flow or API contract when relevant, baseline behavior, and the directional constraints that bound the work (Context). Any load-bearing runtime claim must be runtime-grounded per `./body.md`. If two or more of these are unknown, use `spike` or `research` instead.
+A task ready for implementation is actionable as a handoff: the body alone — with no local plan file — must let a cold implementer reach done and derive the approach and concrete edit sequence against the current code. Check the body or linked references supply: reproduction or invocation command when relevant, code coordinates or expected area, data flow or API contract when relevant, baseline behavior, and the directional constraints that bound the work (Context). Any load-bearing runtime claim must be runtime-grounded per `./runtime-grounded-claims.md`. If two or more of these are unknown, use `spike` or `research` instead.
 
 ## Modes
 

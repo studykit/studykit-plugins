@@ -1,6 +1,6 @@
 # Spike Authoring
 
-A workflow spike is an issue-backed, time-boxed exploration to unblock a decision — a proof of concept, benchmark, integration probe, or focused experiment, possibly with throwaway code. Read with `./body.md` (body conventions, runtime-grounded claims) and `./common.md` (issue rules, completion baseline).
+A workflow spike is an issue-backed, time-boxed exploration to unblock a decision — a proof of concept, benchmark, integration probe, or focused experiment, possibly with throwaway code. Read with `./common.md` (issue rules, body conventions) and `./runtime-grounded-claims.md` (grounding rule for runtime claims).
 
 Choose the type by output:
 
@@ -15,7 +15,7 @@ Choose the type by output:
 - Validation Method — the experiment, benchmark, integration probe, prototype, or sample-driven check.
 - Acceptance Criteria — one or more observable outcomes that answer the question.
 
-Add any other sections the exploration needs and fill them in; any premise they rest on must meet the runtime-grounded-claim rule in `./body.md`. Link throwaway evidence (a scratch branch, gist, benchmark output, screenshots, or prototype under a clearly marked scratch location) rather than assuming a local evidence directory.
+Add any other sections the exploration needs and fill them in; any premise they rest on must meet the runtime-grounded-claim rule in `./runtime-grounded-claims.md`. Link throwaway evidence (a scratch branch, gist, benchmark output, screenshots, or prototype under a clearly marked scratch location) rather than assuming a local evidence directory.
 
 ## Completion criteria
 

@@ -6,8 +6,7 @@ Use an existing issue comment when the feedback is local to one issue and resolv
 
 Companion contracts:
 
-- `./body.md`
-- Issue rules: `./common.md`
+- Issue rules and body conventions: `./common.md`
 
 ## One concern per item
 
@@ -46,7 +45,7 @@ Required section:
 
 - `Description` — the concern, why it matters, and what would resolve it. The first paragraph is the conclusion (see below). For a cross-cutting review with no specific target, `Description` must explain why.
 
-Beyond `Description`, each author adds sections as the concern needs (see `./body.md`).
+Beyond `Description`, each author adds sections as the concern needs (see `./common.md`).
 
 ## Description and the conclusion paragraph
 
@@ -56,7 +55,7 @@ The first paragraph of `Description` is the conclusion: a reader who reads only 
 - What target it lands on (when not obvious from the title).
 - Why a reader should care (one short clause is usually enough).
 
-Reasoning, evidence, sub-points, and remediation belong in later paragraphs or in a purpose-specific section the author adds per `./body.md`. Do not start the body with a section header, a bulleted list, or scaffolding — the first thing the reader sees is the conclusion in sentences. Keep the body short; long discussion belongs in comments or linked evidence.
+Reasoning, evidence, sub-points, and remediation belong in later paragraphs or in a purpose-specific section the author adds per `./common.md`. Do not start the body with a section header, a bulleted list, or scaffolding — the first thing the reader sees is the conclusion in sentences. Keep the body short; long discussion belongs in comments or linked evidence.
 
 This mirrors the verdict-comment shape the workflow auditors use (`agents/implementation-auditor.md`, `agents/task-size-auditor.md`): the first paragraph names the verdict in natural prose, everything else backs it up.
 

@@ -1,19 +1,19 @@
 # Bug Authoring
 
-A workflow bug is an issue-backed fix for production behavior that is wrong, missing, regressed, or inconsistent with a use case, spec, test expectation, or user-visible contract. It records the defect as a **spec**: what is broken, how to reproduce it, and what "done" means — not the fix approach, which is decided against the current code at implementation time. Read with `./body.md` (body conventions, runtime-grounded claims) and `./common.md` (issue rules, motivation, completion baseline).
+A workflow bug is an issue-backed fix for production behavior that is wrong, missing, regressed, or inconsistent with a use case, spec, test expectation, or user-visible contract. It records the defect as a **spec**: what is broken, how to reproduce it, and what "done" means — not the fix approach, which is decided against the current code at implementation time. Read with `./common.md` (issue rules, body conventions) and `./runtime-grounded-claims.md` (grounding rule for runtime claims).
 
 A bug without a reproducible failure path is not ready for implementation. When reproduction is unknown and the work is mostly discovery, use `spike` or `research` until the defect is pinned down.
 
 ## Required sections
 
-- Context — the backdrop a reader who was not in the room needs before the bug makes sense: where in the system it surfaces, what triggered the report, the conditions or invariants in play, and the prior decisions or anchors it relates to. This is the home for the motivation and rationale (`./common.md`).
+- Context — the backdrop a reader who was not in the room needs before the bug makes sense: where in the system it surfaces, what triggered the report, the conditions or invariants in play, and the prior decisions or anchors it relates to. This is the home for the bug's motivation and rationale.
 - Description — what is broken, observed vs expected behavior, and why it matters.
 - Reproduction — steps, command, data, or conditions that reproduce the bug.
 - Acceptance Criteria — completion-oriented items, each stated in operational, independently checkable terms: "bug no longer reproduces" (via the Reproduction steps) and "regression test fails before the fix and passes after". Required even when the bug links to a use case or spec. When no automated test is feasible, record the manual verification path and the reason for it here, as a criterion.
 
-Add any other sections the fix needs and fill them in; any premise they rest on must meet the runtime-grounded-claim rule in `./body.md`. One section is optional but carries a bug-specific rule:
+Add any other sections the fix needs and fill them in; any premise they rest on must meet the runtime-grounded-claim rule in `./runtime-grounded-claims.md`. One section is optional but carries a bug-specific rule:
 
-- Root Cause — the diagnosed mechanism behind the wrong behavior: the specific code path, state, or condition responsible, pinned by evidence (a runtime-grounded claim per `./body.md`), not an asserted hypothesis. Record it only when the cause is already known — self-evident from the symptom, or surfaced before authoring; fold it into Description when self-evident. Otherwise leave it out: diagnosing a cause requires heavy code reading and is done at implementation time. Reproduction is still required; only the cause may be deferred. Do not assert an undiagnosed hypothesis as the cause.
+- Root Cause — the diagnosed mechanism behind the wrong behavior: the specific code path, state, or condition responsible, pinned by evidence (a runtime-grounded claim per `./runtime-grounded-claims.md`), not an asserted hypothesis. Record it only when the cause is already known — self-evident from the symptom, or surfaced before authoring; fold it into Description when self-evident. Otherwise leave it out: diagnosing a cause requires heavy code reading and is done at implementation time. Reproduction is still required; only the cause may be deferred. Do not assert an undiagnosed hypothesis as the cause.
 
 Do not record the fix approach or a step sequence in the body — those are worked out against the current code at implementation time.
 
