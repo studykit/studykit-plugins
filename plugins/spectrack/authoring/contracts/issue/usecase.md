@@ -24,11 +24,13 @@ Recommended sections:
 - `Current Draft` — short current summary or link to the curated page draft.
 - `Open Questions` — outstanding questions, one per bullet.
 
-Optional sections:
+Common optional sections — add when useful, and these are examples, not a closed set:
 
 - `Related Work` — related tasks, specs, reviews, research, or pages.
 - `Supersedes` — prior use case when replacing one.
 - `Resume` — current-state snapshot while shaping.
+
+Add any other section the use case discovery needs and fill it in; keep each section narrow and use canonical Title Case names (`./common.md`).
 
 Use comments for conversation, interview notes, and feedback threads.
 
