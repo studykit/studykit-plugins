@@ -7,13 +7,7 @@ Read after:
 - `../../../contracts/knowledge/usecase.md`
 - `./convention.md`
 
-## Scope
-
-Use this binding for GitHub repository Markdown `usecase` pages. The final body structure is listed below.
-
 ## Final body structure
-
-Use this final GitHub repository Markdown body structure for `usecase` pages.
 
 Common required sections are defined by `../../../contracts/knowledge/usecase.md`:
 

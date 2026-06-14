@@ -21,10 +21,10 @@ Required sections:
 
 - `Context` — why the research was needed and what question it answers.
 
-Required by mode:
+Required by shape — exactly one of:
 
-- **Comparative mode** — an `Options` section. Each option appears as a subsection that includes `Sources Consulted` and `Key Findings` content.
-- **Single mode** — a `Findings` section that includes `Sources Consulted` and `Key Findings` content.
+- When the research compares two or more named options — an `Options` section. Each option appears as a subsection that includes `Sources Consulted` and `Key Findings` content.
+- Otherwise — a `Findings` section that includes `Sources Consulted` and `Key Findings` content.
 
 Optional sections:
 
@@ -43,7 +43,7 @@ Publish or update the curated report when:
 - The research question is clear.
 - Sources consulted are listed.
 - Findings are grounded in sources.
-- Comparative reports cover each option with similar depth or explain why not.
+- Reports that compare options cover each option with similar depth or explain why not.
 - Limitations or confidence boundaries are visible.
 - The report can be cited by a spec, task, or review without relying on hidden discussion.
 

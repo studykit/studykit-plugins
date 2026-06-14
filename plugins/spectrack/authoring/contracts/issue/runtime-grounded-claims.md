@@ -1,8 +1,9 @@
-# Issue Body Conventions
+# Runtime-Grounded Claims
 
-Body-level rules for issue-backed items (`task`, `bug`, `spike`, `epic`, `review`, and the issue side of `usecase` and `research`). Type-specific authoring files define each type's required sections; add any other section the issue needs, keep each section narrow and the body short, and use canonical Title Case section names. Read with `./common.md`.
-
-## Runtime-grounded claims
+The grounding rule for assertions about runtime behavior in an issue body.
+It applies to implementation-bearing types — `task`, `bug`, and `spike` — where
+a downstream decision rests on what the running system actually does. Read with
+`./common.md` (issue rules, body conventions).
 
 A *runtime-grounded claim* is an assertion about runtime behavior that a
 downstream decision rests on — a measurement, the output of a command, an

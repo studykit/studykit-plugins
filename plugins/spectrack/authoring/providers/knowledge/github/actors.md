@@ -7,13 +7,7 @@ Read after:
 - `../../../contracts/knowledge/actors.md`
 - `./convention.md`
 
-## Scope
-
-Use this binding for GitHub repository Markdown `actors` pages. The final body structure is listed below.
-
 ## Final body structure
-
-Use this final GitHub repository Markdown body structure for `actors` pages.
 
 Common required sections are defined by `../../../contracts/knowledge/actors.md`:
 

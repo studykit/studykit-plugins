@@ -58,7 +58,6 @@ def test_bare_review_resolution_uses_absolute_authoring_files() -> None:
     assert resolution.target is None
     assert resolution.provider == "github"
     assert _rel_paths(resolution.files) == [
-        "contracts/issue/body.md",
         "contracts/issue/common.md",
         "contracts/issue/review.md",
         "providers/issue/github/convention.md",
@@ -307,6 +306,32 @@ def test_decomposition_eligible_types_include_decomposition_patterns(
     )
 
 
+@pytest.mark.parametrize("artifact_type", ["task", "bug", "spike"])
+def test_runtime_grounded_types_include_grounding_rule(artifact_type: str) -> None:
+    resolution = resolve_authoring(
+        artifact_type, side="issue", mode=_mode_for(artifact_type)
+    )
+    assert "contracts/issue/runtime-grounded-claims.md" in _rel_paths(resolution.files)
+
+
+@pytest.mark.parametrize(
+    "artifact_type,side",
+    [
+        ("epic", None),
+        ("review", None),
+        ("research", "issue"),
+        ("usecase", "issue"),
+    ],
+)
+def test_non_runtime_grounded_issue_types_exclude_grounding_rule(
+    artifact_type: str, side: str | None
+) -> None:
+    resolution = resolve_authoring(artifact_type, side=side, mode=_mode_for(artifact_type))
+    assert "contracts/issue/runtime-grounded-claims.md" not in _rel_paths(
+        resolution.files
+    )
+
+
 @pytest.mark.parametrize("artifact_type", ["task", "epic"])
 def test_decomposition_patterns_excluded_from_comment_scope(
     artifact_type: str,
@@ -362,9 +387,10 @@ def test_backlog_mode_reads_spec_and_backlog_framing(artifact_type: str) -> None
     assert rels.index(f"contracts/issue/{artifact_type}.md") < rels.index(
         "contracts/issue/backlog.md"
     )
-    # Body convention and provider conventions still apply.
-    assert "contracts/issue/body.md" in rels
+    # Common rules (incl. body conventions), the runtime-grounded-claim rule,
+    # and provider conventions still apply.
     assert "contracts/issue/common.md" in rels
+    assert "contracts/issue/runtime-grounded-claims.md" in rels
     assert "providers/issue/github/convention.md" in rels
 
 
@@ -615,7 +641,6 @@ def test_review_target_usecase_issue_bundles_actors_companion() -> None:
         "contracts/quality/usecase-issue-criteria.md",
         "contracts/usecase-abstraction-guard.md",
         "contracts/quality/actors-criteria.md",
-        "contracts/issue/body.md",
         "contracts/issue/common.md",
         "contracts/issue/review.md",
         "providers/issue/github/convention.md",

@@ -24,11 +24,13 @@ Recommended sections:
 - `Current Draft` — short current summary or link to the curated page draft.
 - `Open Questions` — outstanding questions, one per bullet.
 
-Optional sections:
+Common optional sections — add when useful, and these are examples, not a closed set:
 
 - `Related Work` — related tasks, specs, reviews, research, or pages.
 - `Supersedes` — prior use case when replacing one.
 - `Resume` — current-state snapshot while shaping.
+
+Add any other section the use case discovery needs and fill it in; keep each section narrow and use canonical Title Case names (`./common.md`).
 
 Use comments for conversation, interview notes, and feedback threads.
 
@@ -36,7 +38,7 @@ Use comments for conversation, interview notes, and feedback threads.
 
 Cite each `Actors` entry by the canonical name from the project's actors registry. Before naming an actor in a new use case issue:
 
-1. The actors authoring contract is bundled with the usecase issue authoring contract returned by `spectrack mustread --type usecase --side issue`. Resolve the actors page path with `spectrack prd_path actors`.
+1. Resolve the actors page path with `spectrack prd_path actors`.
 2. If the actor already exists in the registry, reuse the canonical name verbatim.
 3. If the actor is missing, pick a canonical name that fits the registry's naming conventions and list it in the `Actors` bullet. Do not write identity into the issue body; the registry is the only place identity lives.
 

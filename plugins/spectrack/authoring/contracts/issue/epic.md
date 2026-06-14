@@ -8,8 +8,7 @@ Epics are stored in the configured issue backend.
 
 Companion contracts:
 
-- `./body.md`
-- Issue rules: `./common.md`
+- Issue rules and body conventions: `./common.md`
 - Decomposition choice: `./decomposition-patterns.md`
 
 ## When to create an epic
@@ -42,11 +41,13 @@ Recommended sections:
 
 - `Coordination Notes` — current decisions across member issues, constraints, or sequencing notes.
 
-Optional sections:
+Common optional sections — add when useful, and these are examples, not a closed set:
 
 - `Acceptance Criteria` — integration outcome not naturally owned by a single member issue; do not restate per-member criteria.
 - `Resume` — current-state snapshot while open.
 - `Why Discarded` — reason when discarded.
+
+Add any other section the coordination needs and fill it in; keep each section narrow and use canonical Title Case names (`./common.md`).
 
 ## Relationship to knowledge pages
 
