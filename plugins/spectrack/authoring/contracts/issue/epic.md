@@ -8,8 +8,7 @@ Epics are stored in the configured issue backend.
 
 Companion contracts:
 
-- `./body.md`
-- Issue rules: `./common.md`
+- Issue rules and body conventions: `./common.md`
 - Decomposition choice: `./decomposition-patterns.md`
 
 ## When to create an epic

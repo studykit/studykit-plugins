@@ -2,7 +2,6 @@
 
 Read this with:
 
-- `../../../contracts/issue/body.md`
 - `../../../contracts/issue/common.md`
 - `./convention.md`
 

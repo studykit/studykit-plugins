@@ -51,6 +51,11 @@ DECOMPOSITION_TYPES = {"task", "epic"}
 
 PLAN_MODE_TYPES = {"task", "bug"}
 
+# Issue types whose bodies carry assertions about runtime behavior, so they read
+# the runtime-grounded-claim rule. Other issue types only need body conventions
+# (folded into issue/common.md).
+RUNTIME_GROUNDED_TYPES = {"task", "bug", "spike"}
+
 # Authoring intent for task/bug content. Unlike side/scope/target, the
 # resolver cannot infer it from the artifact — the author decides which one
 # applies (capturing not-yet-done work / recording already-done work).
@@ -336,13 +341,14 @@ def _common_parts(
                     "contracts/quality/actors-criteria.md",
                 ])
             parts.extend([
-                "contracts/issue/body.md",
                 "contracts/issue/common.md",
                 "contracts/issue/review.md",
             ])
             return parts
         case (_, None, "issue"):
-            parts = ["contracts/issue/body.md", "contracts/issue/common.md"]
+            parts = ["contracts/issue/common.md"]
+            if artifact_type in RUNTIME_GROUNDED_TYPES:
+                parts.append("contracts/issue/runtime-grounded-claims.md")
         case _:  # (_, None, "knowledge")
             parts = ["contracts/knowledge/body.md"]
 

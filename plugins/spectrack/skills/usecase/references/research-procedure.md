@@ -25,12 +25,10 @@ authoring contract is the contract.
 ## Procedure
 
 1. **Frame the research question with the user.** One question per
-   research issue. Decide the mode:
+   research issue. Decide whether it compares alternatives:
 
-   - `comparative` — comparing two or more named options.
-   - `single` — investigating one topic in depth.
-
-   Capture the option list when `comparative`.
+   - Comparing two or more named options — capture the option list.
+   - Investigating one topic in depth — no option list needed.
 
 2. **Resolve `research` authoring.** Call:
 
@@ -39,7 +37,7 @@ authoring contract is the contract.
    ```
 
    The resolver returns the issue-side body shape (`Description`,
-   `Research Question`, `Mode`, `Options` when comparative, optional
+   `Research Question`, `Options` when comparing alternatives, optional
    `Scope`, `Sources To Check`, `Resume`).
 
 3. **Publish the research issue.** Draft the body under
