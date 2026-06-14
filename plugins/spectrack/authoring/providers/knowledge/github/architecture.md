@@ -7,13 +7,7 @@ Read after:
 - `../../../contracts/knowledge/architecture.md`
 - `./convention.md`
 
-## Scope
-
-Use this binding for GitHub repository Markdown `architecture` pages. The final body structure is listed below.
-
 ## Final body structure
-
-Use this final GitHub repository Markdown body structure for `architecture` pages.
 
 Common required sections are defined by `../../../contracts/knowledge/architecture.md`:
 

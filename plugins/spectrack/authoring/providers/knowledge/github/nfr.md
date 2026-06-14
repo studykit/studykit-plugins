@@ -7,13 +7,7 @@ Read after:
 - `../../../contracts/knowledge/nfr.md`
 - `./convention.md`
 
-## Scope
-
-Use this binding for GitHub repository Markdown `nfr` pages. The final body structure is listed below.
-
 ## Final body structure
-
-Use this final GitHub repository Markdown body structure for `nfr` pages.
 
 Common required sections are defined by `../../../contracts/knowledge/nfr.md`:
 

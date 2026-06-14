@@ -41,7 +41,7 @@ Do not include raw discovery discussion in the curated page; it belongs in the w
 
 ## Actor citation
 
-The actors authoring contract is bundled with the usecase knowledge authoring contract returned by `spectrack mustread --type usecase --side knowledge`. Resolve the actors page path with `spectrack prd_path actors`. Cite each `Actors` entry by canonical name with the per-flow role on the curated page. Do not define new actor identity on this curated page; the registry is the only place identity lives.
+Resolve the actors page path with `spectrack prd_path actors`. Cite each `Actors` entry by canonical name with the per-flow role on the curated page. Do not define new actor identity on this curated page; the registry is the only place identity lives.
 
 ## Publishing rule
 
