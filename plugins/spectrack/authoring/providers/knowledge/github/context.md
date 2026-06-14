@@ -7,13 +7,7 @@ Read after:
 - `../../../contracts/knowledge/context.md`
 - `./convention.md`
 
-## Scope
-
-Use this binding for GitHub repository Markdown `context` pages. The final body structure is listed below.
-
 ## Final body structure
-
-Use this final GitHub repository Markdown body structure for `context` pages.
 
 Common required sections are defined by `../../../contracts/knowledge/context.md`:
 
