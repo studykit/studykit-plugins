@@ -238,16 +238,15 @@ def _resolve_authoring_github_issue(
     artifact_type: str, target: str | None, scope: str, mode: str | None
 ) -> tuple[list[str], list[str]]:
     convention = "providers/issue/github/convention.md"
-    anti_patterns = "providers/issue/github/anti-patterns.md"
     match (scope, target):
         case ("comment", _):
             return [convention], []
         case (_, str()):
-            return [convention, anti_patterns], []
+            return [convention], []
         case _:
             if mode == "backlog":
-                return [convention, anti_patterns], []
-            parts = [convention, anti_patterns]
+                return [convention], []
+            parts = [convention]
             if artifact_type == "usecase":
                 parts.append("providers/knowledge/github/actors.md")
             notes = (
@@ -277,16 +276,15 @@ def _resolve_authoring_jira_issue(
     artifact_type: str, target: str | None, scope: str, mode: str | None
 ) -> tuple[list[str], list[str]]:
     convention = "providers/issue/jira/convention.md"
-    anti_patterns = "providers/issue/jira/anti-patterns.md"
     match (scope, target):
         case ("comment", _):
             return [convention], []
         case (_, str()):
-            return [convention, anti_patterns], []
+            return [convention], []
         case _:
             if mode == "backlog":
-                return [convention, anti_patterns], []
-            parts = [convention, anti_patterns]
+                return [convention], []
+            parts = [convention]
             notes = (
                 [RETROACTIVE_PUBLISH_STATE_JIRA] if mode == "retroactive" else []
             )

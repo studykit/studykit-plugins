@@ -35,7 +35,7 @@ If the verdict you are about to issue is `epic-candidate`, also read:
 
 Do not rely on a prior summary of these files. Re-read them per audit.
 
-This auditor reads direct contract paths rather than going through `spectrack mustread`. The resolver bundle is author-oriented — it includes body / authoring commons, provider conventions, and anti-patterns — and a size-only audit needs only the decomposition contract.
+This auditor reads direct contract paths rather than going through `spectrack mustread`. The resolver bundle is author-oriented — it includes body / authoring commons and provider conventions — and a size-only audit needs only the decomposition contract.
 
 ## Evaluation — Granularity
 
