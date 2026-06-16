@@ -163,10 +163,6 @@ section carries the verdict in natural language; the consumer is an LLM
 and can extract intent from prose. The structured return below carries
 the machine-readable verdict token as a separate surface.
 
-Match the language of the implementation issue. If the issue is in
-Korean, write the comment in Korean. If the issue is in English, write
-in English. Do not mix languages.
-
 #### Verdict section — prose examples
 
 - `ok` — "이 implementer 실행은 보고와 산출물이 일치하고 이슈의 의도대로 구현됐습니다." / "This implementer run's report and artifacts agree, and the work matches the issue's intent."
