@@ -6,7 +6,7 @@ Provider-wide convention rules for issue-backed items stored as Jira issues.
 
 Use these rules for issue-backed items stored in Jira.
 
-This file defines Jira-wide issue writing rules only. Jira body anti-patterns belong in `./anti-patterns.md`.
+This file defines Jira-wide issue writing rules only.
 
 ## Body markup
 
@@ -16,113 +16,22 @@ Canonical section names from common authoring map to `h2. Name` headings. Use `h
 
 Wiki markup has no native task-list. Where common authoring asks for a completion-oriented checklist (for example, `Acceptance Criteria` items), emit each item as a normal bulleted line (`* item`). Do not write `- [ ]` or `- [x]`; those render as literal text in Jira.
 
-For Markdown-to-wiki mistake mappings (Markdown headings, bold, lists, inline code, code fences, links, tables, checklists), see the "Markdown leakage" section in `./anti-patterns.md`.
+## Markdown leakage
 
-## Identity and references
+Jira Data Center descriptions and comments render as Jira wiki markup, not Markdown. Markdown forms that look correct but render as literal text in Jira include:
 
-Use Jira issue keys in visible text.
+- Markdown headings such as `## Description`. Use `h2. Description` instead.
+- Markdown bold `**text**`. Use `*text*` instead.
+- Markdown bulleted lists with `- item`. Use `* item` instead.
+- Markdown checklist items `- [ ] item`. Use a plain bullet `* item` (wiki markup has no native task list).
+- Markdown inline code with backticks. Use `{{text}}` instead.
+- Markdown fenced code blocks with triple backticks. Use `{code:lang}…{code}` or `{noformat}…{noformat}` instead.
+- Markdown link form `[label](url)`. Use `[label|url]` instead.
+- Markdown tables with `| --- |` separator rows. Use `||header|| | row |` instead.
 
-Examples:
+## Accidental strikethrough
 
-- `PROJ-123`.
-- `[PROJ-123]` in GitHub comments when GitHub for Atlassian should create a Jira link.
-- Full Jira URL when outside Jira/Atlassian-aware contexts or when a portable link is needed.
-
-## `Related` body section
-
-A `Related` section (rendered as `h2. Related`) is available to any Jira issue type.
-
-Use it for human-readable references: implementation anchors, non-Jira review targets, follow-up work, external pages, or other soft references.
-
-When used:
-
-- Start with one bullet (`* …`) per related reference.
-- Keep descriptions short.
-
-## Provider update intent
-
-When running `spectrack issue update` or
-`spectrack issue {state <KEY> <verb>|assign|unassign|set-type}`
-to update provider-owned Jira issue fields, supply only the values needed
-for the requested update.
-
-Generic supported update intents:
-
-- Issue key, plus desired summary/title when changing the Jira issue title.
-- Issue key, plus the workflow type whose Jira issuetype to apply when
-  swapping the issuetype (`issue set-type`). The script
-  resolves the native Jira issuetype name via the `artifact_issue_types`
-  mapping.
-- Issue key, plus assignee username (or the literal `me`) when changing
-  the assignee (`issue assign|unassign`).
-- Issue key, plus the configured `state_transitions` mapping when closing
-  or reopening (`issue state <KEY> close|reopen` or any configured verb).
-
-Do not ask for generic status or priority changes from this contract.
-Those writes require a separate project-specific workflow extension that
-documents and supports the selected field or transition.
-
-## Comments and logs
-
-Use Jira comments, history, and worklog for discussion and work logs.
-
-Do not create a body `Log` section (`h2. Log`). Keep the issue body structured and current.
-
-## Implementation summary comments
-
-When updating an issue after implementation, keep the comment concise.
-
-Recommended shape (wiki markup):
-
-```text
-Implemented <short outcome>.
-
-Why:
-* <reason this change was needed>
-
-Summary:
-* <material change>
-* <material change>
-
-Validation: local workflow checks passed.
-```
-
-Rules:
-
-- Include `Why:` when the motivation is not obvious, the change removes
-  behavior or documentation, or the work changes an agent, provider, or
-  authoring boundary.
-- Do not paste unit test output, test file lists, or verbose validation logs into issue comments.
-- Do not list commit references by default. When commit subjects prefix the
-  Jira issue key (`ABC-123 …`) and the project has a DVCS or Smart Commit
-  integration, Jira already links those commits to the issue.
-- Include commit reference bullets only when the auto-link cannot fire (no
-  DVCS integration, commits in a different repository, or commits whose
-  subject does not carry the issue key) or when a few commits in a large set
-  need explicit highlighting.
-- Keep implementation details high-level; link or reference changed files only when the distinction matters.
-
-## Branch, commit, and PR conventions
-
-Default branch pattern:
-
-```text
-PROJ-123-some-name
-```
-
-Default commit pattern:
-
-```text
-PROJ-123 <summary>
-```
-
-Default PR title pattern:
-
-```text
-PROJ-123 <summary>
-```
-
-A slash branch pattern such as `PROJ-123/some-name` may work, but the default is hyphen for compatibility with Atlassian examples and common tooling.
+Jira renders `-text-` as strikethrough, so stray hyphen pairs in literals (`@body-K`, `->`, `1-2`) can strike through unintentionally. `{{...}}` is styling, not a raw block — it does not suppress this. For such strings use `{noformat}`/`{code}`, or escape the hyphen inline as `\-`.
 
 ## Smart Commits
 
