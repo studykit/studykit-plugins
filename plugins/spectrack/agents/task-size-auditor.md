@@ -70,8 +70,6 @@ Write the full prose review to the sidecar audit report path described above usi
 
 The sidecar file is Markdown prose. Do not include a `Recommendation:` line, a verdict enum field, or any other machine-readable label. The first paragraph carries the conclusion in natural language; the consumer is an LLM and can extract intent from prose.
 
-Match the language of the draft. If the draft is in Korean, write the review in Korean. If the draft is in English, write in English. Do not mix languages.
-
 #### First paragraph: the conclusion
 Name the verdict in natural prose using a phrase the calling LLM can recognize unambiguously. Examples:
 

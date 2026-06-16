@@ -177,9 +177,6 @@ modes the review is Markdown **prose**: no `Recommendation:` line, no verdict
 enum field, no machine-readable label inside the prose. The first paragraph
 carries the conclusion in natural language and the consumer is an LLM.
 
-Match the language of the source. If the plan or issue is in Korean, write the
-review in Korean; if in English, write in English. Do not mix languages.
-
 ### The review body (both modes)
 
 - **First paragraph — the conclusion.** Name the verdict in natural prose using a
