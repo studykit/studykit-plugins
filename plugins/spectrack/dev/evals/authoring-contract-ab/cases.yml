@@ -1,0 +1,73 @@
+# GitHub-only A/B cases for comparing SpecTrack issue drafting with and without
+# resolver-returned authoring contracts. These cases are intentionally not pytest
+# fixtures: they evaluate prose judgment, not executable behavior.
+
+cases:
+  - id: task_simple_cache_guard
+    type: task
+    provider: github
+    mode: backlog
+    input: |
+      Add a freshness guard before writing issue body updates. If the cached
+      issue body was fetched before the remote issue changed, refuse the update
+      unless the user explicitly passes an overwrite flag.
+
+  - id: task_auth_policy_contract
+    type: task
+    provider: github
+    mode: backlog
+    input: |
+      Add project-level authorization policy checks for workflow issue updates.
+      Different teams may configure who can update issue state, labels, and body.
+
+  - id: bug_unknown_root_cause
+    type: bug
+    provider: github
+    mode: backlog
+    input: |
+      Users report that issue comments sometimes disappear from the local cache
+      after running fetch. We don't know why yet. It seems to happen after
+      multiple comments are edited quickly.
+
+  - id: bug_repro_cli_flag
+    type: bug
+    provider: github
+    mode: backlog
+    input: |
+      `spectrack issue update --issue 123 --set-labels bug,task` silently keeps
+      both labels even though only one workflow type label should remain. Repro:
+      fetch issue 123, run the update command, then fetch again; both labels are
+      present.
+
+  - id: spike_provider_rate_limit
+    type: spike
+    provider: github
+    input: |
+      We need to know whether GitHub's GraphQL API can reliably return all
+      parent, child, blocking, and related issue relationships in one request for
+      repositories with thousands of issues.
+
+  - id: research_issue_linking_options
+    type: research
+    provider: github
+    side: issue
+    input: |
+      Compare GitHub native sub-issues, issue tasklists, labels, and cross-links
+      as options for representing parent/child task relationships in SpecTrack.
+
+  - id: review_multi_concern_pressure
+    type: review
+    provider: github
+    input: |
+      The proposed cache-write task mixes two concerns: refusing stale writes and
+      redesigning the cache directory layout. It also doesn't say how the user
+      can recover after a refusal.
+
+  - id: epic_or_parent_task_migration
+    type: epic
+    provider: github
+    input: |
+      Coordinate the migration from ad-hoc issue body writes to
+      cache-fingerprint protected writes across GitHub and Jira. Work includes
+      updating both providers, writing tests for stale-write refusal, updating
+      docs, and adding a fallback workflow for users who need to overwrite.

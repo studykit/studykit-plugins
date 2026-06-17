@@ -4,11 +4,6 @@ This file covers the **issue side** of `research`: the workflow issue used for s
 
 Common rules that apply across both sides (definition, dual-role overview, when research is warranted, decision neutrality) live in `../research.md`. Read that file in addition to this one.
 
-Companion contracts:
-
-- Issue rules and body conventions: `./common.md`
-- Research rules common to both sides: `../research.md`
-
 ## Storage role (issue side)
 
 The workflow issue lives on the configured issue backend. Purpose: scope, questions, discussion, status, review, and follow-up tracking. The workflow issue may exist on its own while the investigation is in progress; the curated report is added later when findings stabilize.
@@ -23,34 +18,23 @@ Recommended sections:
 - `Research Question` — single question or comparison objective.
 - `Options` — alternatives being compared, one per bullet; include when the research compares two or more named options.
 
-Common optional sections — add when useful, and these are examples, not a closed set:
+Common optional sections:
 
 - `Scope` — in-scope and out-of-scope boundaries.
 - `Sources To Check` — initial source list or search plan.
 - `Resume` — current-state snapshot while in progress.
 
-Add any other section the investigation needs and fill it in; keep each section narrow and use canonical Title Case names (`./common.md`).
+Add purposeful sections when useful. Research may produce a conditional recommendation under stated constraints, but it should distinguish evidence, inference, recommendation, and open verification gaps; do not commit the project to a design before evidence is collected.
 
 Use comments for ongoing notes, links discovered midstream, and review discussion. Promote stable findings into the curated report when ready.
 
 ## Review before done
 
-Before marking research `done`, perform or request a quality review for:
-
-- Source quality.
-- Claim grounding.
-- Option balance when alternatives are compared.
-- Missing criteria.
-- Bias or premature decision-making.
-- Clear limitations.
+Before marking research `done`, perform or request a quality review for source
+quality, claim grounding, balanced alternatives, missing criteria, bias,
+premature decisions, and clear limitations.
 
 Review findings should become `review` items if they need workflow tracking.
-
-## Common mistakes (issue side)
-
-- Treating the issue body as the final deliverable instead of promoting findings to the curated report when a knowledge backend is configured.
-- Marking research `done` before a citable report exists or before the issue explains why no report is needed.
-- Hiding source links in comments instead of consolidating them into the curated report.
 
 ## Do not (issue side)
 

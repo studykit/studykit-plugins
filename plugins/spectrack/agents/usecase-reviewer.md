@@ -43,10 +43,9 @@ spectrack prd_path actors
 ```
 
 The call returns the review criteria files (use case quality +
-actors registry quality) bundled with the review issue authoring
-chain needed to publish findings. The criteria files are the
-authoritative rules you apply to every use case and (when present)
-to the actors registry.
+actors registry quality) plus common issue body conventions. The
+criteria files are the authoritative rules you apply to every use
+case and (when present) to the actors registry.
 
 ## What you read
 
@@ -154,8 +153,8 @@ Track the count of dedup hits per case in the return summary's
 For each finding that survived deduplication:
 
 1. **Draft the `review` body** under
-   `<review-draft-dir>/<finding-slug>.md`. Follow the resolver-returned
-   review body shape; agent-specific points beyond that:
+   `<review-draft-dir>/<finding-slug>.md`. Use purposeful sections;
+   agent-specific requirements:
 
    - In `Description`, name the targeted `usecase` ref(s) and (for
      overlap or cross-use-case findings) the related refs.
@@ -288,9 +287,10 @@ trailing prose.
   Findings go through `review` issues only.
 - Do not edit knowledge pages. Knowledge findings still publish a
   `review` issue; the resolution lives elsewhere.
-- Do not pack multiple concerns into one `review` issue. The
-  session-summary review is the only exception: it is a meta-review
-  that anchors the run, not a multi-concern finding.
+- Do not pack unrelated findings into one `review` issue. Tightly
+  coupled details may stay together when they explain the same
+  target problem. The session-summary review is the only exception:
+  it is a meta-review that anchors the run, not a finding.
 - Do not invent placeholder targets. Every `review` issue names a
   concrete use case or knowledge surface in `Description`.
 - Do not edit the body or change the state of pre-existing open

@@ -24,7 +24,7 @@ The calling session names:
 - **`plan`** — the approved approach, inline or as an absolute path to a plan file. This is the plan of record: it was settled in the calling session's implement-time planning pass (decided against the current code, audited, user-approved) and handed to you here, because the body carries no plan. It names the chosen approach and the code coordinates it rests on; you derive the concrete steps from it.
 - **extra requirements** — optional emphasis to weave into execution ("focus on X", "skip Y", "use library Z").
 
-If no `issue-ref` is supplied, stop and ask. If no approved approach was handed in (`plan` absent), stop with `paused` — the body is a spec, not a plan; the approach is settled upstream, not invented here.
+If no `issue-ref` is supplied, stop and ask. If no approved approach was handed in (`plan` absent), stop with `paused` — the body is a spec, not a plan; the approach is settled upstream, not invented here. The paused reason must start with `No approved approach was handed in` so the caller can recognize this gate reliably.
 
 ## Scope
 
@@ -46,7 +46,7 @@ For `bug`, add the regression test first and confirm it fails on the unfixed cod
 
 6. **Commit.** Stage only the files the approach covered. Split into meaningful commits (implementation, tests, scaffolding, tooling) and follow the injected commit-prefix policy on every subject. In worktree mode, always push the worktree's branch to the remote — the worktree is temporary, and the pushed branch is how the work reaches the user for review, PR, or merge. In in-place mode, the commits land on the current branch — no branch creation; whether they are pushed follows the project's own conventions. Do not list commit SHAs in issue bodies or comments — the provider's timeline already links commits via the ref-prefixed subject.
 
-7. **Refresh `Resume`.** Body-only writeback via `spectrack issue update`: `Approach` summarises what landed, `Waiting for` is "user review/merge", `Open questions` enumerates any deferred AC, `Next` is "review and merge". Do not name the branch in the body; do not transition issue state — the user resolves the issue after merge.
+7. **Refresh `Resume`.** Body-only writeback via `spectrack issue update`: `Approach` summarises what landed, `Waiting for` is "user review/merge", `Open questions` contains only non-blocking follow-up questions, and `Next` is "review and merge". Do not put an unfinished required Acceptance Criterion in `Open questions`, `Deferred`, or follow-up text under an `implemented` report; if a required AC cannot be completed, stop with `paused` instead. Do not name the branch in the body; do not transition issue state — the user resolves the issue after merge.
 
 8. **Report.** Return the structured `<report>` block (see `## Output`).
 
