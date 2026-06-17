@@ -237,16 +237,15 @@ def resolve_side(
 def _resolve_authoring_github_issue(
     artifact_type: str, target: str | None, scope: str, mode: str | None
 ) -> tuple[list[str], list[str]]:
-    convention = "providers/issue/github/convention.md"
     match (scope, target):
         case ("comment", _):
-            return [convention], []
+            return [], []
         case (_, str()):
-            return [convention], []
+            return [], []
         case _:
             if mode == "backlog":
-                return [convention], []
-            parts = [convention]
+                return [], []
+            parts: list[str] = []
             if artifact_type == "usecase":
                 parts.append("providers/knowledge/github/actors.md")
             notes = (

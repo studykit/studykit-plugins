@@ -1,13 +1,5 @@
 # Jira Issue Provider Convention
 
-Provider-wide convention rules for issue-backed items stored as Jira issues.
-
-## Scope
-
-Use these rules for issue-backed items stored in Jira.
-
-This file defines Jira-wide issue writing rules only.
-
 ## Body markup
 
 Jira Data Center issue descriptions and comments render as **Jira wiki markup**, not GitHub Markdown. Emit wiki markup when writing any Jira issue body or comment.

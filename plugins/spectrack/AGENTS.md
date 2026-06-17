@@ -1,5 +1,8 @@
 # SpecTrack
 
+This AGENTS.md file is for SpecTrack plugin contributors. It is not runtime
+guidance for LLMs using an installed SpecTrack plugin.
+
 The SpecTrack plugin's Python sources live in `scripts/`; tests live in
 `tests/`. There is no `pyproject.toml` — each script declares its own PEP 723
 inline metadata and the bundled `scripts/spectrack` launcher runs it via

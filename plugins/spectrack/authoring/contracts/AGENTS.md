@@ -1,5 +1,8 @@
 # Common Authoring Instructions
 
+This AGENTS.md file is for SpecTrack plugin contributors. It is not runtime
+guidance for LLMs using an installed SpecTrack plugin.
+
 Files in this directory define provider-neutral workflow authoring contracts only.
 
 - Do not include provider-specific rules, examples, API details, transport notes, or relationship handling.
@@ -22,9 +25,8 @@ Write common file prose so a reader unfamiliar with the selected backend can sti
 
 Common files describe **section meaning** (what a section is for, when it is required, what it must contain). They do not define the literal markup form used to render that section.
 
-The literal markup for headings, paragraphs, lists, inline emphasis, links, code blocks, tables, checklists, and any provider-only constructs (panels, info macros, smart links, etc.) is defined by the matching provider convention file:
+The literal markup for headings, paragraphs, lists, inline emphasis, links, code blocks, tables, checklists, and any provider-only constructs (panels, info macros, smart links, etc.) is defined by the matching provider convention file when one exists:
 
-- `../providers/issue/github/convention.md`
 - `../providers/knowledge/github/convention.md`
 - `../providers/issue/jira/convention.md`
 
