@@ -60,7 +60,6 @@ def test_bare_review_resolution_uses_absolute_authoring_files() -> None:
     assert _rel_paths(resolution.files) == [
         "contracts/issue/common.md",
         "contracts/issue/review.md",
-        "providers/issue/github/convention.md",
     ]
     assert all(path.is_absolute() for path in resolution.files)
     assert all("plugins/spectrack/operator" not in str(path) for path in resolution.files)
@@ -250,9 +249,7 @@ def test_comment_scope_github_issue_resolution_uses_only_comment_relevant_files(
 
     assert resolution.side == "issue"
     assert resolution.provider == "github"
-    assert _rel_paths(resolution.files) == [
-        "providers/issue/github/convention.md",
-    ]
+    assert _rel_paths(resolution.files) == []
 
 
 def test_comment_scope_jira_issue_resolution_uses_only_comment_relevant_files() -> None:
@@ -385,11 +382,10 @@ def test_backlog_mode_reads_spec_and_backlog_framing(artifact_type: str) -> None
     assert rels.index(f"contracts/issue/{artifact_type}.md") < rels.index(
         "contracts/issue/backlog.md"
     )
-    # Common rules (incl. body conventions), the runtime-grounded-claim rule,
-    # and provider conventions still apply.
+    # Common rules (incl. body conventions) and the runtime-grounded-claim rule
+    # still apply.
     assert "contracts/issue/common.md" in rels
     assert "contracts/issue/runtime-grounded-claims.md" in rels
-    assert "providers/issue/github/convention.md" in rels
 
 
 @pytest.mark.parametrize("artifact_type", ["task", "bug"])
@@ -641,7 +637,6 @@ def test_review_target_usecase_issue_bundles_actors_companion() -> None:
         "contracts/quality/actors-criteria.md",
         "contracts/issue/common.md",
         "contracts/issue/review.md",
-        "providers/issue/github/convention.md",
     ]
     assert resolution.notes == ()
 

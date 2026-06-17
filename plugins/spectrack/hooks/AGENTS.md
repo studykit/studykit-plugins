@@ -1,5 +1,8 @@
 # plugins/spectrack/hooks/
 
+This AGENTS.md file is for SpecTrack plugin contributors. It is not runtime
+guidance for LLMs using an installed SpecTrack plugin.
+
 Hook adapter layer. Substantive logic lives in
 `../scripts/hook.py` and `../scripts/main_context.py`;
 this directory holds the host-specific entry scripts, manifests, and
