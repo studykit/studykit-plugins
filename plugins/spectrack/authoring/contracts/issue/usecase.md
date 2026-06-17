@@ -1,21 +1,14 @@
 # Use Case Authoring — Issue Side
 
-This file covers the **issue side** of `usecase`: the workflow issue used for discovery, questions, discussion, status, and feedback.
-
-Common rules that apply across both sides (definition, dual-role overview, abstraction discipline) live in `../usecase.md`. Read that file in addition to this one.
-
-Companion contracts:
-
-- Issue rules: `./common.md`
-- Use case rules common to both sides: `../usecase.md`
+This file covers the issue-side workflow item for shaping a use case. The curated use case, when stable, lives on the knowledge side.
 
 ## Storage role (issue side)
 
-The workflow issue lives on the configured issue backend. Purpose: discovery, questions, review, status, discussion, and task linkage. The workflow issue may exist on its own while the use case is being shaped; the curated knowledge page is added later when the flow stabilizes.
+Purpose: discovery, questions, status, feedback, and task linkage while the flow is being shaped.
 
 ## Workflow issue body
 
-The workflow issue body should summarize discovery state and link to the curated page when one exists.
+The issue body summarizes discovery state and links to the curated page when one exists.
 
 Recommended sections:
 
@@ -24,41 +17,25 @@ Recommended sections:
 - `Current Draft` — short current summary or link to the curated page draft.
 - `Open Questions` — outstanding questions, one per bullet.
 
-Common optional sections — add when useful, and these are examples, not a closed set:
+Common optional sections:
 
 - `Related Work` — related tasks, specs, reviews, research, or pages.
 - `Supersedes` — prior use case when replacing one.
 - `Resume` — current-state snapshot while shaping.
 
-Add any other section the use case discovery needs and fill it in; keep each section narrow and use canonical Title Case names (`./common.md`).
+Add purposeful sections when useful.
 
 Use comments for conversation, interview notes, and feedback threads.
 
 ## Actor citation
 
-Cite each `Actors` entry by the canonical name from the project's actors registry. Before naming an actor in a new use case issue:
-
-1. Resolve the actors page path with `spectrack prd_path actors`.
-2. If the actor already exists in the registry, reuse the canonical name verbatim.
-3. If the actor is missing, pick a canonical name that fits the registry's naming conventions and list it in the `Actors` bullet. Do not write identity into the issue body; the registry is the only place identity lives.
+Cite `Actors` entries by canonical names from the actors registry. Do not define actor identity in the issue body; the registry is the only place identity lives.
 
 ## Splitting a use case
 
 Split a use case when the actor goal forks or the flow contains multiple independent goals.
 
-When splitting:
-
-1. Confirm the split with the user.
-2. Create separate workflow issues for the child use cases.
-3. Link parent and child workflow issues according to the selected issue authoring files.
-4. Do not use supersession unless an older published use case is being replaced.
-
-## Common mistakes (issue side)
-
-- Writing internal system mechanics into the use case issue.
-- Creating tasks from a use case whose flow or expected outcome is still unclear.
-- Leaving the workflow issue without a link to the curated page after publication.
-- Discarding discovery discussion that should have been promoted to the body or to a curated page.
+When splitting, confirm with the user, create separate child use case issues, link parent/child issues, and use supersession only when replacing an older published use case.
 
 ## Do not (issue side)
 

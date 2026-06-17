@@ -1,87 +1,40 @@
 # Epic Authoring
 
-A workflow epic is an **issue-backed coordination parent** for a larger goal delivered through multiple member issues.
-
-The epic is not an implementation unit; the work belongs to its member issues. The parent body carries coordination narrative and integration-level outcomes, not a task-shaped implementation contract.
-
-Epics are stored in the configured issue backend.
-
-Companion contracts:
-
-- Issue rules and body conventions: `./common.md`
-- Decomposition choice: `./decomposition-patterns.md`
+A workflow epic is an issue-backed coordination parent. It is not an implementation unit; member issues own the work.
 
 ## When to create an epic
 
-Create an epic only when the work matches one of these canonical scopes:
+Create an epic only for coordination-heavy scopes:
 
-- **Feature initiative** — a user-facing feature delivered through multiple coordinated members, with an integration-level outcome (such as end-to-end behavior or rollout gate) that no single member owns.
-- **Platform or subsystem capability** — a new platform component or subsystem whose delivery requires multiple coordinated members with shared sequencing or interface decisions.
-- **Migration or campaign** — moving from an old system to a new one, or applying a cross-cutting change across many call sites; member types are usually mixed (`task`, `bug`, `spike`, `research`).
-- **Stabilization or quality initiative** — a coordinated effort to improve a quality dimension (flake reduction, observability rollout, deprecation cleanup) where the integration-level outcome is an external metric.
+- **Feature initiative** — user-facing feature delivered through coordinated members.
+- **Platform or subsystem capability** — new shared capability with sequencing or interface decisions.
+- **Migration or campaign** — cross-cutting change or old-to-new move, often with mixed member types.
+- **Stabilization or quality initiative** — coordinated quality work with an external metric.
 
-Do not create an epic when:
+Do not create an epic when one issue is enough, a knowledge page is the real home, the parent would naturally pass as a task, or members are unrelated.
 
-- One issue is enough.
-- A spec, architecture, or domain page is the real home for the decision.
-- The decomposition has only 2–3 task-typed slices and the parent body would naturally pass as a task — use a parent task with subtasks per `./decomposition-patterns.md` instead.
-- Members are unrelated and have no shared narrative or anchor.
+Parent task vs epic discriminator: the epic body cannot stand as a task. If the parent has meaningful implementation-level `Acceptance Criteria`, use a parent task instead.
 
-Parent task vs epic discriminator: the epic body cannot stand as a task. If a draft parent body would have meaningful integration-level `Acceptance Criteria` at the parent level, the parent is a task, not an epic. See `./decomposition-patterns.md`.
-
-The epic body is the home for shared narrative across member issues (decisions, integration constraints, shared blockers, sequencing, scope changes). See the Shared narrative section in `./decomposition-patterns.md`.
+The epic body is the shared narrative home for member issues: decisions, shared behavioral invariants, integration constraints, integration-level verification, blockers, sequencing, and scope changes.
 
 ## Body shape
 
-Required sections:
+Minimum section:
 
 - `Description` — what the member issues together accomplish and why they are grouped.
 
-Recommended sections:
+Common optional sections:
 
-- `Coordination Notes` — current decisions across member issues, constraints, or sequencing notes.
-
-Common optional sections — add when useful, and these are examples, not a closed set:
-
-- `Acceptance Criteria` — integration outcome not naturally owned by a single member issue; do not restate per-member criteria.
+- `Acceptance Criteria` — integration outcome or shared invariant not naturally owned by a single member issue; do not restate per-member criteria.
+- `Member Workstreams` — natural member clusters and sequencing when useful.
+- `Coordination Notes` — current decisions, constraints, or sequencing notes.
 - `Resume` — current-state snapshot while open.
 - `Why Discarded` — reason when discarded.
 
-Add any other section the coordination needs and fill it in; keep each section narrow and use canonical Title Case names (`./common.md`).
-
-## Relationship to knowledge pages
-
-Epics coordinate work. They do not define the product, architecture, or implementation contract.
-
-Use knowledge pages for durable content:
-
-- User-facing behavior → use case curated page.
-- Implementation contract → spec.
-- Component shape → architecture.
-- Vocabulary → domain.
-- Non-functional target → nfr.
-
-If an epic discussion creates durable knowledge, update the relevant knowledge page and add a `Change Log` entry there.
+Add purposeful sections when useful. Keep member-level implementation detail out, but include shared invariants, integration-level verification, sequencing, and member workstreams when they coordinate the batch.
 
 ## Completion criteria
 
-Completion is author-judged; closing all member issues does not automatically close the epic.
+Completion is author-judged; closing all member issues does not automatically close the epic. Complete only when the coordinated outcome is reached or descoped, members are closed/discarded/moved, and integration-level criteria are satisfied or waived.
 
-An epic is complete when:
 
-- The coordinated outcome has been reached or explicitly descoped.
-- Member issues are closed, discarded, or moved elsewhere.
-- Integration-level acceptance criteria are satisfied or explicitly waived.
-
-## Common mistakes
-
-- Using an epic as a spec or architecture document.
-- Duplicating per-member-issue details in the epic body.
-- Closing the epic while active member issues still depend on it.
-- Nesting epics without explicit backend support and configuration.
-
-## Do not
-
-- Do not put implementation details or member-level acceptance criteria in the epic.
-- Do not discard member issues automatically when discarding an epic.
-- Do not store durable design decisions only in the epic; update the relevant knowledge page.

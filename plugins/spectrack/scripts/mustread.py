@@ -337,10 +337,7 @@ def _common_parts(
                     "contracts/usecase-abstraction-guard.md",
                     "contracts/quality/actors-criteria.md",
                 ])
-            parts.extend([
-                "contracts/issue/common.md",
-                "contracts/issue/review.md",
-            ])
+            parts.append("contracts/issue/common.md")
             return parts
         case (_, None, "issue"):
             parts = ["contracts/issue/common.md"]
@@ -351,6 +348,8 @@ def _common_parts(
 
     if artifact_type in PRD_COMPONENT_TYPES:
         parts.append("contracts/prd.md")
+    if artifact_type == "review":
+        return parts
     if artifact_type in DUAL_TYPES:
         parts.append(f"contracts/{artifact_type}.md")
         parts.append(f"contracts/{side}/{artifact_type}.md")
@@ -363,11 +362,6 @@ def _common_parts(
             "contracts/usecase-abstraction-guard.md",
             "contracts/knowledge/actors.md",
         ])
-    if mode == "backlog":
-        # A backlog item is the open spec: the type contract above defines the
-        # spec sections; backlog.md frames how to capture them (brief to
-        # detailed, no cause/approach/steps in the body).
-        parts.append("contracts/issue/backlog.md")
     return parts
 
 

@@ -62,6 +62,12 @@ For every concrete claim in the report, find the artifact that backs it.
 - **Resume writeback.** Compare the issue's `Resume` section against
   what the report implies happened. A stale `Resume` under an
   `implemented` claim is a fidelity gap.
+- **Deferred-work evasion.** Treat an `implemented` report as a claim
+  that all required Acceptance Criteria are done. If the refreshed
+  `Resume`, `Open Questions`, `Deferred`, `Follow-up`, or report text
+  moves a required AC into future work, the report is inaccurate unless
+  it explicitly reports a non-implemented state. Do not accept a
+  required AC as "open" or "deferred" under `implemented`.
 
 ### 2. AC evidence quality
 
@@ -79,6 +85,10 @@ evidence backs the report's claim that it was verified.
   file, a commit message naming the validation output, or a `Resume`
   carrying the result). PoC code alone is not evidence — the conclusion
   must be recorded somewhere durable.
+- Open questions, deferred sections, or follow-up notes are not AC
+  evidence. When they name a required AC as unfinished, score that first
+  as `report-claim-inaccurate` under the priority table; when they merely
+  lack evidence for a claimed-complete AC, score it as `weak-ac-evidence`.
 
 Do not re-run tests. Verify the **shape and presence** of evidence, not
 its passing.
@@ -106,7 +116,7 @@ pre-empt later ones because they invalidate the analysis of later axes.
 | Priority | Verdict | Trigger |
 |---|---|---|
 | 1 | `unverifiable` | Required artifacts are unreachable (worktree cleaned up, remote inaccessible, issue ref invalid) and the audit cannot complete. |
-| 2 | `report-claim-inaccurate` | At least one report claim contradicts an observable artifact — branch not on remote when `implemented` claimed, Resume writeback not applied, state token inconsistent with branch / provider state. |
+| 2 | `report-claim-inaccurate` | At least one report claim contradicts an observable artifact — branch not on remote when `implemented` claimed, Resume writeback not applied, state token inconsistent with branch / provider state, or an `implemented` run parks a required AC in `Open Questions`, `Deferred`, `Follow-up`, or equivalent future-work text. |
 | 3 | `intent-divergence` | What landed on the branch contradicts the issue's stated intent in a load-bearing way, and the report does not surface the divergence. |
 | 4 | `weak-ac-evidence` | At least one AC the report treats as verified lacks concrete evidence. |
 | 5 | `ok` | All three axes pass. |

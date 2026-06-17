@@ -59,7 +59,6 @@ def test_bare_review_resolution_uses_absolute_authoring_files() -> None:
     assert resolution.provider == "github"
     assert _rel_paths(resolution.files) == [
         "contracts/issue/common.md",
-        "contracts/issue/review.md",
     ]
     assert all(path.is_absolute() for path in resolution.files)
     assert all("plugins/spectrack/operator" not in str(path) for path in resolution.files)
@@ -375,13 +374,10 @@ def test_backlog_mode_reads_spec_and_backlog_framing(artifact_type: str) -> None
     )
     rels = _rel_paths(resolution.files)
 
-    # Backlog is the open spec: it reads the type's spec contract plus the
-    # backlog framing, with the framing after the contract it frames.
+    # Backlog is the open spec: the mode note carries the backlog-specific
+    # framing, so only the type contract is needed.
     assert f"contracts/issue/{artifact_type}.md" in rels
-    assert "contracts/issue/backlog.md" in rels
-    assert rels.index(f"contracts/issue/{artifact_type}.md") < rels.index(
-        "contracts/issue/backlog.md"
-    )
+    assert "contracts/issue/backlog.md" not in rels
     # Common rules (incl. body conventions) and the runtime-grounded-claim rule
     # still apply.
     assert "contracts/issue/common.md" in rels
@@ -636,7 +632,6 @@ def test_review_target_usecase_issue_bundles_actors_companion() -> None:
         "contracts/usecase-abstraction-guard.md",
         "contracts/quality/actors-criteria.md",
         "contracts/issue/common.md",
-        "contracts/issue/review.md",
     ]
     assert resolution.notes == ()
 
@@ -692,7 +687,7 @@ def test_bare_review_returns_authoring_contract_without_review_files() -> None:
     assert resolution.target is None
     rels = _rel_paths(resolution.files)
     assert "contracts/issue/common.md" in rels
-    assert "contracts/issue/review.md" in rels
+    assert "contracts/issue/review.md" not in rels
     assert "contracts/quality/usecase-issue-criteria.md" not in rels
     assert resolution.reading_anchor == "review-issue"
 

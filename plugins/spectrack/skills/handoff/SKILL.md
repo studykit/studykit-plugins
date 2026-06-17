@@ -19,7 +19,7 @@ Leave durable continuation context for a fresh session that cannot see this conv
 
 - Refresh in-issue resume context first: for every touched mid-flight issue, rewrite the `Resume` section in the issue body so the issue alone shows current approach, who/what it is waiting for, open questions, and the next step. Append a comment only for narrative-worthy events: decision pivots, blocker resolutions, or approach changes.
 - The cached `issue.md` and `comment-*.md` projections are read-only. Resume rewrites and comments must go through the configured provider write scripts via the `spectrack` launcher — see `spectrack issue update --help` and `spectrack issue comment --help`. Mutations require a temp body file, user approval, and the freshness-check flow.
-- Session-level residual that does not fit any in-flight issue's body lands in `review`-type issues. Each review item holds one concern only (`finding` / `gap` / `question`) per `${CLAUDE_PLUGIN_ROOT}/authoring/contracts/issue/review.md`. Do not pack multiple concerns into one review; do not create a review item when an existing in-flight issue's `Resume` or a comment can hold it.
+- Session-level residual that does not fit any in-flight issue's body lands in `review`-type issues. Create one review item per actionable finding, gap, or question; tightly coupled details may stay together when they explain the same target problem. Do not create a review item when an existing in-flight issue's `Resume` or a comment can hold it.
 
 ## Handoff gate
 
@@ -79,11 +79,11 @@ Non-triggers on their own (do not publish a review for these):
 
 3. **Run the Stage 2 residual check.**
    - If no residual remains, stop here and report the no-op outcome.
-   - Otherwise, list each residual concern atomically. One concern per review item. The concern type is one of `finding`, `gap`, or `question` per `${CLAUDE_PLUGIN_ROOT}/authoring/contracts/issue/review.md`.
+   - Otherwise, list each residual as an actionable finding, gap, or question. Split unrelated findings; keep tightly coupled details together when they explain the same target problem.
 
 4. **Publish one `review` issue per residual concern.**
    - Resolve authoring paths: `spectrack mustread --type review` and read the returned files.
-   - Draft each review body per `${CLAUDE_PLUGIN_ROOT}/authoring/contracts/issue/review.md`: a `Description` that states the single concern, why it matters, and what would resolve it; optional `Suggested Fix`, `Evidence`, `Resume`. Identify the target issue or content per the review-target rules; if truly cross-cutting, say so explicitly in `Description`.
+   - Draft each review body with a `Description` that states the finding, why it matters, the target issue/content or cross-cutting scope, and what would resolve it. Add `Evidence`, `Recommended Scope`, or `Resolution Criteria` when useful.
    - Reference related in-flight issues by provider-native ref (`#NNN` for GitHub Issues, `KEY-NNN` for Jira). Do not use cache projection paths as identity. Do not paste issue body or comment content; link instead.
    - Publish via `issue new --type review --title <title> --body-file <path>` after presenting the draft and obtaining user approval. Link siblings or the parent using relationship flags when appropriate.
 

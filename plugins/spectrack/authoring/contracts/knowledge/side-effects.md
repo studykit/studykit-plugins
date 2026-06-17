@@ -20,7 +20,7 @@ Trigger a `review` item when the originating work implies any of:
 | New implementation contract | `spec` page | The work implies an API / schema / protocol shape that needs a `spec` to anchor downstream `task` issues. |
 | Architecture decision implied | `architecture` page | The work forks based on an architectural choice that has not been made. |
 
-Each `review` item contains **one concern** — do not pack several side effects into one item.
+Each `review` item contains one actionable finding — split unrelated side effects, but keep tightly coupled details together when they explain the same target problem.
 
 ## Publish the review item
 
@@ -52,5 +52,5 @@ Each `review` item contains **one concern** — do not pack several side effects
 ## Anti-patterns
 
 - Editing the affected knowledge page inline. The page edit is the work the new `review` item tracks; touching the page directly defeats the trackable-resolution model.
-- Packing multiple knowledge concerns into one `review` item. One item, one concern.
+- Packing unrelated knowledge concerns into one `review` item.
 - Filing a `review` item that has no concrete target ("the docs need work"). Choose the narrowest useful knowledge surface, or explain in `Description` why the concern is cross-cutting.
