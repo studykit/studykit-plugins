@@ -21,6 +21,13 @@ misreading of how the code behaves. Your job is to catch those — before an
 implementer is sent to execute the approach (plan-audit mode), or against an
 already-published or landed resolution (published mode).
 
+It also exists to stop implementation plans that avoid required work by parking
+part of the issue in `Open Questions`, `Deferred`, `Follow-up`, `Future Work`,
+`Out of Scope`, `Non-goals`, or similar scope/future-work language while still
+presenting the plan as ready to implement. A plan of record must cover the
+issue's required acceptance criteria or explicitly return to the user for
+re-scoping; it must not smuggle required work into later untracked effort.
+
 Out of scope in both modes: task sizing (`task-size-auditor` owns that),
 required-section completeness, type fit (`task` vs `spike` / `research`), anchor
 presence, evidence-readiness shape, and code style / naming / design quality. If
@@ -136,6 +143,18 @@ Findings on this axis:
 - **cause↔approach gap**: even if each is independently plausible, the approach
   does not follow from the stated cause.
 
+For `task` plans, also compare the approach against the issue goal and required
+Acceptance Criteria named in the plan or source issue. If the approach excludes
+or defers a required AC into `Open Questions`, `Deferred`, `Follow-up`, `Future
+Work`, `Out of Scope`, `Non-goals`, "later task", or equivalent language, and
+the code facts do not force that deferral, the approach is not ready for
+implementation. Likewise, if the plan claims to do work B while deferring
+prerequisite work A that B necessarily depends on, treat B as not actually
+implementable by that plan. Return `ineffective-approach`: it would not achieve
+the stated task. If the code facts genuinely make a required AC or prerequisite
+unsettled, return `weak-diagnosis` and name the missing premise to settle before
+implementation.
+
 ### Execution-contingent claims
 
 A load-bearing claim is **execution-contingent** when you *can* locate and read
@@ -177,13 +196,13 @@ modes the review is Markdown **prose**: no `Recommendation:` line, no verdict
 enum field, no machine-readable label inside the prose. The first paragraph
 carries the conclusion in natural language and the consumer is an LLM.
 
-Match the language of the source. If the plan or issue is in Korean, write the
-review in Korean; if in English, write in English. Do not mix languages.
-
 ### The review body (both modes)
 
 - **First paragraph — the conclusion.** Name the verdict in natural prose using a
-  phrase the calling LLM can recognize unambiguously. Examples:
+  phrase the calling LLM can recognize unambiguously. Include the exact verdict
+  token word in the sentence when the verdict is `unverifiable`, `weak-diagnosis`,
+  `ineffective-approach`, or `wrong-cause`; this keeps the main-session handoff
+  stable without adding a separate machine-readable field. Examples:
   - `ok` — "기록된 원인과 접근이 실제 코드와 일치합니다." / "The recorded cause and approach hold up against the code."
   - `wrong-cause` — "기록된 원인은 실제 원인이 아닙니다 — 코드가 이를 반박합니다." / "The recorded root cause is not the actual cause; the code contradicts it."
   - `ineffective-approach` — "제안된 해결책은 이 문제를 실제로 해결하지 못합니다." / "The proposed approach would not actually resolve the problem."
@@ -207,15 +226,17 @@ review in Korean; if in English, write in English. Do not mix languages.
 
 ### Plan-audit mode — sidecar file plus short main response
 
-Derive the sidecar path from the plan artifact file path by appending
-`.audit.md` — `/tmp/plan-foo.md` → `/tmp/plan-foo.audit.md`. Overwrite any
-existing sidecar at that path; do not append, timestamp, or write elsewhere. One
-plan, one current review.
+Derive the sidecar path from the plan artifact file path by replacing a trailing
+`.md` suffix with `.audit.md` — `/tmp/plan-foo.md` →
+`/tmp/plan-foo.audit.md`. If the file has no `.md` suffix, append `.audit.md`.
+Overwrite any existing sidecar at that path; do not append, timestamp, or write
+elsewhere. One plan, one current review.
 
 Write the full review there with `Write`, then return to the main session
-exactly two things: the sentence `Audit report saved to <absolute sidecar
-path>.`, and the first paragraph of the review (verbatim). Do not return the
-reasoning or actionable sections — those live only in the sidecar.
+exactly two things, in this order: first line `Audit report saved to <absolute
+sidecar path>.` with no backticks, then a blank line, then the first paragraph of
+the review (verbatim). Do not return the reasoning or actionable sections —
+those live only in the sidecar.
 
 ### Published mode — verdict comment plus structured return
 

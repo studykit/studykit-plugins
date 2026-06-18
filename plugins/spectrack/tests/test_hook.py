@@ -896,6 +896,7 @@ def test_session_start_injects_policy_for_configured_project(
     assert "<authoring-resolver>" in context
     assert "<prd-path>" in context
     assert "<commands>" in context
+    assert "spectrack mustread" in context
     assert "<bash>" in context
     assert "## workflow policy" not in context
     if runtime == "claude":
@@ -1430,7 +1431,7 @@ def test_static_codex_manifest_does_not_register_stop_hook() -> None:
 
     assert {"SessionStart", "UserPromptSubmit"}.issubset(manifest["hooks"])
     assert "Stop" not in manifest["hooks"]
-    assert "Stop" not in manifest["description"]
+    assert "Stop" not in manifest.get("description", "")
 
 
 def test_user_prompt_caches_issue_and_injects_project_relative_path(

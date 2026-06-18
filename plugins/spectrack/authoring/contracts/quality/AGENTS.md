@@ -1,5 +1,8 @@
 # Quality Criteria Authoring Instructions
 
+This AGENTS.md file is for SpecTrack plugin contributors. It is not runtime
+guidance for LLMs using an installed SpecTrack plugin.
+
 Files in this directory define quality criteria for workflow artifacts. Reviewers consult them when assessing an artifact; authors may also consult them as a quality bar.
 
 - Each criteria document must be self-contained. A reviewer must be able to apply the criteria without opening any other file.

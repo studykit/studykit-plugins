@@ -237,17 +237,15 @@ def resolve_side(
 def _resolve_authoring_github_issue(
     artifact_type: str, target: str | None, scope: str, mode: str | None
 ) -> tuple[list[str], list[str]]:
-    convention = "providers/issue/github/convention.md"
-    anti_patterns = "providers/issue/github/anti-patterns.md"
     match (scope, target):
         case ("comment", _):
-            return [convention], []
+            return [], []
         case (_, str()):
-            return [convention, anti_patterns], []
+            return [], []
         case _:
             if mode == "backlog":
-                return [convention, anti_patterns], []
-            parts = [convention, anti_patterns]
+                return [], []
+            parts: list[str] = []
             if artifact_type == "usecase":
                 parts.append("providers/knowledge/github/actors.md")
             notes = (
@@ -277,16 +275,15 @@ def _resolve_authoring_jira_issue(
     artifact_type: str, target: str | None, scope: str, mode: str | None
 ) -> tuple[list[str], list[str]]:
     convention = "providers/issue/jira/convention.md"
-    anti_patterns = "providers/issue/jira/anti-patterns.md"
     match (scope, target):
         case ("comment", _):
             return [convention], []
         case (_, str()):
-            return [convention, anti_patterns], []
+            return [convention], []
         case _:
             if mode == "backlog":
-                return [convention, anti_patterns], []
-            parts = [convention, anti_patterns]
+                return [convention], []
+            parts = [convention]
             notes = (
                 [RETROACTIVE_PUBLISH_STATE_JIRA] if mode == "retroactive" else []
             )
@@ -340,10 +337,7 @@ def _common_parts(
                     "contracts/usecase-abstraction-guard.md",
                     "contracts/quality/actors-criteria.md",
                 ])
-            parts.extend([
-                "contracts/issue/common.md",
-                "contracts/issue/review.md",
-            ])
+            parts.append("contracts/issue/common.md")
             return parts
         case (_, None, "issue"):
             parts = ["contracts/issue/common.md"]
@@ -354,6 +348,8 @@ def _common_parts(
 
     if artifact_type in PRD_COMPONENT_TYPES:
         parts.append("contracts/prd.md")
+    if artifact_type == "review":
+        return parts
     if artifact_type in DUAL_TYPES:
         parts.append(f"contracts/{artifact_type}.md")
         parts.append(f"contracts/{side}/{artifact_type}.md")
@@ -366,11 +362,6 @@ def _common_parts(
             "contracts/usecase-abstraction-guard.md",
             "contracts/knowledge/actors.md",
         ])
-    if mode == "backlog":
-        # A backlog item is the open spec: the type contract above defines the
-        # spec sections; backlog.md frames how to capture them (brief to
-        # detailed, no cause/approach/steps in the body).
-        parts.append("contracts/issue/backlog.md")
     return parts
 
 

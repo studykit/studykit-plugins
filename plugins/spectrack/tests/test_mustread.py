@@ -59,9 +59,6 @@ def test_bare_review_resolution_uses_absolute_authoring_files() -> None:
     assert resolution.provider == "github"
     assert _rel_paths(resolution.files) == [
         "contracts/issue/common.md",
-        "contracts/issue/review.md",
-        "providers/issue/github/convention.md",
-        "providers/issue/github/anti-patterns.md",
     ]
     assert all(path.is_absolute() for path in resolution.files)
     assert all("plugins/spectrack/operator" not in str(path) for path in resolution.files)
@@ -225,7 +222,6 @@ providers:
     assert issue_resolution.provider == "jira"
     assert "contracts/issue/common.md" in _rel_paths(issue_resolution.files)
     assert "providers/issue/jira/convention.md" in _rel_paths(issue_resolution.files)
-    assert "providers/issue/jira/anti-patterns.md" in _rel_paths(issue_resolution.files)
     assert knowledge_resolution.provider == "github"
     assert _rel_paths(knowledge_resolution.files) == [
         "contracts/knowledge/body.md",
@@ -252,9 +248,7 @@ def test_comment_scope_github_issue_resolution_uses_only_comment_relevant_files(
 
     assert resolution.side == "issue"
     assert resolution.provider == "github"
-    assert _rel_paths(resolution.files) == [
-        "providers/issue/github/convention.md",
-    ]
+    assert _rel_paths(resolution.files) == []
 
 
 def test_comment_scope_jira_issue_resolution_uses_only_comment_relevant_files() -> None:
@@ -380,18 +374,14 @@ def test_backlog_mode_reads_spec_and_backlog_framing(artifact_type: str) -> None
     )
     rels = _rel_paths(resolution.files)
 
-    # Backlog is the open spec: it reads the type's spec contract plus the
-    # backlog framing, with the framing after the contract it frames.
+    # Backlog is the open spec: the mode note carries the backlog-specific
+    # framing, so only the type contract is needed.
     assert f"contracts/issue/{artifact_type}.md" in rels
-    assert "contracts/issue/backlog.md" in rels
-    assert rels.index(f"contracts/issue/{artifact_type}.md") < rels.index(
-        "contracts/issue/backlog.md"
-    )
-    # Common rules (incl. body conventions), the runtime-grounded-claim rule,
-    # and provider conventions still apply.
+    assert "contracts/issue/backlog.md" not in rels
+    # Common rules (incl. body conventions) and the runtime-grounded-claim rule
+    # still apply.
     assert "contracts/issue/common.md" in rels
     assert "contracts/issue/runtime-grounded-claims.md" in rels
-    assert "providers/issue/github/convention.md" in rels
 
 
 @pytest.mark.parametrize("artifact_type", ["task", "bug"])
@@ -642,9 +632,6 @@ def test_review_target_usecase_issue_bundles_actors_companion() -> None:
         "contracts/usecase-abstraction-guard.md",
         "contracts/quality/actors-criteria.md",
         "contracts/issue/common.md",
-        "contracts/issue/review.md",
-        "providers/issue/github/convention.md",
-        "providers/issue/github/anti-patterns.md",
     ]
     assert resolution.notes == ()
 
@@ -700,7 +687,7 @@ def test_bare_review_returns_authoring_contract_without_review_files() -> None:
     assert resolution.target is None
     rels = _rel_paths(resolution.files)
     assert "contracts/issue/common.md" in rels
-    assert "contracts/issue/review.md" in rels
+    assert "contracts/issue/review.md" not in rels
     assert "contracts/quality/usecase-issue-criteria.md" not in rels
     assert resolution.reading_anchor == "review-issue"
 
