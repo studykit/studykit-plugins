@@ -37,6 +37,8 @@ def test_session_surface_is_policy_wrapped() -> None:
     text = _render("session", "github")
     assert "<policy>" in text and "</policy>" in text
     assert "<launcher>" in text and "<commands>" in text
+    assert "<authoring-resolver>" in text
+    assert "spectrack mustread" in text
 
 
 def test_session_output_matches_runtime_builder() -> None:
@@ -66,6 +68,8 @@ def test_subagent_agent_block_merges_one_commands() -> None:
 def test_subagent_base_has_no_agent_block() -> None:
     text = _render("subagent", "github", agent=None)
     assert "<commit-prefix>" not in text
+    assert "<authoring-resolver>" in text
+    assert "spectrack mustread" in text
 
 
 def test_commit_surface_returns_prefix_snippet() -> None:
