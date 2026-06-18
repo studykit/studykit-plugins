@@ -896,6 +896,7 @@ def test_session_start_injects_policy_for_configured_project(
     assert "<authoring-resolver>" in context
     assert "<prd-path>" in context
     assert "<commands>" in context
+    assert "spectrack mustread" in context
     assert "<bash>" in context
     assert "## workflow policy" not in context
     if runtime == "claude":
