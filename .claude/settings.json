@@ -1,49 +1,5 @@
 {
   "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "Read",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "A4_HOOK_RUNTIME=claude uv run \"$CLAUDE_PROJECT_DIR/plugins/a4/dev/scripts/contributor_hook.py\" pre-read",
-            "timeout": 10
-          }
-        ]
-      },
-      {
-        "matcher": "Write|Edit|MultiEdit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "A4_HOOK_RUNTIME=claude uv run \"$CLAUDE_PROJECT_DIR/plugins/a4/dev/scripts/contributor_hook.py\" pre-edit",
-            "timeout": 10
-          }
-        ]
-      }
-    ],
-    "SessionEnd": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "A4_HOOK_RUNTIME=claude bash \"$CLAUDE_PROJECT_DIR/plugins/a4/dev/scripts/cleanup-contributor.sh\"",
-            "timeout": 5
-          }
-        ]
-      }
-    ],
-    "SessionStart": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "A4_HOOK_RUNTIME=claude bash \"$CLAUDE_PROJECT_DIR/plugins/a4/dev/scripts/sweep-contributor.sh\"",
-            "timeout": 5
-          }
-        ]
-      }
-    ]
   },
   "enabledPlugins": {
     "claude-code-setup@claude-plugins-official": true,
