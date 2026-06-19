@@ -29,7 +29,9 @@ root. The fastest way to create it is the bundled setup skill:
 ```
 
 The skill walks through provider selection, fills in the required fields,
-and writes `.spectrack/config.yml`.
+and writes `.spectrack/config.yml`. It also installs the Codex custom-agent
+roles used by SpecTrack subagent workflows; restart Codex after setup so the
+new `spectrack:*` roles are available.
 
 A minimal hand-written configuration looks like:
 
