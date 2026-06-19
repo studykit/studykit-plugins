@@ -1,6 +1,6 @@
 ---
 name: audit-resolution
-description: "Validate the recorded root cause and proposed approach/fix of a published `task` or `bug` issue against the actual code and git history. Dispatches `resolution-auditor` in published mode, which appends a single verdict comment to the issue and returns a verdict. This skill dispatches and passes the report through."
+description: "Validate the recorded root cause and proposed approach or fix of a published workflow `task` or `bug` issue against the actual code and git history. Use when the user wants an independent resolution audit for an existing issue."
 argument-hint: "<issue-ref>"
 disable-model-invocation: true
 allowed-tools:
@@ -9,12 +9,10 @@ allowed-tools:
 
 # Audit Resolution
 
-Dispatcher for validating an issue's recorded diagnosis. The agent checks
+Dispatcher for validating an issue's recorded diagnosis. The audit checks
 whether the issue's recorded root cause is the actual cause, and whether the
-recorded approach/fix would actually resolve it — judged against the real code
-and its git history, not the issue's internal plausibility. The skill owns
-dispatch only; `agents/resolution-auditor.md` is the source of truth for what
-the agent does and which verdicts it returns.
+recorded approach or fix would actually resolve it — judged against the real
+code and its git history, not the issue's internal plausibility.
 
 ## Flow
 
@@ -27,7 +25,6 @@ the agent does and which verdicts it returns.
    against the code read-only, appends a single verdict comment to the issue,
    and returns a `<report>` with a `verdict`.
 
-3. **Pass through.** Emit the auditor's `<report>`. The skill adds nothing on
-   top.
+3. **Report.** Emit the auditor's `<report>` without adding new conclusions.
 
 $ARGUMENTS

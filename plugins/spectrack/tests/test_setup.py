@@ -917,13 +917,12 @@ def test_write_creates_agents_md_with_knowledge_root(tmp_path: Path) -> None:
 
     assert AGENTS_KNOWLEDGE_HEADING in agents_text
     assert "`wiki/spectrack`" in agents_text
-    assert expected_absolute in agents_text
+    assert expected_absolute not in agents_text
     assert claude_path.read_text(encoding="utf-8") == CLAUDE_AGENTS_SHIM
     assert result["agents_md"]["agents_action"] == "create"
     assert result["agents_md"]["claude_action"] == "create"
     assert result["agents_md"]["knowledge_root"] == {
         "repo_relative": "wiki/spectrack",
-        "absolute": expected_absolute,
     }
     assert result["codex_agents"]["restart_required"] is True
     assert (tmp_path / CODEX_CONFIG_RELATIVE_PATH).exists()

@@ -1,6 +1,6 @@
 ---
 name: implement-issue
-description: "Implement a workflow `task`, `bug`, or `spike` issue from its spec. The issue body is a spec (`Context` / `Description` / `Acceptance Criteria`), not a stored plan: the implementation approach is settled here, at implement time, against the current code — investigate, decide in plan mode, get the user's approval, and audit it (size + resolution). Then dispatch `issue-implementer` with the approved approach, then `implementation-auditor` to verify the result. This skill settles the approach and passes the agents' reports through."
+description: "Implement a workflow `task`, `bug`, or `spike` issue from its spec. Use when the user gives an issue ref and wants the work implemented. Settle the implementation approach against the current code, get user approval, run size and resolution audits, dispatch `issue-implementer` in an isolated worktree, then run `implementation-auditor` when implementation succeeds."
 argument-hint: "<issue-ref> [additional requirements]"
 disable-model-invocation: true
 model: opus
@@ -18,9 +18,7 @@ the body. This skill settles and validates that approach with the user, then
 hands it to `issue-implementer` (which adopts the approach, derives the concrete
 steps against the current code, executes it in an isolated worktree, and pushes
 a topic branch), then to `implementation-auditor` (which cross-checks the
-result, read-only). The skill owns the plan-settling pass and dispatch; the
-agents' bodies are the source of truth for what they do and which states they
-return.
+result, read-only).
 
 ## Flow
 
@@ -31,10 +29,9 @@ return.
 
 2. **Settle the plan.** The body is a spec, not a plan, so settle the
    implementation approach now, against the current code:
-   - **Fetch and read.** `spectrack issue fetch <ref>` — it reports the
-     local cache location of the fetched issue (a `Base:` directory with the
-     body and comment file paths under it). Read the body and comments
-     there. The cached copy is read-only — never edit it in place.
+   - **Fetch and read.** `spectrack issue fetch <ref>`, then read the
+     fetched issue body and comments from the paths it reports. Treat
+     fetched issue files as read-only.
    - **Pre-flight the premise.** Before planning, check the spec's premises
      against the current code — the files, symbols, commands, and behaviors
      it names actually exist and behave as the body claims. A backlog spec
@@ -50,13 +47,11 @@ return.
      `Plan` subagent where the runtime provides one), grounded in the
      current code, and **get the user's explicit approval** of the approach
      before going further.
-   - **Audit.** Both auditors are file-based: each writes a sidecar review
-     (`<file>.audit.md`) and returns only the verdict's first paragraph plus
-     that path, so **read the sidecar to get the actionable reasoning**.
-     - Size: copy the fetched body to a temp file — the cached copy is
-       read-only, and the auditor writes its sidecar beside the file you
-       pass — and dispatch `task-size-auditor` with that temp path. It
-       surfaces decomposition when the work is not a single task.
+   - **Audit.** Run the size and resolution audits and read the full audit
+     output paths they return before dispatching implementation.
+     - Size: dispatch `task-size-auditor` with a writable copy of the
+       fetched body. It surfaces decomposition when the work is not a
+       single task.
      - Resolution: write the settled approach to a temp plan file and
        dispatch `resolution-auditor` (plan-audit mode) with that path; it
        validates the cause and the approach against the current code.
@@ -70,10 +65,7 @@ return.
 
 3. **Dispatch `issue-implementer`.** Call `Agent` with `subagent_type:
    spectrack:issue-implementer` **and `isolation: "worktree"`** —
-   the agent's frontmatter does not request isolation itself; this
-   call-time parameter is what provisions the isolated worktree.
-   Omitted, the agent would run in-place in the calling session's
-   checkout — this skill always dispatches worktree mode. Pass the
+   this skill always dispatches implementation in worktree mode. Pass the
    issue ref, the extra requirements verbatim, and the settled approach
    from step 2 as the `plan` (the implementer's plan of record — the body
    carries none). It returns a `<report>` whose `state` is `implemented`,
@@ -86,8 +78,7 @@ return.
    and `report` (the implementer's `<report>` block, inline). It is
    read-only and returns a `<report>` with a `verdict`.
 
-5. **Pass through.** Emit the implementer's `<report>`; when the audit
-   ran, emit the auditor's `<report>` directly after. The skill adds
-   nothing on top.
+5. **Report.** Emit the implementer's `<report>`; when the audit ran, emit
+   the auditor's `<report>` directly after without adding new conclusions.
 
 $ARGUMENTS

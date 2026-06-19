@@ -32,7 +32,6 @@ spectrack setup.py build-config --issue-provider jira --knowledge-provider <prov
 spectrack setup.py build-config --issue-provider jira --knowledge-provider <provider> --jira-epic-field-name <id> --jira-epic-field-link <id> --jira-epic-field-status <id> [--jira-epic-issue-type <NAME>] <options...>
 spectrack setup.py build-config --issue-provider jira --knowledge-provider <provider> --jira-state-transition <verb>=<transition> [--jira-state-transition <verb>=<transition> ...] <options...>
 spectrack setup.py write --project <project-root> --config <reviewed-yaml-file>
-spectrack setup.py install-codex-agents --project <project-root>
 spectrack config.py --project <project-root> --require
 ```
 
@@ -76,33 +75,25 @@ spectrack config.py --project <project-root> --require
    the confirmed mapping to `build-config` via
    `--jira-state-transition <verb>=<transition>` (repeatable). Skip when
    the user does not intend to drive transitions through the workflow.
-7. For Jira issue providers, ask whether cached `comment-*.md` projections
-   should hide automation comments by body marker. If the user gives markers
-   such as `!git-event`, pass each one with
+7. For Jira issue providers, ask whether local Jira snapshots should hide
+   automation comments by body marker. If the user gives markers such as
+   `!git-event`, pass each one with
    `--jira-snapshot-hidden-comment-marker`.
 8. Collect the commit reference style.
 9. Run `capabilities` for the selected providers and show limitations before
    confirmation.
-10. Run `build-config`, extract the `yaml` and `warnings` fields from the JSON
-   payload, show the generated YAML and warnings to the user, and ask for
-   explicit confirmation before writing.
+10. Run `build-config`, show the generated YAML and warnings to the user, and
+   ask for explicit confirmation before writing.
 11. After confirmation, write with `write --config <reviewed-yaml-file>`. The
-   write step also installs SpecTrack Codex custom-agent roles in
-   `.codex/config.toml` under names like `spectrack:issue-implementer`.
-   Tell Codex users to restart Codex before using newly installed roles.
-   Then verify with `config.py --require`.
+   write step also installs SpecTrack Codex agent roles. Tell Codex users to
+   restart Codex before using newly installed roles. Then verify with
+   `config.py --require`.
 12. `write` also records the configured knowledge folder under a
-   `## Workflow Knowledge Root` section in `<project-root>/AGENTS.md`
+   `## SpecTrack Knowledge` section in `<project-root>/AGENTS.md`
    (auto-created when missing) and creates `<project-root>/CLAUDE.md`
-   as a `@AGENTS.md` shim if absent. The section is appended only when
-   the heading is not already present; an existing section is left
-   untouched so the agent should manually update the heading body when
-   the configured knowledge path changes. Skipped when the github
-   knowledge provider has no `path` configured. Inspect `result.agents_md`
-   from the `write` payload to see which actions ran
-   (`create` / `append` / `skip`).
-13. Inspect `result.codex_agents` from the `write` payload to see which Codex
-   agent role files and managed config block were created, updated, or skipped.
+   as a `@AGENTS.md` shim if absent. The generated section records the
+   repository-relative knowledge path, not the local absolute path.
+   Skipped when the github knowledge provider has no `path` configured.
 
 ## Provider Rules
 
@@ -146,9 +137,8 @@ spectrack config.py --project <project-root> --require
   profiling flow in this skill before building the final config.
 - Jira comment hiding is opt-in. Use
   `providers.issues.snapshot.hidden_comment_markers` only when the user or
-  provider profile supplies exact body markers. The markers skip writing
-  matching comments as cached `comment-*.md` projections; the raw provider
-  `.issue.json` cache still retains the original comments.
+  provider profile supplies exact body markers. The markers hide matching
+  comments from local snapshots; they do not delete provider comments.
 - Jira labels are opt-in. Do not copy local labels into Jira unless the user or
   provider profile explicitly asks for label writes.
 - Jira Epic configuration (`providers.issues.epic_fields.{name,link,status}`
