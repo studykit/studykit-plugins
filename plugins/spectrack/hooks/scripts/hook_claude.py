@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # /// script
+# requires-python = ">=3.10"
 # dependencies = ["python-frontmatter", "PyYAML"]
 # ///
 """Claude hook adapter and CLI entry point.

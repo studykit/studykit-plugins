@@ -1,4 +1,5 @@
 # /// script
+# requires-python = ">=3.10"
 # dependencies = ["python-frontmatter", "PyYAML"]
 # ///
 """Package entry point: run as `uv run --script issue/__main__.py`.
