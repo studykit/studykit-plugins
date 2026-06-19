@@ -40,10 +40,18 @@ from hook_claude import main as claude_main  # noqa: E402
 from hook_claude import parse_claude_event_payload  # noqa: E402
 from hook_claude import session_start as claude_session_start  # noqa: E402
 from hook_codex import CodexSessionStartPayload  # noqa: E402
-from hook_codex import CodexStopPayload, CodexUserPromptSubmitPayload  # noqa: E402
+from hook_codex import (  # noqa: E402
+    CodexStopPayload,
+    CodexSubagentStartPayload,
+    CodexUserPromptSubmitPayload,
+)
 from hook_codex import parse_codex_event_payload  # noqa: E402
 from hook_codex import session_start as codex_session_start  # noqa: E402
-from hook_codex import stop, user_prompt_submit  # noqa: E402
+from hook_codex import (  # noqa: E402
+    stop,
+    subagent_start as codex_subagent_start,
+    user_prompt_submit,
+)
 from env import codex_env_exports  # noqa: E402
 from session_state import (  # noqa: E402
     legacy_session_env_state_path,
@@ -737,6 +745,33 @@ def test_parse_claude_event_payload_builds_event_structures(
     assert post_tool_event.duration_ms == 9
 
 
+def test_parse_codex_event_payload_builds_subagent_start_structure(
+    tmp_path: Path,
+) -> None:
+    subagent_event = parse_codex_event_payload(
+        {
+            "session_id": "parent-session",
+            "transcript_path": None,
+            "cwd": str(tmp_path),
+            "hook_event_name": "SubagentStart",
+            "model": "gpt-5-codex",
+            "permission_mode": "default",
+            "turn_id": "turn-1",
+            "agent_id": "agent-123",
+            "agent_type": "spectrack:issue-implementer",
+        }
+    )
+
+    assert isinstance(subagent_event, CodexSubagentStartPayload)
+    assert subagent_event.event_name == "SubagentStart"
+    assert subagent_event.session_id == "parent-session"
+    assert subagent_event.transcript_path == ""
+    assert subagent_event.cwd == str(tmp_path)
+    assert subagent_event.turn_id == "turn-1"
+    assert subagent_event.agent_id == "agent-123"
+    assert subagent_event.agent_type == "spectrack:issue-implementer"
+
+
 def test_session_start_clear_uses_documented_source_only(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -765,31 +800,6 @@ def test_session_start_clear_uses_documented_source_only(
 @pytest.mark.parametrize(
     "payload_update",
     [
-        {"source": "agent"},
-        {"subagent_type": "workflow-operator"},
-        {"parent_session_id": "parent-session"},
-    ],
-)
-def test_codex_session_start_emits_nothing_for_agent_sessions(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-    payload_update: dict[str, Any],
-) -> None:
-    _write_config(tmp_path)
-
-    out = _run_session_start(
-        tmp_path,
-        monkeypatch,
-        runtime="codex",
-        payload_update=payload_update,
-    )
-
-    assert out == ""
-
-
-@pytest.mark.parametrize(
-    "payload_update",
-    [
         {"agent_type": "workflow-operator"},
     ],
 )
@@ -810,7 +820,7 @@ def test_claude_session_start_emits_nothing_for_agent_sessions(
     assert out == ""
 
 
-def test_session_start_emits_nothing_for_codex_subagent_transcript(
+def test_codex_session_start_does_not_infer_subagents_from_transcript_metadata(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -823,24 +833,6 @@ def test_session_start_emits_nothing_for_codex_subagent_transcript(
         monkeypatch,
         runtime="codex",
         payload_update={"source": "startup", "transcript_path": str(transcript_path)},
-    )
-
-    assert out == ""
-
-
-def test_session_start_transcript_agent_metadata_is_codex_only(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    _write_config(tmp_path)
-    transcript_path = tmp_path / "subagent-rollout.jsonl"
-    _write_subagent_transcript(transcript_path)
-
-    out = _run_session_start(
-        tmp_path,
-        monkeypatch,
-        runtime="claude",
-        payload_update={"transcript_path": str(transcript_path)},
     )
 
     assert out != ""
@@ -1139,31 +1131,85 @@ def test_non_empty_hook_stdout_is_json_only(
         _json_object(output)
 
 
-def test_session_start_records_codex_subagent_identity_and_emits_nothing(
+def test_codex_subagent_start_records_identity_and_injects_workflow_context(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _write_config(tmp_path)
-    transcript = tmp_path / "subagent-rollout.jsonl"
-    _write_subagent_transcript(transcript)
+    monkeypatch.setenv("PLUGIN_ROOT", str(_PLUGIN_ROOT))
+    monkeypatch.delenv("CLAUDE_PROJECT_DIR", raising=False)
+    monkeypatch.delenv("CLAUDE_PLUGIN_ROOT", raising=False)
 
-    out = _run_session_start(
-        tmp_path,
-        monkeypatch,
-        runtime="codex",
-        payload_update={"source": "startup", "transcript_path": str(transcript)},
+    captured = io.StringIO()
+    event_payload = parse_codex_event_payload(
+        {
+            "session_id": "parent-thread",
+            "transcript_path": None,
+            "cwd": str(tmp_path),
+            "hook_event_name": "SubagentStart",
+            "model": "gpt-5-codex",
+            "permission_mode": "default",
+            "turn_id": "turn-1",
+            "agent_id": "codex-subagent-session",
+            "agent_type": "general-purpose",
+        }
+    )
+    assert isinstance(event_payload, CodexSubagentStartPayload)
+    assert codex_subagent_start(event_payload, stdout=captured) == 0
+
+    payload = json.loads(captured.getvalue())
+    assert payload["hookSpecificOutput"]["hookEventName"] == "SubagentStart"
+    assert payload["hookSpecificOutput"]["additionalContext"] == (
+        expected_subagent_start_context(runtime="codex", issue_kind="github")
     )
 
-    assert out == ""
     parent_state = session_state_path(tmp_path, "codex", "parent-thread")
     assert parent_state is not None
     parent_state_payload = json.loads(parent_state.read_text(encoding="utf-8"))
     assert parent_state_payload["subagents"]["started"] == [
-        {"agent_id": "codex-session", "agent_type": "default"}
+        {"agent_id": "codex-subagent-session", "agent_type": "general-purpose"}
     ]
-    subagent_state = session_state_path(tmp_path, "codex", "codex-session")
-    assert subagent_state is not None
-    assert not subagent_state.exists()
+
+    subagent_exports = codex_env_exports(tmp_path, "codex-subagent-session")
+    assert "SPECTRACK_SESSION_ID=parent-thread" in subagent_exports
+
+
+def test_codex_subagent_start_injects_issue_implementer_agent_block(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _write_config(tmp_path)
+    monkeypatch.setenv("PLUGIN_ROOT", str(_PLUGIN_ROOT))
+    monkeypatch.delenv("CLAUDE_PROJECT_DIR", raising=False)
+    monkeypatch.delenv("CLAUDE_PLUGIN_ROOT", raising=False)
+
+    captured = io.StringIO()
+    event_payload = parse_codex_event_payload(
+        {
+            "session_id": "parent-thread-impl",
+            "transcript_path": None,
+            "cwd": str(tmp_path),
+            "hook_event_name": "SubagentStart",
+            "model": "gpt-5-codex",
+            "permission_mode": "default",
+            "turn_id": "turn-1",
+            "agent_id": "codex-agent-impl",
+            "agent_type": "spectrack:issue-implementer",
+        }
+    )
+    assert isinstance(event_payload, CodexSubagentStartPayload)
+    assert codex_subagent_start(event_payload, stdout=captured) == 0
+
+    payload = json.loads(captured.getvalue())
+    context = payload["hookSpecificOutput"]["additionalContext"]
+    assert context == expected_subagent_start_context(
+        runtime="codex",
+        issue_kind="github",
+        agent_type="spectrack:issue-implementer",
+    )
+    assert "<commit-prefix>" in context
+    assert "- `fetch`" in context
+    assert "- `update`" in context
 
 
 def test_session_start_emits_commands_pointer_for_jira_config(
@@ -1429,7 +1475,11 @@ def test_static_codex_manifest_does_not_register_stop_hook() -> None:
         (_PLUGIN_ROOT / "hooks" / "hooks.codex.json").read_text(encoding="utf-8")
     )
 
-    assert {"SessionStart", "UserPromptSubmit"}.issubset(manifest["hooks"])
+    assert {"SessionStart", "SubagentStart", "UserPromptSubmit"}.issubset(manifest["hooks"])
+    assert "matcher" not in manifest["hooks"]["SubagentStart"][0]
+    assert manifest["hooks"]["SubagentStart"][0]["hooks"][0]["command"] == (
+        'uv run --script "${PLUGIN_ROOT}/hooks/scripts/hook_codex.py"'
+    )
     assert "Stop" not in manifest["hooks"]
     assert "Stop" not in manifest.get("description", "")
 

@@ -47,19 +47,19 @@ the authoring resolver block, and the PRD-path resolver block.
 - **Adapters are host-specific; shared logic is host-neutral.** Do not add
   Claude/Codex branches inside `../scripts/hook.py` — push the
   host detail into the adapter.
-- **Manifest asymmetry is deliberate.** Codex registers only `SessionStart`
-  + `UserPromptSubmit`. Claude additionally registers `PreToolUse` (cache
-  projection protection + authoring-read notice), `PostToolUse`
-  (authoring-read tracking), and `SubagentStart`. New behavior must fit
-  one of those events on the target runtime or be runtime-only.
+- **Manifest asymmetry is deliberate.** Codex registers `SessionStart`,
+  `SubagentStart`, and `UserPromptSubmit`. Claude additionally registers
+  `PreToolUse` (cache projection protection + authoring-read notice) and
+  `PostToolUse` (authoring-read tracking). New behavior must fit one of
+  those events on the target runtime or be runtime-only.
 - **Stdout is JSON or empty.** Empty stdout = no-op. Never emit plain text.
 - **Subagents inherit env, not policy.** SubagentStart injection stays
   narrow (launcher + authoring resolver + PRD-path resolver + the same
   `<commands>` `--help` pointer as the main session, plus per-agent flow
   blocks for `issue-implementer`). Per-verb CLI usage lives in
   `spectrack issue <verb> --help` for both main session and subagents.
-- **Codex cannot persist env from SessionStart.** `hook_codex.py` records
-  session state under `.spectrack-cache/hook-state/`; the
+- **Codex cannot persist env directly from hooks.** `hook_codex.py` records
+  main and subagent session state under `.spectrack-cache/hook-state/`; the
   `../scripts/spectrack` wrapper sources the exports later via
   `CODEX_THREAD_ID`. Do not rely on `os.environ` for the `SPECTRACK_*`
   contract on Codex.
