@@ -1,6 +1,6 @@
 ---
 name: setup
-description: Initialize the workflow plugin in a repository by generating and writing .spectrack/config.yml, including GitHub, Jira Data Center or Server, filesystem issues, GitHub repository wiki, and Jira site profiling for relationship mappings, fields, Epic configuration, and labels.
+description: Initialize the spectrack plugin in a repository by generating and writing .spectrack/config.yml, including GitHub, Jira Data Center or Server, filesystem issues, GitHub repository wiki, and Jira site profiling for relationship mappings, fields, Epic configuration, and labels.
 disable-model-invocation: true
 ---
 
