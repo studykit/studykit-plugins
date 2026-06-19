@@ -475,7 +475,7 @@ def build_config_payload(raw: Mapping[str, Any], *, project: Path) -> dict[str, 
 
 AGENTS_FILENAME = "AGENTS.md"
 CLAUDE_FILENAME = "CLAUDE.md"
-AGENTS_KNOWLEDGE_HEADING = "## Workflow Knowledge Root"
+AGENTS_KNOWLEDGE_HEADING = "## SpecTrack Knowledge"
 CLAUDE_AGENTS_SHIM = "@AGENTS.md\n"
 CODEX_DIRNAME = ".codex"
 CODEX_CONFIG_FILENAME = "config.toml"
@@ -494,11 +494,10 @@ SPECTRACK_CODEX_AGENT_ROLES: Mapping[str, str] = {
 }
 
 
-def _knowledge_root_section(repo_relative: str, absolute: str) -> str:
+def _knowledge_root_section(repo_relative: str) -> str:
     return (
         f"{AGENTS_KNOWLEDGE_HEADING}\n\n"
-        f"Workflow knowledge pages live at `{repo_relative}` "
-        f"(resolved: `{absolute}`).\n"
+        f"SpecTrack workflow knowledge pages live under `{repo_relative}`.\n"
     )
 
 
@@ -521,8 +520,7 @@ def ensure_agents_knowledge_root(
 
     project = project.expanduser().resolve()
     repo_relative = raw_path.strip()
-    absolute = str((project / repo_relative).resolve())
-    section = _knowledge_root_section(repo_relative, absolute)
+    section = _knowledge_root_section(repo_relative)
 
     agents_path = project / AGENTS_FILENAME
     if agents_path.exists():
@@ -551,7 +549,6 @@ def ensure_agents_knowledge_root(
         "claude_action": claude_action,
         "knowledge_root": {
             "repo_relative": repo_relative,
-            "absolute": absolute,
         },
     }
 

@@ -40,12 +40,6 @@ Non-triggers on their own:
 - general guidance edits that future sessions auto-load,
 - context rederivable from issue content and git history.
 
-## Context
-
-- Timestamp: !`date +"%Y-%m-%d_%H%M"`
-- Timezone: !`date +"%Z %z"`
-- Git status preview: !`git status --short | head -10`
-
 ## Task
 
 Wrap the session in this order: refresh touched issue Resume comments, add only necessary narrative comments, commit relevant non-handoff changes when appropriate, run the residual gate, publish review issues only for remaining residual concerns, and record verification outcomes.

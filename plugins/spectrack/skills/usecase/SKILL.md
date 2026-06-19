@@ -1,6 +1,6 @@
 ---
 name: usecase
-description: "Shape a rough product idea into concrete workflow `usecase` issues through a Socratic, one-question-at-a-time interview. Publishes each confirmed use case as its own workflow `usecase` issue, and at wrap-up dispatches `usecase-explorer` then `usecase-reviewer` for gap finding and quality review."
+description: "Shape a rough product idea into concrete workflow `usecase` issues through a Socratic, one-question-at-a-time interview. Use when the user wants to discover, refine, resume, or iterate product use cases before implementation. Publishes each confirmed use case as its own workflow `usecase` issue and wraps up with missed-case and quality review."
 argument-hint: "<idea or vague concept to turn into use cases, or 'iterate' to resume>"
 disable-model-invocation: true
 allowed-tools:
@@ -81,7 +81,7 @@ backlog to seed.
 **Conditional tasks** — add when the corresponding step fires:
 
 - `"Discovery: <ref> <title>"` — one per confirmed and published use case.
-- `"Research: <topic>"` — when a similar-systems research dispatch fires.
+- `"Research: <topic>"` — when similar-systems research starts.
 - `"UI screen grouping"` — when the user agrees to group UI-related use cases.
 - `"Mock: <screen slug>"` — when mock generation is requested.
 
@@ -114,23 +114,16 @@ explorer → present candidates → reviewer → walk findings → session
 report. Do **not** conclude on your own — the interview ends only when
 the user says so.
 
-## Agent dispatch
+## Wrap-Up Support
 
-The skill spawns these subagents at wrap-up and at user request.
-Context is passed via dispatch arguments (issue refs, output paths),
-not agent memory.
+At wrap-up and on user request, use the available SpecTrack support roles:
 
-- **Reviewer** — `Agent(subagent_type: "spectrack:usecase-reviewer")`.
-  Pass the list of `usecase` issue refs to review and the absolute
-  output directory for the per-finding `review` issue draft bodies
-  (the reviewer publishes the `review` issues itself).
-- **Explorer** — `Agent(subagent_type: "spectrack:usecase-explorer")`.
-  Pass the list of `usecase` issue refs and the absolute output path
-  for the advisory exploration report.
-- **Mock generator** — `Agent(subagent_type: "spectrack:mock-html-generator")`.
-  Pass the participating use case refs, screen-group label, layout
-  requirements, and an absolute output directory under
-  `$(spectrack project-dir .spectrack-cache/mocks/<screen-slug>/)`.
+- **Reviewer** — reviews confirmed `usecase` issues and publishes one
+  workflow `review` issue for each quality finding.
+- **Explorer** — looks for missed candidate use cases and returns an
+  advisory exploration report.
+- **Mock generator** — optionally creates throwaway HTML mockups for
+  requested UI screen groups.
 
 **Execution order in Wrap Up:** explorer first (find candidates the
 existing set missed), then reviewer (validate the full set).
@@ -147,8 +140,7 @@ interactive interview. The session's durable outputs are:
   `review` issue, linked `--related` to the use case it targets.
 - Optional: one `research` issue per similar-systems investigation,
   linked `--related` to the use cases it informs.
-- Optional: mock HTML files at the absolute output path the mock
-  dispatch named.
+- Optional: mock HTML files for requested UI screen groups.
 
 The skill itself emits a wrap-up summary that lists the refs created,
 the open `review` items waiting for resolution, and which use cases
