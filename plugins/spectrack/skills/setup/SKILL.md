@@ -32,6 +32,7 @@ spectrack setup.py build-config --issue-provider jira --knowledge-provider <prov
 spectrack setup.py build-config --issue-provider jira --knowledge-provider <provider> --jira-epic-field-name <id> --jira-epic-field-link <id> --jira-epic-field-status <id> [--jira-epic-issue-type <NAME>] <options...>
 spectrack setup.py build-config --issue-provider jira --knowledge-provider <provider> --jira-state-transition <verb>=<transition> [--jira-state-transition <verb>=<transition> ...] <options...>
 spectrack setup.py write --project <project-root> --config <reviewed-yaml-file>
+spectrack setup.py install-codex-agents --project <project-root>
 spectrack config.py --project <project-root> --require
 ```
 
@@ -85,8 +86,11 @@ spectrack config.py --project <project-root> --require
 10. Run `build-config`, extract the `yaml` and `warnings` fields from the JSON
    payload, show the generated YAML and warnings to the user, and ask for
    explicit confirmation before writing.
-11. After confirmation, write with `write --config <reviewed-yaml-file>`. Then
-   verify with `config.py --require`.
+11. After confirmation, write with `write --config <reviewed-yaml-file>`. The
+   write step also installs SpecTrack Codex custom-agent roles in
+   `.codex/config.toml` under names like `spectrack:issue-implementer`.
+   Tell Codex users to restart Codex before using newly installed roles.
+   Then verify with `config.py --require`.
 12. `write` also records the configured knowledge folder under a
    `## Workflow Knowledge Root` section in `<project-root>/AGENTS.md`
    (auto-created when missing) and creates `<project-root>/CLAUDE.md`
@@ -97,6 +101,8 @@ spectrack config.py --project <project-root> --require
    knowledge provider has no `path` configured. Inspect `result.agents_md`
    from the `write` payload to see which actions ran
    (`create` / `append` / `skip`).
+13. Inspect `result.codex_agents` from the `write` payload to see which Codex
+   agent role files and managed config block were created, updated, or skipped.
 
 ## Provider Rules
 

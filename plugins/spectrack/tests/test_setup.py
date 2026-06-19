@@ -5,6 +5,7 @@ from __future__ import annotations
 import io
 import json
 import sys
+import tomllib
 from pathlib import Path
 from typing import Any
 
@@ -23,14 +24,20 @@ from config import WorkflowConfigError, parse_workflow_config  # noqa: E402
 from setup import (  # noqa: E402
     AGENTS_FILENAME,
     AGENTS_KNOWLEDGE_HEADING,
+    CODEX_AGENT_INSTALL_MARKER_BEGIN,
+    CODEX_AGENT_INSTALL_MARKER_END,
+    CODEX_CONFIG_RELATIVE_PATH,
+    CODEX_SPECTRACK_AGENT_DIR,
     CLAUDE_AGENTS_SHIM,
     CLAUDE_FILENAME,
+    SPECTRACK_CODEX_AGENT_ROLES,
     WorkflowSetupError,
     build_config,
     build_config_payload,
     build_jira_relationship_mappings,
     derive_state_transition_verb,
     format_config_yaml,
+    install_codex_agents,
     inspect_jira_relationships,
     inspect_jira_state_transitions,
     probe_git_remote,
@@ -918,6 +925,9 @@ def test_write_creates_agents_md_with_knowledge_root(tmp_path: Path) -> None:
         "repo_relative": "wiki/spectrack",
         "absolute": expected_absolute,
     }
+    assert result["codex_agents"]["restart_required"] is True
+    assert (tmp_path / CODEX_CONFIG_RELATIVE_PATH).exists()
+    assert (tmp_path / CODEX_SPECTRACK_AGENT_DIR / "issue-implementer.toml").exists()
 
 
 def test_write_appends_knowledge_root_when_agents_md_exists(tmp_path: Path) -> None:
@@ -965,8 +975,75 @@ def test_write_omits_agents_md_update_when_knowledge_path_absent(
     result = write_config(tmp_path, raw)
 
     assert "agents_md" not in result
+    assert result["codex_agents"]["operation"] == "install_codex_agents"
     assert not (tmp_path / AGENTS_FILENAME).exists()
     assert not (tmp_path / CLAUDE_FILENAME).exists()
+    assert (tmp_path / CODEX_CONFIG_RELATIVE_PATH).exists()
+
+
+def test_install_codex_agents_creates_project_roles(tmp_path: Path) -> None:
+    result = install_codex_agents(tmp_path)
+
+    config_path = tmp_path / CODEX_CONFIG_RELATIVE_PATH
+    config_text = config_path.read_text(encoding="utf-8")
+    role_path = tmp_path / CODEX_SPECTRACK_AGENT_DIR / "issue-implementer.toml"
+    role_text = role_path.read_text(encoding="utf-8")
+
+    tomllib.loads(config_text)
+    tomllib.loads(role_text)
+    assert result["config_action"] == "create"
+    assert len(result["agents"]) == len(SPECTRACK_CODEX_AGENT_ROLES)
+    assert CODEX_AGENT_INSTALL_MARKER_BEGIN in config_text
+    assert CODEX_AGENT_INSTALL_MARKER_END in config_text
+    assert '[agents."spectrack:issue-implementer"]' in config_text
+    assert 'config_file = "spectrack/agents/issue-implementer.toml"' in config_text
+    assert "developer_instructions = '''" in role_text
+    assert "SpecTrack `spectrack:issue-implementer` custom agent in Codex" in role_text
+    assert "# Issue Implementer" in role_text
+    assert "[apps._default]" in role_text
+    assert "enabled = false" in role_text
+
+
+def test_install_codex_agents_replaces_managed_block_only(tmp_path: Path) -> None:
+    codex_dir = tmp_path / ".codex"
+    codex_dir.mkdir()
+    config_path = codex_dir / "config.toml"
+    config_path.write_text(
+        "\n".join(
+            [
+                'sandbox_mode = "workspace-write"',
+                "",
+                CODEX_AGENT_INSTALL_MARKER_BEGIN,
+                "[agents.old]",
+                'description = "stale"',
+                CODEX_AGENT_INSTALL_MARKER_END,
+                "",
+                "[features]",
+                "hooks = true",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    result = install_codex_agents(tmp_path)
+    text = config_path.read_text(encoding="utf-8")
+
+    assert result["config_action"] == "update"
+    assert 'sandbox_mode = "workspace-write"' in text
+    assert "[features]\nhooks = true" in text
+    assert "[agents.old]" not in text
+    assert text.count(CODEX_AGENT_INSTALL_MARKER_BEGIN) == 1
+    assert '[agents."spectrack:resolution-auditor"]' in text
+
+
+def test_install_codex_agents_is_idempotent(tmp_path: Path) -> None:
+    install_codex_agents(tmp_path)
+
+    result = install_codex_agents(tmp_path)
+
+    assert result["config_action"] == "skip"
+    assert {item["action"] for item in result["agents"]} == {"skip"}
 
 
 def test_probe_git_remote_detects_github_repository(tmp_path: Path) -> None:
