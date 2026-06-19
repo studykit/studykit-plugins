@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # /// script
+# requires-python = ">=3.10"
 # dependencies = ["python-frontmatter"]
 # ///
 """Workflow shell environment contract helpers.
