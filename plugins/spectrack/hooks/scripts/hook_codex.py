@@ -7,15 +7,10 @@
 This module owns Codex payload and environment handling. Shared workflow policy
 and issue-cache behavior lives in ``hook.py`` as plain functions.
 
-The workflow Codex manifest registers ``SessionStart`` and
+The workflow Codex manifest registers ``SessionStart``, ``SubagentStart``, and
 ``UserPromptSubmit`` events for this plugin. Provider cache projection
 protection and other write checks stay explicit in workflow scripts rather than
 using hidden authoring read tracking.
-
-Codex has no native ``SubagentStart`` event, so subagent identity tracking is
-prepared from the Codex ``SessionStart`` path when transcript metadata
-identifies a spawned agent. Subagent sessions skip the main-session workflow
-authoring policy injection.
 
 The script is the executable entry point for Codex's hook manifest
 (``plugins/spectrack/hooks/hooks.codex.json``). Each hook command invokes this
@@ -43,6 +38,7 @@ if _SCRIPTS_DIR not in sys.path:
 from command import CommandRunner  # noqa: E402
 from hook import (  # noqa: E402
     build_session_start_context,
+    build_subagent_start_context,
     inject_prompt_issue_context,
     record_stop_issue_references,
     workflow_config_for_project,
@@ -55,7 +51,7 @@ from session_state import (  # noqa: E402
     session_policy_was_announced,
 )
 
-CODEX_SESSION_START_SOURCES = {"startup", "resume", "clear"}
+CODEX_SESSION_START_SOURCES = {"startup", "resume", "clear", "compact"}
 _PAYLOAD_AGENT_BOOL_KEYS = ("is_agent", "is_subagent", "agent_session")
 _PAYLOAD_AGENT_STRING_KEYS = (
     "agent_id",
@@ -106,6 +102,13 @@ class CodexSessionStartPayload(CodexCommonPayload):
 
 
 @dataclass(frozen=True)
+class CodexSubagentStartPayload(CodexCommonPayload):
+    turn_id: str
+    agent_id: str
+    agent_type: str
+
+
+@dataclass(frozen=True)
 class CodexUserPromptSubmitPayload(CodexCommonPayload):
     turn_id: str
     prompt_text: str
@@ -121,6 +124,7 @@ class CodexStopPayload(CodexCommonPayload):
 
 CodexEventPayload = (
     CodexSessionStartPayload
+    | CodexSubagentStartPayload
     | CodexUserPromptSubmitPayload
     | CodexStopPayload
 )
@@ -265,65 +269,6 @@ def _read_session_meta(transcript_path: str) -> Mapping[str, Any] | None:
     return None
 
 
-def _parent_thread_id_from_metadata(metadata: Mapping[str, Any]) -> str:
-    direct = as_string(metadata.get("parent_thread_id"))
-    if direct:
-        return direct
-    spawn = _nested_mapping(metadata, "source", "subagent", "thread_spawn")
-    if spawn is not None:
-        return as_string(spawn.get("parent_thread_id"))
-    return ""
-
-
-def _agent_name_from_metadata(metadata: Mapping[str, Any]) -> str:
-    for key in ("agent_name", "agent_role", "agent_nickname", "agent_path"):
-        value = as_string(metadata.get(key))
-        if value:
-            return value
-    subagent = _nested_mapping(metadata, "source", "subagent")
-    if subagent is not None:
-        for key in ("agent_name", "agent_role", "agent_nickname"):
-            value = as_string(subagent.get(key))
-            if value:
-                return value
-        spawn = subagent.get("thread_spawn")
-        if isinstance(spawn, Mapping):
-            for key in ("agent_name", "agent_role"):
-                value = as_string(spawn.get(key))
-                if value:
-                    return value
-    return ""
-
-
-def _agent_id_from_metadata(metadata: Mapping[str, Any]) -> str:
-    for key in ("agent_id", "subagent_id", "agent_thread_id"):
-        value = as_string(metadata.get(key))
-        if value:
-            return value
-    subagent = _nested_mapping(metadata, "source", "subagent")
-    if subagent is not None:
-        for key in ("agent_id", "subagent_id", "agent_thread_id"):
-            value = as_string(subagent.get(key))
-            if value:
-                return value
-        spawn = subagent.get("thread_spawn")
-        if isinstance(spawn, Mapping):
-            for key in ("agent_id", "subagent_id", "agent_thread_id"):
-                value = as_string(spawn.get(key))
-                if value:
-                    return value
-    return ""
-
-
-def _nested_mapping(root: Mapping[str, Any], *keys: str) -> Mapping[str, Any] | None:
-    current: Any = root
-    for key in keys:
-        if not isinstance(current, Mapping):
-            return None
-        current = current.get(key)
-    return current if isinstance(current, Mapping) else None
-
-
 def _common_payload_fields(payload: dict[str, Any]) -> dict[str, Any]:
     return {
         "raw": payload,
@@ -339,6 +284,15 @@ def _build_session_start_payload(payload: dict[str, Any]) -> CodexSessionStartPa
     return CodexSessionStartPayload(
         **_common_payload_fields(payload),
         source=_session_start_source(payload),
+    )
+
+
+def _build_subagent_start_payload(payload: dict[str, Any]) -> CodexSubagentStartPayload:
+    return CodexSubagentStartPayload(
+        **_common_payload_fields(payload),
+        turn_id=as_string(payload.get("turn_id")),
+        agent_id=as_string(payload.get("agent_id")),
+        agent_type=as_string(payload.get("agent_type")),
     )
 
 
@@ -371,6 +325,8 @@ def parse_codex_event_payload(
     event_name = as_string(data.get("hook_event_name"))
     if event_name == "SessionStart":
         return _build_session_start_payload(data)
+    if event_name == "SubagentStart":
+        return _build_subagent_start_payload(data)
     if event_name == "UserPromptSubmit":
         return _build_user_prompt_submit_payload(data)
     if event_name == "Stop":
@@ -385,40 +341,47 @@ def session_start(
 ) -> int:
     """Handle a Codex ``SessionStart`` hook invocation."""
 
-    metadata = _read_session_meta(event_payload.transcript_path)
-    payload_marks_agent = _payload_marks_agent(event_payload.raw)
-    metadata_marks_agent = metadata is not None and _session_metadata_indicates_agent(metadata)
-    if payload_marks_agent or metadata_marks_agent:
-        return _handle_agent_session_start(event_payload, metadata, stdout=stdout)
     return emit_session_start_policy(event_payload, stdout=stdout)
 
 
-def _handle_agent_session_start(
-    event_payload: CodexSessionStartPayload,
-    metadata: Mapping[str, Any] | None,
+def subagent_start(
+    event_payload: CodexSubagentStartPayload,
     *,
     stdout: TextIO | None = None,
 ) -> int:
-    """Codex subagent SessionStart: track identity; skip main-session policy."""
-
-    _ = stdout
-    if metadata is None:
-        return 0
-    parent_thread_id = _parent_thread_id_from_metadata(metadata)
-    if not parent_thread_id:
-        return 0
+    """Handle a Codex ``SubagentStart`` hook invocation."""
 
     config = workflow_config_for_project(_project_dir(event_payload))
     if config is None:
         return 0
 
-    agent_name = _agent_name_from_metadata(metadata)
+    _persist_codex_shell_env(
+        project_dir=config.root,
+        codex_session_id=event_payload.agent_id,
+        workflow_session_id=event_payload.session_id,
+    )
+
     record_subagent_start(
         config.root,
         "codex",
-        parent_thread_id,
-        agent_id=_agent_id_from_metadata(metadata) or event_payload.session_id,
-        agent_type=agent_name or "subagent",
+        event_payload.session_id,
+        agent_id=event_payload.agent_id,
+        agent_type=event_payload.agent_type,
+    )
+
+    emit_json(
+        {
+            "hookSpecificOutput": {
+                "hookEventName": "SubagentStart",
+                "additionalContext": build_subagent_start_context(
+                    config,
+                    _plugin_root(),
+                    runtime="codex",
+                    agent_type=event_payload.agent_type,
+                ),
+            }
+        },
+        stdout=stdout,
     )
     return 0
 
@@ -507,6 +470,8 @@ def main(
     event_payload = parse_codex_event_payload(payload)
     if isinstance(event_payload, CodexSessionStartPayload):
         return session_start(event_payload, stdout=stdout)
+    if isinstance(event_payload, CodexSubagentStartPayload):
+        return subagent_start(event_payload, stdout=stdout)
     if isinstance(event_payload, CodexUserPromptSubmitPayload):
         return user_prompt_submit(event_payload, stdout=stdout)
     if isinstance(event_payload, CodexStopPayload):
