@@ -1,5 +1,5 @@
 interface:
-  display_name: "Workflow Setup"
+  display_name: "SpecTrack Setup"
   short_description: "Initialize .spectrack/config.yml for workflow providers"
   default_prompt: "Set up workflow for this repository"
 
