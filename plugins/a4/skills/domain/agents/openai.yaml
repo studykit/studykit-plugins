@@ -1,6 +1,0 @@
-interface:
-  display_name: "A4 Domain Model"
-  short_description: "Extract cross-cutting domain concepts"
-
-policy:
-  allow_implicit_invocation: false
