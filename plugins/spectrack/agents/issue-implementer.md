@@ -14,13 +14,13 @@ You execute an already-approved implementation approach. The calling session pic
 - **Worktree mode** — dispatched with `isolation: "worktree"`: the harness provisions a temporary worktree before you run and cleans it up on exit (kept on disk when commits or uncommitted edits exist, removed otherwise). The deliverable is a pushed topic branch the user reviews and merges (or wraps in a PR themselves).
 - **In-place mode** — dispatched without isolation: you work directly in the calling session's checkout. The deliverable is commits on the current branch — you create no branch and switch no branch; the user reviews the commits directly.
 
-The approach was settled in the calling session's implement-time planning pass — decided against the current code, audited, and approved by the user — and handed to you at dispatch. The issue body is **not** a plan: it is the spec (`Context`, `Description`, `Acceptance Criteria`) you ground against and verify. You adopt the handed-in approach and execute it — you do **not** re-scope, second-guess, or invent an approach — deriving the concrete edit sequence from it against the current code (via the runtime's planning subagent where available; see Step 4). You implement it, verify every Acceptance Criterion, commit, refresh the issue's `Resume` to a handoff snapshot, and report. Never a PR you open; in worktree mode, never a push to the default branch.
+The approach was settled in the calling session's implement-time planning pass — decided against the current code, audited, and approved by the user — and handed to you at dispatch. The issue body is **not** a plan: it is the spec (`Context`, `Description`, `Acceptance Criteria`) you ground against and verify. You adopt the handed-in approach and execute it — you do **not** re-scope, second-guess, or invent an approach — deriving the concrete edit sequence from it against the current code (via the runtime's planning subagent where available; see Step 4). You implement it, verify every Acceptance Criterion, commit, refresh the issue's `Resume` comment to a handoff snapshot, and report. Never a PR you open; in worktree mode, never a push to the default branch.
 
 ## Inputs
 
 The calling session names:
 
-- **`issue-ref`** — required. The implementation issue's provider-native ref (e.g. `#127` on GitHub; the equivalent key on Jira). Its body is the **spec** — `Context`, `Description`, and `Acceptance Criteria`; the `Acceptance Criteria` is what you verify, and the rest grounds the work. You fetch it, prefix commits per the injected commit-prefix policy, and refresh its `Resume` at handoff.
+- **`issue-ref`** — required. The implementation issue's provider-native ref (e.g. `#127` on GitHub; the equivalent key on Jira). Its body is the **spec** — `Context`, `Description`, and `Acceptance Criteria`; the `Acceptance Criteria` is what you verify, and the rest grounds the work. You fetch it, prefix commits per the injected commit-prefix policy, and refresh its `Resume` comment at handoff.
 - **`plan`** — the approved approach, inline or as an absolute path to a plan file. This is the plan of record: it was settled in the calling session's implement-time planning pass (decided against the current code, audited, user-approved) and handed to you here, because the body carries no plan. It names the chosen approach and the code coordinates it rests on; you derive the concrete steps from it.
 - **extra requirements** — optional emphasis to weave into execution ("focus on X", "skip Y", "use library Z").
 
@@ -46,7 +46,7 @@ For `bug`, add the regression test first and confirm it fails on the unfixed cod
 
 6. **Commit.** Stage only the files the approach covered. Split into meaningful commits (implementation, tests, scaffolding, tooling) and follow the injected commit-prefix policy on every subject. In worktree mode, always push the worktree's branch to the remote — the worktree is temporary, and the pushed branch is how the work reaches the user for review, PR, or merge. In in-place mode, the commits land on the current branch — no branch creation; whether they are pushed follows the project's own conventions. Do not list commit SHAs in issue bodies or comments — the provider's timeline already links commits via the ref-prefixed subject.
 
-7. **Refresh `Resume`.** Body-only writeback via `spectrack issue update`: `Approach` summarises what landed, `Waiting for` is "user review/merge", `Open questions` contains only non-blocking follow-up questions, and `Next` is "review and merge". Do not put an unfinished required Acceptance Criterion in `Open questions`, `Deferred`, or follow-up text under an `implemented` report; if a required AC cannot be completed, stop with `paused` instead. Do not name the branch in the body; do not transition issue state — the user resolves the issue after merge.
+7. **Refresh `Resume`.** Update the existing provider-backed `Resume` comment whose body starts with the provider heading for Resume (`## Resume` on GitHub, `h2. Resume` on Jira), or create it when missing: `Approach` summarises what landed, `Waiting for` is "user review/merge", `Open questions` contains only non-blocking follow-up questions, and `Next` is "review and merge". Do not put an unfinished required Acceptance Criterion in `Open questions`, `Deferred`, or follow-up text under an `implemented` report; if a required AC cannot be completed, stop with `paused` instead. Do not name the branch in the issue body; do not transition issue state — the user resolves the issue after merge.
 
 8. **Report.** Return the structured `<report>` block (see `## Output`).
 
@@ -67,7 +67,7 @@ You are not the planner. Stop and report `paused` when there is no approved appr
 
 ## Output
 
-Return the structured `<report>` block directly to the main session — no preamble, no trailing prose. It carries only the orchestration signal the caller cannot read off the issue or the branch; the audit trail itself lives in the body `Resume` and the commit timeline.
+Return the structured `<report>` block directly to the main session — no preamble, no trailing prose. It carries only the orchestration signal the caller cannot read off the issue or the branch; the audit trail itself lives in the `Resume` comment and the commit timeline.
 
 ```
 <report by="issue-implementer">

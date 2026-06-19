@@ -22,6 +22,7 @@ import frontmatter as frontmatter_lib
 
 from command import CommandRunner
 from config import WorkflowConfig, WorkflowConfigError
+from issue.cache import _read_frontmatter_markdown
 from issue.jira.client import resolve_jira_data_center_site
 from issue.backend import IssueBackendError
 from issue.cli_output import (
@@ -148,7 +149,7 @@ class JiraIssueBackend:
                         payload={
                             "issue": issue_key,
                             "include_body": False,
-                            "include_comments": False,
+                            "include_comments": True,
                             "include_relationships": False,
                         },
                     )
@@ -157,6 +158,10 @@ class JiraIssueBackend:
                 comment_paths = tuple(
                     display_project_path(path, config.root)
                     for path in cache.comment_files(site, issue_key)
+                )
+                resume = _find_resume_comment_summary(
+                    comment_files=cache.comment_files(site, issue_key),
+                    project=config.root,
                 )
                 relationships_path = cache.relationships_file(site, issue_key)
                 relationships_display = (
@@ -183,6 +188,7 @@ class JiraIssueBackend:
                         ),
                         provider_kind="jira",
                         comments=comment_paths,
+                        resume=resume,
                         relationships=relationships_display,
                         attachments=attachments_display,
                     )
@@ -244,6 +250,65 @@ class JiraIssueBackend:
         return 0
 
     # ------------------------------------------------------------------
+    # resume
+    # ------------------------------------------------------------------
+
+    def add_resume_args(self, parser: argparse.ArgumentParser) -> None:
+        parser.add_argument(
+            "--cache-policy",
+            choices=_CACHE_FETCH_POLICIES,
+            default=CACHE_POLICY_DEFAULT,
+            help="default reuses the fresh local copy; refresh forces a remote re-read",
+        )
+        parser.add_argument("issue", help="Jira issue key")
+
+    def run_resume(
+        self,
+        args: argparse.Namespace,
+        *,
+        config: WorkflowConfig,
+        runner: CommandRunner | None,
+        stdout: TextIO,
+        stderr: TextIO,
+    ) -> int:
+        try:
+            site = resolve_jira_data_center_site(config.root)
+            issue_key = normalize_jira_issue_key(args.issue)
+            provider = JiraDataCenterIssueNativeProvider(runner=runner)
+            response = provider.call(
+                ProviderRequest(
+                    role="issue",
+                    kind="jira",
+                    operation="get",
+                    context=ProviderContext(
+                        project=config.root,
+                        artifact_type="task",
+                        cache_policy=args.cache_policy,
+                    ),
+                    payload={
+                        "issue": issue_key,
+                        "include_body": False,
+                        "include_comments": True,
+                        "include_relationships": False,
+                    },
+                )
+            )
+            cache = JiraDataCenterIssueCache.for_project(config.root)
+            payload = _find_resume_comment_payload(
+                comment_files=cache.comment_files(site, issue_key),
+                issue=issue_key,
+                kind="jira",
+                project=config.root,
+                cache_refreshed=cache_refreshed_from_payload(response.payload, default=True),
+            )
+        except Exception as exc:  # noqa: BLE001
+            print(f"Jira issue resume error: {exc}", file=stderr)
+            return 2
+
+        print(json.dumps(payload, indent=2, sort_keys=False), file=stdout)
+        return 0
+
+    # ------------------------------------------------------------------
     # comments
     # ------------------------------------------------------------------
 
@@ -274,6 +339,28 @@ class JiraIssueBackend:
             action="store_true",
             help="replace the provider copy even if it changed since the last fetch",
         )
+        update = subparsers.add_parser(
+            "update",
+            help="update one Jira issue comment from a body file",
+        )
+        update.add_argument("--type", default="task", help="workflow artifact type")
+        update.add_argument("--issue", required=True, help="Jira issue key")
+        update.add_argument(
+            "--comment-id",
+            required=True,
+            help="provider comment id to update",
+        )
+        update.add_argument(
+            "--body-file",
+            type=Path,
+            required=True,
+            help="path to the opaque body content file (leading YAML frontmatter is stripped)",
+        )
+        update.add_argument(
+            "--overwrite",
+            action="store_true",
+            help="replace the provider copy even if it changed since the last fetch",
+        )
 
     def run_comments(
         self,
@@ -296,10 +383,20 @@ class JiraIssueBackend:
                     overwrite=args.overwrite,
                     runner=runner,
                 )
+            elif args.command == "update":
+                payload = self._update_comment(
+                    config=config,
+                    artifact_type=args.type,
+                    issue=args.issue,
+                    comment_id=args.comment_id,
+                    body_file=args.body_file,
+                    overwrite=args.overwrite,
+                    runner=runner,
+                )
             else:
                 raise IssueBackendError(f"unsupported command: {args.command}")
         except Exception as exc:  # noqa: BLE001
-            print(f"Jira issue comment append error: {exc}", file=stderr)
+            print(f"Jira issue comment {args.command} error: {exc}", file=stderr)
             return 2
 
         print(json.dumps(payload, indent=2, sort_keys=False), file=stdout)
@@ -383,6 +480,84 @@ class JiraIssueBackend:
             "comment": provider_payload.get("comment"),
             "state_changed": bool(provider_payload.get("state_changed")),
             "state": provider_payload.get("state"),
+            "issue_file": issue_file,
+            "body_file": str(body_path),
+            "body_file_removed": body_removed,
+            "cache_refreshed": bool(provider_payload.get("cache_refreshed")),
+        }
+
+    def _update_comment(
+        self,
+        *,
+        config: WorkflowConfig,
+        artifact_type: str,
+        issue: str,
+        comment_id: str,
+        body_file: Path,
+        overwrite: bool = False,
+        runner: CommandRunner | None,
+    ) -> dict[str, object]:
+        artifact_type = _required_text(artifact_type, "artifact type")
+        normalized_comment_id = _required_text(comment_id, "comment id")
+        try:
+            issue_key = normalize_jira_issue_key(issue)
+        except JiraProviderError as exc:
+            raise IssueBackendError(str(exc)) from exc
+
+        body_path = body_file.expanduser()
+        if not body_path.is_file():
+            raise IssueBackendError(f"body file does not exist: {body_path}")
+        body = _strip_body_frontmatter(body_path.read_text(encoding="utf-8"))
+
+        payload: dict[str, object] = {
+            "issue": issue_key,
+            "comment_id": normalized_comment_id,
+            "body": body,
+            "freshness_check": True,
+        }
+        if overwrite:
+            payload["overwrite"] = True
+
+        provider = JiraDataCenterIssueNativeProvider(runner=runner)
+        response = provider.call(
+            ProviderRequest(
+                role="issue",
+                kind="jira",
+                operation="update_comment",
+                context=ProviderContext(project=config.root, artifact_type=artifact_type),
+                payload=payload,
+            )
+        )
+
+        provider_payload = dict(response.payload)
+        if provider_payload.get("status") == "conflict":
+            provider_payload["body_file"] = str(body_path)
+            provider_payload["body_file_removed"] = False
+            return provider_payload
+
+        cache_payload = (
+            provider_payload.get("cache")
+            if isinstance(provider_payload.get("cache"), dict)
+            else {}
+        )
+        issue_file = (
+            cache_payload.get("issue_file") if isinstance(cache_payload, dict) else None
+        )
+        body_removed = False
+        try:
+            body_path.unlink()
+        except OSError:
+            body_removed = False
+        else:
+            body_removed = True
+
+        return {
+            "operation": "update_comment",
+            "kind": "jira",
+            "issue": provider_payload.get("issue") or provider_payload.get("key"),
+            "key": provider_payload.get("key"),
+            "comment_id": provider_payload.get("comment_id"),
+            "comment": provider_payload.get("comment"),
             "issue_file": issue_file,
             "body_file": str(body_path),
             "body_file_removed": body_removed,
@@ -1475,6 +1650,59 @@ def _required_text(value: str, name: str) -> str:
     if not text:
         raise IssueBackendError(f"{name} is required")
     return text
+
+
+def _find_resume_comment_payload(
+    *,
+    comment_files: list[Path],
+    issue: str,
+    kind: str,
+    project: Path,
+    cache_refreshed: bool | None,
+) -> dict[str, object]:
+    for path in comment_files:
+        frontmatter, body = _read_frontmatter_markdown(path)
+        if not _is_resume_comment_body(body):
+            continue
+        comment_id = str(frontmatter.get("provider_comment_id") or "").strip()
+        return {
+            "kind": kind,
+            "issue": issue,
+            "found": True,
+            "comment_id": comment_id,
+            "comment_file": display_project_path(path, project),
+            "body": body,
+            "cache_refreshed": cache_refreshed,
+        }
+    return {
+        "kind": kind,
+        "issue": issue,
+        "found": False,
+        "comment_id": None,
+        "comment_file": None,
+        "body": None,
+        "cache_refreshed": cache_refreshed,
+    }
+
+
+def _find_resume_comment_summary(
+    *,
+    comment_files: list[Path],
+    project: Path,
+) -> dict[str, object] | None:
+    for path in comment_files:
+        frontmatter, body = _read_frontmatter_markdown(path)
+        if not _is_resume_comment_body(body):
+            continue
+        return {
+            "comment_id": str(frontmatter.get("provider_comment_id") or "").strip(),
+            "comment_file": display_project_path(path, project),
+        }
+    return None
+
+
+def _is_resume_comment_body(body: str) -> bool:
+    return body.lstrip().startswith("h2. Resume")
 
 
 def _optional_text(value: str | None) -> str | None:

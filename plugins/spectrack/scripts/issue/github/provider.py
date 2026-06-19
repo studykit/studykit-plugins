@@ -39,6 +39,7 @@ from issue.github.gh import (
     reopen_issue,
     resolve_github_repository,
     search_issues,
+    update_issue_comment,
     view_issue,
 )
 from issue.github.cache import (
@@ -440,6 +441,51 @@ class GitHubIssueNativeProvider(IssueProvider):
             "comment": dict(posted),
             "state_changed": state_result is not None,
             "state": dict(state_result) if state_result is not None else None,
+            "cache_refreshed": True,
+            "cache": write_result.to_json(),
+        }
+
+    def update_comment(self, request: ProviderRequest) -> Mapping[str, Any]:
+        issue = _required_payload_value(request, "issue")
+        comment_id = _required_payload_value(request, "comment_id")
+        body = _required_payload_value(request, "body")
+        issue_number = normalize_issue_number(issue)
+        repo = resolve_github_repository(request.context.project, runner=self.runner)
+        cache = GitHubIssueCache.for_project(request.context.project, configured_repo=repo)
+
+        for target in ("issue", "comments"):
+            freshness_payload = dict(request.payload)
+            freshness_payload["freshness_check"] = True
+            freshness_payload["freshness_target"] = target
+            try:
+                self._require_write_freshness(
+                    replace(request, payload=freshness_payload),
+                    issue_number,
+                    default_target=target,
+                )
+            except ProviderFreshnessError as exc:
+                return self._conflict_payload(
+                    request=request,
+                    repo=repo,
+                    cache=cache,
+                    issue_number=issue_number,
+                    operation="update_comment",
+                    target=target,
+                    error=exc,
+                )
+
+        updated = update_issue_comment(
+            comment_id,
+            body=str(body),
+            project=request.context.project,
+            runner=self.runner,
+        )
+        write_result = self._refresh_issue_bundle(request, repo, cache, issue_number)
+        return {
+            "operation": "update_comment",
+            "issue": issue_number,
+            "comment_id": str(comment_id),
+            "comment": dict(updated),
             "cache_refreshed": True,
             "cache": write_result.to_json(),
         }

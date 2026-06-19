@@ -13,10 +13,11 @@ if str(_SCRIPTS_DIR) not in sys.path:
 
 from functools import partial  # noqa: E402
 
-from issue.dispatch import COMMENTS, DRAFTS, WRITEBACK, run_intent  # noqa: E402
+from issue.dispatch import COMMENTS, DRAFTS, FETCH, WRITEBACK, run_intent  # noqa: E402
 
 github_issue_comments_main = partial(run_intent, COMMENTS)
 github_issue_drafts_main = partial(run_intent, DRAFTS)
+github_issue_fetch_main = partial(run_intent, FETCH)
 github_issue_writeback_main = partial(run_intent, WRITEBACK)
 jira_issue_drafts_main = partial(run_intent, DRAFTS)
 from command import CommandRequest, CommandResult  # noqa: E402
@@ -317,6 +318,7 @@ class GitHubAppendCommentRunner:
         self,
         *,
         conflict_target: str | None = None,
+        existing_comment: bool = False,
         state_after: str = "OPEN",
         state_reason_after: object = None,
     ) -> None:
@@ -325,9 +327,11 @@ class GitHubAppendCommentRunner:
         # provider fingerprint diverge from the seeded cache, which drives the
         # freshness conflict path. ``None`` keeps every target fresh.
         self.conflict_target = conflict_target
+        self.existing_comment = existing_comment
         self.state_after = state_after
         self.state_reason_after = state_reason_after
         self.posted_bodies: list[str] = []
+        self.updated_bodies: list[str] = []
         self.state_calls: list[str] = []
 
     def __call__(self, request: CommandRequest) -> CommandResult:
@@ -348,8 +352,9 @@ class GitHubAppendCommentRunner:
                 ),
             )
         if request.args == _gh_issue_view_args(72, "number,comments"):
-            comments = (
-                [
+            comments = []
+            if self.conflict_target == "comments":
+                comments = [
                     {
                         "id": "IC_provider_only",
                         "url": "https://github.com/studykit/studykit-plugins/issues/72#issuecomment-9900001",
@@ -359,9 +364,17 @@ class GitHubAppendCommentRunner:
                         "updatedAt": "2026-05-14T00:05:00Z",
                     }
                 ]
-                if self.conflict_target == "comments"
-                else []
-            )
+            elif self.existing_comment:
+                comments = [
+                    {
+                        "id": "IC_kwDOQplzFM8AAAABCKrz_g",
+                        "url": "https://github.com/studykit/studykit-plugins/issues/72#issuecomment-7700001",
+                        "author": {"login": "studykit"},
+                        "body": "Old resume.\n",
+                        "createdAt": "2026-05-14T00:01:00Z",
+                        "updatedAt": "2026-05-14T00:01:00Z",
+                    }
+                ]
             return CommandResult(
                 request=request,
                 returncode=0,
@@ -371,6 +384,27 @@ class GitHubAppendCommentRunner:
             body_file = Path(request.args[request.args.index("--body-file") + 1])
             self.posted_bodies.append(body_file.read_text(encoding="utf-8"))
             return CommandResult(request=request, returncode=0)
+        if (
+            len(request.args) >= 7
+            and request.args[:3] == ("gh", "api", "repos/studykit/studykit-plugins/issues/comments/7700001")
+            and request.args[3:6] == ("-X", "PATCH", "--raw-field")
+        ):
+            raw_body = request.args[6]
+            assert raw_body.startswith("body=")
+            body = raw_body.removeprefix("body=")
+            self.updated_bodies.append(body)
+            return CommandResult(
+                request=request,
+                returncode=0,
+                stdout=json.dumps(
+                    {
+                        "id": 7700001,
+                        "body": body,
+                        "created_at": "2026-05-14T00:01:00Z",
+                        "updated_at": "2026-05-14T00:02:00Z",
+                    }
+                ),
+            )
         if request.args[:3] == ("gh", "issue", "close"):
             self.state_calls.append("close")
             return CommandResult(request=request, returncode=0)
@@ -400,9 +434,19 @@ class GitHubAppendCommentRunner:
                                 "id": "IC_kwDOQplzFM8AAAABCKrz_g",
                                 "url": "https://github.com/studykit/studykit-plugins/issues/72#issuecomment-7700001",
                                 "author": {"login": "studykit"},
-                                "body": self.posted_bodies[-1] if self.posted_bodies else "Comment body.\n",
+                                "body": (
+                                    self.updated_bodies[-1]
+                                    if self.updated_bodies
+                                    else self.posted_bodies[-1]
+                                    if self.posted_bodies
+                                    else "Comment body.\n"
+                                ),
                                 "createdAt": "2026-05-14T00:01:00Z",
-                                "updatedAt": "2026-05-14T00:01:00Z",
+                                "updatedAt": (
+                                    "2026-05-14T00:02:00Z"
+                                    if self.updated_bodies
+                                    else "2026-05-14T00:01:00Z"
+                                ),
                             }
                         ],
                         "updatedAt": "2026-05-14T00:01:00Z",
@@ -437,7 +481,13 @@ def _tmp_project_from_args(request: CommandRequest) -> Path:
     return Path("/tmp")
 
 
-def _seed_cached_issue(project: Path, issue_number: int = 72, *, updated_at: str = "2026-05-14T00:00:00Z") -> None:
+def _seed_cached_issue(
+    project: Path,
+    issue_number: int = 72,
+    *,
+    updated_at: str = "2026-05-14T00:00:00Z",
+    comments: list[dict[str, object]] | None = None,
+) -> None:
     GitHubIssueCache.for_project(project, configured_repo=_repo()).write_issue_bundle(
         _repo(),
         {
@@ -448,7 +498,7 @@ def _seed_cached_issue(project: Path, issue_number: int = 72, *, updated_at: str
             "body": "Cached body.",
             "labels": [{"name": "task"}],
             "updatedAt": updated_at,
-            "comments": [],
+            "comments": comments or [],
         },
         fetched_at=updated_at,
     )
@@ -522,6 +572,134 @@ def test_github_append_strips_body_file_frontmatter(tmp_path: Path) -> None:
     assert payload["body_file_removed"] is True
     assert runner.posted_bodies == ["Comment body.\n"]
     assert not body_file.exists()
+
+
+def test_github_update_comment_uses_provider_id_and_deletes_body_file(tmp_path: Path) -> None:
+    _write_config(tmp_path)
+    _seed_cached_issue(
+        tmp_path,
+        comments=[
+            {
+                "id": "IC_kwDOQplzFM8AAAABCKrz_g",
+                "url": "https://github.com/studykit/studykit-plugins/issues/72#issuecomment-7700001",
+                "author": {"login": "studykit"},
+                "body": "Old resume.\n",
+                "createdAt": "2026-05-14T00:01:00Z",
+                "updatedAt": "2026-05-14T00:01:00Z",
+            }
+        ],
+    )
+    body_file = _write_body_file(tmp_path, "Updated resume.\n", name="resume.md")
+    runner = GitHubAppendCommentRunner(existing_comment=True)
+    stdout = io.StringIO()
+
+    code = github_issue_comments_main(
+        [
+            "--project",
+            str(tmp_path),
+            "update",
+            "--type",
+            "task",
+            "--issue",
+            "72",
+            "--comment-id",
+            "7700001",
+            "--body-file",
+            str(body_file),
+        ],
+        stdout=stdout,
+        runner=runner,
+    )
+
+    payload = json.loads(stdout.getvalue())
+    assert code == 0
+    assert payload["operation"] == "update_comment"
+    assert payload["kind"] == "github"
+    assert payload["issue"] == "72"
+    assert payload["comment_id"] == "7700001"
+    assert payload["body_file_removed"] is True
+    assert payload["cache_refreshed"] is True
+    assert runner.updated_bodies == ["Updated resume.\n"]
+    assert runner.posted_bodies == []
+    assert not body_file.exists()
+    comment_files = GitHubIssueCache.for_project(tmp_path, configured_repo=_repo()).comment_files(_repo(), 72)
+    assert [path.name for path in comment_files] == ["comment-2026-05-14T000100Z-7700001.md"]
+    cached = comment_files[0].read_text(encoding="utf-8")
+    assert "provider_comment_id:" in cached
+    assert "7700001" in cached
+    assert "Updated resume.\n" in cached
+
+
+def test_github_fetch_identifies_resume_comment(tmp_path: Path) -> None:
+    _write_config(tmp_path)
+    runner = GitHubFakeRunner()
+    runner.requests.clear()
+    stdout = io.StringIO()
+
+    def run_fetch(request: CommandRequest) -> CommandResult:
+        runner.requests.append(request)
+        if request.args == _gh_remote_args(_tmp_project_from_args(request)):
+            return CommandResult(
+                request=request,
+                returncode=0,
+                stdout="git@github.com:studykit/studykit-plugins.git\n",
+            )
+        if request.args == _gh_issue_view_args(72, ",".join(DEFAULT_ISSUE_FIELDS)):
+            return CommandResult(
+                request=request,
+                returncode=0,
+                stdout=json.dumps(
+                    {
+                        "number": 72,
+                        "title": "Issue with resume",
+                        "state": "OPEN",
+                        "stateReason": None,
+                        "body": "Body.",
+                        "labels": [{"name": "task"}],
+                        "comments": [
+                            {
+                                "id": "IC_kwDOQplzFM8AAAABCKrz_g",
+                                "url": "https://github.com/studykit/studykit-plugins/issues/72#issuecomment-7700001",
+                                "author": {"login": "studykit"},
+                                "body": "## Resume\n\nCurrent state.\n",
+                                "createdAt": "2026-05-14T00:01:00Z",
+                                "updatedAt": "2026-05-14T00:02:00Z",
+                            }
+                        ],
+                        "url": "https://github.com/studykit/studykit-plugins/issues/72",
+                        "createdAt": "2026-05-14T00:00:00Z",
+                        "updatedAt": "2026-05-14T00:02:00Z",
+                        "closedAt": None,
+                    }
+                ),
+            )
+        if request.args == _gh_api_args("repos/studykit/studykit-plugins/issues/72"):
+            return CommandResult(
+                request=request,
+                returncode=0,
+                stdout=json.dumps({"id": 7200, "number": 72, "updated_at": "2026-05-14T00:02:00Z"}),
+            )
+        if request.args == _gh_api_args("repos/studykit/studykit-plugins/issues/72/parent"):
+            return CommandResult(request=request, returncode=404, stderr="not found")
+        if request.args in {
+            _gh_api_args("repos/studykit/studykit-plugins/issues/72/sub_issues", "--paginate"),
+            _gh_api_args("repos/studykit/studykit-plugins/issues/72/dependencies/blocked_by", "--paginate"),
+            _gh_api_args("repos/studykit/studykit-plugins/issues/72/dependencies/blocking", "--paginate"),
+        }:
+            return CommandResult(request=request, returncode=0, stdout="[]")
+        return CommandResult(request=request, returncode=127, stderr=f"unexpected command: {request.args}")
+
+    code = github_issue_fetch_main(
+        ["--project", str(tmp_path), "72"],
+        stdout=stdout,
+        runner=run_fetch,
+    )
+
+    payload = json.loads(stdout.getvalue())
+    assert code == 0
+    issue = payload["issues"][0]
+    assert issue["resume"]["comment_id"] == "7700001"
+    assert issue["resume"]["comment_file"].endswith("comment-2026-05-14T000100Z-7700001.md")
 
 
 def test_github_append_missing_body_file_fails(tmp_path: Path) -> None:

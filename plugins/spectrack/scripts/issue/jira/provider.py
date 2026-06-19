@@ -30,6 +30,7 @@ from config import WorkflowConfigError, load_workflow_config
 from issue.jira.client import (
     jira_download_attachment,
     jira_upload_attachments,
+    jira_data_center_comment_path,
     jira_data_center_comments_path,
     jira_data_center_issue_path,
     jira_data_center_issue_link_path,
@@ -390,6 +391,40 @@ class JiraDataCenterIssueNativeProvider(IssueProvider):
         state = _optional_string(request.payload.get("state"))
         normalized_state = state.lower() if state is not None else None
         return self._append_comment(request, issue_key, body, state=normalized_state)
+
+    def update_comment(self, request: ProviderRequest) -> Mapping[str, Any]:
+        issue_key = normalize_jira_issue_key(_required_payload_value(request, "issue"))
+        comment_id = str(_required_payload_value(request, "comment_id")).strip()
+        if not comment_id:
+            raise ProviderOperationError("update_comment requires a non-empty 'comment_id' payload")
+        body = str(_required_payload_value(request, "body"))
+
+        site = resolve_jira_data_center_site(request.context.project)
+        cache = JiraDataCenterIssueCache.for_project(request.context.project)
+        for target in ("issue", "comments"):
+            try:
+                self._require_write_freshness(request, site, cache, issue_key, target=target)
+            except ProviderFreshnessError as exc:
+                return self._conflict_payload(
+                    site=site,
+                    cache=cache,
+                    project=request.context.project,
+                    issue_key=issue_key,
+                    operation="update_comment",
+                    target=target,
+                    error=exc,
+                )
+        updated = update_comment(site, issue_key, comment_id=comment_id, body=body, runner=self.runner)
+        write_result = self._refresh_cache(request.context.project, site, cache, issue_key)
+        return {
+            "operation": "update_comment",
+            "issue": issue_key,
+            "key": issue_key,
+            "comment_id": comment_id,
+            "comment": dict(updated) if isinstance(updated, Mapping) else {},
+            "cache_refreshed": True,
+            "cache": write_result,
+        }
 
     def add_attachment(self, request: ProviderRequest) -> Mapping[str, Any]:
         issue_key = normalize_jira_issue_key(_required_payload_value(request, "issue"))
@@ -1179,6 +1214,26 @@ def add_comment(
         site,
         "POST",
         jira_data_center_comments_path(site, issue_key),
+        {"body": body},
+        runner=runner,
+    )
+    if not isinstance(result, Mapping):
+        return {}
+    return result
+
+
+def update_comment(
+    site: Any,
+    issue_key: str,
+    *,
+    comment_id: str,
+    body: str,
+    runner: CommandRunner | None = None,
+) -> Mapping[str, Any]:
+    result = jira_send_json(
+        site,
+        "PUT",
+        jira_data_center_comment_path(site, issue_key, comment_id),
         {"body": body},
         runner=runner,
     )

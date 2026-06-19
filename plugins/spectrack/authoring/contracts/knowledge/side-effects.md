@@ -30,7 +30,7 @@ Each `review` item contains one actionable finding — split unrelated side effe
    spectrack mustread --type review
    ```
 
-   Follow the body shape the resolver returns. `review-authoring.md` keeps the body deliberately compact: required `Description`, optional `Suggested Fix`, `Evidence`, `Resume`.
+   Follow the body shape the resolver returns. Review bodies stay deliberately compact: required `Description`, optional `Suggested Fix` and `Evidence`.
 
 2. Draft the `review` body under a scratch path the originating skill / agent picks (e.g., `$(spectrack project-dir .spectrack-cache/<originator>-side-effects/<slug>.md)` — the helper resolves the project root and creates the parent, anchoring on the main repo so the draft survives worktree teardown). Include in `Description`:
 

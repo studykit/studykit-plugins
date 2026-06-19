@@ -1209,7 +1209,8 @@ def test_codex_subagent_start_injects_issue_implementer_agent_block(
     )
     assert "<commit-prefix>" in context
     assert "- `fetch`" in context
-    assert "- `update`" in context
+    assert "- `comment update`" in context
+    assert "- `comment append`" in context
 
 
 def test_session_start_emits_commands_pointer_for_jira_config(
@@ -1318,7 +1319,8 @@ def test_claude_subagent_start_injects_issue_implementer_agent_block(
     assert "<commit-prefix>" in context
     assert "## issue-implementer subagent context" not in context
     assert "- `fetch`" in context
-    assert "- `update`" in context
+    assert "- `comment update`" in context
+    assert "- `comment append`" in context
 
 
 def test_subagent_start_emits_single_commands_for_issue_implementer(
@@ -1347,7 +1349,7 @@ def test_subagent_start_emits_single_commands_for_issue_implementer(
     assert context.count("<commands>") == 1
     assert context.count("</commands>") == 1
     # The base <commands> pointer is replaced by the agent's verb-scoped block.
-    for verb in ("fetch", "update"):
+    for verb in ("fetch", "comment update", "comment append"):
         assert f"- `{verb}`" in context
 
 

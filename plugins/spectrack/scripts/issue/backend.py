@@ -87,6 +87,20 @@ class IssueBackend(Protocol):
         stderr: TextIO,
     ) -> int: ...
 
+    # --- resume ---------------------------------------------------------
+
+    def add_resume_args(self, parser: argparse.ArgumentParser) -> None: ...
+
+    def run_resume(
+        self,
+        args: argparse.Namespace,
+        *,
+        config: WorkflowConfig,
+        runner: CommandRunner | None,
+        stdout: TextIO,
+        stderr: TextIO,
+    ) -> int: ...
+
     # --- drafts ---------------------------------------------------------
 
     def add_drafts_args(self, parser: argparse.ArgumentParser) -> None: ...

@@ -20,7 +20,9 @@ Verb mapping
 ``update ...``                  ``WRITEBACK`` with ``["update", ...]``
 ``fetch ...``                   ``FETCH`` with ``[...]``
 ``search ...``                  ``SEARCH`` with ``[...]``
-``comment ...``                 ``COMMENTS`` with ``["append", ...]``
+``comment ...``                 ``COMMENTS`` with ``["append", ...]`` for legacy calls,
+                                or ``["append"|"update", ...]`` when explicit
+``resume ...``                  ``RESUME`` with ``[...]``
 ``attach ...``                  ``ATTACH`` with ``[...]`` (Jira only)
 ``link ...``                    ``RELATIONSHIPS`` with ``[...]``
 ``state <ref> <target> [opts]`` ``FIELDS`` with ``[<target>, <ref>, ...]``
@@ -75,6 +77,7 @@ class IntentSpec:
 FETCH = IntentSpec("issue fetch", "add_fetch_args", "run_fetch")
 SEARCH = IntentSpec("issue search", "add_search_args", "run_search")
 COMMENTS = IntentSpec("issue comment", "add_comments_args", "run_comments")
+RESUME = IntentSpec("issue resume", "add_resume_args", "run_resume")
 DRAFTS = IntentSpec("issue draft", "add_drafts_args", "run_drafts")
 WRITEBACK = IntentSpec("issue update", "add_writeback_args", "run_writeback")
 RELATIONSHIPS = IntentSpec(
@@ -176,7 +179,8 @@ _VERB_HELP: tuple[tuple[str, str, bool], ...] = (
     ("update", "update title / body / labels / state", False),
     ("fetch", "fetch one or more issues into the cache", False),
     ("search", "search issues with the backend's native query", False),
-    ("comment", "append a comment from a body file", False),
+    ("comment", "append or update a comment from a body file", False),
+    ("resume", "find the current Resume comment for an issue", False),
     ("attach", "add/get issue file attachments", True),
     ("link", "add / remove / replace relationships", False),
     ("state", "change lifecycle state (e.g. `state <ref> close`)", False),
@@ -267,7 +271,11 @@ def main(
     if verb == "search":
         return run_intent(SEARCH, rest, **kwargs)
     if verb == "comment":
+        if rest and rest[0] in {"append", "update"}:
+            return run_intent(COMMENTS, rest, **kwargs)
         return run_intent(COMMENTS, ["append", *rest], **kwargs)
+    if verb == "resume":
+        return run_intent(RESUME, rest, **kwargs)
     if verb == "attach":
         return run_intent(ATTACH, rest, **kwargs)
     if verb == "link":

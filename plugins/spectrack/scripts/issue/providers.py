@@ -29,6 +29,7 @@ ISSUE_WRITE_OPERATIONS = frozenset(
         "create",
         "update",
         "add_comment",
+        "update_comment",
         "add_attachment",
         "set_parent",
         "set_dependency",
@@ -225,7 +226,7 @@ class IssueProvider(ProviderTransport):
     """Issue provider interface.
 
     Covered operations: create, update, get, search, comments, logs,
-    add_comment, add_attachment, get_attachment, set_parent,
+    add_comment, update_comment, add_attachment, get_attachment, set_parent,
     set_dependency, close, and reopen.
     """
 
@@ -252,6 +253,9 @@ class IssueProvider(ProviderTransport):
 
     def add_comment(self, request: ProviderRequest) -> Mapping[str, Any]:
         raise ProviderOperationError("issue add_comment is not implemented")
+
+    def update_comment(self, request: ProviderRequest) -> Mapping[str, Any]:
+        raise ProviderOperationError("issue update_comment is not implemented")
 
     def add_attachment(self, request: ProviderRequest) -> Mapping[str, Any]:
         raise ProviderOperationError("issue add_attachment is not implemented")

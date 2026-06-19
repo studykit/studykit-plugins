@@ -28,7 +28,6 @@ Common optional sections:
 - `Acceptance Criteria` — integration outcome or shared invariant not naturally owned by a single member issue; do not restate per-member criteria.
 - `Member Workstreams` — natural member clusters and sequencing when useful.
 - `Coordination Notes` — current decisions, constraints, or sequencing notes.
-- `Resume` — current-state snapshot while open.
 - `Why Discarded` — reason when discarded.
 
 Add purposeful sections when useful. Keep member-level implementation detail out, but include shared invariants, integration-level verification, sequencing, and member workstreams when they coordinate the batch.
@@ -36,5 +35,4 @@ Add purposeful sections when useful. Keep member-level implementation detail out
 ## Completion criteria
 
 Completion is author-judged; closing all member issues does not automatically close the epic. Complete only when the coordinated outcome is reached or descoped, members are closed/discarded/moved, and integration-level criteria are satisfied or waived.
-
 

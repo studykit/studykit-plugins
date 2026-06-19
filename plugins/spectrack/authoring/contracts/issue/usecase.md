@@ -21,7 +21,6 @@ Common optional sections:
 
 - `Related Work` — related tasks, specs, reviews, research, or pages.
 - `Supersedes` — prior use case when replacing one.
-- `Resume` — current-state snapshot while shaping.
 
 Add purposeful sections when useful.
 

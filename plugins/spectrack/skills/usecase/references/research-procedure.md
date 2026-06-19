@@ -38,7 +38,7 @@ authoring contract is the contract.
 
    The resolver returns the issue-side body shape (`Description`,
    `Research Question`, `Options` when comparing alternatives, optional
-   `Scope`, `Sources To Check`, `Resume`).
+   `Scope`, `Sources To Check`).
 
 3. **Publish the research issue.** Draft the body under
    `$(spectrack project-dir .spectrack-cache/usecase-research/<slug>.md)` and publish via
