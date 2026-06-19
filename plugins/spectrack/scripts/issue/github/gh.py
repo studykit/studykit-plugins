@@ -431,6 +431,31 @@ def comment_issue(
     return {"repository": repo.to_json(), "issue": issue_number, "operation": "comment_issue"}
 
 
+def update_issue_comment(
+    comment_id: int | str,
+    *,
+    body: str,
+    project: Path,
+    runner: CommandRunner | None = None,
+) -> dict[str, Any]:
+    """Update an existing issue comment."""
+
+    repo = resolve_github_repository(project, runner=runner)
+    normalized_comment_id = str(comment_id).strip()
+    if not normalized_comment_id:
+        raise GitHubParseError("comment id is required")
+    payload = _gh_api_json_object_with_args(
+        f"repos/{repo.slug}/issues/comments/{normalized_comment_id}",
+        ["-X", "PATCH", "--raw-field", f"body={body}"],
+        project=project,
+        runner=runner,
+    )
+    payload.setdefault("repository", repo.to_json())
+    payload.setdefault("id", normalized_comment_id)
+    payload.setdefault("operation", "update_issue_comment")
+    return payload
+
+
 def close_issue(
     issue: int | str,
     *,
@@ -1135,6 +1160,17 @@ def _gh_api_json_object(
     runner: CommandRunner | None = None,
 ) -> dict[str, Any]:
     result = _gh(["api", path], project=project, runner=runner)
+    return _loads_json_object(result.stdout, f"gh api {path}")
+
+
+def _gh_api_json_object_with_args(
+    path: str,
+    args: list[str],
+    *,
+    project: Path,
+    runner: CommandRunner | None = None,
+) -> dict[str, Any]:
+    result = _gh(["api", path, *args], project=project, runner=runner)
     return _loads_json_object(result.stdout, f"gh api {path}")
 
 

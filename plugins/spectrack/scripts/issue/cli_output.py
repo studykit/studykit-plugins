@@ -21,6 +21,7 @@ class IssueFetchContext:
     provider_kind: str = "github"
     issue_file: str = "issue.md"
     comments: tuple[str, ...] = ()
+    resume: Mapping[str, Any] | None = None
     relationships: str | None = None
     attachments: str | None = None
 
@@ -56,6 +57,12 @@ class IssueFetchContext:
                 comment[len(basedir):] if basedir and comment.startswith(basedir) else comment
                 for comment in self.comments
             ]
+        if self.resume:
+            resume = dict(self.resume)
+            comment_file = resume.get("comment_file")
+            if isinstance(comment_file, str) and comment_file and basedir and comment_file.startswith(basedir):
+                resume["comment_file"] = comment_file[len(basedir):]
+            payload["resume"] = resume
         return payload
 
 

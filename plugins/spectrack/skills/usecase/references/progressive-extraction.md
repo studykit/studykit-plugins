@@ -70,7 +70,7 @@ Read the files the resolver returns. They define:
 
 - The workflow `usecase` issue body shape (`Description`, `Actors`,
   `Current Draft`, `Open Questions`, optional `Related Work`,
-  `Supersedes`, `Resume`).
+  `Supersedes`).
 - The provider's markup convention (heading form, link form).
 - Any provider-specific anti-patterns to avoid.
 

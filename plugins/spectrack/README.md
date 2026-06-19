@@ -85,7 +85,7 @@ Once configured, the plugin exposes these slash commands:
   when the named cause is not the real cause, or when the approach would
   not actually resolve it, and leaves a single verdict comment on the
   issue.
-- `/handoff` — Wrap up a session by refreshing the `Resume` section of
+- `/handoff` — Wrap up a session by refreshing the `Resume` comment of
   every in-flight issue and, if needed, publishing `review`-type issues
   for residual findings, gaps, or questions.
 
@@ -113,7 +113,7 @@ then run `/clear` (or start a new session) for it to take effect.
 - Keeps commit subjects prefixed with the related issue reference and the
   PR's `Closes` keyword pointing at the right issue.
 - Refreshes in-flight issues at session handoff so the next session can
-  pick up from the issue body alone.
+  pick up from provider issue context.
 
 ## Configuration Reference
 

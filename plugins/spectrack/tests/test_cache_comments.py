@@ -14,9 +14,10 @@ if str(_SCRIPTS_DIR) not in sys.path:
 
 from functools import partial  # noqa: E402
 
-from issue.dispatch import COMMENTS, run_intent  # noqa: E402
+from issue.dispatch import COMMENTS, FETCH, run_intent  # noqa: E402
 
 jira_issue_comments_main = partial(run_intent, COMMENTS)
+jira_issue_fetch_main = partial(run_intent, FETCH)
 from command import CommandRequest, CommandResult  # noqa: E402
 from config import load_workflow_config  # noqa: E402
 from issue.jira.cache import JiraDataCenterIssueCache  # noqa: E402
@@ -77,7 +78,11 @@ def jira_site(project: Path):
     return jira_data_center_site_from_provider_config(config.issues)
 
 
-def jira_issue_payload(*, body: str = "Cached body.") -> dict[str, object]:
+def jira_issue_payload(
+    *,
+    body: str = "Cached body.",
+    comments: list[dict[str, object]] | None = None,
+) -> dict[str, object]:
     return {
         "id": "10001",
         "key": "TEST-1234",
@@ -88,7 +93,7 @@ def jira_issue_payload(*, body: str = "Cached body.") -> dict[str, object]:
             "created": "2026-05-15T09:00:00.000+0900",
             "updated": "2026-05-15T10:00:00.000+0900",
             "status": {"name": "In Progress", "statusCategory": {"key": "indeterminate"}},
-            "comment": {"comments": []},
+            "comment": {"comments": comments or []},
             "issuelinks": [],
         },
     }
@@ -116,6 +121,10 @@ def jira_issue_url(issue: str = "TEST-1234") -> str:
     return f"https://jira.example.test/rest/api/2/issue/{issue}"
 
 
+def jira_comment_url(issue: str = "TEST-1234", comment_id: str = "30001") -> str:
+    return f"https://jira.example.test/rest/api/2/issue/{issue}/comment/{comment_id}"
+
+
 def jira_remote_links_url(issue: str = "TEST-1234") -> str:
     return f"https://jira.example.test/rest/api/2/issue/{issue}/remotelink"
 
@@ -124,12 +133,16 @@ def jira_transitions_url(issue: str = "TEST-1234") -> str:
     return f"https://jira.example.test/rest/api/2/issue/{issue}/transitions"
 
 
-def _seed_cached_issue(project: Path) -> None:
+def _seed_cached_issue(
+    project: Path,
+    *,
+    comments: list[dict[str, object]] | None = None,
+) -> None:
     site = jira_site(project)
     cache = JiraDataCenterIssueCache.for_project(project)
     cache.write_issue_bundle(
         site,
-        jira_issue_payload(),
+        jira_issue_payload(comments=comments),
         remote_links=remote_links_payload(),
         fetched_at="2026-05-15T10:00:00.000+0900",
     )
@@ -239,6 +252,116 @@ def test_jira_append_strips_body_file_frontmatter(tmp_path: Path) -> None:
     assert not body_file.exists()
     write_request = next(request for request in runner.requests if request.args == curl_write_args())
     assert '\\"body\\":\\"Inline comment body.\\\\n\\"' in str(write_request.input_text)
+
+
+def test_jira_update_comment_uses_provider_id_and_deletes_body_file(tmp_path: Path) -> None:
+    write_jira_config(tmp_path)
+    old_comment = {
+        "id": "30001",
+        "body": "Old resume.\n",
+        "created": "2026-05-15T09:30:00.000+0900",
+        "updated": "2026-05-15T09:30:00.000+0900",
+        "author": {"displayName": "Studykit"},
+    }
+    updated_comment = {
+        **old_comment,
+        "body": "Updated resume.\n",
+        "updated": "2026-05-15T10:05:00.000+0900",
+    }
+    _seed_cached_issue(tmp_path, comments=[old_comment])
+    body_file = _write_body_file(tmp_path, "Updated resume.\n", name="resume.md")
+    updated_issue = jira_issue_payload(comments=[updated_comment])
+    runner = FakeRunner(
+        {
+            curl_args(jira_issue_url()): [
+                result(curl_args(jira_issue_url()), stdout=json.dumps(jira_issue_payload(comments=[old_comment]))),
+                result(curl_args(jira_issue_url()), stdout=json.dumps(jira_issue_payload(comments=[old_comment]))),
+                result(curl_args(jira_issue_url()), stdout=json.dumps(updated_issue)),
+            ],
+            curl_write_args(): result(
+                curl_write_args(),
+                stdout=json.dumps(updated_comment),
+            ),
+            curl_args(jira_remote_links_url()): result(
+                curl_args(jira_remote_links_url()),
+                stdout=json.dumps(remote_links_payload()),
+            ),
+        }
+    )
+    stdout = io.StringIO()
+
+    code = jira_issue_comments_main(
+        [
+            "--project",
+            str(tmp_path),
+            "update",
+            "--issue",
+            "TEST-1234",
+            "--comment-id",
+            "30001",
+            "--body-file",
+            str(body_file),
+        ],
+        stdout=stdout,
+        runner=runner,
+    )
+
+    payload = json.loads(stdout.getvalue())
+    assert code == 0
+    assert payload["operation"] == "update_comment"
+    assert payload["kind"] == "jira"
+    assert payload["issue"] == "TEST-1234"
+    assert payload["comment_id"] == "30001"
+    assert payload["body_file_removed"] is True
+    assert payload["cache_refreshed"] is True
+    assert not body_file.exists()
+    write_request = next(request for request in runner.requests if request.args == curl_write_args())
+    assert 'request = "PUT"' in str(write_request.input_text)
+    assert f'url = "{jira_comment_url()}"' in str(write_request.input_text)
+    assert '\\"body\\":\\"Updated resume.\\\\n\\"' in str(write_request.input_text)
+    site = jira_site(tmp_path)
+    comment_files = JiraDataCenterIssueCache.for_project(tmp_path).comment_files(site, "TEST-1234")
+    assert [path.name for path in comment_files] == ["comment-2026-05-15T093000Z-30001.md"]
+    cached = comment_files[0].read_text(encoding="utf-8")
+    assert "provider_comment_id:" in cached
+    assert "30001" in cached
+    assert "Updated resume.\n" in cached
+
+
+def test_jira_fetch_identifies_resume_comment_with_wiki_heading(tmp_path: Path) -> None:
+    write_jira_config(tmp_path)
+    resume_comment = {
+        "id": "30001",
+        "body": "h2. Resume\n\nCurrent state.\n",
+        "created": "2026-05-15T09:30:00.000+0900",
+        "updated": "2026-05-15T10:05:00.000+0900",
+        "author": {"displayName": "Studykit"},
+    }
+    runner = FakeRunner(
+        {
+            curl_args(jira_issue_url()): result(
+                curl_args(jira_issue_url()),
+                stdout=json.dumps(jira_issue_payload(comments=[resume_comment])),
+            ),
+            curl_args(jira_remote_links_url()): result(
+                curl_args(jira_remote_links_url()),
+                stdout=json.dumps(remote_links_payload()),
+            ),
+        }
+    )
+    stdout = io.StringIO()
+
+    code = jira_issue_fetch_main(
+        ["--project", str(tmp_path), "TEST-1234"],
+        stdout=stdout,
+        runner=runner,
+    )
+
+    payload = json.loads(stdout.getvalue())
+    assert code == 0
+    issue = payload["issues"][0]
+    assert issue["resume"]["comment_id"] == "30001"
+    assert issue["resume"]["comment_file"].endswith("comment-2026-05-15T093000Z-30001.md")
 
 
 def test_jira_append_missing_body_file_fails(tmp_path: Path) -> None:

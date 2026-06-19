@@ -22,7 +22,6 @@ Common optional sections:
 
 - `Scope` — in-scope and out-of-scope boundaries.
 - `Sources To Check` — initial source list or search plan.
-- `Resume` — current-state snapshot while in progress.
 
 Add purposeful sections when useful. Research may produce a conditional recommendation under stated constraints, but it should distinguish evidence, inference, recommendation, and open verification gaps; do not commit the project to a design before evidence is collected.
 

@@ -144,6 +144,12 @@ def jira_data_center_comments_path(site: JiraDataCenterSite, issue_key: str) -> 
     return f"/rest/api/{site.api_version}/issue/{escaped_key}/comment"
 
 
+def jira_data_center_comment_path(site: JiraDataCenterSite, issue_key: str, comment_id: str) -> str:
+    escaped_key = quote(normalize_jira_issue_key(issue_key), safe="")
+    escaped_comment = quote(str(comment_id).strip(), safe="")
+    return f"/rest/api/{site.api_version}/issue/{escaped_key}/comment/{escaped_comment}"
+
+
 def jira_data_center_attachments_path(site: JiraDataCenterSite, issue_key: str) -> str:
     escaped_key = quote(normalize_jira_issue_key(issue_key), safe="")
     return f"/rest/api/{site.api_version}/issue/{escaped_key}/attachments"

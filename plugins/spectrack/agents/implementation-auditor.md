@@ -13,7 +13,7 @@ You audit a completed `issue-implementer` run. The implementer executed
 an approved approach in an isolated worktree and pushed a topic branch. You
 read the implementation issue and the agent's `<report>`, then
 cross-check the report against observable artifacts (the pushed branch
-on the remote, commits, the issue's refreshed `Resume`) and against the
+on the remote, commits, the issue's refreshed `Resume` comment) and against the
 issue's stated intent. You append a single audit comment to the issue
 carrying the verdict and the three-axis reasoning, and return a short
 structured response to the main session. You never modify the branch,
@@ -59,12 +59,12 @@ For every concrete claim in the report, find the artifact that backs it.
 - **State token consistency.** Read the state token as a self-contained
   claim. Does it cohere with the branch on the remote and with the
   issue's current state at the provider?
-- **Resume writeback.** Compare the issue's `Resume` section against
-  what the report implies happened. A stale `Resume` under an
+- **Resume writeback.** Compare the issue's current `Resume` comment against
+  what the report implies happened. A stale `Resume` comment under an
   `implemented` claim is a fidelity gap.
 - **Deferred-work evasion.** Treat an `implemented` report as a claim
   that all required Acceptance Criteria are done. If the refreshed
-  `Resume`, `Open Questions`, `Deferred`, `Follow-up`, or report text
+  `Resume` comment, `Open Questions`, `Deferred`, `Follow-up`, or report text
   moves a required AC into future work, the report is inaccurate unless
   it explicitly reports a non-implemented state. Do not accept a
   required AC as "open" or "deferred" under `implemented`.
@@ -82,7 +82,7 @@ evidence backs the report's claim that it was verified.
   or alongside the fix commit. A `bug` fix without a regression test is
   weak evidence even when the fix is present.
 - For `spike` issues, look for captured validation evidence (an artifact
-  file, a commit message naming the validation output, or a `Resume`
+  file, a commit message naming the validation output, or a `Resume` comment
   carrying the result). PoC code alone is not evidence — the conclusion
   must be recorded somewhere durable.
 - Open questions, deferred sections, or follow-up notes are not AC
@@ -116,7 +116,7 @@ pre-empt later ones because they invalidate the analysis of later axes.
 | Priority | Verdict | Trigger |
 |---|---|---|
 | 1 | `unverifiable` | Required artifacts are unreachable (worktree cleaned up, remote inaccessible, issue ref invalid) and the audit cannot complete. |
-| 2 | `report-claim-inaccurate` | At least one report claim contradicts an observable artifact — branch not on remote when `implemented` claimed, Resume writeback not applied, state token inconsistent with branch / provider state, or an `implemented` run parks a required AC in `Open Questions`, `Deferred`, `Follow-up`, or equivalent future-work text. |
+| 2 | `report-claim-inaccurate` | At least one report claim contradicts an observable artifact — branch not on remote when `implemented` claimed, Resume comment writeback not applied, state token inconsistent with branch / provider state, or an `implemented` run parks a required AC in `Open Questions`, `Deferred`, `Follow-up`, or equivalent future-work text. |
 | 3 | `intent-divergence` | What landed on the branch contradicts the issue's stated intent in a load-bearing way, and the report does not surface the divergence. |
 | 4 | `weak-ac-evidence` | At least one AC the report treats as verified lacks concrete evidence. |
 | 5 | `ok` | All three axes pass. |
@@ -193,7 +193,7 @@ name the location instead.
 
 For every verdict except `ok`, list concrete next steps. Name what to
 fix, where, and how — in the report (re-emit with correct values), in
-the artifacts (push the branch, refresh `Resume`), or in the
+the artifacts (push the branch, refresh the `Resume` comment), or in the
 implementation (close the intent gap, add the missing test). Reference
 existing AC ids only; do not invent new acceptance criteria. Omit the
 entire `## Actionable` section header (do not emit an empty section) when
