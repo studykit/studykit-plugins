@@ -1,6 +1,0 @@
-interface:
-  display_name: "A4 Use Case"
-  short_description: "Shape ideas into concrete use cases"
-
-policy:
-  allow_implicit_invocation: false
