@@ -35,7 +35,7 @@
     {
       "name": "korea-gov-data",
       "source": "./plugins/korea-gov-data",
-      "description": "Extract and organize Open API specifications from data.go.kr (Korea Public Data Portal)",
+      "description": "Extract and organize Open API specifications from KOSIS (Korean Statistical Information Service)",
       "author": {
         "name": "studykit"
       },
