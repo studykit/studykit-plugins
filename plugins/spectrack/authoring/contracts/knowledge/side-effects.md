@@ -45,7 +45,7 @@ Each `review` item contains one actionable finding — split unrelated side effe
    - `--title` — short concern phrase ("Missing domain concept: meeting summary").
    - `--body-file` — the temp file from step 2.
    - `--assignee me` — the user owns the follow-up by default.
-   - `--related <originator-ref>` — link the causing artifact so the side-effect chain is reviewable from either direction.
+   - Link the review so it blocks the causing artifact, so the side-effect chain is reviewable from either direction.
 
 4. If the originating skill / agent maintains a session task list, add a task `"Side effect: review <ref>"` and mark it completed once the issue is published. The `review` item is the durable record; the task list is just the session map.
 

@@ -615,12 +615,6 @@ class GitHubIssueBackend:
             default=[],
             help="add sub-issue after publish (repeatable)",
         )
-        publish.add_argument(
-            "--related",
-            action="append",
-            default=[],
-            help="add related ref after publish (repeatable)",
-        )
 
     def run_drafts(
         self,
@@ -668,8 +662,6 @@ class GitHubIssueBackend:
             intent["blocking_add"] = list(args.blocking)
         if getattr(args, "child", None):
             intent["child_add"] = list(args.child)
-        if getattr(args, "related", None):
-            intent["related_add"] = list(args.related)
         return intent
 
     def _publish_issue(
@@ -886,16 +878,6 @@ class GitHubIssueBackend:
             default=[],
             help="remove a blocking dependency (repeatable)",
         )
-        update.add_argument(
-            "--related", action="append", default=[], help="add a related ref (repeatable)"
-        )
-        update.add_argument(
-            "--remove-related",
-            dest="remove_related",
-            action="append",
-            default=[],
-            help="remove a related ref (repeatable)",
-        )
 
     def run_writeback(
         self,
@@ -958,10 +940,6 @@ class GitHubIssueBackend:
             intent["child_add"] = list(args.child)
         if getattr(args, "remove_child", None):
             intent["child_remove"] = list(args.remove_child)
-        if getattr(args, "related", None):
-            intent["related_add"] = list(args.related)
-        if getattr(args, "remove_related", None):
-            intent["related_remove"] = list(args.remove_related)
         return intent
 
     def _update_issue(
@@ -1154,19 +1132,6 @@ class GitHubIssueBackend:
             help="remove a blocking dependency (repeatable)",
         )
         parser.add_argument(
-            "--related",
-            action="append",
-            default=[],
-            help="add a related ref (repeatable)",
-        )
-        parser.add_argument(
-            "--remove-related",
-            dest="remove_related",
-            action="append",
-            default=[],
-            help="remove a related ref (repeatable)",
-        )
-        parser.add_argument(
             "issue", help="GitHub issue id or configured repository issue reference"
         )
 
@@ -1216,10 +1181,6 @@ class GitHubIssueBackend:
             intent["child_add"] = list(args.child)
         if args.remove_child:
             intent["child_remove"] = list(args.remove_child)
-        if args.related:
-            intent["related_add"] = list(args.related)
-        if args.remove_related:
-            intent["related_remove"] = list(args.remove_related)
         return intent
 
     def _apply_relationships(

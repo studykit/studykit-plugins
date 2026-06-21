@@ -45,7 +45,8 @@ task `completed`, then run the End-Iteration procedure below.
    cross-use-case consistency, and — when an actors registry exists
    — actor registry alignment and registry quality) and publishes
    one `review` issue per finding via `spectrack issue new --type
-   review`, linked `--related` to the target use case.
+   review`, linked `--blocking` to the target use case (the finding
+   blocks that use case).
 
 4. **Walk findings with the user** — for each `review` ref the
    reviewer published, present the finding to the user. Resolve
@@ -82,6 +83,6 @@ set that is about to grow.
 If the wrap-up walk reveals a gap the user wants to explore as a new
 use case rather than as a `review` item, leave the `review` issue
 open, re-enter `./progressive-extraction.md`, publish the new use
-case, then add the new ref to the reviewer's `--related` for the
+case, then add the new ref to the reviewer's `--blocking` for the
 next iteration. Do **not** silently close the `review` issue —
 discovery and quality review are different surfaces.

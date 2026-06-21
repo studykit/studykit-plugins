@@ -48,9 +48,11 @@ authoring contract is the contract.
      tools for 5-person teams").
    - `--body-file` — the temp body file.
    - `--assignee me` by default.
-   - `--related <usecase-ref>` for every use case the research
-     informs. Link both directions by repeating `--related` for each
-     ref; the link verb will fan out from the new issue.
+   - Relate the research to every use case it informs — via the
+     backend's related link where it exposes one (`--related
+     <usecase-ref>`, repeat per ref; run `spectrack issue new --help`),
+     otherwise by listing the use case refs in the research issue's
+     Related body section.
 
 4. **Decide whether this session runs the research.** Two paths:
 
