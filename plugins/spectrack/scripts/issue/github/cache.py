@@ -425,7 +425,7 @@ class GitHubIssueCache:
         _atomic_write_text(
             state_path,
             _render_github_state_markdown(
-                issue_number,
+                title=meta["title"],
                 state=meta["state"],
                 state_reason=meta["state_reason"],
                 assignees=meta["assignees"],
@@ -577,8 +577,8 @@ _GITHUB_RELATIONSHIP_KINDS: tuple[str, ...] = (
 
 
 def _render_github_state_markdown(
-    issue: int | str,
     *,
+    title: str,
     state: str,
     state_reason: str | None,
     assignees: list[str],
@@ -586,22 +586,20 @@ def _render_github_state_markdown(
 ) -> str:
     """Render native GitHub state as a readable ``state.md`` projection.
 
-    Surfaces ``state`` / ``state_reason`` / ``assignees`` / ``labels`` so a
-    fetch caller (and the LLM) can read lifecycle state without opening the
-    internal ``.meta.json``. Frontmatter carries the machine-readable fields;
-    the body is a one-line human summary. Always written.
+    Surfaces ``title`` / ``state`` / ``state_reason`` / ``assignees`` /
+    ``labels`` so a fetch caller (and the LLM) can read the issue title and
+    lifecycle state without opening the internal ``.meta.json``. Frontmatter
+    carries the machine-readable fields; the body is empty. Always written.
     """
 
     frontmatter: dict[str, Any] = {
+        "title": title,
         "state": state,
         "state_reason": state_reason,
         "assignees": list(assignees),
         "labels": list(labels),
     }
-    reason = f" ({state_reason})" if state_reason else ""
-    who = ", ".join(assignees) if assignees else "unassigned"
-    summary = f"#{issue} — {state}{reason}, assignee {who}"
-    return _format_markdown(frontmatter, summary + "\n")
+    return _format_markdown(frontmatter, "")
 
 
 def _render_github_relationships_markdown(

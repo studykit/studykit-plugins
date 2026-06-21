@@ -186,11 +186,11 @@ def test_github_write_issue_bundle_renders_state_markdown(tmp_path: Path) -> Non
 
     assert write.state_file == write.issue_dir / "state.md"
     state_text = write.state_file.read_text(encoding="utf-8")
+    assert "title: Add local cache for workflow provider reads" in state_text
     assert "state: closed" in state_text
     assert "state_reason: completed" in state_text
     assert "studykit" in state_text
     assert "task" in state_text and "workflow" in state_text
-    assert "#39 — closed (completed), assignee studykit" in state_text
 
 
 def test_github_state_markdown_marks_unassigned(tmp_path: Path) -> None:
@@ -199,8 +199,9 @@ def test_github_state_markdown_marks_unassigned(tmp_path: Path) -> None:
     write = cache.write_issue_bundle(repo(), issue_payload(), fetched_at="2026-05-13T12:34:56Z")
 
     state_text = write.state_file.read_text(encoding="utf-8")
-    # OPEN issue, no assignees, no state_reason suffix.
-    assert "#39 — open, assignee unassigned" in state_text
+    # OPEN issue, no assignees, no state_reason.
+    assert "state: open" in state_text
+    assert "assignees: []" in state_text
 
 
 def test_github_issue_cache_writes_flat_layout_with_meta_and_relationships(tmp_path: Path) -> None:

@@ -245,9 +245,7 @@ class JiraDataCenterIssueCache:
         _atomic_write_text(remote_links_path, _format_json(links))
         _atomic_write_text(issue_md_path, str(normalized.get("body") or ""))
         state_path = self.state_file(site, key)
-        _atomic_write_text(
-            state_path, render_jira_state_markdown(normalized, issue_key=key)
-        )
+        _atomic_write_text(state_path, render_jira_state_markdown(normalized))
         relationships_md = render_jira_relationships_markdown(
             relationships if isinstance(relationships, Mapping) else {},
             issue_key=key,
