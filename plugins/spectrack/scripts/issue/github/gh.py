@@ -1175,9 +1175,46 @@ def _gh_api_json_object_with_args(
     return _loads_json_object(result.stdout, f"gh api {path}")
 
 
+_LABEL_FLAGS = ("--label", "--add-label", "--remove-label")
+
+
 def _gh(args: list[str], *, project: Path, runner: CommandRunner | None = None, check: bool = True):
     cwd = project.expanduser().resolve(strict=False)
-    return run_command(["gh", *args], cwd=cwd, runner=runner, check=check)
+    try:
+        return run_command(["gh", *args], cwd=cwd, runner=runner, check=check)
+    except WorkflowCommandError as exc:
+        hint = _missing_label_hint(args, exc.result)
+        if hint is None:
+            raise
+        raise WorkflowCommandError(
+            f"{exc}\n{hint}", request=exc.request, result=exc.result
+        ) from exc
+
+
+def _missing_label_hint(args: list[str], result) -> str | None:
+    """Return a `gh label create` hint when a label-bearing gh command failed
+    because a label does not exist, else ``None``.
+
+    The original gh error is always preserved by the caller; this only decides
+    whether to append the actionable hint, so it never depends on gh's exact
+    wording being matched.
+    """
+
+    if not any(flag in args for flag in _LABEL_FLAGS):
+        return None
+    stderr = (getattr(result, "stderr", "") or "").lower()
+    # Exclude issue-level 404s so an unrelated failure is not misattributed to
+    # a label. Label-bearing edits target a cached (existing) issue, and
+    # creates cannot 404 on the issue, so a remaining "not found" is the label.
+    if "could not resolve to an issue" in stderr or "could not find any issue" in stderr:
+        return None
+    if "could not add label" not in stderr and "not found" not in stderr:
+        return None
+    return (
+        "hint: a label may not exist in this repository. Create it with "
+        "`gh label create <name> [--color <hex>] [--description <text>]`, "
+        "then retry."
+    )
 
 
 def _raise_gh_error(result) -> None:

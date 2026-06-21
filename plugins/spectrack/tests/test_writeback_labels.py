@@ -236,6 +236,69 @@ def test_github_writeback_set_labels_replaces(tmp_path: Path) -> None:
     ]
 
 
+class FailingEditLabelRunner(WritebackLabelRunner):
+    """Serves cached views but fails `gh issue edit` as if a label is missing."""
+
+    def __init__(self, *, current_labels: list[str], stderr: str) -> None:
+        super().__init__(current_labels=current_labels, labels_after=current_labels)
+        self._fail_stderr = stderr
+
+    def __call__(self, request: CommandRequest) -> CommandResult:
+        if request.args[:3] == ("gh", "issue", "edit"):
+            self.requests.append(request)
+            return result(request.args, returncode=1, stderr=self._fail_stderr)
+        return super().__call__(request)
+
+
+def test_github_writeback_missing_label_appends_create_hint(tmp_path: Path) -> None:
+    write_github_config(tmp_path)
+    _seed_github_cache(tmp_path)
+    body_file = _write_body_file(tmp_path)
+    runner = FailingEditLabelRunner(
+        current_labels=["task", "workflow"],
+        stderr="could not add label: 'needs-design' not found",
+    )
+
+    with pytest.raises(Exception) as excinfo:
+        github_writeback_update(
+            project=tmp_path,
+            artifact_type="task",
+            issue="#39",
+            body_file=body_file,
+            add_labels=("needs-design",),
+            runner=runner,
+        )
+
+    message = str(excinfo.value)
+    # The actionable hint is appended...
+    assert "gh label create" in message
+    # ...without dropping gh's original failure detail.
+    assert "could not add label" in message
+
+
+def test_github_writeback_issue_404_omits_label_hint(tmp_path: Path) -> None:
+    write_github_config(tmp_path)
+    _seed_github_cache(tmp_path)
+    body_file = _write_body_file(tmp_path)
+    runner = FailingEditLabelRunner(
+        current_labels=["task", "workflow"],
+        stderr="GraphQL: Could not resolve to an Issue with the number of 39.",
+    )
+
+    with pytest.raises(Exception) as excinfo:
+        github_writeback_update(
+            project=tmp_path,
+            artifact_type="task",
+            issue="#39",
+            body_file=body_file,
+            add_labels=("needs-design",),
+            runner=runner,
+        )
+
+    # An issue-level 404 must not be misattributed to a missing label.
+    assert "gh label create" not in str(excinfo.value)
+
+
 def test_github_writeback_set_labels_conflict_with_add(tmp_path: Path) -> None:
     write_github_config(tmp_path)
     body_file = _write_body_file(tmp_path)
