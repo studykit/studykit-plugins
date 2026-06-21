@@ -13,11 +13,16 @@ Choose the type by output:
 ## Required sections
 
 - Description — the question being explored, why a spike is needed, and what decision it informs.
+
+## Optional sections
+
+The body shape is yours to choose: use the sections below only when they carry
+weight, and add other sections when the spike needs them. These commonly help:
+
 - Hypothesis — what the spike tries to prove, disprove, or measure.
 - Validation Method — the experiment, benchmark, integration probe, prototype, or sample-driven check.
-- Acceptance Criteria — one or more observable outcomes that answer the question.
 
-Add purposeful sections when useful. Any load-bearing runtime premise must be runtime-grounded. When the question depends on provider/API/runtime behavior, evidence must include the exact query, command, input shape, observed result, scale, limits, errors, pagination, or rate-limit cost needed to make the answer decisive. Link throwaway evidence rather than assuming a local evidence directory.
+When the question depends on the configured backend, API, or runtime behavior, ground the answer with the exact query, command, input shape, observed result, scale, limits, errors, pagination, or rate-limit cost needed to make it decisive. Link throwaway evidence rather than assuming a local evidence directory.
 
 ## Completion criteria
 
