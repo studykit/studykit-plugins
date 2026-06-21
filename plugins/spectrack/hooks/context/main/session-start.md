@@ -37,9 +37,14 @@ flags and usage.
 <implementing-issues>
 
 A workflow `task` / `bug` / `spike` issue body is a spec — what / why /
-done — not a plan. Before changing any code to implement one, settle the
-approach against the current code in plan mode (where the runtime provides
-it) and get the user's explicit approval of it. Then, with the
+done — not a plan. Before settling the approach, read the issue's full
+context: its body, all of its comments, and every related issue — both
+the relationships the fetch surfaces (`relation.md`) and any other issue
+the body itself names — fetching those refs and reading their bodies and
+comments too. Also read any `wiki/` knowledge page the body or its
+`Context` points to, or that covers the code you will touch. Then settle
+the approach against the current code in plan mode (where the runtime
+provides it) and get the user's explicit approval of it. Then, with the
 `AskUserQuestion` tool (offer selectable options so the user need not type
 a reply), ask whether to validate the approved approach with a plan audit
 — the `resolution-auditor` agent in plan-audit mode, pointed at the
@@ -51,5 +56,5 @@ implement the approved approach directly.
 
 Don't quote, paraphrase, or summarize issue bodies, comments, or knowledge
 documents beyond what the user asked for. The cached `issue.md`, `state.md`,
-and `comment-*.md` files are projection-owned and read-only — refresh them
-via the matching fetch script; never edit them in place.
+`relation.md`, and `comment-*.md` files are projection-owned and read-only —
+refresh them via the matching fetch script; never edit them in place.
