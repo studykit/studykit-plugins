@@ -52,6 +52,10 @@ DECOMPOSITION_TYPES = {"task", "epic"}
 
 PLAN_MODE_TYPES = {"task", "bug"}
 
+# Knowledge types that still ship a type-specific GitHub rendering file; every
+# other knowledge type renders through the shared convention alone.
+GITHUB_KNOWLEDGE_PERTYPE = {"usecase", "decision-index"}
+
 # Issue types whose bodies carry assertions about runtime behavior, so they read
 # the runtime-grounded-claim rule. Other issue types only need body conventions
 # (folded into issue/common.md).
@@ -100,6 +104,22 @@ USECASE_INTERVIEW_NOTE = (
     f"interview: read `{USECASE_SKILL_PATH}` and follow its body as the "
     "procedure, treating the user's idea/topic as its `$ARGUMENTS`. If you are "
     "already executing that interview, ignore this note and continue."
+)
+
+RESEARCH_RECORDING_NOTE = (
+    "Recording phase: this research issue is the working record of the "
+    "investigation — capture the question, evidence, and findings here. When "
+    "findings across one or more research issues are stable, consolidate them "
+    "into the curated report: `spectrack mustread --type research --side "
+    "knowledge`. Do not write the curated report before its research issue(s) "
+    "exist."
+)
+
+RESEARCH_CONSOLIDATION_NOTE = (
+    "Consolidation phase: the curated report summarizes and references existing "
+    "research issues — do not run fresh investigation here. If a new question "
+    "arises, open a new research issue first: `spectrack mustread --type "
+    "research --side issue`."
 )
 
 
@@ -263,10 +283,11 @@ def _resolve_authoring_github_knowledge(
         case ("comment", _):
             return [convention], []
         case _:
-            parts = [
-                convention,
-                f"providers/knowledge/github/{artifact_type}.md",
-            ]
+            # Most knowledge types render through the shared convention; only a
+            # few keep a type-specific rendering file.
+            parts = [convention]
+            if artifact_type in GITHUB_KNOWLEDGE_PERTYPE:
+                parts.append(f"providers/knowledge/github/{artifact_type}.md")
             if artifact_type == "usecase":
                 parts.append("providers/knowledge/github/actors.md")
             return parts, []
@@ -324,6 +345,11 @@ def is_authoring_file(path: Path, *, plugin_root: Path | None = None) -> bool:
 def _common_parts(
     side: str, artifact_type: str, target: str | None, scope: str, mode: str | None
 ) -> list[str]:
+    # Research authoring is consolidated into a single self-contained, side-agnostic
+    # contract. Content-scope research reads only that file (plus any provider parts);
+    # comment scope and review targets fall through to the shared rules below.
+    if artifact_type == "research" and target is None and scope != "comment":
+        return ["contracts/research.md"]
     match (scope, target, side):
         case ("comment", _, _):
             return []
@@ -413,7 +439,19 @@ def _common_notes(
     mode: str | None,
     runtime: str,
 ) -> list[str]:
-    if scope == "comment" or target is not None or side != "issue":
+    if scope == "comment" or target is not None:
+        return []
+    # Research threads its two-phase workflow through the notes channel: the
+    # issue is the working record, the knowledge report consolidates it. Each
+    # phase points at the command for the next, so the flow is discoverable by
+    # walking it rather than documented up front.
+    if artifact_type == "research":
+        return [
+            RESEARCH_RECORDING_NOTE
+            if side == "issue"
+            else RESEARCH_CONSOLIDATION_NOTE
+        ]
+    if side != "issue":
         return []
     notes: list[str] = []
     if artifact_type == "usecase":

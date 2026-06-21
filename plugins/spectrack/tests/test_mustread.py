@@ -14,6 +14,8 @@ if str(_SCRIPTS_DIR) not in sys.path:
 
 from mustread import (  # noqa: E402
     BACKLOG_TRIGGER_NOTE,
+    RESEARCH_CONSOLIDATION_NOTE,
+    RESEARCH_RECORDING_NOTE,
     RETROACTIVE_PUBLISH_STATE_GITHUB,
     RETROACTIVE_TRIGGER_NOTE,
     USECASE_INTERVIEW_NOTE,
@@ -145,8 +147,6 @@ def test_usecase_comment_scope_excludes_abstraction_guard() -> None:
     [
         ("usecase", "issue", "contracts/issue/usecase.md"),
         ("usecase", "knowledge", "contracts/knowledge/usecase.md"),
-        ("research", "issue", "contracts/issue/research.md"),
-        ("research", "knowledge", "contracts/knowledge/research.md"),
     ],
 )
 def test_dual_type_returns_side_specific_authoring_file(
@@ -162,8 +162,6 @@ def test_dual_type_returns_side_specific_authoring_file(
     [
         ("usecase", "issue", "contracts/knowledge/usecase.md"),
         ("usecase", "knowledge", "contracts/issue/usecase.md"),
-        ("research", "issue", "contracts/knowledge/research.md"),
-        ("research", "knowledge", "contracts/issue/research.md"),
     ],
 )
 def test_dual_type_excludes_other_side_authoring_file(
@@ -189,8 +187,6 @@ def test_dual_type_includes_common_authoring_file(
     [
         ("usecase", "issue"),
         ("usecase", "knowledge"),
-        ("research", "issue"),
-        ("research", "knowledge"),
     ],
 )
 def test_dual_type_common_authoring_precedes_side_specific(
@@ -201,6 +197,14 @@ def test_dual_type_common_authoring_precedes_side_specific(
     common = f"contracts/{artifact_type}.md"
     side_specific = f"contracts/{side}/{artifact_type}.md"
     assert rels.index(common) < rels.index(side_specific)
+
+
+@pytest.mark.parametrize("side", ["issue", "knowledge"])
+def test_research_resolves_to_single_self_contained_contract(side: str) -> None:
+    # Research authoring is consolidated into one side-agnostic file: no
+    # side-specific contract and no separate body/common base file.
+    resolution = resolve_authoring("research", side=side)
+    assert _rel_paths(resolution.files) == ["contracts/research.md"]
 
 
 def test_provider_can_be_inferred_from_workflow_config(tmp_path: Path) -> None:
@@ -227,7 +231,6 @@ providers:
         "contracts/knowledge/body.md",
         "contracts/knowledge/architecture.md",
         "providers/knowledge/github/convention.md",
-        "providers/knowledge/github/architecture.md",
     ]
 
 
@@ -240,6 +243,28 @@ def test_decision_index_resolution_uses_knowledge_files() -> None:
         "contracts/knowledge/decision-index.md",
         "providers/knowledge/github/convention.md",
         "providers/knowledge/github/decision-index.md",
+    ]
+
+
+def test_research_github_knowledge_uses_only_shared_convention() -> None:
+    # Research sections are subject-shaped, so there is no per-type GitHub
+    # rendering file — only the shared convention applies.
+    resolution = resolve_authoring("research", side="knowledge", provider="github")
+    assert _rel_paths(resolution.files) == [
+        "contracts/research.md",
+        "providers/knowledge/github/convention.md",
+    ]
+
+
+def test_slimmed_knowledge_type_uses_only_shared_convention() -> None:
+    # Slimmed knowledge types (e.g. spec) render through the shared convention;
+    # only usecase and decision-index keep a per-type GitHub rendering file.
+    resolution = resolve_authoring("spec", side="knowledge", provider="github")
+    assert _rel_paths(resolution.files) == [
+        "contracts/knowledge/body.md",
+        "contracts/prd.md",
+        "contracts/knowledge/spec.md",
+        "providers/knowledge/github/convention.md",
     ]
 
 
@@ -424,7 +449,6 @@ def test_mode_participates_in_cache_key(tmp_path: Path) -> None:
         ("spike", None),
         ("epic", None),
         ("review", None),
-        ("research", "issue"),
         ("spec", None),
         ("architecture", None),
     ],
@@ -433,6 +457,25 @@ def test_non_implementation_types_omit_notes(
     artifact_type: str, side: str | None
 ) -> None:
     resolution = resolve_authoring(artifact_type, side=side)
+    assert resolution.notes == ()
+
+
+def test_research_issue_emits_recording_phase_note() -> None:
+    resolution = resolve_authoring("research", side="issue")
+    assert RESEARCH_RECORDING_NOTE in resolution.notes
+    # Self-threading: the recording phase points at the consolidation command.
+    assert "--type research --side knowledge" in RESEARCH_RECORDING_NOTE
+
+
+def test_research_knowledge_emits_consolidation_phase_note() -> None:
+    resolution = resolve_authoring("research", side="knowledge")
+    assert RESEARCH_CONSOLIDATION_NOTE in resolution.notes
+    # Self-threading: the consolidation phase points back at the issue command.
+    assert "--type research --side issue" in RESEARCH_CONSOLIDATION_NOTE
+
+
+def test_research_comment_scope_omits_phase_notes() -> None:
+    resolution = resolve_authoring("research", side="issue", scope="comment")
     assert resolution.notes == ()
 
 

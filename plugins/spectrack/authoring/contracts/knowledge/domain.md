@@ -1,87 +1,27 @@
 # Domain Authoring
 
-A domain page is a **knowledge-backed shared vocabulary reference**. It catalogs cross-cutting product and business concepts used by use cases, specs, architecture, tasks, reviews, and research.
-
-Domain is curated knowledge, stored in the configured knowledge backend, not the issue backend. Issue-backed work may cause domain updates, but the page itself is a knowledge page.
-
-Companion contracts:
-
-- `./body.md`
-
-## Purpose
-
-Use domain for shared vocabulary:
-
-- Domain entities.
-- Value objects.
-- Important product terms.
-- Lifecycle states.
-- Invariants.
-- Concept relationships.
-
-Domain terms should be reused consistently in use cases, specs, architecture, tasks, and reviews.
-
-Do not use domain for runtime components, framework constructs, or implementation classes unless those names are also domain concepts.
+A domain page is a **knowledge-backed shared-vocabulary reference** — the cross-cutting product and business concepts that use cases, specs, architecture, tasks, reviews, and research reuse consistently. It is not for runtime components or framework constructs (those go in `architecture`) unless the name is itself a domain concept.
 
 ## Body shape
 
-Required sections:
+A `Concepts` section is required — the glossary of entities, value objects, and significant domain terms. Give each concept a name, a one-paragraph definition, examples when useful, and any invariants or constraints that matter.
 
-- `Concepts` — glossary of entities, value objects, and significant domain terms.
-
-Each concept should include:
-
-- Name.
-- One-paragraph definition.
-- Examples when useful.
-- Invariants or constraints when important.
-
-Optional sections:
-
-- `Relationships` — associations, compositions, aggregates, ownership, cardinality.
-- `State Transitions` — named lifecycle states, allowed next states, and triggers.
-- `Related Work` — workflow issues, specs, use cases, research, reviews, or architecture pages that inform the vocabulary.
-- `Change Log` — required for material updates. See `./body.md`.
+Add other sections only when the vocabulary needs them — for example relationships (associations, ownership, cardinality) or named lifecycle states and their transitions. Prefer compact, scannable forms (tables, Mermaid, ASCII, short lists) over long prose when showing relationships or states.
 
 ## Concept stability
 
-Domain terms are reference targets for use cases, specs, architecture, and code.
-
-Do not rename a concept silently. If a rename is needed:
-
-1. Update the domain page.
-2. Add a `Change Log` entry with the causing work item.
-3. Update affected use cases, specs, architecture, tasks, and reviews, or create review items for deferred updates.
-
-## Relationship and state notation
-
-Prefer compact, scannable formats:
-
-- Tables.
-- Mermaid diagrams.
-- Short bullet lists.
-- ASCII diagrams.
-
-Avoid long prose when a table or diagram would make relationships clearer.
+Domain terms are reference targets for use cases, specs, architecture, and code, so keep their names stable. If a concept is renamed, record the cause in `Change Log` and update the affected use cases/specs/architecture/tasks/reviews or open review items for the deferred updates. Do not rename a concept silently, and do not define the same concept under two names.
 
 ## Content boundaries
 
-Use these boundaries to place domain content. Do not encode these as metadata relationships.
+Place content on the right page rather than here:
 
-- Use `architecture` for runtime components and integration boundaries.
-- Use `context` for product/problem framing.
-- Use `spec` for prescriptive contracts.
-- Use `usecase` curated pages for user-visible interactions.
-- Use `nfr` for non-functional targets.
+- `architecture` — runtime components and integration boundaries.
+- `context` — product/problem framing.
+- `usecase` — user-visible interactions.
+- `nfr` — non-functional targets.
+- `spec` — prescriptive contracts.
 
 ## Drift and feedback
 
-If a concept appears repeatedly in use cases, specs, architecture, or tasks but is missing from domain, create a `review` item targeting the domain page and the causing work item; describe the missing concept in prose.
-
-If architecture uses a domain term differently from this page, create a `review` item targeting both pages; describe the inconsistency in prose.
-
-## Common mistakes
-
-- Putting architecture components or framework constructs in domain.
-- Renaming concepts without managing downstream references.
-- Defining the same concept with different names.
+If a concept recurs in use cases, specs, architecture, or tasks but is missing here — or if `architecture` uses a term differently from this page — open a `review` item targeting the relevant page(s) and the causing work item, describing the gap in prose.

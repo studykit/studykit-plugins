@@ -1,82 +1,23 @@
 # Architecture Authoring
 
-An architecture page is a **knowledge-backed design-intent reference** for the current system shape: components, responsibilities, integration boundaries, technology stack, and test strategy.
-
-Architecture is curated knowledge, stored in the configured knowledge backend, not the issue backend. Issue-backed work may cause architecture updates, but the page itself is a knowledge page.
-
-Companion contracts:
-
-- `./body.md`
-
-## Purpose
-
-Architecture records the current design shape that implementation work should align with.
-
-Use it for:
-
-- System overview.
-- Component responsibilities.
-- Interfaces exposed or consumed by components.
-- Cross-component dependencies.
-- Technology stack.
-- Testing strategy at the system level.
-
-Do not use it for:
-
-- Long decision rationale.
-- Raw discussion.
-- Roadmaps.
-- Task-level implementation plans.
-- Detailed API/schema contracts that belong in specs.
+An architecture page is a **knowledge-backed reference for the current system shape** — components, responsibilities, integration boundaries, and the chosen technology stack. It records the design that implementation work should align with, not decision rationale (that belongs in a `spec`) or a roadmap.
 
 ## Body shape
 
-Required sections:
+There is no fixed section list. Describe the system's shape in whatever sections fit it, keeping each one narrow and letting the structure follow the architecture. A typical page covers a high-level overview, the components and their responsibilities/interfaces/dependencies, the chosen technology stack, and the system-level test strategy — but include only what the system actually needs.
 
-- `Overview` — high-level architectural narrative.
-- `Components` — component definitions, responsibilities, interfaces, and dependencies.
-- `Technology Stack` — chosen runtime, framework, libraries, persistence, and build tooling.
-- `Test Strategy` — unit/integration/e2e split, isolation strategy, fixtures, and test boundaries.
-
-Optional sections:
-
-- `Component Diagram` — diagram or link to external diagram artifact.
-- `External Dependencies` — third-party services, vendor APIs, upstream systems.
-- `Related Work` — issues, specs, reviews, use cases, or research that inform the architecture.
-- `Change Log` — required for material updates. See `./body.md`.
+Record the **chosen** shape and stack, not the options considered; comparisons and rejected alternatives belong in a `spec` or a research report. A short rationale sentence is fine when it helps a reader understand the current shape.
 
 ## Component anchors
 
-Component headings are reference targets for tasks, bugs, specs, and reviews.
-
-Keep component names stable. If a component is renamed:
-
-1. Update the architecture page.
-2. Add a `Change Log` entry with the causing work item.
-3. Update affected specs/tasks/reviews or create review items for deferred updates.
-
-Do not silently rename component headings.
-
-## Decision rationale
-
-Architecture records the current shape. Durable rationale belongs in specs, especially the spec's `Decision Log` or `Rejected Alternatives` sections.
-
-A short rationale sentence is acceptable when it helps readers understand the current shape. Long comparisons and rejected options belong in a spec or research report.
+Component headings are reference targets for tasks, bugs, specs, and reviews, so keep their names stable. If a component is renamed, record the cause in `Change Log` and update the affected specs/tasks/reviews or open review items for the deferred updates. Do not silently rename a component heading.
 
 ## Content boundaries
 
-Use these boundaries to place architecture content. Do not encode these as metadata relationships.
+Place content on the right page rather than packing it here:
 
-- Use `domain` for vocabulary, concepts, relationships, and state transitions.
-- Use `context` for problem framing, product scope, and original idea.
-- Use `nfr` for non-functional requirements.
-- Use `ci` for exact test commands and CI execution contract.
-- Use `spec` for prescriptive API/schema/protocol contracts.
-
-## Common mistakes
-
-- Writing executable test commands here instead of `ci`.
-- Using architecture as a roadmap or milestone plan.
-- Listing considered options in `Technology Stack` instead of recording chosen stack only.
-- Packing long decision rationale into `Overview` instead of a spec.
-- Renaming component headings without updating references or creating review items.
+- `domain` — vocabulary, concepts, relationships, state transitions.
+- `context` — problem framing, product scope, original idea.
+- `nfr` — non-functional requirements.
+- `ci` — exact test commands and the CI execution contract.
+- `spec` — prescriptive API/schema/protocol contracts and decision rationale.

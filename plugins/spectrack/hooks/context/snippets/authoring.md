@@ -54,5 +54,9 @@ Types:
   `domain`, `nfr`, `spec`. Dual-side with the `knowledge` side:
   `research`, `usecase`.
 
+Dual-side types (`research`, `usecase`) begin on the `issue` side — the
+issue is the working record, the `knowledge` page consolidates it. Follow
+any notes in the resolver result for the next step in the flow.
+
 Knowledge pages live under `wiki/` — edit the resolver-returned file
 and commit.
