@@ -572,6 +572,12 @@ class GitHubIssueBackend:
         publish = subparsers.add_parser(
             "publish",
             help="publish a new GitHub issue from a body file",
+            epilog=(
+                "Labels must already exist in the repository. If a label is "
+                "missing, create it first with "
+                "`gh label create <name> [--color <hex>] [--description <text>]`, "
+                "then retry."
+            ),
         )
         publish.add_argument("--type", required=True, help="workflow artifact type")
         publish.add_argument("--title", required=True)
@@ -782,7 +788,11 @@ class GitHubIssueBackend:
             epilog=(
                 "For a partial edit, seed --body-file from the cached body "
                 "and change only the affected sections rather than "
-                "re-authoring the whole body."
+                "re-authoring the whole body. "
+                "Labels passed to --add-label / --set-labels must already "
+                "exist in the repository; create a missing one first with "
+                "`gh label create <name> [--color <hex>] [--description <text>]`, "
+                "then retry."
             ),
         )
         update.add_argument("--type", default="task", help="workflow artifact type")
@@ -1292,7 +1302,14 @@ class GitHubIssueBackend:
         p_unassign.add_argument("issue", help="GitHub issue reference")
 
         p_set_type = subparsers.add_parser(
-            "set-type", help="swap the workflow type label"
+            "set-type",
+            help="swap the workflow type label",
+            epilog=(
+                "The target type label must already exist in the repository. "
+                "If it is missing, create it first with "
+                "`gh label create <name> [--color <hex>] [--description <text>]`, "
+                "then retry."
+            ),
         )
         p_set_type.add_argument("issue", help="GitHub issue reference")
         p_set_type.add_argument(
