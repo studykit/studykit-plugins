@@ -4,11 +4,17 @@ A workflow task records implementation work as a **spec**: what changes, why it 
 
 ## Required sections
 
-- Context — motivation, anchors, constraints, and current-state background.
 - Description — the intended change and scope.
+
+## Optional sections
+
+The body shape is yours to choose: use the sections below only when they carry
+weight, and add other sections when the task needs them. These commonly help:
+
+- Context — motivation, anchors, constraints, and current-state background.
 - Acceptance Criteria — independently checkable done conditions, including the behavior tests or verification must cover. Ground criteria in linked use cases/specs or the explicit request.
 
-Add purposeful sections when useful. Valuable task detail is behavioral: boundaries, edge cases, recovery paths, atomicity, and verification. Avoid file/function choices or step sequences unless they are already verified constraints.
+Valuable task detail is behavioral: boundaries, edge cases, recovery paths, atomicity, and verification. Avoid file/function choices or step sequences unless they are already verified constraints.
 
 ## Anchors and scope
 
