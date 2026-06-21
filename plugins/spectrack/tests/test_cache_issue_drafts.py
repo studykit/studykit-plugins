@@ -263,7 +263,7 @@ def test_github_publish_preserves_body_on_relationship_failure(tmp_path: Path) -
             "Draft issue",
             "--body-file",
             str(body_file),
-            "--related",
+            "--blocking",
             "100",
         ],
         stdout=stdout,
@@ -279,8 +279,7 @@ def test_github_publish_preserves_body_on_relationship_failure(tmp_path: Path) -
     assert body_file.exists()
     relationships = payload["relationships"]
     assert relationships["status"] == "failed"
-    assert "related" in relationships["error"]
-    assert relationships["intent"] == {"related_add": ["100"]}
+    assert relationships["intent"] == {"blocking_add": ["100"]}
 
 
 def test_github_publish_missing_body_file_fails(tmp_path: Path) -> None:

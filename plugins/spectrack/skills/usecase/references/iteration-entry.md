@@ -27,10 +27,9 @@ Filter to the items the session can act on:
 - `usecase` issues whose state is open and whose `Open Questions`
   section is non-empty. These are use cases that need further
   refinement.
-- `usecase` issues linked `--related` to any open `review` issue
-  whose `source` indicates `usecase-reviewer` or `usecase-explorer`
-  (these are quality findings or candidate gaps waiting for
-  resolution).
+- `usecase` issues blocked by any open `review` issue whose `source`
+  indicates `usecase-reviewer` or `usecase-explorer` (these are
+  quality findings or candidate gaps waiting for resolution).
 
 Present the active backlog as a short priority-ordered list (the
 user-supplied ref first, then issues with the most open questions,

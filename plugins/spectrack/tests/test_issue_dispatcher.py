@@ -124,7 +124,9 @@ def test_relationships_help_under_github_hides_jira_epic(tmp_path: Path) -> None
     assert "--parent" in stdout
     assert "--blocked-by" in stdout
     assert "--child" in stdout
-    assert "--related" in stdout
+    # GitHub has no native "related" relationship; the flag is not exposed.
+    assert "--related" not in stdout
+    assert "--remove-related" not in stdout
     assert "--epic" not in stdout
     assert "--replace-epic" not in stdout
     assert "--remove-epic" not in stdout

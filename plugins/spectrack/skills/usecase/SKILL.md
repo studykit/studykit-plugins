@@ -137,9 +137,12 @@ interactive interview. The session's durable outputs are:
   `Description`, `Actors`, `Current Draft`, `Open Questions` sections
   defined by the `usecase` issue authoring contract).
 - Each quality finding from the wrap-up reviewer → one workflow
-  `review` issue, linked `--related` to the use case it targets.
+  `review` issue, linked `--blocking` to the use case it targets (the
+  finding blocks that use case).
 - Optional: one `research` issue per similar-systems investigation,
-  linked `--related` to the use cases it informs.
+  linked as related to the use cases it informs — via the backend's
+  related link where it exposes one, otherwise listed in the issue's
+  Related body section (run `spectrack issue new --help`).
 - Optional: mock HTML files for requested UI screen groups.
 
 The skill itself emits a wrap-up summary that lists the refs created,

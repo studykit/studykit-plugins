@@ -2,7 +2,7 @@
 
 Quality criteria for reviewing workflow `usecase` issues. This file defines what to flag during review.
 
-A reviewer applies each criterion below to every targeted use case. Each non-OK verdict becomes one `review` issue, linked `--related` to the use case it targets (with exceptions noted per criterion).
+A reviewer applies each criterion below to every targeted use case. Each non-OK verdict becomes one `review` issue that blocks the use case it targets (with exceptions noted per criterion).
 
 ## 1. Size
 

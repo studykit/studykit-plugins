@@ -87,11 +87,12 @@ Use `spectrack issue new --type usecase`. Provide:
   they travel with the issue.
 - `--assignee me` — by default the user owns the issue they
   discovered. The caller may override with a different assignee.
-- `--related <ref>` — when this use case is part of a discovery
-  session that produced earlier sibling use cases, link them
-  pairwise. Sibling relationships use `related`, not `parent`; run
-  `spectrack issue link --help` for the relationship kinds the
-  configured backend accepts.
+- Relate siblings — when this use case is part of a discovery session
+  that produced earlier sibling use cases, link them pairwise as
+  related, not `parent`. Use the backend's related link where it
+  exposes one (`--related <ref>`; run `spectrack issue link --help`
+  for the relationship kinds the configured backend accepts),
+  otherwise list the sibling refs in the issue's Related body section.
 
 After publish, capture the returned ref from the script's JSON output
 and:
