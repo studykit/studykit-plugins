@@ -114,12 +114,12 @@ def test_jira_write_issue_bundle_renders_state_markdown(tmp_path: Path) -> None:
     )
 
     state_text = cache.state_file(site, "TEST-1234").read_text(encoding="utf-8")
+    assert "title: Issue summary" in state_text
     assert "status: Resolved" in state_text
     assert "type: Task" in state_text
     assert "resolution: Done" in state_text
     assert "assignee: Pascal" in state_text
     assert "backend" in state_text and "infra" in state_text
-    assert "TEST-1234 — Task, Resolved (Done), assignee Pascal" in state_text
 
 
 def test_jira_state_markdown_marks_unresolved_and_unassigned(tmp_path: Path) -> None:
@@ -132,7 +132,7 @@ def test_jira_state_markdown_marks_unresolved_and_unassigned(tmp_path: Path) -> 
 
     state_text = cache.state_file(site, "TEST-1234").read_text(encoding="utf-8")
     assert "resolution: Unresolved" in state_text  # Jira's empty-resolution label, not null
-    assert "TEST-1234 — Task, Open (Unresolved), assignee unassigned" in state_text
+    assert "assignee: null" in state_text
 
 
 def test_jira_write_issue_bundle_does_not_emit_metadata_file(tmp_path: Path) -> None:

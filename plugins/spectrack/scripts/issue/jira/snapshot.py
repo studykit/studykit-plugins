@@ -9,18 +9,17 @@ from typing import Any
 from issue.cache import _format_markdown
 
 
-def render_jira_state_markdown(
-    normalized: Mapping[str, Any], *, issue_key: str
-) -> str:
+def render_jira_state_markdown(normalized: Mapping[str, Any]) -> str:
     """Render native Jira state as a readable ``state.md`` projection.
 
-    Surfaces ``status`` / ``type`` / ``resolution`` / ``assignee`` / ``labels``
-    so a fetch caller (and the LLM) can read lifecycle state and the issue type
-    without opening the internal native ``.issue.json``. Frontmatter carries the
-    machine-readable fields; the body is a one-line human summary. Always
-    written — every issue has a status.
+    Surfaces ``title`` / ``status`` / ``type`` / ``resolution`` / ``assignee``
+    / ``labels`` so a fetch caller (and the LLM) can read the issue title,
+    lifecycle state, and the issue type without opening the internal native
+    ``.issue.json``. Frontmatter carries the machine-readable fields; the body
+    is empty. Always written — every issue has a status.
     """
 
+    title = _normalize_optional(normalized.get("title")) or ""
     status = _normalize_optional(normalized.get("state")) or "unknown"
     issue_type = _normalize_optional(normalized.get("type"))
     # Jira leaves resolution unset until an issue is resolved; mirror the UI's
@@ -29,17 +28,14 @@ def render_jira_state_markdown(
     assignee = _jira_person_display_name(normalized.get("assignee"))
     labels = [str(label) for label in normalized.get("labels") or [] if label is not None]
     frontmatter: dict[str, Any] = {
+        "title": title,
         "status": status,
         "type": issue_type,
         "resolution": resolution,
         "assignee": assignee,
         "labels": labels,
     }
-    summary = (
-        f"{issue_key} — {issue_type or 'issue'}, {status} ({resolution}), "
-        f"assignee {assignee or 'unassigned'}"
-    )
-    return _format_markdown(frontmatter, summary + "\n")
+    return _format_markdown(frontmatter, "")
 
 
 def jira_relationship_fingerprint_block(relationships: Mapping[str, Any]) -> dict[str, Any]:
