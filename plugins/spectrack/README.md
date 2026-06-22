@@ -1,9 +1,9 @@
 # SpecTrack
 
-Issue- and knowledge-backed workflow for Claude Code and Codex sessions. The
-plugin treats the configured provider — GitHub Issues, Jira, or a GitHub
-repository `wiki/` — as the source of truth and helps the assistant draft,
-publish, refresh, and link work items without leaving the session.
+Issue- and knowledge-backed workflow for Claude Code, Codex, and Hermes
+sessions. The plugin treats the configured provider — GitHub Issues, Jira, or a
+GitHub repository `wiki/` — as the source of truth and helps the assistant
+draft, publish, refresh, and link work items without leaving the session.
 
 ## Supported Providers
 
@@ -16,8 +16,18 @@ mixed setups (e.g., Jira issues + GitHub repository `wiki/`) are supported.
 
 ## Installation
 
-Install from the studykit plugin marketplace inside Claude Code or Codex.
-The plugin works in both runtimes.
+Install from the studykit plugin marketplace inside Claude Code or Codex, or
+install the plugin directory as a Hermes plugin. The Claude and Codex runtimes
+receive the full hook, skill, slash-command, and agent surface. Hermes receives
+first-turn workflow policy injection for repositories with `.spectrack/config.yml`
+and bundled plugin skills such as `spectrack:handoff`.
+
+For a local Hermes install from this repository:
+
+```bash
+ln -s /path/to/studykit-plugins/plugins/spectrack ~/.hermes/plugins/spectrack
+hermes plugins enable spectrack
+```
 
 ## Configuration
 

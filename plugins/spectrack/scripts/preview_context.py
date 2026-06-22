@@ -47,7 +47,7 @@ _PLUGIN_ROOT = Path(__file__).resolve().parents[1]
 _AGENTS_DIR = _PLUGIN_ROOT / "hooks" / "context" / "subagent" / "agents"
 
 _KNOWN_PROVIDERS = ("github", "jira", "filesystem")
-_KNOWN_RUNTIMES = ("claude", "codex")
+_KNOWN_RUNTIMES = ("claude", "codex", "hermes")
 _SURFACES = ("session", "subagent", "commit", "all")
 
 

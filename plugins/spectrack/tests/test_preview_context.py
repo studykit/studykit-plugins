@@ -51,6 +51,14 @@ def test_session_output_matches_runtime_builder() -> None:
     assert direct in _render("session", "github")
 
 
+def test_hermes_session_context_uses_absolute_launcher() -> None:
+    config = synthesize_config("github")
+    text = "\n\n".join(
+        render_surface("session", config, runtime="hermes", agent=None)
+    )
+    assert f'`"{_PLUGIN_ROOT}/scripts/spectrack" <script>`' in text
+
+
 def test_session_commands_block_is_provider_agnostic() -> None:
     # The <commands> block points at --help (backend-aware on its own), so the
     # injected text no longer differs by provider.
