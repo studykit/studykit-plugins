@@ -116,10 +116,9 @@ def expected_session_start_context(
 ) -> str:
     text = main_context_fragment("main/session-start.md")
     launcher_block = main_context_fragment(f"snippets/launcher/{runtime}.md")
-    if runtime == "codex":
-        launcher_block = launcher_block.replace(
-            "{{SPECTRACK_PLUGIN_ROOT}}", str(_PLUGIN_ROOT)
-        )
+    launcher_block = launcher_block.replace(
+        "{{SPECTRACK_PLUGIN_ROOT}}", str(_PLUGIN_ROOT)
+    )
     rendered = render_template(text, {
         "SNIPPET_LAUNCHER": launcher_block,
         "SNIPPET_AUTHORING": main_context_fragment("snippets/authoring.md"),
@@ -137,10 +136,9 @@ def expected_subagent_start_context(
 ) -> str:
     text = main_context_fragment("subagent/session-start.md")
     launcher_block = main_context_fragment(f"snippets/launcher/{runtime}.md")
-    if runtime == "codex":
-        launcher_block = launcher_block.replace(
-            "{{SPECTRACK_PLUGIN_ROOT}}", str(_PLUGIN_ROOT)
-        )
+    launcher_block = launcher_block.replace(
+        "{{SPECTRACK_PLUGIN_ROOT}}", str(_PLUGIN_ROOT)
+    )
     rendered = render_template(text, {
         "SNIPPET_LAUNCHER": launcher_block,
         "SNIPPET_AUTHORING": main_context_fragment("snippets/authoring.md"),

@@ -23,9 +23,9 @@ distinct from real ``$NAME`` shell variables in the same text.
 ``{{SNIPPET_AUTHORING}}``, ``{{SNIPPET_LAUNCHER}}``, and
 ``{{SNIPPET_PRD_PATH}}`` substitute the three inlined snippet files;
 ``{{SPECTRACK_ISSUE_PROVIDER}}`` resolves to the active issue provider
-(``github``/``jira``/``filesystem``). The Codex launcher snippet additionally
-has ``{{SPECTRACK_PLUGIN_ROOT}}`` resolved to the absolute plugin root before
-injection so Codex shell tool calls can use literal paths.
+(``github``/``jira``/``filesystem``). Launcher snippets may use
+``{{SPECTRACK_PLUGIN_ROOT}}``, which resolves to the absolute plugin root before
+injection so runtimes without a ``spectrack`` PATH export can use literal paths.
 """
 
 from __future__ import annotations
@@ -37,7 +37,7 @@ from typing import Any
 _PLUGIN_ROOT = Path(__file__).resolve().parents[1]
 _CONTEXT_ROOT = _PLUGIN_ROOT / "hooks" / "context"
 _KNOWN_ISSUE_PROVIDERS = {"github", "jira", "filesystem"}
-_KNOWN_RUNTIMES = {"claude", "codex"}
+_KNOWN_RUNTIMES = {"claude", "codex", "hermes"}
 
 _PLACEHOLDER_RE = re.compile(r"\{\{(\w+)\}\}")
 
@@ -193,8 +193,7 @@ def _agent_type_segment(agent_type: str | None) -> str | None:
 def _build_launcher_block(runtime: str | None, plugin_root: Path) -> str:
     segment = _runtime_segment(runtime)
     block = _read_fragment(f"snippets/launcher/{segment}.md").strip()
-    if segment == "codex":
-        block = block.replace("{{SPECTRACK_PLUGIN_ROOT}}", str(plugin_root))
+    block = block.replace("{{SPECTRACK_PLUGIN_ROOT}}", str(plugin_root))
     return block
 
 
