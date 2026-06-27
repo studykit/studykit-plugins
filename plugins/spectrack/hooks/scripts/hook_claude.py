@@ -31,7 +31,6 @@ if _SCRIPTS_DIR not in sys.path:
     sys.path.insert(0, _SCRIPTS_DIR)
 
 from command import CommandRunner  # noqa: E402
-from mustread import authoring_relative_path  # noqa: E402
 from hook import (  # noqa: E402
     EditTarget,
     block_provider_cache_body_write,
@@ -48,9 +47,7 @@ from env import (  # noqa: E402
     append_claude_env_file,
 )
 from session_state import (  # noqa: E402
-    record_authoring_file_read,
     record_session_policy_announced,
-    record_subagent_start,
     session_policy_was_announced,
 )
 
@@ -379,14 +376,6 @@ def subagent_start(
     if config is None:
         return 0
 
-    record_subagent_start(
-        config.root,
-        "claude",
-        event_payload.session_id,
-        agent_id=event_payload.agent_id,
-        agent_type=event_payload.agent_type,
-    )
-
     emit_json(
         {
             "hookSpecificOutput": {
@@ -469,39 +458,6 @@ def pre_tool_use(
     return pre_write(event_payload, stdout=stdout)
 
 
-def post_read(
-    event_payload: ClaudePostToolUsePayload,
-    *,
-    stdout: TextIO | None = None,
-) -> int:
-    """Record Claude main-assistant authoring file reads in session state."""
-
-    _ = stdout
-    if event_payload.tool_name != "Read" or event_payload.agent_type:
-        return 0
-
-    target = _read_target(event_payload.tool_input)
-    if target is None:
-        return 0
-
-    relative_path = authoring_relative_path(target, plugin_root=_plugin_root())
-    if relative_path is None:
-        return 0
-
-    config = workflow_config_for_project(_project_dir())
-    if config is None:
-        return 0
-
-    record_authoring_file_read(
-        config.root,
-        "claude",
-        event_payload.session_id,
-        path=target,
-        relative_path=relative_path,
-    )
-    return 0
-
-
 def user_prompt_submit(
     event_payload: ClaudeUserPromptSubmitPayload,
     *,
@@ -552,8 +508,6 @@ def main(
         return subagent_start(event_payload, stdout=stdout)
     if isinstance(event_payload, ClaudePreToolUsePayload):
         return pre_tool_use(event_payload, stdout=stdout)
-    if isinstance(event_payload, ClaudePostToolUsePayload):
-        return post_read(event_payload, stdout=stdout)
     if isinstance(event_payload, ClaudeUserPromptSubmitPayload):
         return user_prompt_submit(event_payload, stdout=stdout)
     if isinstance(event_payload, ClaudeStopPayload):

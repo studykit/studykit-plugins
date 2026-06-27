@@ -48,7 +48,6 @@ from util import as_string, emit_json, read_payload_or_stdin, scan_text_values  
 from env import write_codex_env_file  # noqa: E402
 from session_state import (  # noqa: E402
     record_session_policy_announced,
-    record_subagent_start,
     session_policy_was_announced,
 )
 
@@ -360,14 +359,6 @@ def subagent_start(
         project_dir=config.root,
         codex_session_id=event_payload.agent_id,
         workflow_session_id=event_payload.session_id,
-    )
-
-    record_subagent_start(
-        config.root,
-        "codex",
-        event_payload.session_id,
-        agent_id=event_payload.agent_id,
-        agent_type=event_payload.agent_type,
     )
 
     emit_json(
