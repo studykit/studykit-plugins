@@ -416,9 +416,10 @@ def emit_session_start_policy(
     if config is None:
         return 0
 
-    if event_payload.source == "compact":
-        return 0
-    if event_payload.source != "clear" and session_policy_was_announced(
+    # ``clear`` and ``compact`` both replace the live context window, dropping
+    # the policy injected at startup. Re-inject on both, ignoring the
+    # once-per-session announcement flag so the policy is restored.
+    if event_payload.source not in ("clear", "compact") and session_policy_was_announced(
         config.root,
         "claude",
         event_payload.session_id,
