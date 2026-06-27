@@ -26,11 +26,8 @@ from mustread import (  # noqa: E402
     main as mustread_main,
     notes_anchor,
     reading_anchor,
-    render_cache_hit_reference,
     resolve_authoring,
 )
-from mustread import _resolution_key  # noqa: E402
-from session_state import read_authoring_resolution  # noqa: E402
 
 
 def _config_path(project: Path) -> Path:
@@ -433,16 +430,6 @@ def test_retroactive_mode_notes(artifact_type: str) -> None:
     assert "contracts/issue/backlog.md" not in rels
 
 
-def test_mode_participates_in_cache_key(tmp_path: Path) -> None:
-    retroactive = resolve_authoring(
-        "task", side="issue", provider="github", mode="retroactive"
-    )
-    backlog = resolve_authoring("task", side="issue", provider="github", mode="backlog")
-    assert retroactive.mode == "retroactive"
-    assert backlog.mode == "backlog"
-    assert _resolution_key(retroactive) != _resolution_key(backlog)
-
-
 @pytest.mark.parametrize(
     "artifact_type,side",
     [
@@ -604,28 +591,6 @@ def test_anchor_helpers_apply_comment_suffix_for_comment_scope(
     assert notes_anchor("task", "issue", scope, None) == expected
 
 
-def test_render_cache_hit_reference_with_notes_anchor() -> None:
-    rendered = render_cache_hit_reference("task-issue", "task-issue")
-
-    assert rendered == (
-        '- See `<reading anchor="task-issue">` above.\n'
-        '- See `<notes anchor="task-issue">` above — '
-        "triggers apply to this call too.\n"
-        "- If the anchor body is no longer in context, rerun this command "
-        "with `--raw` to re-emit it.\n"
-    )
-
-
-def test_render_cache_hit_reference_without_notes_anchor() -> None:
-    rendered = render_cache_hit_reference("spike-issue")
-
-    assert rendered == (
-        '- See `<reading anchor="spike-issue">` above.\n'
-        "- If the anchor body is no longer in context, rerun this command "
-        "with `--raw` to re-emit it.\n"
-    )
-
-
 def test_actors_type_is_rejected() -> None:
     with pytest.raises(ResolverError, match="unsupported artifact type"):
         resolve_authoring("actors", side="knowledge")
@@ -735,21 +700,6 @@ def test_bare_review_returns_authoring_contract_without_review_files() -> None:
     assert resolution.reading_anchor == "review-issue"
 
 
-def test_render_cache_hit_reference_includes_raw_recovery_hint() -> None:
-    """Narrow contract: cache-hit output names the `--raw` token.
-
-    The exact prose may evolve, but the bullet must always contain the
-    `--raw` token so the model can find the escape hatch when the anchor
-    body has dropped out of context.
-    """
-
-    with_notes = render_cache_hit_reference("task-issue", "task-issue")
-    without_notes = render_cache_hit_reference("spike-issue")
-
-    assert "`--raw`" in with_notes
-    assert "`--raw`" in without_notes
-
-
 def test_authoring_path_classification_uses_plugin_authoring_root(tmp_path: Path) -> None:
     authoring_file = _PLUGIN_ROOT / "authoring" / "contracts" / "issue" / "task.md"
     outside_file = tmp_path / "task.md"
@@ -798,13 +748,11 @@ def _resolver_args(
     return args
 
 
-def test_main_first_call_emits_sections_and_persists(
+def test_main_emits_full_sections_and_persists_nothing(
     capsys: pytest.CaptureFixture[str],
     resolver_session: tuple[str, str],
     tmp_path: Path,
 ) -> None:
-    runtime, session_id = resolver_session
-
     exit_code = mustread_main(_resolver_args(tmp_path))
 
     assert exit_code == 0
@@ -812,117 +760,35 @@ def test_main_first_call_emits_sections_and_persists(
     assert '<reading anchor="task-issue">' in out
     assert '<notes anchor="task-issue">' in out
 
-    reading_entry = read_authoring_resolution(
-        tmp_path, runtime, session_id, tag="reading", anchor="task-issue"
-    )
-    assert reading_entry is not None
-    assert reading_entry["key"] == {
-        "type": "task",
-        "side": "issue",
-        "provider": "github",
-        "scope": "content",
-        "target": None,
-        "mode": "backlog",
-    }
-    assert reading_entry["emitted_at"]
-
-    notes_entry = read_authoring_resolution(
-        tmp_path, runtime, session_id, tag="notes", anchor="task-issue"
-    )
-    assert notes_entry is not None
-    assert notes_entry["key"] == reading_entry["key"]
+    # The resolver no longer records per-session dedup state: a session is
+    # set (via the fixture) yet nothing is written under hook-state.
+    hook_state_dir = tmp_path / ".spectrack-cache" / "hook-state"
+    if hook_state_dir.exists():
+        assert not list(hook_state_dir.iterdir())
 
 
-def test_main_repeat_call_emits_bullet_only_form(
+def test_main_repeat_call_re_emits_full_sections(
     capsys: pytest.CaptureFixture[str],
     resolver_session: tuple[str, str],
     tmp_path: Path,
 ) -> None:
+    # Regression: the second call must re-emit the full contract, not a
+    # cache-hit bullet. Main and subagents share one session_id and the CLI
+    # cannot tell them apart, so dedup was dropped — every caller (including a
+    # second instance of the same agent type) gets the full contract.
     args = _resolver_args(tmp_path)
-    mustread_main(args)
-    capsys.readouterr()
-
-    exit_code = mustread_main(args)
-
-    assert exit_code == 0
-    out = capsys.readouterr().out
-    assert out == (
-        '- See `<reading anchor="task-issue">` above.\n'
-        '- See `<notes anchor="task-issue">` above — '
-        "triggers apply to this call too.\n"
-        "- If the anchor body is no longer in context, rerun this command "
-        "with `--raw` to re-emit it.\n"
-    )
-
-
-def test_main_repeat_call_for_noteless_type_omits_notes_bullet(
-    capsys: pytest.CaptureFixture[str],
-    resolver_session: tuple[str, str],
-    tmp_path: Path,
-) -> None:
-    args = _resolver_args(tmp_path, artifact="spike")
-    mustread_main(args)
-    capsys.readouterr()
 
     mustread_main(args)
-    out = capsys.readouterr().out
+    first = capsys.readouterr().out
+    mustread_main(args)
+    second = capsys.readouterr().out
 
-    assert out == (
-        '- See `<reading anchor="spike-issue">` above.\n'
-        "- If the anchor body is no longer in context, rerun this command "
-        "with `--raw` to re-emit it.\n"
-    )
-
-
-def test_main_raw_flag_forces_section_emission(
-    capsys: pytest.CaptureFixture[str],
-    resolver_session: tuple[str, str],
-    tmp_path: Path,
-) -> None:
-    runtime, session_id = resolver_session
-    base = _resolver_args(tmp_path)
-
-    mustread_main(base)
-    capsys.readouterr()
-    first_entry = read_authoring_resolution(
-        tmp_path, runtime, session_id, tag="reading", anchor="task-issue"
-    )
-
-    mustread_main(base + ["--raw"])
-    out = capsys.readouterr().out
-
-    assert '<reading anchor="task-issue">' in out
-    second_entry = read_authoring_resolution(
-        tmp_path, runtime, session_id, tag="reading", anchor="task-issue"
-    )
-    assert first_entry is not None
-    assert second_entry is not None
-    assert second_entry["key"] == first_entry["key"]
-    assert second_entry["emitted_at"] >= first_entry["emitted_at"]
+    assert '<reading anchor="task-issue">' in second
+    assert '<notes anchor="task-issue">' in second
+    assert second == first
 
 
-def test_main_provider_drift_triggers_refresh(
-    capsys: pytest.CaptureFixture[str],
-    resolver_session: tuple[str, str],
-    tmp_path: Path,
-) -> None:
-    runtime, session_id = resolver_session
-
-    mustread_main(_resolver_args(tmp_path, provider="github"))
-    capsys.readouterr()
-
-    mustread_main(_resolver_args(tmp_path, provider="jira"))
-    out = capsys.readouterr().out
-
-    assert '<reading anchor="task-issue">' in out
-    entry = read_authoring_resolution(
-        tmp_path, runtime, session_id, tag="reading", anchor="task-issue"
-    )
-    assert entry is not None
-    assert entry["key"]["provider"] == "jira"
-
-
-def test_main_without_session_emits_sections_without_persisting(
+def test_main_without_session_emits_sections(
     capsys: pytest.CaptureFixture[str],
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
