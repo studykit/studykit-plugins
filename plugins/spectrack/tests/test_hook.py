@@ -563,95 +563,6 @@ def test_claude_main_dispatches_from_payload_event_name(
     assert payload["hookSpecificOutput"]["hookEventName"] == "SessionStart"
 
 
-def test_claude_post_read_records_authoring_file_reads_in_session_state(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    _write_config(tmp_path)
-    _hook_env(monkeypatch, tmp_path, runtime="claude")
-    authoring_file = _PLUGIN_ROOT / "authoring" / "contracts" / "issue" / "task.md"
-    payload = {
-        "session_id": "claude-authoring-read",
-        "cwd": str(tmp_path),
-        "permission_mode": "default",
-        "hook_event_name": "PostToolUse",
-        "tool_name": "Read",
-        "tool_input": {"file_path": str(authoring_file)},
-        "tool_response": {"filePath": str(authoring_file)},
-        "tool_use_id": "toolu_read",
-        "duration_ms": 12,
-    }
-
-    captured = io.StringIO()
-    assert claude_main(payload=payload, stdout=captured) == 0
-    assert claude_main(payload=payload, stdout=captured) == 0
-
-    assert captured.getvalue() == ""
-    state_file = session_state_path(tmp_path, "claude", "claude-authoring-read")
-    assert state_file is not None
-    state = json.loads(state_file.read_text(encoding="utf-8"))
-    assert state["authoring"]["read_files"] == [
-        {
-            "path": str(authoring_file.resolve()),
-            "relative_path": "contracts/issue/task.md",
-        }
-    ]
-
-
-def test_claude_post_read_skips_non_authoring_reads(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    _write_config(tmp_path)
-    _hook_env(monkeypatch, tmp_path, runtime="claude")
-    readme = tmp_path / "README.md"
-    readme.write_text("# Project\n", encoding="utf-8")
-
-    captured = io.StringIO()
-    assert claude_main(
-        payload={
-            "session_id": "claude-non-authoring-read",
-            "cwd": str(tmp_path),
-            "hook_event_name": "PostToolUse",
-            "tool_name": "Read",
-            "tool_input": {"file_path": str(readme)},
-        },
-        stdout=captured,
-    ) == 0
-
-    assert captured.getvalue() == ""
-    state_file = session_state_path(tmp_path, "claude", "claude-non-authoring-read")
-    assert state_file is not None
-    assert not state_file.exists()
-
-
-def test_claude_post_read_skips_subagent_authoring_reads(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    _write_config(tmp_path)
-    _hook_env(monkeypatch, tmp_path, runtime="claude")
-    authoring_file = _PLUGIN_ROOT / "authoring" / "contracts" / "issue" / "task.md"
-
-    captured = io.StringIO()
-    assert claude_main(
-        payload={
-            "session_id": "claude-subagent-authoring-read",
-            "cwd": str(tmp_path),
-            "hook_event_name": "PostToolUse",
-            "agent_type": "workflow-operator",
-            "tool_name": "Read",
-            "tool_input": {"file_path": str(authoring_file)},
-        },
-        stdout=captured,
-    ) == 0
-
-    assert captured.getvalue() == ""
-    state_file = session_state_path(tmp_path, "claude", "claude-subagent-authoring-read")
-    assert state_file is not None
-    assert not state_file.exists()
-
-
 def test_parse_claude_event_payload_builds_event_structures(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -1136,7 +1047,7 @@ def test_non_empty_hook_stdout_is_json_only(
         _json_object(output)
 
 
-def test_codex_subagent_start_records_identity_and_injects_workflow_context(
+def test_codex_subagent_start_injects_workflow_context(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -1167,13 +1078,6 @@ def test_codex_subagent_start_records_identity_and_injects_workflow_context(
     assert payload["hookSpecificOutput"]["additionalContext"] == (
         expected_subagent_start_context(runtime="codex", issue_kind="github")
     )
-
-    parent_state = session_state_path(tmp_path, "codex", "parent-thread")
-    assert parent_state is not None
-    parent_state_payload = json.loads(parent_state.read_text(encoding="utf-8"))
-    assert parent_state_payload["subagents"]["started"] == [
-        {"agent_id": "codex-subagent-session", "agent_type": "general-purpose"}
-    ]
 
     subagent_exports = codex_env_exports(tmp_path, "codex-subagent-session")
     assert "SPECTRACK_SESSION_ID=parent-thread" in subagent_exports
@@ -1260,7 +1164,7 @@ def test_session_start_skips_claude_subagent_payload(
     assert "AUTHORING_RESOLVER" not in content
 
 
-def test_claude_subagent_start_records_subagent_identity_and_injects_workflow_context(
+def test_claude_subagent_start_injects_workflow_context(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -1286,13 +1190,6 @@ def test_claude_subagent_start_records_subagent_identity_and_injects_workflow_co
     assert payload["hookSpecificOutput"]["additionalContext"] == (
         expected_subagent_start_context(issue_kind="github")
     )
-
-    state_file = session_state_path(tmp_path, "claude", "claude-session")
-    assert state_file is not None
-    state = json.loads(state_file.read_text(encoding="utf-8"))
-    assert state["subagents"]["started"] == [
-        {"agent_id": "agent-123", "agent_type": "general-purpose"}
-    ]
 
 
 def test_claude_subagent_start_injects_issue_implementer_agent_block(
@@ -1425,39 +1322,6 @@ def test_claude_subagent_start_emits_nothing_for_non_workflow_projects(
     ) == 0
 
     assert captured.getvalue() == ""
-
-
-def test_claude_subagent_start_deduplicates_agent_identity_records(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    _write_config(tmp_path)
-    monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(tmp_path))
-    monkeypatch.setenv("CLAUDE_PLUGIN_ROOT", str(_PLUGIN_ROOT))
-
-    payload = {
-        "session_id": "claude-session",
-        "transcript_path": "/tmp/transcript.jsonl",
-        "cwd": str(tmp_path),
-        "hook_event_name": "SubagentStart",
-        "agent_id": "agent-123",
-        "agent_type": "general-purpose",
-    }
-
-    assert claude_main(payload=payload, stdout=io.StringIO()) == 0
-    assert claude_main(payload=payload, stdout=io.StringIO()) == 0
-    assert claude_main(
-        payload={**payload, "agent_id": "agent-456", "agent_type": "Plan"},
-        stdout=io.StringIO(),
-    ) == 0
-
-    state_file = session_state_path(tmp_path, "claude", "claude-session")
-    assert state_file is not None
-    state = json.loads(state_file.read_text(encoding="utf-8"))
-    assert state["subagents"]["started"] == [
-        {"agent_id": "agent-123", "agent_type": "general-purpose"},
-        {"agent_id": "agent-456", "agent_type": "Plan"},
-    ]
 
 
 def test_static_claude_manifest_registers_global_subagent_start_hook() -> None:

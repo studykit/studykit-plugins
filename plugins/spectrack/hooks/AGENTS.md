@@ -49,8 +49,7 @@ the authoring resolver block, and the PRD-path resolver block.
   host detail into the adapter.
 - **Manifest asymmetry is deliberate.** Codex registers `SessionStart`,
   `SubagentStart`, and `UserPromptSubmit`. Claude additionally registers
-  `PreToolUse` (cache projection protection + authoring-read notice) and
-  `PostToolUse` (authoring-read tracking). New behavior must fit one of
+  `PreToolUse` (cache projection protection). New behavior must fit one of
   those events on the target runtime or be runtime-only.
 - **Stdout is JSON or empty.** Empty stdout = no-op. Never emit plain text.
 - **Subagents inherit env, not policy.** SubagentStart injection stays
@@ -80,10 +79,6 @@ the authoring resolver block, and the PRD-path resolver block.
   both providers, plus GitHub's `.relation.json` and Jira's `.issue.json` /
   `.remote-links.json` native machine sources — are blocked for both read
   and write; they are projection bookkeeping, not issue content.
-- **Authoring read-tracking scope is `../authoring/` only.**
-  `mustread.authoring_relative_path` defines the surface. A new
-  reference doc that needs re-read tracking belongs under
-  `../authoring/`, not under `./context/`.
 - **Injected text is consumer-facing.** The main agent calls scripts; it
   does not implement them. In `context/main/`, `context/subagent/`, and
   `context/snippets/`, describe verb syntax, flag meaning, output kind,

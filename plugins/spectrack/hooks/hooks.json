@@ -1,5 +1,5 @@
 {
-  "description": "Workflow hooks. SessionStart persists workflow shell environment exports (and prepends the plugin scripts directory to PATH) when .spectrack/config.yml exists and injects provider-backed workflow authoring policy only for main sessions. SubagentStart records spawned Claude subagent identities in session state and injects the workflow launcher contract plus provider-specific issue-fetch usage as additionalContext for the subagent. PreToolUse protects read-only provider cache projections: it blocks edits to issue content files and blocks both reads and edits of the internal .meta.json. PostToolUse records main-session authoring file reads in session state. UserPromptSubmit reads mentioned GitHub issue references through cache-aware provider reads and injects project-relative issue cache paths as additionalContext.",
+  "description": "Workflow hooks. SessionStart persists workflow shell environment exports (and prepends the plugin scripts directory to PATH) when .spectrack/config.yml exists and injects provider-backed workflow authoring policy only for main sessions. SubagentStart injects the workflow launcher contract plus provider-specific issue-fetch usage as additionalContext for the subagent. PreToolUse protects read-only provider cache projections: it blocks edits to issue content files and blocks both reads and edits of the internal .meta.json. UserPromptSubmit reads mentioned GitHub issue references through cache-aware provider reads and injects project-relative issue cache paths as additionalContext.",
   "hooks": {
     "PreToolUse": [
       {
@@ -10,19 +10,6 @@
             "command": "uv run --script \"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/hook_claude.py\"",
             "timeout": 5,
             "description": "Protect read-only provider cache projections: block edits to issue content files and both reads and edits of the internal .meta.json"
-          }
-        ]
-      }
-    ],
-    "PostToolUse": [
-      {
-        "matcher": "Read",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "uv run --script \"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/hook_claude.py\"",
-            "timeout": 5,
-            "description": "Record main-session workflow authoring file reads in session state"
           }
         ]
       }

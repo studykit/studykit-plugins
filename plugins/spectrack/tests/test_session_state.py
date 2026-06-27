@@ -14,17 +14,17 @@ if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
 import session_state  # noqa: E402
-from session_state import read_subagent_starts  # noqa: E402
+from session_state import read_session_issues  # noqa: E402
 
 
-def test_subagent_start_records_survive_concurrent_parent_state_updates(
+def test_issue_records_survive_concurrent_parent_state_updates(
     tmp_path: Path,
 ) -> None:
     if session_state.fcntl is None:
         pytest.skip("session state locking requires fcntl on this platform")
 
     start_file = tmp_path / "start"
-    recorder = tmp_path / "record_subagent_start.py"
+    recorder = tmp_path / "record_session_issues.py"
     recorder.write_text(
         "\n".join(
             [
@@ -32,38 +32,38 @@ def test_subagent_start_records_survive_concurrent_parent_state_updates(
                 "import time",
                 "from pathlib import Path",
                 f"sys.path.insert(0, {str(_SCRIPTS_DIR)!r})",
-                "from session_state import record_subagent_start",
+                "from session_state import record_session_issues",
                 "project = Path(sys.argv[1])",
                 "start_file = Path(sys.argv[2])",
-                "agent_id = sys.argv[3]",
+                "issue = sys.argv[3]",
                 "deadline = time.time() + 5",
                 "while not start_file.exists():",
                 "    if time.time() > deadline:",
                 "        raise SystemExit('timed out waiting for start signal')",
                 "    time.sleep(0.01)",
-                "ok = record_subagent_start(",
+                "record_session_issues(",
                 "    project,",
-                "    'codex',",
                 "    'parent-session',",
-                "    agent_id=agent_id,",
-                "    agent_type='worker',",
+                "    [issue],",
+                "    'announced',",
+                "    runtime='codex',",
                 ")",
-                "raise SystemExit(0 if ok else 1)",
+                "raise SystemExit(0)",
                 "",
             ]
         ),
         encoding="utf-8",
     )
 
-    expected_agent_ids = {f"agent-{index:02d}" for index in range(16)}
+    expected_issues = {str(100 + index) for index in range(16)}
     processes = [
         subprocess.Popen(
-            [sys.executable, str(recorder), str(tmp_path), str(start_file), agent_id],
+            [sys.executable, str(recorder), str(tmp_path), str(start_file), issue],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
         )
-        for agent_id in sorted(expected_agent_ids)
+        for issue in sorted(expected_issues)
     ]
     start_file.write_text("go\n", encoding="utf-8")
 
@@ -71,7 +71,9 @@ def test_subagent_start_records_survive_concurrent_parent_state_updates(
         stdout, stderr = process.communicate(timeout=10)
         assert process.returncode == 0, stdout + stderr
 
-    starts = read_subagent_starts(tmp_path, "codex", "parent-session")
+    # Every concurrent append must survive: the exclusive file lock in
+    # _mutate_session_state serializes the read-modify-write so no recorder
+    # clobbers another's entry.
+    recorded = read_session_issues(tmp_path, "parent-session", "announced", runtime="codex")
 
-    assert {item["agent_id"] for item in starts} == expected_agent_ids
-    assert {item["agent_type"] for item in starts} == {"worker"}
+    assert recorded == expected_issues
