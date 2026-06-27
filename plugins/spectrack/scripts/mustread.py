@@ -26,14 +26,8 @@ from config import (
     validate_provider_for_role,
 )
 from env import (
-    WorkflowEnvError,
     detect_shell_runtime,
     workflow_project_dir_from_env,
-    workflow_session_id_from_env,
-)
-from session_state import (
-    read_authoring_resolution,
-    record_authoring_resolution,
 )
 
 PLUGIN_ROOT = Path(__file__).resolve().parent.parent
@@ -181,23 +175,6 @@ class Resolution:
             notes_lines.append("</notes>")
             sections.append("\n".join(notes_lines))
         return "\n\n".join(sections) + "\n"
-
-
-def render_cache_hit_reference(
-    reading_anchor: str,
-    notes_anchor: str | None = None,
-) -> str:
-    lines = [f'- See `<reading anchor="{reading_anchor}">` above.']
-    if notes_anchor is not None:
-        lines.append(
-            f'- See `<notes anchor="{notes_anchor}">` above — '
-            "triggers apply to this call too."
-        )
-    lines.append(
-        "- If the anchor body is no longer in context, rerun this command "
-        "with `--raw` to re-emit it."
-    )
-    return "\n".join(lines) + "\n"
 
 
 class ResolverError(ValueError):
@@ -583,11 +560,6 @@ def build_parser() -> argparse.ArgumentParser:
         help="project path used to find .spectrack/config.yml",
     )
     parser.add_argument("--require-config", action="store_true", help="fail when .spectrack/config.yml is absent")
-    parser.add_argument(
-        "--raw",
-        action="store_true",
-        help="force full markdown re-emission, overwriting the stored entry",
-    )
     return parser
 
 
@@ -610,82 +582,8 @@ def main(argv: list[str] | None = None) -> int:
         print(f"authoring resolver error: {exc}", file=sys.stderr)
         return 2
 
-    runtime, session_id = _resolve_session()
-    if not session_id:
-        print(resolution.to_markdown(), end="")
-        return 0
-
-    anchor = resolution.reading_anchor
-    current_key = _resolution_key(resolution)
-    use_cache_hit = False
-    if not args.raw:
-        existing = read_authoring_resolution(
-            args.project, runtime, session_id, tag="reading", anchor=anchor
-        )
-        if existing is not None and _keys_equal(existing.get("key"), current_key):
-            use_cache_hit = True
-
-    if use_cache_hit:
-        notes_anchor_value = (
-            resolution.notes_anchor if resolution.notes else None
-        )
-        print(
-            render_cache_hit_reference(
-                resolution.reading_anchor,
-                notes_anchor_value,
-            ),
-            end="",
-        )
-        return 0
-
     print(resolution.to_markdown(), end="")
-    record_authoring_resolution(
-        args.project,
-        runtime,
-        session_id,
-        tag="reading",
-        anchor=anchor,
-        key=current_key,
-    )
-    if resolution.notes:
-        record_authoring_resolution(
-            args.project,
-            runtime,
-            session_id,
-            tag="notes",
-            anchor=resolution.notes_anchor,
-            key=current_key,
-        )
     return 0
-
-
-def _resolve_session() -> tuple[str, str]:
-    runtime = detect_shell_runtime()
-    if runtime.session_id:
-        return runtime.name, runtime.session_id
-    try:
-        session_id = workflow_session_id_from_env()
-    except WorkflowEnvError:
-        return "", ""
-    return runtime.name, session_id
-
-
-def _resolution_key(resolution: Resolution) -> dict[str, str | None]:
-    return {
-        "type": resolution.artifact_type,
-        "side": resolution.side,
-        "provider": resolution.provider,
-        "scope": resolution.scope,
-        "target": resolution.target,
-        "mode": resolution.mode,
-    }
-
-
-def _keys_equal(left: object, right: dict[str, str | None]) -> bool:
-    if not isinstance(left, dict):
-        return False
-    fields = ("type", "side", "provider", "scope", "target", "mode")
-    return all(left.get(field) == right.get(field) for field in fields)
 
 
 if __name__ == "__main__":
