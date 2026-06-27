@@ -488,22 +488,25 @@ def test_session_start_policy_state_is_runtime_scoped(
     assert codex_second == ""
 
 
-def test_session_start_ignores_claude_compact_source(
+def test_session_start_reinjects_policy_on_claude_compact_source(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _write_config(tmp_path)
 
+    # A compaction replaces the live context window, dropping the policy
+    # injected at startup. The compact SessionStart must re-inject it even
+    # though it was already announced this session.
+    startup = _run_session_start(tmp_path, monkeypatch, runtime="claude")
     compact = _run_session_start(
         tmp_path,
         monkeypatch,
         runtime="claude",
         payload_update={"source": "compact"},
     )
-    startup = _run_session_start(tmp_path, monkeypatch, runtime="claude")
 
-    assert compact == ""
     assert startup
+    assert compact
 
 
 def test_claude_entrypoint_owns_runtime_for_codex_shaped_payload(
@@ -528,7 +531,11 @@ def test_claude_entrypoint_owns_runtime_for_codex_shaped_payload(
     assert isinstance(event_payload, ClaudeSessionStartPayload)
     assert claude_session_start(event_payload, stdout=captured) == 0
 
-    assert captured.getvalue() == ""
+    # The Claude entrypoint owns this codex-shaped payload and emits the
+    # Claude policy. ``compact`` re-injects the policy (it replaces context),
+    # so the output is the Claude-runtime SessionStart block.
+    payload = json.loads(captured.getvalue())
+    assert payload["hookSpecificOutput"]["hookEventName"] == "SessionStart"
 
 
 def test_claude_main_dispatches_from_payload_event_name(

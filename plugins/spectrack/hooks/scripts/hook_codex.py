@@ -404,7 +404,10 @@ def emit_session_start_policy(
         workflow_session_id=event_payload.session_id,
     )
 
-    if event_payload.source != "clear" and session_policy_was_announced(
+    # ``clear`` and ``compact`` both replace the live context window, dropping
+    # the policy injected at startup. Re-inject on both, ignoring the
+    # once-per-session announcement flag so the policy is restored.
+    if event_payload.source not in ("clear", "compact") and session_policy_was_announced(
         config.root, "codex", event_payload.session_id,
     ):
         return 0
