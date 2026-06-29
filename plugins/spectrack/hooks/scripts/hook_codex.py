@@ -8,10 +8,10 @@
 This module owns Codex payload and environment handling. Shared workflow policy
 and issue-cache behavior lives in ``hook.py`` as plain functions.
 
-The workflow Codex manifest registers ``SessionStart``, ``SubagentStart``, and
-``UserPromptSubmit`` events for this plugin. Provider cache projection
-protection and other write checks stay explicit in workflow scripts rather than
-using hidden authoring read tracking.
+The workflow Codex manifest registers ``SessionStart``, ``SubagentStart``,
+``UserPromptSubmit``, and ``Stop`` events for this plugin. Provider cache
+projection protection and other write checks stay explicit in workflow scripts
+rather than using hidden authoring read tracking.
 
 The script is the executable entry point for Codex's hook manifest
 (``plugins/spectrack/hooks/hooks.codex.json``). Each hook command invokes this

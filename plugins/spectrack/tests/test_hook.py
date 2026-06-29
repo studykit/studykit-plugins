@@ -1341,18 +1341,23 @@ def test_static_claude_manifest_does_not_register_stop_hook() -> None:
     assert "Stop" not in manifest["description"]
 
 
-def test_static_codex_manifest_does_not_register_stop_hook() -> None:
+def test_static_codex_manifest_registers_stop_hook() -> None:
     manifest = json.loads(
         (_PLUGIN_ROOT / "hooks" / "hooks.codex.json").read_text(encoding="utf-8")
     )
 
-    assert {"SessionStart", "SubagentStart", "UserPromptSubmit"}.issubset(manifest["hooks"])
+    assert {"SessionStart", "SubagentStart", "UserPromptSubmit", "Stop"}.issubset(
+        manifest["hooks"]
+    )
+    assert manifest["hooks"]["SessionStart"][0]["matcher"] == "startup|resume|clear|compact"
     assert "matcher" not in manifest["hooks"]["SubagentStart"][0]
     assert manifest["hooks"]["SubagentStart"][0]["hooks"][0]["command"] == (
         'uv run --script "${PLUGIN_ROOT}/hooks/scripts/hook_codex.py"'
     )
-    assert "Stop" not in manifest["hooks"]
-    assert "Stop" not in manifest.get("description", "")
+    assert "matcher" not in manifest["hooks"]["Stop"][0]
+    assert manifest["hooks"]["Stop"][0]["hooks"][0]["command"] == (
+        'uv run --script "${PLUGIN_ROOT}/hooks/scripts/hook_codex.py"'
+    )
 
 
 def test_user_prompt_caches_issue_and_injects_project_relative_path(

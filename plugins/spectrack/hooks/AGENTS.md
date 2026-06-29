@@ -48,9 +48,10 @@ the authoring resolver block, and the PRD-path resolver block.
   Claude/Codex branches inside `../scripts/hook.py` — push the
   host detail into the adapter.
 - **Manifest asymmetry is deliberate.** Codex registers `SessionStart`,
-  `SubagentStart`, and `UserPromptSubmit`. Claude additionally registers
-  `PreToolUse` (cache projection protection). New behavior must fit one of
-  those events on the target runtime or be runtime-only.
+  `SubagentStart`, `UserPromptSubmit`, and `Stop`. Claude additionally
+  registers `PreToolUse` (cache projection protection), while Claude `Stop`
+  stays unregistered. New behavior must fit one of those events on the
+  target runtime or be runtime-only.
 - **Stdout is JSON or empty.** Empty stdout = no-op. Never emit plain text.
 - **Subagents inherit env, not policy.** SubagentStart injection stays
   narrow (launcher + authoring resolver + PRD-path resolver + the same
