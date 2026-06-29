@@ -15,8 +15,9 @@ points at the doc with the full detail.
 
 All issue verbs route through `scripts/issue/dispatch.py` (verb table in its
 module docstring); provider behavior lives in `scripts/issue/github/` and
-`scripts/issue/jira/`. Hooks enter at `hooks/scripts/hook_claude.py` and
-inject Markdown fragments from `hooks/context/`. CLI usage is self-documenting
+`scripts/issue/jira/`. Hooks enter through the runtime adapters
+`hooks/scripts/hook_claude.py` and `hooks/scripts/hook_codex.py`, then inject
+Markdown fragments from `hooks/context/`. CLI usage is self-documenting
 — `spectrack issue --help` lists the backend's verbs and `spectrack issue
 <verb> --help` shows each verb's flags — so a feature change spans the dispatch
 surface, the provider drivers (including their argparse `--help` wording),

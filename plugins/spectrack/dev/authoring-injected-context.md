@@ -1,8 +1,8 @@
 # Authoring Agent and Skill Docs Against the Hook-Injected Context
 
 Before writing or editing any `agents/<name>.md` or
-`skills/<name>/SKILL.md` in this plugin, **read the context that
-`hooks/scripts/hook_claude.py` injects on the surface you are authoring**.
+`skills/<name>/SKILL.md` in this plugin, **read the context that the
+runtime hook adapter injects on the surface you are authoring**.
 Skipping this leaves the doc duplicating runtime-injected text, restating
 it stale, or — worse — assuming context that isn't actually injected on
 that surface and leaving the runtime instance missing what it needs.
@@ -55,8 +55,10 @@ every per-agent SubagentStart block.
   (per-verb flags) — the single source of truth for issue-CLI usage. The
   agent runs `--help` when it needs a verb's flags.
 
-`hooks/hooks.json` and `hooks/scripts/hook_claude.py` are the source of truth
-whenever the layout above looks stale.
+The runtime manifests (`hooks/hooks.json` for Claude and
+`hooks/hooks.codex.json` for Codex) and their adapters
+(`hooks/scripts/hook_claude.py`, `hooks/scripts/hook_codex.py`) are the source
+of truth whenever the layout above looks stale.
 
 ## Rules that follow
 
@@ -71,6 +73,5 @@ whenever the layout above looks stale.
   boundary leaves the runtime doc missing assumed context — surface the
   needed inputs through the caller's dispatch arguments instead.
 - When adding a new agent that needs its own injected block, add the
-  file under `hooks/context/subagent/agents/`, wire it through
-  `hooks/scripts/hook_claude.py`, and only then reference it from the agent
-  body.
+  file under `hooks/context/subagent/agents/`, wire it through the runtime
+  adapters, and only then reference it from the agent body.
