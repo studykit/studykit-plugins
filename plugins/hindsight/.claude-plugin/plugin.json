@@ -1,0 +1,17 @@
+{
+  "name": "hindsight",
+  "version": "0.1.0",
+  "description": "Mine past Claude Code session transcripts to surface recurring agent mistakes and how the user works, accumulating both as durable, project-independent guidance. Claude Code only.",
+  "author": {
+    "name": "studykit"
+  },
+  "repository": "https://github.com/studykit/studykit-plugins",
+  "license": "MIT",
+  "keywords": [
+    "transcripts",
+    "retrospective",
+    "agent-improvement",
+    "self-review",
+    "claude-code"
+  ]
+}
