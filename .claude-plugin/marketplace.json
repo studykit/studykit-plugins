@@ -143,7 +143,7 @@
     {
       "name": "hindsight",
       "source": "./plugins/hindsight",
-      "description": "Mine past Claude Code session transcripts to surface recurring agent mistakes and how the user works, accumulating both as durable, project-independent guidance. Claude Code only.",
+      "description": "Mine past Claude Code session transcripts to surface recurring agent mistakes and how the user works, accumulating both as durable, project-independent guidance. Review refreshes the analysis from new sessions; report shows the accumulated findings and profile. Claude Code only.",
       "author": {
         "name": "studykit"
       },

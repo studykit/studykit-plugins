@@ -1,7 +1,7 @@
 {
   "name": "hindsight",
-  "version": "0.1.0",
-  "description": "Mine past Claude Code session transcripts to surface recurring agent mistakes and how the user works, accumulating both as durable, project-independent guidance. Claude Code only.",
+  "version": "0.2.0",
+  "description": "Mine past Claude Code session transcripts to surface recurring agent mistakes and how the user works, accumulating both as durable, project-independent guidance. The `review` skill refreshes the analysis from new sessions; the `report` skill shows the accumulated findings and user profile as a ranked report. Claude Code only.",
   "author": {
     "name": "studykit"
   },
