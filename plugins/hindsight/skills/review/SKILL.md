@@ -1,6 +1,6 @@
 ---
 name: review
-description: Analyze accumulated Claude Code session transcripts across ALL projects to surface recurring agent MISTAKES (project-independent patterns to prevent) and how the USER works and communicates (a profile to adapt to). Use when the user wants to review/distill agent mistakes or understand their own usage patterns from session history ("transcript 분석", "내 사용 패턴", "what do I keep getting wrong", "how should you talk to me"). Claude Code only — reads `~/.claude/projects/` and dispatches Claude subagents. Incremental: each run covers only newly-appended transcript activity.
+description: 'Analyze accumulated Claude Code session transcripts across ALL projects to surface recurring agent mistakes (project-independent patterns to prevent) and a profile of how the user works and communicates. Use when the user wants to review agent mistakes or understand their own usage patterns from session history ("transcript 분석", "내 사용 패턴", "what do I keep getting wrong"). Claude Code only; reads ~/.claude/projects/ and dispatches Claude subagents. Incremental: covers only newly-appended activity each run.'
 ---
 
 # hindsight — review
