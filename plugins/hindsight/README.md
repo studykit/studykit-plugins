@@ -26,16 +26,29 @@ analysis script).
 
 ## Use
 
-Invoke the skill:
+Hindsight has two skills.
+
+**Refresh the analysis from new sessions:**
 
 ```
 /hindsight:review
 ```
 
-The skill scans your session history, asks a cheap model to flag suspected mistakes
-and usage signals, then has the top model confirm and organize them. It reports what
-it found and where the accumulated patterns and profile live. The first run reviews
-your whole history and can take a while; later runs only cover what's new.
+This scans your session history, asks a cheap model to flag suspected mistakes and
+usage signals, then has the top model confirm and organize them into the accumulated
+findings and profile. The first run reviews your whole history and can take a while;
+later runs only cover what's new.
+
+**See what's been found so far:**
+
+```
+/hindsight:report
+```
+
+This prints a single ranked report of the accumulated agent-mistake findings (open
+ones first) and your work profile — without re-scanning any transcripts, so it's
+instant. Add `--track`, `--status`, `--brief`, `--full`, or `--out <path>` to narrow
+or save the view.
 
 Results are stored under `~/.claude/hindsight/` so they persist across projects and
 sessions.
