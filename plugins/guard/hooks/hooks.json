@@ -39,6 +39,18 @@
         ]
       }
     ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/guard_hook.py\" post-tool",
+            "timeout": 10,
+            "description": "Record this turn's tool commands and output as evidence."
+          }
+        ]
+      }
+    ],
     "Stop": [
       {
         "hooks": [
