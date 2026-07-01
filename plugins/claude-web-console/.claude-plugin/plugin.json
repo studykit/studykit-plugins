@@ -1,0 +1,20 @@
+{
+  "name": "claude-web-console",
+  "version": "0.1.0",
+  "description": "Mirror the Claude Code conversation into a local web UI and render fenced code blocks (PlantUML, LaTeX math) as rich output. Streams assistant text live via the MessageDisplay hook and renders diagrams at message completion. Claude Code only.",
+  "author": {
+    "name": "studykit"
+  },
+  "repository": "https://github.com/studykit/studykit-plugins",
+  "license": "MIT",
+  "keywords": [
+    "web-console",
+    "viewer",
+    "plantuml",
+    "latex",
+    "katex",
+    "sse",
+    "markdown-it",
+    "claude-code"
+  ]
+}

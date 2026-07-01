@@ -151,6 +151,18 @@
       "license": "MIT",
       "category": "development",
       "keywords": ["transcripts", "retrospective", "agent-improvement", "self-review", "claude-code"]
+    },
+    {
+      "name": "claude-web-console",
+      "source": "./plugins/claude-web-console",
+      "description": "Mirror the Claude Code conversation into a local web UI and render fenced code blocks (PlantUML, LaTeX math) as rich output. Streams assistant text live via the MessageDisplay hook and renders diagrams at message completion. Claude Code only.",
+      "author": {
+        "name": "studykit"
+      },
+      "repository": "https://github.com/studykit/studykit-plugins",
+      "license": "MIT",
+      "category": "development",
+      "keywords": ["web-console", "viewer", "plantuml", "latex", "katex", "sse", "markdown-it", "claude-code"]
     }
   ]
 }
