@@ -52,9 +52,17 @@ These are claims already confirmed earlier this session — treat them as **esta
 evidence**: a claim consistent with a verified fact is SUPPORTED and need not be
 re-derived.
 
-Then **read the repository** (Read/Grep/Glob/Bash) to verify the remaining claims. Do
-not assume — open the real definition. Ground every judgment in the turn record, the
-verified facts, and what you read from the repo.
+**Triage first.** After reading `turn_file`, scan the `assistant` text for something to
+verify — a load-bearing technical claim or a deferral. If it has neither (it only plans,
+asks the user a question, proposes an approach, or narrates an action already shown in
+`tools[]`), the turn passes with nothing to record: **do not read the repository**,
+record no verified facts, and report `verdict: pass` (recorded: 0). Do not open the repo
+for a turn that asserts nothing verifiable.
+
+Otherwise, when there IS a claim or deferral to check, **read the repository**
+(Read/Grep/Glob/Bash) to verify the remaining claims. Do not assume — open the real
+definition. Ground every judgment in the turn record, the verified facts, and what you
+read from the repo.
 
 ## Audit — two axes
 
