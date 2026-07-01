@@ -1,9 +1,10 @@
 # guard — design detail
 
 Deep reference for `guard` contributors. Not auto-loaded; open it when working on the
-area it covers. The always-loaded summary and the non-negotiable runtime facts live
-in `../AGENTS.md`. The source (`scripts/guard_hook.py`) is the truth for control flow
-— this file records *why* the design is shaped this way, not a line-by-line walkthrough.
+area it covers. `../AGENTS.md` is the always-loaded map and points here. The source
+(`scripts/guard_hook.py`) is the truth for control flow — this file records *why* the
+design is shaped this way and the runtime facts verified against the real CLI, not a
+line-by-line walkthrough.
 
 ## Hook wiring (`hooks/hooks.json`)
 
@@ -37,6 +38,42 @@ Stop it reconstructs the turn from Claude Code's transcript, sliced by `prompt_i
 
 State survives session end (a resumed `claude --resume` must keep its flags);
 age-based `SessionStart` sweep is the only reaper. There is no SessionEnd hook.
+
+## Verified runtime facts (confirmed against the CLI / real payloads; do not regress)
+
+Re-verify before changing anything that depends on these — they came from real
+payloads, not memory.
+
+- **`prompt_id` is common to every hook** (PreToolUse and Stop included) and equals
+  the transcript record's `promptId` — this is what lets the gate's `gated_prompt_id`
+  match the same turn's Stop. Observed on real payloads (seen on Claude Code 2.1.197;
+  needs ≥ 2.1.196); the hook input schema is in the official hooks docs
+  (https://code.claude.com/docs/en/hooks). Re-verify against those docs and a live Stop
+  payload before relying on this.
+- **Transcript slice.** The anchor record has `promptId == prompt_id` (a typed prompt:
+  `origin={"kind":"human"}` + str content). Derived records — assistant text,
+  tool_use/tool_result — have `promptId=None` and stay in the slice; the slice ends at
+  the next different non-empty promptId. `isMeta:true` records (guard's own feedback)
+  are skipped. `_read_turn_from_transcript(path, prompt_id)` is unit-testable on a
+  fixture JSONL.
+- **A background-agent completion opens its own transcript turn** (`origin.kind ==
+  "task-notification"`, `promptSource: "system"`, NOT `isMeta`; verified 2.1.197). In
+  subagent mode this would loop — the guardian dispatch is itself a background task, so
+  its completion re-dispatches the guardian. `cmd_stop` skips these
+  (`skip_task_notification`) from BOTH archive and judge. Ordering that must not
+  regress: the skip precedes `_append_log`, and `_append_log` stays ahead of the
+  `stop_hook_active` check (so a corrected response after a headless block is still
+  archived).
+- **A Stop hook may inject `additionalContext` without `decision`** and the
+  conversation continues — the subagent-dispatch mechanism. `stop_hook_active: true`
+  ⇒ guard already blocked this turn, so Stop returns at once.
+- **`/guard:turn` and `/guard:mode` take a `--project` / `--global` scope flag.** No
+  flag sets the live session (`toggle` / `set-mode` write `state/`); `--project` writes
+  only the session-start default (`enabled` / `mode`) to `guard.local.json`, live
+  session untouched; `--global` is reserved (reported unsupported). Safe despite writing
+  config: these fire ONLY on a user-typed slash command via UserPromptExpansion, which
+  the model cannot invoke. `_scope_of` parses the flag; `_write_config` edits only the
+  one key.
 
 ## Design invariants (why, not how)
 
@@ -89,8 +126,8 @@ age-based `SessionStart` sweep is the only reaper. There is no SessionEnd hook.
   one `git check-ignore` for exemption 3 below (5s timeout, fail-toward-gating). It
   gates only `MUTATING_TOOLS`; Bash and reads/searches always pass.
 - **Three exemptions, all narrow.** The gate lets an unapproved write through only when:
-  1. **refs/** — the target resolves inside `.claude/guard/refs/` (the evidence-first
-     style tells the assistant to save cited docs there — guard must not forbid its own
+  1. **refs/** — the target resolves inside `.claude/guard/refs/` (the Grounded
+     output style tells the assistant to save cited docs there — guard must not forbid its own
      required behavior). Both paths `resolve()`d so `..` can't escape.
   2. **outside the project dir** (`_is_outside_project`) — not under `CLAUDE_PROJECT_DIR`
      (e.g. the session scratchpad under `/private/tmp`). Not project source, and Bash

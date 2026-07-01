@@ -131,7 +131,7 @@
     {
       "name": "guard",
       "source": "./plugins/guard",
-      "description": "Enforce evidence-backed technical claims and gate file edits behind explicit user approval. Ships an evidence-first output style, logs each session's turns with the assistant's claims and their evidence, runs an isolated headless judge that blocks a turn when technical claims lack grounding, and denies file-mutating tools until the user explicitly approves implementation. Claude Code only.",
+      "description": "Enforce evidence-backed technical claims and gate file edits behind explicit user approval. Ships a Grounded output style, logs each session's turns with the assistant's claims and their evidence, runs an isolated headless judge that blocks a turn when technical claims lack grounding, and denies file-mutating tools until the user explicitly approves implementation. Claude Code only.",
       "author": {
         "name": "studykit"
       },

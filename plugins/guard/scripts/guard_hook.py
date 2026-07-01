@@ -34,7 +34,7 @@ Subcommands
                  explicit user approval unless the session is approved. On a deny it
                  records the turn's ``prompt_id`` in ``gated_prompt_id`` so Stop skips
                  auditing a plan/approval-request response. Writes under
-                 ``.claude/guard/refs/`` are exempt (the evidence-first style saves
+                 ``.claude/guard/refs/`` are exempt (the Grounded output style saves
                  cited docs there), as are writes that don't touch tracked project
                  source — targets outside the project dir (e.g. the scratchpad) and
                  git-ignored writes inside it (scratch/temp, ``**/*.local.*``,
@@ -186,7 +186,7 @@ def _turn_slice_file(project_dir: Path, session_id: str, prompt_id: str) -> Path
 
 
 def _refs_dir(project_dir: Path) -> Path:
-    """Directory where the evidence-first style saves local copies of cited docs.
+    """Directory where the Grounded output style saves local copies of cited docs.
 
     Writes here are the assistant grounding its own claims (per the output style),
     not implementing the user's task — so the approval gate exempts them.
@@ -1095,7 +1095,7 @@ def cmd_gate() -> int:
     if state["approved"]:
         return 0
 
-    # Exempt the assistant's own evidence store: the evidence-first output style
+    # Exempt the assistant's own evidence store: the Grounded output style
     # tells it to save cited docs under `.claude/guard/refs/`. Grounding a claim is
     # not implementing the user's task, so those writes pass without approval. Note
     # this is deliberately ONLY refs/ — never the wider `.claude/guard/` tree, so

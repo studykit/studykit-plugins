@@ -21,6 +21,10 @@ _lock = threading.Lock()
 _history: list[dict] = []
 _clients: "list[queue.Queue[dict]]" = []
 
+# Static assets fall back to application/octet-stream (see the GET handler). A
+# browser refuses to execute an ES module served as octet-stream, so a missing
+# ".mjs" mapping silently breaks the whole viewer — the vendored module never
+# evaluates. ".woff2" must stay mapped for the KaTeX fonts for the same reason.
 CONTENT_TYPES = {
     ".html": "text/html; charset=utf-8",
     ".js": "text/javascript; charset=utf-8",
