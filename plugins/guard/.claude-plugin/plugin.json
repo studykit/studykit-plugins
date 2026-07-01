@@ -1,6 +1,6 @@
 {
   "name": "guard",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Enforce evidence-backed technical claims in Claude Code. Ships an evidence-first output style, logs each session's user/assistant turns with the assistant's claims and their supporting evidence, and (when armed for the session) audits each finished turn for grounding at Stop — either via an isolated headless judge that blocks the turn, or by dispatching the guardian subagent. Claude Code only.",
   "author": {
     "name": "studykit"

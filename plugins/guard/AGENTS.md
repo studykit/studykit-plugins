@@ -30,14 +30,18 @@ changing anything that depends on them.
   the transcript record's `promptId`. This is what lets the gate's `gated_prompt_id`
   match the same turn's Stop. Needs Claude Code ≥ 2.1.196 (seen on 2.1.197). Saved:
   `.claude/guard/refs/stop-hook-input.md`.
-- **Transcript slice**: the anchor record has `promptId == prompt_id`; a typed prompt
-  has `origin={"kind":"human"}` + str content, a `!`-command turn has `origin=None` +
-  str content with `<bash-input>`/`<bash-stdout>` — **both carry the promptId**, so
-  slice on promptId, NOT origin. Derived records (assistant text,
-  tool_use/tool_result, further `!` commands) have `promptId=None`; the slice ends at
+- **Transcript slice**: the anchor record has `promptId == prompt_id` (a typed prompt:
+  `origin={"kind":"human"}` + str content). Derived records — assistant text,
+  tool_use/tool_result — have `promptId=None` and stay in the slice; the slice ends at
   the next different non-empty promptId. Skip `isMeta:true` (guard's own feedback).
-- **`!` commands fold into the preceding typed turn** — they never open their own
-  promptId; a pure bash-only turn is not observed (verified 2.1.197).
+- **`!` commands inherit the preceding typed prompt's promptId** — they do NOT open
+  their own turn (verified 2.1.197: `!git push` after a reply carried that reply's
+  promptId; the `<bash-input>`/`<bash-stdout>` records also carry it). Their output
+  lands in the slice AFTER the response guard already judged, so the evidence arrives
+  later than the claims it would support. guard therefore does **not** treat `!` output
+  as evidence and **does not judge** a turn whose slice contains a `!` command:
+  `_read_turn_from_transcript` sets `has_user_command` and `cmd_stop` skips
+  (`skip_user_command`).
 - **A Stop hook may inject `additionalContext` without `decision`** and the
   conversation continues — the subagent-dispatch mechanism.
   `stop_hook_active: true` ⇒ guard already blocked this turn; Stop returns at once.
