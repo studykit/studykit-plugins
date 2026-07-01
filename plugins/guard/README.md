@@ -9,7 +9,7 @@ project before you have actually approved the work.
 
 guard adds three layers of control over the assistant's responses and actions:
 
-1. **Evidence-first output style** — an output style that requires every technical
+1. **Grounded output style** — an output style that requires every technical
    claim to carry its evidence (a `file:line` reference, a command's output, a
    named doc/spec, or a measurement), and to mark anything unverified as an
    assumption instead of stating it as fact.
@@ -53,7 +53,7 @@ Install from the studykit marketplace, then enable the plugin:
 
 ### The output style
 
-The evidence-first output style is applied **automatically while guard is enabled**
+The Grounded output style is applied **automatically while guard is enabled**
 — you do not need to select it. Because guard forces this style, it takes
 precedence over any other output style you have chosen (built-in or custom) for as
 long as the plugin is enabled. Disable the plugin to return to your own output

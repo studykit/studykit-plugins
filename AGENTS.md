@@ -28,9 +28,11 @@ The `global/` directory manages rules, subagents, skills, hooks, and MCP configu
 
 ## Agent Instruction Files
 
-When creating an `AGENTS.md` instruction file, always create a sibling `CLAUDE.md` file that imports it with exactly `@AGENTS.md`. Keep shared instructions in `AGENTS.md`; use `CLAUDE.md` only as the Claude Code import shim unless a location explicitly requires Claude-only instructions.
+Do **not** write detailed implementation content into any `AGENTS.md` file: no long procedures, step-by-step walkthroughs, code-level specifics, or internal mechanics. Keep that detail in the deeper docs it belongs to (deeper docs, `dev/` design notes, source) and link to it from `AGENTS.md` instead of inlining it.
 
-Every `AGENTS.md` file must be organized as a map of contents: a concise, navigable index that orients the reader and points to where the detail actually lives (deeper docs, `dev/` design notes, source), rather than inlining long procedures or walkthroughs.
+- **Omit anything the code already shows.** If a fact is evident from reading the source — file/module layout, function names, control flow, which file handles what — leave it out; it only drifts out of date. Capture the *why* and the constraints the code cannot express, not a restatement of the code.
+- **Detailed rationale belongs in code comments, not `AGENTS.md`** — and only when the code alone does not make it clear. If reading the code answers the question, no comment is needed either.
+- **Keep a way to run the tests.** `AGENTS.md` may say how to test the component; when those instructions grow long, replace them with a pointer to the file that holds them (e.g. under `dev/`).
 
 ## Plugin README Scope
 
