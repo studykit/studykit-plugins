@@ -8,29 +8,35 @@ because its own machinery broke).
 
 Subcommands
 -----------
-- user-prompt    UserPromptSubmit. Append the user turn to the session log, then
+- user-prompt    UserPromptSubmit. Log the user turn, open a new turn record, and
                  (when guard is enabled) update the approval gate: an explicit user
-                 instruction to implement arms it; a clear shift to a new/undecided
+                 instruction to implement arms it; a shift to a new/undecided
                  discussion re-locks it. Intent is judged by an isolated headless
                  ``claude`` (see ``run_judge``). Only a user message can arm approval.
-- toggle         UserPromptExpansion (matcher ``turn``). Read the on/off argument
-                 from the raw ``prompt`` and set the session's ``enabled`` flag —
-                 the single switch for BOTH the evidence judge and the approval gate.
+                 guard's own ``/guard:turn`` command is ignored here (not a turn).
+- toggle         UserPromptExpansion (matcher ``(guard:)?turn``). Read the on/off
+                 argument from the raw ``prompt`` and set the session's ``enabled``
+                 flag — the one switch for BOTH the evidence judge and approval gate.
 - gate           PreToolUse. When guard is enabled, for the file-editing tools
                  (Write/Edit/MultiEdit/NotebookEdit), deny with a reason to seek
                  explicit user approval unless the session is approved. Reads state
                  only — no judge call, so it is fast and deterministic. Bash and all
                  read/search tools are never matched by the hook and always pass.
-- stop           Stop. Append the assistant turn (from ``last_assistant_message``)
-                 to the session log. If guard is enabled and ``stop_hook_active`` is
-                 false, judge the response on two axes and block when a load-bearing
-                 technical claim is unsupported OR the response defers a question the
-                 repository can answer (no punting on things the code would settle).
-- session-start  SessionStart. Sweep state and log files older than retention.
+- post-tool      PostToolUse. Append the tool's command + output to the current
+                 turn record, so a claim grounded in a command's output is treated
+                 as evidence by the Stop judge.
+- stop           Stop. Close the current turn record with the assistant response.
+                 If guard is enabled and ``stop_hook_active`` is false, judge the
+                 whole turn (user + tool output + response) on two axes and block
+                 when a load-bearing claim is unsupported OR a deferral is resolvable
+                 from the repo. Writes a per-turn line to the verdict record.
+- session-start  SessionStart. Sweep state/logs/turns/verdicts older than retention.
 
 State lives project-local under ``${CLAUDE_PROJECT_DIR}/.claude/guard/``:
-- ``state/<sid>.json``       — {enabled, approved, skip_stop_once, updated_at}
-- ``sessions/<sid>.jsonl``   — one record per turn / judge verdict
+- ``state/<sid>.json``       — {enabled, approved, turn_seq, updated_at}
+- ``sessions/<sid>.jsonl``   — full session archive: one record per turn / verdict
+- ``turns/<sid>/<seq>.json`` — one file per turn: {seq, user, tools[], assistant}
+- ``verdicts/<sid>.jsonl``   — verification record: one line per judged turn
 - ``trace.log``              — file-only debug trace (enabled by GUARD_TRACE)
 
 State is retained across the end of a session so a resumed session
@@ -106,6 +112,21 @@ def _log_file(project_dir: Path, session_id: str) -> Path:
     return _state_root(project_dir) / "sessions" / f"{session_id}.jsonl"
 
 
+def _turns_dir(project_dir: Path, session_id: str) -> Path:
+    """Directory holding this session's per-turn record files."""
+    return _state_root(project_dir) / "turns" / session_id
+
+
+def _turn_file(project_dir: Path, session_id: str, seq: int) -> Path:
+    """One turn's record file (user prompt + tool activity + assistant response)."""
+    return _turns_dir(project_dir, session_id) / f"{seq:04d}.json"
+
+
+def _verdicts_file(project_dir: Path, session_id: str) -> Path:
+    """Per-session accumulation of turn verdicts (verification record)."""
+    return _state_root(project_dir) / "verdicts" / f"{session_id}.jsonl"
+
+
 def _trace_file(project_dir: Path) -> Path:
     return _state_root(project_dir) / TRACE_FILE_NAME
 
@@ -146,6 +167,8 @@ def _read_payload() -> dict | None:
 
 
 _SESSION_ID_RE = re.compile(r"^[A-Za-z0-9._-]+$")
+# guard's own toggle command, e.g. "/guard:turn on" or "/turn off".
+_TURN_CMD_RE = re.compile(r"^/(guard:)?turn\b", re.IGNORECASE)
 
 
 def _session_id(payload: dict) -> str | None:
@@ -158,6 +181,75 @@ def _session_id(payload: dict) -> str | None:
     if ".." in sid or not _SESSION_ID_RE.match(sid):
         return None
     return sid
+
+
+TOOL_CONTEXT_MAX_CHARS = 12000
+TOOL_RESULT_MAX_CHARS = 2000
+
+
+def _extract_tool_output(tool_name: Any, tool_response: Any) -> str:
+    """Render a tool_response payload to text for the evidence buffer."""
+    if isinstance(tool_response, str):
+        return tool_response
+    if isinstance(tool_response, dict):
+        # Bash: {stdout, stderr, ...}. Prefer those; else dump the dict.
+        if "stdout" in tool_response or "stderr" in tool_response:
+            out = str(tool_response.get("stdout") or "")
+            err = str(tool_response.get("stderr") or "")
+            return (out + (("\n[stderr] " + err) if err.strip() else "")).strip()
+        return json.dumps(tool_response, ensure_ascii=False)
+    if tool_response is None:
+        return ""
+    return json.dumps(tool_response, ensure_ascii=False)
+
+
+def _read_turn(project_dir: Path, session_id: str, seq: int) -> dict[str, Any]:
+    """Load the current turn's record, or a fresh skeleton if none exists."""
+    skeleton: dict[str, Any] = {"seq": seq, "user": "", "tools": [], "assistant": ""}
+    path = _turn_file(project_dir, session_id, seq)
+    if not path.is_file():
+        return skeleton
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError, ValueError):
+        return skeleton
+    if not isinstance(data, dict):
+        return skeleton
+    skeleton.update({k: data[k] for k in ("seq", "user", "tools", "assistant") if k in data})
+    if not isinstance(skeleton["tools"], list):
+        skeleton["tools"] = []
+    return skeleton
+
+
+def _write_turn(project_dir: Path, session_id: str, turn: dict[str, Any]) -> None:
+    path = _turn_file(project_dir, session_id, int(turn.get("seq", 0)))
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_suffix(".json.tmp")
+        tmp.write_text(json.dumps(turn, ensure_ascii=False), encoding="utf-8")
+        tmp.replace(path)
+    except OSError:
+        pass
+
+
+def _render_turn_for_judge(turn: dict[str, Any]) -> str:
+    """Render a whole turn (user + tools + assistant) for the judge."""
+    tool_parts: list[str] = []
+    for t in turn.get("tools", []):
+        if not isinstance(t, dict):
+            continue
+        out = str(t.get("output", ""))
+        if len(out) > TOOL_RESULT_MAX_CHARS:
+            out = out[:TOOL_RESULT_MAX_CHARS] + "\n…(truncated)"
+        tool_parts.append(f"$ {t.get('command', '')}\n→ {out}")
+    tools_text = "\n\n".join(tool_parts).strip() or "(none)"
+    if len(tools_text) > TOOL_CONTEXT_MAX_CHARS:
+        tools_text = "…(earlier tool activity omitted)\n" + tools_text[-TOOL_CONTEXT_MAX_CHARS:]
+    return (
+        "<<<USER_REQUEST\n" + str(turn.get("user", "")) + "\nUSER_REQUEST\n\n"
+        "<<<TOOL_ACTIVITY\n" + tools_text + "\nTOOL_ACTIVITY\n\n"
+        "<<<ASSISTANT_RESPONSE\n" + str(turn.get("assistant", "")) + "\nASSISTANT_RESPONSE"
+    )
 
 
 def _load_config(project_dir: Path) -> dict[str, Any]:
@@ -187,7 +279,7 @@ def _read_state(project_dir: Path, session_id: str, config: dict[str, Any]) -> d
     default = {
         "enabled": bool(config.get("enabled", True)),
         "approved": False,
-        "skip_stop_once": False,
+        "turn_seq": 0,
         "updated_at": None,
     }
     path = _state_file(project_dir, session_id)
@@ -199,7 +291,7 @@ def _read_state(project_dir: Path, session_id: str, config: dict[str, Any]) -> d
         return default
     if not isinstance(data, dict):
         return default
-    keys = ("enabled", "approved", "skip_stop_once", "updated_at")
+    keys = ("enabled", "approved", "turn_seq", "updated_at")
     default.update({k: data[k] for k in keys if k in data})
     return default
 
@@ -219,6 +311,29 @@ def _write_state(project_dir: Path, session_id: str, state: dict[str, Any]) -> N
 def _append_log(project_dir: Path, session_id: str, record: dict[str, Any]) -> None:
     record = {"ts": _now_iso(), **record}
     path = _log_file(project_dir, session_id)
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(record, ensure_ascii=False) + "\n")
+    except OSError:
+        pass
+
+
+def _append_verdict(project_dir: Path, session_id: str, seq: int, verdict: dict[str, Any]) -> None:
+    """Append one turn's verification result to the per-session verdict record."""
+    unsupported = [c for c in verdict.get("claims", [])
+                   if isinstance(c, dict) and c.get("supported") is False]
+    resolvable = [d for d in verdict.get("deferrals", [])
+                  if isinstance(d, dict) and d.get("resolvable_from_repo") is True]
+    record = {
+        "ts": _now_iso(),
+        "turn": seq,
+        "blocked": bool(unsupported or resolvable),
+        "summary": verdict.get("summary", ""),
+        "unsupported_claims": unsupported,
+        "resolvable_deferrals": resolvable,
+    }
+    path = _verdicts_file(project_dir, session_id)
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
         with path.open("a", encoding="utf-8") as f:
@@ -355,11 +470,15 @@ EVIDENCE_SYSTEM = (
     "You audit an assistant's response from a coding session on TWO axes. You have "
     "the repository available and MUST read it (Read/Grep/Glob/Bash) to judge — do "
     "not assume.\n\n"
+    "A TOOL_ACTIVITY block may precede the response: it is the commands the assistant "
+    "actually ran this turn and their output. Treat that output as first-class "
+    "evidence — a claim that restates or directly follows from a command's output in "
+    "TOOL_ACTIVITY is SUPPORTED even if the response does not re-cite it.\n\n"
     "AXIS 1 — unsupported or shallowly-supported technical claims. A technical claim "
     "asserts how a system, tool, language, library, API, algorithm, configuration, or "
-    "codebase behaves or performs. For each load-bearing claim, decide if the response "
-    "carries adequate evidence: a specific code reference (file:line or symbol), a "
-    "quoted command and its output, a named doc/spec, a measurement, or a sound "
+    "codebase behaves or performs. For each load-bearing claim, decide if it is "
+    "backed by adequate evidence: output of a command in TOOL_ACTIVITY, a specific "
+    "code reference (file:line or symbol), a named doc/spec, a measurement, or a sound "
     "derivation. Judge the QUALITY of the evidence, not just its presence — mark the "
     "claim UNSUPPORTED when the assistant reasoned from a SURFACE SIGNAL instead of "
     "the actual behavior: inferring what a function does from its NAME, a comment, a "
@@ -445,10 +564,26 @@ def cmd_user_prompt() -> int:
 
     prompt = payload.get("prompt")
     prompt = prompt if isinstance(prompt, str) else ""
+
+    # guard's own control command (`/guard:turn ...`) is not a real turn — the
+    # UserPromptExpansion `toggle` handles it. Don't log it, don't start a turn,
+    # don't judge it.
+    if _TURN_CMD_RE.match(prompt.strip()):
+        _trace(project_dir, session_id, "user-prompt", "skip_turn_cmd")
+        return 0
+
     _append_log(project_dir, session_id, {"role": "user", "text": prompt})
 
     config = _load_config(project_dir)
     state = _read_state(project_dir, session_id, config)
+
+    # Start a new turn: bump the sequence and open its record with the user prompt.
+    # Tool activity (PostToolUse) and the assistant response (Stop) append to it.
+    state["turn_seq"] = int(state.get("turn_seq", 0)) + 1
+    _write_state(project_dir, session_id, state)
+    turn = {"seq": state["turn_seq"], "user": prompt, "tools": [], "assistant": ""}
+    _write_turn(project_dir, session_id, turn)
+
     if not state["enabled"] or not prompt.strip():
         return 0
 
@@ -505,9 +640,6 @@ def cmd_toggle() -> int:
     elif arg == "off":
         state["enabled"] = False
     # no arg → report only; leave enabled unchanged
-    # This turn is a guard control command, not real work — exempt its response
-    # from the Stop evidence judge (the toggle confirmation carries no claims).
-    state["skip_stop_once"] = True
     _write_state(project_dir, session_id, state)
 
     msg = "guard is {} for this session (evidence judge + approval gate).".format(
@@ -563,6 +695,36 @@ def _is_mutating(tool_name: Any) -> bool:
     return tool_name in MUTATING_TOOLS
 
 
+def cmd_post_tool() -> int:
+    """Record a tool's command + output into the current turn (evidence buffer)."""
+    project_dir = _project_dir()
+    payload = _read_payload()
+    if payload is None or project_dir is None:
+        return 0
+    session_id = _session_id(payload)
+    if session_id is None:
+        return 0
+
+    tool_name = payload.get("tool_name")
+    tool_input = payload.get("tool_input") if isinstance(payload.get("tool_input"), dict) else {}
+    command = tool_input.get("command")
+    if not isinstance(command, str) or not command:
+        # Non-Bash tool: label by tool name + a compact view of its input.
+        command = f"[{tool_name}] {json.dumps(tool_input, ensure_ascii=False)[:200]}"
+    output = _extract_tool_output(tool_name, payload.get("tool_response"))
+
+    config = _load_config(project_dir)
+    state = _read_state(project_dir, session_id, config)
+    seq = int(state.get("turn_seq", 0))
+    if seq <= 0:
+        return 0  # no active turn yet
+    turn = _read_turn(project_dir, session_id, seq)
+    turn.setdefault("tools", []).append({"command": command, "output": output})
+    _write_turn(project_dir, session_id, turn)
+    _trace(project_dir, session_id, "post-tool", "recorded", tool=tool_name, seq=seq)
+    return 0
+
+
 def cmd_stop() -> int:
     project_dir = _project_dir()
     payload = _read_payload()
@@ -576,28 +738,35 @@ def cmd_stop() -> int:
     response = response if isinstance(response, str) else ""
     _append_log(project_dir, session_id, {"role": "assistant", "text": response})
 
+    config = _load_config(project_dir)
+    state = _read_state(project_dir, session_id, config)
+    seq = int(state.get("turn_seq", 0))
+
+    # Close the current turn record with the assistant response (for the archive),
+    # regardless of whether the judge runs.
+    if seq > 0:
+        turn = _read_turn(project_dir, session_id, seq)
+        turn["assistant"] = response
+        _write_turn(project_dir, session_id, turn)
+    else:
+        turn = {"seq": 0, "user": "", "tools": [], "assistant": response}
+
     # Recursion / re-entry guard: never block twice in a row.
     if payload.get("stop_hook_active") is True:
         _trace(project_dir, session_id, "stop", "skip_active")
         return 0
 
-    config = _load_config(project_dir)
-    state = _read_state(project_dir, session_id, config)
     if not state["enabled"] or not response.strip():
         return 0
 
-    # A `turn` control command set this: skip the judge for its confirmation turn,
-    # then clear the flag so the next real turn is judged normally.
-    if state.get("skip_stop_once") is True:
-        state["skip_stop_once"] = False
-        _write_state(project_dir, session_id, state)
-        _trace(project_dir, session_id, "stop", "skip_once")
-        return 0
-
+    # Judge the whole turn: user request + the commands run this turn and their
+    # output (first-class evidence) + the assistant response.
     judge_input = (
-        "Audit the assistant response between the markers below, reading the "
-        "repository as needed. Return only the JSON verdict.\n\n"
-        "<<<ASSISTANT_RESPONSE\n" + response + "\nASSISTANT_RESPONSE"
+        "Audit the assistant's turn below. Treat the commands in TOOL_ACTIVITY and "
+        "their output as first-class evidence for the assistant's claims, alongside "
+        "what you can read from the repository. USER_REQUEST is context (e.g. facts "
+        "the user already confirmed). Return only the JSON verdict.\n\n"
+        + _render_turn_for_judge(turn)
     )
     verdict = run_judge(project_dir, EVIDENCE_SYSTEM, judge_input, EVIDENCE_SCHEMA, config)
     if verdict is None:
@@ -610,6 +779,8 @@ def cmd_stop() -> int:
         "claims": verdict.get("claims", []),
         "deferrals": verdict.get("deferrals", []),
     })
+    # Verification record: one line per judged turn, accumulated per session.
+    _append_verdict(project_dir, session_id, seq, verdict)
 
     # Decide blocking from the concrete violation lists, not the model's own
     # `verdict` field — the judge sometimes returns verdict="block" while every
@@ -665,7 +836,8 @@ def cmd_session_start() -> int:
         return 0
     root = _state_root(project_dir)
     cutoff = time.time() - ORPHAN_MAX_AGE_SECONDS
-    for sub in ("state", "sessions"):
+    # File-per-session dirs.
+    for sub in ("state", "sessions", "verdicts"):
         d = root / sub
         if not d.is_dir():
             continue
@@ -679,6 +851,24 @@ def cmd_session_start() -> int:
                     entry.unlink()
             except OSError:
                 pass
+    # turns/ holds one directory per session; remove whole stale dirs.
+    turns_root = root / "turns"
+    if turns_root.is_dir():
+        try:
+            sess_dirs = list(turns_root.iterdir())
+        except OSError:
+            sess_dirs = []
+        for d in sess_dirs:
+            try:
+                if d.is_dir() and d.stat().st_mtime < cutoff:
+                    for child in d.iterdir():
+                        try:
+                            child.unlink()
+                        except OSError:
+                            pass
+                    d.rmdir()
+            except OSError:
+                pass
     _trace(project_dir, None, "session-start", "swept")
     return 0
 
@@ -687,6 +877,7 @@ SUBCOMMANDS = {
     "user-prompt": cmd_user_prompt,
     "toggle": cmd_toggle,
     "gate": cmd_gate,
+    "post-tool": cmd_post_tool,
     "stop": cmd_stop,
     "session-start": cmd_session_start,
 }

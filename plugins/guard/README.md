@@ -101,5 +101,7 @@ The evidence review always reads your repository to verify cited claims. A
 
 ## Logs
 
-guard keeps a per-session record of the conversation and its review results under
-`.claude/guard/` in your project. Add `.claude/guard/` to your `.gitignore`.
+guard keeps records under `.claude/guard/` in your project: a full session
+archive, one file per turn (your request, the commands run, and the response), and
+a per-turn verification record of what the review checked and flagged. Add
+`.claude/guard/` to your `.gitignore`.

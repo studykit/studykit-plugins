@@ -27,11 +27,29 @@ payload fields; there is no Codex path.
 
 | Event | Subcommand | Role |
 | --- | --- | --- |
-| `UserPromptSubmit` | `user-prompt` | Log the user turn; update approval state. |
+| `UserPromptSubmit` | `user-prompt` | Open a new turn record; update approval state. Ignores `/guard:turn`. |
 | `UserPromptExpansion` (matcher `(guard:)?turn`) | `toggle` | Flip the session `enabled` flag (judge + gate). |
-| `PreToolUse` (`Write\|Edit\|MultiEdit\|NotebookEdit\|Bash`) | `gate` | Deny file-mutating tools until approved. |
-| `Stop` | `stop` | Log the assistant turn; run the evidence judge when armed. |
-| `SessionStart` | `session-start` | Sweep state/log files past retention. |
+| `PreToolUse` (`Write\|Edit\|MultiEdit\|NotebookEdit`) | `gate` | Deny file-editing tools until approved. |
+| `PostToolUse` (all tools) | `post-tool` | Record the tool's command + output into the current turn (evidence). |
+| `Stop` | `stop` | Close the turn record; run the evidence judge over the whole turn when armed; write a verdict line. |
+| `SessionStart` | `session-start` | Sweep state/sessions/turns/verdicts past retention. |
+
+## Storage layout
+
+Project-local under `${CLAUDE_PROJECT_DIR}/.claude/guard/`:
+
+- `state/<sid>.json` — `{enabled, approved, turn_seq, updated_at}` (atomic write).
+- `sessions/<sid>.jsonl` — full session archive: one line per user/assistant/gate/judge record.
+- `turns/<sid>/<seq>.json` — one file per turn: `{seq, user, tools[], assistant}`,
+  built across UserPromptSubmit → PostToolUse(s) → Stop. This is what the Stop
+  judge reads, so a claim grounded in a command's output is evidence, not a
+  transcript re-parse.
+- `verdicts/<sid>.jsonl` — verification record: one line per judged turn
+  (`turn`, `blocked`, `summary`, `unsupported_claims`, `resolvable_deferrals`).
+- `trace.log` — file-only debug trace (`GUARD_TRACE` truthy).
+
+`turn_seq` increments on each real user turn; `/guard:turn` control commands do
+not bump it or create a turn record.
 
 ## Verified runtime facts (do not regress)
 
@@ -94,30 +112,25 @@ location is sufficient for discovery.
   (Stop) and the approval gate (UserPromptSubmit + PreToolUse). `turn` flips it;
   its session-start default is the config `enabled` key. When off, `cmd_gate`,
   `cmd_stop`, and the approval-classifier in `cmd_user_prompt` all early-return.
-- A `turn` invocation is a guard control command, not real work, so its response
-  is exempt from the evidence judge: `cmd_toggle` sets `skip_stop_once` in state,
-  and the next `cmd_stop` clears it and returns without judging. One-shot, so the
-  following real turn is judged normally.
+- `turn` only flips `enabled` (a persistent session toggle) — it does not touch
+  the judge's per-turn logic. `/guard:turn` is also skipped by `cmd_user_prompt`
+  (via `_TURN_CMD_RE`) so it neither opens a turn nor is judged.
+- Command output is evidence: the turn record (`turns/<sid>/<seq>.json`) is
+  assembled across UserPromptSubmit (user) → PostToolUse (each command + output) →
+  Stop (assistant). At Stop the judge is handed the whole turn via
+  `_render_turn_for_judge` (USER_REQUEST + TOOL_ACTIVITY + ASSISTANT_RESPONSE), and
+  EVIDENCE_SYSTEM treats TOOL_ACTIVITY as first-class evidence. This is why a claim
+  grounded in a command the assistant ran (e.g. `source-analyzer repos`) is not
+  judged unsupported — `last_assistant_message` alone would omit that output.
 - The gate reads state only (no judge call) so PreToolUse stays fast and
   deterministic. It gates only the file-editing tools in `MUTATING_TOOLS`
   (Write/Edit/MultiEdit/NotebookEdit). Bash is intentionally NOT gated — shell
   commands, reads, and searches always pass.
-
-## State & logs
-
-Project-local under `${CLAUDE_PROJECT_DIR}/.claude/guard/`:
-
-- `state/<sid>.json` — `{enabled, approved, skip_stop_once, updated_at}` (atomic write via
-  temp + `replace`).
-- `sessions/<sid>.jsonl` — one record per user/assistant turn, gate change, and
-  judge verdict.
-- `trace.log` — file-only debug trace; enabled only when `GUARD_TRACE` is truthy
-  (`1/true/yes/on`). Never writes to stdout/stderr.
-
-`SessionStart` sweeps both `state/` and `sessions/` for files older than
-`ORPHAN_MAX_AGE_SECONDS` (7 days). State is **not** cleared at SessionEnd — a
-resumed session (`claude --resume`) must keep its `enabled`/`approved` flags,
-so age-based expiry is the only reaper. There is no SessionEnd hook.
+- Retention: `SessionStart` sweeps `state/`, `sessions/`, `verdicts/` (files) and
+  `turns/` (whole per-session dirs) older than `ORPHAN_MAX_AGE_SECONDS` (7 days).
+  Nothing is cleared at SessionEnd — a resumed session (`claude --resume`) must
+  keep its `enabled`/`approved`/`turn_seq` state, so age-based expiry is the only
+  reaper. There is no SessionEnd hook.
 
 ## Config (`.claude/guard.local.json`)
 
