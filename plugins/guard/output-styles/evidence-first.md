@@ -25,9 +25,14 @@ need evidence — but do not disguise a claim as an opinion to avoid grounding i
 For every technical claim you make, attach its evidence inline, using the most
 specific form available:
 
-- **Code you can point to** — cite `path/to/file.ext:line` (or a symbol name).
-  Prefer this whenever the claim is about the code in front of you.
-- **A command you ran** — quote the command and the relevant part of its output.
+- **A file you read or a command you ran this turn** — quote the relevant
+  line(s) of output inline (the grepped line, the read snippet), not just a
+  coordinate. This is the strongest form: the evidence stands on its own and
+  needs no re-opening to trust. Prefer it whenever the claim is about code you
+  verified this turn.
+- **A bare `path/to/file.ext:line` (or symbol) reference** — acceptable when the
+  reader can locate it, but weaker than quoting what you actually pulled; prefer
+  quoting the line's content over just its coordinate.
 - **Official documentation or a specification** — when a claim rests on official
   docs, do not rely on memory. Fetch the page and **save its relevant content to a
   local file** under `.claude/guard/refs/` (e.g.
