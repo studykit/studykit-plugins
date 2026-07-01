@@ -98,8 +98,15 @@ Set the session-start default with the `mode` key in configuration (below).
 While guard is on and a task is still under discussion, any attempt to change files
 is denied with a note asking for a plan and your approval. Approve by saying so in
 your own words — for example "go ahead", "implement it", or "apply the change".
-Approval lasts until you steer the conversation to a new or undecided topic, at
-which point the gate re-locks.
+Approval sticks with the current task: questions, refinements, corrections, and
+follow-ups on the same work keep it in place. The gate only re-locks when you clearly
+move on to a different, unrelated task — at which point you approve that one afresh.
+
+The gate only guards your **tracked project source**. Writes to git-ignored paths are
+never blocked — scratch and temp files, local config (`*.local.*`), and skill-authored
+output such as a handoff document written to an ignored `.handover/`. (guard's own
+config and state are the one exception: they stay protected even though they're
+git-ignored, so nothing can quietly disable the guard.)
 
 ## Configuration
 
@@ -110,7 +117,8 @@ Configuration is optional. Create `.claude/guard.local.json` in your project:
   "model": "haiku",
   "effort": "medium",
   "enabled": true,
-  "mode": "headless"
+  "mode": "headless",
+  "exempt_skills": ["deep-research", "hindsight:review"]
 }
 ```
 
@@ -120,11 +128,19 @@ Configuration is optional. Create `.claude/guard.local.json` in your project:
 | `effort` | Review reasoning effort (`low`/`medium`/`high`/`xhigh`/`max`) | `"medium"` |
 | `enabled` | Session-start default for guard (evidence judge + approval gate) | `true` |
 | `mode` | Session-start review mode (`headless`/`subagent`, see [Review modes](#review-modes)) | `"headless"` |
+| `exempt_skills` | Skills / slash commands whose turn the review skips, named `plugin:skill` (leading `/` and case ignored) | `[]` |
 
 `model` and `effort` apply to the **headless** review; the **subagent** review runs
 on the `guardian` agent's own model. The evidence review always reads your repository
 to verify cited claims. A `guard.local.json.example` file ships with the plugin as a
 starting point.
+
+Use `exempt_skills` for skills or slash commands whose output is a report or a relay
+rather than claims about your codebase (e.g. a research skill) — guard won't review the
+turn they run in. List each by the name you invoke after the slash, **including its
+plugin namespace**: `hindsight:review`, `guard:turn`, or a bare name for an
+un-namespaced skill like `deep-research`. guard's own `/guard:turn` and `/guard:mode`
+are always exempt.
 
 ## Logs
 

@@ -44,13 +44,27 @@ age-based `SessionStart` sweep is the only reaper. There is no SessionEnd hook.
   leaves state untouched and does not block — guard must never harass the user
   because its own machinery broke.
 - **Approval is armed only by a user message**, only on an explicit-implementation
-  verdict from the classifier. The `turn` skill and the model cannot arm it.
-  Approval/discussion are mutually exclusive; the dispatcher still resolves
-  defensively (`if explicit: approved=True elif opens_new: approved=False`).
+  verdict from the classifier. The `turn` skill and the model cannot arm it. It is
+  **revoked only when the user clearly starts an unrelated new task**
+  (`starts_unrelated_task`) — NOT on questions, refinements, corrections, or
+  continuations of the current work, so a mid-implementation question doesn't re-lock
+  the gate. The two axes are mutually exclusive; the dispatcher resolves defensively
+  (`if explicit: approved=True elif starts_unrelated_task: approved=False`).
 - **One master switch.** Session `enabled` gates BOTH the judge and the approval gate;
   when off, gate/stop/classifier all early-return. `turn` flips it (default from the
-  config `enabled` key). `/guard:turn` and `/guard:mode` are skipped as turns (never
-  opened, never judged).
+  config `enabled` key).
+- **Control turns and exempt commands are never judged.** `/guard:turn` and
+  `/guard:mode` are skipped on BOTH sides: the approval classifier skips them at
+  UserPromptSubmit (`_CONTROL_CMD_RE` on the raw prompt), and `cmd_stop` skips them via
+  `command_name` (extracted from the transcript's expanded
+  `<command-name>/guard:turn</command-name>`). This second skip is load-bearing — a
+  control turn's response is a one-line relay ("guard on") with no evidence, and
+  without it the Stop judge falsely blocked it (session b30dbaec). The same
+  `command_name` path skips any skill / slash command the user lists in
+  `exempt_skills` — named with its plugin namespace (`plugin:skill`), since a
+  user-invoked skill reaches the transcript as a namespaced `<command-name>` just like
+  a command (skill output is not a body of technical claims to ground). Both modes
+  honor it (checked before the `mode` branch).
 - **Two modes, one criteria.** `mode` selects only *how* the Stop audit runs (in-hook
   judge that blocks vs. dispatch guardian); the two-axis criteria are identical, and
   `guardian.md` mirrors them in prose. Bad `mode` → `headless`. `set-mode` flips it,
@@ -70,14 +84,22 @@ age-based `SessionStart` sweep is the only reaper. There is no SessionEnd hook.
   arrive later than the claims it supports, and cannot be judged coherently in that
   turn. `_read_turn_from_transcript` flags the turn (`has_user_command`) and `cmd_stop`
   skips it (`skip_user_command`); the `!` records are never collected or rendered.
-- **The gate is state-only** (no judge call, so PreToolUse stays fast). It gates only
-  `MUTATING_TOOLS`; Bash and reads/searches always pass.
-- **Refs exemption.** The gate lets an unapproved write through only when the target
-  resolves inside `.claude/guard/refs/` (the evidence-first style tells the assistant
-  to save cited docs there — guard must not forbid its own required behavior). Scoped
-  to `refs/` ONLY, never the wider `.claude/guard/` tree, so the model can't write
-  `state/` to arm its own approval; both target and refs dir are `resolve()`d so `..`
-  can't escape into `state/`.
+- **The gate runs no judge** (so PreToolUse stays fast); its only subprocess is one
+  `git check-ignore` for the exemption below (5s timeout, fail-toward-gating). It gates
+  only `MUTATING_TOOLS`; Bash and reads/searches always pass.
+- **Two exemptions, both narrow.** The gate lets an unapproved write through only when:
+  1. **refs/** — the target resolves inside `.claude/guard/refs/` (the evidence-first
+     style tells the assistant to save cited docs there — guard must not forbid its own
+     required behavior). Both paths `resolve()`d so `..` can't escape.
+  2. **git-ignored** — `git check-ignore` reports the target ignored: scratch/temp,
+     local config (`**/*.local.*`), skill-authored docs (`/handoff` → `.handover/`).
+     These aren't the user's tracked project source, so gating them is pure friction.
+     `git check-ignore` honors the global gitignore too.
+  **Guard's own config + state are excluded from the git-ignore exemption**
+  (`_is_guard_owned`): `.claude/guard/` is itself git-ignored, so without this the model
+  could `Write` `state/<sid>.json` to arm its own approval or edit `guard.local.json`
+  to disable the judge / add `exempt_skills`. refs/ is the one deliberate hole and is
+  checked first. Failing to resolve a path ⇒ treated as guard-owned (no exemption).
 - **Gated turns aren't audited.** A gate denial records `gated_prompt_id`; Stop skips
   that turn (its response is a plan/approval request, not claims to ground). A new
   turn has a new prompt_id, so the flag self-expires.
@@ -86,9 +108,13 @@ age-based `SessionStart` sweep is the only reaper. There is no SessionEnd hook.
 
 Parsed by `_load_config`; fail-open to defaults. Keys: `model` (default `"haiku"`),
 `effort` (low/medium/high/xhigh/max, default `"medium"`), `enabled` (bool, default
-`true`), `mode` (`"headless"`|`"subagent"`, default `"headless"`). Only keys whose
-value matches the default's type are honored (a malformed value can't flip a flag);
-unknown keys ignored; missing/malformed file → all defaults. `guard.local.json.example`
+`true`), `mode` (`"headless"`|`"subagent"`, default `"headless"`), `exempt_skills`
+(list of strings, default `[]`) — skills / slash commands whose turn the Stop judge
+skips, named with their plugin namespace (`plugin:skill`, e.g. `guard:turn`) or bare
+for un-namespaced skills, matched leading-`/`-stripped and case-insensitively (guard's
+own `turn`/`mode` control commands are always exempt regardless). Only keys whose value matches the
+default's type are honored (a malformed value can't flip a flag); unknown keys ignored;
+missing/malformed file → all defaults. `guard.local.json.example`
 ships at the plugin root. The judge always reads the repo (`--allowedTools
 Read,Grep,Glob,Bash`, no `--disallowedTools` — room to extend, e.g. a verification
 artifact); isolation comes from `--safe-mode` + `--no-session-persistence`, not from
