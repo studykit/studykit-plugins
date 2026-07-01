@@ -1,0 +1,19 @@
+{
+  "name": "guard",
+  "version": "0.1.0",
+  "description": "Enforce evidence-backed technical claims in Claude Code. Ships an evidence-first output style, logs each session's user/assistant turns with the assistant's claims and their supporting evidence, and (when armed for the session) runs an isolated headless judge at Stop that blocks the turn when technical claims lack grounding. Claude Code only.",
+  "author": {
+    "name": "studykit"
+  },
+  "repository": "https://github.com/studykit/studykit-plugins",
+  "license": "MIT",
+  "keywords": [
+    "evidence",
+    "claims",
+    "grounding",
+    "hallucination-guard",
+    "hooks",
+    "output-style",
+    "claude-code"
+  ]
+}
