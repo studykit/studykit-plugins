@@ -103,5 +103,6 @@ The evidence review always reads your repository to verify cited claims. A
 
 guard keeps records under `.claude/guard/` in your project: a full session
 archive, one file per turn (your request, the commands run, and the response), and
-a per-turn verification record of what the review checked and flagged. Add
-`.claude/guard/` to your `.gitignore`.
+a store of facts that passed review (each with its evidence). Facts verified in
+earlier turns are reused as established evidence when reviewing later turns, so the
+same thing isn't re-checked repeatedly. Add `.claude/guard/` to your `.gitignore`.
