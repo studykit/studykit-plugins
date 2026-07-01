@@ -129,6 +129,18 @@
       "keywords": ["dev-rules", "logging", "hooks", "coding-rules", "context-injection"]
     },
     {
+      "name": "guard",
+      "source": "./plugins/guard",
+      "description": "Enforce evidence-backed technical claims and gate file edits behind explicit user approval. Ships an evidence-first output style, logs each session's turns with the assistant's claims and their evidence, runs an isolated headless judge that blocks a turn when technical claims lack grounding, and denies file-mutating tools until the user explicitly approves implementation. Claude Code only.",
+      "author": {
+        "name": "studykit"
+      },
+      "repository": "https://github.com/studykit/studykit-plugins",
+      "license": "MIT",
+      "category": "development",
+      "keywords": ["evidence", "claims", "grounding", "hallucination-guard", "approval-gate", "hooks", "output-style", "claude-code"]
+    },
+    {
       "name": "hindsight",
       "source": "./plugins/hindsight",
       "description": "Mine past Claude Code session transcripts to surface recurring agent mistakes and how the user works, accumulating both as durable, project-independent guidance. Claude Code only.",

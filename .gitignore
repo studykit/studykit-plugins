@@ -206,6 +206,7 @@ __marimo__/
 
 *.pdf
 **/*.local.*
+!**/*.local.*.example
 session-tree.lock
 
 .claude/sessions/
