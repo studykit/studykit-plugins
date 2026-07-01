@@ -211,6 +211,7 @@ session-tree.lock
 
 .claude/sessions/
 .claude/tmp/
+.claude/guard/
 .DS_Store
 **/node_modules/
 .obsidian/workspace.json

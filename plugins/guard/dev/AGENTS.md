@@ -8,15 +8,22 @@ Design and runtime internals for the `guard` plugin. End-user docs live in
 Two independent capabilities, both expressed through hooks over a single stdlib
 dispatcher (`scripts/guard_hook.py`):
 
-1. **Evidence judge** (Stop) — a single repo-reading judge that blocks a turn on
-   any of three grounds: (a) a load-bearing technical claim stated as fact without
-   adequate evidence; (b) a claim backed only by a *surface signal* — reasoning
-   from a function/variable/type name, comment, filename, or docstring without
-   reading the body, or built on an earlier unverified assumption; (c) an
-   *unjustified deferral* — punting as "open question / TBD / deferred / needs
-   investigation / 결정 안 됨" on something the repository could answer. Genuine
-   human product/policy decisions are left alone. All three are one `run_judge`
-   call (EVIDENCE_SYSTEM / EVIDENCE_SCHEMA: `claims[]` + `deferrals[]`).
+1. **Evidence judge** (Stop) — a repo-reading audit that flags a turn on any of
+   three grounds: (a) a load-bearing technical claim stated as fact without adequate
+   evidence; (b) a claim backed only by a *surface signal* — reasoning from a
+   function/variable/type name, comment, filename, or docstring without reading the
+   body, or built on an earlier unverified assumption; (c) an *unjustified deferral*
+   — punting as "open question / TBD / deferred / needs investigation / 결정 안 됨"
+   on something the repository could answer. Genuine human product/policy decisions
+   are left alone. The **same two-axis criteria** run in one of two **modes** (per
+   session, `state["mode"]`, default from config):
+   - **`headless`** (original) — one `run_judge` call spawns an isolated `claude`
+     inside the Stop hook (EVIDENCE_SYSTEM / EVIDENCE_SCHEMA: `claims[]` +
+     `deferrals[]`) and **blocks** the turn on a violation.
+   - **`subagent`** — the Stop hook does not judge or block; it injects an
+     `additionalContext` instruction and the main agent dispatches the `guardian`
+     subagent (`agents/guardian.md`, criteria mirror EVIDENCE_SYSTEM in prose) to
+     audit the turn, report violations, and record verified facts itself.
 2. **Approval gate** — block file mutation until the user explicitly approves
    implementation.
 
@@ -27,18 +34,20 @@ payload fields; there is no Codex path.
 
 | Event | Subcommand | Role |
 | --- | --- | --- |
-| `UserPromptSubmit` | `user-prompt` | Open a new turn record; update approval state. Ignores `/guard:turn`. |
+| `UserPromptSubmit` | `user-prompt` | Open a new turn record; update approval state. Ignores `/guard:turn` and `/guard:mode`. |
 | `UserPromptExpansion` (matcher `(guard:)?turn`) | `toggle` | Flip the session `enabled` flag (judge + gate). |
-| `PreToolUse` (`Write\|Edit\|MultiEdit\|NotebookEdit`) | `gate` | Deny file-editing tools until approved. |
+| `UserPromptExpansion` (matcher `(guard:)?mode`) | `set-mode` | Set the session `mode` (`headless`\|`subagent`) for the Stop-time evidence judge. |
+| `PreToolUse` (`Write\|Edit\|MultiEdit\|NotebookEdit`) | `gate` | Deny file-editing tools until approved (except writes under `.claude/guard/refs/`). |
 | `PostToolUse` (all tools) | `post-tool` | Record the tool's command + output into the current turn (evidence). |
-| `Stop` | `stop` | Close the turn record; judge the whole turn (+ verified facts) when armed; on PASS append its supported claims to the verified-facts store. |
+| (called via Bash, not a hook) | `record-verified` | Append a passed turn's supported claims to the verified store. Called by the `guardian` subagent in subagent mode — the single writer both modes share. |
+| `Stop` | `stop` | Close the turn record; then in `headless` mode judge the whole turn (+ verified facts) and block on violations (on PASS append supported claims); in `subagent` mode inject an `additionalContext` dispatch instruction (no block) once per turn. |
 | `SessionStart` | `session-start` | Sweep state/sessions/turns/verified past retention. |
 
 ## Storage layout
 
 Project-local under `${CLAUDE_PROJECT_DIR}/.claude/guard/`:
 
-- `state/<sid>.json` — `{enabled, approved, turn_seq, updated_at}` (atomic write).
+- `state/<sid>.json` — `{enabled, approved, turn_seq, mode, last_audited_seq, gated_seq, updated_at}` (atomic write).
 - `sessions/<sid>.jsonl` — full session archive: one line per user/assistant/gate/judge record.
 - `turns/<sid>/<seq>.json` — one file per turn: `{seq, user, tools[], assistant}`,
   built across UserPromptSubmit → PostToolUse(s) → Stop. This is what the Stop
@@ -118,8 +127,29 @@ location is sufficient for discovery.
   its session-start default is the config `enabled` key. When off, `cmd_gate`,
   `cmd_stop`, and the approval-classifier in `cmd_user_prompt` all early-return.
 - `turn` only flips `enabled` (a persistent session toggle) — it does not touch
-  the judge's per-turn logic. `/guard:turn` is also skipped by `cmd_user_prompt`
-  (via `_TURN_CMD_RE`) so it neither opens a turn nor is judged.
+  the judge's per-turn logic. `/guard:turn` and `/guard:mode` are both skipped by
+  `cmd_user_prompt` (via `_CONTROL_CMD_RE`, `(guard:)?(turn|mode)`) so a control
+  command neither opens a turn nor is judged.
+- **Two evidence-judge modes, one criteria.** `state["mode"]` (default from config
+  `mode`, validated by `_mode`; bad → `headless`) selects how the Stop-time audit
+  runs. `headless` is the original in-hook `run_judge` → block path. `subagent`
+  makes `cmd_stop` early-return through `_stop_subagent`: no judge call, no block —
+  it emits `hookSpecificOutput.additionalContext` (no `decision`) naming the
+  `turn_file`, `verified_file`, and `dispatcher` paths so the main agent dispatches
+  `guard:guardian`. Confirmed a Stop hook may inject `additionalContext` without
+  `decision` and the conversation continues — see `.claude/guard/refs/stop-hook-output.md`.
+  Both modes apply the same two-axis criteria; `guardian.md` mirrors EVIDENCE_SYSTEM
+  in prose. `set-mode` (`/guard:mode`) flips it, mirroring `toggle`.
+- **Subagent-mode re-entry guard.** `headless` avoids a block loop via the payload's
+  `stop_hook_active`. `subagent` never blocks, so that flag is not set on the next
+  Stop; instead `_stop_subagent` records `last_audited_seq` and returns early when it
+  already equals `turn_seq`, so guardian is dispatched at most once per turn.
+- **Verified-facts parity via a single writer.** In `headless`, `cmd_stop` calls
+  `_append_verified` on a PASS. In `subagent`, the hook never sees the verdict, so
+  `guardian` records the passed turn's supported claims by piping JSON to
+  `guard_hook.py record-verified` (`cmd_record_verified` → `_append_verified`). All
+  state writes stay funneled through the dispatcher (single writer), and Bash is not
+  gated so the call needs no approval.
 - Command output is evidence: the turn record (`turns/<sid>/<seq>.json`) is
   assembled across UserPromptSubmit (user) → PostToolUse (each command + output) →
   Stop (assistant). At Stop the judge is handed the whole turn via
@@ -131,6 +161,22 @@ location is sufficient for discovery.
   deterministic. It gates only the file-editing tools in `MUTATING_TOOLS`
   (Write/Edit/MultiEdit/NotebookEdit). Bash is intentionally NOT gated — shell
   commands, reads, and searches always pass.
+- **Refs exemption.** `cmd_gate` lets an unapproved write through when its target
+  path resolves inside `.claude/guard/refs/` (`_targets_refs_dir`). The
+  evidence-first output style tells the assistant to save cited docs there;
+  grounding a claim is not implementing the user's task, so those writes must not
+  be blocked (otherwise guard forbids its own required behavior). The exemption is
+  scoped to `refs/` ONLY — never the wider `.claude/guard/` tree — so the model
+  cannot write `state/<sid>.json` to arm its own approval. Both the target and the
+  refs dir are `resolve()`d before comparison, so `..` traversal into `state/`
+  still hits the deny path.
+- **Gated turns are not audited.** When `cmd_gate` denies a file edit for want of
+  approval, it records `gated_seq = turn_seq`. `cmd_stop` skips the evidence judge
+  (both modes) when `gated_seq == seq` — after a gate denial the response is a plan
+  / approval request, not technical claims to ground, so auditing it is noise. The
+  turn record is still closed (archive) before the skip. Recorded only on an actual
+  deny, not on a refs-exemption pass. `turn_seq` bumps every turn so the flag is
+  self-expiring — the next turn is judged normally.
 - Verified-fact reuse: on a PASS, `_append_verified` stores the turn's supported
   claims (+ evidence). The next Stop calls `_read_verified_facts` and injects a
   VERIFIED_FACTS block, so cross-turn established facts don't need re-deriving.
@@ -146,8 +192,11 @@ location is sufficient for discovery.
 
 JSON object parsed by `_load_config`. Keys: `model` (str, default `"haiku"`),
 `effort` (str, one of low/medium/high/xhigh/max, default `"medium"` — validated by
-`_effort`, bad values fall back to medium), and `enabled` (bool, default `true` —
-session-start default of the master switch for the evidence judge + approval gate). Only keys in `DEFAULT_CONFIG` whose value
+`_effort`, bad values fall back to medium), `enabled` (bool, default `true` —
+session-start default of the master switch for the evidence judge + approval gate),
+and `mode` (str, `"headless"`|`"subagent"`, default `"headless"` — validated by
+`_mode`, bad values fall back to headless; session-start default of the Stop-time
+evidence-judge mode). Only keys in `DEFAULT_CONFIG` whose value
 matches the default's type are honored (so a malformed value can't flip a flag);
 unknown keys ignored; missing/malformed file → all defaults. A
 `guard.local.json.example` template ships at the plugin root.
@@ -170,11 +219,20 @@ H="$CLAUDE_PLUGIN_ROOT/scripts/guard_hook.py"
 # gate denies a mutating tool before approval
 echo '{"session_id":"s1","tool_name":"Write","tool_input":{"file_path":"x"}}' | "$H" gate
 
-# arm the judge, then block an unsupported claim
+# arm the judge, then block an unsupported claim (headless mode)
 echo '{"session_id":"s1","prompt":"/guard:turn on"}' | "$H" toggle
 echo '{"session_id":"s1","last_assistant_message":"Redis is always faster than Postgres.","stop_hook_active":false}' | "$H" stop
+
+# switch to subagent mode: Stop injects a guardian-dispatch instruction, no block
+echo '{"session_id":"s1","prompt":"/guard:mode subagent"}' | "$H" set-mode
+echo '{"session_id":"s1","last_assistant_message":"done","stop_hook_active":false}' | "$H" stop
+# → hookSpecificOutput.additionalContext with turn_file/verified_file/dispatcher, no `decision`
+
+# guardian records a passed turn's facts (single writer both modes share)
+echo '{"session_id":"s1","seq":1,"claims":[{"claim":"x","evidence":"y"}]}' | "$H" record-verified
 ```
 
-The `user-prompt` and `stop` subcommands spawn a real `claude` judge, so they need
-a working CLI and network/auth. The `gate`, `toggle`, and session subcommands are
-deterministic and need neither.
+The `user-prompt` and headless `stop` subcommands spawn a real `claude` judge, so
+they need a working CLI and network/auth. The `gate`, `toggle`, `set-mode`,
+subagent-mode `stop`, `record-verified`, and session subcommands are deterministic
+and need neither.
