@@ -15,13 +15,13 @@
     ],
     "UserPromptExpansion": [
       {
-        "matcher": "turn",
+        "matcher": "(guard:)?turn",
         "hooks": [
           {
             "type": "command",
             "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/guard_hook.py\" toggle",
             "timeout": 5,
-            "description": "Toggle the session's evidence judge."
+            "description": "Toggle guard for the session."
           }
         ]
       }

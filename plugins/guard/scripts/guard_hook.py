@@ -29,7 +29,7 @@ Subcommands
 - session-start  SessionStart. Sweep state and log files older than retention.
 
 State lives project-local under ``${CLAUDE_PROJECT_DIR}/.claude/guard/``:
-- ``state/<sid>.json``       — {enabled, approved, updated_at}
+- ``state/<sid>.json``       — {enabled, approved, skip_stop_once, updated_at}
 - ``sessions/<sid>.jsonl``   — one record per turn / judge verdict
 - ``trace.log``              — file-only debug trace (enabled by GUARD_TRACE)
 
@@ -187,6 +187,7 @@ def _read_state(project_dir: Path, session_id: str, config: dict[str, Any]) -> d
     default = {
         "enabled": bool(config.get("enabled", True)),
         "approved": False,
+        "skip_stop_once": False,
         "updated_at": None,
     }
     path = _state_file(project_dir, session_id)
@@ -198,7 +199,8 @@ def _read_state(project_dir: Path, session_id: str, config: dict[str, Any]) -> d
         return default
     if not isinstance(data, dict):
         return default
-    default.update({k: data[k] for k in ("enabled", "approved", "updated_at") if k in data})
+    keys = ("enabled", "approved", "skip_stop_once", "updated_at")
+    default.update({k: data[k] for k in keys if k in data})
     return default
 
 
@@ -502,7 +504,10 @@ def cmd_toggle() -> int:
         state["enabled"] = True
     elif arg == "off":
         state["enabled"] = False
-    # no arg → report only; leave state unchanged
+    # no arg → report only; leave enabled unchanged
+    # This turn is a guard control command, not real work — exempt its response
+    # from the Stop evidence judge (the toggle confirmation carries no claims).
+    state["skip_stop_once"] = True
     _write_state(project_dir, session_id, state)
 
     msg = "guard is {} for this session (evidence judge + approval gate).".format(
@@ -579,6 +584,14 @@ def cmd_stop() -> int:
     config = _load_config(project_dir)
     state = _read_state(project_dir, session_id, config)
     if not state["enabled"] or not response.strip():
+        return 0
+
+    # A `turn` control command set this: skip the judge for its confirmation turn,
+    # then clear the flag so the next real turn is judged normally.
+    if state.get("skip_stop_once") is True:
+        state["skip_stop_once"] = False
+        _write_state(project_dir, session_id, state)
+        _trace(project_dir, session_id, "stop", "skip_once")
         return 0
 
     judge_input = (
