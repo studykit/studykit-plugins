@@ -72,26 +72,31 @@ the approval gate together. Toggle it per session with the `turn` skill:
 /guard:turn         # report the current state
 ```
 
+Add `--project` to set the session-start default instead of the current session — e.g.
+`/guard:turn --project off` writes `enabled: false` to `.claude/guard.local.json`
+without changing this session. `--global` is reserved for a future user-level default.
+
 ### Review modes
 
 The evidence review can run two ways. Switch per session with the `mode` skill:
 
 ```
-/guard:mode headless     # in-hook review that blocks the turn (default)
-/guard:mode subagent      # dispatch the guardian subagent to review in-session
-/guard:mode               # report the current mode
+/guard:mode subagent     # dispatch the guardian subagent to review in-session (default)
+/guard:mode headless     # in-hook review that blocks the turn
+/guard:mode              # report the current mode
 ```
 
-- **headless** (default) — the review runs as a separate, hidden `claude` check and
-  **blocks** the turn until unsupported claims are grounded or resolvable deferrals
-  are resolved.
-- **subagent** — instead of blocking, guard asks the assistant to dispatch a
-  `guardian` subagent that reviews the finished turn in your session (so you can see
-  it), reports anything it finds for the assistant to fix, and remembers the facts
-  that passed. Both modes apply the same checks; this one keeps the review visible
-  and reuses your main model.
+- **subagent** (default) — guard asks the assistant to dispatch a `guardian` subagent
+  that reviews the finished turn in your session (so you can see it), reports anything
+  it finds for the assistant to fix, and remembers the facts that passed. It does not
+  block; it runs on the `guardian` agent's own model (Haiku by default).
+- **headless** — the review runs as a separate, hidden `claude` check and **blocks**
+  the turn until unsupported claims are grounded or resolvable deferrals are resolved.
+  Both modes apply the same checks.
 
-Set the session-start default with the `mode` key in configuration (below).
+Set the session-start default with the `mode` key in configuration (below), or
+interactively with `/guard:mode --project <mode>` (writes the default without changing
+the current session). `--global` is reserved for a future user-level default.
 
 ### The approval gate
 
@@ -118,22 +123,23 @@ Configuration is optional. Create `.claude/guard.local.json` in your project:
   "model": "haiku",
   "effort": "medium",
   "enabled": true,
-  "mode": "headless",
+  "mode": "subagent",
   "exempt_skills": ["deep-research", "hindsight:review"]
 }
 ```
 
 | Key | Meaning | Default |
 | --- | --- | --- |
-| `model` | Model the evidence review runs on | `"haiku"` |
-| `effort` | Review reasoning effort (`low`/`medium`/`high`/`xhigh`/`max`) | `"medium"` |
+| `model` | Model the **headless** review runs on | `"haiku"` |
+| `effort` | **Headless** review reasoning effort (`low`/`medium`/`high`/`xhigh`/`max`) | `"medium"` |
 | `enabled` | Session-start default for guard (evidence judge + approval gate) | `true` |
-| `mode` | Session-start review mode (`headless`/`subagent`, see [Review modes](#review-modes)) | `"headless"` |
+| `mode` | Session-start review mode (`headless`/`subagent`, see [Review modes](#review-modes)) | `"subagent"` |
 | `exempt_skills` | Skills / slash commands whose turn the review skips, named `plugin:skill` (leading `/` and case ignored) | `[]` |
 
-`model` and `effort` apply to the **headless** review; the **subagent** review runs
-on the `guardian` agent's own model. The evidence review always reads your repository
-to verify cited claims. A `guard.local.json.example` file ships with the plugin as a
+`model` and `effort` apply to the **headless** review only; the **subagent** review
+runs on the `guardian` agent's own model and effort (Haiku / medium by default, set in
+the agent definition). The evidence review always reads your repository to verify cited
+claims. A `guard.local.json.example` file ships with the plugin as a
 starting point.
 
 Use `exempt_skills` for skills or slash commands whose output is a report or a relay

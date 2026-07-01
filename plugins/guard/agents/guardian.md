@@ -3,7 +3,8 @@ name: guardian
 description: |
   Audits a completed assistant turn for evidence grounding. Reads a turn record that guard sliced from the transcript for you (user request, tool activity, assistant response), verifies load-bearing technical claims and resolvable deferrals against the repository, records the confirmed claims as verified facts on a pass, and reports any violations back to the main session. Dispatched by guard's Stop hook in subagent mode. Never edits files.
 tools: Read, Grep, Glob, Bash
-model: opus
+model: haiku
+effort: medium
 color: red
 ---
 

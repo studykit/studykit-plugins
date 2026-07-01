@@ -42,6 +42,14 @@ changing anything that depends on them.
   as evidence and **does not judge** a turn whose slice contains a `!` command:
   `_read_turn_from_transcript` sets `has_user_command` and `cmd_stop` skips
   (`skip_user_command`).
+- **A background-agent completion opens its own transcript turn** (`origin.kind ==
+  "task-notification"`, `promptSource: "system"`, NOT `isMeta`; verified 2.1.197). In
+  subagent mode auditing one loops endlessly — the guardian dispatch is itself a
+  background task, so its completion re-dispatches the guardian. `cmd_stop` skips these
+  (`skip_task_notification`) from BOTH archive and judge; the skip must precede
+  `_append_log`, and `_append_log` must stay ahead of the `stop_hook_active` check (so a
+  corrected response after a headless block is still archived). Do not regress that
+  order. Mechanism/why is in the `cmd_stop` comment.
 - **A Stop hook may inject `additionalContext` without `decision`** and the
   conversation continues — the subagent-dispatch mechanism.
   `stop_hook_active: true` ⇒ guard already blocked this turn; Stop returns at once.
@@ -63,6 +71,14 @@ changing anything that depends on them.
   via Bash). That CLI edits ONLY `exempt_skills` — never `enabled`/`mode`/state — so it
   can narrow the judge's coverage but cannot disable guard or touch the gate. Guard's
   config stays blocked from the Write/Edit tools (`_is_guard_owned`).
+- **`/guard:turn` and `/guard:mode` take a `--project` / `--global` scope flag.** No flag
+  sets the live session (`toggle`/`set-mode` write `state/`); `--project` writes the
+  session-start default (`enabled` / `mode`) to guard.local.json — that one key only, the
+  live session untouched; `--global` is reserved (reported unsupported). These hooks may
+  write config (unlike the gated Write/Edit tools) yet stay safe: they fire ONLY on a
+  user-typed slash command via UserPromptExpansion, which the model cannot invoke — so
+  `--project` cannot let the model disable or weaken guard. `_scope_of` parses the flag;
+  `_write_config` edits only the one key.
 - **Gate exemptions** (unapproved writes that still pass): (1) `.claude/guard/refs/`
   — the evidence-first store, scoped to `refs/` ONLY; (2) **outside the project dir**
   (`_is_outside_project`) — e.g. the session scratchpad under `/private/tmp`, which
