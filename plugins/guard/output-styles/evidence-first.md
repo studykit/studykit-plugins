@@ -1,6 +1,7 @@
 ---
 name: Evidence-First
 description: Require every technical claim to carry its evidence, and mark unverified statements as assumptions rather than facts.
+keep-coding-instructions: true
 force-for-plugin: true
 ---
 
