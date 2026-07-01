@@ -45,13 +45,14 @@ from issue.providers import (
     ProviderContext,
     ProviderRequest,
 )
+from mustread import GITHUB_TYPE_LABEL_NAMES
 
 
 _FRONTMATTER_HANDLER = frontmatter_lib.YAMLHandler()
 
-_GITHUB_TYPE_LABELS = frozenset(
-    {"task", "bug", "spike", "epic", "review", "usecase", "research"}
-)
+# Derived from the canonical spec in mustread so the membership set used by
+# set-type/publish never drifts from the labels setup creates and records.
+_GITHUB_TYPE_LABELS = GITHUB_TYPE_LABEL_NAMES
 
 _CACHE_FETCH_POLICIES = (CACHE_POLICY_DEFAULT, CACHE_POLICY_REFRESH)
 
@@ -289,6 +290,48 @@ class GitHubIssueBackend:
             return 2
 
         print(json.dumps(payload, indent=2, sort_keys=False), file=stdout)
+        return 0
+
+    # ------------------------------------------------------------------
+    # labels
+    # ------------------------------------------------------------------
+
+    def add_labels_args(self, parser: argparse.ArgumentParser) -> None:
+        parser.add_argument(
+            "--json",
+            action="store_true",
+            help="emit the configured labels as JSON instead of a table",
+        )
+
+    def run_labels(
+        self,
+        args: argparse.Namespace,
+        *,
+        config: WorkflowConfig,
+        runner: CommandRunner | None,
+        stdout: TextIO,
+        stderr: TextIO,
+    ) -> int:
+        labels = _configured_github_labels(config)
+        if args.json:
+            print(json.dumps({"labels": labels}, indent=2, sort_keys=False), file=stdout)
+            return 0
+        if not labels:
+            print(
+                "No labels are recorded in .spectrack/config.yml "
+                "(providers.issues.settings.labels). Re-run setup's "
+                "ensure-github-labels step to populate them.",
+                file=stdout,
+            )
+            return 0
+        width = max(len(str(label.get("name", ""))) for label in labels)
+        for label in labels:
+            name = str(label.get("name", ""))
+            color = str(label.get("color", ""))
+            description = str(label.get("description", ""))
+            suffix = f"  {description}" if description else ""
+            color_col = f"#{color}" if color else ""
+            print(f"{name.ljust(width)}  {color_col.ljust(7)}{suffix}".rstrip(), file=stdout)
         return 0
 
     # ------------------------------------------------------------------
@@ -1420,6 +1463,29 @@ class GitHubIssueBackend:
             )
         )
         return flatten_provider_envelope(response.payload, project=config.root)
+
+
+def _configured_github_labels(config: WorkflowConfig) -> list[dict[str, str]]:
+    """Return the labels recorded under providers.issues.settings.labels."""
+
+    raw = config.issues.settings.get("labels")
+    if not isinstance(raw, list):
+        return []
+    labels: list[dict[str, str]] = []
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        name = str(item.get("name") or "").strip()
+        if not name:
+            continue
+        labels.append(
+            {
+                "name": name,
+                "color": str(item.get("color") or "").strip(),
+                "description": str(item.get("description") or "").strip(),
+            }
+        )
+    return labels
 
 
 def _replace_github_type_label(labels: set[str], workflow_type: str) -> set[str]:

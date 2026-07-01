@@ -345,6 +345,71 @@ def edit_issue(
     return {"operation": operation, "issue": issue_number, "verified": verify}
 
 
+_LABEL_LIST_LIMIT = 1000
+
+
+def list_labels(
+    repo: GitHubRepository,
+    *,
+    project: Path,
+    runner: CommandRunner | None = None,
+) -> list[dict[str, str]]:
+    """Return the repository's labels with name, color, and description.
+
+    Used by setup to skip labels that already exist and to record the merged
+    label set into ``.spectrack/config.yml``.
+    """
+
+    result = _gh(
+        [
+            "label",
+            "list",
+            "--repo",
+            repo.slug,
+            "--json",
+            "name,color,description",
+            "--limit",
+            str(_LABEL_LIST_LIMIT),
+        ],
+        project=project,
+        runner=runner,
+    )
+    labels: list[dict[str, str]] = []
+    for item in _loads_json_items(result.stdout, "gh label list"):
+        if not isinstance(item, dict):
+            continue
+        name = str(item.get("name") or "").strip()
+        if not name:
+            continue
+        labels.append(
+            {
+                "name": name,
+                "color": str(item.get("color") or "").strip(),
+                "description": str(item.get("description") or "").strip(),
+            }
+        )
+    return labels
+
+
+def create_label(
+    repo: GitHubRepository,
+    name: str,
+    *,
+    color: str = "",
+    description: str = "",
+    project: Path,
+    runner: CommandRunner | None = None,
+) -> None:
+    """Create a repository label via ``gh label create``."""
+
+    args = ["label", "create", name, "--repo", repo.slug]
+    if color:
+        args.extend(["--color", color])
+    if description:
+        args.extend(["--description", description])
+    _gh(args, project=project, runner=runner)
+
+
 def get_github_login(
     *,
     project: Path,

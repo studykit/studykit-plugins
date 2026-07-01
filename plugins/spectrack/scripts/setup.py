@@ -46,7 +46,15 @@ from config import (  # noqa: E402
     validate_provider_for_role,
 )
 from env import workflow_project_dir_from_env  # noqa: E402
-from issue.github.gh import GitHubRepositoryError, parse_github_remote_url  # noqa: E402
+from issue.github.gh import (  # noqa: E402
+    GitHubRepository,
+    GitHubRepositoryError,
+    create_label,
+    list_labels,
+    parse_github_remote_url,
+    resolve_github_repository,
+)
+from mustread import GITHUB_TYPE_LABEL_SPECS  # noqa: E402
 from prd_path import PrdPathError, normalize_prd_path  # noqa: E402
 from issue.jira.client import (  # noqa: E402
     jira_data_center_createmeta_path,
@@ -114,6 +122,128 @@ def probe_git_remote(
         "owner": repo.owner,
         "repo": repo.name,
         "slug": repo.slug,
+    }
+
+
+def _resolve_github_repo_for_labels(
+    project: Path,
+    *,
+    repo: str | None,
+    host: str | None,
+    runner: CommandRunner | None,
+) -> GitHubRepository:
+    """Resolve the GitHub repository for label operations.
+
+    Prefers an explicit ``owner/repo`` slug (optionally with ``--host``), then
+    falls back to the project's configured repo or Git remote.
+    """
+
+    if repo:
+        value = repo.strip()
+        if value.startswith(("http://", "https://", "ssh://", "git@")):
+            return parse_github_remote_url(value)
+        parts = value.strip("/").split("/")
+        if len(parts) == 3 and not host:
+            resolved_host, owner, name = parts
+        elif len(parts) == 2:
+            resolved_host = host or "github.com"
+            owner, name = parts
+        else:
+            raise WorkflowSetupError(
+                f"invalid --repo slug: {repo!r}; expected owner/repo"
+            )
+        if not owner or not name:
+            raise WorkflowSetupError(
+                f"invalid --repo slug: {repo!r}; expected owner/repo"
+            )
+        return GitHubRepository(host=resolved_host, owner=owner, name=name.removesuffix(".git"))
+    try:
+        return resolve_github_repository(project, runner=runner)
+    except GitHubRepositoryError as exc:
+        raise WorkflowSetupError(
+            f"could not resolve a GitHub repository for label setup: {exc}; "
+            "pass --repo owner/repo"
+        ) from exc
+
+
+def ensure_github_labels(
+    project: Path,
+    *,
+    repo: str | None = None,
+    host: str | None = None,
+    runner: CommandRunner | None = None,
+) -> dict[str, Any]:
+    """Create missing canonical issue-type labels and return the merged set.
+
+    Fetches the repository's current labels, creates any canonical
+    ``GITHUB_TYPE_LABEL_SPECS`` label that is absent (case-insensitive), and
+    returns the merged label set (repo labels win on name collision so user
+    customizations are preserved) for recording into ``.spectrack/config.yml``.
+    """
+
+    repository = _resolve_github_repo_for_labels(
+        project, repo=repo, host=host, runner=runner
+    )
+    try:
+        existing = list_labels(repository, project=project, runner=runner)
+    except WorkflowCommandError as exc:
+        raise WorkflowSetupError(
+            f"could not list GitHub labels for {repository.slug}: {exc}"
+        ) from exc
+
+    existing_by_lower: dict[str, dict[str, str]] = {}
+    for label in existing:
+        existing_by_lower.setdefault(label["name"].lower(), label)
+
+    actions: list[dict[str, str]] = []
+    for spec in GITHUB_TYPE_LABEL_SPECS:
+        name = spec["name"]
+        if name.lower() in existing_by_lower:
+            actions.append({"name": name, "action": "skip"})
+            continue
+        try:
+            create_label(
+                repository,
+                name,
+                color=spec.get("color", ""),
+                description=spec.get("description", ""),
+                project=project,
+                runner=runner,
+            )
+        except WorkflowCommandError as exc:
+            raise WorkflowSetupError(
+                f"could not create GitHub label {name!r} in {repository.slug}: {exc}"
+            ) from exc
+        created = {
+            "name": name,
+            "color": spec.get("color", ""),
+            "description": spec.get("description", ""),
+        }
+        existing_by_lower[name.lower()] = created
+        actions.append({"name": name, "action": "create"})
+
+    # Merge: repo labels (post-create) win on name collision; canonical specs
+    # fill in any label that is somehow still absent. Order canonical labels
+    # first, then remaining repo labels, both deduped by lowercase name.
+    merged: list[dict[str, str]] = []
+    seen: set[str] = set()
+    for spec in GITHUB_TYPE_LABEL_SPECS:
+        key = spec["name"].lower()
+        label = existing_by_lower.get(key, dict(spec))
+        merged.append(dict(label))
+        seen.add(key)
+    for label in existing:
+        key = label["name"].lower()
+        if key not in seen:
+            merged.append(dict(label))
+            seen.add(key)
+
+    return {
+        "operation": "ensure_github_labels",
+        "repo": repository.slug,
+        "host": repository.host,
+        "actions": actions,
+        "labels": merged,
     }
 
 
@@ -357,6 +487,7 @@ def build_config(
     github_wiki_host: str | None = None,
     github_wiki_path: str | None = None,
     github_wiki_prd_path: str | None = None,
+    github_labels: Sequence[Mapping[str, str]] | None = None,
     jira_site: str | None = None,
     jira_deployment: str | None = "data_center",
     jira_api_version: str | None = "2",
@@ -406,6 +537,7 @@ def build_config(
         issue_provider,
         github_repo=github_repo or probed_repo,
         github_host=issue_github_host,
+        github_labels=github_labels,
         jira_site=jira_site,
         jira_deployment=jira_deployment,
         jira_api_version=jira_api_version,
@@ -823,6 +955,14 @@ def build_parser() -> argparse.ArgumentParser:
     probe.add_argument("--remote", default="origin", help="git remote name")
     probe.add_argument("--require", action="store_true", help="fail when no GitHub remote can be detected")
 
+    ensure_labels = subparsers.add_parser(
+        "ensure-github-labels",
+        help="create missing canonical issue-type labels in the GitHub repo and return the merged label set",
+    )
+    ensure_labels.add_argument("--project", type=Path, default=workflow_project_dir_from_env(), help="project path")
+    ensure_labels.add_argument("--repo", help="GitHub repository slug owner/repo; resolved from config or git remote when omitted")
+    ensure_labels.add_argument("--host", help="GitHub host when it differs from github.com")
+
     profile = subparsers.add_parser("profile-from-docs", help="extract setup defaults from provider profile docs")
     profile.add_argument("paths", nargs="*", type=Path, help="profile document paths")
     profile.add_argument("--stdin", action="store_true", help="read an additional provider profile from stdin")
@@ -928,6 +1068,8 @@ def main(argv: list[str] | None = None, *, stdout: Any = sys.stdout, stderr: Any
 def _dispatch(args: argparse.Namespace) -> dict[str, Any]:
     if args.command == "probe-git-remote":
         return probe_git_remote(args.project, remote=args.remote)
+    if args.command == "ensure-github-labels":
+        return ensure_github_labels(args.project, repo=args.repo, host=args.host)
     if args.command == "profile-from-docs":
         stdin_text = sys.stdin.read() if args.stdin else None
         return profile_from_docs(args.paths, stdin_text=stdin_text)
@@ -997,6 +1139,16 @@ def _add_config_build_args(parser: argparse.ArgumentParser) -> None:
             "Must not be absolute and must not contain '..'."
         ),
     )
+    parser.add_argument(
+        "--github-label",
+        action="append",
+        default=[],
+        help="repeatable GitHub issue label as name[:color[:description]] (writes providers.issues.settings.labels)",
+    )
+    parser.add_argument(
+        "--github-labels-json",
+        help="JSON array of GitHub label objects {name,color,description}; or a file path when it names one",
+    )
     parser.add_argument("--jira-site", help="Jira Data Center or Server base URL")
     parser.add_argument("--jira-deployment", default="data_center", help="Jira deployment; Cloud is unsupported")
     parser.add_argument("--jira-api-version", default="2", help="Jira REST API version")
@@ -1057,6 +1209,7 @@ def _config_from_args(args: argparse.Namespace) -> dict[str, Any]:
         github_wiki_host=args.github_wiki_host,
         github_wiki_path=args.github_wiki_path,
         github_wiki_prd_path=args.github_wiki_prd_path,
+        github_labels=_github_labels_from_args(args),
         jira_site=args.jira_site,
         jira_deployment=args.jira_deployment,
         jira_api_version=args.jira_api_version,
@@ -1107,6 +1260,7 @@ def _issue_provider_config(
     *,
     github_repo: str | None,
     github_host: str | None,
+    github_labels: Sequence[Mapping[str, str]] | None = None,
     jira_site: str | None,
     jira_deployment: str | None,
     jira_api_version: str | None,
@@ -1123,6 +1277,9 @@ def _issue_provider_config(
     if provider == "github":
         _set_if_text(settings, "repo", github_repo)
         _set_if_text(settings, "host", github_host)
+        normalized_labels = _normalize_github_labels(github_labels)
+        if normalized_labels:
+            settings["labels"] = normalized_labels
     elif provider == "jira":
         _set_if_text(settings, "site", jira_site)
         _set_if_text(settings, "deployment", jira_deployment or "data_center")
@@ -1666,6 +1823,72 @@ def _jira_state_transitions_from_args(args: argparse.Namespace) -> dict[str, str
             )
         transitions[verb] = transition_name
     return transitions or None
+
+
+def _normalize_github_labels(
+    labels: Sequence[Mapping[str, str]] | None,
+) -> list[dict[str, str]]:
+    """Coerce label inputs into an ordered list of {name, color, description}.
+
+    Deduplicates by case-insensitive name, keeping the first occurrence. Only a
+    non-empty ``name`` is required; ``color``/``description`` are optional.
+    """
+
+    if not labels:
+        return []
+    result: list[dict[str, str]] = []
+    seen: set[str] = set()
+    for raw in labels:
+        if not isinstance(raw, Mapping):
+            raise WorkflowSetupError("each GitHub label must be a mapping with a name")
+        name = _text(raw.get("name"))
+        if not name:
+            raise WorkflowSetupError("GitHub label requires a non-empty name")
+        key = name.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        entry: dict[str, str] = {"name": name}
+        _set_if_text(entry, "color", _text(raw.get("color")))
+        _set_if_text(entry, "description", _text(raw.get("description")))
+        result.append(entry)
+    return result
+
+
+def _github_labels_from_args(args: argparse.Namespace) -> list[dict[str, str]]:
+    labels: list[dict[str, str]] = []
+    raw_json = getattr(args, "github_labels_json", None)
+    if raw_json:
+        text = raw_json
+        candidate = Path(raw_json)
+        if candidate.exists():
+            text = candidate.read_text(encoding="utf-8")
+        try:
+            parsed = json.loads(text)
+        except json.JSONDecodeError as exc:
+            raise WorkflowSetupError(f"invalid --github-labels-json: {exc}") from exc
+        if not isinstance(parsed, list):
+            raise WorkflowSetupError("--github-labels-json must be a JSON array of label objects")
+        for item in parsed:
+            if not isinstance(item, Mapping):
+                raise WorkflowSetupError("--github-labels-json entries must be objects")
+            labels.append(dict(item))
+    for spec in getattr(args, "github_label", []) or []:
+        labels.append(_parse_github_label_spec(spec))
+    return _normalize_github_labels(labels)
+
+
+def _parse_github_label_spec(value: str) -> dict[str, str]:
+    parts = value.split(":", 2)
+    name = parts[0].strip()
+    if not name:
+        raise WorkflowSetupError(f"--github-label requires a name: {value!r}")
+    label: dict[str, str] = {"name": name}
+    if len(parts) >= 2 and parts[1].strip():
+        label["color"] = parts[1].strip()
+    if len(parts) == 3 and parts[2].strip():
+        label["description"] = parts[2].strip()
+    return label
 
 
 def _jira_epic_fields_from_args(args: argparse.Namespace) -> dict[str, str] | None:
