@@ -19,6 +19,10 @@ Subcommands
                  flag — the one switch for BOTH the evidence judge and approval gate.
 - set-mode       UserPromptExpansion (matcher ``(guard:)?mode``). Set the session's
                  ``mode`` (``headless``|``subagent``) for the Stop-time evidence judge.
+- exempt         CLI (argv), run by the ``guard:exempt`` skill via Bash after the user
+                 confirms an interactive selection. ``list``/``set``/``add``/
+                 ``remove``/``clear`` the ``exempt_skills`` config key — that key ONLY,
+                 never ``enabled``/``mode``/state. Not a hook event.
 - gate           PreToolUse. When guard is enabled, for the file-editing tools
                  (Write/Edit/MultiEdit/NotebookEdit), deny with a reason to seek
                  explicit user approval unless the session is approved. On a deny it
@@ -224,7 +228,7 @@ def _read_payload() -> dict | None:
 _SESSION_ID_RE = re.compile(r"^[A-Za-z0-9._-]+$")
 # guard's own control commands, e.g. "/guard:turn on", "/turn off",
 # "/guard:mode subagent". These are handled by UserPromptExpansion, not real turns.
-_CONTROL_CMD_RE = re.compile(r"^/(guard:)?(turn|mode)\b", re.IGNORECASE)
+_CONTROL_CMD_RE = re.compile(r"^/(guard:)?(turn|mode|exempt)\b", re.IGNORECASE)
 # In the transcript, a slash command is expanded to
 # "<command-name>/guard:turn</command-name>" (see session b30dbaec). Pull the command
 # name out of that tag; a raw typed form ("/guard:turn on") is handled by the fallback
@@ -287,8 +291,16 @@ def _turn_command_name(user_text: str) -> str:
 
 def _is_control_command_name(name: str) -> bool:
     """True when a normalized command name is one of guard's own control commands
-    (``turn``/``mode``, with or without the ``guard:`` prefix)."""
+    (``turn``/``mode``/``exempt``, with or without the ``guard:`` prefix)."""
     return bool(name) and bool(_CONTROL_CMD_RE.match("/" + name))
+
+
+def _norm_skill(name: Any) -> str:
+    """Normalize a skill / command name for storage and matching: leading '/' stripped,
+    lowercased, plugin namespace (``plugin:skill``) preserved. '' if not a usable str."""
+    if not isinstance(name, str):
+        return ""
+    return name.strip().lstrip("/").lower()
 
 
 def _exempt_skills(config: dict[str, Any]) -> set[str]:
@@ -299,11 +311,7 @@ def _exempt_skills(config: dict[str, Any]) -> set[str]:
     raw = config.get("exempt_skills", [])
     if not isinstance(raw, list):
         return set()
-    return {
-        c.strip().lstrip("/").lower()
-        for c in raw
-        if isinstance(c, str) and c.strip()
-    }
+    return {n for n in (_norm_skill(c) for c in raw) if n}
 
 
 def _read_turn_from_transcript(transcript_path: Any, prompt_id: Any) -> dict[str, Any] | None:
@@ -458,6 +466,33 @@ def _load_config(project_dir: Path) -> dict[str, Any]:
         if key in data and isinstance(data[key], type(default)):
             config[key] = data[key]
     return config
+
+
+def _load_raw_config(project_dir: Path) -> dict[str, Any]:
+    """Read guard.local.json as a raw dict (unmerged, no defaults applied), or {} if
+    missing/malformed. Used by the exempt CLI so it can edit ``exempt_skills`` in place
+    while preserving every other key the user has set."""
+    path = project_dir / CONFIG_REL
+    if not path.is_file():
+        return {}
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError, ValueError):
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def _write_config(project_dir: Path, data: dict[str, Any]) -> bool:
+    """Atomically write guard.local.json. Returns True on success."""
+    path = project_dir / CONFIG_REL
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.parent / (path.name + ".tmp")
+        tmp.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        tmp.replace(path)
+        return True
+    except OSError:
+        return False
 
 
 def _read_state(project_dir: Path, session_id: str, config: dict[str, Any]) -> dict[str, Any]:
@@ -1039,9 +1074,11 @@ def _is_guard_owned(project_dir: Path, target: Path) -> bool:
     These must never ride the git-ignore exemption: `.claude/guard/` is itself
     git-ignored, so without this exclusion the model could `Write`
     `state/<sid>.json` to arm its own approval, or edit `guard.local.json` to turn
-    the judge off / add `exempt_skills`. (`refs/` is the one deliberate hole and has
-    its own explicit allow, checked before this.) Fail toward guard-owned (safe: no
-    exemption) if the paths can't be resolved.
+    the judge off / change `mode`. (`refs/` is the one deliberate hole and has its own
+    explicit allow, checked before this. The `exempt_skills` list is managed only
+    through the `exempt` CLI — see `cmd_exempt` — which touches that one key and never
+    `enabled`/`mode`/state, so it can weaken the judge's coverage but not disable the
+    gate.) Fail toward guard-owned (safe: no exemption) if the paths can't be resolved.
     """
     try:
         state_root = _state_root(project_dir).resolve()
@@ -1373,6 +1410,73 @@ def cmd_session_start() -> int:
     return 0
 
 
+def cmd_exempt() -> int:
+    """Manage the ``exempt_skills`` list in guard.local.json. Invoked by the
+    ``guard:exempt`` skill via Bash, AFTER the user has confirmed a selection
+    interactively (the skill drives the listing + AskUserQuestion; this only records
+    the confirmed result). Argv:
+
+        exempt list                — print the current exempt_skills
+        exempt set   NAME [NAME…]  — replace the list with exactly these
+        exempt add   NAME [NAME…]  — add
+        exempt remove NAME [NAME…] — remove
+        exempt clear               — empty the list
+
+    Edits ONLY the ``exempt_skills`` key — never ``enabled`` / ``mode`` / state — so it
+    can change which skills' turns the Stop judge skips but cannot disable guard or
+    touch the approval gate. Project dir from ``CLAUDE_PROJECT_DIR`` (Bash env), else
+    the current working directory. Prints the resulting list for the skill to relay.
+    """
+    argv = sys.argv[2:]
+    op = argv[0].lower() if argv else "list"
+    names = [n for n in (_norm_skill(a) for a in argv[1:]) if n]
+
+    pd_env = os.environ.get("CLAUDE_PROJECT_DIR")
+    project_dir = Path(pd_env) if pd_env else Path.cwd()
+
+    raw = _load_raw_config(project_dir)
+    cur_raw = raw.get("exempt_skills")
+    current: list[str] = []
+    if isinstance(cur_raw, list):
+        for c in cur_raw:
+            n = _norm_skill(c)
+            if n and n not in current:
+                current.append(n)
+
+    changed = False
+    if op == "set":
+        new: list[str] = []
+        for n in names:
+            if n not in new:
+                new.append(n)
+        changed = new != current
+        current = new
+    elif op == "add":
+        for n in names:
+            if n not in current:
+                current.append(n)
+                changed = True
+    elif op in ("remove", "rm"):
+        for n in names:
+            if n in current:
+                current.remove(n)
+                changed = True
+    elif op == "clear":
+        changed = bool(current)
+        current = []
+    # "list" / unknown → report only
+
+    if changed:
+        raw["exempt_skills"] = current
+        if not _write_config(project_dir, raw):
+            print("guard exempt: failed to write .claude/guard.local.json", file=sys.stderr)
+            return 0
+
+    print("exempt_skills: " + (", ".join(current) if current else "(none)"))
+    _trace(project_dir, None, "exempt", op, n=len(current), changed=changed)
+    return 0
+
+
 SUBCOMMANDS = {
     "user-prompt": cmd_user_prompt,
     "toggle": cmd_toggle,
@@ -1381,6 +1485,7 @@ SUBCOMMANDS = {
     "record-verified": cmd_record_verified,
     "stop": cmd_stop,
     "session-start": cmd_session_start,
+    "exempt": cmd_exempt,
 }
 
 

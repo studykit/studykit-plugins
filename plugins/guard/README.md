@@ -142,6 +142,15 @@ plugin namespace**: `hindsight:review`, `guard:turn`, or a bare name for an
 un-namespaced skill like `deep-research`. guard's own `/guard:turn` and `/guard:mode`
 are always exempt.
 
+You don't have to edit the file by hand. Run `/guard:exempt` and guard shows the
+skills available in your session, lets you pick which to exempt, and records your
+choice into `exempt_skills` for you:
+
+```
+/guard:exempt                 # pick from the list interactively
+/guard:exempt hindsight:review  # start with a skill already in mind
+```
+
 ## Logs
 
 guard keeps records under `.claude/guard/` in your project: a full session

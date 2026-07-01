@@ -9,11 +9,12 @@ in `../AGENTS.md`. The source (`scripts/guard_hook.py`) is the truth for control
 
 | Event | Subcommand | Role |
 | --- | --- | --- |
-| `UserPromptSubmit` | `user-prompt` | Update approval state. Ignores `/guard:turn` / `/guard:mode`. |
+| `UserPromptSubmit` | `user-prompt` | Update approval state. Ignores `/guard:turn` / `/guard:mode` / `/guard:exempt`. |
 | `UserPromptExpansion` (matcher `(guard:)?turn`) | `toggle` | Flip session `enabled` (judge + gate). |
 | `UserPromptExpansion` (matcher `(guard:)?mode`) | `set-mode` | Set session `mode` (`headless`\|`subagent`). |
 | `PreToolUse` (`Write\|Edit\|MultiEdit\|NotebookEdit`) | `gate` | Deny file edits until approved. |
 | (called via Bash, not a hook) | `record-verified` | Guardian appends a passed turn's claims to the verified store. |
+| (called via Bash, not a hook) | `exempt` | `guard:exempt` skill records the user's confirmed `exempt_skills` selection (that key only). |
 | `Stop` | `stop` | Audit the turn (headless judge / subagent dispatch). |
 | `SessionStart` | `session-start` | Age-sweep state/sessions/verified/turns. |
 
@@ -98,8 +99,10 @@ age-based `SessionStart` sweep is the only reaper. There is no SessionEnd hook.
   **Guard's own config + state are excluded from the git-ignore exemption**
   (`_is_guard_owned`): `.claude/guard/` is itself git-ignored, so without this the model
   could `Write` `state/<sid>.json` to arm its own approval or edit `guard.local.json`
-  to disable the judge / add `exempt_skills`. refs/ is the one deliberate hole and is
-  checked first. Failing to resolve a path ⇒ treated as guard-owned (no exemption).
+  to disable the judge / change `mode`. refs/ is the one deliberate hole and is checked
+  first. Failing to resolve a path ⇒ treated as guard-owned (no exemption). (`exempt_skills`
+  is edited only via the `exempt` CLI — that one key, never `enabled`/`mode`/state — so
+  it can narrow the judge's coverage but not disable the gate.)
 - **Gated turns aren't audited.** A gate denial records `gated_prompt_id`; Stop skips
   that turn (its response is a plan/approval request, not claims to ground). A new
   turn has a new prompt_id, so the flag self-expires.
@@ -112,7 +115,9 @@ Parsed by `_load_config`; fail-open to defaults. Keys: `model` (default `"haiku"
 (list of strings, default `[]`) — skills / slash commands whose turn the Stop judge
 skips, named with their plugin namespace (`plugin:skill`, e.g. `guard:turn`) or bare
 for un-namespaced skills, matched leading-`/`-stripped and case-insensitively (guard's
-own `turn`/`mode` control commands are always exempt regardless). Only keys whose value matches the
+own `turn`/`mode`/`exempt` control commands are always exempt regardless). Manage
+`exempt_skills` interactively with the `guard:exempt` skill (lists session skills →
+AskUserQuestion → records via the `exempt` CLI); no need to hand-edit. Only keys whose value matches the
 default's type are honored (a malformed value can't flip a flag); unknown keys ignored;
 missing/malformed file → all defaults. `guard.local.json.example`
 ships at the plugin root. The judge always reads the repo (`--allowedTools
