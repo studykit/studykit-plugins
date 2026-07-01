@@ -57,6 +57,12 @@ changing anything that depends on them.
   any skill/command listed in the `exempt_skills` config key (default `[]`), named with
   its plugin namespace (`plugin:skill`) — a user-invoked skill reaches the transcript
   as a namespaced `<command-name>` just like a command. Both modes honor it.
+- **`exempt_skills` is managed by the `guard:exempt` skill**, not by hand. The skill
+  lists the session's available skills, takes the user's choice via `AskUserQuestion`,
+  and records it through the `exempt` CLI subcommand (`guard_hook.py exempt set …`, run
+  via Bash). That CLI edits ONLY `exempt_skills` — never `enabled`/`mode`/state — so it
+  can narrow the judge's coverage but cannot disable guard or touch the gate. Guard's
+  config stays blocked from the Write/Edit tools (`_is_guard_owned`).
 - **Gate exemptions** (unapproved writes that still pass): (1) `.claude/guard/refs/`
   — the evidence-first store, scoped to `refs/` ONLY; (2) **git-ignored** targets
   (`git check-ignore`) — scratch/temp, local config `**/*.local.*`, skill docs like
