@@ -1,5 +1,5 @@
 {
-  "description": "guard hooks. Logic lives in `scripts/guard_hook.py`; see `dev/AGENTS.md` for the design.",
+  "description": "guard hooks. Logic lives in `scripts/guard_hook.py`; see `dev/design.md` for the design.",
   "hooks": {
     "UserPromptSubmit": [
       {
@@ -46,18 +46,6 @@
             "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/guard_hook.py\" gate",
             "timeout": 10,
             "description": "Gate file-mutating tools on the approval state."
-          }
-        ]
-      }
-    ],
-    "PostToolUse": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/guard_hook.py\" post-tool",
-            "timeout": 10,
-            "description": "Record this turn's tool commands and output as evidence."
           }
         ]
       }
