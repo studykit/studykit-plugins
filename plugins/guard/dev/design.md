@@ -85,18 +85,22 @@ age-based `SessionStart` sweep is the only reaper. There is no SessionEnd hook.
   arrive later than the claims it supports, and cannot be judged coherently in that
   turn. `_read_turn_from_transcript` flags the turn (`has_user_command`) and `cmd_stop`
   skips it (`skip_user_command`); the `!` records are never collected or rendered.
-- **The gate runs no judge** (so PreToolUse stays fast); its only subprocess is one
-  `git check-ignore` for the exemption below (5s timeout, fail-toward-gating). It gates
-  only `MUTATING_TOOLS`; Bash and reads/searches always pass.
-- **Two exemptions, both narrow.** The gate lets an unapproved write through only when:
+- **The gate runs no judge** (so PreToolUse stays fast); its only subprocess is at most
+  one `git check-ignore` for exemption 3 below (5s timeout, fail-toward-gating). It
+  gates only `MUTATING_TOOLS`; Bash and reads/searches always pass.
+- **Three exemptions, all narrow.** The gate lets an unapproved write through only when:
   1. **refs/** — the target resolves inside `.claude/guard/refs/` (the evidence-first
      style tells the assistant to save cited docs there — guard must not forbid its own
      required behavior). Both paths `resolve()`d so `..` can't escape.
-  2. **git-ignored** — `git check-ignore` reports the target ignored: scratch/temp,
-     local config (`**/*.local.*`), skill-authored docs (`/handoff` → `.handover/`).
-     These aren't the user's tracked project source, so gating them is pure friction.
-     `git check-ignore` honors the global gitignore too.
-  **Guard's own config + state are excluded from the git-ignore exemption**
+  2. **outside the project dir** (`_is_outside_project`) — not under `CLAUDE_PROJECT_DIR`
+     (e.g. the session scratchpad under `/private/tmp`). Not project source, and Bash
+     can already write there ungated, so gating the file-edit tools is pure friction.
+     `git check-ignore` can't classify an out-of-repo path, so this is a separate check
+     (and skips the subprocess).
+  3. **git-ignored** inside the repo — `git check-ignore` reports the target ignored:
+     scratch/temp, local config (`**/*.local.*`), skill-authored docs (`/handoff` →
+     `.handover/`). Honors the global gitignore too.
+  **Guard's own config + state are excluded from exemptions 2–3**
   (`_is_guard_owned`): `.claude/guard/` is itself git-ignored, so without this the model
   could `Write` `state/<sid>.json` to arm its own approval or edit `guard.local.json`
   to disable the judge / change `mode`. refs/ is the one deliberate hole and is checked

@@ -64,11 +64,13 @@ changing anything that depends on them.
   can narrow the judge's coverage but cannot disable guard or touch the gate. Guard's
   config stays blocked from the Write/Edit tools (`_is_guard_owned`).
 - **Gate exemptions** (unapproved writes that still pass): (1) `.claude/guard/refs/`
-  — the evidence-first store, scoped to `refs/` ONLY; (2) **git-ignored** targets
+  — the evidence-first store, scoped to `refs/` ONLY; (2) **outside the project dir**
+  (`_is_outside_project`) — e.g. the session scratchpad under `/private/tmp`, which
+  Bash can already write ungated; (3) **git-ignored** targets inside the repo
   (`git check-ignore`) — scratch/temp, local config `**/*.local.*`, skill docs like
-  `/handoff` → `.handover/`; not tracked project source. Guard's OWN config
+  `/handoff` → `.handover/`. None are tracked project source. Guard's OWN config
   (`.claude/guard.local.json`) + state tree (`.claude/guard/`) are **excluded** from
-  the git-ignore exemption (`_is_guard_owned`) — both are git-ignored, so without the
+  (2)–(3) (`_is_guard_owned`) — they live in-repo and are git-ignored, so without the
   exclusion the model could `Write` `state/` to self-arm or edit `guard.local.json` to
   disable the judge. All paths `resolve()`d; `git check-ignore` fails toward gating.
 

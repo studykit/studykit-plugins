@@ -102,11 +102,12 @@ Approval sticks with the current task: questions, refinements, corrections, and
 follow-ups on the same work keep it in place. The gate only re-locks when you clearly
 move on to a different, unrelated task — at which point you approve that one afresh.
 
-The gate only guards your **tracked project source**. Writes to git-ignored paths are
-never blocked — scratch and temp files, local config (`*.local.*`), and skill-authored
-output such as a handoff document written to an ignored `.handover/`. (guard's own
-config and state are the one exception: they stay protected even though they're
-git-ignored, so nothing can quietly disable the guard.)
+The gate only guards your **tracked project source**. Writes elsewhere are never
+blocked — anything outside your project directory (such as scratch files under the
+temp dir), and git-ignored paths inside it: scratch and temp files, local config
+(`*.local.*`), and skill-authored output such as a handoff document written to an
+ignored `.handover/`. (guard's own config and state are the one exception: they stay
+protected even though they're git-ignored, so nothing can quietly disable the guard.)
 
 ## Configuration
 
