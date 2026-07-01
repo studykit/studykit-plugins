@@ -20,6 +20,7 @@ Useful commands:
 
 ```bash
 spectrack setup.py probe-git-remote --project <project-root>
+spectrack setup.py ensure-github-labels --project <project-root> [--repo <owner/repo>] [--host <host>]
 spectrack setup.py profile-from-docs <profile-docs...>
 spectrack setup.py capabilities --issue-provider <provider> --knowledge-provider <provider>
 spectrack setup.py jira-relationship-inspect --jira-site <url> --issue <KEY>
@@ -80,15 +81,24 @@ spectrack config.py --project <project-root> --require
    `!git-event`, pass each one with
    `--jira-snapshot-hidden-comment-marker`.
 8. Collect the commit reference style.
-9. Run `capabilities` for the selected providers and show limitations before
+9. For GitHub issue providers, after the `owner/repo` slug is settled and
+   before `build-config`, run `ensure-github-labels` to create any missing
+   canonical issue-type labels (`task`, `bug`, `spike`, `epic`, `review`,
+   `usecase`, `research`) in the repository. Existing labels are skipped, not
+   overwritten. Show the user the created/skipped result, then pass the
+   returned merged `labels` set into `build-config` via `--github-labels-json`
+   (the command emits a JSON `labels` array) so the written config records the
+   full label set under `providers.issues.settings.labels`. Skip this step for
+   `jira` and `filesystem` issue providers.
+10. Run `capabilities` for the selected providers and show limitations before
    confirmation.
-10. Run `build-config`, show the generated YAML and warnings to the user, and
+11. Run `build-config`, show the generated YAML and warnings to the user, and
    ask for explicit confirmation before writing.
-11. After confirmation, write with `write --config <reviewed-yaml-file>`. The
+12. After confirmation, write with `write --config <reviewed-yaml-file>`. The
    write step also installs SpecTrack Codex agent roles. Tell Codex users to
    restart Codex before using newly installed roles. Then verify with
    `config.py --require`.
-12. `write` also records the configured knowledge folder under a
+13. `write` also records the configured knowledge folder under a
    `## SpecTrack Knowledge` section in `<project-root>/AGENTS.md`
    (auto-created when missing) and creates `<project-root>/CLAUDE.md`
    as a `@AGENTS.md` shim if absent. The generated section records the
@@ -102,6 +112,12 @@ spectrack config.py --project <project-root> --require
   slug. When the issue repository is not on `github.com`, use
   `--github-issue-host`; use `--github-host` only as a shared fallback when the
   issue and knowledge repositories are on the same GitHub host.
+- GitHub issue setup pre-creates the canonical issue-type labels via
+  `ensure-github-labels` (skip-existing, never overwrite) and records the merged
+  repository label set into `providers.issues.settings.labels`. This runs only
+  for the `github` issue provider and requires an authenticated `gh`. The
+  recorded labels are viewable at runtime with `spectrack issue labels`. It is
+  a separate step from `build-config`/`write`, which stay usable offline.
 - Always pass explicit `--issue-provider` and `--knowledge-provider` values to
   `build-config` or `write` when building config from options. Missing provider
   flags mean setup is incomplete; ask for the provider choice before continuing.

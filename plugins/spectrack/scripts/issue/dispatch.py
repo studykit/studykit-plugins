@@ -25,6 +25,7 @@ Verb mapping
 ``resume ...``                  ``RESUME`` with ``[...]``
 ``attach ...``                  ``ATTACH`` with ``[...]`` (Jira only)
 ``link ...``                    ``RELATIONSHIPS`` with ``[...]``
+``labels ...``                  ``LABELS`` with ``[...]`` (GitHub only)
 ``state <ref> <target> [opts]`` ``FIELDS`` with ``[<target>, <ref>, ...]``
 ``assign <ref> <user>``         ``FIELDS`` with ``["assign", <ref>, <user>]``
 ``unassign <ref>``              ``FIELDS`` with ``["unassign", <ref>]``
@@ -85,6 +86,7 @@ RELATIONSHIPS = IntentSpec(
 )
 FIELDS = IntentSpec("issue fields", "add_fields_args", "run_fields", state_verbs=True)
 ATTACH = IntentSpec("issue attach", "add_attach_args", "run_attach", require_jira=True)
+LABELS = IntentSpec("issue labels", "add_labels_args", "run_labels")
 
 
 def run_intent(
@@ -142,6 +144,17 @@ def run_intent(
         print(f"{spec.label} error: {exc}", file=err)
         return 2
 
+    # Some intents are provider-scoped (e.g. `labels` is GitHub-only). When the
+    # active backend does not implement the intent, refuse cleanly rather than
+    # raising an AttributeError.
+    if not hasattr(backend, spec.add_args) or not hasattr(backend, spec.run):
+        print(
+            f"{spec.label} error: the {config.issues.kind} issue provider does "
+            "not support this command",
+            file=err,
+        )
+        return 2
+
     parser = argparse.ArgumentParser(prog="issue")
     parser.add_argument(
         "--project",
@@ -172,31 +185,33 @@ def run_intent(
     )
 
 
-# (verb, one-line description, jira_only). Verbs flagged jira_only are
-# listed by `issue --help` only when the configured provider is Jira.
-_VERB_HELP: tuple[tuple[str, str, bool], ...] = (
-    ("new", "create a new issue", False),
-    ("update", "update title / body / labels / state", False),
-    ("fetch", "fetch one or more issues into the cache", False),
-    ("search", "search issues with the backend's native query", False),
-    ("comment", "append or update a comment from a body file", False),
-    ("resume", "find the current Resume comment for an issue", False),
-    ("attach", "add/get issue file attachments", True),
-    ("link", "add / remove / replace relationships", False),
-    ("state", "change lifecycle state (e.g. `state <ref> close`)", False),
-    ("assign", "assign an issue to a user (e.g. `assign <ref> me`)", False),
-    ("unassign", "clear all assignees (e.g. `unassign <ref>`)", False),
-    ("set-type", "swap the workflow type label (e.g. `set-type <ref> bug`)", False),
+# (verb, one-line description, only). ``only`` scopes the verb to a single
+# provider in `issue --help`: None lists it for every provider, "jira" or
+# "github" list it only when the configured provider matches.
+_VERB_HELP: tuple[tuple[str, str, str | None], ...] = (
+    ("new", "create a new issue", None),
+    ("update", "update title / body / labels / state", None),
+    ("fetch", "fetch one or more issues into the cache", None),
+    ("search", "search issues with the backend's native query", None),
+    ("comment", "append or update a comment from a body file", None),
+    ("resume", "find the current Resume comment for an issue", None),
+    ("attach", "add/get issue file attachments", "jira"),
+    ("link", "add / remove / replace relationships", None),
+    ("labels", "list configured issue-type labels", "github"),
+    ("state", "change lifecycle state (e.g. `state <ref> close`)", None),
+    ("assign", "assign an issue to a user (e.g. `assign <ref> me`)", None),
+    ("unassign", "clear all assignees (e.g. `unassign <ref>`)", None),
+    ("set-type", "swap the workflow type label (e.g. `set-type <ref> bug`)", None),
 )
 
-_VERBS = tuple(name for name, _desc, _jira_only in _VERB_HELP)
+_VERBS = tuple(name for name, _desc, _only in _VERB_HELP)
 
 
 def _build_usage(provider: str | None) -> str:
     rows = [
         (name, desc)
-        for name, desc, jira_only in _VERB_HELP
-        if not jira_only or provider == "jira"
+        for name, desc, only in _VERB_HELP
+        if only is None or provider == only
     ]
     width = max(len(name) for name, _desc in rows)
     verb_lines = "".join(f"  {name.ljust(width)}   {desc}\n" for name, desc in rows)
@@ -280,6 +295,8 @@ def main(
         return run_intent(ATTACH, rest, **kwargs)
     if verb == "link":
         return run_intent(RELATIONSHIPS, rest, **kwargs)
+    if verb == "labels":
+        return run_intent(LABELS, rest, **kwargs)
     if verb == "state":
         return _run_state(rest, kwargs=kwargs, stderr=err)
     if verb in {"assign", "unassign", "set-type"}:

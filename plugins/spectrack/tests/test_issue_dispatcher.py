@@ -38,13 +38,16 @@ from issue.dispatch import (  # noqa: E402
     DRAFTS,
     FETCH,
     FIELDS,
+    LABELS,
     RELATIONSHIPS,
     SEARCH,
     WRITEBACK,
+    main as issue_main,
     run_intent,
 )
 
 issue_attach_main = partial(run_intent, ATTACH)
+issue_labels_main = partial(run_intent, LABELS)
 issue_comments_main = partial(run_intent, COMMENTS)
 issue_drafts_main = partial(run_intent, DRAFTS)
 issue_fetch_main = partial(run_intent, FETCH)
@@ -425,3 +428,74 @@ def test_attach_add_under_jira_rejects_missing_file(tmp_path: Path) -> None:
     )
     assert code == 2
     assert "does not exist" in err
+
+
+# ---------------------------------------------------------------------------
+# labels: GitHub-only verb
+# ---------------------------------------------------------------------------
+
+
+_GITHUB_CONFIG_WITH_LABELS = """
+version: 1
+providers:
+  issues:
+    kind: github
+    repo: studykit/studykit-plugins
+    labels:
+    - name: task
+      color: 1d76db
+      description: SpecTrack task issue
+    - name: bug
+      color: d73a4a
+      description: SpecTrack bug issue
+  knowledge:
+    kind: github
+issue_id_format: github
+"""
+
+
+def test_top_usage_lists_labels_under_github_only(tmp_path: Path) -> None:
+    _write_config(tmp_path, _GITHUB_CONFIG)
+    code, stdout, _ = _capture_help(issue_main, ["--help", "--project", str(tmp_path)])
+    assert code == 0
+    assert "labels" in stdout
+    # attach is Jira-only and stays hidden under GitHub.
+    assert "attach" not in stdout
+
+
+def test_top_usage_hides_labels_under_jira(tmp_path: Path) -> None:
+    _write_config(tmp_path, _JIRA_CONFIG)
+    code, stdout, _ = _capture_help(issue_main, ["--help", "--project", str(tmp_path)])
+    assert code == 0
+    assert "attach" in stdout
+    # labels is GitHub-only and stays hidden under Jira.
+    for line in stdout.splitlines():
+        assert not line.strip().startswith("labels")
+
+
+def test_labels_lists_configured_labels(tmp_path: Path) -> None:
+    _write_config(tmp_path, _GITHUB_CONFIG_WITH_LABELS)
+    code, stdout, _ = _capture_help(issue_labels_main, ["--project", str(tmp_path)])
+    assert code == 0
+    assert "task" in stdout
+    assert "bug" in stdout
+    assert "#1d76db" in stdout
+
+
+def test_labels_json_shape(tmp_path: Path) -> None:
+    import json as _json
+
+    _write_config(tmp_path, _GITHUB_CONFIG_WITH_LABELS)
+    code, stdout, _ = _capture_help(
+        issue_labels_main, ["--project", str(tmp_path), "--json"]
+    )
+    assert code == 0
+    payload = _json.loads(stdout)
+    assert [label["name"] for label in payload["labels"]] == ["task", "bug"]
+
+
+def test_labels_under_jira_is_refused(tmp_path: Path) -> None:
+    _write_config(tmp_path, _JIRA_CONFIG)
+    code, _, err = _capture_help(issue_labels_main, ["--project", str(tmp_path)])
+    assert code == 2
+    assert "does not support this command" in err

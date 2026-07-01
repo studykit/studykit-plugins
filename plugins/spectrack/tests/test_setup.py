@@ -36,6 +36,7 @@ from setup import (  # noqa: E402
     build_config_payload,
     build_jira_relationship_mappings,
     derive_state_transition_verb,
+    ensure_github_labels,
     format_config_yaml,
     install_codex_agents,
     inspect_jira_relationships,
@@ -45,6 +46,7 @@ from setup import (  # noqa: E402
     provider_capabilities,
     write_config,
 )
+from mustread import GITHUB_TYPE_LABEL_SPECS  # noqa: E402
 
 
 def _fixture(name: str) -> dict[str, Any]:
@@ -1249,3 +1251,130 @@ def _marketplace_entry(marketplace: dict[str, Any], name: str) -> dict[str, Any]
         if entry["name"] == name:
             return entry
     raise AssertionError(f"missing marketplace entry: {name}")
+
+
+def _github_label_runner(
+    existing: list[dict[str, str]],
+    *,
+    created: list[str],
+    expected_slug: str = "acme/widgets",
+) -> Any:
+    """Fake gh runner for label list/create, recording created label names."""
+
+    def runner(request: CommandRequest) -> CommandResult:
+        args = list(request.args)
+        if args[:3] == ["gh", "label", "list"]:
+            assert "--repo" in args and args[args.index("--repo") + 1] == expected_slug
+            return CommandResult(request=request, returncode=0, stdout=json.dumps(existing))
+        if args[:3] == ["gh", "label", "create"]:
+            created.append(args[3])
+            return CommandResult(request=request, returncode=0, stdout="")
+        return CommandResult(request=request, returncode=127, stderr=f"unexpected: {args}")
+
+    return runner
+
+
+def test_ensure_github_labels_creates_missing_and_skips_existing(tmp_path: Path) -> None:
+    created: list[str] = []
+    existing = [
+        {"name": "task", "color": "111111", "description": ""},
+        {"name": "wontfix", "color": "222222", "description": "won't fix"},
+    ]
+    payload = ensure_github_labels(
+        tmp_path,
+        repo="acme/widgets",
+        runner=_github_label_runner(existing, created=created),
+    )
+
+    canonical = [spec["name"] for spec in GITHUB_TYPE_LABEL_SPECS]
+    # task pre-exists; everything else canonical is created.
+    assert created == [name for name in canonical if name != "task"]
+    actions = {entry["name"]: entry["action"] for entry in payload["actions"]}
+    assert actions["task"] == "skip"
+    assert actions["bug"] == "create"
+    assert payload["repo"] == "acme/widgets"
+
+
+def test_ensure_github_labels_all_present_is_noop(tmp_path: Path) -> None:
+    created: list[str] = []
+    existing = [
+        {"name": spec["name"], "color": spec["color"], "description": spec["description"]}
+        for spec in GITHUB_TYPE_LABEL_SPECS
+    ]
+    payload = ensure_github_labels(
+        tmp_path,
+        repo="acme/widgets",
+        runner=_github_label_runner(existing, created=created),
+    )
+
+    assert created == []
+    assert all(entry["action"] == "skip" for entry in payload["actions"])
+
+
+def test_ensure_github_labels_skips_case_insensitively(tmp_path: Path) -> None:
+    created: list[str] = []
+    existing = [{"name": "Bug", "color": "ff0000", "description": "existing bug"}]
+    payload = ensure_github_labels(
+        tmp_path,
+        repo="acme/widgets",
+        runner=_github_label_runner(existing, created=created),
+    )
+
+    assert "bug" not in created and "Bug" not in created
+    actions = {entry["name"]: entry["action"] for entry in payload["actions"]}
+    assert actions["bug"] == "skip"
+    # Repo's customized Bug label wins in the merged set (color/description kept).
+    merged = {label["name"]: label for label in payload["labels"]}
+    assert merged["Bug"]["color"] == "ff0000"
+    assert merged["Bug"]["description"] == "existing bug"
+
+
+def test_ensure_github_labels_merged_set_includes_repo_extras(tmp_path: Path) -> None:
+    created: list[str] = []
+    existing = [{"name": "wontfix", "color": "222222", "description": "won't fix"}]
+    payload = ensure_github_labels(
+        tmp_path,
+        repo="acme/widgets",
+        runner=_github_label_runner(existing, created=created),
+    )
+
+    names = [label["name"] for label in payload["labels"]]
+    # Canonical labels come first, then non-canonical repo labels.
+    assert names[: len(GITHUB_TYPE_LABEL_SPECS)] == [
+        spec["name"] for spec in GITHUB_TYPE_LABEL_SPECS
+    ]
+    assert "wontfix" in names
+
+
+def test_build_config_records_github_labels(tmp_path: Path) -> None:
+    raw = build_config(
+        project=tmp_path,
+        issue_provider="github",
+        knowledge_provider="github",
+        github_repo="acme/widgets",
+        github_wiki_path="wiki/widgets",
+        github_labels=[
+            {"name": "task", "color": "1d76db", "description": "SpecTrack task issue"},
+            {"name": "bug"},
+        ],
+    )
+
+    labels = raw["providers"]["issues"].get("labels")
+    assert labels == [
+        {"name": "task", "color": "1d76db", "description": "SpecTrack task issue"},
+        {"name": "bug"},
+    ]
+    # Config still round-trips through the loader.
+    parse_workflow_config(raw, path=tmp_path / ".spectrack" / "config.yml")
+
+
+def test_build_config_omits_labels_when_not_provided(tmp_path: Path) -> None:
+    raw = build_config(
+        project=tmp_path,
+        issue_provider="github",
+        knowledge_provider="github",
+        github_repo="acme/widgets",
+        github_wiki_path="wiki/widgets",
+    )
+
+    assert "labels" not in raw["providers"]["issues"]

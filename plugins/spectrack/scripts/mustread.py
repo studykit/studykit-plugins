@@ -40,6 +40,24 @@ ALL_TYPES = ISSUE_TYPES | KNOWLEDGE_TYPES | DUAL_TYPES
 AUTHORING_SCOPES = {"content", "comment"}
 REVIEW_TARGETS = ALL_TYPES - {"review"}
 
+# Canonical GitHub issue-type labels, ordered. Each issue carries exactly one
+# of these labels; setup pre-creates any that are missing in the repository and
+# records the merged label set into .spectrack/config.yml. This is the single
+# source of truth for the type-label vocabulary and its color/description
+# metadata — GitHub membership checks derive their name set from here.
+GITHUB_TYPE_LABEL_SPECS: tuple[dict[str, str], ...] = (
+    {"name": "task", "color": "1d76db", "description": "SpecTrack task issue"},
+    {"name": "bug", "color": "d73a4a", "description": "SpecTrack bug issue"},
+    {"name": "spike", "color": "5319e7", "description": "SpecTrack spike issue"},
+    {"name": "epic", "color": "a2eeef", "description": "SpecTrack epic issue"},
+    {"name": "review", "color": "0e8a16", "description": "SpecTrack review issue"},
+    {"name": "usecase", "color": "fbca04", "description": "SpecTrack use case issue"},
+    {"name": "research", "color": "bfdadc", "description": "SpecTrack research issue"},
+)
+GITHUB_TYPE_LABEL_NAMES: frozenset[str] = frozenset(
+    spec["name"] for spec in GITHUB_TYPE_LABEL_SPECS
+)
+
 PRD_COMPONENT_TYPES = {"context", "usecase", "nfr", "spec", "domain"}
 
 DECOMPOSITION_TYPES = {"task", "epic"}
