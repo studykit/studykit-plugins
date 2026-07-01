@@ -24,11 +24,10 @@ guard adds three layers of control over the assistant's responses and actions:
    you are left alone. The review runs as a separate check, so it adds some latency
    and model usage to each turn.
 
-3. **Approval gate** — guard blocks file-changing actions (Write/Edit and
-   workspace-mutating shell commands) until you have given an explicit instruction
-   to implement, in your own words. Discussion, planning, and questions never count
-   as approval — only your message can grant it. Read-only and search actions are
-   never blocked.
+3. **Approval gate** — guard blocks the file-editing tools (Write/Edit/MultiEdit/
+   NotebookEdit) until you have given an explicit instruction to implement, in your
+   own words. Discussion, planning, and questions never count as approval — only
+   your message can grant it. Shell commands, reads, and searches are never blocked.
 
 Both the evidence judge and the approval gate are governed by one on/off switch
 (on by default), toggled per session with the `turn` skill (see below).

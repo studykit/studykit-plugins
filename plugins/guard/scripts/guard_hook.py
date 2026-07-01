@@ -16,12 +16,11 @@ Subcommands
 - toggle         UserPromptExpansion (matcher ``turn``). Read the on/off argument
                  from the raw ``prompt`` and set the session's ``enabled`` flag —
                  the single switch for BOTH the evidence judge and the approval gate.
-- gate           PreToolUse. When guard is enabled, for file-mutating tools
-                 (Write/Edit/MultiEdit/NotebookEdit and workspace-mutating Bash),
-                 deny with a reason to seek explicit user approval unless the session
-                 is approved. Reads state only — no judge call, so it is fast and
-                 deterministic. Non-mutating Bash and all read/search tools are never
-                 matched by the hook and always pass.
+- gate           PreToolUse. When guard is enabled, for the file-editing tools
+                 (Write/Edit/MultiEdit/NotebookEdit), deny with a reason to seek
+                 explicit user approval unless the session is approved. Reads state
+                 only — no judge call, so it is fast and deterministic. Bash and all
+                 read/search tools are never matched by the hook and always pass.
 - stop           Stop. Append the assistant turn (from ``last_assistant_message``)
                  to the session log. If guard is enabled and ``stop_hook_active`` is
                  false, judge the response on two axes and block when a load-bearing
@@ -78,22 +77,9 @@ DEFAULT_CONFIG: dict[str, Any] = {
 
 VALID_EFFORTS = {"low", "medium", "high", "xhigh", "max"}
 
+# Tools the approval gate blocks before approval. Bash is intentionally NOT gated:
+# guard only guards the dedicated file-editing tools, and lets shell commands run.
 MUTATING_TOOLS = {"Write", "Edit", "MultiEdit", "NotebookEdit"}
-
-# Bash commands that change the workspace. Conservative denylist: Bash is allowed
-# by default (read/inspection commands must never be blocked); only a command that
-# clearly mutates files or version-control state is gated. Word-boundary anchored
-# so substrings inside paths/args do not trip it.
-_MUTATING_BASH_PATTERNS = [
-    r">>?",                              # output redirection
-    r"\brm\b", r"\brmdir\b", r"\bmv\b", r"\bcp\b",
-    r"\btouch\b", r"\bmkdir\b", r"\btee\b", r"\btruncate\b", r"\bln\b",
-    r"\bsed\b[^|]*\s-\w*i", r"\bperl\b[^|]*\s-\w*i",  # in-place edits
-    r"\bgit\s+(add|commit|push|reset|checkout|restore|rm|mv|merge|rebase|apply|stash|clean|tag)\b",
-    r"\b(npm|pnpm|yarn|pip|pipx|uv|cargo|go|gem|brew|apt|apt-get)\s+(install|add|remove|uninstall|publish|update|upgrade)\b",
-    r"\b(chmod|chown|dd|mkfs|shred)\b",
-]
-_MUTATING_BASH_RE = re.compile("|".join(_MUTATING_BASH_PATTERNS))
 
 
 # --------------------------------------------------------------------------- #
@@ -542,8 +528,7 @@ def cmd_gate() -> int:
         return 0
 
     tool_name = payload.get("tool_name")
-    tool_input = payload.get("tool_input") if isinstance(payload.get("tool_input"), dict) else {}
-    if not _is_mutating(tool_name, tool_input):
+    if not _is_mutating(tool_name):
         return 0
 
     if state["approved"]:
@@ -569,14 +554,8 @@ def cmd_gate() -> int:
     return 0
 
 
-def _is_mutating(tool_name: Any, tool_input: dict) -> bool:
-    if tool_name in MUTATING_TOOLS:
-        return True
-    if tool_name == "Bash":
-        command = tool_input.get("command")
-        if isinstance(command, str) and _MUTATING_BASH_RE.search(command):
-            return True
-    return False
+def _is_mutating(tool_name: Any) -> bool:
+    return tool_name in MUTATING_TOOLS
 
 
 def cmd_stop() -> int:

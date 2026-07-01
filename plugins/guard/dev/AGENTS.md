@@ -93,11 +93,9 @@ location is sufficient for discovery.
   its session-start default is the config `enabled` key. When off, `cmd_gate`,
   `cmd_stop`, and the approval-classifier in `cmd_user_prompt` all early-return.
 - The gate reads state only (no judge call) so PreToolUse stays fast and
-  deterministic. Non-mutating Bash and all read/search tools are never matched.
-- Mutating-Bash detection is a conservative denylist (`_MUTATING_BASH_RE`):
-  redirection, `rm/mv/cp/mkdir/...`, in-place `sed -i`/`perl -i`, mutating `git`
-  subcommands, package-manager installs, and permission/disk ops. Inspection
-  commands must never match.
+  deterministic. It gates only the file-editing tools in `MUTATING_TOOLS`
+  (Write/Edit/MultiEdit/NotebookEdit). Bash is intentionally NOT gated — shell
+  commands, reads, and searches always pass.
 
 ## State & logs
 
