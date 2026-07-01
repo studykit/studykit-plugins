@@ -28,7 +28,7 @@ payload fields; there is no Codex path.
 | Event | Subcommand | Role |
 | --- | --- | --- |
 | `UserPromptSubmit` | `user-prompt` | Log the user turn; update approval state. |
-| `UserPromptExpansion` (matcher `turn`) | `toggle` | Flip the session `enabled` flag (judge + gate). |
+| `UserPromptExpansion` (matcher `(guard:)?turn`) | `toggle` | Flip the session `enabled` flag (judge + gate). |
 | `PreToolUse` (`Write\|Edit\|MultiEdit\|NotebookEdit\|Bash`) | `gate` | Deny file-mutating tools until approved. |
 | `Stop` | `stop` | Log the assistant turn; run the evidence judge when armed. |
 | `SessionStart` | `session-start` | Sweep state/log files past retention. |
@@ -45,11 +45,13 @@ change behavior that depends on them, re-verify against the current runtime.
 - **`stop_hook_active: true`** means guard already blocked once this turn — the
   Stop subcommand returns immediately to avoid a block loop.
 - **UserPromptSubmit** carries the user's text in `prompt`.
-- **UserPromptExpansion** fires on a skill/command invocation with `command_name`
-  (bare name, e.g. `turn`), `command_source`, and the raw `prompt`. The `turn`
-  toggle is detected here (matcher on the bare `command_name` `turn`, verified
-  empirically — not `guard:turn`), not in UserPromptSubmit — UserPromptSubmit is
-  not a reliable place to hook skill invocations.
+- **UserPromptExpansion** fires on a skill/command invocation with `command_name`,
+  `command_source`, and the raw `prompt`. The matcher runs against `command_name`.
+  For a plugin skill the name is **namespaced**: invoking `/guard:turn` sends
+  `command_name = "guard:turn"` (verified empirically with `--plugin-dir`), NOT the
+  bare `turn`. A project-level skill would send the bare name. So the matcher is
+  `(guard:)?turn` to catch both. Detecting the toggle here (not in UserPromptSubmit)
+  is required — UserPromptSubmit is not a reliable place to hook skill invocations.
 - **UserPromptExpansion `additionalContext`** is delivered to the model (verified:
   a `hookSpecificOutput.additionalContext` string surfaces as a
   `<system-reminder>` in the model's context). That is how the `turn` toggle's
@@ -92,6 +94,10 @@ location is sufficient for discovery.
   (Stop) and the approval gate (UserPromptSubmit + PreToolUse). `turn` flips it;
   its session-start default is the config `enabled` key. When off, `cmd_gate`,
   `cmd_stop`, and the approval-classifier in `cmd_user_prompt` all early-return.
+- A `turn` invocation is a guard control command, not real work, so its response
+  is exempt from the evidence judge: `cmd_toggle` sets `skip_stop_once` in state,
+  and the next `cmd_stop` clears it and returns without judging. One-shot, so the
+  following real turn is judged normally.
 - The gate reads state only (no judge call) so PreToolUse stays fast and
   deterministic. It gates only the file-editing tools in `MUTATING_TOOLS`
   (Write/Edit/MultiEdit/NotebookEdit). Bash is intentionally NOT gated — shell
@@ -101,7 +107,7 @@ location is sufficient for discovery.
 
 Project-local under `${CLAUDE_PROJECT_DIR}/.claude/guard/`:
 
-- `state/<sid>.json` — `{enabled, approved, updated_at}` (atomic write via
+- `state/<sid>.json` — `{enabled, approved, skip_stop_once, updated_at}` (atomic write via
   temp + `replace`).
 - `sessions/<sid>.jsonl` — one record per user/assistant turn, gate change, and
   judge verdict.
