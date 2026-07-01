@@ -1,0 +1,41 @@
+{
+  "description": "claude-web-console hooks: mirror the live conversation to the local web UI. Every hook is best-effort and no-ops silently when the server is not running; none write to stdout, so the conversation is never affected.",
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/user_prompt.py\"",
+            "timeout": 5,
+            "description": "Mirror the user prompt to the web console."
+          }
+        ]
+      }
+    ],
+    "MessageDisplay": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/message_display.py\"",
+            "timeout": 5,
+            "description": "Stream assistant text deltas to the web console."
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/stop.py\"",
+            "timeout": 5,
+            "description": "Signal turn end to the web console."
+          }
+        ]
+      }
+    ]
+  }
+}

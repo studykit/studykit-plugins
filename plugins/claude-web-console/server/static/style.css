@@ -1,0 +1,114 @@
+:root {
+  --bg: #1e1e22;
+  --panel: #26262b;
+  --user: #2d3b4d;
+  --text: #e6e6e6;
+  --muted: #9a9aa2;
+  --accent: #7aa2f7;
+  --error: #f7768e;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.55;
+}
+
+header {
+  position: sticky;
+  top: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  padding: 0.6rem 1rem;
+  background: var(--panel);
+  border-bottom: 1px solid #000;
+  z-index: 10;
+}
+
+header h1 {
+  font-size: 1rem;
+  margin: 0;
+}
+
+.status {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+.status.ok {
+  color: #9ece6a;
+}
+.status.err {
+  color: var(--error);
+}
+
+#log {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 1rem;
+}
+
+.msg {
+  margin: 0 0 1rem;
+  padding: 0.75rem 1rem;
+  border-radius: 10px;
+  background: var(--panel);
+}
+.msg.user {
+  background: var(--user);
+}
+
+.role {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  margin-bottom: 0.35rem;
+}
+
+.body :first-child {
+  margin-top: 0;
+}
+.body :last-child {
+  margin-bottom: 0;
+}
+.msg.user .body {
+  white-space: pre-wrap;
+}
+
+pre,
+.code {
+  background: #16161a;
+  padding: 0.75rem;
+  border-radius: 8px;
+  overflow-x: auto;
+}
+code {
+  font-family: "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.9em;
+}
+
+a {
+  color: var(--accent);
+}
+
+.render {
+  margin: 0.5rem 0;
+  overflow-x: auto;
+}
+.render.plantuml img {
+  max-width: 100%;
+  background: #fff;
+  border-radius: 6px;
+}
+.render-error {
+  color: var(--error);
+  font-size: 0.85rem;
+  font-style: italic;
+}
