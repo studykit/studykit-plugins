@@ -2,6 +2,6 @@
   "model": "haiku",
   "effort": "medium",
   "enabled": true,
-  "mode": "headless",
+  "mode": "subagent",
   "exempt_skills": ["deep-research", "hindsight:review"]
 }

@@ -17,8 +17,14 @@ Subcommands
 - toggle         UserPromptExpansion (matcher ``(guard:)?turn``). Read the on/off
                  argument from the raw ``prompt`` and set the session's ``enabled``
                  flag — the one switch for BOTH the evidence judge and approval gate.
+                 A ``--project`` flag instead writes the session-start default
+                 (``enabled``) to guard.local.json (that key only, not the live session);
+                 ``--global`` is reserved (reported unsupported).
 - set-mode       UserPromptExpansion (matcher ``(guard:)?mode``). Set the session's
                  ``mode`` (``headless``|``subagent``) for the Stop-time evidence judge.
+                 A ``--project`` flag instead writes the session-start default (``mode``)
+                 to guard.local.json (that key only, not the live session); ``--global``
+                 is reserved (reported unsupported).
 - exempt         CLI (argv), run by the ``guard:exempt`` skill via Bash after the user
                  confirms an interactive selection. ``list``/``set``/``add``/
                  ``remove``/``clear`` the ``exempt_skills`` config key — that key ONLY,
@@ -74,19 +80,20 @@ expired only by the age-based sweep at SessionStart (see ORPHAN_MAX_AGE_SECONDS)
 Configuration (optional) is a JSON object at
 ``${CLAUDE_PROJECT_DIR}/.claude/guard.local.json``: ``model`` (string, default
 ``"haiku"``), ``effort`` (one of low/medium/high/xhigh/max, default ``"medium"``
-— the judge's reasoning effort), ``enabled`` (bool, default ``true``) — the
-session-start value of the single master switch that turns BOTH the evidence judge
-and the approval gate on or off, and ``mode`` (``"headless"``|``"subagent"``,
-default ``"headless"``) — how the Stop-time evidence judge runs (in-hook headless
-judge vs. dispatch the ``guardian`` subagent), and ``exempt_skills`` (list of
-strings, default ``[]``) — skills / slash commands whose turn the Stop judge must not
-audit, named with their plugin namespace (``plugin:skill``, e.g. ``guard:turn``) or
-bare for un-namespaced skills; matched leading-``/``-stripped and case-insensitively
-(guard's own ``turn``/``mode`` control commands are always exempt regardless of this
-list). Unknown keys are ignored; a missing or malformed file falls back to all
-defaults. The judge always reads the repo
-(Read/Grep/Glob/Bash) to verify claims. The ``turn`` skill flips ``enabled`` and
-the ``mode`` skill flips ``mode`` per session.
+— reasoning effort of the HEADLESS judge only; the subagent judge's model/effort come
+from the ``guardian`` agent's own frontmatter, not these keys), ``enabled`` (bool,
+default ``true``) — the session-start value of the single master switch that turns BOTH
+the evidence judge and the approval gate on or off, and ``mode``
+(``"headless"``|``"subagent"``, default ``"subagent"``) — how the Stop-time evidence
+judge runs (in-hook headless judge vs. dispatch the ``guardian`` subagent), and
+``exempt_skills`` (list of strings, default ``[]``) — skills / slash commands whose turn
+the Stop judge must not audit, named with their plugin namespace (``plugin:skill``, e.g.
+``guard:turn``) or bare for un-namespaced skills; matched leading-``/``-stripped and
+case-insensitively (guard's own ``turn``/``mode`` control commands are always exempt
+regardless of this list). Unknown keys are ignored; a missing or malformed file falls
+back to all defaults. The judge always reads the repo (Read/Grep/Glob/Bash) to verify
+claims. The ``turn`` / ``mode`` skills flip ``enabled`` / ``mode`` for the session, or
+with ``--project`` write those keys' session-start defaults to guard.local.json.
 """
 
 from __future__ import annotations
@@ -117,7 +124,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "model": "haiku",
     "effort": "medium",
     "enabled": True,
-    "mode": "headless",
+    "mode": "subagent",
     # Skills / slash commands whose turn the Stop judge must NOT audit. A turn opened
     # by one of these is skill output or a relay, not a body of technical claims to
     # ground. Values are the name as it appears after the slash, INCLUDING the plugin
@@ -318,10 +325,13 @@ def _exempt_skills(config: dict[str, Any]) -> set[str]:
 def _read_turn_from_transcript(transcript_path: Any, prompt_id: Any) -> dict[str, Any] | None:
     """Reconstruct a turn from Claude Code's transcript, sliced by ``prompt_id``.
 
-    Returns ``{user, tools[], has_user_command, command_name}`` or None (fail-open)
-    when the transcript is unreadable or the prompt_id is not found. ``command_name``
-    is the slash command that opened the turn (normalized, '' if none) — used by the
-    Stop path to skip auditing guard's own control turns and user-exempted commands.
+    Returns ``{user, tools[], has_user_command, origin_kind, command_name}`` or None
+    (fail-open) when the transcript is unreadable or the prompt_id is not found.
+    ``command_name`` is the slash command that opened the turn (normalized, '' if none)
+    — used by the Stop path to skip auditing guard's own control turns and user-exempted
+    commands. ``origin_kind`` is the anchor's ``origin.kind`` ('' if absent) — the Stop
+    path skips turns opened by a ``task-notification`` (a background-agent completion,
+    not a user request).
 
     A turn is anchored on the FIRST record whose top-level ``promptId == prompt_id``
     (origin-agnostic — a turn opened by a typed prompt has ``origin.kind=human`` and
@@ -348,6 +358,7 @@ def _read_turn_from_transcript(transcript_path: Any, prompt_id: Any) -> dict[str
     user = ""
     tools: list[dict[str, str]] = []
     has_user_command = False
+    origin_kind = ""
     in_turn = False
 
     for line in lines:
@@ -367,6 +378,14 @@ def _read_turn_from_transcript(transcript_path: Any, prompt_id: Any) -> dict[str
                 in_turn = True
                 # The anchor is either the typed prompt (str) or a `!` command
                 # (str with <bash-input>); classify it like any in-turn record below.
+                # Capture how the turn was opened. A typed prompt has
+                # ``origin.kind == "human"``; a background-agent completion opens a turn
+                # whose anchor is a ``<task-notification>`` with
+                # ``origin.kind == "task-notification"`` (promptSource "system", NOT
+                # isMeta) — the Stop path uses this to skip auditing such relay turns.
+                origin = rec.get("origin")
+                if isinstance(origin, dict):
+                    origin_kind = str(origin.get("kind") or "")
             else:
                 continue
         else:
@@ -421,6 +440,7 @@ def _read_turn_from_transcript(transcript_path: Any, prompt_id: Any) -> dict[str
         "user": user,
         "tools": tools,
         "has_user_command": has_user_command,
+        "origin_kind": origin_kind,
         "command_name": _turn_command_name(user),
     }
 
@@ -518,7 +538,7 @@ def _read_state(project_dir: Path, session_id: str, config: dict[str, Any]) -> d
     keys = ("enabled", "approved", "mode", "last_audited_prompt_id", "gated_prompt_id", "updated_at")
     default.update({k: data[k] for k in keys if k in data})
     if default["mode"] not in VALID_MODES:
-        default["mode"] = "headless"
+        default["mode"] = DEFAULT_CONFIG["mode"]
     return default
 
 
@@ -605,8 +625,9 @@ def _effort(config: dict[str, Any]) -> str:
 
 
 def _mode(config: dict[str, Any]) -> str:
-    value = str(config.get("mode", "headless")).lower()
-    return value if value in VALID_MODES else "headless"
+    default = DEFAULT_CONFIG["mode"]
+    value = str(config.get("mode", default)).lower()
+    return value if value in VALID_MODES else default
 
 
 def run_judge(
@@ -891,6 +912,34 @@ def cmd_user_prompt() -> int:
     return 0
 
 
+# `/guard:turn` and `/guard:mode` accept an optional persistence-scope flag: no flag
+# (default) sets the LIVE session only; `--project` writes the session-start default in
+# guard.local.json (that one key only, never the live session); `--global` is reserved
+# for a future user-level store and is reported as not-yet-supported. These hooks fire
+# ONLY on a user-typed slash command (the model cannot invoke them), so writing config
+# here cannot let the model weaken guard.
+_GLOBAL_UNSUPPORTED = (
+    "guard: --global defaults are not supported yet (no global config store; planned). "
+    "Use `--project` for the project default, or no flag for this session.")
+
+
+def _scope_of(prompt: Any) -> str:
+    """Persistence scope parsed from a control command's raw prompt:
+    ``--global`` / ``--project`` → that scope, else ``"session"``."""
+    if isinstance(prompt, str):
+        toks = {t.lower() for t in prompt.split()}
+        if "--global" in toks:
+            return "global"
+        if "--project" in toks:
+            return "project"
+    return "session"
+
+
+def _emit_expansion(msg: str) -> None:
+    output = {"hookSpecificOutput": {"hookEventName": "UserPromptExpansion", "additionalContext": msg}}
+    json.dump(output, sys.stdout)
+
+
 def cmd_toggle() -> int:
     project_dir = _project_dir()
     payload = _read_payload()
@@ -901,15 +950,45 @@ def cmd_toggle() -> int:
         return 0
 
     prompt = payload.get("prompt")
+    scope = _scope_of(prompt)
     arg = ""
     if isinstance(prompt, str):
-        # prompt looks like "/guard:turn on" or "/turn off" — take the last token.
-        tokens = prompt.strip().split()
-        if tokens:
-            tail = tokens[-1].lower()
-            if tail in ("on", "off"):
-                arg = tail
+        # "/guard:turn on", "/guard:turn --project off" — find the on/off token.
+        for tok in prompt.split():
+            low = tok.lower()
+            if low in ("on", "off"):
+                arg = low
 
+    if scope == "global":
+        _emit_expansion(_GLOBAL_UNSUPPORTED)
+        _trace(project_dir, session_id, "toggle", "global_unsupported", arg=arg)
+        return 0
+
+    if scope == "project":
+        # Persist the session-start default (`enabled`) in guard.local.json — that key
+        # ONLY, leaving the live session untouched. Report-only when no on/off is given.
+        raw = _load_raw_config(project_dir)
+        current = bool(raw.get("enabled", True))
+        note = ""
+        if arg:
+            desired = arg == "on"
+            if desired == current:
+                pass
+            elif _write_config(project_dir, {**raw, "enabled": desired}):
+                current = desired
+            else:
+                note = " (write failed; unchanged)"
+        _emit_expansion(
+            "guard project default: {} for new sessions (.claude/guard.local.json){}. "
+            "This session is unchanged — use `/guard:turn on|off` to change it now.".format(
+                "on" if current else "off", note)
+            if arg else
+            "guard project default: {} (.claude/guard.local.json).".format(
+                "on" if current else "off"))
+        _trace(project_dir, session_id, "toggle", "set_project", arg=arg, enabled=current)
+        return 0
+
+    # scope == "session": live-session toggle (original behavior).
     config = _load_config(project_dir)
     state = _read_state(project_dir, session_id, config)
     if arg == "on":
@@ -919,17 +998,17 @@ def cmd_toggle() -> int:
     # no arg → report only; leave enabled unchanged
     _write_state(project_dir, session_id, state)
 
-    msg = "guard is {} for this session (evidence judge + approval gate).".format(
-        "on" if state["enabled"] else "off")
-    output = {"hookSpecificOutput": {"hookEventName": "UserPromptExpansion", "additionalContext": msg}}
-    json.dump(output, sys.stdout)
+    _emit_expansion("guard is {} for this session (evidence judge + approval gate).".format(
+        "on" if state["enabled"] else "off"))
     _trace(project_dir, session_id, "toggle", "set", arg=arg, enabled=state["enabled"])
     return 0
 
 
 def cmd_set_mode() -> int:
-    """UserPromptExpansion for `/guard:mode [headless|subagent]`. Set the session's
-    evidence-judge mode; no/unknown arg reports the current mode only."""
+    """UserPromptExpansion for `/guard:mode [--project] [headless|subagent]`. No scope
+    flag sets the LIVE session's evidence-judge mode; `--project` writes the session-start
+    default in guard.local.json (that key only, not the live session); `--global` is
+    reserved (reported unsupported). No/unknown mode arg reports the current value only."""
     project_dir = _project_dir()
     payload = _read_payload()
     if payload is None or project_dir is None:
@@ -939,15 +1018,43 @@ def cmd_set_mode() -> int:
         return 0
 
     prompt = payload.get("prompt")
+    scope = _scope_of(prompt)
     arg = ""
     if isinstance(prompt, str):
-        # prompt looks like "/guard:mode subagent" — take the last token.
-        tokens = prompt.strip().split()
-        if tokens:
-            tail = tokens[-1].lower()
-            if tail in VALID_MODES:
-                arg = tail
+        # "/guard:mode subagent", "/guard:mode --project headless" — find the mode token.
+        for tok in prompt.split():
+            low = tok.lower()
+            if low in VALID_MODES:
+                arg = low
 
+    if scope == "global":
+        _emit_expansion(_GLOBAL_UNSUPPORTED)
+        _trace(project_dir, session_id, "set-mode", "global_unsupported", arg=arg)
+        return 0
+
+    if scope == "project":
+        # Persist the session-start default `mode` in guard.local.json — that key ONLY,
+        # leaving the live session untouched. Report-only when no mode is given.
+        raw = _load_raw_config(project_dir)
+        current = _mode(raw)
+        note = ""
+        if arg:
+            if arg == current:
+                pass
+            elif _write_config(project_dir, {**raw, "mode": arg}):
+                current = arg
+            else:
+                note = " (write failed; unchanged)"
+        _emit_expansion(
+            "guard project default mode: {} for new sessions (.claude/guard.local.json){}. "
+            "This session is unchanged — use `/guard:mode {}` to switch it now.".format(
+                current, note, current)
+            if arg else
+            "guard project default mode: {} (.claude/guard.local.json).".format(current))
+        _trace(project_dir, session_id, "set-mode", "set_project", arg=arg, mode=current)
+        return 0
+
+    # scope == "session": live-session mode (original behavior).
     config = _load_config(project_dir)
     state = _read_state(project_dir, session_id, config)
     if arg:
@@ -962,8 +1069,7 @@ def cmd_set_mode() -> int:
     else:
         msg = ("guard evidence judge mode: headless for this session. The Stop hook "
                "runs an isolated judge and blocks the turn on unsupported claims.")
-    output = {"hookSpecificOutput": {"hookEventName": "UserPromptExpansion", "additionalContext": msg}}
-    json.dump(output, sys.stdout)
+    _emit_expansion(msg)
     _trace(project_dir, session_id, "set-mode", "set", arg=arg, mode=state["mode"])
     return 0
 
@@ -1191,9 +1297,10 @@ def _stop_subagent(project_dir: Path, session_id: str, state: dict[str, Any],
         return 0
 
     # Write this turn's slice ({user, tools, assistant}) to a file. Internal flags
-    # (has_user_command / command_name — both already handled before this path) are
-    # not part of the guardian's schema, so drop them.
-    slice_out = {k: v for k, v in turn.items() if k not in ("has_user_command", "command_name")}
+    # (has_user_command / origin_kind / command_name — all already handled before this
+    # path) are not part of the guardian's schema, so drop them.
+    slice_out = {k: v for k, v in turn.items()
+                 if k not in ("has_user_command", "origin_kind", "command_name")}
     turn_path = _turn_slice_file(project_dir, session_id, prompt_id)
     try:
         turn_path.parent.mkdir(parents=True, exist_ok=True)
@@ -1241,6 +1348,26 @@ def cmd_stop() -> int:
 
     response = payload.get("last_assistant_message")
     response = response if isinstance(response, str) else ""
+
+    # Read the finished turn up front: it is needed both to keep the session archive and
+    # to judge, and a `<task-notification>` turn must be excluded from BOTH, so the check
+    # precedes the archive write. When a background subagent finishes, Claude Code opens
+    # a NEW transcript turn (fresh promptId) whose anchor is a `<task-notification>`
+    # record (`origin.kind == "task-notification"`, promptSource "system", NOT isMeta —
+    # otherwise indistinguishable from a typed prompt). It is not the assistant answering
+    # a user, so it does not belong in the archive; and in subagent mode auditing it is
+    # self-perpetuating (the guardian dispatch is itself a background task whose
+    # completion is another task-notification → guardian re-dispatched ad infinitum,
+    # verified 2.1.197). (older CC / no prompt yet → turn is None; nothing to skip here,
+    # the judge path below still fails open on skip_no_prompt_id.)
+    prompt_id = payload.get("prompt_id")
+    transcript_path = payload.get("transcript_path")
+    has_prompt = isinstance(prompt_id, str) and bool(prompt_id) and isinstance(transcript_path, str)
+    turn = _read_turn_from_transcript(transcript_path, prompt_id) if has_prompt else None
+    if turn is not None and turn.get("origin_kind") == "task-notification":
+        _trace(project_dir, session_id, "stop", "skip_task_notification", prompt_id=prompt_id)
+        return 0
+
     _append_log(project_dir, session_id, {"role": "assistant", "text": response})
 
     config = _load_config(project_dir)
@@ -1257,10 +1384,11 @@ def cmd_stop() -> int:
     # The turn is identified by the transcript prompt_id; guard reads the whole turn
     # from Claude Code's transcript. Without them (older CC / no prompt yet) there is
     # nothing to audit — fail open.
-    prompt_id = payload.get("prompt_id")
-    transcript_path = payload.get("transcript_path")
-    if not isinstance(prompt_id, str) or not prompt_id or not isinstance(transcript_path, str):
+    if not has_prompt:
         _trace(project_dir, session_id, "stop", "skip_no_prompt_id")
+        return 0
+    if turn is None:
+        _trace(project_dir, session_id, "stop", "skip_no_turn", prompt_id=prompt_id)
         return 0
 
     # Skip auditing a turn the approval gate denied a file edit in. After a gate
@@ -1269,11 +1397,6 @@ def cmd_stop() -> int:
     # evidence judge has nothing legitimate to check. Applies to both modes.
     if state.get("gated_prompt_id") == prompt_id:
         _trace(project_dir, session_id, "stop", "skip_gated", prompt_id=prompt_id)
-        return 0
-
-    turn = _read_turn_from_transcript(transcript_path, prompt_id)
-    if turn is None:
-        _trace(project_dir, session_id, "stop", "skip_no_turn", prompt_id=prompt_id)
         return 0
 
     # Skip judging a turn whose slice contains a user `!` command. A `!` command
