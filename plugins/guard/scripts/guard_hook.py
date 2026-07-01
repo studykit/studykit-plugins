@@ -27,16 +27,18 @@ Subcommands
                  as evidence by the Stop judge.
 - stop           Stop. Close the current turn record with the assistant response.
                  If guard is enabled and ``stop_hook_active`` is false, judge the
-                 whole turn (user + tool output + response) on two axes and block
-                 when a load-bearing claim is unsupported OR a deferral is resolvable
-                 from the repo. Writes a per-turn line to the verdict record.
-- session-start  SessionStart. Sweep state/logs/turns/verdicts older than retention.
+                 whole turn (user + tool output + response), also given the session's
+                 VERIFIED_FACTS as established evidence, on two axes; block when a
+                 load-bearing claim is unsupported OR a deferral is resolvable from
+                 the repo. On a PASS, the turn's supported claims (+ evidence) are
+                 appended to the verified-facts store for later turns to reuse.
+- session-start  SessionStart. Sweep state/sessions/turns/verified older than retention.
 
 State lives project-local under ``${CLAUDE_PROJECT_DIR}/.claude/guard/``:
 - ``state/<sid>.json``       — {enabled, approved, turn_seq, updated_at}
 - ``sessions/<sid>.jsonl``   — full session archive: one record per turn / verdict
 - ``turns/<sid>/<seq>.json`` — one file per turn: {seq, user, tools[], assistant}
-- ``verdicts/<sid>.jsonl``   — verification record: one line per judged turn
+- ``verified/<sid>.jsonl``   — verified facts from PASSED turns: {turn, claim, evidence}
 - ``trace.log``              — file-only debug trace (enabled by GUARD_TRACE)
 
 State is retained across the end of a session so a resumed session
@@ -122,9 +124,9 @@ def _turn_file(project_dir: Path, session_id: str, seq: int) -> Path:
     return _turns_dir(project_dir, session_id) / f"{seq:04d}.json"
 
 
-def _verdicts_file(project_dir: Path, session_id: str) -> Path:
-    """Per-session accumulation of turn verdicts (verification record)."""
-    return _state_root(project_dir) / "verdicts" / f"{session_id}.jsonl"
+def _verified_file(project_dir: Path, session_id: str) -> Path:
+    """Per-session accumulation of VERIFIED facts (claims from passed turns)."""
+    return _state_root(project_dir) / "verified" / f"{session_id}.jsonl"
 
 
 def _trace_file(project_dir: Path) -> Path:
@@ -319,27 +321,54 @@ def _append_log(project_dir: Path, session_id: str, record: dict[str, Any]) -> N
         pass
 
 
-def _append_verdict(project_dir: Path, session_id: str, seq: int, verdict: dict[str, Any]) -> None:
-    """Append one turn's verification result to the per-session verdict record."""
-    unsupported = [c for c in verdict.get("claims", [])
-                   if isinstance(c, dict) and c.get("supported") is False]
-    resolvable = [d for d in verdict.get("deferrals", [])
-                  if isinstance(d, dict) and d.get("resolvable_from_repo") is True]
-    record = {
-        "ts": _now_iso(),
-        "turn": seq,
-        "blocked": bool(unsupported or resolvable),
-        "summary": verdict.get("summary", ""),
-        "unsupported_claims": unsupported,
-        "resolvable_deferrals": resolvable,
-    }
-    path = _verdicts_file(project_dir, session_id)
+VERIFIED_MAX_FACTS = 200
+VERIFIED_CONTEXT_MAX = 40
+
+
+def _append_verified(project_dir: Path, session_id: str, seq: int, verdict: dict[str, Any]) -> None:
+    """Record the supported claims of a PASSED turn as verified facts.
+
+    Only called when the turn passed (no unsupported claim, no resolvable
+    deferral). Each supported claim + its evidence becomes a reusable fact that
+    later turns' judging can rely on without re-deriving it.
+    """
+    facts = [
+        {"claim": c.get("claim", "").strip(), "evidence": c.get("evidence", "").strip()}
+        for c in verdict.get("claims", [])
+        if isinstance(c, dict) and c.get("supported") is True and c.get("claim")
+    ]
+    if not facts:
+        return
+    path = _verified_file(project_dir, session_id)
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
         with path.open("a", encoding="utf-8") as f:
-            f.write(json.dumps(record, ensure_ascii=False) + "\n")
+            for fact in facts:
+                f.write(json.dumps({"ts": _now_iso(), "turn": seq, **fact}, ensure_ascii=False) + "\n")
     except OSError:
         pass
+
+
+def _read_verified_facts(project_dir: Path, session_id: str) -> list[dict[str, str]]:
+    """Load previously verified facts (most recent first, capped)."""
+    path = _verified_file(project_dir, session_id)
+    if not path.is_file():
+        return []
+    facts: list[dict[str, str]] = []
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return []
+    for line in lines[-VERIFIED_MAX_FACTS:]:
+        if not line.strip():
+            continue
+        try:
+            rec = json.loads(line)
+        except (json.JSONDecodeError, ValueError):
+            continue
+        if isinstance(rec, dict) and rec.get("claim"):
+            facts.append({"claim": rec.get("claim", ""), "evidence": rec.get("evidence", "")})
+    return facts
 
 
 # --------------------------------------------------------------------------- #
@@ -474,6 +503,10 @@ EVIDENCE_SYSTEM = (
     "actually ran this turn and their output. Treat that output as first-class "
     "evidence — a claim that restates or directly follows from a command's output in "
     "TOOL_ACTIVITY is SUPPORTED even if the response does not re-cite it.\n\n"
+    "A VERIFIED_FACTS block may also precede the response: these are claims already "
+    "confirmed (with their evidence) in earlier turns of this session. Treat them as "
+    "established — a claim consistent with a verified fact is SUPPORTED and need not "
+    "be re-derived.\n\n"
     "AXIS 1 — unsupported or shallowly-supported technical claims. A technical claim "
     "asserts how a system, tool, language, library, API, algorithm, configuration, or "
     "codebase behaves or performs. For each load-bearing claim, decide if it is "
@@ -759,13 +792,28 @@ def cmd_stop() -> int:
     if not state["enabled"] or not response.strip():
         return 0
 
+    # Facts verified in earlier passed turns are reusable evidence: a claim that
+    # matches one need not be re-derived. Provide them as VERIFIED_FACTS context.
+    verified = _read_verified_facts(project_dir, session_id)
+    verified_block = ""
+    if verified:
+        lines = [f"- {v['claim']}" + (f"  [evidence: {v['evidence']}]" if v.get("evidence") else "")
+                 for v in verified[-VERIFIED_CONTEXT_MAX:]]
+        verified_block = (
+            "<<<VERIFIED_FACTS (already confirmed earlier this session — treat as "
+            "established; a claim consistent with these is supported)\n"
+            + "\n".join(lines) + "\nVERIFIED_FACTS\n\n"
+        )
+
     # Judge the whole turn: user request + the commands run this turn and their
     # output (first-class evidence) + the assistant response.
     judge_input = (
         "Audit the assistant's turn below. Treat the commands in TOOL_ACTIVITY and "
         "their output as first-class evidence for the assistant's claims, alongside "
-        "what you can read from the repository. USER_REQUEST is context (e.g. facts "
-        "the user already confirmed). Return only the JSON verdict.\n\n"
+        "VERIFIED_FACTS and what you can read from the repository. USER_REQUEST is "
+        "context (e.g. facts the user already confirmed). Return only the JSON "
+        "verdict.\n\n"
+        + verified_block
         + _render_turn_for_judge(turn)
     )
     verdict = run_judge(project_dir, EVIDENCE_SYSTEM, judge_input, EVIDENCE_SCHEMA, config)
@@ -779,8 +827,6 @@ def cmd_stop() -> int:
         "claims": verdict.get("claims", []),
         "deferrals": verdict.get("deferrals", []),
     })
-    # Verification record: one line per judged turn, accumulated per session.
-    _append_verdict(project_dir, session_id, seq, verdict)
 
     # Decide blocking from the concrete violation lists, not the model's own
     # `verdict` field — the judge sometimes returns verdict="block" while every
@@ -792,6 +838,8 @@ def cmd_stop() -> int:
                   if isinstance(d, dict) and d.get("resolvable_from_repo") is True]
 
     if not unsupported and not resolvable:
+        # Passed turn: collect its supported claims as verified facts for reuse.
+        _append_verified(project_dir, session_id, seq, verdict)
         _trace(project_dir, session_id, "stop", "pass", verdict=verdict.get("verdict"))
         return 0
 
@@ -837,7 +885,7 @@ def cmd_session_start() -> int:
     root = _state_root(project_dir)
     cutoff = time.time() - ORPHAN_MAX_AGE_SECONDS
     # File-per-session dirs.
-    for sub in ("state", "sessions", "verdicts"):
+    for sub in ("state", "sessions", "verified"):
         d = root / sub
         if not d.is_dir():
             continue

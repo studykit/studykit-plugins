@@ -31,8 +31,8 @@ payload fields; there is no Codex path.
 | `UserPromptExpansion` (matcher `(guard:)?turn`) | `toggle` | Flip the session `enabled` flag (judge + gate). |
 | `PreToolUse` (`Write\|Edit\|MultiEdit\|NotebookEdit`) | `gate` | Deny file-editing tools until approved. |
 | `PostToolUse` (all tools) | `post-tool` | Record the tool's command + output into the current turn (evidence). |
-| `Stop` | `stop` | Close the turn record; run the evidence judge over the whole turn when armed; write a verdict line. |
-| `SessionStart` | `session-start` | Sweep state/sessions/turns/verdicts past retention. |
+| `Stop` | `stop` | Close the turn record; judge the whole turn (+ verified facts) when armed; on PASS append its supported claims to the verified-facts store. |
+| `SessionStart` | `session-start` | Sweep state/sessions/turns/verified past retention. |
 
 ## Storage layout
 
@@ -44,8 +44,13 @@ Project-local under `${CLAUDE_PROJECT_DIR}/.claude/guard/`:
   built across UserPromptSubmit → PostToolUse(s) → Stop. This is what the Stop
   judge reads, so a claim grounded in a command's output is evidence, not a
   transcript re-parse.
-- `verdicts/<sid>.jsonl` — verification record: one line per judged turn
-  (`turn`, `blocked`, `summary`, `unsupported_claims`, `resolvable_deferrals`).
+- `verified/<sid>.jsonl` — verified facts accumulated from PASSED turns only:
+  `{ts, turn, claim, evidence}`, one line per supported claim. The Stop judge
+  loads these (most-recent-capped) and injects them as a VERIFIED_FACTS block, so
+  a later claim consistent with an already-verified fact is supported without
+  re-derivation. `evidence` carries the judge's grounding (e.g. which command's
+  output or which doc path established the claim). Only passed turns contribute,
+  so a blocked/unsupported claim never becomes a "verified" fact.
 - `trace.log` — file-only debug trace (`GUARD_TRACE` truthy).
 
 `turn_seq` increments on each real user turn; `/guard:turn` control commands do
@@ -126,7 +131,12 @@ location is sufficient for discovery.
   deterministic. It gates only the file-editing tools in `MUTATING_TOOLS`
   (Write/Edit/MultiEdit/NotebookEdit). Bash is intentionally NOT gated — shell
   commands, reads, and searches always pass.
-- Retention: `SessionStart` sweeps `state/`, `sessions/`, `verdicts/` (files) and
+- Verified-fact reuse: on a PASS, `_append_verified` stores the turn's supported
+  claims (+ evidence). The next Stop calls `_read_verified_facts` and injects a
+  VERIFIED_FACTS block, so cross-turn established facts don't need re-deriving.
+  This is the one intentional break from strict per-turn isolation — but only
+  passed, evidence-backed claims flow forward, never raw prior-turn text.
+- Retention: `SessionStart` sweeps `state/`, `sessions/`, `verified/` (files) and
   `turns/` (whole per-session dirs) older than `ORPHAN_MAX_AGE_SECONDS` (7 days).
   Nothing is cleared at SessionEnd — a resumed session (`claude --resume`) must
   keep its `enabled`/`approved`/`turn_seq` state, so age-based expiry is the only
