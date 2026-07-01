@@ -10,7 +10,7 @@ Subcommands
 -----------
 - user-prompt    UserPromptSubmit. Log the user turn and (when guard is enabled)
                  update the approval gate: an explicit user instruction to implement
-                 arms it; a shift to a new/undecided discussion re-locks it. Intent is
+                 arms it; a shift to a clearly unrelated new task re-locks it. Intent is
                  judged by an isolated headless ``claude`` (see ``run_judge``). Only a
                  user message can arm approval. guard's own ``/guard:turn`` /
                  ``/guard:mode`` commands are ignored here (not turns).
@@ -25,7 +25,12 @@ Subcommands
                  records the turn's ``prompt_id`` in ``gated_prompt_id`` so Stop skips
                  auditing a plan/approval-request response. Writes under
                  ``.claude/guard/refs/`` are exempt (the evidence-first style saves
-                 cited docs there). Reads state only — no judge call. Bash and all
+                 cited docs there), as are git-ignored writes — scratch/temp, local
+                 config (``**/*.local.*``), and skill-authored docs like ``/handoff`` →
+                 ``.handover/`` — since those don't mutate tracked project source
+                 (``git check-ignore``); guard's OWN config/state tree is excluded from
+                 that exemption so the model can't self-arm or disable the judge. Reads
+                 state (+ one ``git check-ignore``) — no judge call. Bash and all
                  read/search tools always pass.
 - record-verified Append verified facts for a passed turn. Called by the guardian
                  subagent (subagent mode) via Bash so its confirmed claims reach the
@@ -35,9 +40,12 @@ Subcommands
                  ``prompt_id``, both in the payload) via ``_read_turn_from_transcript``
                  — user request, tool activity, and response. Skips when guard is off,
                  ``stop_hook_active``, the prompt_id/transcript are absent, the turn was
-                 gated (``gated_prompt_id``), or the slice contains a user ``!`` command
+                 gated (``gated_prompt_id``), the slice contains a user ``!`` command
                  (its output arrives after the judged response, so it is neither
-                 evidence nor auditable here). Otherwise branch on ``mode``.
+                 evidence nor auditable here), or the turn was opened by guard's own
+                 ``/guard:turn`` / ``/guard:mode`` control command or a user-configured
+                 ``exempt_skills`` entry (skill output / a relay, not claims to
+                 ground). Otherwise branch on ``mode``.
                  ``headless``: judge the turn (+ VERIFIED_FACTS) on
                  two axes; block on an unsupported claim or repo-resolvable deferral;
                  on PASS append supported claims to the verified store. ``subagent``:
@@ -65,8 +73,13 @@ Configuration (optional) is a JSON object at
 session-start value of the single master switch that turns BOTH the evidence judge
 and the approval gate on or off, and ``mode`` (``"headless"``|``"subagent"``,
 default ``"headless"``) — how the Stop-time evidence judge runs (in-hook headless
-judge vs. dispatch the ``guardian`` subagent). Unknown keys are ignored; a missing
-or malformed file falls back to all defaults. The judge always reads the repo
+judge vs. dispatch the ``guardian`` subagent), and ``exempt_skills`` (list of
+strings, default ``[]``) — skills / slash commands whose turn the Stop judge must not
+audit, named with their plugin namespace (``plugin:skill``, e.g. ``guard:turn``) or
+bare for un-namespaced skills; matched leading-``/``-stripped and case-insensitively
+(guard's own ``turn``/``mode`` control commands are always exempt regardless of this
+list). Unknown keys are ignored; a missing or malformed file falls back to all
+defaults. The judge always reads the repo
 (Read/Grep/Glob/Bash) to verify claims. The ``turn`` skill flips ``enabled`` and
 the ``mode`` skill flips ``mode`` per session.
 """
@@ -91,12 +104,23 @@ TRACE_ENV_VAR = "GUARD_TRACE"
 TRACE_TRUTHY = {"1", "true", "yes", "on"}
 ORPHAN_MAX_AGE_SECONDS = 7 * 24 * 60 * 60
 JUDGE_TIMEOUT_SECONDS = 90
+# `git check-ignore` in the gate must be quick; it is the only subprocess the gate
+# runs. Fail toward gating (treat as not-ignored) if it is slow or errors.
+GIT_CHECK_TIMEOUT_SECONDS = 5
 
 DEFAULT_CONFIG: dict[str, Any] = {
     "model": "haiku",
     "effort": "medium",
     "enabled": True,
     "mode": "headless",
+    # Skills / slash commands whose turn the Stop judge must NOT audit. A turn opened
+    # by one of these is skill output or a relay, not a body of technical claims to
+    # ground. Values are the name as it appears after the slash, INCLUDING the plugin
+    # namespace (e.g. "guard:turn", "hindsight:review") or the bare name for an
+    # un-namespaced skill ("deep-research"); matched leading-'/'-stripped and
+    # case-insensitively. guard's own turn/mode control commands are always exempt
+    # regardless of this list.
+    "exempt_skills": [],
 }
 
 VALID_EFFORTS = {"low", "medium", "high", "xhigh", "max"}
@@ -201,6 +225,11 @@ _SESSION_ID_RE = re.compile(r"^[A-Za-z0-9._-]+$")
 # guard's own control commands, e.g. "/guard:turn on", "/turn off",
 # "/guard:mode subagent". These are handled by UserPromptExpansion, not real turns.
 _CONTROL_CMD_RE = re.compile(r"^/(guard:)?(turn|mode)\b", re.IGNORECASE)
+# In the transcript, a slash command is expanded to
+# "<command-name>/guard:turn</command-name>" (see session b30dbaec). Pull the command
+# name out of that tag; a raw typed form ("/guard:turn on") is handled by the fallback
+# in _turn_command_name.
+_COMMAND_NAME_RE = re.compile(r"<command-name>\s*(/?[^<\n]+?)\s*</command-name>", re.IGNORECASE)
 
 
 def _session_id(payload: dict) -> str | None:
@@ -237,11 +266,53 @@ def _message_of(record: Any) -> dict[str, Any]:
     return msg if isinstance(msg, dict) else {}
 
 
+def _turn_command_name(user_text: str) -> str:
+    """The slash command that opened the turn, normalized (leading '/' stripped,
+    lowercased), or '' when the turn was not opened by a slash command.
+
+    Slash commands reach the transcript expanded as
+    ``<command-name>/guard:turn</command-name>``; a raw typed form
+    (``/guard:turn on``) is handled by the fallback.
+    """
+    text = user_text.strip()
+    m = _COMMAND_NAME_RE.search(text)
+    if m:
+        name = m.group(1).strip()
+    elif text.startswith("/"):
+        name = text.split()[0]
+    else:
+        return ""
+    return name.lstrip("/").lower()
+
+
+def _is_control_command_name(name: str) -> bool:
+    """True when a normalized command name is one of guard's own control commands
+    (``turn``/``mode``, with or without the ``guard:`` prefix)."""
+    return bool(name) and bool(_CONTROL_CMD_RE.match("/" + name))
+
+
+def _exempt_skills(config: dict[str, Any]) -> set[str]:
+    """Normalized set of skill / command names whose turn the Stop judge must not audit
+    (from the ``exempt_skills`` config key). Values keep their plugin namespace
+    (``plugin:skill``); compared leading-'/'-stripped and lowercased, matching
+    ``_turn_command_name``."""
+    raw = config.get("exempt_skills", [])
+    if not isinstance(raw, list):
+        return set()
+    return {
+        c.strip().lstrip("/").lower()
+        for c in raw
+        if isinstance(c, str) and c.strip()
+    }
+
+
 def _read_turn_from_transcript(transcript_path: Any, prompt_id: Any) -> dict[str, Any] | None:
     """Reconstruct a turn from Claude Code's transcript, sliced by ``prompt_id``.
 
-    Returns ``{user, tools[], has_user_command}`` or None (fail-open) when the
-    transcript is unreadable or the prompt_id is not found.
+    Returns ``{user, tools[], has_user_command, command_name}`` or None (fail-open)
+    when the transcript is unreadable or the prompt_id is not found. ``command_name``
+    is the slash command that opened the turn (normalized, '' if none) — used by the
+    Stop path to skip auditing guard's own control turns and user-exempted commands.
 
     A turn is anchored on the FIRST record whose top-level ``promptId == prompt_id``
     (origin-agnostic — a turn opened by a typed prompt has ``origin.kind=human`` and
@@ -337,7 +408,12 @@ def _read_turn_from_transcript(transcript_path: Any, prompt_id: Any) -> dict[str
                     tools.append({"command": "[tool_result]", "output": out})
     if not in_turn:
         return None
-    return {"user": user, "tools": tools, "has_user_command": has_user_command}
+    return {
+        "user": user,
+        "tools": tools,
+        "has_user_command": has_user_command,
+        "command_name": _turn_command_name(user),
+    }
 
 
 def _render_turn_for_judge(turn: dict[str, Any]) -> str:
@@ -591,25 +667,35 @@ def _parse_judge_output(project_dir: Path, stdout: str) -> dict | None:
 # judge prompts + schemas
 # --------------------------------------------------------------------------- #
 APPROVAL_SYSTEM = (
-    "You classify a single user message from a coding session. Decide whether the "
-    "user is giving an EXPLICIT instruction to start implementing / editing files / "
-    "applying changes now (e.g. 'implement it', 'go ahead', 'apply the change', "
-    "'make the edits', '구현해', '적용해', '진행해'). Planning, questions, discussion, "
-    "brainstorming, or requests to 'show a plan' are NOT approval. Separately, decide "
-    "whether the message opens a NEW or still-undecided topic. These two are mutually "
-    "exclusive: a message that instructs implementation is NOT opening a new "
-    "discussion, so if explicit_implementation_instruction is true then "
-    "opens_new_discussion must be false. Be strict: when unsure, "
-    "explicit_implementation_instruction=false. Return only JSON."
+    "You classify a single user message from a coding session on two axes.\n\n"
+    "AXIS 1 — explicit_implementation_instruction. Decide whether the user is giving "
+    "an EXPLICIT instruction to start implementing / editing files / applying changes "
+    "now (e.g. 'implement it', 'go ahead', 'apply the change', 'make the edits', "
+    "'구현해', '적용해', '진행해'). Planning, questions, discussion, brainstorming, or "
+    "requests to 'show a plan' are NOT approval. Be strict: when unsure, "
+    "explicit_implementation_instruction=false.\n\n"
+    "AXIS 2 — starts_unrelated_task. This is the ONLY thing that revokes a previously "
+    "granted approval, so keep it narrow. Set it true ONLY when the message clearly "
+    "pivots to a DIFFERENT, UNRELATED piece of work — a new feature, goal, or area with "
+    "no connection to what was just being worked on. Set it FALSE for everything that "
+    "continues the current work: questions, clarifications, refinements, corrections, "
+    "bug reports, review comments, follow-ups, or 'also do X' / 'now handle Y' within "
+    "the same task. A question or comment by itself is NOT starting a task. Be strict "
+    "the other way here: when unsure whether the topic is genuinely unrelated, "
+    "starts_unrelated_task=false — do NOT revoke approval on a mere question or a "
+    "continuation of the same work.\n\n"
+    "The two axes are mutually exclusive: a message that instructs implementation is "
+    "not starting an unrelated task, so if explicit_implementation_instruction is true "
+    "then starts_unrelated_task must be false. Return only JSON."
 )
 APPROVAL_SCHEMA = {
     "type": "object",
     "properties": {
         "explicit_implementation_instruction": {"type": "boolean"},
-        "opens_new_discussion": {"type": "boolean"},
+        "starts_unrelated_task": {"type": "boolean"},
         "reasoning": {"type": "string"},
     },
-    "required": ["explicit_implementation_instruction", "opens_new_discussion", "reasoning"],
+    "required": ["explicit_implementation_instruction", "starts_unrelated_task", "reasoning"],
     "additionalProperties": False,
 }
 
@@ -747,7 +833,7 @@ def cmd_user_prompt() -> int:
     approved_before = state["approved"]
     if verdict.get("explicit_implementation_instruction") is True:
         state["approved"] = True
-    elif verdict.get("opens_new_discussion") is True:
+    elif verdict.get("starts_unrelated_task") is True:
         state["approved"] = False
     if state["approved"] != approved_before:
         _write_state(project_dir, session_id, state)
@@ -864,8 +950,20 @@ def cmd_gate() -> int:
     # not implementing the user's task, so those writes pass without approval. Note
     # this is deliberately ONLY refs/ — never the wider `.claude/guard/` tree, so
     # the model can't write `state/<sid>.json` to arm its own approval.
-    if _targets_refs_dir(project_dir, payload.get("tool_input")):
+    tool_input = payload.get("tool_input")
+    if _targets_refs_dir(project_dir, tool_input):
         _trace(project_dir, session_id, "gate", "allow_refs", tool=tool_name)
+        return 0
+
+    # Exempt writes that don't mutate the user's tracked project source: git-ignored
+    # scratch / temp files, local config (`**/*.local.*`), and skill-authored docs
+    # (e.g. `/handoff` writing to a git-ignored `.handover/`). The gate exists to guard
+    # the user's task edits, not this throwaway/side output. EXCLUDING guard's own
+    # config + state tree, which are git-ignored too but must stay gated so the model
+    # can't self-arm or disable the judge (see _is_guard_owned).
+    target = _tool_target_path(project_dir, tool_input)
+    if target is not None and not _is_guard_owned(project_dir, target) and _git_ignored(project_dir, target):
+        _trace(project_dir, session_id, "gate", "allow_gitignored", tool=tool_name)
         return 0
 
     # Record that this turn had a file edit denied for want of approval. The Stop
@@ -901,27 +999,79 @@ def _is_mutating(tool_name: Any) -> bool:
     return tool_name in MUTATING_TOOLS
 
 
-def _targets_refs_dir(project_dir: Path, tool_input: Any) -> bool:
-    """True when a mutating tool's target path is inside `.claude/guard/refs/`.
+def _tool_target_path(project_dir: Path, tool_input: Any) -> Path | None:
+    """Absolute, resolved target path of a mutating tool call, or None.
 
-    Reads the file path from the PreToolUse `tool_input` (`file_path` for
-    Write/Edit/MultiEdit, `notebook_path` for NotebookEdit). Resolves both sides so
-    a relative path or `..` cannot smuggle a write outside refs/ past the check.
+    Reads the path from the PreToolUse `tool_input` (`file_path` for
+    Write/Edit/MultiEdit, `notebook_path` for NotebookEdit). Resolving means a
+    relative path or `..` cannot smuggle a write past the path-based checks below.
     """
     if not isinstance(tool_input, dict):
-        return False
+        return None
     raw = tool_input.get("file_path") or tool_input.get("notebook_path")
     if not isinstance(raw, str) or not raw:
+        return None
+    try:
+        target = Path(raw)
+        if not target.is_absolute():
+            target = project_dir / target
+        return target.resolve()
+    except OSError:
+        return None
+
+
+def _targets_refs_dir(project_dir: Path, tool_input: Any) -> bool:
+    """True when a mutating tool's target path is inside `.claude/guard/refs/`."""
+    target = _tool_target_path(project_dir, tool_input)
+    if target is None:
         return False
     try:
         refs = _refs_dir(project_dir).resolve()
-        target = Path(raw)
-        if not target.is_absolute():
-            target = (project_dir / target)
-        target = target.resolve()
     except OSError:
         return False
     return target == refs or refs in target.parents
+
+
+def _is_guard_owned(project_dir: Path, target: Path) -> bool:
+    """True when the path is one of guard's OWN files — its config
+    (`.claude/guard.local.json`) or anywhere in its state tree (`.claude/guard/`).
+
+    These must never ride the git-ignore exemption: `.claude/guard/` is itself
+    git-ignored, so without this exclusion the model could `Write`
+    `state/<sid>.json` to arm its own approval, or edit `guard.local.json` to turn
+    the judge off / add `exempt_skills`. (`refs/` is the one deliberate hole and has
+    its own explicit allow, checked before this.) Fail toward guard-owned (safe: no
+    exemption) if the paths can't be resolved.
+    """
+    try:
+        state_root = _state_root(project_dir).resolve()
+        config_path = (project_dir / CONFIG_REL).resolve()
+    except OSError:
+        return True
+    return target == config_path or target == state_root or state_root in target.parents
+
+
+def _git_ignored(project_dir: Path, target: Path) -> bool:
+    """True when `git check-ignore` reports the target as ignored — untracked scratch,
+    temp, or local-config files that are not the user's tracked project source.
+
+    `git check-ignore -q` exits 0 when ignored, 1 when not, other on error; it also
+    honors the user's global gitignore. Fail toward NOT ignored (keep gating) if git
+    is missing, errors, or times out.
+    """
+    git = shutil.which("git")
+    if git is None:
+        return False
+    try:
+        proc = subprocess.run(
+            [git, "check-ignore", "-q", str(target)],
+            cwd=str(project_dir),
+            capture_output=True,
+            timeout=GIT_CHECK_TIMEOUT_SECONDS,
+        )
+    except (subprocess.TimeoutExpired, OSError):
+        return False
+    return proc.returncode == 0
 
 
 def cmd_record_verified() -> int:
@@ -975,10 +1125,10 @@ def _stop_subagent(project_dir: Path, session_id: str, state: dict[str, Any],
         _trace(project_dir, session_id, "stop", "skip_audited", prompt_id=prompt_id)
         return 0
 
-    # Write this turn's slice ({user, tools, assistant}) to a file. The internal
-    # has_user_command flag (always False here — a `!` turn is skipped before this
-    # path) is not part of the guardian's schema, so drop it.
-    slice_out = {k: v for k, v in turn.items() if k != "has_user_command"}
+    # Write this turn's slice ({user, tools, assistant}) to a file. Internal flags
+    # (has_user_command / command_name — both already handled before this path) are
+    # not part of the guardian's schema, so drop them.
+    slice_out = {k: v for k, v in turn.items() if k not in ("has_user_command", "command_name")}
     turn_path = _turn_slice_file(project_dir, session_id, prompt_id)
     try:
         turn_path.parent.mkdir(parents=True, exist_ok=True)
@@ -1071,6 +1221,19 @@ def cmd_stop() -> int:
     if turn.get("has_user_command"):
         _trace(project_dir, session_id, "stop", "skip_user_command", prompt_id=prompt_id)
         return 0
+
+    # Skip judging a turn opened by guard's own control command (`/guard:turn`,
+    # `/guard:mode`) or by a user-configured exempt skill/command. Such a turn's
+    # response is a relay or skill output, not a body of technical claims to ground —
+    # e.g. relaying "guard on" has no evidence to cite and would be falsely blocked
+    # (session b30dbaec). The approval classifier already skips control commands at
+    # UserPromptSubmit; this is the matching skip at Stop. Applies to both modes.
+    cmd_name = turn.get("command_name", "")
+    if cmd_name and (_is_control_command_name(cmd_name) or cmd_name in _exempt_skills(config)):
+        _trace(project_dir, session_id, "stop", "skip_exempt_skill",
+               prompt_id=prompt_id, command=cmd_name)
+        return 0
+
     turn["assistant"] = response
 
     # Subagent mode: the hook does not judge or block. It hands the turn off to the

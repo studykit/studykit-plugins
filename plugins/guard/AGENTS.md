@@ -49,9 +49,22 @@ changing anything that depends on them.
   non-zero exit; any judge failure leaves state untouched and does not block.
 - **Approval is armed only by a user message** (explicit-implementation classifier
   verdict); the `turn` skill and the model cannot arm it.
-- **Refs exemption**: the gate lets an unapproved write through only when the target
-  resolves inside `.claude/guard/refs/` — scoped to `refs/` ONLY (never the wider
-  tree, so the model can't write `state/` to self-arm), both paths `resolve()`d.
+- **Control turns / exempt commands are not judged at Stop.** `/guard:turn` and
+  `/guard:mode` open a real transcript turn whose response is a one-line relay with no
+  evidence; `cmd_stop` skips it via `command_name` (from the transcript's expanded
+  `<command-name>…`), matching the approval classifier's UserPromptSubmit skip. Without
+  it the Stop judge falsely blocked the relay (session b30dbaec). The same path skips
+  any skill/command listed in the `exempt_skills` config key (default `[]`), named with
+  its plugin namespace (`plugin:skill`) — a user-invoked skill reaches the transcript
+  as a namespaced `<command-name>` just like a command. Both modes honor it.
+- **Gate exemptions** (unapproved writes that still pass): (1) `.claude/guard/refs/`
+  — the evidence-first store, scoped to `refs/` ONLY; (2) **git-ignored** targets
+  (`git check-ignore`) — scratch/temp, local config `**/*.local.*`, skill docs like
+  `/handoff` → `.handover/`; not tracked project source. Guard's OWN config
+  (`.claude/guard.local.json`) + state tree (`.claude/guard/`) are **excluded** from
+  the git-ignore exemption (`_is_guard_owned`) — both are git-ignored, so without the
+  exclusion the model could `Write` `state/` to self-arm or edit `guard.local.json` to
+  disable the judge. All paths `resolve()`d; `git check-ignore` fails toward gating.
 
 ## Deeper detail
 
