@@ -24,6 +24,17 @@
             "description": "Toggle guard for the session."
           }
         ]
+      },
+      {
+        "matcher": "(guard:)?mode",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/guard_hook.py\" set-mode",
+            "timeout": 5,
+            "description": "Set the session's evidence-judge mode (headless|subagent)."
+          }
+        ]
       }
     ],
     "PreToolUse": [

@@ -17,6 +17,8 @@ Subcommands
 - toggle         UserPromptExpansion (matcher ``(guard:)?turn``). Read the on/off
                  argument from the raw ``prompt`` and set the session's ``enabled``
                  flag — the one switch for BOTH the evidence judge and approval gate.
+- set-mode       UserPromptExpansion (matcher ``(guard:)?mode``). Set the session's
+                 ``mode`` (``headless``|``subagent``) for the Stop-time evidence judge.
 - gate           PreToolUse. When guard is enabled, for the file-editing tools
                  (Write/Edit/MultiEdit/NotebookEdit), deny with a reason to seek
                  explicit user approval unless the session is approved. Reads state
@@ -25,17 +27,23 @@ Subcommands
 - post-tool      PostToolUse. Append the tool's command + output to the current
                  turn record, so a claim grounded in a command's output is treated
                  as evidence by the Stop judge.
+- record-verified Append verified facts for a passed turn. Called by the guardian
+                 subagent (subagent mode) via Bash so its confirmed claims reach the
+                 verified store through the same single writer as the headless path.
 - stop           Stop. Close the current turn record with the assistant response.
-                 If guard is enabled and ``stop_hook_active`` is false, judge the
-                 whole turn (user + tool output + response), also given the session's
-                 VERIFIED_FACTS as established evidence, on two axes; block when a
-                 load-bearing claim is unsupported OR a deferral is resolvable from
-                 the repo. On a PASS, the turn's supported claims (+ evidence) are
-                 appended to the verified-facts store for later turns to reuse.
+                 If guard is enabled and ``stop_hook_active`` is false, branch on the
+                 session ``mode``. In ``headless`` mode: judge the whole turn (user +
+                 tool output + response), also given the session's VERIFIED_FACTS as
+                 established evidence, on two axes; block when a load-bearing claim is
+                 unsupported OR a deferral is resolvable from the repo; on a PASS,
+                 append the turn's supported claims (+ evidence) to the verified store.
+                 In ``subagent`` mode: do not judge or block — emit additionalContext
+                 asking the main agent to dispatch the ``guard:guardian`` subagent,
+                 which audits the turn and records verified facts itself.
 - session-start  SessionStart. Sweep state/sessions/turns/verified older than retention.
 
 State lives project-local under ``${CLAUDE_PROJECT_DIR}/.claude/guard/``:
-- ``state/<sid>.json``       — {enabled, approved, turn_seq, updated_at}
+- ``state/<sid>.json``       — {enabled, approved, turn_seq, mode, last_audited_seq, gated_seq, updated_at}
 - ``sessions/<sid>.jsonl``   — full session archive: one record per turn / verdict
 - ``turns/<sid>/<seq>.json`` — one file per turn: {seq, user, tools[], assistant}
 - ``verified/<sid>.jsonl``   — verified facts from PASSED turns: {turn, claim, evidence}
@@ -48,12 +56,14 @@ expired only by the age-based sweep at SessionStart (see ORPHAN_MAX_AGE_SECONDS)
 Configuration (optional) is a JSON object at
 ``${CLAUDE_PROJECT_DIR}/.claude/guard.local.json``: ``model`` (string, default
 ``"haiku"``), ``effort`` (one of low/medium/high/xhigh/max, default ``"medium"``
-— the judge's reasoning effort), and ``enabled`` (bool, default ``true``) — the
+— the judge's reasoning effort), ``enabled`` (bool, default ``true``) — the
 session-start value of the single master switch that turns BOTH the evidence judge
-and the approval gate on or off. Unknown keys are ignored; a missing or malformed
-file falls back to all defaults. The judge always reads the repo
-(Read/Grep/Glob/Bash) to verify claims. The ``turn`` skill flips ``enabled`` per
-session.
+and the approval gate on or off, and ``mode`` (``"headless"``|``"subagent"``,
+default ``"headless"``) — how the Stop-time evidence judge runs (in-hook headless
+judge vs. dispatch the ``guardian`` subagent). Unknown keys are ignored; a missing
+or malformed file falls back to all defaults. The judge always reads the repo
+(Read/Grep/Glob/Bash) to verify claims. The ``turn`` skill flips ``enabled`` and
+the ``mode`` skill flips ``mode`` per session.
 """
 
 from __future__ import annotations
@@ -81,9 +91,15 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "model": "haiku",
     "effort": "medium",
     "enabled": True,
+    "mode": "headless",
 }
 
 VALID_EFFORTS = {"low", "medium", "high", "xhigh", "max"}
+# How the Stop-time evidence judge runs. "headless": spawn an isolated `claude`
+# inside the hook and block the turn (the original path). "subagent": the hook does
+# not judge/block — it injects the turn + verified paths as additionalContext and
+# the main agent dispatches the `guardian` subagent to audit.
+VALID_MODES = {"headless", "subagent"}
 
 # Tools the approval gate blocks before approval. Bash is intentionally NOT gated:
 # guard only guards the dedicated file-editing tools, and lets shell commands run.
@@ -129,6 +145,15 @@ def _verified_file(project_dir: Path, session_id: str) -> Path:
     return _state_root(project_dir) / "verified" / f"{session_id}.jsonl"
 
 
+def _refs_dir(project_dir: Path) -> Path:
+    """Directory where the evidence-first style saves local copies of cited docs.
+
+    Writes here are the assistant grounding its own claims (per the output style),
+    not implementing the user's task — so the approval gate exempts them.
+    """
+    return _state_root(project_dir) / "refs"
+
+
 def _trace_file(project_dir: Path) -> Path:
     return _state_root(project_dir) / TRACE_FILE_NAME
 
@@ -169,8 +194,9 @@ def _read_payload() -> dict | None:
 
 
 _SESSION_ID_RE = re.compile(r"^[A-Za-z0-9._-]+$")
-# guard's own toggle command, e.g. "/guard:turn on" or "/turn off".
-_TURN_CMD_RE = re.compile(r"^/(guard:)?turn\b", re.IGNORECASE)
+# guard's own control commands, e.g. "/guard:turn on", "/turn off",
+# "/guard:mode subagent". These are handled by UserPromptExpansion, not real turns.
+_CONTROL_CMD_RE = re.compile(r"^/(guard:)?(turn|mode)\b", re.IGNORECASE)
 
 
 def _session_id(payload: dict) -> str | None:
@@ -282,6 +308,9 @@ def _read_state(project_dir: Path, session_id: str, config: dict[str, Any]) -> d
         "enabled": bool(config.get("enabled", True)),
         "approved": False,
         "turn_seq": 0,
+        "mode": _mode(config),
+        "last_audited_seq": 0,
+        "gated_seq": 0,
         "updated_at": None,
     }
     path = _state_file(project_dir, session_id)
@@ -293,8 +322,10 @@ def _read_state(project_dir: Path, session_id: str, config: dict[str, Any]) -> d
         return default
     if not isinstance(data, dict):
         return default
-    keys = ("enabled", "approved", "turn_seq", "updated_at")
+    keys = ("enabled", "approved", "turn_seq", "mode", "last_audited_seq", "gated_seq", "updated_at")
     default.update({k: data[k] for k in keys if k in data})
+    if default["mode"] not in VALID_MODES:
+        default["mode"] = "headless"
     return default
 
 
@@ -377,6 +408,11 @@ def _read_verified_facts(project_dir: Path, session_id: str) -> list[dict[str, s
 def _effort(config: dict[str, Any]) -> str:
     value = str(config.get("effort", "medium")).lower()
     return value if value in VALID_EFFORTS else "medium"
+
+
+def _mode(config: dict[str, Any]) -> str:
+    value = str(config.get("mode", "headless")).lower()
+    return value if value in VALID_MODES else "headless"
 
 
 def run_judge(
@@ -598,11 +634,11 @@ def cmd_user_prompt() -> int:
     prompt = payload.get("prompt")
     prompt = prompt if isinstance(prompt, str) else ""
 
-    # guard's own control command (`/guard:turn ...`) is not a real turn — the
-    # UserPromptExpansion `toggle` handles it. Don't log it, don't start a turn,
-    # don't judge it.
-    if _TURN_CMD_RE.match(prompt.strip()):
-        _trace(project_dir, session_id, "user-prompt", "skip_turn_cmd")
+    # guard's own control commands (`/guard:turn ...`, `/guard:mode ...`) are not
+    # real turns — UserPromptExpansion (`toggle` / `set-mode`) handles them. Don't
+    # log, don't start a turn, don't judge.
+    if _CONTROL_CMD_RE.match(prompt.strip()):
+        _trace(project_dir, session_id, "user-prompt", "skip_control_cmd")
         return 0
 
     _append_log(project_dir, session_id, {"role": "user", "text": prompt})
@@ -683,6 +719,47 @@ def cmd_toggle() -> int:
     return 0
 
 
+def cmd_set_mode() -> int:
+    """UserPromptExpansion for `/guard:mode [headless|subagent]`. Set the session's
+    evidence-judge mode; no/unknown arg reports the current mode only."""
+    project_dir = _project_dir()
+    payload = _read_payload()
+    if payload is None or project_dir is None:
+        return 0
+    session_id = _session_id(payload)
+    if session_id is None:
+        return 0
+
+    prompt = payload.get("prompt")
+    arg = ""
+    if isinstance(prompt, str):
+        # prompt looks like "/guard:mode subagent" — take the last token.
+        tokens = prompt.strip().split()
+        if tokens:
+            tail = tokens[-1].lower()
+            if tail in VALID_MODES:
+                arg = tail
+
+    config = _load_config(project_dir)
+    state = _read_state(project_dir, session_id, config)
+    if arg:
+        state["mode"] = arg
+    # no/unknown arg → report only; leave mode unchanged
+    _write_state(project_dir, session_id, state)
+
+    if state["mode"] == "subagent":
+        msg = ("guard evidence judge mode: subagent for this session. The Stop hook "
+               "will ask the main agent to dispatch the guardian subagent to audit "
+               "each turn (it does not block).")
+    else:
+        msg = ("guard evidence judge mode: headless for this session. The Stop hook "
+               "runs an isolated judge and blocks the turn on unsupported claims.")
+    output = {"hookSpecificOutput": {"hookEventName": "UserPromptExpansion", "additionalContext": msg}}
+    json.dump(output, sys.stdout)
+    _trace(project_dir, session_id, "set-mode", "set", arg=arg, mode=state["mode"])
+    return 0
+
+
 def cmd_gate() -> int:
     project_dir = _project_dir()
     payload = _read_payload()
@@ -703,6 +780,23 @@ def cmd_gate() -> int:
 
     if state["approved"]:
         return 0
+
+    # Exempt the assistant's own evidence store: the evidence-first output style
+    # tells it to save cited docs under `.claude/guard/refs/`. Grounding a claim is
+    # not implementing the user's task, so those writes pass without approval. Note
+    # this is deliberately ONLY refs/ — never the wider `.claude/guard/` tree, so
+    # the model can't write `state/<sid>.json` to arm its own approval.
+    if _targets_refs_dir(project_dir, payload.get("tool_input")):
+        _trace(project_dir, session_id, "gate", "allow_refs", tool=tool_name)
+        return 0
+
+    # Record that this turn had a file edit denied for want of approval. The Stop
+    # judge reads this and skips auditing the turn: after a gate denial the response
+    # is a plan / approval request, not a body of technical claims to ground.
+    seq = int(state.get("turn_seq", 0))
+    if seq > 0 and int(state.get("gated_seq", 0)) != seq:
+        state["gated_seq"] = seq
+        _write_state(project_dir, session_id, state)
 
     reason = (
         "guard: file changes are gated until you have explicit approval.\n\n"
@@ -726,6 +820,29 @@ def cmd_gate() -> int:
 
 def _is_mutating(tool_name: Any) -> bool:
     return tool_name in MUTATING_TOOLS
+
+
+def _targets_refs_dir(project_dir: Path, tool_input: Any) -> bool:
+    """True when a mutating tool's target path is inside `.claude/guard/refs/`.
+
+    Reads the file path from the PreToolUse `tool_input` (`file_path` for
+    Write/Edit/MultiEdit, `notebook_path` for NotebookEdit). Resolves both sides so
+    a relative path or `..` cannot smuggle a write outside refs/ past the check.
+    """
+    if not isinstance(tool_input, dict):
+        return False
+    raw = tool_input.get("file_path") or tool_input.get("notebook_path")
+    if not isinstance(raw, str) or not raw:
+        return False
+    try:
+        refs = _refs_dir(project_dir).resolve()
+        target = Path(raw)
+        if not target.is_absolute():
+            target = (project_dir / target)
+        target = target.resolve()
+    except OSError:
+        return False
+    return target == refs or refs in target.parents
 
 
 def cmd_post_tool() -> int:
@@ -755,6 +872,82 @@ def cmd_post_tool() -> int:
     turn.setdefault("tools", []).append({"command": command, "output": output})
     _write_turn(project_dir, session_id, turn)
     _trace(project_dir, session_id, "post-tool", "recorded", tool=tool_name, seq=seq)
+    return 0
+
+
+def cmd_record_verified() -> int:
+    """Append verified facts for a passed turn (subagent-mode single writer).
+
+    The ``guardian`` subagent calls this via Bash on a PASS so its confirmed claims
+    accumulate in ``verified/<sid>.jsonl`` exactly as the headless path does through
+    ``_append_verified``. Funneling the write through the dispatcher keeps state
+    writes single-writer and needs no approval (Bash is never gated).
+
+    Stdin payload: ``{session_id, seq, claims: [{claim, evidence}, ...]}``.
+    """
+    project_dir = _project_dir()
+    payload = _read_payload()
+    if payload is None or project_dir is None:
+        return 0
+    session_id = _session_id(payload)
+    if session_id is None:
+        return 0
+    try:
+        seq = int(payload.get("seq", 0))
+    except (TypeError, ValueError):
+        seq = 0
+    raw_claims = payload.get("claims")
+    if not isinstance(raw_claims, list):
+        return 0
+    # Reuse _append_verified: it keeps only supported claims, so mark each supported.
+    verdict = {
+        "claims": [
+            {"claim": c.get("claim", ""), "evidence": c.get("evidence", ""), "supported": True}
+            for c in raw_claims
+            if isinstance(c, dict) and c.get("claim")
+        ]
+    }
+    _append_verified(project_dir, session_id, seq, verdict)
+    _trace(project_dir, session_id, "record-verified", "recorded",
+           seq=seq, n=len(verdict["claims"]))
+    return 0
+
+
+def _stop_subagent(project_dir: Path, session_id: str, state: dict[str, Any], seq: int) -> int:
+    """Subagent mode Stop: inject a dispatch instruction instead of judging inline.
+
+    Emits ``hookSpecificOutput.additionalContext`` (no ``decision``) naming the turn
+    record, the verified-facts store, and this dispatcher, so the main agent can
+    dispatch the ``guard:guardian`` subagent. Guarded to fire once per turn via
+    ``last_audited_seq`` — parity with the headless path judging a turn only once.
+    """
+    if seq <= 0:
+        return 0
+    if int(state.get("last_audited_seq", 0)) == seq:
+        _trace(project_dir, session_id, "stop", "skip_audited", seq=seq)
+        return 0
+    state["last_audited_seq"] = seq
+    _write_state(project_dir, session_id, state)
+
+    turn_path = _turn_file(project_dir, session_id, seq).resolve()
+    verified_path = _verified_file(project_dir, session_id).resolve()
+    dispatcher = Path(__file__).resolve()
+    context = (
+        "guard (subagent mode): audit the turn that just finished before wrapping up. "
+        "Dispatch the guardian subagent with the Agent tool "
+        "(subagent_type: \"guard:guardian\"), passing it these inputs verbatim:\n"
+        f"- session_id: {session_id}\n"
+        f"- seq: {seq}\n"
+        f"- turn_file: {turn_path}\n"
+        f"- verified_file: {verified_path}\n"
+        f"- dispatcher: {dispatcher}\n"
+        "guardian reads the turn record, audits it for unsupported claims and "
+        "resolvable deferrals, records the verified facts on a pass, and reports any "
+        "violations back. If it reports violations, address them; otherwise continue."
+    )
+    output = {"hookSpecificOutput": {"hookEventName": "Stop", "additionalContext": context}}
+    json.dump(output, sys.stdout)
+    _trace(project_dir, session_id, "stop", "dispatch_guardian", seq=seq)
     return 0
 
 
@@ -791,6 +984,22 @@ def cmd_stop() -> int:
 
     if not state["enabled"] or not response.strip():
         return 0
+
+    # Skip auditing a turn the approval gate denied a file edit in. After a gate
+    # denial the assistant's message is a plan / approval request (the work was
+    # blocked before it happened), not a body of technical claims to ground — the
+    # evidence judge has nothing legitimate to check. Applies to both modes.
+    if seq > 0 and int(state.get("gated_seq", 0)) == seq:
+        _trace(project_dir, session_id, "stop", "skip_gated", seq=seq)
+        return 0
+
+    # Subagent mode: the hook does not judge or block. It hands the turn off to the
+    # main agent, which dispatches the `guardian` subagent to audit. We inject the
+    # turn + verified paths as additionalContext (docs: a Stop hook may emit
+    # additionalContext WITHOUT `decision`, and the conversation continues so the
+    # agent can act on it — .claude/guard/refs/stop-hook-output.md).
+    if state["mode"] == "subagent":
+        return _stop_subagent(project_dir, session_id, state, seq)
 
     # Facts verified in earlier passed turns are reusable evidence: a claim that
     # matches one need not be re-derived. Provide them as VERIFIED_FACTS context.
@@ -924,8 +1133,10 @@ def cmd_session_start() -> int:
 SUBCOMMANDS = {
     "user-prompt": cmd_user_prompt,
     "toggle": cmd_toggle,
+    "set-mode": cmd_set_mode,
     "gate": cmd_gate,
     "post-tool": cmd_post_tool,
+    "record-verified": cmd_record_verified,
     "stop": cmd_stop,
     "session-start": cmd_session_start,
 }

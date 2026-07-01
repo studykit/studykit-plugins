@@ -21,8 +21,10 @@ guard adds three layers of control over the assistant's responses and actions:
    deferrals**: if the assistant punts on something the code would answer — "open
    question", "TBD", "deferred", "needs investigation", "결정 안 됨" — guard sends it
    back to read the code and resolve it. Genuine product/policy decisions that need
-   you are left alone. The review runs as a separate check, so it adds some latency
-   and model usage to each turn.
+   you are left alone. The review runs in one of two **modes** (see
+   [Review modes](#review-modes)): a separate headless check that blocks the turn,
+   or an in-session `guardian` subagent you can watch. Either way it adds some
+   latency and model usage to each turn.
 
 3. **Approval gate** — guard blocks the file-editing tools (Write/Edit/MultiEdit/
    NotebookEdit) until you have given an explicit instruction to implement, in your
@@ -70,6 +72,27 @@ the approval gate together. Toggle it per session with the `turn` skill:
 /guard:turn         # report the current state
 ```
 
+### Review modes
+
+The evidence review can run two ways. Switch per session with the `mode` skill:
+
+```
+/guard:mode headless     # in-hook review that blocks the turn (default)
+/guard:mode subagent      # dispatch the guardian subagent to review in-session
+/guard:mode               # report the current mode
+```
+
+- **headless** (default) — the review runs as a separate, hidden `claude` check and
+  **blocks** the turn until unsupported claims are grounded or resolvable deferrals
+  are resolved.
+- **subagent** — instead of blocking, guard asks the assistant to dispatch a
+  `guardian` subagent that reviews the finished turn in your session (so you can see
+  it), reports anything it finds for the assistant to fix, and remembers the facts
+  that passed. Both modes apply the same checks; this one keeps the review visible
+  and reuses your main model.
+
+Set the session-start default with the `mode` key in configuration (below).
+
 ### The approval gate
 
 While guard is on and a task is still under discussion, any attempt to change files
@@ -86,7 +109,8 @@ Configuration is optional. Create `.claude/guard.local.json` in your project:
 {
   "model": "haiku",
   "effort": "medium",
-  "enabled": true
+  "enabled": true,
+  "mode": "headless"
 }
 ```
 
@@ -95,9 +119,12 @@ Configuration is optional. Create `.claude/guard.local.json` in your project:
 | `model` | Model the evidence review runs on | `"haiku"` |
 | `effort` | Review reasoning effort (`low`/`medium`/`high`/`xhigh`/`max`) | `"medium"` |
 | `enabled` | Session-start default for guard (evidence judge + approval gate) | `true` |
+| `mode` | Session-start review mode (`headless`/`subagent`, see [Review modes](#review-modes)) | `"headless"` |
 
-The evidence review always reads your repository to verify cited claims. A
-`guard.local.json.example` file ships with the plugin as a starting point.
+`model` and `effort` apply to the **headless** review; the **subagent** review runs
+on the `guardian` agent's own model. The evidence review always reads your repository
+to verify cited claims. A `guard.local.json.example` file ships with the plugin as a
+starting point.
 
 ## Logs
 
