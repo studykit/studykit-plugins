@@ -30,6 +30,8 @@ The `global/` directory manages rules, subagents, skills, hooks, and MCP configu
 
 When creating an `AGENTS.md` instruction file, always create a sibling `CLAUDE.md` file that imports it with exactly `@AGENTS.md`. Keep shared instructions in `AGENTS.md`; use `CLAUDE.md` only as the Claude Code import shim unless a location explicitly requires Claude-only instructions.
 
+Every `AGENTS.md` file must be organized as a map of contents: a concise, navigable index that orients the reader and points to where the detail actually lives (deeper docs, `dev/` design notes, source), rather than inlining long procedures or walkthroughs.
+
 ## Plugin README Scope
 
 Each plugin's `plugins/<name>/README.md` is written for **end users who install the plugin from the marketplace**. It is not a contributor guide and is not context for the assistant at runtime.
