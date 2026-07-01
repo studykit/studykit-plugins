@@ -29,12 +29,13 @@ Subcommands
                  records the turn's ``prompt_id`` in ``gated_prompt_id`` so Stop skips
                  auditing a plan/approval-request response. Writes under
                  ``.claude/guard/refs/`` are exempt (the evidence-first style saves
-                 cited docs there), as are git-ignored writes — scratch/temp, local
-                 config (``**/*.local.*``), and skill-authored docs like ``/handoff`` →
-                 ``.handover/`` — since those don't mutate tracked project source
-                 (``git check-ignore``); guard's OWN config/state tree is excluded from
-                 that exemption so the model can't self-arm or disable the judge. Reads
-                 state (+ one ``git check-ignore``) — no judge call. Bash and all
+                 cited docs there), as are writes that don't touch tracked project
+                 source — targets outside the project dir (e.g. the scratchpad) and
+                 git-ignored writes inside it (scratch/temp, ``**/*.local.*``,
+                 skill-authored docs like ``/handoff`` → ``.handover/``); guard's OWN
+                 config/state tree is excluded from those exemptions so the model can't
+                 self-arm or disable the judge. Reads state (+ at most one
+                 ``git check-ignore``) — no judge call. Bash and all
                  read/search tools always pass.
 - record-verified Append verified facts for a passed turn. Called by the guardian
                  subagent (subagent mode) via Bash so its confirmed claims reach the
@@ -990,16 +991,24 @@ def cmd_gate() -> int:
         _trace(project_dir, session_id, "gate", "allow_refs", tool=tool_name)
         return 0
 
-    # Exempt writes that don't mutate the user's tracked project source: git-ignored
-    # scratch / temp files, local config (`**/*.local.*`), and skill-authored docs
-    # (e.g. `/handoff` writing to a git-ignored `.handover/`). The gate exists to guard
-    # the user's task edits, not this throwaway/side output. EXCLUDING guard's own
-    # config + state tree, which are git-ignored too but must stay gated so the model
-    # can't self-arm or disable the judge (see _is_guard_owned).
+    # Exempt writes that don't mutate the user's tracked project source. The gate
+    # guards the user's task edits, not throwaway / side output. Two cases, both
+    # EXCLUDING guard's own config + state tree (see _is_guard_owned) so the model
+    # can't self-arm or disable the judge:
+    #   1. Outside the project dir entirely — e.g. the session scratchpad under
+    #      /private/tmp. Not project source, and Bash can already write there ungated,
+    #      so gating the file-edit tools here is pure friction. (git check-ignore can't
+    #      classify an out-of-repo path, so this is a separate check.)
+    #   2. git-ignored inside the repo — scratch/temp, local config (`**/*.local.*`),
+    #      skill-authored docs (e.g. `/handoff` → `.handover/`).
     target = _tool_target_path(project_dir, tool_input)
-    if target is not None and not _is_guard_owned(project_dir, target) and _git_ignored(project_dir, target):
-        _trace(project_dir, session_id, "gate", "allow_gitignored", tool=tool_name)
-        return 0
+    if target is not None and not _is_guard_owned(project_dir, target):
+        if _is_outside_project(project_dir, target):
+            _trace(project_dir, session_id, "gate", "allow_outside_repo", tool=tool_name)
+            return 0
+        if _git_ignored(project_dir, target):
+            _trace(project_dir, session_id, "gate", "allow_gitignored", tool=tool_name)
+            return 0
 
     # Record that this turn had a file edit denied for want of approval. The Stop
     # judge reads this and skips auditing the turn: after a gate denial the response
@@ -1086,6 +1095,17 @@ def _is_guard_owned(project_dir: Path, target: Path) -> bool:
     except OSError:
         return True
     return target == config_path or target == state_root or state_root in target.parents
+
+
+def _is_outside_project(project_dir: Path, target: Path) -> bool:
+    """True when the resolved target is not the project dir and not under it — i.e. a
+    write outside the guarded repo (e.g. the session scratchpad under /private/tmp).
+    Fail toward inside (keep gating) if the project dir can't be resolved."""
+    try:
+        root = project_dir.resolve()
+    except OSError:
+        return False
+    return target != root and root not in target.parents
 
 
 def _git_ignored(project_dir: Path, target: Path) -> bool:
