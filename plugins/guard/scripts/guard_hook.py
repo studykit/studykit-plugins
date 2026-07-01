@@ -33,11 +33,12 @@ Subcommands
 - stop           Stop. A turn == the transcript ``prompt_id``; guard reads the whole
                  turn from Claude Code's transcript (``transcript_path`` +
                  ``prompt_id``, both in the payload) via ``_read_turn_from_transcript``
-                 — user request, tool activity, user-run ``!`` commands, and response.
-                 Skips when guard is off, ``stop_hook_active``, the prompt_id/
-                 transcript are absent, the turn was gated (``gated_prompt_id``), or the
-                 turn was opened by a ``!`` command with no assistant work. Otherwise
-                 branch on ``mode``. ``headless``: judge the turn (+ VERIFIED_FACTS) on
+                 — user request, tool activity, and response. Skips when guard is off,
+                 ``stop_hook_active``, the prompt_id/transcript are absent, the turn was
+                 gated (``gated_prompt_id``), or the slice contains a user ``!`` command
+                 (its output arrives after the judged response, so it is neither
+                 evidence nor auditable here). Otherwise branch on ``mode``.
+                 ``headless``: judge the turn (+ VERIFIED_FACTS) on
                  two axes; block on an unsupported claim or repo-resolvable deferral;
                  on PASS append supported claims to the verified store. ``subagent``:
                  do not judge/block — slice the turn to a file and emit
@@ -49,7 +50,7 @@ State lives project-local under ``${CLAUDE_PROJECT_DIR}/.claude/guard/``:
 - ``state/<sid>.json``       — {enabled, approved, mode, last_audited_prompt_id, gated_prompt_id, updated_at}
 - ``sessions/<sid>.jsonl``   — full session archive: one record per turn / verdict
 - ``turns/<sid>/<pid>.json`` — subagent mode only: the turn slice guard hands the
-                                guardian subagent ({user, tools[], user_commands[], assistant})
+                                guardian subagent ({user, tools[], assistant})
 - ``verified/<sid>.jsonl``   — verified facts from PASSED turns: {turn, claim, evidence}
 - ``trace.log``              — file-only debug trace (enabled by GUARD_TRACE)
 
@@ -219,12 +220,16 @@ TOOL_RESULT_MAX_CHARS = 2000
 
 
 # A turn is the transcript's promptId: the typed user prompt plus everything derived
-# from it (assistant text, tool calls, and any `!` commands the user runs before the
-# next prompt). The Stop payload gives us prompt_id + transcript_path, so we read the
-# turn from Claude Code's own transcript rather than maintaining a parallel buffer.
-_BASH_INPUT_RE = re.compile(r"<bash-input>(.*?)</bash-input>", re.DOTALL)
-_BASH_STDOUT_RE = re.compile(r"<bash-stdout>(.*?)</bash-stdout>", re.DOTALL)
-_BASH_STDERR_RE = re.compile(r"<bash-stderr>(.*?)</bash-stderr>", re.DOTALL)
+# from it (assistant text, tool calls). The Stop payload gives us prompt_id +
+# transcript_path, so we read the turn from Claude Code's own transcript rather than
+# maintaining a parallel buffer.
+#
+# A user `!` command does NOT open its own promptId — it inherits the preceding typed
+# prompt's id, and its <bash-input>/<bash-stdout> records are appended to that turn's
+# slice AFTER the responses guard already judged (evidence arriving later than the
+# claims it would support). guard therefore does not treat `!` output as evidence and
+# does not judge a turn whose slice contains one; we only need to detect the tag.
+_BASH_TAG = "<bash-input>"
 
 
 def _message_of(record: Any) -> dict[str, Any]:
@@ -235,17 +240,20 @@ def _message_of(record: Any) -> dict[str, Any]:
 def _read_turn_from_transcript(transcript_path: Any, prompt_id: Any) -> dict[str, Any] | None:
     """Reconstruct a turn from Claude Code's transcript, sliced by ``prompt_id``.
 
-    Returns ``{user, tools[], user_commands[]}`` or None (fail-open) when the
+    Returns ``{user, tools[], has_user_command}`` or None (fail-open) when the
     transcript is unreadable or the prompt_id is not found.
 
     A turn is anchored on the FIRST record whose top-level ``promptId == prompt_id``
     (origin-agnostic — a turn opened by a typed prompt has ``origin.kind=human`` and
-    str content, but a turn opened by a `!` command has ``origin=None`` and str
-    content carrying ``<bash-input>``; both carry the turn's promptId, verified). The
-    turn's derived records (assistant text, tool_use/tool_result, further `!`
-    commands) carry ``promptId=None`` and stay in the slice; the slice ends at the
-    first record whose non-empty ``promptId`` differs (the next turn). ``isMeta``
-    records (guard's own injected feedback) are skipped.
+    str content; both typed and `!`-command records carry the turn's promptId,
+    verified). The turn's derived records (assistant text, tool_use/tool_result) carry
+    ``promptId=None`` and stay in the slice; the slice ends at the first record whose
+    non-empty ``promptId`` differs (the next turn). ``isMeta`` records (guard's own
+    injected feedback) are skipped.
+
+    ``!`` command records (``<bash-input>``…) are not evidence and are not rendered;
+    we only set ``has_user_command`` so the Stop path can skip judging that turn (the
+    `!` output arrives in the slice after the responses guard would judge).
     """
     if not isinstance(transcript_path, str) or not isinstance(prompt_id, str) or not prompt_id:
         return None
@@ -259,29 +267,8 @@ def _read_turn_from_transcript(transcript_path: Any, prompt_id: Any) -> dict[str
 
     user = ""
     tools: list[dict[str, str]] = []
-    user_commands: list[dict[str, str]] = []
+    has_user_command = False
     in_turn = False
-
-    def _record_bash(content: str) -> None:
-        # A user `!` command spans two transcript records: one carries
-        # <bash-input>CMD</bash-input>, the NEXT carries
-        # <bash-stdout>OUT</bash-stdout><bash-stderr>ERR</bash-stderr>. Merge the
-        # output record into the open command entry rather than starting a new one.
-        cmd = _BASH_INPUT_RE.search(content)
-        out = _BASH_STDOUT_RE.search(content)
-        err = _BASH_STDERR_RE.search(content)
-        if cmd:
-            user_commands.append({
-                "command": cmd.group(1).strip(),
-                "stdout": (out.group(1).strip() if out else ""),
-                "stderr": (err.group(1).strip() if err else ""),
-            })
-        elif (out or err) and user_commands and not user_commands[-1]["stdout"] \
-                and not user_commands[-1]["stderr"]:
-            if out:
-                user_commands[-1]["stdout"] = out.group(1).strip()
-            if err:
-                user_commands[-1]["stderr"] = err.group(1).strip()
 
     for line in lines:
         line = line.strip()
@@ -313,8 +300,10 @@ def _read_turn_from_transcript(transcript_path: Any, prompt_id: Any) -> dict[str
         msg = _message_of(rec)
         content = msg.get("content")
         if isinstance(content, str):
-            if "<bash-input>" in content or "<bash-stdout>" in content or "<bash-stderr>" in content:
-                _record_bash(content)
+            if _BASH_TAG in content or "<bash-stdout>" in content or "<bash-stderr>" in content:
+                # A user `!` command (input or output record). Not evidence; flag the
+                # turn so Stop skips judging it, and do not collect it.
+                has_user_command = True
             elif not user:
                 # The turn's typed human prompt (first non-bash str user record).
                 user = content
@@ -348,11 +337,11 @@ def _read_turn_from_transcript(transcript_path: Any, prompt_id: Any) -> dict[str
                     tools.append({"command": "[tool_result]", "output": out})
     if not in_turn:
         return None
-    return {"user": user, "tools": tools, "user_commands": user_commands}
+    return {"user": user, "tools": tools, "has_user_command": has_user_command}
 
 
 def _render_turn_for_judge(turn: dict[str, Any]) -> str:
-    """Render a whole turn (user + tools + user `!` commands) for the judge."""
+    """Render a whole turn (user request + tool activity + response) for the judge."""
     tool_parts: list[str] = []
     for t in turn.get("tools", []):
         if not isinstance(t, dict):
@@ -365,34 +354,11 @@ def _render_turn_for_judge(turn: dict[str, Any]) -> str:
     if len(tools_text) > TOOL_CONTEXT_MAX_CHARS:
         tools_text = "…(earlier tool activity omitted)\n" + tools_text[-TOOL_CONTEXT_MAX_CHARS:]
 
-    parts = [
+    return "\n\n".join([
         "<<<USER_REQUEST\n" + str(turn.get("user", "")) + "\nUSER_REQUEST",
         "<<<TOOL_ACTIVITY\n" + tools_text + "\nTOOL_ACTIVITY",
-    ]
-
-    cmd_parts: list[str] = []
-    for c in turn.get("user_commands", []):
-        if not isinstance(c, dict):
-            continue
-        out = str(c.get("stdout", ""))
-        if c.get("stderr"):
-            out = (out + "\n[stderr] " + str(c["stderr"])).strip()
-        if len(out) > TOOL_RESULT_MAX_CHARS:
-            out = out[:TOOL_RESULT_MAX_CHARS] + "\n…(truncated)"
-        cmd_parts.append(f"$ {c.get('command', '')}\n→ {out}")
-    if cmd_parts:
-        cmds_text = "\n\n".join(cmd_parts)
-        if len(cmds_text) > TOOL_CONTEXT_MAX_CHARS:
-            cmds_text = "…(earlier commands omitted)\n" + cmds_text[-TOOL_CONTEXT_MAX_CHARS:]
-        parts.append(
-            "<<<USER_COMMANDS (commands the USER ran directly this turn — first-class "
-            "evidence)\n" + cmds_text + "\nUSER_COMMANDS"
-        )
-
-    parts.append(
-        "<<<ASSISTANT_RESPONSE\n" + str(turn.get("assistant", "")) + "\nASSISTANT_RESPONSE"
-    )
-    return "\n\n".join(parts)
+        "<<<ASSISTANT_RESPONSE\n" + str(turn.get("assistant", "")) + "\nASSISTANT_RESPONSE",
+    ])
 
 
 def _load_config(project_dir: Path) -> dict[str, Any]:
@@ -655,11 +621,6 @@ EVIDENCE_SYSTEM = (
     "actually ran this turn and their output. Treat that output as first-class "
     "evidence — a claim that restates or directly follows from a command's output in "
     "TOOL_ACTIVITY is SUPPORTED even if the response does not re-cite it.\n\n"
-    "A USER_COMMANDS block may also precede the response: these are commands the USER "
-    "ran directly this turn (via the `!` prefix) and their output. Treat that output "
-    "as first-class evidence exactly like TOOL_ACTIVITY — a claim that restates or "
-    "directly follows from a USER_COMMANDS output is SUPPORTED even if the response "
-    "does not re-cite it.\n\n"
     "A VERIFIED_FACTS block may also precede the response: these are claims already "
     "confirmed (with their evidence) in earlier turns of this session. Treat them as "
     "established — a claim consistent with a verified fact is SUPPORTED and need not "
@@ -1014,12 +975,15 @@ def _stop_subagent(project_dir: Path, session_id: str, state: dict[str, Any],
         _trace(project_dir, session_id, "stop", "skip_audited", prompt_id=prompt_id)
         return 0
 
-    # Write this turn's slice (user + tools + user_commands + assistant) to a file.
+    # Write this turn's slice ({user, tools, assistant}) to a file. The internal
+    # has_user_command flag (always False here — a `!` turn is skipped before this
+    # path) is not part of the guardian's schema, so drop it.
+    slice_out = {k: v for k, v in turn.items() if k != "has_user_command"}
     turn_path = _turn_slice_file(project_dir, session_id, prompt_id)
     try:
         turn_path.parent.mkdir(parents=True, exist_ok=True)
         tmp = turn_path.with_suffix(".json.tmp")
-        tmp.write_text(json.dumps(turn, ensure_ascii=False), encoding="utf-8")
+        tmp.write_text(json.dumps(slice_out, ensure_ascii=False), encoding="utf-8")
         tmp.replace(turn_path)
     except OSError:
         _trace(project_dir, session_id, "stop", "slice_write_failed", prompt_id=prompt_id)
@@ -1040,7 +1004,7 @@ def _stop_subagent(project_dir: Path, session_id: str, state: dict[str, Any],
         f"- verified_file: {verified_path}\n"
         f"- dispatcher: {dispatcher}\n"
         "guardian reads the turn record at turn_file "
-        "(`{user, tools[], user_commands[], assistant}`), audits it for unsupported "
+        "(`{user, tools[], assistant}`), audits it for unsupported "
         "claims and resolvable deferrals, records the verified facts on a pass, and "
         "reports any violations back. If it reports violations, address them; "
         "otherwise continue."
@@ -1096,15 +1060,18 @@ def cmd_stop() -> int:
     if turn is None:
         _trace(project_dir, session_id, "stop", "skip_no_turn", prompt_id=prompt_id)
         return 0
-    turn["assistant"] = response
 
-    # NOTE: there is intentionally no "bash-only turn" skip here. A user `!` command
-    # never opens its own promptId — it folds into the most recent typed prompt's
-    # turn (verified empirically on Claude Code 2.1.197: `!date`/`!pwd` run after a
-    # reply still carried the preceding prompt's promptId; a following typed query
-    # got a fresh one). So a turn whose slice has user_commands but no typed `user`
-    # is not observed. If a future runtime produced one, it would fall through to the
-    # normal judge path and be audited on its USER_COMMANDS evidence — harmless.
+    # Skip judging a turn whose slice contains a user `!` command. A `!` command
+    # inherits the preceding typed prompt's promptId (verified on 2.1.197: `!git push`
+    # ran after a reply carried that reply's promptId), and its <bash-input>/
+    # <bash-stdout> records land in the slice AFTER the responses guard already judged
+    # — the `!` output is evidence that arrives later than the claims it would support,
+    # so it cannot be judged coherently within this turn. Do not treat `!` as evidence
+    # and do not audit the turn it appears in.
+    if turn.get("has_user_command"):
+        _trace(project_dir, session_id, "stop", "skip_user_command", prompt_id=prompt_id)
+        return 0
+    turn["assistant"] = response
 
     # Subagent mode: the hook does not judge or block. It hands the turn off to the
     # main agent, which dispatches the `guardian` subagent to audit. We inject the

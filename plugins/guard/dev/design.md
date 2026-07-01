@@ -25,9 +25,9 @@ Stop it reconstructs the turn from Claude Code's transcript, sliced by `prompt_i
 - `state/<sid>.json` — `{enabled, approved, mode, last_audited_prompt_id, gated_prompt_id, updated_at}`.
 - `sessions/<sid>.jsonl` — full session archive, one line per user/assistant/gate/judge record.
 - `turns/<sid>/<prompt_id>.json` — **subagent mode only**: the turn slice guard cut
-  from the transcript (`{user, tools[], user_commands[], assistant}`) and hands to the
-  `guardian` subagent, so guardian reads one turn, not the whole transcript. Headless
-  mode judges in-process and writes no turn file.
+  from the transcript (`{user, tools[], assistant}`) and hands to the `guardian`
+  subagent, so guardian reads one turn, not the whole transcript. Headless mode judges
+  in-process and writes no turn file.
 - `verified/<sid>.jsonl` — supported claims from PASSED turns only (`{ts, turn, claim,
   evidence}`, `turn` = prompt_id), replayed to later Stops as a VERIFIED_FACTS block
   so an established fact isn't re-derived. Only passed turns contribute, so a
@@ -62,10 +62,14 @@ age-based `SessionStart` sweep is the only reaper. There is no SessionEnd hook.
   dispatcher (`record-verified` for guardian, direct for headless) — never a parallel
   writer. This is the one intentional break from per-turn isolation, and only passed,
   evidence-backed claims cross the boundary, never raw prior-turn text.
-- **Command output is first-class evidence** — both assistant tool activity and
-  user-run `!` commands (rendered as USER_COMMANDS). `!` output reaches guard no other
-  way (it is absent from every hook payload), which is the whole reason Stop reads the
-  transcript rather than a self-built buffer.
+- **Assistant tool output is first-class evidence** (rendered as TOOL_ACTIVITY) — a
+  claim that restates or follows from a command's output there is supported without a
+  re-cite. **User-run `!` commands are NOT evidence and their turn is not judged.** A
+  `!` command inherits the preceding typed prompt's promptId, so its output records
+  land in the slice *after* the response guard already judged — the evidence would
+  arrive later than the claims it supports, and cannot be judged coherently in that
+  turn. `_read_turn_from_transcript` flags the turn (`has_user_command`) and `cmd_stop`
+  skips it (`skip_user_command`); the `!` records are never collected or rendered.
 - **The gate is state-only** (no judge call, so PreToolUse stays fast). It gates only
   `MUTATING_TOOLS`; Bash and reads/searches always pass.
 - **Refs exemption.** The gate lets an unapproved write through only when the target
