@@ -18,4 +18,6 @@ flow.
 external contracts (the `MessageDisplay` hook payload/cadence and the PlantUML PicoWeb
 bridge, each cited to a saved ref), the env configuration, the vendored-frontend notes,
 and the tracked open questions. **`dev/vendor.md`** holds the browser-library rebuild /
-version-bump procedure.
+version-bump procedure. **`dev/transcript-schema.md`** holds the reverse-engineered
+schema of Claude Code's stored session transcripts (`~/.claude/projects/*/*.jsonl`),
+for the session-management workstream (browse / render stored sessions).
