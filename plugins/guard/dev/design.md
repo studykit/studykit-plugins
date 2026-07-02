@@ -12,11 +12,12 @@ line-by-line walkthrough.
 | --- | --- | --- |
 | `UserPromptSubmit` | `user-prompt` | Update approval state. Ignores `/guard:turn` / `/guard:mode` / `/guard:exempt`. |
 | `UserPromptExpansion` (matcher `(guard:)?turn`) | `toggle` | Flip session `enabled` (judge + gate). |
-| `UserPromptExpansion` (matcher `(guard:)?mode`) | `set-mode` | Set session `mode` (`headless`\|`subagent`). |
+| `UserPromptExpansion` (matcher `(guard:)?mode`) | `set-mode` | Set session `mode` (`manual`\|`subagent`\|`headless`). |
+| `UserPromptExpansion` (matcher `(guard:)?verify`) | `verify` | On demand, dispatch the guardian for the last completed turn (`pending_verify_prompt_id`). |
 | `PreToolUse` (`Write\|Edit\|MultiEdit\|NotebookEdit`) | `gate` | Deny file edits until approved. |
 | (called via Bash, not a hook) | `record-verified` | Guardian appends a passed turn's claims to the verified store. |
 | (called via Bash, not a hook) | `exempt` | `guard:exempt` skill records the user's confirmed `exempt_skills` selection (that key only). |
-| `Stop` | `stop` | Audit the turn (headless judge / subagent dispatch). |
+| `Stop` | `stop` | manual: record pending target, no audit. subagent: dispatch guardian. headless: in-hook judge that blocks. |
 | `SessionStart` | `session-start` | Age-sweep state/sessions/verified/turns. |
 
 ## Storage layout (`${CLAUDE_PROJECT_DIR}/.claude/guard/`)
@@ -24,12 +25,13 @@ line-by-line walkthrough.
 A **turn is the transcript's `promptId`**. guard keeps no turn buffer of its own; at
 Stop it reconstructs the turn from Claude Code's transcript, sliced by `prompt_id`.
 
-- `state/<sid>.json` — `{enabled, approved, mode, last_audited_prompt_id, gated_prompt_id, updated_at}`.
+- `state/<sid>.json` — `{enabled, approved, mode, last_audited_prompt_id, gated_prompt_id, pending_verify_prompt_id, updated_at}`.
 - `sessions/<sid>.jsonl` — full session archive, one line per user/assistant/gate/judge record.
-- `turns/<sid>/<prompt_id>.json` — **subagent mode only**: the turn slice guard cut
-  from the transcript (`{user, tools[], assistant}`) and hands to the `guardian`
-  subagent, so guardian reads one turn, not the whole transcript. Headless mode judges
-  in-process and writes no turn file.
+- `turns/<sid>/<prompt_id>.json` — **subagent and manual modes**: the turn slice guard
+  cut from the transcript (`{user, tools[], assistant}`) and hands to the `guardian`
+  subagent, so guardian reads one turn, not the whole transcript. Subagent mode dispatches
+  immediately; manual mode leaves it for `/guard:verify` (targeting
+  `pending_verify_prompt_id`). Headless mode judges in-process and writes no turn file.
 - `verified/<sid>.jsonl` — supported claims from PASSED turns only (`{ts, turn, claim,
   evidence}`, `turn` = prompt_id), replayed to later Stops as a VERIFIED_FACTS block
   so an established fact isn't re-derived. Only passed turns contribute, so a
@@ -103,13 +105,24 @@ payloads, not memory.
   user-invoked skill reaches the transcript as a namespaced `<command-name>` just like
   a command (skill output is not a body of technical claims to ground). Both modes
   honor it (checked before the `mode` branch).
-- **Two modes, one criteria.** `mode` selects only *how* the Stop audit runs (in-hook
-  judge that blocks vs. dispatch guardian); the two-axis criteria are identical, and
-  `guardian.md` mirrors them in prose. Bad `mode` → `headless`. `set-mode` flips it,
-  mirroring `toggle`.
+- **Three modes, one criteria.** `mode` selects only *how/when* the Stop audit runs —
+  `manual` (default; no auto-audit, `/guard:verify` dispatches on demand), `subagent`
+  (dispatch guardian each turn), or `headless` (in-hook judge that blocks). The two-axis
+  criteria are identical across all three, and `guardian.md` mirrors them in prose. Bad
+  `mode` → the default (`manual`, via `_mode`). `set-mode` flips it, mirroring `toggle`.
+  The approval gate is independent of `mode` (governed by `enabled`), so `manual` narrows
+  auto-verification without weakening the gate.
+- **Manual mode + on-demand verify.** manual-mode Stop archives the turn, writes its
+  slice (shared `_write_turn_slice`), and records `pending_verify_prompt_id` — then emits
+  nothing. `/guard:verify` (`cmd_verify`, UserPromptExpansion) reads that pending target's
+  slice off disk and emits the same guardian-dispatch context as subagent Stop
+  (`_guardian_dispatch_context`), so it needs no transcript access. `/guard:verify` is a
+  control command (in `_CONTROL_CMD_RE`), so its own turn is skipped and never becomes the
+  pending target.
 - **Judge once per turn.** headless relies on the payload's `stop_hook_active`;
   subagent (which never blocks, so that flag won't be set on the next Stop) instead
-  guards on `last_audited_prompt_id == prompt_id`.
+  guards on `last_audited_prompt_id == prompt_id`. manual writes no dispatch, so it needs
+  no once-guard.
 - **Verified facts flow forward through a single writer.** Both modes append via the
   dispatcher (`record-verified` for guardian, direct for headless) — never a parallel
   writer. This is the one intentional break from per-turn isolation, and only passed,
@@ -152,11 +165,11 @@ payloads, not memory.
 
 Parsed by `_load_config`; fail-open to defaults. Keys: `model` (default `"haiku"`),
 `effort` (low/medium/high/xhigh/max, default `"medium"`), `enabled` (bool, default
-`true`), `mode` (`"headless"`|`"subagent"`, default `"headless"`), `exempt_skills`
+`true`), `mode` (`"manual"`|`"subagent"`|`"headless"`, default `"manual"`), `exempt_skills`
 (list of strings, default `[]`) — skills / slash commands whose turn the Stop judge
 skips, named with their plugin namespace (`plugin:skill`, e.g. `guard:turn`) or bare
 for un-namespaced skills, matched leading-`/`-stripped and case-insensitively (guard's
-own `turn`/`mode`/`exempt` control commands are always exempt regardless). Manage
+own `turn`/`mode`/`verify`/`exempt` control commands are always exempt regardless). Manage
 `exempt_skills` interactively with the `guard:exempt` skill (lists session skills →
 AskUserQuestion → records via the `exempt` CLI); no need to hand-edit. Only keys whose value matches the
 default's type are honored (a malformed value can't flip a flag); unknown keys ignored;
