@@ -32,7 +32,18 @@
             "type": "command",
             "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/guard_hook.py\" set-mode",
             "timeout": 5,
-            "description": "Set the session's evidence-judge mode (headless|subagent)."
+            "description": "Set the session's evidence-judge mode (manual|subagent|headless)."
+          }
+        ]
+      },
+      {
+        "matcher": "(guard:)?verify",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/guard_hook.py\" verify",
+            "timeout": 5,
+            "description": "On demand, dispatch the guardian to audit the last completed turn."
           }
         ]
       }

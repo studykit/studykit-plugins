@@ -21,10 +21,11 @@ guard adds three layers of control over the assistant's responses and actions:
    deferrals**: if the assistant punts on something the code would answer — "open
    question", "TBD", "deferred", "needs investigation", "결정 안 됨" — guard sends it
    back to read the code and resolve it. Genuine product/policy decisions that need
-   you are left alone. The review runs in one of two **modes** (see
-   [Review modes](#review-modes)): a separate headless check that blocks the turn,
-   or an in-session `guardian` subagent you can watch. Either way it adds some
-   latency and model usage to each turn.
+   you are left alone. By default the review runs **on demand** — you run
+   [`/guard:verify`](#review-modes) when you want the last turn checked, so ordinary
+   turns cost nothing extra. You can switch to a mode that reviews every turn: an
+   in-session `guardian` subagent you can watch, or a separate headless check that
+   blocks the turn (either adds latency and model usage per turn).
 
 3. **Approval gate** — guard blocks the file-editing tools (Write/Edit/MultiEdit/
    NotebookEdit) until you have given an explicit instruction to implement, in your
@@ -78,25 +79,38 @@ without changing this session. `--global` is reserved for a future user-level de
 
 ### Review modes
 
-The evidence review can run two ways. Switch per session with the `mode` skill:
+By default guard reviews **on demand** — nothing runs automatically when a turn ends.
+When you want the last completed turn checked, run:
 
 ```
-/guard:mode subagent     # dispatch the guardian subagent to review in-session (default)
-/guard:mode headless     # in-hook review that blocks the turn
+/guard:verify            # audit the last completed turn now
+```
+
+guard dispatches the `guardian` subagent to review that turn and report anything it
+finds. Nothing is checked until you ask, so ordinary turns cost nothing extra.
+
+If you'd rather have every turn reviewed automatically, switch the mode per session with
+the `mode` skill:
+
+```
+/guard:mode manual       # on-demand only, via /guard:verify (default)
+/guard:mode subagent     # dispatch the guardian subagent to review every turn in-session
+/guard:mode headless     # in-hook review that blocks each turn
 /guard:mode              # report the current mode
 ```
 
-- **subagent** (default) — guard asks the assistant to dispatch a `guardian` subagent
-  that reviews the finished turn in your session (so you can see it), reports anything
-  it finds for the assistant to fix, and remembers the facts that passed. It does not
-  block; it runs on the `guardian` agent's own model (Haiku by default).
-- **headless** — the review runs as a separate, hidden `claude` check and **blocks**
-  the turn until unsupported claims are grounded or resolvable deferrals are resolved.
-  Both modes apply the same checks.
+- **manual** (default) — no automatic review; run `/guard:verify` when you want one.
+- **subagent** — guard asks the assistant to dispatch a `guardian` subagent that reviews
+  each finished turn in your session (so you can see it), reports anything it finds for
+  the assistant to fix, and remembers the facts that passed. It does not block; it runs
+  on the `guardian` agent's own model (Haiku by default).
+- **headless** — the review runs as a separate, hidden `claude` check and **blocks** the
+  turn until unsupported claims are grounded or resolvable deferrals are resolved.
 
-Set the session-start default with the `mode` key in configuration (below), or
-interactively with `/guard:mode --project <mode>` (writes the default without changing
-the current session). `--global` is reserved for a future user-level default.
+All modes apply the same checks, and `/guard:verify` works in any mode. Set the
+session-start default with the `mode` key in configuration (below), or interactively
+with `/guard:mode --project <mode>` (writes the default without changing the current
+session). `--global` is reserved for a future user-level default.
 
 ### The approval gate
 
@@ -123,7 +137,7 @@ Configuration is optional. Create `.claude/guard.local.json` in your project:
   "model": "haiku",
   "effort": "medium",
   "enabled": true,
-  "mode": "subagent",
+  "mode": "manual",
   "exempt_skills": ["deep-research", "hindsight:review"]
 }
 ```
@@ -133,7 +147,7 @@ Configuration is optional. Create `.claude/guard.local.json` in your project:
 | `model` | Model the **headless** review runs on | `"haiku"` |
 | `effort` | **Headless** review reasoning effort (`low`/`medium`/`high`/`xhigh`/`max`) | `"medium"` |
 | `enabled` | Session-start default for guard (evidence judge + approval gate) | `true` |
-| `mode` | Session-start review mode (`headless`/`subagent`, see [Review modes](#review-modes)) | `"subagent"` |
+| `mode` | Session-start review mode (`manual`/`subagent`/`headless`, see [Review modes](#review-modes)) | `"manual"` |
 | `exempt_skills` | Skills / slash commands whose turn the review skips, named `plugin:skill` (leading `/` and case ignored) | `[]` |
 
 `model` and `effort` apply to the **headless** review only; the **subagent** review
@@ -146,8 +160,8 @@ Use `exempt_skills` for skills or slash commands whose output is a report or a r
 rather than claims about your codebase (e.g. a research skill) — guard won't review the
 turn they run in. List each by the name you invoke after the slash, **including its
 plugin namespace**: `hindsight:review`, `guard:turn`, or a bare name for an
-un-namespaced skill like `deep-research`. guard's own `/guard:turn` and `/guard:mode`
-are always exempt.
+un-namespaced skill like `deep-research`. guard's own `/guard:turn`, `/guard:mode`, and
+`/guard:verify` are always exempt.
 
 You don't have to edit the file by hand. Run `/guard:exempt` and guard shows the
 skills available in your session, lets you pick which to exempt, and records your

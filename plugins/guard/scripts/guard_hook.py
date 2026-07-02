@@ -21,10 +21,15 @@ Subcommands
                  (``enabled``) to guard.local.json (that key only, not the live session);
                  ``--global`` is reserved (reported unsupported).
 - set-mode       UserPromptExpansion (matcher ``(guard:)?mode``). Set the session's
-                 ``mode`` (``headless``|``subagent``) for the Stop-time evidence judge.
-                 A ``--project`` flag instead writes the session-start default (``mode``)
-                 to guard.local.json (that key only, not the live session); ``--global``
-                 is reserved (reported unsupported).
+                 ``mode`` (``manual``|``subagent``|``headless``) for the Stop-time
+                 evidence judge. A ``--project`` flag instead writes the session-start
+                 default (``mode``) to guard.local.json (that key only, not the live
+                 session); ``--global`` is reserved (reported unsupported).
+- verify         UserPromptExpansion (matcher ``(guard:)?verify``). On demand, emit the
+                 guardian-dispatch instruction for the last completed turn
+                 (``pending_verify_prompt_id``, recorded by manual-mode Stop). Reads no
+                 transcript — the slice is already on disk. The on-demand counterpart to
+                 auto-auditing; works whenever guard is enabled.
 - exempt         CLI (argv), run by the ``guard:exempt`` skill via Bash after the user
                  confirms an interactive selection. ``list``/``set``/``add``/
                  ``remove``/``clear`` the ``exempt_skills`` config key — that key ONLY,
@@ -54,21 +59,23 @@ Subcommands
                  gated (``gated_prompt_id``), the slice contains a user ``!`` command
                  (its output arrives after the judged response, so it is neither
                  evidence nor auditable here), or the turn was opened by guard's own
-                 ``/guard:turn`` / ``/guard:mode`` control command or a user-configured
-                 ``exempt_skills`` entry (skill output / a relay, not claims to
-                 ground). Otherwise branch on ``mode``.
-                 ``headless``: judge the turn (+ VERIFIED_FACTS) on
-                 two axes; block on an unsupported claim or repo-resolvable deferral;
-                 on PASS append supported claims to the verified store. ``subagent``:
-                 do not judge/block — slice the turn to a file and emit
-                 additionalContext asking the main agent to dispatch ``guard:guardian``.
+                 ``/guard:turn`` / ``/guard:mode`` / ``/guard:verify`` control command
+                 or a user-configured ``exempt_skills`` entry (skill output / a relay,
+                 not claims to ground). Otherwise branch on ``mode``.
+                 ``manual`` (default): do not audit — record the turn as the pending
+                 ``/guard:verify`` target and emit nothing. ``subagent``: do not
+                 judge/block — slice the turn to a file and emit additionalContext asking
+                 the main agent to dispatch ``guard:guardian``. ``headless``: judge the
+                 turn (+ VERIFIED_FACTS) on two axes; block on an unsupported claim or a
+                 repo-resolvable deferral; on PASS append supported claims to the
+                 verified store.
 - session-start  SessionStart. Sweep state/sessions/verified files and turns/ dirs
                  older than retention.
 
 State lives project-local under ``${CLAUDE_PROJECT_DIR}/.claude/guard/``:
-- ``state/<sid>.json``       — {enabled, approved, mode, last_audited_prompt_id, gated_prompt_id, updated_at}
+- ``state/<sid>.json``       — {enabled, approved, mode, last_audited_prompt_id, gated_prompt_id, pending_verify_prompt_id, updated_at}
 - ``sessions/<sid>.jsonl``   — full session archive: one record per turn / verdict
-- ``turns/<sid>/<pid>.json`` — subagent mode only: the turn slice guard hands the
+- ``turns/<sid>/<pid>.json`` — subagent and manual modes: the turn slice guard hands the
                                 guardian subagent ({user, tools[], assistant})
 - ``verified/<sid>.jsonl``   — verified facts from PASSED turns: {turn, claim, evidence}
 - ``trace.log``              — file-only debug trace (enabled by GUARD_TRACE)
@@ -84,13 +91,14 @@ Configuration (optional) is a JSON object at
 from the ``guardian`` agent's own frontmatter, not these keys), ``enabled`` (bool,
 default ``true``) — the session-start value of the single master switch that turns BOTH
 the evidence judge and the approval gate on or off, and ``mode``
-(``"headless"``|``"subagent"``, default ``"subagent"``) — how the Stop-time evidence
-judge runs (in-hook headless judge vs. dispatch the ``guardian`` subagent), and
-``exempt_skills`` (list of strings, default ``[]``) — skills / slash commands whose turn
-the Stop judge must not audit, named with their plugin namespace (``plugin:skill``, e.g.
-``guard:turn``) or bare for un-namespaced skills; matched leading-``/``-stripped and
-case-insensitively (guard's own ``turn``/``mode`` control commands are always exempt
-regardless of this list). Unknown keys are ignored; a missing or malformed file falls
+(``"manual"``|``"subagent"``|``"headless"``, default ``"manual"``) — how the Stop-time
+evidence judge runs (manual: no auto-audit, verify on demand via ``/guard:verify``;
+subagent: dispatch the ``guardian`` subagent each turn; headless: in-hook judge that
+blocks), and ``exempt_skills`` (list of strings, default ``[]``) — skills / slash
+commands whose turn the Stop judge must not audit, named with their plugin namespace
+(``plugin:skill``, e.g. ``guard:turn``) or bare for un-namespaced skills; matched
+leading-``/``-stripped and case-insensitively (guard's own ``turn``/``mode``/``verify``
+control commands are always exempt regardless of this list). Unknown keys are ignored; a missing or malformed file falls
 back to all defaults. The judge always reads the repo (Read/Grep/Glob/Bash) to verify
 claims. The ``turn`` / ``mode`` skills flip ``enabled`` / ``mode`` for the session, or
 with ``--project`` write those keys' session-start defaults to guard.local.json.
@@ -124,7 +132,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "model": "haiku",
     "effort": "medium",
     "enabled": True,
-    "mode": "subagent",
+    "mode": "manual",
     # Skills / slash commands whose turn the Stop judge must NOT audit. A turn opened
     # by one of these is skill output or a relay, not a body of technical claims to
     # ground. Values are the name as it appears after the slash, INCLUDING the plugin
@@ -136,11 +144,17 @@ DEFAULT_CONFIG: dict[str, Any] = {
 }
 
 VALID_EFFORTS = {"low", "medium", "high", "xhigh", "max"}
-# How the Stop-time evidence judge runs. "headless": spawn an isolated `claude`
-# inside the hook and block the turn (the original path). "subagent": the hook does
-# not judge/block — it injects the turn + verified paths as additionalContext and
-# the main agent dispatches the `guardian` subagent to audit.
-VALID_MODES = {"headless", "subagent"}
+# How the Stop-time evidence judge runs.
+# "manual" (default): the hook does NOT audit at Stop — it archives the turn and
+#   records it as the pending verify target; verification runs only on demand via
+#   `/guard:verify`, which dispatches the guardian. The approval gate is unaffected
+#   (it is governed by `enabled`, not `mode`).
+# "subagent": the hook does not judge/block — it injects the turn + verified paths as
+#   additionalContext and the main agent dispatches the `guardian` subagent to audit
+#   every turn.
+# "headless": spawn an isolated `claude` inside the hook and block the turn (the
+#   original path).
+VALID_MODES = {"manual", "subagent", "headless"}
 
 # Tools the approval gate blocks before approval. Bash is intentionally NOT gated:
 # guard only guards the dedicated file-editing tools, and lets shell commands run.
@@ -236,7 +250,7 @@ def _read_payload() -> dict | None:
 _SESSION_ID_RE = re.compile(r"^[A-Za-z0-9._-]+$")
 # guard's own control commands, e.g. "/guard:turn on", "/turn off",
 # "/guard:mode subagent". These are handled by UserPromptExpansion, not real turns.
-_CONTROL_CMD_RE = re.compile(r"^/(guard:)?(turn|mode|exempt)\b", re.IGNORECASE)
+_CONTROL_CMD_RE = re.compile(r"^/(guard:)?(turn|mode|exempt|verify)\b", re.IGNORECASE)
 # In the transcript, a slash command is expanded to
 # "<command-name>/guard:turn</command-name>" (see session b30dbaec). Pull the command
 # name out of that tag; a raw typed form ("/guard:turn on") is handled by the fallback
@@ -299,7 +313,7 @@ def _turn_command_name(user_text: str) -> str:
 
 def _is_control_command_name(name: str) -> bool:
     """True when a normalized command name is one of guard's own control commands
-    (``turn``/``mode``/``exempt``, with or without the ``guard:`` prefix)."""
+    (``turn``/``mode``/``exempt``/``verify``, with or without the ``guard:`` prefix)."""
     return bool(name) and bool(_CONTROL_CMD_RE.match("/" + name))
 
 
@@ -524,6 +538,9 @@ def _read_state(project_dir: Path, session_id: str, config: dict[str, Any]) -> d
         # Per-turn guards keyed by the transcript prompt_id (a turn == one promptId).
         "last_audited_prompt_id": "",
         "gated_prompt_id": "",
+        # Manual mode: the most recent auditable turn's prompt_id, the target that
+        # `/guard:verify` dispatches the guardian for.
+        "pending_verify_prompt_id": "",
         "updated_at": None,
     }
     path = _state_file(project_dir, session_id)
@@ -535,7 +552,8 @@ def _read_state(project_dir: Path, session_id: str, config: dict[str, Any]) -> d
         return default
     if not isinstance(data, dict):
         return default
-    keys = ("enabled", "approved", "mode", "last_audited_prompt_id", "gated_prompt_id", "updated_at")
+    keys = ("enabled", "approved", "mode", "last_audited_prompt_id", "gated_prompt_id",
+            "pending_verify_prompt_id", "updated_at")
     default.update({k: data[k] for k in keys if k in data})
     if default["mode"] not in VALID_MODES:
         default["mode"] = DEFAULT_CONFIG["mode"]
@@ -1062,7 +1080,11 @@ def cmd_set_mode() -> int:
     # no/unknown arg → report only; leave mode unchanged
     _write_state(project_dir, session_id, state)
 
-    if state["mode"] == "subagent":
+    if state["mode"] == "manual":
+        msg = ("guard evidence judge mode: manual for this session. The Stop hook does "
+               "not audit — run `/guard:verify` to audit the last completed turn on "
+               "demand. The approval gate is unaffected.")
+    elif state["mode"] == "subagent":
         msg = ("guard evidence judge mode: subagent for this session. The Stop hook "
                "will ask the main agent to dispatch the guardian subagent to audit "
                "each turn (it does not block).")
@@ -1071,6 +1093,43 @@ def cmd_set_mode() -> int:
                "runs an isolated judge and blocks the turn on unsupported claims.")
     _emit_expansion(msg)
     _trace(project_dir, session_id, "set-mode", "set", arg=arg, mode=state["mode"])
+    return 0
+
+
+def cmd_verify() -> int:
+    """UserPromptExpansion for `/guard:verify`. On-demand audit of the last completed
+    turn: emit the guardian-dispatch instruction for ``pending_verify_prompt_id`` (set
+    by manual-mode Stop). Reads no transcript — the Stop hook already wrote the slice.
+    Works whenever guard is enabled, regardless of mode."""
+    project_dir = _project_dir()
+    payload = _read_payload()
+    if payload is None or project_dir is None:
+        return 0
+    session_id = _session_id(payload)
+    if session_id is None:
+        return 0
+
+    config = _load_config(project_dir)
+    state = _read_state(project_dir, session_id, config)
+    if not state["enabled"]:
+        _emit_expansion("guard is off for this session — nothing to verify. "
+                        "Turn it on with `/guard:turn on`.")
+        _trace(project_dir, session_id, "verify", "disabled")
+        return 0
+
+    pid = state.get("pending_verify_prompt_id") or ""
+    turn_path = _turn_slice_file(project_dir, session_id, pid) if pid else None
+    if not pid or turn_path is None or not turn_path.is_file():
+        _emit_expansion("guard: no completed turn is available to verify yet. "
+                        "Ask something first, then run `/guard:verify`.")
+        _trace(project_dir, session_id, "verify", "no_pending", prompt_id=pid)
+        return 0
+
+    context = _guardian_dispatch_context(
+        project_dir, session_id, pid, turn_path,
+        "guard (verify): audit the last completed turn on request.")
+    _emit_expansion(context)
+    _trace(project_dir, session_id, "verify", "dispatch_guardian", prompt_id=pid)
     return 0
 
 
@@ -1281,24 +1340,16 @@ def cmd_record_verified() -> int:
     return 0
 
 
-def _stop_subagent(project_dir: Path, session_id: str, state: dict[str, Any],
-                   prompt_id: str, turn: dict[str, Any]) -> int:
-    """Subagent mode Stop: inject a dispatch instruction instead of judging inline.
+def _write_turn_slice(project_dir: Path, session_id: str, prompt_id: str,
+                      turn: dict[str, Any]) -> Path | None:
+    """Write this turn's slice ({user, tools, assistant}) to its ``turn_file``.
 
-    guard slices the turn from the transcript itself (the single slice
-    implementation) and writes just that turn to a ``turn_file``; the dispatch names
-    that file, the verified store, and this dispatcher, so the main agent can dispatch
-    the ``guard:guardian`` subagent without exposing the whole transcript. Guarded to
-    fire once per turn via ``last_audited_prompt_id`` — parity with the headless path
-    judging a turn only once.
+    The single slice-writer, shared by subagent-mode Stop (which then dispatches the
+    guardian) and manual-mode Stop (which records it as the pending on-demand target).
+    Internal flags (has_user_command / origin_kind / command_name — all handled before
+    this point) are not part of the guardian's schema, so drop them. Returns the path,
+    or None on a write failure (caller fails open).
     """
-    if state.get("last_audited_prompt_id") == prompt_id:
-        _trace(project_dir, session_id, "stop", "skip_audited", prompt_id=prompt_id)
-        return 0
-
-    # Write this turn's slice ({user, tools, assistant}) to a file. Internal flags
-    # (has_user_command / origin_kind / command_name — all already handled before this
-    # path) are not part of the guardian's schema, so drop them.
     slice_out = {k: v for k, v in turn.items()
                  if k not in ("has_user_command", "origin_kind", "command_name")}
     turn_path = _turn_slice_file(project_dir, session_id, prompt_id)
@@ -1309,15 +1360,21 @@ def _stop_subagent(project_dir: Path, session_id: str, state: dict[str, Any],
         tmp.replace(turn_path)
     except OSError:
         _trace(project_dir, session_id, "stop", "slice_write_failed", prompt_id=prompt_id)
-        return 0  # fail open
+        return None
+    return turn_path
 
-    state["last_audited_prompt_id"] = prompt_id
-    _write_state(project_dir, session_id, state)
 
+def _guardian_dispatch_context(project_dir: Path, session_id: str, prompt_id: str,
+                               turn_path: Path, lead: str) -> str:
+    """Build the additionalContext that asks the main agent to dispatch the guardian.
+
+    The dispatch inputs are identical for the subagent-mode Stop auto-dispatch and the
+    on-demand ``/guard:verify`` path — only the leading sentence (``lead``) differs.
+    """
     verified_path = _verified_file(project_dir, session_id).resolve()
     dispatcher = Path(__file__).resolve()
-    context = (
-        "guard (subagent mode): audit the turn that just finished before wrapping up. "
+    return (
+        lead + " "
         "Dispatch the guardian subagent with the Agent tool "
         "(subagent_type: \"guard:guardian\"), passing it these inputs verbatim:\n"
         f"- session_id: {session_id}\n"
@@ -1331,9 +1388,53 @@ def _stop_subagent(project_dir: Path, session_id: str, state: dict[str, Any],
         "reports any violations back. If it reports violations, address them; "
         "otherwise continue."
     )
+
+
+def _stop_subagent(project_dir: Path, session_id: str, state: dict[str, Any],
+                   prompt_id: str, turn: dict[str, Any]) -> int:
+    """Subagent mode Stop: inject a dispatch instruction instead of judging inline.
+
+    guard slices the turn from the transcript itself and writes just that turn to a
+    ``turn_file``; the dispatch names that file, the verified store, and this
+    dispatcher, so the main agent can dispatch the ``guard:guardian`` subagent without
+    exposing the whole transcript. Guarded to fire once per turn via
+    ``last_audited_prompt_id`` — parity with the headless path judging a turn once.
+    """
+    if state.get("last_audited_prompt_id") == prompt_id:
+        _trace(project_dir, session_id, "stop", "skip_audited", prompt_id=prompt_id)
+        return 0
+
+    turn_path = _write_turn_slice(project_dir, session_id, prompt_id, turn)
+    if turn_path is None:
+        return 0  # fail open
+
+    state["last_audited_prompt_id"] = prompt_id
+    _write_state(project_dir, session_id, state)
+
+    context = _guardian_dispatch_context(
+        project_dir, session_id, prompt_id, turn_path,
+        "guard (subagent mode): audit the turn that just finished before wrapping up.")
     output = {"hookSpecificOutput": {"hookEventName": "Stop", "additionalContext": context}}
     json.dump(output, sys.stdout)
     _trace(project_dir, session_id, "stop", "dispatch_guardian", prompt_id=prompt_id)
+    return 0
+
+
+def _stop_manual(project_dir: Path, session_id: str, state: dict[str, Any],
+                 prompt_id: str, turn: dict[str, Any]) -> int:
+    """Manual mode Stop: record the turn as the pending verify target; do NOT audit.
+
+    The turn is already in the session archive; here we persist just its slice and
+    remember its prompt_id so ``/guard:verify`` can dispatch the guardian for it
+    without any transcript access. The hook emits nothing and never blocks — the
+    approval gate still runs (it is governed by ``enabled``, not ``mode``).
+    """
+    turn_path = _write_turn_slice(project_dir, session_id, prompt_id, turn)
+    if turn_path is None:
+        return 0  # fail open
+    state["pending_verify_prompt_id"] = prompt_id
+    _write_state(project_dir, session_id, state)
+    _trace(project_dir, session_id, "stop", "manual_pending", prompt_id=prompt_id)
     return 0
 
 
@@ -1424,11 +1525,17 @@ def cmd_stop() -> int:
 
     turn["assistant"] = response
 
+    # Manual mode (default): the hook never audits or blocks at Stop. It records the
+    # turn as the pending on-demand target; the user runs `/guard:verify` to dispatch
+    # the guardian for it. The approval gate still runs (governed by `enabled`).
+    if state["mode"] == "manual":
+        return _stop_manual(project_dir, session_id, state, prompt_id, turn)
+
     # Subagent mode: the hook does not judge or block. It hands the turn off to the
     # main agent, which dispatches the `guardian` subagent to audit. We inject the
     # transcript + prompt_id as additionalContext (docs: a Stop hook may emit
     # additionalContext WITHOUT `decision`, and the conversation continues so the
-    # agent can act on it — .claude/guard/refs/stop-hook-output.md).
+    # agent can act on it).
     if state["mode"] == "subagent":
         return _stop_subagent(project_dir, session_id, state, prompt_id, turn)
 
@@ -1632,6 +1739,7 @@ SUBCOMMANDS = {
     "user-prompt": cmd_user_prompt,
     "toggle": cmd_toggle,
     "set-mode": cmd_set_mode,
+    "verify": cmd_verify,
     "gate": cmd_gate,
     "record-verified": cmd_record_verified,
     "stop": cmd_stop,

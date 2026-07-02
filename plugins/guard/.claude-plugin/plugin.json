@@ -1,7 +1,7 @@
 {
   "name": "guard",
-  "version": "0.4.1",
-  "description": "Enforce evidence-backed technical claims in Claude Code. Ships a Grounded output style, logs each session's user/assistant turns with the assistant's claims and their supporting evidence, and (when armed for the session) audits each finished turn for grounding at Stop — either via an isolated headless judge that blocks the turn, or by dispatching the guardian subagent. Claude Code only.",
+  "version": "0.5.0",
+  "description": "Enforce evidence-backed technical claims in Claude Code. Ships a Grounded output style, logs each session's user/assistant turns with the assistant's claims and their supporting evidence, and (on demand via /guard:verify by default, or automatically each turn in subagent/headless mode) audits a turn for grounding — dispatching the guardian subagent or an isolated headless judge that blocks. Claude Code only.",
   "author": {
     "name": "studykit"
   },
