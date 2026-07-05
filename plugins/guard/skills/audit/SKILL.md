@@ -1,12 +1,12 @@
 ---
-name: verify
+name: audit
 description: 'On demand, audit the last completed turn for evidence grounding — guard dispatches the guardian subagent to check that turn''s technical claims against the repository. Use when you want a specific turn verified instead of guard auto-auditing every turn. Claude Code only.'
 argument-hint: ''
 disable-model-invocation: true
 ---
 
-This command is handled by guard's `verify` hook, which fires the moment you type
-`/guard:verify` and targets the last completed turn. It has already run. The hook emits
+This command is handled by a guard hook, which fires the moment you type
+`/guard:audit` and targets the last completed turn. It has already run. The hook emits
 a `<system-reminder>` carrying the guardian dispatch inputs (session_id, prompt_id,
 turn_file, verified_file, dispatcher).
 

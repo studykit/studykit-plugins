@@ -11,9 +11,9 @@ line-by-line walkthrough.
 | Event | Subcommand | Role |
 | --- | --- | --- |
 | `UserPromptSubmit` | `user-prompt` | Update approval state. Ignores `/guard:turn` / `/guard:mode` / `/guard:exempt`. |
-| `UserPromptExpansion` (matcher `(guard:)?turn`) | `toggle` | Flip session `enabled` (judge + gate). |
-| `UserPromptExpansion` (matcher `(guard:)?mode`) | `set-mode` | Set session `mode` (`manual`\|`subagent`\|`headless`). |
-| `UserPromptExpansion` (matcher `(guard:)?verify`) | `verify` | On demand, dispatch the guardian for the last completed turn (`pending_verify_prompt_id`). |
+| `UserPromptExpansion` (matcher `^(guard:)?turn$`) | `toggle` | Flip session `enabled` (judge + gate). |
+| `UserPromptExpansion` (matcher `^(guard:)?mode$`) | `set-mode` | Set session `mode` (`manual`\|`subagent`\|`headless`). |
+| `UserPromptExpansion` (matcher `^(guard:)?audit$`) | `verify` | On demand, dispatch the guardian for the last completed turn (`pending_verify_prompt_id`). |
 | `PreToolUse` (`Write\|Edit\|MultiEdit\|NotebookEdit`) | `gate` | Deny file edits until approved. |
 | (called via Bash, not a hook) | `record-verified` | Guardian appends a passed turn's claims to the verified store. |
 | (called via Bash, not a hook) | `exempt` | `guard:exempt` skill records the user's confirmed `exempt_skills` selection (that key only). |
@@ -30,7 +30,7 @@ Stop it reconstructs the turn from Claude Code's transcript, sliced by `prompt_i
 - `turns/<sid>/<prompt_id>.json` — **subagent and manual modes**: the turn slice guard
   cut from the transcript (`{user, tools[], assistant}`) and hands to the `guardian`
   subagent, so guardian reads one turn, not the whole transcript. Subagent mode dispatches
-  immediately; manual mode leaves it for `/guard:verify` (targeting
+  immediately; manual mode leaves it for `/guard:audit` (targeting
   `pending_verify_prompt_id`). Headless mode judges in-process and writes no turn file.
 - `verified/<sid>.jsonl` — supported claims from PASSED turns only (`{ts, turn, claim,
   evidence}`, `turn` = prompt_id), replayed to later Stops as a VERIFIED_FACTS block
@@ -84,7 +84,11 @@ payloads, not memory.
   leaves state untouched and does not block — guard must never harass the user
   because its own machinery broke.
 - **Approval is armed only by a user message**, only on an explicit-implementation
-  verdict from the classifier. The `turn` skill and the model cannot arm it. It is
+  verdict from the classifier. The `turn` skill and the model cannot arm it. The
+  classifier sees the tail of the session archive as conversation context
+  (`_recent_dialogue`) — used only to resolve what the message refers to, so a bare
+  "go ahead" arms only when it answers a proposed plan; context alone can never
+  arm or revoke. It is
   **revoked only when the user clearly starts an unrelated new task**
   (`starts_unrelated_task`) — NOT on questions, refinements, corrections, or
   continuations of the current work, so a mid-implementation question doesn't re-lock
@@ -106,7 +110,7 @@ payloads, not memory.
   a command (skill output is not a body of technical claims to ground). Both modes
   honor it (checked before the `mode` branch).
 - **Three modes, one criteria.** `mode` selects only *how/when* the Stop audit runs —
-  `manual` (default; no auto-audit, `/guard:verify` dispatches on demand), `subagent`
+  `manual` (default; no auto-audit, `/guard:audit` dispatches on demand), `subagent`
   (dispatch guardian each turn), or `headless` (in-hook judge that blocks). The two-axis
   criteria are identical across all three, and `guardian.md` mirrors them in prose. Bad
   `mode` → the default (`manual`, via `_mode`). `set-mode` flips it, mirroring `toggle`.
@@ -114,9 +118,9 @@ payloads, not memory.
   auto-verification without weakening the gate.
 - **Manual mode + on-demand verify.** manual-mode Stop archives the turn, writes its
   slice (shared `_write_turn_slice`), and records `pending_verify_prompt_id` — then emits
-  nothing. `/guard:verify` (`cmd_verify`, UserPromptExpansion) reads that pending target's
+  nothing. `/guard:audit` (`cmd_verify`, UserPromptExpansion) reads that pending target's
   slice off disk and emits the same guardian-dispatch context as subagent Stop
-  (`_guardian_dispatch_context`), so it needs no transcript access. `/guard:verify` is a
+  (`_guardian_dispatch_context`), so it needs no transcript access. `/guard:audit` is a
   control command (in `_CONTROL_CMD_RE`), so its own turn is skipped and never becomes the
   pending target.
 - **Judge once per turn.** headless relies on the payload's `stop_hook_active`;
@@ -169,7 +173,7 @@ Parsed by `_load_config`; fail-open to defaults. Keys: `model` (default `"haiku"
 (list of strings, default `[]`) — skills / slash commands whose turn the Stop judge
 skips, named with their plugin namespace (`plugin:skill`, e.g. `guard:turn`) or bare
 for un-namespaced skills, matched leading-`/`-stripped and case-insensitively (guard's
-own `turn`/`mode`/`verify`/`exempt` control commands are always exempt regardless). Manage
+own `turn`/`mode`/`audit`/`exempt` control commands are always exempt regardless). Manage
 `exempt_skills` interactively with the `guard:exempt` skill (lists session skills →
 AskUserQuestion → records via the `exempt` CLI); no need to hand-edit. Only keys whose value matches the
 default's type are honored (a malformed value can't flip a flag); unknown keys ignored;

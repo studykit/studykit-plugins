@@ -15,7 +15,7 @@
     ],
     "UserPromptExpansion": [
       {
-        "matcher": "(guard:)?turn",
+        "matcher": "^(guard:)?turn$",
         "hooks": [
           {
             "type": "command",
@@ -26,7 +26,7 @@
         ]
       },
       {
-        "matcher": "(guard:)?mode",
+        "matcher": "^(guard:)?mode$",
         "hooks": [
           {
             "type": "command",
@@ -37,7 +37,7 @@
         ]
       },
       {
-        "matcher": "(guard:)?verify",
+        "matcher": "^(guard:)?audit$",
         "hooks": [
           {
             "type": "command",

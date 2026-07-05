@@ -22,7 +22,7 @@ guard adds three layers of control over the assistant's responses and actions:
    question", "TBD", "deferred", "needs investigation", "결정 안 됨" — guard sends it
    back to read the code and resolve it. Genuine product/policy decisions that need
    you are left alone. By default the review runs **on demand** — you run
-   [`/guard:verify`](#review-modes) when you want the last turn checked, so ordinary
+   [`/guard:audit`](#review-modes) when you want the last turn checked, so ordinary
    turns cost nothing extra. You can switch to a mode that reviews every turn: an
    in-session `guardian` subagent you can watch, or a separate headless check that
    blocks the turn (either adds latency and model usage per turn).
@@ -83,7 +83,7 @@ By default guard reviews **on demand** — nothing runs automatically when a tur
 When you want the last completed turn checked, run:
 
 ```
-/guard:verify            # audit the last completed turn now
+/guard:audit            # audit the last completed turn now
 ```
 
 guard dispatches the `guardian` subagent to review that turn and report anything it
@@ -93,13 +93,13 @@ If you'd rather have every turn reviewed automatically, switch the mode per sess
 the `mode` skill:
 
 ```
-/guard:mode manual       # on-demand only, via /guard:verify (default)
+/guard:mode manual       # on-demand only, via /guard:audit (default)
 /guard:mode subagent     # dispatch the guardian subagent to review every turn in-session
 /guard:mode headless     # in-hook review that blocks each turn
 /guard:mode              # report the current mode
 ```
 
-- **manual** (default) — no automatic review; run `/guard:verify` when you want one.
+- **manual** (default) — no automatic review; run `/guard:audit` when you want one.
 - **subagent** — guard asks the assistant to dispatch a `guardian` subagent that reviews
   each finished turn in your session (so you can see it), reports anything it finds for
   the assistant to fix, and remembers the facts that passed. It does not block; it runs
@@ -107,7 +107,7 @@ the `mode` skill:
 - **headless** — the review runs as a separate, hidden `claude` check and **blocks** the
   turn until unsupported claims are grounded or resolvable deferrals are resolved.
 
-All modes apply the same checks, and `/guard:verify` works in any mode. Set the
+All modes apply the same checks, and `/guard:audit` works in any mode. Set the
 session-start default with the `mode` key in configuration (below), or interactively
 with `/guard:mode --project <mode>` (writes the default without changing the current
 session). `--global` is reserved for a future user-level default.
@@ -117,6 +117,9 @@ session). `--global` is reserved for a future user-level default.
 While guard is on and a task is still under discussion, any attempt to change files
 is denied with a note asking for a plan and your approval. Approve by saying so in
 your own words — for example "go ahead", "implement it", or "apply the change".
+guard reads your message together with the recent conversation, so a short
+"go ahead" counts when it clearly accepts a proposed plan — and doesn't when it
+refers to something else.
 Approval sticks with the current task: questions, refinements, corrections, and
 follow-ups on the same work keep it in place. The gate only re-locks when you clearly
 move on to a different, unrelated task — at which point you approve that one afresh.
@@ -161,7 +164,7 @@ rather than claims about your codebase (e.g. a research skill) — guard won't r
 turn they run in. List each by the name you invoke after the slash, **including its
 plugin namespace**: `hindsight:review`, `guard:turn`, or a bare name for an
 un-namespaced skill like `deep-research`. guard's own `/guard:turn`, `/guard:mode`, and
-`/guard:verify` are always exempt.
+`/guard:audit` are always exempt.
 
 You don't have to edit the file by hand. Run `/guard:exempt` and guard shows the
 skills available in your session, lets you pick which to exempt, and records your
