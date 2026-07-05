@@ -6,10 +6,11 @@ no Codex path):
 
 1. **Evidence judge** (Stop) — a repo-reading audit that flags a turn on an
    unsupported/surface-signal technical claim or an unjustified deferral. Runs in one
-   of two **modes**: `headless` (an isolated `claude` runs inside the Stop hook and
-   **blocks** on a violation) or `subagent` (the Stop hook injects `additionalContext`
-   with no block; the main agent dispatches the `guardian` subagent to run the same
-   audit).
+   of three **modes**: `manual` (default — no audit at Stop; `/guard:audit` dispatches
+   the `guardian` subagent for the last completed turn on demand), `subagent` (the Stop
+   hook injects `additionalContext` with no block; the main agent dispatches the
+   `guardian` subagent to run the same audit), or `headless` (an isolated `claude` runs
+   inside the Stop hook and **blocks** on a violation).
 2. **Approval gate** — block file mutation until the user explicitly approves.
 
 A **turn is the transcript's `promptId`.** guard keeps no turn buffer; at Stop it
