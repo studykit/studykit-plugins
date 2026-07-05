@@ -1,7 +1,7 @@
 ---
 name: mode
-description: 'Set how guard judges evidence this session — headless (in-hook judge that blocks) or subagent (dispatch the guardian subagent) — or with --project set the session-start default. Claude Code only.'
-argument-hint: '[--project] [headless|subagent]'
+description: 'Set how guard judges evidence this session — manual (on demand via /guard:audit, default), subagent (dispatch the guardian subagent each turn), or headless (in-hook judge that blocks) — or with --project set the session-start default. Claude Code only.'
+argument-hint: '[--project] [manual|subagent|headless]'
 disable-model-invocation: true
 ---
 
