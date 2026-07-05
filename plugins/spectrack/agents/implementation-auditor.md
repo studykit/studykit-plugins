@@ -3,7 +3,6 @@ name: implementation-auditor
 description: |
   Audits a completed `issue-implementer` run by cross-checking its `<report>` against the issue, the pushed branch, and the issue's intent. Appends a single audit comment carrying the verdict and reasoning; never modifies code, the issue body, links, state, or the branch.
 tools: Read, Write, Bash, Grep, Glob
-model: opus
 color: yellow
 ---
 
