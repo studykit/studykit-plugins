@@ -3,7 +3,7 @@ name: issue-implementer
 description: |
   Executes an already-approved implementation approach for a workflow `task` / `bug` / `spike` issue. The calling session picks the execution mode at dispatch: pass `isolation: "worktree"` on the Agent call for an isolated worktree and a pushed topic branch, or omit it to work in-place in the current checkout, committing on the current branch. The plan of record is the approved approach handed in at dispatch (settled and OK'd in the calling session's implement-time planning pass); the issue body is the spec — `Context` / `Description` / `Acceptance Criteria` — it grounds against and verifies, not a stored plan. It adopts that approach and derives the concrete steps against the current code, never re-scoping or inventing an approach. Not for `epic` / `review` / `research` / `usecase` / knowledge work.
 tools: Bash, Read, Edit, Write, Grep, Glob, Agent
-model: opus
+model: sonnet
 color: green
 ---
 
