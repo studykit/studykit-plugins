@@ -239,7 +239,6 @@ def test_decision_index_resolution_uses_knowledge_files() -> None:
         "contracts/knowledge/body.md",
         "contracts/knowledge/decision-index.md",
         "providers/knowledge/github/convention.md",
-        "providers/knowledge/github/decision-index.md",
     ]
 
 
@@ -254,8 +253,8 @@ def test_research_github_knowledge_uses_only_shared_convention() -> None:
 
 
 def test_slimmed_knowledge_type_uses_only_shared_convention() -> None:
-    # Slimmed knowledge types (e.g. spec) render through the shared convention;
-    # only usecase and decision-index keep a per-type GitHub rendering file.
+    # Every knowledge type renders through the single GitHub convention; no type
+    # keeps a per-type provider rendering file.
     resolution = resolve_authoring("spec", side="knowledge", provider="github")
     assert _rel_paths(resolution.files) == [
         "contracts/knowledge/body.md",
@@ -596,7 +595,7 @@ def test_actors_type_is_rejected() -> None:
         resolve_authoring("actors", side="knowledge")
 
 
-def test_usecase_issue_author_bundles_actors_with_provider() -> None:
+def test_usecase_issue_author_bundles_provider_convention() -> None:
     resolution = resolve_authoring(
         "usecase", side="issue", provider="github"
     )
@@ -604,13 +603,13 @@ def test_usecase_issue_author_bundles_actors_with_provider() -> None:
 
     assert "contracts/issue/usecase.md" in rels
     assert "contracts/knowledge/actors.md" in rels
-    assert "providers/knowledge/github/actors.md" in rels
+    assert "providers/knowledge/github/convention.md" in rels
     assert rels.index("contracts/issue/usecase.md") < rels.index(
         "contracts/knowledge/actors.md"
     )
 
 
-def test_usecase_knowledge_author_bundles_actors_with_provider() -> None:
+def test_usecase_knowledge_author_bundles_provider_convention() -> None:
     resolution = resolve_authoring(
         "usecase", side="knowledge", provider="github"
     )
@@ -618,15 +617,15 @@ def test_usecase_knowledge_author_bundles_actors_with_provider() -> None:
 
     assert "contracts/knowledge/usecase.md" in rels
     assert "contracts/knowledge/actors.md" in rels
-    assert "providers/knowledge/github/actors.md" in rels
+    assert "providers/knowledge/github/convention.md" in rels
 
 
-def test_usecase_author_without_provider_omits_provider_actors_file() -> None:
+def test_usecase_author_without_provider_omits_provider_convention_file() -> None:
     resolution = resolve_authoring("usecase", side="issue")
     rels = _rel_paths(resolution.files)
 
     assert "contracts/knowledge/actors.md" in rels
-    assert "providers/knowledge/github/actors.md" not in rels
+    assert "providers/knowledge/github/convention.md" not in rels
 
 
 def test_review_target_usecase_issue_bundles_actors_companion() -> None:

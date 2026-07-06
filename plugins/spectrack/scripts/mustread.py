@@ -64,10 +64,6 @@ DECOMPOSITION_TYPES = {"task", "epic"}
 
 PLAN_MODE_TYPES = {"task", "bug"}
 
-# Knowledge types that still ship a type-specific GitHub rendering file; every
-# other knowledge type renders through the shared convention alone.
-GITHUB_KNOWLEDGE_PERTYPE = {"usecase", "decision-index"}
-
 # Issue types whose bodies carry assertions about runtime behavior, so they read
 # the runtime-grounded-claim rule. Other issue types only need body conventions
 # (folded into issue/common.md).
@@ -263,7 +259,7 @@ def _resolve_authoring_github_issue(
                 return [], []
             parts: list[str] = []
             if artifact_type == "usecase":
-                parts.append("providers/knowledge/github/actors.md")
+                parts.append("providers/knowledge/github/convention.md")
             notes = (
                 [RETROACTIVE_PUBLISH_STATE_GITHUB] if mode == "retroactive" else []
             )
@@ -273,19 +269,10 @@ def _resolve_authoring_github_issue(
 def _resolve_authoring_github_knowledge(
     artifact_type: str, target: str | None, scope: str
 ) -> tuple[list[str], list[str]]:
-    convention = "providers/knowledge/github/convention.md"
-    match (scope, target):
-        case ("comment", _):
-            return [convention], []
-        case _:
-            # Most knowledge types render through the shared convention; only a
-            # few keep a type-specific rendering file.
-            parts = [convention]
-            if artifact_type in GITHUB_KNOWLEDGE_PERTYPE:
-                parts.append(f"providers/knowledge/github/{artifact_type}.md")
-            if artifact_type == "usecase":
-                parts.append("providers/knowledge/github/actors.md")
-            return parts, []
+    # Every knowledge type renders through the single GitHub convention: the
+    # provider layer carries only github-Markdown-specific rules, while section
+    # structure and per-type rules live in the shared knowledge contracts.
+    return ["providers/knowledge/github/convention.md"], []
 
 
 def _resolve_authoring_jira_issue(
@@ -544,8 +531,51 @@ def resolve_authoring(
     )
 
 
+# Pre-call policy the resolver cannot infer from its flags: how to choose the
+# mode/side arguments, the workflow type vocabulary, and how a non-workflow
+# type is handled. Kept here so `--help` is the single source and the injected
+# SessionStart/SubagentStart context can stay a thin pointer to it.
+_HELP_EPILOG = """\
+Choosing --mode (required for task/bug content authoring):
+  retroactive  The change has already landed (implemented, committed, or
+               merged) — pick it even when the user never says the word. The
+               body records facts: what changed, the diagnosed cause when
+               relevant, how it was actually done, and the checks that ran.
+               The issue publishes in the backend's closed/resolved state.
+  backlog      The work is not yet done; the issue is the open spec. Record at
+               least Description; add Context, Acceptance Criteria, and — for a
+               bug — Reproduction to any useful level of detail. Do not work
+               out a cause, an approach, or implementation steps in the body;
+               those are settled against the current code when the item is
+               picked up. Publishes in the backend's open/unresolved state.
+
+Choosing --side (dual-side types research / usecase):
+  They begin on the issue side (the working record) and consolidate onto the
+  knowledge side.
+
+Workflow artifact types:
+  issue      task, bug, spike, epic, review
+  knowledge  architecture, ci, context, decision-index, domain, nfr, spec
+  dual-side  research, usecase (both issue and knowledge sides)
+
+Any other --type returns NONE — there is no authoring contract. On GitHub,
+create the issue directly with that type (it is carried as a type label). On
+Jira, use only the workflow types above unless a
+providers.issues.artifact_issue_types mapping exists (see
+`spectrack issue <verb> --help`).
+
+The resolver output lists the files to read before drafting and a notes
+section whose every bullet is a binding rule for the calling flow. Knowledge
+pages live under wiki/ — edit the resolver-returned file and commit.
+"""
+
+
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(
+        description=__doc__,
+        epilog=_HELP_EPILOG,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     parser.add_argument("--type", required=True, help="workflow artifact type")
     parser.add_argument(
         "--side",
