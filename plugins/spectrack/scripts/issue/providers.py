@@ -23,7 +23,9 @@ TRANSPORT_NATIVE = "native"
 TRANSPORT_MCP = "mcp"
 TRANSPORT_PRIORITY = (TRANSPORT_NATIVE, TRANSPORT_MCP)
 
-ISSUE_READ_OPERATIONS = frozenset({"get", "search", "comments", "logs", "get_attachment"})
+ISSUE_READ_OPERATIONS = frozenset(
+    {"get", "search", "comments", "logs", "history", "get_attachment"}
+)
 ISSUE_WRITE_OPERATIONS = frozenset(
     {
         "create",
@@ -226,8 +228,8 @@ class IssueProvider(ProviderTransport):
     """Issue provider interface.
 
     Covered operations: create, update, get, search, comments, logs,
-    add_comment, update_comment, add_attachment, get_attachment, set_parent,
-    set_dependency, close, and reopen.
+    history, add_comment, update_comment, add_attachment, get_attachment,
+    set_parent, set_dependency, close, and reopen.
     """
 
     role = ROLE_ISSUE
@@ -250,6 +252,9 @@ class IssueProvider(ProviderTransport):
 
     def logs(self, request: ProviderRequest) -> Mapping[str, Any]:
         raise ProviderOperationError("issue logs is not implemented")
+
+    def history(self, request: ProviderRequest) -> Mapping[str, Any]:
+        raise ProviderOperationError("issue history is not implemented")
 
     def add_comment(self, request: ProviderRequest) -> Mapping[str, Any]:
         raise ProviderOperationError("issue add_comment is not implemented")

@@ -56,6 +56,29 @@ query($owner:String!, $repo:String!, $number:Int!) {
       lastEditedAt
       editor { login }
       userContentEdits(first: 20) {
+        totalCount
+        nodes {
+          editedAt
+          editor { login }
+          deletedAt
+          diff
+        }
+      }
+    }
+  }
+}
+""".strip()
+
+COMMENT_EDIT_HISTORY_QUERY = """
+query($id:ID!) {
+  node(id:$id) {
+    ... on IssueComment {
+      createdAt
+      author { login }
+      lastEditedAt
+      editor { login }
+      userContentEdits(first: 20) {
+        totalCount
         nodes {
           editedAt
           editor { login }
@@ -1206,6 +1229,53 @@ def issue_body_edit_history(
         "repository": repo.to_json(),
         "issue": issue_number,
         "body_edit_history": issue_data,
+    }
+
+
+def comment_edit_history(
+    comment_id: str,
+    *,
+    project: Path,
+    runner: CommandRunner | None = None,
+) -> dict[str, Any]:
+    """Read one comment's edit history through GraphQL ``userContentEdits``.
+
+    ``comment_id`` is the provider comment id (the REST numeric id carried in
+    cached comment frontmatter). The REST comment read resolves its GraphQL
+    node id; GraphQL cannot look an IssueComment up by numeric id directly.
+    """
+
+    repo = resolve_github_repository(project, runner=runner)
+    comment = _gh_api_json_object(
+        f"repos/{repo.slug}/issues/comments/{comment_id}",
+        project=project,
+        runner=runner,
+    )
+    node_id = comment.get("node_id")
+    if not node_id:
+        raise GitHubParseError(
+            f"comment {comment_id} response did not carry a node_id"
+        )
+    result = _gh(
+        [
+            "api",
+            "graphql",
+            "-f",
+            f"id={node_id}",
+            "-f",
+            f"query={COMMENT_EDIT_HISTORY_QUERY}",
+        ],
+        project=project,
+        runner=runner,
+    )
+    data = _loads_json_object(result.stdout, "gh api graphql comment userContentEdits")
+    node = _dig(data, "data", "node")
+    if not isinstance(node, dict):
+        raise GitHubParseError("GraphQL response did not contain data.node for the comment")
+    return {
+        "repository": repo.to_json(),
+        "comment_id": str(comment_id),
+        "comment_edit_history": node,
     }
 
 

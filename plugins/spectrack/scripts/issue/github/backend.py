@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, TextIO
 
@@ -287,6 +288,69 @@ class GitHubIssueBackend:
             )
         except Exception as exc:  # noqa: BLE001
             print(f"GitHub issue resume error: {exc}", file=stderr)
+            return 2
+
+        print(json.dumps(payload, indent=2, sort_keys=False), file=stdout)
+        return 0
+
+    # ------------------------------------------------------------------
+    # history
+    # ------------------------------------------------------------------
+
+    def add_history_args(self, parser: argparse.ArgumentParser) -> None:
+        parser.description = (
+            "Show the remote edit history of an issue body, or of one comment "
+            "with --comment. Each entry carries the editor, the edit time, and "
+            "the full content snapshot as of that edit (GitHub reports "
+            "snapshots, not deltas). Reads the provider directly; the local "
+            "cache is not consulted or updated."
+        )
+        parser.add_argument(
+            "--comment",
+            help=(
+                "provider comment id (from the cached comment frontmatter) — "
+                "show that comment's edit history instead of the body's"
+            ),
+        )
+        parser.add_argument(
+            "issue",
+            help="GitHub issue id or configured reference",
+        )
+
+    def run_history(
+        self,
+        args: argparse.Namespace,
+        *,
+        config: WorkflowConfig,
+        runner: CommandRunner | None,
+        stdout: TextIO,
+        stderr: TextIO,
+    ) -> int:
+        try:
+            repo = resolve_github_repository(config.root, runner=runner)
+            issue_numbers = issue_numbers_from_references(
+                [args.issue],
+                repo=repo,
+                allow_bare_numbers=True,
+            )
+            if len(issue_numbers) != 1:
+                raise IssueBackendError(
+                    f"expected exactly one configured GitHub issue reference, got {len(issue_numbers)}"
+                )
+            issue_number = issue_numbers[0]
+            provider = GitHubIssueNativeProvider(runner=runner)
+            response = provider.call(
+                ProviderRequest(
+                    role="issue",
+                    kind="github",
+                    operation="history",
+                    context=ProviderContext(project=config.root, artifact_type="task"),
+                    payload={"issue": issue_number, "comment": args.comment},
+                )
+            )
+            payload = _history_payload(response.payload, issue=issue_number)
+        except Exception as exc:  # noqa: BLE001
+            print(f"GitHub issue history error: {exc}", file=stderr)
             return 2
 
         print(json.dumps(payload, indent=2, sort_keys=False), file=stdout)
@@ -1536,6 +1600,62 @@ def _required_text(value: str, name: str) -> str:
     if not text:
         raise IssueBackendError(f"{name} is required")
     return text
+
+
+def _history_payload(provider_payload: Mapping[str, Any], *, issue: str) -> dict[str, Any]:
+    """Flatten the provider history payload into the emitted JSON shape.
+
+    GraphQL ``userContentEdits.diff`` carries the full content snapshot as of
+    that edit, not a delta — surface it as ``body`` so readers do not expect
+    a unified diff. ``edit_count`` is the provider total; the query returns at
+    most the 20 most recent edits, so ``truncated`` flags a longer history.
+    """
+
+    comment_history = provider_payload.get("comment_edit_history")
+    if isinstance(comment_history, Mapping):
+        payload: dict[str, Any] = {
+            "issue": str(issue),
+            "target": "comment",
+            "comment_id": str(provider_payload.get("comment_id") or ""),
+            "author": _login(comment_history.get("author")),
+            "created_at": comment_history.get("createdAt"),
+        }
+        source = comment_history
+    else:
+        body_history = provider_payload.get("body_edit_history")
+        source = body_history if isinstance(body_history, Mapping) else {}
+        payload = {
+            "issue": str(issue),
+            "target": "body",
+            "title": source.get("title"),
+        }
+
+    payload["last_edited_at"] = source.get("lastEditedAt")
+    payload["last_editor"] = _login(source.get("editor"))
+    content_edits = source.get("userContentEdits")
+    nodes = content_edits.get("nodes") if isinstance(content_edits, Mapping) else None
+    total = content_edits.get("totalCount") if isinstance(content_edits, Mapping) else None
+    edits = [
+        {
+            "edited_at": node.get("editedAt"),
+            "editor": _login(node.get("editor")),
+            "deleted_at": node.get("deletedAt"),
+            "body": node.get("diff"),
+        }
+        for node in (nodes or [])
+        if isinstance(node, Mapping)
+    ]
+    payload["edit_count"] = total if isinstance(total, int) else len(edits)
+    payload["truncated"] = isinstance(total, int) and total > len(edits)
+    payload["edits"] = edits
+    return payload
+
+
+def _login(value: Any) -> str | None:
+    if isinstance(value, Mapping):
+        login = value.get("login")
+        return str(login) if login else None
+    return None
 
 
 def _find_resume_comment_payload(

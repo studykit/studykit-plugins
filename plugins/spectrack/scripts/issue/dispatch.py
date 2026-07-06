@@ -23,6 +23,7 @@ Verb mapping
 ``comment ...``                 ``COMMENTS`` with ``["append", ...]`` for legacy calls,
                                 or ``["append"|"update", ...]`` when explicit
 ``resume ...``                  ``RESUME`` with ``[...]``
+``history ...``                 ``HISTORY`` with ``[...]`` (GitHub only)
 ``attach ...``                  ``ATTACH`` with ``[...]`` (Jira only)
 ``link ...``                    ``RELATIONSHIPS`` with ``[...]``
 ``labels ...``                  ``LABELS`` with ``[...]`` (GitHub only)
@@ -79,6 +80,7 @@ FETCH = IntentSpec("issue fetch", "add_fetch_args", "run_fetch")
 SEARCH = IntentSpec("issue search", "add_search_args", "run_search")
 COMMENTS = IntentSpec("issue comment", "add_comments_args", "run_comments")
 RESUME = IntentSpec("issue resume", "add_resume_args", "run_resume")
+HISTORY = IntentSpec("issue history", "add_history_args", "run_history")
 DRAFTS = IntentSpec("issue draft", "add_drafts_args", "run_drafts")
 WRITEBACK = IntentSpec("issue update", "add_writeback_args", "run_writeback")
 RELATIONSHIPS = IntentSpec(
@@ -195,6 +197,7 @@ _VERB_HELP: tuple[tuple[str, str, str | None], ...] = (
     ("search", "search issues with the backend's native query", None),
     ("comment", "append or update a comment from a body file", None),
     ("resume", "find the current Resume comment for an issue", None),
+    ("history", "show issue body or comment edit history", "github"),
     ("attach", "add/get issue file attachments", "jira"),
     ("link", "add / remove / replace relationships", None),
     ("labels", "list configured issue-type labels", "github"),
@@ -291,6 +294,8 @@ def main(
         return run_intent(COMMENTS, ["append", *rest], **kwargs)
     if verb == "resume":
         return run_intent(RESUME, rest, **kwargs)
+    if verb == "history":
+        return run_intent(HISTORY, rest, **kwargs)
     if verb == "attach":
         return run_intent(ATTACH, rest, **kwargs)
     if verb == "link":
