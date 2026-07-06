@@ -43,8 +43,10 @@ spectrack mustread \
 
 The resolver returns markdown listing files to read before drafting.
 Treat any bullet in a notes section as a binding rule for the calling
-flow. If the target is not a workflow artifact, the resolver returns
-`NONE`.
+flow. If `--type` is not one of SpecTrack's workflow artifact types
+below, the resolver returns `NONE`: there is no authoring contract to
+read, so create the artifact directly with whatever type the user asked
+for.
 
 Types:
 

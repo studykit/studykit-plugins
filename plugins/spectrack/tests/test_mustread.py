@@ -788,6 +788,24 @@ def test_main_repeat_call_re_emits_full_sections(
     assert second == first
 
 
+@pytest.mark.parametrize("artifact_type", ["customthing", "actors", "story"])
+def test_main_emits_none_for_non_workflow_type(
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+    artifact_type: str,
+) -> None:
+    # Types outside the built-in workflow vocabulary have no authoring
+    # contract: the CLI reports NONE and succeeds instead of erroring, so the
+    # calling flow can create the artifact directly.
+    exit_code = mustread_main(
+        ["--type", artifact_type, "--provider", "github", "--project", str(tmp_path)]
+    )
+
+    assert exit_code == 0
+    out = capsys.readouterr().out
+    assert out.strip() == "NONE"
+
+
 def test_main_without_session_emits_sections(
     capsys: pytest.CaptureFixture[str],
     monkeypatch: pytest.MonkeyPatch,
