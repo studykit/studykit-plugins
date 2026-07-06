@@ -286,6 +286,8 @@ def test_relationships_cli_dispatches_inline_intent(tmp_path: Path) -> None:
             return CommandResult(request=request, returncode=0, stdout="[]")
         if request.args == gh_api_args("repos/studykit/studykit-plugins/issues/44/dependencies/blocking", "--paginate"):
             return CommandResult(request=request, returncode=0, stdout="[]")
+        if request.args == gh_api_args("repos/studykit/studykit-plugins/issues/44/timeline", "--paginate"):
+            return CommandResult(request=request, returncode=0, stdout="[]")
         return CommandResult(request=request, returncode=127, stderr=f"unexpected command: {request.args}")
 
     stdout = io.StringIO()

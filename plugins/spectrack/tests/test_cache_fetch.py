@@ -109,6 +109,10 @@ def relationship_responses(
             gh_api_args(f"{issue_path}/dependencies/blocking", paginate=True),
             stdout="[]",
         ),
+        gh_api_args(f"{issue_path}/timeline", paginate=True): result(
+            gh_api_args(f"{issue_path}/timeline", paginate=True),
+            stdout="[]",
+        ),
     }
 
 
@@ -374,6 +378,7 @@ def test_cache_fetch_refresh_reads_remote_and_updates_cache(tmp_path: Path) -> N
         gh_api_args("repos/studykit/studykit-plugins/issues/42/sub_issues", paginate=True),
         gh_api_args("repos/studykit/studykit-plugins/issues/42/dependencies/blocked_by", paginate=True),
         gh_api_args("repos/studykit/studykit-plugins/issues/42/dependencies/blocking", paginate=True),
+        gh_api_args("repos/studykit/studykit-plugins/issues/42/timeline", paginate=True),
     ]
     cached = GitHubIssueCache.for_project(tmp_path, configured_repo=repo()).read_issue(repo(), 42)
     assert cached["body"] == "Fresh body."

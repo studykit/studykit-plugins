@@ -350,6 +350,7 @@ def test_github_issue_update_can_request_freshness_check_before_mutation(tmp_pat
             gh_api_args("repos/studykit/studykit-plugins/issues/39/sub_issues", "--paginate"),
             gh_api_args("repos/studykit/studykit-plugins/issues/39/dependencies/blocked_by", "--paginate"),
             gh_api_args("repos/studykit/studykit-plugins/issues/39/dependencies/blocking", "--paginate"),
+            gh_api_args("repos/studykit/studykit-plugins/issues/39/timeline", "--paginate"),
         }:
             return CommandResult(request=request, returncode=0, stdout="[]")
         return CommandResult(request=request, returncode=127, stderr="unexpected command")
@@ -412,6 +413,7 @@ def test_github_issue_update_blocks_stale_freshness_before_mutation(tmp_path: Pa
             gh_api_args("repos/studykit/studykit-plugins/issues/39/sub_issues", "--paginate"),
             gh_api_args("repos/studykit/studykit-plugins/issues/39/dependencies/blocked_by", "--paginate"),
             gh_api_args("repos/studykit/studykit-plugins/issues/39/dependencies/blocking", "--paginate"),
+            gh_api_args("repos/studykit/studykit-plugins/issues/39/timeline", "--paginate"),
         }:
             return CommandResult(request=request, returncode=0, stdout="[]")
         if request.args[:3] == ("gh", "issue", "edit"):
@@ -521,6 +523,7 @@ def test_github_issue_update_applies_inline_state_change_and_refreshes_cache(
             gh_api_args("repos/studykit/studykit-plugins/issues/39/sub_issues", "--paginate"),
             gh_api_args("repos/studykit/studykit-plugins/issues/39/dependencies/blocked_by", "--paginate"),
             gh_api_args("repos/studykit/studykit-plugins/issues/39/dependencies/blocking", "--paginate"),
+            gh_api_args("repos/studykit/studykit-plugins/issues/39/timeline", "--paginate"),
         }:
             return CommandResult(request=request, returncode=0, stdout="[]")
         return CommandResult(request=request, returncode=127, stderr="unexpected command")
@@ -638,6 +641,7 @@ def test_github_issue_create_inline_refreshes_cache(
             gh_api_args("repos/studykit/studykit-plugins/issues/51/sub_issues", "--paginate"),
             gh_api_args("repos/studykit/studykit-plugins/issues/51/dependencies/blocked_by", "--paginate"),
             gh_api_args("repos/studykit/studykit-plugins/issues/51/dependencies/blocking", "--paginate"),
+            gh_api_args("repos/studykit/studykit-plugins/issues/51/timeline", "--paginate"),
         }:
             return CommandResult(request=request, returncode=0, stdout="[]")
         return CommandResult(request=request, returncode=127, stderr="unexpected command")
@@ -722,6 +726,7 @@ def test_github_issue_fields_close_checks_freshness_and_refreshes_cache(
             gh_api_args("repos/studykit/studykit-plugins/issues/39/sub_issues", "--paginate"),
             gh_api_args("repos/studykit/studykit-plugins/issues/39/dependencies/blocked_by", "--paginate"),
             gh_api_args("repos/studykit/studykit-plugins/issues/39/dependencies/blocking", "--paginate"),
+            gh_api_args("repos/studykit/studykit-plugins/issues/39/timeline", "--paginate"),
         }:
             return CommandResult(request=request, returncode=0, stdout="[]")
         return CommandResult(request=request, returncode=127, stderr="unexpected command")
@@ -792,6 +797,7 @@ def test_github_issue_add_comment_inline_body_dispatches_and_refreshes_cache(
             gh_api_args("repos/studykit/studykit-plugins/issues/39/sub_issues", "--paginate"),
             gh_api_args("repos/studykit/studykit-plugins/issues/39/dependencies/blocked_by", "--paginate"),
             gh_api_args("repos/studykit/studykit-plugins/issues/39/dependencies/blocking", "--paginate"),
+            gh_api_args("repos/studykit/studykit-plugins/issues/39/timeline", "--paginate"),
         }:
             return CommandResult(request=request, returncode=0, stdout="[]")
         return CommandResult(request=request, returncode=127, stderr=f"unexpected command: {request.args}")
@@ -854,6 +860,7 @@ def test_github_issue_add_comment_inline_body_blocks_on_stale_issue_freshness(
             gh_api_args("repos/studykit/studykit-plugins/issues/39/sub_issues", "--paginate"),
             gh_api_args("repos/studykit/studykit-plugins/issues/39/dependencies/blocked_by", "--paginate"),
             gh_api_args("repos/studykit/studykit-plugins/issues/39/dependencies/blocking", "--paginate"),
+            gh_api_args("repos/studykit/studykit-plugins/issues/39/timeline", "--paginate"),
         }:
             return CommandResult(request=request, returncode=0, stdout="[]")
         if request.args[:3] == ("gh", "issue", "comment"):
@@ -974,6 +981,8 @@ def test_github_issue_apply_relationships_from_inline_intent_dispatches_and_refr
         if request.args == gh_api_args("repos/studykit/studykit-plugins/issues/44/dependencies/blocking", "--paginate"):
             events.append("relationships-blocking")
             return CommandResult(request=request, returncode=0, stdout=json.dumps([rest_issue(45, 4500)]))
+        if request.args == gh_api_args("repos/studykit/studykit-plugins/issues/44/timeline", "--paginate"):
+            return CommandResult(request=request, returncode=0, stdout="[]")
         return CommandResult(request=request, returncode=127, stderr=f"unexpected command: {request.args}")
 
     dispatcher = ProviderDispatcher(default_provider_registry(runner=runner))

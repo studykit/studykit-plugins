@@ -166,6 +166,7 @@ class WritebackLabelRunner:
             gh_api_args("repos/studykit/studykit-plugins/issues/39/sub_issues", "--paginate"),
             gh_api_args("repos/studykit/studykit-plugins/issues/39/dependencies/blocked_by", "--paginate"),
             gh_api_args("repos/studykit/studykit-plugins/issues/39/dependencies/blocking", "--paginate"),
+            gh_api_args("repos/studykit/studykit-plugins/issues/39/timeline", "--paginate"),
         }:
             return result(request.args, stdout="[]")
         return result(request.args, returncode=127, stderr=f"unexpected command: {request.args}")

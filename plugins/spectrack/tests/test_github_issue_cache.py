@@ -269,6 +269,33 @@ def test_github_issue_cache_writes_flat_layout_with_meta_and_relationships(tmp_p
     assert relationships["blocked_by"][0] == {"number": 32}
 
 
+def test_github_issue_cache_projects_derived_reference_kinds(tmp_path: Path) -> None:
+    cache = GitHubIssueCache.for_project(tmp_path)
+
+    payload = {**issue_payload(), "references": [16, 19], "referenced_by": [20]}
+    write = cache.write_issue_bundle(repo(), payload, fetched_at="2026-05-13T12:34:56Z")
+
+    rel_md = write.relationship_location.read_text(encoding="utf-8")
+    assert "- references: #16, #19" in rel_md
+    assert "- referenced_by: #20" in rel_md
+
+    rel = json.loads((write.issue_dir / ".relation.json").read_text(encoding="utf-8"))
+    assert rel["references"] == [16, 19]
+    assert rel["referenced_by"] == [20]
+
+    relationships = cache.read_relationships(repo(), 39)
+    assert relationships["references"] == [{"number": 16}, {"number": 19}]
+    assert relationships["referenced_by"] == [{"number": 20}]
+
+    # Derived reference churn must not disturb the link-write freshness gate.
+    meta = json.loads(write.meta_file.read_text(encoding="utf-8"))
+    rewrite = cache.write_issue_bundle(
+        repo(), issue_payload(), fetched_at="2026-05-13T13:00:00Z"
+    )
+    remeta = json.loads(rewrite.meta_file.read_text(encoding="utf-8"))
+    assert meta["fingerprints"]["relationships"] == remeta["fingerprints"]["relationships"]
+
+
 def _issue_payload_without_links() -> dict[str, object]:
     payload = issue_payload()
     for key in ("parent", "children", "dependencies"):

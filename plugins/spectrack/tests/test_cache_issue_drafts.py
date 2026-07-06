@@ -86,6 +86,7 @@ class GitHubFakeRunner:
             _gh_api_args("repos/studykit/studykit-plugins/issues/51/sub_issues", "--paginate"),
             _gh_api_args("repos/studykit/studykit-plugins/issues/51/dependencies/blocked_by", "--paginate"),
             _gh_api_args("repos/studykit/studykit-plugins/issues/51/dependencies/blocking", "--paginate"),
+            _gh_api_args("repos/studykit/studykit-plugins/issues/51/timeline", "--paginate"),
         }:
             return CommandResult(request=request, returncode=0, stdout="[]")
         return CommandResult(request=request, returncode=127, stderr="unexpected command")
@@ -464,6 +465,7 @@ class GitHubAppendCommentRunner:
             _gh_api_args("repos/studykit/studykit-plugins/issues/72/sub_issues", "--paginate"),
             _gh_api_args("repos/studykit/studykit-plugins/issues/72/dependencies/blocked_by", "--paginate"),
             _gh_api_args("repos/studykit/studykit-plugins/issues/72/dependencies/blocking", "--paginate"),
+            _gh_api_args("repos/studykit/studykit-plugins/issues/72/timeline", "--paginate"),
         }:
             return CommandResult(request=request, returncode=0, stdout="[]")
         return CommandResult(request=request, returncode=127, stderr=f"unexpected command: {request.args}")
@@ -684,6 +686,7 @@ def test_github_fetch_identifies_resume_comment(tmp_path: Path) -> None:
             _gh_api_args("repos/studykit/studykit-plugins/issues/72/sub_issues", "--paginate"),
             _gh_api_args("repos/studykit/studykit-plugins/issues/72/dependencies/blocked_by", "--paginate"),
             _gh_api_args("repos/studykit/studykit-plugins/issues/72/dependencies/blocking", "--paginate"),
+            _gh_api_args("repos/studykit/studykit-plugins/issues/72/timeline", "--paginate"),
         }:
             return CommandResult(request=request, returncode=0, stdout="[]")
         return CommandResult(request=request, returncode=127, stderr=f"unexpected command: {request.args}")
@@ -939,6 +942,7 @@ class GitHubUpdateIssueRunner:
             _gh_api_args("repos/studykit/studykit-plugins/issues/72/sub_issues", "--paginate"),
             _gh_api_args("repos/studykit/studykit-plugins/issues/72/dependencies/blocked_by", "--paginate"),
             _gh_api_args("repos/studykit/studykit-plugins/issues/72/dependencies/blocking", "--paginate"),
+            _gh_api_args("repos/studykit/studykit-plugins/issues/72/timeline", "--paginate"),
         }:
             return CommandResult(request=request, returncode=0, stdout="[]")
         return CommandResult(request=request, returncode=127, stderr=f"unexpected command: {request.args}")

@@ -567,12 +567,17 @@ class GitHubIssueCache:
 
 
 # Relationship kinds in display order; the key doubles as the inline label.
+# `references` / `referenced_by` are derived from body mentions and timeline
+# cross-references at fetch time, not from provider-native relationship
+# resources — they are read-only and excluded from the freshness fingerprint.
 _GITHUB_RELATIONSHIP_KINDS: tuple[str, ...] = (
     "parent",
     "children",
     "blocked_by",
     "blocking",
     "related",
+    "references",
+    "referenced_by",
 )
 
 
@@ -671,6 +676,11 @@ def _compact_relationships_for_frontmatter(current: Mapping[str, Any]) -> dict[s
     related = _compact_relationship_refs(current.get("related"))
     if related:
         compact["related"] = related
+
+    for derived_key in ("references", "referenced_by"):
+        refs = _compact_relationship_refs(current.get(derived_key))
+        if refs:
+            compact[derived_key] = refs
 
     return compact
 
@@ -930,6 +940,11 @@ def _relationships_from_issue(issue: Mapping[str, Any]) -> dict[str, Any]:
     related = _relationship_items(issue.get("related"))
     if related:
         result["related"] = related
+
+    for derived_key in ("references", "referenced_by"):
+        items = _relationship_items(issue.get(derived_key))
+        if items:
+            result[derived_key] = items
 
     return result
 

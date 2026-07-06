@@ -1064,10 +1064,13 @@ class GitHubIssueNativeProvider(IssueProvider):
             )
             return comments_fingerprint(_comment_fingerprint_items(payload))
         if target == "relationships":
+            # Derived reference kinds are excluded from the fingerprint, so
+            # skip their extra API reads when only the fingerprint is needed.
             relationships = issue_relationships(
                 issue,
                 project=request.context.project,
                 runner=self.runner,
+                include_derived=False,
             )
             compact = _compact_relationships_for_frontmatter(
                 _relationships_from_issue(relationships)
