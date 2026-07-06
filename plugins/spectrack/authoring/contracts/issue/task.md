@@ -2,14 +2,10 @@
 
 A workflow task records implementation work as a **spec**: what changes, why it matters, and what "done" means. It does not record how to build it; the approach is decided against current code at implementation time.
 
-## Required sections
+## Sections
 
-- Description — the intended change and scope.
-
-## Optional sections
-
-The body shape is yours to choose: use the sections below only when they carry
-weight, and add other sections when the task needs them. These commonly help:
+Description (the intended change and scope) is the only required section; the
+rest of the body shape is yours to choose. These commonly help:
 
 - Context — motivation, anchors, constraints, and current-state background.
 - Acceptance Criteria — independently checkable done conditions, including the behavior tests or verification must cover. Ground criteria in linked use cases/specs or the explicit request.
@@ -29,8 +25,3 @@ A durable, cross-cutting design decision belongs in a spec rather than only in t
 ## Evidence-readiness
 
 A task is ready when the body lets a cold implementer reach done without a local plan file. If key behavior, baseline, data/API contract, or verification is unknown, use `spike` or `research` first.
-
-## Modes
-
-- Backlog — the open, not-yet-done spec captured for later pickup; recorded at any useful level of detail.
-- Retroactive — the change already landed; the body records facts (what changed, the cause when relevant, how it was done, and the checks that ran) and publishes together with the transition to the resolved state.

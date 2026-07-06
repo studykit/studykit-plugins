@@ -4,14 +4,10 @@ A workflow bug records wrong, missing, regressed, or inconsistent behavior as a 
 
 When reproduction is unknown and the work is mostly discovery, use `spike` or `research` until the defect is pinned down.
 
-## Required sections
+## Sections
 
-- Description — observed vs expected behavior.
-
-## Optional sections
-
-The body shape is yours to choose: use the sections below only when they carry
-weight, and add other sections when the bug needs them. These commonly help:
+Description (observed vs expected behavior) is the only required section; the
+rest of the body shape is yours to choose. These commonly help:
 
 - Context — where it surfaces, triggering conditions, relevant anchors, and why it matters.
 - Reproduction — steps, command, data, or conditions that reproduce the bug.
@@ -26,7 +22,3 @@ Do not record the fix approach or a step sequence in the body — those are work
 ## Evidence-readiness
 
 Before treating a bug as ready for fix, capture enough to reproduce, diagnose, fix, and confirm: reproduction, observed/expected behavior, relevant environment/data conditions, and the regression behavior the fix must pin.
-
-## Backlog mode
-
-A backlog bug captures the defect to triage and fix later; record at least Description and add Context, Reproduction, and Acceptance Criteria to whatever level of detail is useful now.
