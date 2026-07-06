@@ -47,9 +47,10 @@ flow. If `--type` is not one of SpecTrack's workflow artifact types
 below, the resolver returns `NONE`: there is no authoring contract to
 read, so create the artifact directly. How a non-workflow type is
 recorded is provider-specific — GitHub carries it as a type label, Jira
-maps it to a native issue type (falling back to the project's default
-issue type when the name has no mapping) — so pass the requested type
-through and let the backend resolve it (`spectrack issue <verb> --help`).
+maps it to a native issue type — so pass the requested type through. On
+Jira a name with no configured mapping falls back to the site's default
+`issue_type` (and errors when none is set), so set `--issue-type`
+explicitly when needed (`spectrack issue <verb> --help`).
 
 Types:
 
