@@ -1,7 +1,7 @@
 <bash>
-spectrack prd_path <component> | --list
+spectrack prd_path <component>
 </bash>
 
-Resolves the absolute base and relative bullet for a PRD-component page
-(use-case work). Components: `actors`, `context`, `usecase`, `spec`,
-`nfr`, `domain`. `--list` enumerates all components for the project.
+Resolves where a PRD-component page lives (use-case work) — its absolute base
+and relative bullet. Run `spectrack prd_path --help` for the component set and
+`--list`.
