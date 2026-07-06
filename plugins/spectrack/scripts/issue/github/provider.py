@@ -30,6 +30,7 @@ from issue.github.gh import (
     get_github_login,
     issue_assignees,
     issue_relationships,
+    comment_edit_history,
     issue_body_edit_history,
     issue_events,
     issue_timeline,
@@ -987,6 +988,29 @@ class GitHubIssueNativeProvider(IssueProvider):
             else:
                 raise ProviderOperationError(f"unsupported GitHub issue log stream: {item}")
         return payload
+
+    def history(self, request: ProviderRequest) -> Mapping[str, Any]:
+        """Read the issue body's — or one comment's — edit history.
+
+        Pure remote read: no cache projection is written or consulted.
+        """
+
+        issue = _required_payload_value(request, "issue")
+        comment = request.payload.get("comment")
+        if comment is not None:
+            return {
+                "issue": str(issue),
+                **comment_edit_history(
+                    str(comment),
+                    project=request.context.project,
+                    runner=self.runner,
+                ),
+            }
+        return issue_body_edit_history(
+            issue,
+            project=request.context.project,
+            runner=self.runner,
+        )
 
     def comments(self, request: ProviderRequest) -> Mapping[str, Any]:
         issue = self.get(request)
