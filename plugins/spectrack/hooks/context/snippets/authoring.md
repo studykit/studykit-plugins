@@ -45,12 +45,12 @@ The resolver returns markdown listing files to read before drafting.
 Treat any bullet in a notes section as a binding rule for the calling
 flow. If `--type` is not one of SpecTrack's workflow artifact types
 below, the resolver returns `NONE`: there is no authoring contract to
-read, so create the artifact directly. How a non-workflow type is
-recorded is provider-specific — GitHub carries it as a type label, Jira
-maps it to a native issue type — so pass the requested type through. On
-Jira a name with no configured mapping falls back to the site's default
-`issue_type` (and errors when none is set), so set `--issue-type`
-explicitly when needed (`spectrack issue <verb> --help`).
+read. A non-workflow type is a GitHub-only capability: GitHub carries it
+as a type label, so create the issue directly with the requested type.
+Jira represents the type as a native issue type and rejects any it cannot
+map, so on Jira use only the workflow types below — or first add a
+`providers.issues.artifact_issue_types` mapping (see `spectrack issue
+<verb> --help`).
 
 Types:
 

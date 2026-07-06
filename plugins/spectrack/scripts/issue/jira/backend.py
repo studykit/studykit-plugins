@@ -911,6 +911,23 @@ class JiraIssueBackend:
         normalized_issue_type = _optional_text(issue_type)
         normalized_epic_name = _optional_text(epic_name)
 
+        # Jira represents the workflow type as a native issuetype, not a label,
+        # so a type it cannot map has nowhere to live and would silently
+        # collapse into the site default. Custom (non-workflow) types are a
+        # GitHub-only capability: reject one here unless the caller pins a
+        # native issuetype with --issue-type or maps it in config. Mirrors the
+        # set-type guard.
+        if normalized_issue_type is None and not _jira_native_issue_type(
+            config, artifact_type
+        ):
+            artifact = artifact_type.strip().lower()
+            raise IssueBackendError(
+                f"Jira does not support the custom issue type '{artifact_type}'. "
+                f"Use a SpecTrack workflow type, add a "
+                f"providers.issues.artifact_issue_types.{artifact} mapping in "
+                f".spectrack/config.yml, or pass --issue-type."
+            )
+
         body_path = body_file.expanduser()
         if not body_path.is_file():
             raise IssueBackendError(f"body file does not exist: {body_path}")
@@ -1601,14 +1618,9 @@ class JiraIssueBackend:
         elif verb == "set-type":
             if not new_type or not new_type.strip():
                 raise IssueBackendError("set-type requires a non-empty type")
-            artifact = new_type.strip().lower()
-            try:
-                settings = _jira_issue_provider_settings(config.root)
-            except Exception as exc:  # noqa: BLE001
-                raise IssueBackendError(str(exc)) from exc
-            configured = _jira_configured_artifact_issue_types(settings).get(artifact)
-            native = configured or JIRA_ARTIFACT_ISSUE_TYPES.get(artifact)
+            native = _jira_native_issue_type(config, new_type)
             if not native:
+                artifact = new_type.strip().lower()
                 raise IssueBackendError(
                     f"no Jira issuetype mapping for workflow type '{new_type}'. "
                     f"Configure providers.issues.artifact_issue_types.{artifact} in .spectrack/config.yml."
@@ -1633,6 +1645,21 @@ class JiraIssueBackend:
             )
         )
         return flatten_provider_envelope(response.payload, project=config.root)
+
+
+def _jira_native_issue_type(config: WorkflowConfig, artifact_type: str) -> str | None:
+    """Resolve the native Jira issuetype an artifact type maps to, if any.
+
+    Returns the configured (``providers.issues.artifact_issue_types.<type>``)
+    or built-in mapping, or ``None`` when the type has no mapping. Jira carries
+    the workflow type as a native issuetype rather than a label, so an unmapped
+    type cannot be expressed — callers reject it instead of letting it collapse
+    into the site default.
+    """
+    artifact = artifact_type.strip().lower()
+    settings = _jira_issue_provider_settings(config.root)
+    configured = _jira_configured_artifact_issue_types(settings).get(artifact)
+    return configured or JIRA_ARTIFACT_ISSUE_TYPES.get(artifact)
 
 
 def _strip_body_frontmatter(body: str) -> str:
