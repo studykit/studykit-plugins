@@ -1234,6 +1234,93 @@ def test_jira_publish_creates_issue_inline_and_deletes_body_file(tmp_path: Path)
     assert runner.requests[0].args == _jira_write_args()
 
 
+def test_jira_publish_rejects_custom_non_workflow_type(tmp_path: Path) -> None:
+    # Jira maps the workflow type to a native issuetype, so a custom type it
+    # cannot map is unsupported: publish must reject it (not silently fall back
+    # to the site default) and touch the provider for nothing.
+    _write_jira_config(tmp_path)
+    body_file = _write_body_file(tmp_path, "Body.\n")
+
+    runner = JiraFakeRunner({})
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+
+    code = jira_issue_drafts_main(
+        [
+            "--project",
+            str(tmp_path),
+            "publish",
+            "--type",
+            "customthing",
+            "--title",
+            "Published Jira issue",
+            "--body-file",
+            str(body_file),
+        ],
+        stdout=stdout,
+        stderr=stderr,
+        runner=runner,
+    )
+
+    assert code == 2
+    assert "does not support the custom issue type 'customthing'" in stderr.getvalue()
+    assert runner.requests == []
+    assert body_file.exists()
+    assert stdout.getvalue() == ""
+
+
+def test_jira_publish_allows_custom_type_with_explicit_issue_type(tmp_path: Path) -> None:
+    # An explicit --issue-type pins a native issuetype, so a non-workflow type
+    # is allowed through that deliberate escape hatch.
+    _write_jira_config(tmp_path)
+    body_file = _write_body_file(tmp_path, "Body.\n")
+    issue_url = "https://jira.example.test/rest/api/2/issue/TEST-1234"
+    remote_links_url = "https://jira.example.test/rest/api/2/issue/TEST-1234/remotelink"
+
+    runner = JiraFakeRunner(
+        {
+            _jira_write_args(): CommandResult(
+                request=CommandRequest(args=()),
+                returncode=0,
+                stdout=json.dumps({"id": "10001", "key": "TEST-1234"}),
+            ),
+            _jira_curl_get_args(issue_url): CommandResult(
+                request=CommandRequest(args=()),
+                returncode=0,
+                stdout=json.dumps(_jira_issue_payload()),
+            ),
+            _jira_curl_get_args(remote_links_url): CommandResult(
+                request=CommandRequest(args=()),
+                returncode=0,
+                stdout=json.dumps([]),
+            ),
+        }
+    )
+    stdout = io.StringIO()
+
+    code = jira_issue_drafts_main(
+        [
+            "--project",
+            str(tmp_path),
+            "publish",
+            "--type",
+            "customthing",
+            "--issue-type",
+            "Task",
+            "--title",
+            "Published Jira issue",
+            "--body-file",
+            str(body_file),
+        ],
+        stdout=stdout,
+        runner=runner,
+    )
+
+    payload = json.loads(stdout.getvalue())
+    assert code == 0
+    assert payload["issue"] == "TEST-1234"
+
+
 def test_jira_publish_fails_fast_when_relationship_mapping_missing(tmp_path: Path) -> None:
     _write_jira_config(tmp_path)
     body_file = _write_body_file(tmp_path, "Body.\n")
