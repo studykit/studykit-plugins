@@ -55,6 +55,13 @@ def comments_fingerprint(items: list[dict[str, str | None]]) -> str:
     return fingerprint(items)
 
 
+# Reference kinds derived at fetch time (body mentions, timeline
+# cross-references) rather than authored through link operations. They are
+# volatile — any third issue mentioning this one changes them — so they must
+# not participate in the freshness fingerprint that gates link write-backs.
+DERIVED_RELATIONSHIP_KINDS: tuple[str, ...] = ("references", "referenced_by")
+
+
 def relationships_fingerprint(compact: Mapping[str, Any]) -> str:
     """Fingerprint of a compact relationship projection (order-independent)."""
 
@@ -64,6 +71,8 @@ def relationships_fingerprint(compact: Mapping[str, Any]) -> str:
 def _canonical_relationships(compact: Mapping[str, Any]) -> dict[str, Any]:
     canonical: dict[str, Any] = {}
     for key, value in compact.items():
+        if key in DERIVED_RELATIONSHIP_KINDS:
+            continue
         if isinstance(value, list):
             canonical[key] = sorted(str(item) for item in value)
         else:

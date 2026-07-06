@@ -141,6 +141,7 @@ def _refresh_relationship_args() -> dict[tuple[str, ...], CommandResult]:
     children_args = gh_api_args("repos/studykit/studykit-plugins/issues/39/sub_issues", "--paginate")
     blocked_by_args = gh_api_args("repos/studykit/studykit-plugins/issues/39/dependencies/blocked_by", "--paginate")
     blocking_args = gh_api_args("repos/studykit/studykit-plugins/issues/39/dependencies/blocking", "--paginate")
+    timeline_args = gh_api_args("repos/studykit/studykit-plugins/issues/39/timeline", "--paginate")
     return {
         rest_issue_args: result(
             rest_issue_args,
@@ -150,6 +151,7 @@ def _refresh_relationship_args() -> dict[tuple[str, ...], CommandResult]:
         children_args: result(children_args, stdout="[]"),
         blocked_by_args: result(blocked_by_args, stdout="[]"),
         blocking_args: result(blocking_args, stdout="[]"),
+        timeline_args: result(timeline_args, stdout="[]"),
     }
 
 

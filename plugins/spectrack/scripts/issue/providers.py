@@ -531,6 +531,8 @@ def _payload_has_relationship_projection(payload: Mapping[str, Any]) -> bool:
         "blocking",
         "blocks",
         "related",
+        "references",
+        "referenced_by",
     }
     return any(key in payload for key in relationship_keys)
 

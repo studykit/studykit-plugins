@@ -197,6 +197,7 @@ def default_github_relationship_response(request: CommandRequest) -> CommandResu
         f"{issue_number}/sub_issues",
         f"{issue_number}/dependencies/blocked_by",
         f"{issue_number}/dependencies/blocking",
+        f"{issue_number}/timeline",
     }:
         return CommandResult(request=request, returncode=0, stdout="[]")
 
@@ -234,6 +235,7 @@ def empty_relationship_read_args(issue: int | str) -> list[tuple[str, ...]]:
         gh_api_args(f"{base}/sub_issues", "--paginate"),
         gh_api_args(f"{base}/dependencies/blocked_by", "--paginate"),
         gh_api_args(f"{base}/dependencies/blocking", "--paginate"),
+        gh_api_args(f"{base}/timeline", "--paginate"),
     ]
 
 

@@ -109,6 +109,15 @@ def test_relationships_fingerprint_is_order_independent() -> None:
     ) == relationships_fingerprint({"parent": 9, "blocked_by": [3, 1, 2]})
 
 
+def test_relationships_fingerprint_ignores_derived_reference_kinds() -> None:
+    """Derived references change whenever any issue mentions this one, so they
+    must not make a link write-back look conflicted."""
+
+    assert relationships_fingerprint(
+        {"blocking": [22], "references": [16], "referenced_by": [20]}
+    ) == relationships_fingerprint({"blocking": [22]})
+
+
 def test_comments_fingerprint_tracks_identity_and_revision() -> None:
     items = [{"id": "1", "updated_at": "2026-05-14T00:00:00Z"}]
 

@@ -19,7 +19,7 @@ from command import WorkflowCommandError  # noqa: E402
 from issue.github.gh import DEFAULT_ISSUE_FIELDS, GitHubParseError  # noqa: E402
 from issue.github.gh import GitHubVerificationError  # noqa: E402
 from issue.github.gh import close_issue, comment_issue, create_issue, edit_issue, edit_issue_body  # noqa: E402
-from issue.github.gh import issue_body_edit_history, issue_timeline  # noqa: E402
+from issue.github.gh import issue_body_edit_history, issue_relationships, issue_timeline  # noqa: E402
 from issue.github.gh import parse_github_remote_url, resolve_github_repository, view_issue  # noqa: E402
 from issue.github.gh import reopen_issue  # noqa: E402
 
@@ -171,6 +171,81 @@ def test_timeline_flattens_paginated_json_arrays(tmp_path: Path) -> None:
     timeline = issue_timeline(37, project=tmp_path, runner=runner)
 
     assert [event["event"] for event in timeline["events"]] == ["labeled", "sub_issue_added"]
+
+
+def _derived_relationship_responses(project: Path, *, body: str, timeline: list[dict[str, Any]]) -> dict[tuple[str, ...], CommandResult]:
+    base = "repos/studykit/studykit-plugins/issues/17"
+    responses = {
+        git_args(project, "remote", "get-url", "origin"): result(
+            git_args(project, "remote", "get-url", "origin"),
+            stdout="git@github.com:studykit/studykit-plugins.git\n",
+        ),
+        gh_args(project, "api", base): result(
+            gh_args(project, "api", base),
+            stdout=json.dumps({"number": 17, "body": body, "updated_at": "2026-07-06T00:00:00Z"}),
+        ),
+        gh_args(project, "api", f"{base}/parent"): result(
+            gh_args(project, "api", f"{base}/parent"), returncode=404, stderr="not found"
+        ),
+        gh_args(project, "api", f"{base}/sub_issues", "--paginate"): result(
+            gh_args(project, "api", f"{base}/sub_issues", "--paginate"), stdout="[]"
+        ),
+        gh_args(project, "api", f"{base}/dependencies/blocked_by", "--paginate"): result(
+            gh_args(project, "api", f"{base}/dependencies/blocked_by", "--paginate"), stdout="[]"
+        ),
+        gh_args(project, "api", f"{base}/dependencies/blocking", "--paginate"): result(
+            gh_args(project, "api", f"{base}/dependencies/blocking", "--paginate"),
+            stdout=json.dumps([{"number": 22, "title": "Blocked twin", "state": "open"}]),
+        ),
+        gh_args(project, "api", f"{base}/timeline", "--paginate"): result(
+            gh_args(project, "api", f"{base}/timeline", "--paginate"),
+            stdout=json.dumps(timeline),
+        ),
+    }
+    return responses
+
+
+def _cross_referenced_event(number: int, *, full_name: str = "studykit/studykit-plugins", pull_request: bool = False) -> dict[str, Any]:
+    source_issue: dict[str, Any] = {"number": number, "repository": {"full_name": full_name}}
+    if pull_request:
+        source_issue["pull_request"] = {"url": f"https://github.com/{full_name}/pull/{number}"}
+    return {"event": "cross-referenced", "source": {"type": "issue", "issue": source_issue}}
+
+
+def test_issue_relationships_derives_body_references_and_timeline_referenced_by(tmp_path: Path) -> None:
+    body = (
+        "Builds on #16 (see #16 again) and studykit/studykit-plugins#18, "
+        "not other/repo#5, plus https://github.com/studykit/studykit-plugins/issues/19. "
+        "Already blocking #22; self ref #17."
+    )
+    timeline = [
+        _cross_referenced_event(22),
+        _cross_referenced_event(20),
+        _cross_referenced_event(30, pull_request=True),
+        _cross_referenced_event(7, full_name="other/repo"),
+        _cross_referenced_event(20),
+        {"event": "labeled"},
+    ]
+    runner = FakeRunner(_derived_relationship_responses(tmp_path, body=body, timeline=timeline))
+
+    payload = issue_relationships(17, project=tmp_path, runner=runner)
+
+    # Outgoing: same-repo body refs minus self (#17) and native kinds (#22 blocking).
+    assert payload["references"] == [16, 18, 19]
+    # Incoming: timeline cross-references minus native kinds, PRs, other repos, dups.
+    assert payload["referenced_by"] == [20]
+
+
+def test_issue_relationships_without_derived_skips_timeline_and_reference_keys(tmp_path: Path) -> None:
+    runner = FakeRunner(
+        _derived_relationship_responses(tmp_path, body="Mentions #16.", timeline=[])
+    )
+
+    payload = issue_relationships(17, project=tmp_path, runner=runner, include_derived=False)
+
+    assert "references" not in payload
+    assert "referenced_by" not in payload
+    assert not any("/timeline" in " ".join(request.args) for request in runner.requests)
 
 
 def test_body_edit_history_uses_graphql_user_content_edits(tmp_path: Path) -> None:

@@ -728,8 +728,17 @@ def issue_relationships(
     *,
     project: Path,
     runner: CommandRunner | None = None,
+    include_derived: bool = True,
 ) -> dict[str, Any]:
-    """Read current GitHub issue relationships through provider-native REST endpoints."""
+    """Read current GitHub issue relationships through provider-native REST endpoints.
+
+    With ``include_derived`` (the default), also surface reference links GitHub
+    does not model as native relationships: same-repository issues the body
+    mentions (``references``) and issues whose timeline cross-referenced this
+    one (``referenced_by``). Callers that only need the freshness fingerprint
+    pass ``include_derived=False`` — derived kinds are excluded from that
+    fingerprint, so fetching them there would be wasted API calls.
+    """
 
     repo = resolve_github_repository(project, runner=runner)
     issue_number = normalize_issue_number(issue)
@@ -775,7 +784,101 @@ def issue_relationships(
         dependency_payload["blocking"] = blocking
     if dependency_payload:
         payload["dependencies"] = dependency_payload
+
+    if include_derived:
+        native_numbers = {
+            number
+            for source in ([parent] if parent else []) + children + blocked_by + blocking
+            for number in [_relationship_number(source)]
+            if number is not None
+        }
+        native_numbers.add(int(issue_number))
+        references = _body_issue_references(
+            repo,
+            body=str(issue_data.get("body") or ""),
+            exclude=native_numbers,
+        )
+        if references:
+            payload["references"] = references
+        referenced_by = _timeline_cross_references(
+            repo,
+            issue_number,
+            exclude=native_numbers,
+            project=project,
+            runner=runner,
+        )
+        if referenced_by:
+            payload["referenced_by"] = referenced_by
     return payload
+
+
+def _relationship_number(value: Any) -> int | None:
+    if isinstance(value, Mapping):
+        value = value.get("number")
+    try:
+        return int(normalize_issue_number(value))
+    except Exception:
+        return None
+
+
+def _body_issue_references(
+    repo: GitHubRepository,
+    *,
+    body: str,
+    exclude: set[int],
+) -> list[int]:
+    """Same-repository issues the body text mentions, minus native-kind refs."""
+
+    # Function-level import: refs.py imports this module for GitHubRepository.
+    from issue.github.refs import extract_issue_numbers
+
+    return [
+        number
+        for raw in extract_issue_numbers(body, repo=repo)
+        if (number := int(raw)) not in exclude
+    ]
+
+
+def _timeline_cross_references(
+    repo: GitHubRepository,
+    issue_number: str,
+    *,
+    exclude: set[int],
+    project: Path,
+    runner: CommandRunner | None = None,
+) -> list[int]:
+    """Same-repository issues whose body or comments cross-referenced this issue.
+
+    Cross-referenced timeline events accumulate on the mentioned issue, so this
+    is the incoming direction only. PR sources are skipped: ``source.type`` is
+    ``"issue"`` for both, so a PR is detected by its ``pull_request`` key.
+    """
+
+    events = _issue_rest_items(
+        repo,
+        f"repos/{repo.slug}/issues/{issue_number}/timeline",
+        project=project,
+        runner=runner,
+    )
+    numbers: list[int] = []
+    seen: set[int] = set(exclude)
+    for event in events:
+        if not isinstance(event, Mapping) or event.get("event") != "cross-referenced":
+            continue
+        source = event.get("source")
+        source_issue = source.get("issue") if isinstance(source, Mapping) else None
+        if not isinstance(source_issue, Mapping) or "pull_request" in source_issue:
+            continue
+        repository = source_issue.get("repository")
+        full_name = repository.get("full_name") if isinstance(repository, Mapping) else None
+        if not isinstance(full_name, str) or full_name.lower() != repo.slug.lower():
+            continue
+        number = _relationship_number(source_issue)
+        if number is None or number in seen:
+            continue
+        seen.add(number)
+        numbers.append(number)
+    return numbers
 
 
 def _verify_issue_body(
