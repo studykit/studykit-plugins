@@ -585,6 +585,13 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
 
+    # Types outside SpecTrack's built-in workflow vocabulary carry no authoring
+    # contract. Report NONE (rather than failing) so the calling flow knows
+    # there is nothing to read and can create the artifact directly.
+    if args.type not in ALL_TYPES:
+        print("NONE")
+        return 0
+
     try:
         resolution = resolve_authoring(
             args.type,
