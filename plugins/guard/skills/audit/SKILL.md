@@ -14,8 +14,8 @@ turn_file, verified_file, dispatcher).
 Agent tool exactly as the reminder specifies, then relay its verdict — if it reports
 violations, address them; otherwise state that the turn passed.
 
-If the reminder instead says there is nothing to verify (guard is off, or no completed
-turn yet), relay that in one line and take no further action.
+If the reminder instead says there is nothing to verify (no completed turn yet), relay
+that in one line and take no further action.
 
 Do not read guard's state files or investigate how the pending turn is tracked — the
 hook has already selected the turn; your only job is to dispatch the guardian when the

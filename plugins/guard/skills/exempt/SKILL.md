@@ -19,7 +19,7 @@ Do this, in order:
    available-skills context) with their exact invokable names, INCLUDING the plugin
    namespace (`plugin:skill`, e.g. `hindsight:review`) or the bare name for an
    un-namespaced skill (e.g. `deep-research`). Exclude guard's own `guard:turn`,
-   `guard:mode`, and `guard:exempt`. If the user already named specific skills in
+   `guard:audit-mode`, and `guard:exempt`. If the user already named specific skills in
    their message, you may skip straight to step 4 with those.
 
 3. **Ask the user to choose.** Call `AskUserQuestion` with `multiSelect: true`,
@@ -36,4 +36,4 @@ Do this, in order:
 
 Do NOT edit `.claude/guard.local.json` with the Write/Edit tools — guard's approval
 gate blocks writes to its own config by design. The `exempt` script above is the only
-supported writer; it changes just the `exempt_skills` key (never `enabled`/`mode`).
+supported writer; it changes just the `exempt_skills` key (never `edit_gate`/`mode`).

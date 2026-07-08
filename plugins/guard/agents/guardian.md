@@ -21,7 +21,7 @@ call described below.
 
 ## Inputs
 
-The dispatching message names these verbatim. All are required:
+The dispatching message names these verbatim. All are required except `refs_dir`:
 
 - **`session_id`** — the session identifier.
 - **`prompt_id`** — the turn's id (the transcript `promptId`); pass it back to
@@ -32,8 +32,11 @@ The dispatching message names these verbatim. All are required:
   (`.jsonl`, may not exist yet).
 - **`dispatcher`** — absolute path to `guard_hook.py` (you call it for
   `record-verified`).
+- **`refs_dir`** — absolute path to the directory where the assistant saves local
+  copies of cited docs (the project may point this at a git-tracked folder). If the
+  dispatch omits it, resolve it yourself: `"<dispatcher>" refs-dir` prints the path.
 
-If any input is missing, stop and say so. Do not guess paths.
+If any required input is missing, stop and say so. Do not guess paths.
 
 ## Grounding
 
@@ -87,8 +90,8 @@ actual behavior:
 
 A cited `file:line` that does not actually establish the claim counts as unsupported.
 When a claim cites **official documentation**, the response must also point to a local
-saved copy under `.claude/guard/refs/`; confirm that file exists and supports the claim
-— a docs claim with no existing local copy, or a missing path, is unsupported.
+saved copy under the refs directory (`refs_dir`); confirm that file exists and supports
+the claim — a docs claim with no existing local copy, or a missing path, is unsupported.
 
 Statements explicitly flagged as unverified assumptions are **not** violations;
 opinions and hedged suggestions are **not** claims.
