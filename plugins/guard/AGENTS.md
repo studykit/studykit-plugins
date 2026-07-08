@@ -11,7 +11,9 @@ no Codex path):
    hook injects `additionalContext` with no block; the main agent dispatches the
    `guardian` subagent to run the same audit), or `headless` (an isolated `claude` runs
    inside the Stop hook and **blocks** on a violation).
-2. **Approval gate** — block file mutation until the user explicitly approves.
+2. **Approval gate** — block file mutation until the user explicitly approves. Approval
+   arms on a user message (classifier) or on the user approving a non-deferring plan via
+   ExitPlanMode (`PostToolUse` → `plan-approved`); the model can arm neither.
 
 A **turn is the transcript's `promptId`.** guard keeps no turn buffer; at Stop it
 slices the turn from Claude Code's transcript (`transcript_path` + `prompt_id`). State

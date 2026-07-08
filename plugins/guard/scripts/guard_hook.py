@@ -836,6 +836,39 @@ APPROVAL_SCHEMA = {
     "additionalProperties": False,
 }
 
+# Plan-approval gate. When the user APPROVES a plan via ExitPlanMode, PostToolUse
+# fires (verified: a rejected plan fires no PostToolUse), so cmd_plan_approved runs
+# this judge over the approved plan text to decide whether to arm the approval gate.
+# Arm only when the plan resolves everything it scopes in — a plan that still defers
+# in-scope work is not a green light to start editing files.
+PLAN_DEFER_SYSTEM = (
+    "You are a plan gate. You are given an implementation plan the user has just "
+    "approved. Decide whether the plan DEFERS, postpones, or leaves unresolved any "
+    "work or decision that the plan itself treats as in scope for this task.\n\n"
+    "Deferral takes many forms, not just literal headings; treat as deferral any of: "
+    "sections such as Open Questions, Deferred, TBD, Later, Follow-up, or Future work; "
+    "phrases such as 'we can do this later', 'for now', 'leave as-is', 'revisit', "
+    "'stub out', or 'placeholder'; an either/or choice left for later such as "
+    "'option A or B' or 'decide during implementation'; or a required decision handed "
+    "off instead of made. The same applies in any language (including Korean: "
+    "'미정', '추후', '나중에', '확인 필요', '결정 안 됨').\n\n"
+    "Return ok=true when the plan resolves everything it scopes in, OR when it is a "
+    "research, investigation, or analysis plan whose deliverable is findings rather "
+    "than a code change (such plans legitimately end in open questions).\n\n"
+    "Return ok=false ONLY for an implementation plan that carries unresolved in-scope "
+    "work or a deferred decision; in `reason`, name the specific deferred items. "
+    "Return only JSON."
+)
+PLAN_DEFER_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "ok": {"type": "boolean"},
+        "reason": {"type": "string"},
+    },
+    "required": ["ok", "reason"],
+    "additionalProperties": False,
+}
+
 EVIDENCE_SYSTEM = (
     "You audit an assistant's response from a coding session on TWO axes: unsupported "
     "technical claims (AXIS 1) and unjustified deferrals (AXIS 2), both defined below.\n\n"
@@ -998,6 +1031,69 @@ def cmd_user_prompt() -> int:
         })
     _trace(project_dir, session_id, "user-prompt", "approval",
            approved=state["approved"], before=approved_before)
+    return 0
+
+
+def cmd_plan_approved() -> int:
+    """PostToolUse(ExitPlanMode): the user has APPROVED a plan.
+
+    Verified against real payloads: an ExitPlanMode approval fires PostToolUse, while
+    a rejection ("Denied by user") fires only PreToolUse — so this hook running IS the
+    user's approval, a genuine user action the model cannot forge (it authors the plan
+    but cannot approve its own tool call). That closes the gap where a plan approved in
+    plan mode left no user text message for the UserPromptSubmit classifier to read, so
+    the gate stayed locked and the first post-approval edit was denied.
+
+    Arm the approval gate — but only when the approved plan resolves everything it
+    scopes in. A plan that still defers in-scope work is not a green light to edit, so
+    it leaves the gate as-is (the user can still approve in words later). On any judge
+    failure, do NOT arm: unlike the evidence judge (fail-open = don't block the user),
+    the safe direction for the gate is to stay closed.
+    """
+    project_dir = _project_dir()
+    payload = _read_payload()
+    if payload is None or project_dir is None:
+        return 0
+    session_id = _session_id(payload)
+    if session_id is None:
+        return 0
+
+    config = _load_config(project_dir)
+    state = _read_state(project_dir, session_id, config)
+    if not state["enabled"]:
+        return 0
+
+    # Defensive: the hook matcher already scopes this to ExitPlanMode.
+    if payload.get("tool_name") != "ExitPlanMode":
+        return 0
+    if state["approved"]:
+        return 0  # already armed — no judge spawn, nothing to change
+
+    # The plan text rides in tool_input.plan on the PostToolUse payload (verified).
+    tool_input = payload.get("tool_input")
+    plan_text = tool_input.get("plan") if isinstance(tool_input, dict) else None
+    if not isinstance(plan_text, str) or not plan_text.strip():
+        _trace(project_dir, session_id, "plan-approved", "no_plan_text")
+        return 0
+
+    verdict = run_judge(project_dir, PLAN_DEFER_SYSTEM, plan_text, PLAN_DEFER_SCHEMA, config)
+    if verdict is None:
+        # Fail toward the closed gate: never arm on a judge failure.
+        _trace(project_dir, session_id, "plan-approved", "judge_failed")
+        return 0
+
+    if verdict.get("ok") is True:
+        state["approved"] = True
+        _write_state(project_dir, session_id, state)
+        _append_log(project_dir, session_id, {
+            "role": "gate",
+            "approved": True,
+            "reasoning": "plan approved (no deferred in-scope work): " + verdict.get("reason", ""),
+        })
+        _trace(project_dir, session_id, "plan-approved", "armed")
+    else:
+        _trace(project_dir, session_id, "plan-approved", "defers",
+               reason=str(verdict.get("reason", ""))[:200])
     return 0
 
 
@@ -1805,6 +1901,7 @@ def cmd_exempt() -> int:
 
 SUBCOMMANDS = {
     "user-prompt": cmd_user_prompt,
+    "plan-approved": cmd_plan_approved,
     "toggle": cmd_toggle,
     "set-mode": cmd_set_mode,
     "verify": cmd_verify,
