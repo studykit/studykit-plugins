@@ -120,6 +120,11 @@ your own words — for example "go ahead", "implement it", or "apply the change"
 guard reads your message together with the recent conversation, so a short
 "go ahead" counts when it clearly accepts a proposed plan — and doesn't when it
 refers to something else.
+Approving a **plan in plan mode** also counts as approval — as long as the plan leaves
+no in-scope work deferred (no "TBD", "later", or unresolved either/or choices). Approve
+a plan that still defers work and the gate stays closed until you approve in your own
+words, so you are never handed the keys on a half-finished plan.
+
 Approval sticks with the current task: questions, refinements, corrections, and
 follow-ups on the same work keep it in place. The gate only re-locks when you clearly
 move on to a different, unrelated task — at which point you approve that one afresh.

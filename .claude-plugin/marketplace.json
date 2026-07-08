@@ -131,7 +131,7 @@
     {
       "name": "guard",
       "source": "./plugins/guard",
-      "description": "Enforce evidence-backed technical claims and gate file edits behind explicit user approval. Ships a Grounded output style, logs each session's turns with the assistant's claims and their evidence, audits a turn for grounding on demand (/guard:audit) or automatically each turn in subagent/headless mode, and denies file-mutating tools until the user explicitly approves implementation. Claude Code only.",
+      "description": "Enforce evidence-backed technical claims and gate file edits behind explicit user approval. Ships a Grounded output style, logs each session's turns with the assistant's claims and their evidence, audits a turn for grounding on demand (/guard:audit) or automatically each turn in subagent/headless mode, and denies file-mutating tools until the user explicitly approves implementation — in a message or by approving a non-deferring plan in plan mode. Claude Code only.",
       "author": {
         "name": "studykit"
       },
