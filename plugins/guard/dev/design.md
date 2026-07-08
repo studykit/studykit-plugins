@@ -15,6 +15,7 @@ line-by-line walkthrough.
 | `UserPromptExpansion` (matcher `^(guard:)?mode$`) | `set-mode` | Set session `mode` (`manual`\|`subagent`\|`headless`). |
 | `UserPromptExpansion` (matcher `^(guard:)?audit$`) | `verify` | On demand, dispatch the guardian for the last completed turn (`pending_verify_prompt_id`). |
 | `PreToolUse` (`Write\|Edit\|MultiEdit\|NotebookEdit`) | `gate` | Deny file edits until approved. |
+| `PostToolUse` (matcher `ExitPlanMode`) | `plan-approved` | On plan approval, arm the gate when the plan defers no in-scope work. |
 | (called via Bash, not a hook) | `record-verified` | Guardian appends a passed turn's claims to the verified store. |
 | (called via Bash, not a hook) | `exempt` | `guard:exempt` skill records the user's confirmed `exempt_skills` selection (that key only). |
 | `Stop` | `stop` | manual: record pending target, no audit. subagent: dispatch guardian. headless: in-hook judge that blocks. |
@@ -69,6 +70,16 @@ payloads, not memory.
 - **A Stop hook may inject `additionalContext` without `decision`** and the
   conversation continues — the subagent-dispatch mechanism. `stop_hook_active: true`
   ⇒ guard already blocked this turn, so Stop returns at once.
+- **`PostToolUse(ExitPlanMode)` fires only on plan approval.** Verified against live
+  payloads (probe on Claude Code 2.1.x): approving a plan fires BOTH `PreToolUse` and
+  `PostToolUse`; rejecting it ("Denied by user") fires `PreToolUse` only — consistent
+  with the hooks doc rule that a blocked/denied tool produces no PostToolUse
+  (https://code.claude.com/docs/en/hooks). The plan text rides in `tool_input.plan`
+  on both payloads (and `tool_response.plan` on Post); `prompt_id` is common to both;
+  on approval `permission_mode` transitions `plan → acceptEdits`. This is what lets
+  `cmd_plan_approved` treat its own invocation as a genuine user approval — the model
+  authors the plan but cannot approve its own tool call. Re-verify against a live
+  payload before relying on it.
 - **`/guard:turn` and `/guard:mode` take a `--project` / `--global` scope flag.** No
   flag sets the live session (`toggle` / `set-mode` write `state/`); `--project` writes
   only the session-start default (`enabled` / `mode`) to `guard.local.json`, live
@@ -83,8 +94,15 @@ payloads, not memory.
   non-zero exit. Any judge failure (missing binary, timeout, unparseable output)
   leaves state untouched and does not block — guard must never harass the user
   because its own machinery broke.
-- **Approval is armed only by a user message**, only on an explicit-implementation
-  verdict from the classifier. The `turn` skill and the model cannot arm it. The
+- **Approval is armed only by a user action**, never by the model. Two paths, both
+  requiring the user: (1) a **user message** on an explicit-implementation verdict from
+  the classifier; (2) the user **approving a plan** via ExitPlanMode, where
+  `cmd_plan_approved` (PostToolUse, which fires only on approval — see Verified facts)
+  arms the gate *only if* the approved plan defers no in-scope work (`PLAN_DEFER_SYSTEM`
+  judge). The model authors the plan but cannot approve its own tool call, so path 2 is
+  still a genuine user action; a deferring plan does not arm, and a judge failure never
+  arms (fail toward the closed gate — the opposite of the evidence judge's fail-open).
+  The `turn` skill and the model cannot arm it by either path. The
   classifier sees the tail of the session archive as conversation context
   (`_recent_dialogue`) — used only to resolve what the message refers to, so a bare
   "go ahead" arms only when it answers a proposed plan; context alone can never

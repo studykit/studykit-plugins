@@ -61,6 +61,19 @@
         ]
       }
     ],
+    "PostToolUse": [
+      {
+        "matcher": "ExitPlanMode",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/guard_hook.py\" plan-approved",
+            "timeout": 60,
+            "description": "On plan approval, arm the approval gate when the plan defers no in-scope work."
+          }
+        ]
+      }
+    ],
     "Stop": [
       {
         "hooks": [
