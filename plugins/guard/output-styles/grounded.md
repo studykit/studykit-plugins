@@ -35,12 +35,16 @@ specific form available:
   quoting the line's content over just its coordinate.
 - **Official documentation or a specification** — when a claim rests on official
   docs, do not rely on memory. Fetch the page and **save its relevant content to a
-  local file** under `.claude/guard/refs/` (e.g.
-  `.claude/guard/refs/<topic>.md`), then cite **both** the source URL and that
-  local path so the evidence is inspectable after the fact. Name the version or
-  section when it matters. That refs copy is a **local, git-ignored** cache for your
-  own verification — see the tracked-file rule under Practical form before citing it
-  anywhere durable.
+  local file** in the project's **refs directory**, then cite **both** the source
+  URL and that local path so the evidence is inspectable after the fact. guard
+  exports the refs directory's absolute path to your Bash environment as
+  `GUARD_REFS_DIR` — resolve it once before your first save this session
+  (`echo "$GUARD_REFS_DIR"`) and save there (e.g. `$GUARD_REFS_DIR/<topic>.md`).
+  Only if the variable is unset, fall back to `refs_dir` from
+  `.claude/guard.local.json`, then to `.claude/guard/refs/`. Name the version or
+  section when it matters. Whether that refs copy is repo content or a local
+  git-ignored cache depends on where the project points it — see the tracked-file
+  rule under Practical form before citing it anywhere durable.
 - **A measurement** — give the numbers and how you obtained them.
 - **Direct reasoning** — when the claim follows by construction from something
   already established, state the derivation briefly.
@@ -69,20 +73,22 @@ uncertainty marker, or cut the claim.
   degrade to an assumption marker rather than a bare assertion.
 - Brevity still matters: ground the load-bearing claims precisely; don't bury the
   answer in ceremony.
-- **Tracked files cite the URL, not the local refs cache.** `.claude/guard/refs/` is
-  git-ignored — a per-machine verification cache, not repo content. When a claim's
-  grounding goes into a committed file (documentation, `dev/` notes, code comments),
-  cite the source URL (with version/section); never write a `.claude/guard/refs/…`
-  path there, since the repo does not ship that file and the reference would dangle
-  for anyone who clones it. Keep the refs copy for your own in-turn checking only.
+- **Tracked files cite what the repo ships.** When a claim's grounding goes into a
+  committed file (documentation, `dev/` notes, code comments), always cite the
+  source URL (with version/section). Add the refs copy's repo-relative path only
+  when the refs directory is itself git-tracked (unsure? `git check-ignore` it
+  once). Never write a git-ignored refs path into a committed file — the repo does
+  not ship that file and the reference would dangle for anyone who clones it; a
+  git-ignored refs copy is for your own in-turn checking only.
 - **Commit messages name only tracked content.** A commit subject or body must not
   reference a git-ignored or untracked file (e.g. anything under `.claude/guard/`) —
   the commit does not carry that file, so the mention dangles for anyone reading the
   history. Describe the change in terms of the tracked files it actually touches, and
-  cite a source URL rather than a local path when grounding is needed.
+  cite a source URL (or a tracked refs path) rather than an ignored local path when
+  grounding is needed.
 - When any claim in your answer relied on official documentation, end the answer
   with a short **Sources** list, one line per source: the official URL (and, in a
-  chat answer, the local `.claude/guard/refs/…` path where you saved its content).
+  chat answer, the local refs path where you saved its content).
   If you cite docs but saved no local copy, that citation is not yet grounded —
   fetch and save it.
 

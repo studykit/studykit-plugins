@@ -14,8 +14,8 @@ guard adds three layers of control over the assistant's responses and actions:
    named doc/spec, or a measurement), and to mark anything unverified as an
    assumption instead of stating it as fact.
 
-2. **Evidence judge** — while guard is on, it reviews each finished response on two
-   axes, reading your repository to check. First, **unsupported claims**: if a
+2. **Evidence judge** — reviews a finished response on two axes, reading your
+   repository to check. First, **unsupported claims**: if a
    load-bearing technical claim is stated as fact without adequate grounding, guard
    asks the assistant to ground it (or flag it as unverified). Second, **unjustified
    deferrals**: if the assistant punts on something the code would answer — "open
@@ -32,8 +32,10 @@ guard adds three layers of control over the assistant's responses and actions:
    own words. Discussion, planning, and questions never count as approval — only
    your message can grant it. Shell commands, reads, and searches are never blocked.
 
-Both the evidence judge and the approval gate are governed by one on/off switch
-(on by default), toggled per session with the `turn` skill (see below).
+The two checks are controlled independently: the approval gate has an on/off switch
+(on by default), toggled per session with the `turn` skill, and the evidence judge is
+governed by its review mode, set with the `audit-mode` skill — `manual` (the default)
+runs nothing automatically, so it is the judge's practical off (see below).
 
 guard also keeps a per-session record of the conversation and its review results
 inside your project (see [Logs](#logs)).
@@ -62,19 +64,20 @@ style.
 
 ## Usage
 
-### Turn guard on or off
+### Turn the approval gate on or off
 
-guard is **on by default**. A single switch controls both the evidence judge and
-the approval gate together. Toggle it per session with the `turn` skill:
+The approval gate is **on by default**. Toggle it per session with the `turn` skill
+(this switch controls only the gate; the evidence judge is set with `audit-mode`,
+below):
 
 ```
-/guard:turn on      # enable guard for this session
-/guard:turn off     # disable both checks (the conversation log is still kept)
+/guard:turn on      # enable the approval gate for this session
+/guard:turn off     # disable the approval gate (the conversation log is still kept)
 /guard:turn         # report the current state
 ```
 
 Add `--project` to set the session-start default instead of the current session — e.g.
-`/guard:turn --project off` writes `enabled: false` to `.claude/guard.local.json`
+`/guard:turn --project off` writes `edit_gate: false` to `.claude/guard.local.json`
 without changing this session. `--global` is reserved for a future user-level default.
 
 ### Review modes
@@ -90,16 +93,18 @@ guard dispatches the `guardian` subagent to review that turn and report anything
 finds. Nothing is checked until you ask, so ordinary turns cost nothing extra.
 
 If you'd rather have every turn reviewed automatically, switch the mode per session with
-the `mode` skill:
+the `audit-mode` skill:
 
 ```
-/guard:mode manual       # on-demand only, via /guard:audit (default)
-/guard:mode subagent     # dispatch the guardian subagent to review every turn in-session
-/guard:mode headless     # in-hook review that blocks each turn
-/guard:mode              # report the current mode
+/guard:audit-mode manual       # on-demand only, via /guard:audit (default)
+/guard:audit-mode subagent     # dispatch the guardian subagent to review every turn in-session
+/guard:audit-mode headless     # in-hook review that blocks each turn
+/guard:audit-mode              # report the current mode
 ```
 
 - **manual** (default) — no automatic review; run `/guard:audit` when you want one.
+  Since nothing runs unless you ask, this is also how you keep the evidence judge
+  effectively off while the approval gate stays on.
 - **subagent** — guard asks the assistant to dispatch a `guardian` subagent that reviews
   each finished turn in your session (so you can see it), reports anything it finds for
   the assistant to fix, and remembers the facts that passed. It does not block; it runs
@@ -107,14 +112,15 @@ the `mode` skill:
 - **headless** — the review runs as a separate, hidden `claude` check and **blocks** the
   turn until unsupported claims are grounded or resolvable deferrals are resolved.
 
-All modes apply the same checks, and `/guard:audit` works in any mode. Set the
+All modes apply the same checks, and `/guard:audit` works in any mode. The mode never
+affects the approval gate. Set the
 session-start default with the `mode` key in configuration (below), or interactively
-with `/guard:mode --project <mode>` (writes the default without changing the current
-session). `--global` is reserved for a future user-level default.
+with `/guard:audit-mode --project <mode>` (writes the default without changing the
+current session). `--global` is reserved for a future user-level default.
 
 ### The approval gate
 
-While guard is on and a task is still under discussion, any attempt to change files
+While the approval gate is on and a task is still under discussion, any attempt to change files
 is denied with a note asking for a plan and your approval. Approve by saying so in
 your own words — for example "go ahead", "implement it", or "apply the change".
 guard reads your message together with the recent conversation, so a short
@@ -144,9 +150,10 @@ Configuration is optional. Create `.claude/guard.local.json` in your project:
 {
   "model": "haiku",
   "effort": "medium",
-  "enabled": true,
+  "edit_gate": true,
   "mode": "manual",
-  "exempt_skills": ["deep-research", "hindsight:review"]
+  "exempt_skills": ["deep-research", "hindsight:review"],
+  "refs_dir": "docs/refs"
 }
 ```
 
@@ -154,9 +161,10 @@ Configuration is optional. Create `.claude/guard.local.json` in your project:
 | --- | --- | --- |
 | `model` | Model the **headless** review runs on | `"haiku"` |
 | `effort` | **Headless** review reasoning effort (`low`/`medium`/`high`/`xhigh`/`max`) | `"medium"` |
-| `enabled` | Session-start default for guard (evidence judge + approval gate) | `true` |
-| `mode` | Session-start review mode (`manual`/`subagent`/`headless`, see [Review modes](#review-modes)) | `"manual"` |
+| `edit_gate` | Session-start default for the approval gate (blocks the file-editing tools until you approve) | `true` |
+| `mode` | Session-start review mode for the evidence judge (`manual`/`subagent`/`headless`, see [Review modes](#review-modes)) | `"manual"` |
 | `exempt_skills` | Skills / slash commands whose turn the review skips, named `plugin:skill` (leading `/` and case ignored) | `[]` |
+| `refs_dir` | Project-relative folder where copies of cited official docs are saved. Empty means the git-ignored default `.claude/guard/refs/`; set a tracked path (e.g. `"docs/refs"`) to keep the collected references under git | `""` |
 
 `model` and `effort` apply to the **headless** review only; the **subagent** review
 runs on the `guardian` agent's own model and effort (Haiku / medium by default, set in
@@ -168,8 +176,16 @@ Use `exempt_skills` for skills or slash commands whose output is a report or a r
 rather than claims about your codebase (e.g. a research skill) — guard won't review the
 turn they run in. List each by the name you invoke after the slash, **including its
 plugin namespace**: `hindsight:review`, `guard:turn`, or a bare name for an
-un-namespaced skill like `deep-research`. guard's own `/guard:turn`, `/guard:mode`, and
-`/guard:audit` are always exempt.
+un-namespaced skill like `deep-research`. guard's own `/guard:turn`, `/guard:audit-mode`,
+and `/guard:audit` are always exempt.
+
+When a response cites official documentation, the Grounded output style saves a
+local copy of the cited content into the refs folder so the evidence stays
+inspectable, and the review checks that the copy exists. By default that folder
+(`.claude/guard/refs/`) is a per-machine cache you git-ignore; set `refs_dir` to a
+tracked folder to collect those references in your repository instead — they are
+then committed through your normal git workflow (guard never commits anything
+itself).
 
 You don't have to edit the file by hand. Run `/guard:exempt` and guard shows the
 skills available in your session, lets you pick which to exempt, and records your

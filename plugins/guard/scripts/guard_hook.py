@@ -8,41 +8,45 @@ because its own machinery broke).
 
 Subcommands
 -----------
-- user-prompt    UserPromptSubmit. Log the user turn and (when guard is enabled)
-                 update the approval gate: an explicit user instruction to implement
-                 arms it; a shift to a clearly unrelated new task re-locks it. Intent is
-                 judged by an isolated headless ``claude`` (see ``run_judge``), which
-                 sees the last few archived user/assistant messages as context
+- user-prompt    UserPromptSubmit. Log the user turn and (when the approval gate is
+                 enabled) update the approval gate: an explicit user instruction to
+                 implement arms it; a shift to a clearly unrelated new task re-locks it.
+                 Intent is judged by an isolated headless ``claude`` (see ``run_judge``),
+                 which sees the last few archived user/assistant messages as context
                  (``_recent_dialogue``) so a short consent ("go ahead") arms only when
                  it answers a proposed plan. Only a user message can arm approval.
-                 guard's own ``/guard:turn`` / ``/guard:mode`` commands are ignored
-                 here (not turns).
+                 guard's own ``/guard:turn`` / ``/guard:audit-mode`` commands are
+                 ignored here (not turns).
 - toggle         UserPromptExpansion (matcher ``^(guard:)?turn$``). Read the on/off
-                 argument from the raw ``prompt`` and set the session's ``enabled``
-                 flag — the one switch for BOTH the evidence judge and approval gate.
-                 A ``--project`` flag instead writes the session-start default
-                 (``enabled``) to guard.local.json (that key only, not the live session);
+                 argument from the raw ``prompt`` and set the session's ``edit_gate``
+                 flag — the APPROVAL GATE only. The evidence judge is governed
+                 independently by ``mode`` (see set-mode); ``manual`` is its practical
+                 off (nothing runs unless the user asks). A ``--project`` flag instead
+                 writes the session-start default (``edit_gate``) to guard.local.json
+                 (that key only, not the live session); ``--global`` is reserved
+                 (reported unsupported).
+- set-mode       UserPromptExpansion (matcher ``^(guard:)?audit-mode$``). Set the
+                 session's ``mode`` (``manual``|``subagent``|``headless``) for the
+                 Stop-time evidence judge, independent of the approval gate. A
+                 ``--project`` flag instead writes the session-start default (``mode``)
+                 to guard.local.json (that key only, not the live session);
                  ``--global`` is reserved (reported unsupported).
-- set-mode       UserPromptExpansion (matcher ``^(guard:)?mode$``). Set the session's
-                 ``mode`` (``manual``|``subagent``|``headless``) for the Stop-time
-                 evidence judge. A ``--project`` flag instead writes the session-start
-                 default (``mode``) to guard.local.json (that key only, not the live
-                 session); ``--global`` is reserved (reported unsupported).
 - verify         UserPromptExpansion (matcher ``^(guard:)?audit$``). On demand, emit the
                  guardian-dispatch instruction for the last completed turn
                  (``pending_verify_prompt_id``, recorded by manual-mode Stop). Reads no
                  transcript — the slice is already on disk. The on-demand counterpart to
-                 auto-auditing; works whenever guard is enabled.
+                 auto-auditing; works in any mode.
 - exempt         CLI (argv), run by the ``guard:exempt`` skill via Bash after the user
                  confirms an interactive selection. ``list``/``set``/``add``/
                  ``remove``/``clear`` the ``exempt_skills`` config key — that key ONLY,
-                 never ``enabled``/``mode``/state. Not a hook event.
-- gate           PreToolUse. When guard is enabled, for the file-editing tools
-                 (Write/Edit/MultiEdit/NotebookEdit), deny with a reason to seek
+                 never ``edit_gate``/``mode``/state. Not a hook event.
+- gate           PreToolUse. When the approval gate is enabled, for the file-editing
+                 tools (Write/Edit/MultiEdit/NotebookEdit), deny with a reason to seek
                  explicit user approval unless the session is approved. On a deny it
                  records the turn's ``prompt_id`` in ``gated_prompt_id`` so Stop skips
-                 auditing a plan/approval-request response. Writes under
-                 ``.claude/guard/refs/`` are exempt (the Grounded output style saves
+                 auditing a plan/approval-request response. Writes into the refs
+                 directory (``.claude/guard/refs/`` by default; the ``refs_dir``
+                 config key may move it) are exempt (the Grounded output style saves
                  cited docs there), as are writes that don't touch tracked project
                  source — targets outside the project dir (e.g. the scratchpad) and
                  git-ignored writes inside it (scratch/temp, ``**/*.local.*``,
@@ -57,14 +61,14 @@ Subcommands
 - stop           Stop. A turn == the transcript ``prompt_id``; guard reads the whole
                  turn from Claude Code's transcript (``transcript_path`` +
                  ``prompt_id``, both in the payload) via ``_read_turn_from_transcript``
-                 — user request, tool activity, and response. Skips when guard is off,
+                 — user request, tool activity, and response. Skips when
                  ``stop_hook_active``, the prompt_id/transcript are absent, the turn was
                  gated (``gated_prompt_id``), the slice contains a user ``!`` command
                  (its output arrives after the judged response, so it is neither
                  evidence nor auditable here), or the turn was opened by guard's own
-                 ``/guard:turn`` / ``/guard:mode`` / ``/guard:audit`` control command
-                 or a user-configured ``exempt_skills`` entry (skill output / a relay,
-                 not claims to ground). Otherwise branch on ``mode``.
+                 ``/guard:turn`` / ``/guard:audit-mode`` / ``/guard:audit`` control
+                 command or a user-configured ``exempt_skills`` entry (skill output / a
+                 relay, not claims to ground). Otherwise branch on ``mode``.
                  ``manual`` (default): do not audit — record the turn as the pending
                  ``/guard:audit`` target and emit nothing. ``subagent``: do not
                  judge/block — slice the turn to a file and emit additionalContext asking
@@ -73,10 +77,15 @@ Subcommands
                  repo-resolvable deferral; on PASS append supported claims to the
                  verified store.
 - session-start  SessionStart. Sweep state/sessions/verified files and turns/ dirs
-                 older than retention.
+                 older than retention, and export ``GUARD_REFS_DIR`` (the resolved
+                 refs directory) via ``$CLAUDE_ENV_FILE`` for the session's Bash
+                 environment.
+- refs-dir       Print the resolved refs directory (absolute), applying the
+                 ``refs_dir`` validation. Called via Bash (guardian fallback / the
+                 output style), not a hook event.
 
 State lives project-local under ``${CLAUDE_PROJECT_DIR}/.claude/guard/``:
-- ``state/<sid>.json``       — {enabled, approved, mode, last_audited_prompt_id, gated_prompt_id, pending_verify_prompt_id, updated_at}
+- ``state/<sid>.json``       — {edit_gate, approved, mode, last_audited_prompt_id, gated_prompt_id, pending_verify_prompt_id, updated_at}
 - ``sessions/<sid>.jsonl``   — full session archive: one record per turn / verdict
 - ``turns/<sid>/<pid>.json`` — subagent and manual modes: the turn slice guard hands the
                                 guardian subagent ({user, tools[], assistant})
@@ -91,20 +100,27 @@ Configuration (optional) is a JSON object at
 ``${CLAUDE_PROJECT_DIR}/.claude/guard.local.json``: ``model`` (string, default
 ``"haiku"``), ``effort`` (one of low/medium/high/xhigh/max, default ``"medium"``
 — reasoning effort of the HEADLESS judge only; the subagent judge's model/effort come
-from the ``guardian`` agent's own frontmatter, not these keys), ``enabled`` (bool,
-default ``true``) — the session-start value of the single master switch that turns BOTH
-the evidence judge and the approval gate on or off, and ``mode``
+from the ``guardian`` agent's own frontmatter, not these keys), ``edit_gate`` (bool,
+default ``true``) — the session-start value of the APPROVAL GATE switch, and ``mode``
 (``"manual"``|``"subagent"``|``"headless"``, default ``"manual"``) — how the Stop-time
-evidence judge runs (manual: no auto-audit, verify on demand via ``/guard:audit``;
-subagent: dispatch the ``guardian`` subagent each turn; headless: in-hook judge that
-blocks), and ``exempt_skills`` (list of strings, default ``[]``) — skills / slash
+evidence judge runs, independent of the gate (manual: no auto-audit — the judge's
+practical off — verify on demand via ``/guard:audit``; subagent: dispatch the
+``guardian`` subagent each turn; headless: in-hook judge that blocks), and
+``exempt_skills`` (list of strings, default ``[]``) — skills / slash
 commands whose turn the Stop judge must not audit, named with their plugin namespace
 (``plugin:skill``, e.g. ``guard:turn``) or bare for un-namespaced skills; matched
-leading-``/``-stripped and case-insensitively (guard's own ``turn``/``mode``/``audit``
-control commands are always exempt regardless of this list). Unknown keys are ignored; a missing or malformed file falls
+leading-``/``-stripped and case-insensitively (guard's own
+``turn``/``audit-mode``/``audit`` control commands are always exempt regardless of this
+list), and ``refs_dir`` (string, default ``""``) — project-relative directory where
+the Grounded output style saves local copies of cited docs; empty means the
+git-ignored default ``.claude/guard/refs/``, a tracked path (e.g. ``"docs/refs"``)
+keeps the collected references under git (values resolving outside the project, at
+the project root, or into guard's own config/state fall back to the default — see
+``_refs_dir``). Unknown keys are ignored; a missing or malformed file falls
 back to all defaults. The judge always reads the repo (Read/Grep/Glob/Bash) to verify
-claims. The ``turn`` / ``mode`` skills flip ``enabled`` / ``mode`` for the session, or
-with ``--project`` write those keys' session-start defaults to guard.local.json.
+claims. The ``turn`` / ``audit-mode`` skills flip ``edit_gate`` / ``mode`` for the
+session, or with ``--project`` write those keys' session-start defaults to
+guard.local.json.
 """
 
 from __future__ import annotations
@@ -112,6 +128,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -134,7 +151,11 @@ GIT_CHECK_TIMEOUT_SECONDS = 5
 DEFAULT_CONFIG: dict[str, Any] = {
     "model": "haiku",
     "effort": "medium",
-    "enabled": True,
+    # Approval-gate switch: gates the file-EDITING tools (Write/Edit/MultiEdit/
+    # NotebookEdit) until the user approves — hence "edit_gate". The evidence judge
+    # has no on/off flag of its own: `mode` governs it, and "manual" is its
+    # practical off (nothing runs unless the user asks via /guard:audit).
+    "edit_gate": True,
     "mode": "manual",
     # Skills / slash commands whose turn the Stop judge must NOT audit. A turn opened
     # by one of these is skill output or a relay, not a body of technical claims to
@@ -144,14 +165,21 @@ DEFAULT_CONFIG: dict[str, Any] = {
     # case-insensitively. guard's own turn/mode control commands are always exempt
     # regardless of this list.
     "exempt_skills": [],
+    # Where the Grounded output style saves local copies of cited docs, relative to
+    # the project dir. Empty = the default git-ignored cache (`.claude/guard/refs/`).
+    # Point it at a tracked path (e.g. "docs/refs") to keep the collected references
+    # under git. Values that resolve outside the project, at the project root, or
+    # into guard's own config/state are ignored (fall back to the default) — see
+    # _refs_dir for why.
+    "refs_dir": "",
 }
 
 VALID_EFFORTS = {"low", "medium", "high", "xhigh", "max"}
 # How the Stop-time evidence judge runs.
 # "manual" (default): the hook does NOT audit at Stop — it archives the turn and
 #   records it as the pending verify target; verification runs only on demand via
-#   `/guard:audit`, which dispatches the guardian. The approval gate is unaffected
-#   (it is governed by `enabled`, not `mode`).
+#   `/guard:audit`, which dispatches the guardian. This is the judge's practical off.
+#   The approval gate is unaffected (it is governed by `edit_gate`, not `mode`).
 # "subagent": the hook does not judge/block — it injects the turn + verified paths as
 #   additionalContext and the main agent dispatches the `guardian` subagent to audit
 #   every turn.
@@ -202,13 +230,47 @@ def _turn_slice_file(project_dir: Path, session_id: str, prompt_id: str) -> Path
     return _state_root(project_dir) / "turns" / session_id / f"{prompt_id}.json"
 
 
-def _refs_dir(project_dir: Path) -> Path:
+def _refs_dir(project_dir: Path, config: dict[str, Any] | None = None) -> Path:
     """Directory where the Grounded output style saves local copies of cited docs.
 
     Writes here are the assistant grounding its own claims (per the output style),
     not implementing the user's task — so the approval gate exempts them.
+
+    Default is the git-ignored cache under guard's state tree; the ``refs_dir``
+    config key may point it at a project path instead (e.g. ``docs/refs``) so the
+    collected references are tracked by git. A configured value is honored only
+    when it resolves STRICTLY INSIDE the project and OUTSIDE guard's own
+    config/state: the gate's refs exemption is checked before its guard-owned
+    exclusion, so without this a ``refs_dir`` of ``.claude/guard`` (self-arm via
+    ``state/<sid>.json``, judge-off via ``guard.local.json``) or ``.`` (every
+    project write exempt) would neuter the gate. Invalid values fall back to the
+    default.
     """
-    return _state_root(project_dir) / "refs"
+    default = _state_root(project_dir) / "refs"
+    raw = (config or {}).get("refs_dir", "")
+    if not isinstance(raw, str) or not raw.strip():
+        return default
+    try:
+        candidate = (project_dir / raw.strip()).resolve()
+        project = project_dir.resolve()
+        state_root = _state_root(project_dir).resolve()
+        config_path = (project_dir / CONFIG_REL).resolve()
+    except OSError:
+        return default
+    if project not in candidate.parents:
+        return default
+    if candidate == state_root or state_root in candidate.parents or candidate == config_path:
+        return default
+    return candidate
+
+
+def _refs_rel(project_dir: Path, config: dict[str, Any]) -> str:
+    """Project-relative refs path (with trailing slash) for prompts and messages."""
+    refs = _refs_dir(project_dir, config)
+    try:
+        return str(refs.resolve().relative_to(project_dir.resolve())) + "/"
+    except (OSError, ValueError):
+        return str(refs) + "/"
 
 
 def _trace_file(project_dir: Path) -> Path:
@@ -252,11 +314,12 @@ def _read_payload() -> dict | None:
 
 _SESSION_ID_RE = re.compile(r"^[A-Za-z0-9._-]+$")
 # guard's own control commands, e.g. "/guard:turn on", "/turn off",
-# "/guard:mode subagent". These are handled by UserPromptExpansion, not real turns.
-# `(?=\s|$)` rather than `\b`: the name must END here, not merely hit a word
+# "/guard:audit-mode subagent". These are handled by UserPromptExpansion, not real
+# turns. `(?=\s|$)` rather than `\b`: the name must END here, not merely hit a word
 # boundary — `\b` would also accept hyphenated names from other plugins
-# (e.g. `/audit-resolution` matching `audit`).
-_CONTROL_CMD_RE = re.compile(r"^/(guard:)?(turn|mode|exempt|audit)(?=\s|$)", re.IGNORECASE)
+# (e.g. `/audit-resolution` matching `audit`). `audit-mode` is listed before `audit`
+# so the longer name matches first.
+_CONTROL_CMD_RE = re.compile(r"^/(guard:)?(turn|audit-mode|exempt|audit)(?=\s|$)", re.IGNORECASE)
 # In the transcript, a slash command is expanded to
 # "<command-name>/guard:turn</command-name>" (see session b30dbaec). Pull the command
 # name out of that tag; a raw typed form ("/guard:turn on") is handled by the fallback
@@ -538,7 +601,7 @@ def _write_config(project_dir: Path, data: dict[str, Any]) -> bool:
 
 def _read_state(project_dir: Path, session_id: str, config: dict[str, Any]) -> dict[str, Any]:
     default = {
-        "enabled": bool(config.get("enabled", True)),
+        "edit_gate": bool(config.get("edit_gate", True)),
         "approved": False,
         "mode": _mode(config),
         # Per-turn guards keyed by the transcript prompt_id (a turn == one promptId).
@@ -558,7 +621,7 @@ def _read_state(project_dir: Path, session_id: str, config: dict[str, Any]) -> d
         return default
     if not isinstance(data, dict):
         return default
-    keys = ("enabled", "approved", "mode", "last_audited_prompt_id", "gated_prompt_id",
+    keys = ("edit_gate", "approved", "mode", "last_audited_prompt_id", "gated_prompt_id",
             "pending_verify_prompt_id", "updated_at")
     default.update({k: data[k] for k in keys if k in data})
     if default["mode"] not in VALID_MODES:
@@ -902,7 +965,7 @@ EVIDENCE_SYSTEM = (
     "on an earlier UNVERIFIED ASSUMPTION. Open the real definition and confirm. A "
     "cited file:line that does not actually establish the claim counts as unsupported. "
     "When a claim cites OFFICIAL DOCUMENTATION, the response must also point to a "
-    "local saved copy under `.claude/guard/refs/`; verify that file actually exists "
+    "local saved copy under `__REFS_DIR__`; verify that file actually exists "
     "(Read/Glob) and supports the claim — a docs claim with no existing local copy, "
     "or a path that is missing, is UNSUPPORTED. "
     "Statements explicitly flagged as unverified assumptions are NOT violations; "
@@ -992,14 +1055,15 @@ def cmd_user_prompt() -> int:
 
     # Snapshot the recent dialogue BEFORE appending this prompt, so the context
     # block cannot duplicate the very message being classified.
-    dialogue = _recent_dialogue(project_dir, session_id) if state["enabled"] and prompt.strip() else ""
+    dialogue = _recent_dialogue(project_dir, session_id) if state["edit_gate"] and prompt.strip() else ""
 
     _append_log(project_dir, session_id, {"role": "user", "text": prompt})
 
     # A turn is the transcript's promptId; guard no longer keeps its own turn buffer.
-    # This hook only runs the approval classifier (below). The Stop judge reads the
-    # whole turn from the transcript via prompt_id.
-    if not state["enabled"] or not prompt.strip():
+    # This hook only runs the approval classifier (below), which serves the approval
+    # gate — skip it when the gate is off. The Stop judge reads the whole turn from
+    # the transcript via prompt_id.
+    if not state["edit_gate"] or not prompt.strip():
         return 0
 
     context_block = (
@@ -1060,7 +1124,7 @@ def cmd_plan_approved() -> int:
 
     config = _load_config(project_dir)
     state = _read_state(project_dir, session_id, config)
-    if not state["enabled"]:
+    if not state["edit_gate"]:
         return 0
 
     # Defensive: the hook matcher already scopes this to ExitPlanMode.
@@ -1097,7 +1161,7 @@ def cmd_plan_approved() -> int:
     return 0
 
 
-# `/guard:turn` and `/guard:mode` accept an optional persistence-scope flag: no flag
+# `/guard:turn` and `/guard:audit-mode` accept an optional persistence-scope flag: no flag
 # (default) sets the LIVE session only; `--project` writes the session-start default in
 # guard.local.json (that one key only, never the live session); `--global` is reserved
 # for a future user-level store and is reported as not-yet-supported. These hooks fire
@@ -1126,6 +1190,11 @@ def _emit_expansion(msg: str) -> None:
 
 
 def cmd_toggle() -> int:
+    """UserPromptExpansion for `/guard:turn [--project] [on|off]`. Flips the APPROVAL
+    GATE only (``edit_gate``); the evidence judge is governed by ``mode`` (see
+    ``cmd_set_mode``). No scope flag sets the LIVE session; `--project` writes the
+    session-start default (that key only, not the live session); `--global` is
+    reserved (reported unsupported)."""
     project_dir = _project_dir()
     payload = _read_payload()
     if payload is None or project_dir is None:
@@ -1150,50 +1219,56 @@ def cmd_toggle() -> int:
         return 0
 
     if scope == "project":
-        # Persist the session-start default (`enabled`) in guard.local.json — that key
-        # ONLY, leaving the live session untouched. Report-only when no on/off is given.
+        # Persist the session-start default (`edit_gate`) in guard.local.json —
+        # that key ONLY, leaving the live session untouched. Report-only when no
+        # on/off is given.
         raw = _load_raw_config(project_dir)
-        current = bool(raw.get("enabled", True))
+        current = raw.get("edit_gate", True)
+        current = current if isinstance(current, bool) else True
         note = ""
         if arg:
             desired = arg == "on"
             if desired == current:
                 pass
-            elif _write_config(project_dir, {**raw, "enabled": desired}):
+            elif _write_config(project_dir, {**raw, "edit_gate": desired}):
                 current = desired
             else:
                 note = " (write failed; unchanged)"
         _emit_expansion(
-            "guard project default: {} for new sessions (.claude/guard.local.json){}. "
-            "This session is unchanged — use `/guard:turn on|off` to change it now.".format(
-                "on" if current else "off", note)
+            "guard approval-gate project default: {} for new sessions "
+            "(.claude/guard.local.json){}. This session is unchanged — use "
+            "`/guard:turn on|off` to change it now.".format("on" if current else "off", note)
             if arg else
-            "guard project default: {} (.claude/guard.local.json).".format(
+            "guard approval-gate project default: {} (.claude/guard.local.json).".format(
                 "on" if current else "off"))
-        _trace(project_dir, session_id, "toggle", "set_project", arg=arg, enabled=current)
+        _trace(project_dir, session_id, "toggle", "set_project", arg=arg, edit_gate=current)
         return 0
 
     # scope == "session": live-session toggle (original behavior).
     config = _load_config(project_dir)
     state = _read_state(project_dir, session_id, config)
     if arg == "on":
-        state["enabled"] = True
+        state["edit_gate"] = True
     elif arg == "off":
-        state["enabled"] = False
-    # no arg → report only; leave enabled unchanged
+        state["edit_gate"] = False
+    # no arg → report only; leave edit_gate unchanged
     _write_state(project_dir, session_id, state)
 
-    _emit_expansion("guard is {} for this session (evidence judge + approval gate).".format(
-        "on" if state["enabled"] else "off"))
-    _trace(project_dir, session_id, "toggle", "set", arg=arg, enabled=state["enabled"])
+    _emit_expansion(
+        "guard approval gate is {} for this session. The evidence judge is separate — "
+        "its mode is set with `/guard:audit-mode`.".format(
+            "on" if state["edit_gate"] else "off"))
+    _trace(project_dir, session_id, "toggle", "set", arg=arg, edit_gate=state["edit_gate"])
     return 0
 
 
 def cmd_set_mode() -> int:
-    """UserPromptExpansion for `/guard:mode [--project] [headless|subagent]`. No scope
-    flag sets the LIVE session's evidence-judge mode; `--project` writes the session-start
-    default in guard.local.json (that key only, not the live session); `--global` is
-    reserved (reported unsupported). No/unknown mode arg reports the current value only."""
+    """UserPromptExpansion for `/guard:audit-mode [--project] [manual|subagent|headless]`.
+    Governs the EVIDENCE JUDGE only (`manual` is its practical off); the approval gate
+    is flipped by `/guard:turn` (see ``cmd_toggle``). No scope flag sets the LIVE
+    session's mode; `--project` writes the session-start default in guard.local.json
+    (that key only, not the live session); `--global` is reserved (reported
+    unsupported). No/unknown mode arg reports the current value only."""
     project_dir = _project_dir()
     payload = _read_payload()
     if payload is None or project_dir is None:
@@ -1206,7 +1281,8 @@ def cmd_set_mode() -> int:
     scope = _scope_of(prompt)
     arg = ""
     if isinstance(prompt, str):
-        # "/guard:mode subagent", "/guard:mode --project headless" — find the mode token.
+        # "/guard:audit-mode subagent", "/guard:audit-mode --project headless" — find
+        # the mode token.
         for tok in prompt.split():
             low = tok.lower()
             if low in VALID_MODES:
@@ -1231,11 +1307,11 @@ def cmd_set_mode() -> int:
             else:
                 note = " (write failed; unchanged)"
         _emit_expansion(
-            "guard project default mode: {} for new sessions (.claude/guard.local.json){}. "
-            "This session is unchanged — use `/guard:mode {}` to switch it now.".format(
+            "guard project default audit mode: {} for new sessions (.claude/guard.local.json){}. "
+            "This session is unchanged — use `/guard:audit-mode {}` to switch it now.".format(
                 current, note, current)
             if arg else
-            "guard project default mode: {} (.claude/guard.local.json).".format(current))
+            "guard project default audit mode: {} (.claude/guard.local.json).".format(current))
         _trace(project_dir, session_id, "set-mode", "set_project", arg=arg, mode=current)
         return 0
 
@@ -1248,9 +1324,9 @@ def cmd_set_mode() -> int:
     _write_state(project_dir, session_id, state)
 
     if state["mode"] == "manual":
-        msg = ("guard evidence judge mode: manual for this session. The Stop hook does "
-               "not audit — run `/guard:audit` to audit the last completed turn on "
-               "demand. The approval gate is unaffected.")
+        msg = ("guard evidence judge mode: manual for this session — effectively off. "
+               "The Stop hook does not audit; run `/guard:audit` to audit the last "
+               "completed turn on demand. The approval gate is unaffected.")
     elif state["mode"] == "subagent":
         msg = ("guard evidence judge mode: subagent for this session. The Stop hook "
                "will ask the main agent to dispatch the guardian subagent to audit "
@@ -1267,7 +1343,7 @@ def cmd_verify() -> int:
     """UserPromptExpansion for `/guard:audit`. On-demand audit of the last completed
     turn: emit the guardian-dispatch instruction for ``pending_verify_prompt_id`` (set
     by manual-mode Stop). Reads no transcript — the Stop hook already wrote the slice.
-    Works whenever guard is enabled, regardless of mode."""
+    Works in any mode, independent of the approval gate."""
     project_dir = _project_dir()
     payload = _read_payload()
     if payload is None or project_dir is None:
@@ -1278,11 +1354,6 @@ def cmd_verify() -> int:
 
     config = _load_config(project_dir)
     state = _read_state(project_dir, session_id, config)
-    if not state["enabled"]:
-        _emit_expansion("guard is off for this session — nothing to verify. "
-                        "Turn it on with `/guard:turn on`.")
-        _trace(project_dir, session_id, "verify", "disabled")
-        return 0
 
     pid = state.get("pending_verify_prompt_id") or ""
     turn_path = _turn_slice_file(project_dir, session_id, pid) if pid else None
@@ -1311,7 +1382,7 @@ def cmd_gate() -> int:
 
     config = _load_config(project_dir)
     state = _read_state(project_dir, session_id, config)
-    if not state["enabled"]:
+    if not state["edit_gate"]:
         return 0
 
     tool_name = payload.get("tool_name")
@@ -1322,12 +1393,14 @@ def cmd_gate() -> int:
         return 0
 
     # Exempt the assistant's own evidence store: the Grounded output style
-    # tells it to save cited docs under `.claude/guard/refs/`. Grounding a claim is
+    # tells it to save cited docs in the refs directory (`.claude/guard/refs/` by
+    # default; `refs_dir` may point it at a tracked path). Grounding a claim is
     # not implementing the user's task, so those writes pass without approval. Note
-    # this is deliberately ONLY refs/ — never the wider `.claude/guard/` tree, so
-    # the model can't write `state/<sid>.json` to arm its own approval.
+    # this is deliberately ONLY the refs dir — never the wider `.claude/guard/`
+    # tree, so the model can't write `state/<sid>.json` to arm its own approval
+    # (_refs_dir rejects a refs_dir that resolves into guard's own files).
     tool_input = payload.get("tool_input")
-    if _targets_refs_dir(project_dir, tool_input):
+    if _targets_refs_dir(project_dir, tool_input, config):
         _trace(project_dir, session_id, "gate", "allow_refs", tool=tool_name)
         return 0
 
@@ -1401,13 +1474,14 @@ def _tool_target_path(project_dir: Path, tool_input: Any) -> Path | None:
         return None
 
 
-def _targets_refs_dir(project_dir: Path, tool_input: Any) -> bool:
-    """True when a mutating tool's target path is inside `.claude/guard/refs/`."""
+def _targets_refs_dir(project_dir: Path, tool_input: Any, config: dict[str, Any]) -> bool:
+    """True when a mutating tool's target path is inside the refs directory
+    (`.claude/guard/refs/` by default, or the validated `refs_dir` config path)."""
     target = _tool_target_path(project_dir, tool_input)
     if target is None:
         return False
     try:
-        refs = _refs_dir(project_dir).resolve()
+        refs = _refs_dir(project_dir, config).resolve()
     except OSError:
         return False
     return target == refs or refs in target.parents
@@ -1423,8 +1497,9 @@ def _is_guard_owned(project_dir: Path, target: Path) -> bool:
     the judge off / change `mode`. (`refs/` is the one deliberate hole and has its own
     explicit allow, checked before this. The `exempt_skills` list is managed only
     through the `exempt` CLI — see `cmd_exempt` — which touches that one key and never
-    `enabled`/`mode`/state, so it can weaken the judge's coverage but not disable the
-    gate.) Fail toward guard-owned (safe: no exemption) if the paths can't be resolved.
+    `edit_gate`/`mode`/state, so it can weaken the judge's coverage but not disable
+    the gate.) Fail toward guard-owned (safe: no exemption) if the paths can't be
+    resolved.
     """
     try:
         state_root = _state_root(project_dir).resolve()
@@ -1537,6 +1612,7 @@ def _guardian_dispatch_context(project_dir: Path, session_id: str, prompt_id: st
     """
     verified_path = _verified_file(project_dir, session_id).resolve()
     dispatcher = Path(__file__).resolve()
+    refs_path = _refs_dir(project_dir, _load_config(project_dir))
     return (
         lead + " "
         "Dispatch the guardian subagent with the Agent tool "
@@ -1546,6 +1622,7 @@ def _guardian_dispatch_context(project_dir: Path, session_id: str, prompt_id: st
         f"- turn_file: {turn_path.resolve()}\n"
         f"- verified_file: {verified_path}\n"
         f"- dispatcher: {dispatcher}\n"
+        f"- refs_dir: {refs_path}\n"
         "guardian reads the turn record at turn_file "
         "(`{user, tools[], assistant}`), audits it for unsupported "
         "claims and resolvable deferrals, records the verified facts on a pass, and "
@@ -1591,7 +1668,7 @@ def _stop_manual(project_dir: Path, session_id: str, state: dict[str, Any],
     The turn is already in the session archive; here we persist just its slice and
     remember its prompt_id so ``/guard:audit`` can dispatch the guardian for it
     without any transcript access. The hook emits nothing and never blocks — the
-    approval gate still runs (it is governed by ``enabled``, not ``mode``).
+    approval gate still runs (it is governed by ``edit_gate``, not ``mode``).
     """
     turn_path = _write_turn_slice(project_dir, session_id, prompt_id, turn)
     if turn_path is None:
@@ -1643,7 +1720,7 @@ def cmd_stop() -> int:
         _trace(project_dir, session_id, "stop", "skip_active")
         return 0
 
-    if not state["enabled"] or not response.strip():
+    if not response.strip():
         return 0
 
     # The turn is identified by the transcript prompt_id; guard reads the whole turn
@@ -1691,7 +1768,7 @@ def cmd_stop() -> int:
 
     # Manual mode (default): the hook never audits or blocks at Stop. It records the
     # turn as the pending on-demand target; the user runs `/guard:audit` to dispatch
-    # the guardian for it. The approval gate still runs (governed by `enabled`).
+    # the guardian for it. The approval gate still runs (governed by `edit_gate`).
     if state["mode"] == "manual":
         return _stop_manual(project_dir, session_id, state, prompt_id, turn)
 
@@ -1727,7 +1804,10 @@ def cmd_stop() -> int:
         + verified_block
         + _render_turn_for_judge(turn)
     )
-    verdict = run_judge(project_dir, EVIDENCE_SYSTEM, judge_input, EVIDENCE_SCHEMA, config)
+    # The judge prompt names the refs directory (where the Grounded style saves
+    # cited-doc copies) so it checks the configured location, not the default.
+    evidence_system = EVIDENCE_SYSTEM.replace("__REFS_DIR__", _refs_rel(project_dir, config))
+    verdict = run_judge(project_dir, evidence_system, judge_input, EVIDENCE_SCHEMA, config)
     if verdict is None:
         return 0  # fail open
 
@@ -1787,7 +1867,7 @@ def cmd_stop() -> int:
 def cmd_session_start() -> int:
     # Sweep both state and logs on the same age policy. State is intentionally NOT
     # cleared at SessionEnd: a session can be resumed later (`claude --resume`), and
-    # its enabled/approved flags must survive the gap. Age-based expiry is the
+    # its gate/approved/mode flags must survive the gap. Age-based expiry is the
     # only reaper, so a resumed session keeps its state as long as it is touched
     # within the retention window.
     project_dir = _project_dir()
@@ -1828,6 +1908,20 @@ def cmd_session_start() -> int:
                     d.rmdir()
             except OSError:
                 pass
+    # Persist the resolved refs directory into the session's Bash environment
+    # (GUARD_REFS_DIR) so the Grounded output style resolves it with one `echo`
+    # instead of re-deriving the `refs_dir` validation from the raw config. Docs:
+    # a SessionStart hook may append `export` lines to $CLAUDE_ENV_FILE and the
+    # variables reach all subsequent Bash commands
+    # (https://code.claude.com/docs/en/hooks, "CLAUDE_ENV_FILE").
+    env_file = os.environ.get("CLAUDE_ENV_FILE")
+    if env_file:
+        refs = _refs_dir(project_dir, _load_config(project_dir))
+        try:
+            with open(env_file, "a", encoding="utf-8") as fh:
+                fh.write(f"export GUARD_REFS_DIR={shlex.quote(str(refs))}\n")
+        except OSError:
+            pass
     _trace(project_dir, None, "session-start", "swept")
     return 0
 
@@ -1844,9 +1938,9 @@ def cmd_exempt() -> int:
         exempt remove NAME [NAME…] — remove
         exempt clear               — empty the list
 
-    Edits ONLY the ``exempt_skills`` key — never ``enabled`` / ``mode`` / state — so it
-    can change which skills' turns the Stop judge skips but cannot disable guard or
-    touch the approval gate. Project dir from ``CLAUDE_PROJECT_DIR`` (Bash env), else
+    Edits ONLY the ``exempt_skills`` key — never ``edit_gate`` / ``mode`` / state —
+    so it can change which skills' turns the Stop judge skips but cannot disable guard
+    or touch the approval gate. Project dir from ``CLAUDE_PROJECT_DIR`` (Bash env), else
     the current working directory. Prints the resulting list for the skill to relay.
     """
     argv = sys.argv[2:]
@@ -1899,6 +1993,20 @@ def cmd_exempt() -> int:
     return 0
 
 
+def cmd_refs_dir() -> int:
+    """Print the resolved refs directory (absolute), applying `refs_dir` validation.
+
+    The single query point for "where do cited-doc copies go": the guardian falls
+    back to it when its dispatch omits `refs_dir`, and anything with the script
+    path can use it instead of re-implementing _refs_dir's fallback rules.
+    """
+    project_dir = _project_dir()
+    if project_dir is None:
+        return 0
+    print(_refs_dir(project_dir, _load_config(project_dir)))
+    return 0
+
+
 SUBCOMMANDS = {
     "user-prompt": cmd_user_prompt,
     "plan-approved": cmd_plan_approved,
@@ -1910,6 +2018,7 @@ SUBCOMMANDS = {
     "stop": cmd_stop,
     "session-start": cmd_session_start,
     "exempt": cmd_exempt,
+    "refs-dir": cmd_refs_dir,
 }
 
 
