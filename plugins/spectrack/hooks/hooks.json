@@ -1,5 +1,5 @@
 {
-  "description": "Workflow hooks. SessionStart persists workflow shell environment exports (and prepends the plugin scripts directory to PATH) when .spectrack/config.yml exists and injects provider-backed workflow authoring policy only for main sessions. SubagentStart injects the workflow launcher contract plus provider-specific issue-fetch usage as additionalContext for the subagent. PreToolUse protects read-only provider cache projections: it blocks edits to issue content files and blocks both reads and edits of the internal .meta.json. UserPromptSubmit reads mentioned GitHub issue references through cache-aware provider reads and injects project-relative issue cache paths as additionalContext.",
+  "description": "Workflow hooks. SessionStart persists workflow shell environment exports (and prepends the plugin scripts directory to PATH) when .spectrack/config.yml exists and injects provider-backed workflow authoring policy only for main sessions. SubagentStart injects the workflow launcher contract plus provider-specific issue-fetch usage as additionalContext for the subagent. PreToolUse protects read-only provider cache projections: it blocks edits to issue content files and blocks both reads and edits of the internal .meta.json; a separate ExitPlanMode prompt hook blocks implementation plans that defer in-scope work or decisions so they are resolved with the user before approval. UserPromptSubmit reads mentioned GitHub issue references through cache-aware provider reads and injects project-relative issue cache paths as additionalContext.",
   "hooks": {
     "PreToolUse": [
       {
@@ -10,6 +10,18 @@
             "command": "uv run --script \"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/hook_claude.py\"",
             "timeout": 5,
             "description": "Protect read-only provider cache projections: block edits to issue content files and both reads and edits of the internal .meta.json"
+          }
+        ]
+      },
+      {
+        "matcher": "ExitPlanMode",
+        "hooks": [
+          {
+            "type": "prompt",
+            "prompt": "You are a plan gate for ExitPlanMode. The hook input JSON is: $ARGUMENTS. Read tool_input.plan, the implementation plan the agent is about to present for approval.\n\nDecide whether the plan defers, postpones, or leaves unresolved any work or decision that the plan itself treats as in scope for this task. Deferral takes many forms, not just literal headings; flag any of: sections such as Open Questions, Deferred, TBD, Later, Follow-up, or Future work; phrases such as 'we can do this later', 'for now', 'leave as-is', 'revisit', 'stub out', or 'placeholder'; either/or choices left for later such as 'option A or B' or 'decide during implementation'; or a required decision handed off instead of made.\n\nAllow (ok true) when the plan resolves everything it scopes in, or when it is a research, investigation, or analysis plan whose deliverable is findings rather than a code change, since such plans legitimately end in open questions.\n\nBlock (ok false) only for implementation plans that carry unresolved in-scope work or decisions. In the reason, name the specific deferred items and instruct the agent to resolve each open question or choice with the user now, fold the decisions into the plan, and re-present a plan with nothing required left deferred.\n\nRespond with ONLY a JSON object: {\"ok\": true} or {\"ok\": false, \"reason\": \"...\"}.",
+            "timeout": 30,
+            "statusMessage": "Checking the plan for deferred work",
+            "description": "Block ExitPlanMode when an implementation plan defers in-scope work or decisions, so the agent resolves them with the user before the plan is approved"
           }
         ]
       }
