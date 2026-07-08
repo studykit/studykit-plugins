@@ -2,6 +2,7 @@
   "model": "haiku",
   "effort": "medium",
   "edit_gate": true,
+  "gate_mode": "ask",
   "mode": "manual",
   "exempt_skills": ["deep-research", "hindsight:review"],
   "refs_dir": "docs/refs"

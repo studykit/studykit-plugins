@@ -72,6 +72,17 @@
             "description": "On plan approval, arm the approval gate when the plan defers no in-scope work."
           }
         ]
+      },
+      {
+        "matcher": "Write|Edit|MultiEdit|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/guard_hook.py\" gate-approved",
+            "timeout": 10,
+            "description": "In gate_mode ask, arm the approval gate after the user approves an edit's permission prompt."
+          }
+        ]
       }
     ],
     "Stop": [

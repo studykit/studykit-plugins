@@ -27,10 +27,13 @@ guard adds three layers of control over the assistant's responses and actions:
    in-session `guardian` subagent you can watch, or a separate headless check that
    blocks the turn (either adds latency and model usage per turn).
 
-3. **Approval gate** — guard blocks the file-editing tools (Write/Edit/MultiEdit/
-   NotebookEdit) until you have given an explicit instruction to implement, in your
-   own words. Discussion, planning, and questions never count as approval — only
-   your message can grant it. Shell commands, reads, and searches are never blocked.
+3. **Approval gate** — guard holds back the file-editing tools (Write/Edit/MultiEdit/
+   NotebookEdit) until you approve the work. By default it asks you to approve the edit
+   right when it happens, through Claude Code's own permission prompt; approving once
+   opens the gate for the rest of that task. (You can switch to a stricter mode that
+   blocks the edit outright until you approve in a message — see `gate_mode` below.)
+   Discussion, planning, and questions never approve on their own. Shell commands,
+   reads, and searches are never blocked.
 
 The two checks are controlled independently: the approval gate has an on/off switch
 (on by default), toggled per session with the `turn` skill, and the evidence judge is
@@ -120,12 +123,19 @@ current session). `--global` is reserved for a future user-level default.
 
 ### The approval gate
 
-While the approval gate is on and a task is still under discussion, any attempt to change files
-is denied with a note asking for a plan and your approval. Approve by saying so in
-your own words — for example "go ahead", "implement it", or "apply the change".
-guard reads your message together with the recent conversation, so a short
-"go ahead" counts when it clearly accepts a proposed plan — and doesn't when it
-refers to something else.
+While the approval gate is on and a task is still under discussion, any attempt to change
+files is held back for your approval. How depends on `gate_mode` (below):
+
+- **`ask` (default)** — you get Claude Code's permission prompt for the edit. Approve it
+  and the gate opens for the rest of that task; reject it and the gate stays closed. The
+  approval is your click on the prompt — the model cannot approve its own edit.
+- **`deny`** — the edit is blocked outright with a note asking for a plan and your
+  approval in a message, so nothing changes until you say so.
+
+You can also approve in your own words at any time — for example "go ahead", "implement
+it", or "apply the change". guard reads your message together with the recent
+conversation, so a short "go ahead" counts when it clearly accepts a proposed plan — and
+doesn't when it refers to something else.
 Approving a **plan in plan mode** also counts as approval — as long as the plan leaves
 no in-scope work deferred (no "TBD", "later", or unresolved either/or choices). Approve
 a plan that still defers work and the gate stays closed until you approve in your own
@@ -151,6 +161,7 @@ Configuration is optional. Create `.claude/guard.local.json` in your project:
   "model": "haiku",
   "effort": "medium",
   "edit_gate": true,
+  "gate_mode": "ask",
   "mode": "manual",
   "exempt_skills": ["deep-research", "hindsight:review"],
   "refs_dir": "docs/refs"
@@ -161,7 +172,8 @@ Configuration is optional. Create `.claude/guard.local.json` in your project:
 | --- | --- | --- |
 | `model` | Model the **headless** review runs on | `"haiku"` |
 | `effort` | **Headless** review reasoning effort (`low`/`medium`/`high`/`xhigh`/`max`) | `"medium"` |
-| `edit_gate` | Session-start default for the approval gate (blocks the file-editing tools until you approve) | `true` |
+| `edit_gate` | Session-start default for the approval gate (holds back the file-editing tools until you approve) | `true` |
+| `gate_mode` | How an unapproved edit is stopped: `ask` prompts you to approve it inline (and opens the gate for the rest of the task); `deny` blocks it until you approve in a message | `"ask"` |
 | `mode` | Session-start review mode for the evidence judge (`manual`/`subagent`/`headless`, see [Review modes](#review-modes)) | `"manual"` |
 | `exempt_skills` | Skills / slash commands whose turn the review skips, named `plugin:skill` (leading `/` and case ignored) | `[]` |
 | `refs_dir` | Project-relative folder where copies of cited official docs are saved. Empty means the git-ignored default `.claude/guard/refs/`; set a tracked path (e.g. `"docs/refs"`) to keep the collected references under git | `""` |

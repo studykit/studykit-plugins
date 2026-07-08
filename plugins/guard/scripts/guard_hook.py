@@ -41,10 +41,13 @@ Subcommands
                  ``remove``/``clear`` the ``exempt_skills`` config key — that key ONLY,
                  never ``edit_gate``/``mode``/state. Not a hook event.
 - gate           PreToolUse. When the approval gate is enabled, for the file-editing
-                 tools (Write/Edit/MultiEdit/NotebookEdit), deny with a reason to seek
-                 explicit user approval unless the session is approved. On a deny it
-                 records the turn's ``prompt_id`` in ``gated_prompt_id`` so Stop skips
-                 auditing a plan/approval-request response. Writes into the refs
+                 tools (Write/Edit/MultiEdit/NotebookEdit), stop an unapproved edit
+                 unless the session is approved. ``gate_mode`` picks how: ``ask``
+                 (default) escalates to Claude Code's permission prompt (the user
+                 approves inline; ``gate-approved`` then arms the session) and records
+                 the turn in ``asked_prompt_id``; ``deny`` blocks the call with a
+                 reason and records the turn's ``prompt_id`` in ``gated_prompt_id`` so
+                 Stop skips auditing a plan/approval-request response. Writes into the refs
                  directory (``.claude/guard/refs/`` by default; the ``refs_dir``
                  config key may move it) are exempt (the Grounded output style saves
                  cited docs there), as are writes that don't touch tracked project
@@ -55,6 +58,12 @@ Subcommands
                  self-arm or disable the judge. Reads state (+ at most one
                  ``git check-ignore``) — no judge call. Bash and all
                  read/search tools always pass.
+- gate-approved  PostToolUse (Write/Edit/MultiEdit/NotebookEdit). gate_mode ``ask``
+                 only: fires after an edit executed, i.e. the user approved the gate's
+                 permission prompt. When the turn matches ``asked_prompt_id`` it arms
+                 the session's ``approved`` so the rest of the task's edits pass. The
+                 user's click arms it — the model cannot approve its own prompt. No-op
+                 in ``deny`` mode and once already approved.
 - record-verified Append verified facts for a passed turn. Called by the guardian
                  subagent (subagent mode) via Bash so its confirmed claims reach the
                  verified store through the same single writer as the headless path.
@@ -85,7 +94,7 @@ Subcommands
                  output style), not a hook event.
 
 State lives project-local under ``${CLAUDE_PROJECT_DIR}/.claude/guard/``:
-- ``state/<sid>.json``       — {edit_gate, approved, mode, last_audited_prompt_id, gated_prompt_id, pending_verify_prompt_id, updated_at}
+- ``state/<sid>.json``       — {edit_gate, approved, mode, last_audited_prompt_id, gated_prompt_id, asked_prompt_id, pending_verify_prompt_id, updated_at}
 - ``sessions/<sid>.jsonl``   — full session archive: one record per turn / verdict
 - ``turns/<sid>/<pid>.json`` — subagent and manual modes: the turn slice guard hands the
                                 guardian subagent ({user, tools[], assistant})
@@ -101,7 +110,11 @@ Configuration (optional) is a JSON object at
 ``"haiku"``), ``effort`` (one of low/medium/high/xhigh/max, default ``"medium"``
 — reasoning effort of the HEADLESS judge only; the subagent judge's model/effort come
 from the ``guardian`` agent's own frontmatter, not these keys), ``edit_gate`` (bool,
-default ``true``) — the session-start value of the APPROVAL GATE switch, and ``mode``
+default ``true``) — the session-start value of the APPROVAL GATE switch, ``gate_mode``
+(``"ask"``|``"deny"``, default ``"ask"``) — how the gate stops an unapproved edit:
+``ask`` escalates to Claude Code's permission prompt (approve inline; the approval
+arms the session for the rest of the task), ``deny`` blocks the call and drives the
+plan→approve workflow, and ``mode``
 (``"manual"``|``"subagent"``|``"headless"``, default ``"manual"``) — how the Stop-time
 evidence judge runs, independent of the gate (manual: no auto-audit — the judge's
 practical off — verify on demand via ``/guard:audit``; subagent: dispatch the
@@ -156,6 +169,14 @@ DEFAULT_CONFIG: dict[str, Any] = {
     # has no on/off flag of its own: `mode` governs it, and "manual" is its
     # practical off (nothing runs unless the user asks via /guard:audit).
     "edit_gate": True,
+    # How the gate stops an unapproved edit. "ask" (default) escalates to Claude
+    # Code's permission prompt so the user approves the edit inline (no typed
+    # approval); on that approval the PostToolUse `gate-approved` hook arms the
+    # session's approval so the rest of the task's edits pass without re-prompting —
+    # the click, not the model, arms it. "deny" instead blocks the tool call with a
+    # reason, forcing the model to present a plan and win approval in a message (the
+    # stricter plan→approve workflow).
+    "gate_mode": "ask",
     "mode": "manual",
     # Skills / slash commands whose turn the Stop judge must NOT audit. A turn opened
     # by one of these is skill output or a relay, not a body of technical claims to
@@ -186,6 +207,9 @@ VALID_EFFORTS = {"low", "medium", "high", "xhigh", "max"}
 # "headless": spawn an isolated `claude` inside the hook and block the turn (the
 #   original path).
 VALID_MODES = {"manual", "subagent", "headless"}
+
+# How the approval gate stops an unapproved edit (see DEFAULT_CONFIG["gate_mode"]).
+VALID_GATE_MODES = {"ask", "deny"}
 
 # Tools the approval gate blocks before approval. Bash is intentionally NOT gated:
 # guard only guards the dedicated file-editing tools, and lets shell commands run.
@@ -607,6 +631,11 @@ def _read_state(project_dir: Path, session_id: str, config: dict[str, Any]) -> d
         # Per-turn guards keyed by the transcript prompt_id (a turn == one promptId).
         "last_audited_prompt_id": "",
         "gated_prompt_id": "",
+        # gate_mode "ask": the prompt_id of the turn whose edit the gate escalated to
+        # the user's permission prompt. If that edit then executes, PostToolUse
+        # (`gate-approved`) sees this marker match and arms the session's approval —
+        # the user's click, not the model, is what arms it.
+        "asked_prompt_id": "",
         # Manual mode: the most recent auditable turn's prompt_id, the target that
         # `/guard:audit` dispatches the guardian for.
         "pending_verify_prompt_id": "",
@@ -622,7 +651,7 @@ def _read_state(project_dir: Path, session_id: str, config: dict[str, Any]) -> d
     if not isinstance(data, dict):
         return default
     keys = ("edit_gate", "approved", "mode", "last_audited_prompt_id", "gated_prompt_id",
-            "pending_verify_prompt_id", "updated_at")
+            "asked_prompt_id", "pending_verify_prompt_id", "updated_at")
     default.update({k: data[k] for k in keys if k in data})
     if default["mode"] not in VALID_MODES:
         default["mode"] = DEFAULT_CONFIG["mode"]
@@ -763,6 +792,12 @@ def _mode(config: dict[str, Any]) -> str:
     default = DEFAULT_CONFIG["mode"]
     value = str(config.get("mode", default)).lower()
     return value if value in VALID_MODES else default
+
+
+def _gate_mode(config: dict[str, Any]) -> str:
+    default = DEFAULT_CONFIG["gate_mode"]
+    value = str(config.get("gate_mode", default)).lower()
+    return value if value in VALID_GATE_MODES else default
 
 
 def run_judge(
@@ -1423,11 +1458,39 @@ def cmd_gate() -> int:
             _trace(project_dir, session_id, "gate", "allow_gitignored", tool=tool_name)
             return 0
 
-    # Record that this turn had a file edit denied for want of approval. The Stop
-    # judge reads this and skips auditing the turn: after a gate denial the response
-    # is a plan / approval request, not a body of technical claims to ground. Keyed
-    # by the transcript prompt_id so it matches the turn the Stop judge reconstructs.
     prompt_id = payload.get("prompt_id")
+
+    # gate_mode "ask": escalate to Claude Code's permission prompt instead of denying.
+    # The user approves the edit inline (no typed approval); if it then executes, the
+    # PostToolUse `gate-approved` hook arms the session's approval so the rest of the
+    # task's edits pass. Record the turn's prompt_id as the marker that hook matches
+    # against. Do NOT set gated_prompt_id here: unlike a hard deny, an approved "ask"
+    # lets the edit happen, so the turn carries real work the Stop judge should audit.
+    if _gate_mode(config) == "ask":
+        if isinstance(prompt_id, str) and prompt_id and state.get("asked_prompt_id") != prompt_id:
+            state["asked_prompt_id"] = prompt_id
+            _write_state(project_dir, session_id, state)
+        reason = (
+            "guard: this edit implements the user's task, which has not been approved "
+            "yet. Approve to allow it — and the rest of this task's edits — or reject "
+            "to keep the gate closed. Only your approval here counts, not the model's."
+        )
+        output = {
+            "hookSpecificOutput": {
+                "hookEventName": "PreToolUse",
+                "permissionDecision": "ask",
+                "permissionDecisionReason": reason,
+            }
+        }
+        json.dump(output, sys.stdout)
+        _trace(project_dir, session_id, "gate", "ask", tool=tool_name)
+        return 0
+
+    # gate_mode "deny": block the edit. Record that this turn had a file edit denied
+    # for want of approval. The Stop judge reads this and skips auditing the turn:
+    # after a gate denial the response is a plan / approval request, not a body of
+    # technical claims to ground. Keyed by the transcript prompt_id so it matches the
+    # turn the Stop judge reconstructs.
     if isinstance(prompt_id, str) and prompt_id and state.get("gated_prompt_id") != prompt_id:
         state["gated_prompt_id"] = prompt_id
         _write_state(project_dir, session_id, state)
@@ -1446,6 +1509,51 @@ def cmd_gate() -> int:
     }
     json.dump(output, sys.stdout)
     _trace(project_dir, session_id, "gate", "deny", tool=tool_name)
+    return 0
+
+
+def cmd_gate_approved() -> int:
+    """PostToolUse (Write/Edit/MultiEdit/NotebookEdit). Arm the session's approval
+    after the user approved a gate "ask" prompt.
+
+    In gate_mode "ask" the gate escalates an unapproved edit to Claude Code's
+    permission prompt and records the turn in ``asked_prompt_id``. PostToolUse fires
+    only after the tool actually executed — i.e. the user approved the prompt — so a
+    successful mutating edit whose turn matches that marker means the user just
+    approved. Arm the session so the rest of the task's edits pass without
+    re-prompting. The user's click is what arms it; the model cannot approve its own
+    prompt. No-op in "deny" mode (the marker is never set) and once already approved.
+    """
+    project_dir = _project_dir()
+    payload = _read_payload()
+    if payload is None or project_dir is None:
+        return 0
+    session_id = _session_id(payload)
+    if session_id is None:
+        return 0
+
+    config = _load_config(project_dir)
+    state = _read_state(project_dir, session_id, config)
+    if not state["edit_gate"] or state["approved"]:
+        return 0
+    if not _is_mutating(payload.get("tool_name")):
+        return 0
+
+    prompt_id = payload.get("prompt_id")
+    if not isinstance(prompt_id, str) or not prompt_id:
+        return 0
+    if state.get("asked_prompt_id") != prompt_id:
+        return 0
+
+    state["approved"] = True
+    state["asked_prompt_id"] = ""
+    _write_state(project_dir, session_id, state)
+    _append_log(project_dir, session_id, {
+        "role": "gate",
+        "approved": True,
+        "reasoning": "approved via ask permission prompt",
+    })
+    _trace(project_dir, session_id, "gate-approved", "armed", prompt_id=prompt_id)
     return 0
 
 
@@ -2014,6 +2122,7 @@ SUBCOMMANDS = {
     "set-mode": cmd_set_mode,
     "verify": cmd_verify,
     "gate": cmd_gate,
+    "gate-approved": cmd_gate_approved,
     "record-verified": cmd_record_verified,
     "stop": cmd_stop,
     "session-start": cmd_session_start,
