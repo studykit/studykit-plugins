@@ -758,6 +758,10 @@ class JiraIssueBackend:
         subparsers = parser.add_subparsers(dest="command", required=True)
         publish = subparsers.add_parser(
             "publish",
+            # `publish` is the internal routing token dispatch injects for the
+            # user-facing `new` verb; force the help usage to read `issue new`
+            # so it never advertises a verb the dispatcher rejects.
+            prog="issue new",
             help="publish a new Jira issue from a body file",
         )
         publish.add_argument("--type", required=True, help="workflow artifact type")
