@@ -22,7 +22,7 @@ guard adds three layers of control over the assistant's responses and actions:
    question", "TBD", "deferred", "needs investigation", "결정 안 됨" — guard sends it
    back to read the code and resolve it. Genuine product/policy decisions that need
    you are left alone. By default the review runs **on demand** — you run
-   [`/guard:audit`](#review-modes) when you want the last turn checked, so ordinary
+   [`/guard:judge`](#review-modes) when you want the last turn checked, so ordinary
    turns cost nothing extra. You can switch to a mode that reviews every turn: an
    in-session `guardian` subagent you can watch, or a separate headless check that
    blocks the turn (either adds latency and model usage per turn).
@@ -30,15 +30,16 @@ guard adds three layers of control over the assistant's responses and actions:
 3. **Approval gate** — guard holds back the file-editing tools (Write/Edit/MultiEdit/
    NotebookEdit) until you approve the work. By default it asks you to approve the edit
    right when it happens, through Claude Code's own permission prompt; approving once
-   opens the gate for the rest of that task. (You can switch to a stricter mode that
-   blocks the edit outright until you approve in a message — see `gate_mode` below.)
+   opens the gate for the rest of that task. (You can switch to a stricter setting that
+   blocks the edit outright until you approve in a message — see `edit_gate` below.)
    Discussion, planning, and questions never approve on their own. Shell commands,
    reads, and searches are never blocked.
 
 The two checks are controlled independently, and both are set from one command,
-`/guard:config`: the approval gate has an on/off switch (`edit_gate`, on by default),
-and the evidence judge is governed by its review mode (`mode`) — `manual` (the default)
-runs nothing automatically, so it is the judge's practical off (see below).
+`/guard:config`: the approval gate is one setting (`edit_gate` — `ask` by default,
+`deny` for the stricter workflow, or `off` to disable it), and the evidence judge is
+governed by `judge_gate` — `manual` (the default) runs nothing automatically, so it is
+the judge's practical off (see below).
 
 guard also keeps a per-session record of the conversation and its review results
 inside your project (see [Logs](#logs)).
@@ -47,6 +48,8 @@ inside your project (see [Logs](#logs)).
 
 - Claude Code with the `claude` CLI available on your `PATH` (guard's evidence
   review runs a separate, read-only `claude` check).
+- Python 3.11 or newer on your `PATH` as `python3` (guard's hook dispatcher runs
+  directly via its shebang).
 
 ## Install
 
@@ -70,7 +73,7 @@ style.
 guard exposes two commands:
 
 - **`/guard:config`** — view and change guard's settings for this project.
-- **`/guard:audit`** — audit the last completed turn on demand.
+- **`/guard:judge`** — judge the last completed turn on demand.
 
 ### Configure guard
 
@@ -81,32 +84,32 @@ setting and value directly:
 ```
 /guard:config                     # show settings, then pick what to change
 /guard:config edit_gate off       # turn the approval gate off
-/guard:config mode headless       # switch the evidence judge to headless
+/guard:config edit_gate deny      # block unapproved edits instead of prompting
+/guard:config judge_gate headless # switch the evidence judge to headless
 ```
 
 The settings it manages:
 
 | Setting | Values | What it controls |
 | --- | --- | --- |
-| `edit_gate` | `on` / `off` | The approval gate (below). On by default. |
-| `mode` | `manual` / `subagent` / `headless` | How the evidence judge runs (below). `manual` by default. |
-| `gate_mode` | `ask` / `deny` | How an unapproved edit is stopped (below). |
+| `edit_gate` | `ask` / `deny` / `off` | The approval gate (below). `off` disables it; `ask` (default) prompts you to approve an unapproved edit inline; `deny` blocks it. |
+| `judge_gate` | `manual` / `subagent` / `headless` | How the evidence judge runs (below). `manual` by default. |
 | `model` | a model name | Model the **headless** judge runs on. |
 | `effort` | `low` / `medium` / `high` / `xhigh` / `max` | **Headless** judge reasoning effort. |
 | `refs_dir` | a path, or empty | Where cited-doc copies are saved (see [Configuration](#configuration)). |
 | `exempt_skills` | skill / command names | Skills whose turn the judge skips (see [Configuration](#configuration)). |
 
 Changes take effect immediately and persist as the project default in
-`.claude/guard.local.json` — `edit_gate` and `mode` also switch the current session, so
-you don't have to restart. `/guard:config` is the only supported way to change these:
+`.claude/guard.local.json` — `edit_gate` and `judge_gate` also switch the current session,
+so you don't have to restart. `/guard:config` is the only supported way to change these:
 guard blocks direct writes to its own config, so nothing but your own action through
 this command can weaken the guard.
 
 ### Review modes
 
-The evidence judge runs in one of three modes, set with `/guard:config mode <mode>`:
+The evidence judge runs in one of three modes, set with `/guard:config judge_gate <mode>`:
 
-- **manual** (default) — no automatic review; run `/guard:audit` when you want the last
+- **manual** (default) — no automatic review; run `/guard:judge` when you want the last
   completed turn checked. Ordinary turns cost nothing extra. Since nothing runs unless
   you ask, this is also how you keep the evidence judge effectively off while the
   approval gate stays on.
@@ -117,14 +120,14 @@ The evidence judge runs in one of three modes, set with `/guard:config mode <mod
 - **headless** — the review runs as a separate, hidden `claude` check and **blocks** the
   turn until unsupported claims are grounded or resolvable deferrals are resolved.
 
-All modes apply the same checks. The mode never affects the approval gate.
+All modes apply the same checks. `judge_gate` never affects the approval gate.
 
-### Audit a turn on demand
+### Judge a turn on demand
 
 Whatever the mode, you can review the last completed turn yourself at any time:
 
 ```
-/guard:audit            # audit the last completed turn now
+/guard:judge            # judge the last completed turn now
 ```
 
 guard dispatches the `guardian` subagent to review that turn and report anything it
@@ -133,7 +136,7 @@ finds.
 ### The approval gate
 
 While the approval gate is on and a task is still under discussion, any attempt to change
-files is held back for your approval. How depends on `gate_mode` (below):
+files is held back for your approval. How depends on `edit_gate` (below):
 
 - **`ask` (default)** — you get Claude Code's permission prompt for the edit. Approve it
   and the gate opens for the rest of that task; reject it and the gate stays closed. The
@@ -169,9 +172,8 @@ Configuration is optional. Create `.claude/guard.local.json` in your project:
 {
   "model": "haiku",
   "effort": "medium",
-  "edit_gate": true,
-  "gate_mode": "ask",
-  "mode": "manual",
+  "edit_gate": "ask",
+  "judge_gate": "manual",
   "exempt_skills": ["deep-research", "hindsight:review"],
   "refs_dir": "docs/refs"
 }
@@ -181,9 +183,8 @@ Configuration is optional. Create `.claude/guard.local.json` in your project:
 | --- | --- | --- |
 | `model` | Model the **headless** review runs on | `"haiku"` |
 | `effort` | **Headless** review reasoning effort (`low`/`medium`/`high`/`xhigh`/`max`) | `"medium"` |
-| `edit_gate` | Session-start default for the approval gate (holds back the file-editing tools until you approve) | `true` |
-| `gate_mode` | How an unapproved edit is stopped: `ask` prompts you to approve it inline (and opens the gate for the rest of the task); `deny` blocks it until you approve in a message | `"ask"` |
-| `mode` | Session-start review mode for the evidence judge (`manual`/`subagent`/`headless`, see [Review modes](#review-modes)) | `"manual"` |
+| `edit_gate` | The approval gate (holds back the file-editing tools until you approve): `off` disables it, `ask` prompts you to approve an unapproved edit inline (and opens the gate for the rest of the task), `deny` blocks it until you approve in a message | `"ask"` |
+| `judge_gate` | Session-start review mode for the evidence judge (`manual`/`subagent`/`headless`, see [Review modes](#review-modes)) | `"manual"` |
 | `exempt_skills` | Skills / slash commands whose turn the review skips, named `plugin:skill` (leading `/` and case ignored) | `[]` |
 | `refs_dir` | Project-relative folder where copies of cited official docs are saved. Empty means the git-ignored default `.claude/guard/refs/`; set a tracked path (e.g. `"docs/refs"`) to keep the collected references under git | `""` |
 
@@ -197,7 +198,7 @@ Use `exempt_skills` for skills or slash commands whose output is a report or a r
 rather than claims about your codebase (e.g. a research skill) — guard won't review the
 turn they run in. List each by the name you invoke after the slash, **including its
 plugin namespace**: `hindsight:review`, or a bare name for an un-namespaced skill like
-`deep-research`. guard's own `/guard:config` and `/guard:audit` are always exempt.
+`deep-research`. guard's own `/guard:config` and `/guard:judge` are always exempt.
 
 When a response cites official documentation, the Grounded output style saves a
 local copy of the cited content into the refs folder so the evidence stays

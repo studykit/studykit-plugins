@@ -1,7 +1,7 @@
 {
   "name": "guard",
-  "version": "0.11.0",
-  "description": "Enforce evidence-backed technical claims in Claude Code. Ships a Grounded output style, logs each session's user/assistant turns with the assistant's claims and their supporting evidence, and (on demand via /guard:audit by default, or automatically each turn in subagent/headless mode) audits a turn for grounding — dispatching the guardian subagent or an isolated headless judge that blocks. The approval gate and the evidence judge's mode are set together with /guard:config and controlled independently. Claude Code only.",
+  "version": "0.12.0",
+  "description": "Enforce evidence-backed technical claims in Claude Code. Ships a Grounded output style, logs each session's user/assistant turns with the assistant's claims and their supporting evidence, and (on demand via /guard:judge by default, or automatically each turn in subagent/headless mode) audits a turn for grounding — dispatching the guardian subagent or an isolated headless judge that blocks. The approval gate (edit_gate) and the evidence judge (judge_gate) are set with /guard:config and controlled independently. Requires Python 3.11+. Claude Code only.",
   "author": {
     "name": "studykit"
   },

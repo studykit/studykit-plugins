@@ -1,6 +1,6 @@
 ---
 name: config
-description: "View and change guard's settings for this project — the approval gate (edit_gate), the evidence-judge mode, gate_mode, model, effort, refs_dir, and exempt_skills — recorded in .claude/guard.local.json. Use when the user wants to configure guard: turn the approval gate on/off, change the audit mode, set gate_mode/model/effort/refs_dir, or manage exempt skills. Claude Code only."
+description: "View and change guard's settings for this project — the approval gate (edit_gate), the evidence judge (judge_gate), model, effort, refs_dir, and exempt_skills — recorded in .claude/guard.local.json. Use when the user wants to configure guard: disable the approval gate or switch it between ask/deny, change the judge_gate mode, set model/effort/refs_dir, or manage exempt skills. Claude Code only."
 argument-hint: '[key] [value]'
 context: fork
 agent: general-purpose
@@ -18,7 +18,7 @@ Fixed values for this run (already substituted — do not re-resolve):
 
 - guard CLI: `"${CLAUDE_SKILL_DIR}/../../scripts/guard_hook.py"`
 - session id: `${CLAUDE_SESSION_ID}` — pass it as `--session ${CLAUDE_SESSION_ID}` so
-  `edit_gate` / `mode` changes take effect in the **current** session, not only in
+  `edit_gate` / `judge_gate` changes take effect in the **current** session, not only in
   sessions started later.
 
 ## Commands
@@ -34,17 +34,16 @@ Fixed values for this run (already substituted — do not re-resolve):
 
 | Key | Values | What it controls |
 | --- | --- | --- |
-| `edit_gate` | `on` / `off` | The approval gate — holds back file edits until you approve. |
-| `mode` | `manual` / `subagent` / `headless` | The evidence judge. `manual` = off (audit only on demand via `/guard:audit`); `subagent` = in-session guardian each turn; `headless` = in-hook judge that blocks. |
-| `gate_mode` | `ask` / `deny` | How an unapproved edit is stopped — `ask` prompts inline, `deny` blocks it outright. |
+| `edit_gate` | `ask` / `deny` / `off` | The approval gate — holds back file edits until you approve. `off` disables it; `ask` prompts inline; `deny` blocks an unapproved edit outright. |
+| `judge_gate` | `manual` / `subagent` / `headless` | The evidence judge. `manual` = off (audit only on demand via `/guard:judge`); `subagent` = in-session guardian each turn; `headless` = in-hook judge that blocks. |
 | `model` | a model name (e.g. `haiku`, `sonnet`) | Model the **headless** judge runs on. |
 | `effort` | `low` / `medium` / `high` / `xhigh` / `max` | **Headless** judge reasoning effort. |
 | `refs_dir` | a project-relative path, or empty | Where the Grounded style saves cited-doc copies. Empty = the git-ignored default `.claude/guard/refs/`; a tracked path (e.g. `docs/refs`) keeps them under git. |
 | `exempt_skills` | skill/command names, namespaced (e.g. `hindsight:review`) | Skills/commands whose finished turn the judge skips. Managed with the `exempt` verbs above. |
 
-`edit_gate` and `mode` apply to the current session and become the new default;
-`gate_mode` / `model` / `effort` / `refs_dir` are read from the file when used, so they
-also take effect immediately.
+`edit_gate` and `judge_gate` apply to the current session and become the new default;
+`model` / `effort` / `refs_dir` are read from the file when used, so they also take
+effect immediately.
 
 ## What to do
 
