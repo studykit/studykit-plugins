@@ -15,28 +15,6 @@
     ],
     "UserPromptExpansion": [
       {
-        "matcher": "^(guard:)?turn$",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/guard_hook.py\" toggle",
-            "timeout": 5,
-            "description": "Toggle the approval gate for the session."
-          }
-        ]
-      },
-      {
-        "matcher": "^(guard:)?audit-mode$",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/guard_hook.py\" set-mode",
-            "timeout": 5,
-            "description": "Set the session's evidence-judge mode (manual|subagent|headless)."
-          }
-        ]
-      },
-      {
         "matcher": "^(guard:)?audit$",
         "hooks": [
           {

@@ -15,28 +15,26 @@ Subcommands
                  which sees the last few archived user/assistant messages as context
                  (``_recent_dialogue``) so a short consent ("go ahead") arms only when
                  it answers a proposed plan. Only a user message can arm approval.
-                 guard's own ``/guard:turn`` / ``/guard:audit-mode`` commands are
+                 guard's own ``/guard:config`` / ``/guard:audit`` commands are
                  ignored here (not turns).
-- toggle         UserPromptExpansion (matcher ``^(guard:)?turn$``). Read the on/off
-                 argument from the raw ``prompt`` and set the session's ``edit_gate``
-                 flag — the APPROVAL GATE only. The evidence judge is governed
-                 independently by ``mode`` (see set-mode); ``manual`` is its practical
-                 off (nothing runs unless the user asks). A ``--project`` flag instead
-                 writes the session-start default (``edit_gate``) to guard.local.json
-                 (that key only, not the live session); ``--global`` is reserved
-                 (reported unsupported).
-- set-mode       UserPromptExpansion (matcher ``^(guard:)?audit-mode$``). Set the
-                 session's ``mode`` (``manual``|``subagent``|``headless``) for the
-                 Stop-time evidence judge, independent of the approval gate. A
-                 ``--project`` flag instead writes the session-start default (``mode``)
-                 to guard.local.json (that key only, not the live session);
-                 ``--global`` is reserved (reported unsupported).
+- config         CLI (argv), run by the ``guard:config`` skill (forked) via Bash.
+                 ``show`` prints the current settings; ``set <key> <value>`` changes one
+                 of ``edit_gate`` (on/off — the APPROVAL GATE), ``mode``
+                 (``manual``|``subagent``|``headless`` — the evidence judge, independent
+                 of the gate; ``manual`` is its practical off), ``gate_mode``
+                 (``ask``|``deny``), ``model``, ``effort``, or ``refs_dir``.
+                 ``edit_gate``/``mode`` also apply to the live session's
+                 ``state/<sid>.json`` when a session id is available (``--session``, which
+                 the forked skill passes as ``${CLAUDE_SESSION_ID}``, else the inherited
+                 ``CLAUDE_CODE_SESSION_ID``); the rest are read from the config file at
+                 use. Preserves every other key; ``exempt_skills`` is managed by
+                 ``exempt``, not here. Not a hook event.
 - verify         UserPromptExpansion (matcher ``^(guard:)?audit$``). On demand, emit the
                  guardian-dispatch instruction for the last completed turn
                  (``pending_verify_prompt_id``, recorded by manual-mode Stop). Reads no
                  transcript — the slice is already on disk. The on-demand counterpart to
                  auto-auditing; works in any mode.
-- exempt         CLI (argv), run by the ``guard:exempt`` skill via Bash after the user
+- exempt         CLI (argv), run by the ``guard:config`` skill via Bash after the user
                  confirms an interactive selection. ``list``/``set``/``add``/
                  ``remove``/``clear`` the ``exempt_skills`` config key — that key ONLY,
                  never ``edit_gate``/``mode``/state. Not a hook event.
@@ -75,7 +73,7 @@ Subcommands
                  gated (``gated_prompt_id``), the slice contains a user ``!`` command
                  (its output arrives after the judged response, so it is neither
                  evidence nor auditable here), or the turn was opened by guard's own
-                 ``/guard:turn`` / ``/guard:audit-mode`` / ``/guard:audit`` control
+                 ``/guard:config`` / ``/guard:audit`` control
                  command or a user-configured ``exempt_skills`` entry (skill output / a
                  relay, not claims to ground). Otherwise branch on ``mode``.
                  ``manual`` (default): do not audit — record the turn as the pending
@@ -121,9 +119,9 @@ practical off — verify on demand via ``/guard:audit``; subagent: dispatch the
 ``guardian`` subagent each turn; headless: in-hook judge that blocks), and
 ``exempt_skills`` (list of strings, default ``[]``) — skills / slash
 commands whose turn the Stop judge must not audit, named with their plugin namespace
-(``plugin:skill``, e.g. ``guard:turn``) or bare for un-namespaced skills; matched
+(``plugin:skill``, e.g. ``guard:config``) or bare for un-namespaced skills; matched
 leading-``/``-stripped and case-insensitively (guard's own
-``turn``/``audit-mode``/``audit`` control commands are always exempt regardless of this
+``config``/``audit`` control commands are always exempt regardless of this
 list), and ``refs_dir`` (string, default ``""``) — project-relative directory where
 the Grounded output style saves local copies of cited docs; empty means the
 git-ignored default ``.claude/guard/refs/``, a tracked path (e.g. ``"docs/refs"``)
@@ -131,9 +129,8 @@ keeps the collected references under git (values resolving outside the project, 
 the project root, or into guard's own config/state fall back to the default — see
 ``_refs_dir``). Unknown keys are ignored; a missing or malformed file falls
 back to all defaults. The judge always reads the repo (Read/Grep/Glob/Bash) to verify
-claims. The ``turn`` / ``audit-mode`` skills flip ``edit_gate`` / ``mode`` for the
-session, or with ``--project`` write those keys' session-start defaults to
-guard.local.json.
+claims. The ``guard:config`` skill changes these through the ``config`` CLI: it writes
+guard.local.json and, for ``edit_gate`` / ``mode``, the live session's state.
 """
 
 from __future__ import annotations
@@ -181,9 +178,9 @@ DEFAULT_CONFIG: dict[str, Any] = {
     # Skills / slash commands whose turn the Stop judge must NOT audit. A turn opened
     # by one of these is skill output or a relay, not a body of technical claims to
     # ground. Values are the name as it appears after the slash, INCLUDING the plugin
-    # namespace (e.g. "guard:turn", "hindsight:review") or the bare name for an
+    # namespace (e.g. "guard:config", "hindsight:review") or the bare name for an
     # un-namespaced skill ("deep-research"); matched leading-'/'-stripped and
-    # case-insensitively. guard's own turn/mode control commands are always exempt
+    # case-insensitively. guard's own config/audit control commands are always exempt
     # regardless of this list.
     "exempt_skills": [],
     # Where the Grounded output style saves local copies of cited docs, relative to
@@ -337,17 +334,16 @@ def _read_payload() -> dict | None:
 
 
 _SESSION_ID_RE = re.compile(r"^[A-Za-z0-9._-]+$")
-# guard's own control commands, e.g. "/guard:turn on", "/turn off",
-# "/guard:audit-mode subagent". These are handled by UserPromptExpansion, not real
-# turns. `(?=\s|$)` rather than `\b`: the name must END here, not merely hit a word
-# boundary — `\b` would also accept hyphenated names from other plugins
-# (e.g. `/audit-resolution` matching `audit`). `audit-mode` is listed before `audit`
-# so the longer name matches first.
-_CONTROL_CMD_RE = re.compile(r"^/(guard:)?(turn|audit-mode|exempt|audit)(?=\s|$)", re.IGNORECASE)
+# guard's own control commands, e.g. "/guard:config edit_gate off", "/config",
+# "/guard:audit". `config` is a forked skill and `audit` a UserPromptExpansion — either
+# way the turn is a relay, not real work to log/judge. `(?=\s|$)` rather than `\b`: the
+# name must END here, not merely hit a word boundary — `\b` would also accept hyphenated
+# names from other plugins (e.g. `/audit-resolution` matching `audit`).
+_CONTROL_CMD_RE = re.compile(r"^/(guard:)?(config|audit)(?=\s|$)", re.IGNORECASE)
 # In the transcript, a slash command is expanded to
-# "<command-name>/guard:turn</command-name>" (see session b30dbaec). Pull the command
-# name out of that tag; a raw typed form ("/guard:turn on") is handled by the fallback
-# in _turn_command_name.
+# "<command-name>/guard:config</command-name>" (see session b30dbaec). Pull the command
+# name out of that tag; a raw typed form ("/guard:config edit_gate off") is handled by
+# the fallback in _turn_command_name.
 _COMMAND_NAME_RE = re.compile(r"<command-name>\s*(/?[^<\n]+?)\s*</command-name>", re.IGNORECASE)
 
 
@@ -390,8 +386,8 @@ def _turn_command_name(user_text: str) -> str:
     lowercased), or '' when the turn was not opened by a slash command.
 
     Slash commands reach the transcript expanded as
-    ``<command-name>/guard:turn</command-name>``; a raw typed form
-    (``/guard:turn on``) is handled by the fallback.
+    ``<command-name>/guard:config</command-name>``; a raw typed form
+    (``/guard:config edit_gate off``) is handled by the fallback.
     """
     text = user_text.strip()
     m = _COMMAND_NAME_RE.search(text)
@@ -406,7 +402,7 @@ def _turn_command_name(user_text: str) -> str:
 
 def _is_control_command_name(name: str) -> bool:
     """True when a normalized command name is one of guard's own control commands
-    (``turn``/``mode``/``exempt``/``audit``, with or without the ``guard:`` prefix)."""
+    (``config``/``audit``, with or without the ``guard:`` prefix)."""
     return bool(name) and bool(_CONTROL_CMD_RE.match("/" + name))
 
 
@@ -1078,8 +1074,8 @@ def cmd_user_prompt() -> int:
     prompt = payload.get("prompt")
     prompt = prompt if isinstance(prompt, str) else ""
 
-    # guard's own control commands (`/guard:turn ...`, `/guard:mode ...`) are not
-    # real turns — UserPromptExpansion (`toggle` / `set-mode`) handles them. Don't
+    # guard's own control commands (`/guard:config ...`, `/guard:audit`) are not
+    # real turns — the forked `config` skill / the `verify` expansion handle them. Don't
     # log, don't start a turn, don't judge.
     if _CONTROL_CMD_RE.match(prompt.strip()):
         _trace(project_dir, session_id, "user-prompt", "skip_control_cmd")
@@ -1196,182 +1192,9 @@ def cmd_plan_approved() -> int:
     return 0
 
 
-# `/guard:turn` and `/guard:audit-mode` accept an optional persistence-scope flag: no flag
-# (default) sets the LIVE session only; `--project` writes the session-start default in
-# guard.local.json (that one key only, never the live session); `--global` is reserved
-# for a future user-level store and is reported as not-yet-supported. These hooks fire
-# ONLY on a user-typed slash command (the model cannot invoke them), so writing config
-# here cannot let the model weaken guard.
-_GLOBAL_UNSUPPORTED = (
-    "guard: --global defaults are not supported yet (no global config store; planned). "
-    "Use `--project` for the project default, or no flag for this session.")
-
-
-def _scope_of(prompt: Any) -> str:
-    """Persistence scope parsed from a control command's raw prompt:
-    ``--global`` / ``--project`` → that scope, else ``"session"``."""
-    if isinstance(prompt, str):
-        toks = {t.lower() for t in prompt.split()}
-        if "--global" in toks:
-            return "global"
-        if "--project" in toks:
-            return "project"
-    return "session"
-
-
 def _emit_expansion(msg: str) -> None:
     output = {"hookSpecificOutput": {"hookEventName": "UserPromptExpansion", "additionalContext": msg}}
     json.dump(output, sys.stdout)
-
-
-def cmd_toggle() -> int:
-    """UserPromptExpansion for `/guard:turn [--project] [on|off]`. Flips the APPROVAL
-    GATE only (``edit_gate``); the evidence judge is governed by ``mode`` (see
-    ``cmd_set_mode``). No scope flag sets the LIVE session; `--project` writes the
-    session-start default (that key only, not the live session); `--global` is
-    reserved (reported unsupported)."""
-    project_dir = _project_dir()
-    payload = _read_payload()
-    if payload is None or project_dir is None:
-        return 0
-    session_id = _session_id(payload)
-    if session_id is None:
-        return 0
-
-    prompt = payload.get("prompt")
-    scope = _scope_of(prompt)
-    arg = ""
-    if isinstance(prompt, str):
-        # "/guard:turn on", "/guard:turn --project off" — find the on/off token.
-        for tok in prompt.split():
-            low = tok.lower()
-            if low in ("on", "off"):
-                arg = low
-
-    if scope == "global":
-        _emit_expansion(_GLOBAL_UNSUPPORTED)
-        _trace(project_dir, session_id, "toggle", "global_unsupported", arg=arg)
-        return 0
-
-    if scope == "project":
-        # Persist the session-start default (`edit_gate`) in guard.local.json —
-        # that key ONLY, leaving the live session untouched. Report-only when no
-        # on/off is given.
-        raw = _load_raw_config(project_dir)
-        current = raw.get("edit_gate", True)
-        current = current if isinstance(current, bool) else True
-        note = ""
-        if arg:
-            desired = arg == "on"
-            if desired == current:
-                pass
-            elif _write_config(project_dir, {**raw, "edit_gate": desired}):
-                current = desired
-            else:
-                note = " (write failed; unchanged)"
-        _emit_expansion(
-            "guard approval-gate project default: {} for new sessions "
-            "(.claude/guard.local.json){}. This session is unchanged — use "
-            "`/guard:turn on|off` to change it now.".format("on" if current else "off", note)
-            if arg else
-            "guard approval-gate project default: {} (.claude/guard.local.json).".format(
-                "on" if current else "off"))
-        _trace(project_dir, session_id, "toggle", "set_project", arg=arg, edit_gate=current)
-        return 0
-
-    # scope == "session": live-session toggle (original behavior).
-    config = _load_config(project_dir)
-    state = _read_state(project_dir, session_id, config)
-    if arg == "on":
-        state["edit_gate"] = True
-    elif arg == "off":
-        state["edit_gate"] = False
-    # no arg → report only; leave edit_gate unchanged
-    _write_state(project_dir, session_id, state)
-
-    _emit_expansion(
-        "guard approval gate is {} for this session. The evidence judge is separate — "
-        "its mode is set with `/guard:audit-mode`.".format(
-            "on" if state["edit_gate"] else "off"))
-    _trace(project_dir, session_id, "toggle", "set", arg=arg, edit_gate=state["edit_gate"])
-    return 0
-
-
-def cmd_set_mode() -> int:
-    """UserPromptExpansion for `/guard:audit-mode [--project] [manual|subagent|headless]`.
-    Governs the EVIDENCE JUDGE only (`manual` is its practical off); the approval gate
-    is flipped by `/guard:turn` (see ``cmd_toggle``). No scope flag sets the LIVE
-    session's mode; `--project` writes the session-start default in guard.local.json
-    (that key only, not the live session); `--global` is reserved (reported
-    unsupported). No/unknown mode arg reports the current value only."""
-    project_dir = _project_dir()
-    payload = _read_payload()
-    if payload is None or project_dir is None:
-        return 0
-    session_id = _session_id(payload)
-    if session_id is None:
-        return 0
-
-    prompt = payload.get("prompt")
-    scope = _scope_of(prompt)
-    arg = ""
-    if isinstance(prompt, str):
-        # "/guard:audit-mode subagent", "/guard:audit-mode --project headless" — find
-        # the mode token.
-        for tok in prompt.split():
-            low = tok.lower()
-            if low in VALID_MODES:
-                arg = low
-
-    if scope == "global":
-        _emit_expansion(_GLOBAL_UNSUPPORTED)
-        _trace(project_dir, session_id, "set-mode", "global_unsupported", arg=arg)
-        return 0
-
-    if scope == "project":
-        # Persist the session-start default `mode` in guard.local.json — that key ONLY,
-        # leaving the live session untouched. Report-only when no mode is given.
-        raw = _load_raw_config(project_dir)
-        current = _mode(raw)
-        note = ""
-        if arg:
-            if arg == current:
-                pass
-            elif _write_config(project_dir, {**raw, "mode": arg}):
-                current = arg
-            else:
-                note = " (write failed; unchanged)"
-        _emit_expansion(
-            "guard project default audit mode: {} for new sessions (.claude/guard.local.json){}. "
-            "This session is unchanged — use `/guard:audit-mode {}` to switch it now.".format(
-                current, note, current)
-            if arg else
-            "guard project default audit mode: {} (.claude/guard.local.json).".format(current))
-        _trace(project_dir, session_id, "set-mode", "set_project", arg=arg, mode=current)
-        return 0
-
-    # scope == "session": live-session mode (original behavior).
-    config = _load_config(project_dir)
-    state = _read_state(project_dir, session_id, config)
-    if arg:
-        state["mode"] = arg
-    # no/unknown arg → report only; leave mode unchanged
-    _write_state(project_dir, session_id, state)
-
-    if state["mode"] == "manual":
-        msg = ("guard evidence judge mode: manual for this session — effectively off. "
-               "The Stop hook does not audit; run `/guard:audit` to audit the last "
-               "completed turn on demand. The approval gate is unaffected.")
-    elif state["mode"] == "subagent":
-        msg = ("guard evidence judge mode: subagent for this session. The Stop hook "
-               "will ask the main agent to dispatch the guardian subagent to audit "
-               "each turn (it does not block).")
-    else:
-        msg = ("guard evidence judge mode: headless for this session. The Stop hook "
-               "runs an isolated judge and blocks the turn on unsupported claims.")
-    _emit_expansion(msg)
-    _trace(project_dir, session_id, "set-mode", "set", arg=arg, mode=state["mode"])
-    return 0
 
 
 def cmd_verify() -> int:
@@ -1860,8 +1683,8 @@ def cmd_stop() -> int:
         _trace(project_dir, session_id, "stop", "skip_user_command", prompt_id=prompt_id)
         return 0
 
-    # Skip judging a turn opened by guard's own control command (`/guard:turn`,
-    # `/guard:mode`) or by a user-configured exempt skill/command. Such a turn's
+    # Skip judging a turn opened by guard's own control command (`/guard:config`,
+    # `/guard:audit`) or by a user-configured exempt skill/command. Such a turn's
     # response is a relay or skill output, not a body of technical claims to ground —
     # e.g. relaying "guard on" has no evidence to cite and would be falsely blocked
     # (session b30dbaec). The approval classifier already skips control commands at
@@ -2036,7 +1859,7 @@ def cmd_session_start() -> int:
 
 def cmd_exempt() -> int:
     """Manage the ``exempt_skills`` list in guard.local.json. Invoked by the
-    ``guard:exempt`` skill via Bash, AFTER the user has confirmed a selection
+    ``guard:config`` skill via Bash, AFTER the user has confirmed a selection
     interactively (the skill drives the listing + AskUserQuestion; this only records
     the confirmed result). Argv:
 
@@ -2101,6 +1924,172 @@ def cmd_exempt() -> int:
     return 0
 
 
+def _bool_arg(value: str) -> bool | None:
+    """Parse an on/off-style token for the ``edit_gate`` config value. None if unrecognized."""
+    v = value.strip().lower()
+    if v in ("on", "true", "1", "yes", "enable", "enabled"):
+        return True
+    if v in ("off", "false", "0", "no", "disable", "disabled"):
+        return False
+    return None
+
+
+def _parse_config_argv(argv: list[str]) -> tuple[list[str], str | None]:
+    """Split a ``config`` CLI argv into positionals and the ``--session <id>`` value."""
+    positional: list[str] = []
+    session: str | None = None
+    i = 0
+    while i < len(argv):
+        tok = argv[i]
+        if tok == "--session":
+            if i + 1 < len(argv):
+                session = argv[i + 1].strip() or None
+                i += 2
+                continue
+            i += 1
+            continue
+        positional.append(tok)
+        i += 1
+    return positional, session
+
+
+def _apply_session_scalar(project_dir: Path, session_id: str | None, key: str, value: Any) -> None:
+    """Mirror an ``edit_gate`` / ``mode`` change into the live session's ``state/<sid>.json``
+    so it takes effect at once, not only for sessions started later. These two are the
+    only settings cached in session state (seeded from config at session start); the rest
+    are read from the config file at use, so writing the file is enough for them. No-op
+    without a session id."""
+    if not session_id:
+        return
+    config = _load_config(project_dir)
+    state = _read_state(project_dir, session_id, config)
+    state[key] = value
+    _write_state(project_dir, session_id, state)
+
+
+def _config_show_lines(project_dir: Path, session_id: str | None) -> list[str]:
+    """Render current guard settings for the ``guard:config`` skill to display. Shows the
+    guard.local.json defaults; for ``edit_gate`` / ``mode`` it also shows the live session
+    value when it differs from the default (the session may have been changed after)."""
+    raw = _load_raw_config(project_dir)
+    cfg = _load_config(project_dir)
+    state = None
+    if session_id and _state_file(project_dir, session_id).is_file():
+        state = _read_state(project_dir, session_id, cfg)
+
+    gate_default = bool(cfg.get("edit_gate", True))
+    if state is not None and bool(state["edit_gate"]) != gate_default:
+        gate_line = (f"edit_gate: {str(bool(state['edit_gate'])).lower()} "
+                     f"(this session; default {str(gate_default).lower()})")
+    else:
+        gate_line = f"edit_gate: {str(gate_default).lower()}"
+
+    mode_default = _mode(cfg)
+    if state is not None and state["mode"] != mode_default:
+        mode_line = f"mode: {state['mode']} (this session; default {mode_default})"
+    else:
+        mode_line = f"mode: {mode_default}"
+
+    exempt = _exempt_skills(cfg)
+    refs_rel = raw.get("refs_dir") if isinstance(raw.get("refs_dir"), str) else ""
+    return [
+        f"model: {cfg['model']}",
+        f"effort: {_effort(cfg)}",
+        gate_line,
+        f"gate_mode: {_gate_mode(cfg)}",
+        mode_line,
+        "exempt_skills: " + (", ".join(sorted(exempt)) if exempt else "(none)"),
+        "refs_dir: " + (refs_rel if refs_rel else "(default .claude/guard/refs/)"),
+    ]
+
+
+def cmd_config() -> int:
+    """View/change guard.local.json settings — the CLI behind the ``guard:config`` skill.
+
+        config [show]                        — print the current settings
+        config set <key> <value>             — change one setting
+
+    Settable keys: ``edit_gate`` (on/off — the approval gate), ``mode``
+    (manual|subagent|headless — the evidence judge), ``gate_mode`` (ask|deny), ``model``,
+    ``effort`` (low|medium|high|xhigh|max), ``refs_dir``. ``edit_gate`` and ``mode`` also
+    apply to the live session's ``state/<sid>.json`` when a session id is available
+    (``--session <id>``, which the forked skill passes as ``${CLAUDE_SESSION_ID}``, else
+    the inherited ``CLAUDE_CODE_SESSION_ID``) so the change takes effect at once and
+    persists as the new default; the rest are read from the config file at use. The gate
+    stays protected: ``exempt_skills`` is managed by the ``exempt`` CLI, not here, and
+    every other key in the file is preserved. Project dir from ``CLAUDE_PROJECT_DIR``
+    (Bash env), else the current directory."""
+    positional, session_arg = _parse_config_argv(sys.argv[2:])
+    op = positional[0].lower() if positional else "show"
+
+    pd_env = os.environ.get("CLAUDE_PROJECT_DIR")
+    project_dir = Path(pd_env) if pd_env else Path.cwd()
+    session_id = session_arg or (os.environ.get("CLAUDE_CODE_SESSION_ID", "").strip() or None)
+
+    if op != "set":
+        for line in _config_show_lines(project_dir, session_id):
+            print(line)
+        _trace(project_dir, session_id, "config", "show")
+        return 0
+
+    if len(positional) < 3:
+        print("guard config: usage: config set <key> <value>", file=sys.stderr)
+        return 0
+    key = positional[1].lower()
+    value = positional[2]
+
+    raw = _load_raw_config(project_dir)
+
+    if key == "edit_gate":
+        parsed = _bool_arg(value)
+        if parsed is None:
+            print(f"guard config: edit_gate must be on/off (got {value!r})", file=sys.stderr)
+            return 0
+        raw["edit_gate"] = parsed
+        _apply_session_scalar(project_dir, session_id, "edit_gate", parsed)
+    elif key == "mode":
+        v = value.lower()
+        if v not in VALID_MODES:
+            print(f"guard config: mode must be one of {sorted(VALID_MODES)} (got {value!r})", file=sys.stderr)
+            return 0
+        raw["mode"] = v
+        _apply_session_scalar(project_dir, session_id, "mode", v)
+    elif key == "gate_mode":
+        v = value.lower()
+        if v not in VALID_GATE_MODES:
+            print(f"guard config: gate_mode must be one of {sorted(VALID_GATE_MODES)} (got {value!r})", file=sys.stderr)
+            return 0
+        raw["gate_mode"] = v
+    elif key == "effort":
+        v = value.lower()
+        if v not in VALID_EFFORTS:
+            print(f"guard config: effort must be one of {sorted(VALID_EFFORTS)} (got {value!r})", file=sys.stderr)
+            return 0
+        raw["effort"] = v
+    elif key == "model":
+        v = value.strip()
+        if not v:
+            print("guard config: model must be a non-empty string", file=sys.stderr)
+            return 0
+        raw["model"] = v
+    elif key == "refs_dir":
+        raw["refs_dir"] = value  # "" resets to the default; _refs_dir validates at use
+    else:
+        print(f"guard config: unknown or unsettable key {key!r}. Settable: edit_gate, mode, "
+              "gate_mode, model, effort, refs_dir (exempt_skills via the exempt CLI).",
+              file=sys.stderr)
+        return 0
+
+    if not _write_config(project_dir, raw):
+        print("guard config: failed to write .claude/guard.local.json", file=sys.stderr)
+        return 0
+
+    for line in _config_show_lines(project_dir, session_id):
+        print(line)
+    _trace(project_dir, session_id, "config", "set", key=key)
+    return 0
+
+
 def cmd_refs_dir() -> int:
     """Print the resolved refs directory (absolute), applying `refs_dir` validation.
 
@@ -2118,9 +2107,8 @@ def cmd_refs_dir() -> int:
 SUBCOMMANDS = {
     "user-prompt": cmd_user_prompt,
     "plan-approved": cmd_plan_approved,
-    "toggle": cmd_toggle,
-    "set-mode": cmd_set_mode,
     "verify": cmd_verify,
+    "config": cmd_config,
     "gate": cmd_gate,
     "gate-approved": cmd_gate_approved,
     "record-verified": cmd_record_verified,

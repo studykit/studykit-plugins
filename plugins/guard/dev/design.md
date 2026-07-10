@@ -10,15 +10,14 @@ line-by-line walkthrough.
 
 | Event | Subcommand | Role |
 | --- | --- | --- |
-| `UserPromptSubmit` | `user-prompt` | Update approval state. Ignores `/guard:turn` / `/guard:audit-mode` / `/guard:exempt`. |
-| `UserPromptExpansion` (matcher `^(guard:)?turn$`) | `toggle` | Flip session `edit_gate` (approval gate only). |
-| `UserPromptExpansion` (matcher `^(guard:)?audit-mode$`) | `set-mode` | Set session `mode` (`manual`\|`subagent`\|`headless`), the judge's own control. |
+| `UserPromptSubmit` | `user-prompt` | Update approval state. Ignores `/guard:config` / `/guard:audit`. |
 | `UserPromptExpansion` (matcher `^(guard:)?audit$`) | `verify` | On demand, dispatch the guardian for the last completed turn (`pending_verify_prompt_id`). |
 | `PreToolUse` (`Write\|Edit\|MultiEdit\|NotebookEdit`) | `gate` | Stop unapproved file edits — `ask` (default) escalates to the permission prompt, `deny` blocks the call (`gate_mode`). |
 | `PostToolUse` (matcher `ExitPlanMode`) | `plan-approved` | On plan approval, arm the gate when the plan defers no in-scope work. |
 | `PostToolUse` (`Write\|Edit\|MultiEdit\|NotebookEdit`) | `gate-approved` | `gate_mode` ask only: after the user approves an edit's permission prompt, arm the session for the rest of the task. |
 | (called via Bash, not a hook) | `record-verified` | Guardian appends a passed turn's claims to the verified store. |
-| (called via Bash, not a hook) | `exempt` | `guard:exempt` skill records the user's confirmed `exempt_skills` selection (that key only). |
+| (called via Bash, not a hook) | `config` | `guard:config` skill (forked) shows/sets guard.local.json settings; `edit_gate`/`mode` also apply to the live session's `state/<sid>.json` (session id from `--session`/`CLAUDE_CODE_SESSION_ID`). Every other key preserved; never `exempt_skills`. |
+| (called via Bash, not a hook) | `exempt` | `guard:config` skill records the user's confirmed `exempt_skills` selection (that key only). |
 | `Stop` | `stop` | manual: record pending target, no audit. subagent: dispatch guardian. headless: in-hook judge that blocks. |
 | `SessionStart` | `session-start` | Age-sweep state/sessions/verified/turns; export `GUARD_REFS_DIR` (resolved refs dir) via `$CLAUDE_ENV_FILE`. |
 | (called via Bash, not a hook) | `refs-dir` | Print the resolved refs directory (guardian fallback; applies `refs_dir` validation). |
@@ -88,13 +87,20 @@ payloads, not memory.
   `cmd_plan_approved` treat its own invocation as a genuine user approval — the model
   authors the plan but cannot approve its own tool call. Re-verify against a live
   payload before relying on it.
-- **`/guard:turn` and `/guard:audit-mode` take a `--project` / `--global` scope flag.** No
-  flag sets the live session (`toggle` / `set-mode` write `state/`); `--project` writes
-  only the session-start default (`edit_gate` / `mode`) to `guard.local.json`, live
-  session untouched; `--global` is reserved (reported unsupported). Safe despite writing
-  config: these fire ONLY on a user-typed slash command via UserPromptExpansion, which
-  the model cannot invoke. `_scope_of` parses the flag; `_write_config` edits only the
-  one key.
+- **A forked skill can reach the pre-fork session id** — the load-bearing fact behind
+  `guard:config` (`context: fork`) writing the live session's `state/<sid>.json`.
+  `${CLAUDE_SESSION_ID}` is a skill-content *substitution* expanded in the parent (per the
+  skills docs, https://code.claude.com/docs/en/skills, "string substitution"), so the real
+  id is baked into the fork's prompt; and `CLAUDE_CODE_SESSION_ID` is an env var inherited
+  by subagents (observed 2026-07-10: a spawned subagent reported the same
+  `CLAUDE_CODE_SESSION_ID` as its parent, the session UUID). `CLAUDE_SESSION_ID` is only
+  the substitution token, NOT a process env var — `printenv CLAUDE_SESSION_ID` is empty in
+  both parent and subagent, so the CLI must read `CLAUDE_CODE_SESSION_ID`, and the skill
+  passes `--session ${CLAUDE_SESSION_ID}`. For the main session this id equals the hook
+  payload's `session_id` that state is keyed on (one id per session; not separately
+  probed against a live payload here). `cmd_config` writes `guard.local.json` (that key
+  only) plus, for `edit_gate`/`mode`, the session state; it runs only from the
+  user-invoked (`disable-model-invocation`) skill, which the model cannot trigger.
 
 ## Design invariants (why, not how)
 
@@ -114,7 +120,8 @@ payloads, not memory.
   permission prompt, so all three are genuine user actions; a deferring plan does not
   arm, and a judge failure never arms (fail toward the closed gate — the opposite of the
   evidence judge's fail-open).
-  The `turn` skill and the model cannot arm it by either path. The
+  The `config` skill (it sets `edit_gate`/`mode`, never `approved`) and the model cannot
+  arm it by either path. The
   classifier sees the tail of the session archive as conversation context
   (`_recent_dialogue`) — used only to resolve what the message refers to, so a bare
   "go ahead" arms only when it answers a proposed plan; context alone can never
@@ -127,14 +134,14 @@ payloads, not memory.
 - **Two independent switches.** Session `edit_gate` governs ONLY the approval gate
   (gate + classifier + plan-approval early-return when off); the evidence judge has no
   on/off flag of its own — `mode` is its control, and `manual` is its practical off
-  (Stop archives the turn and records the pending target, but spawns no judge). `turn`
-  flips `edit_gate` (default from the config `edit_gate` key), `audit-mode` sets
-  `mode`. Neither switch touches the other's feature.
-- **Control turns and exempt commands are never judged.** `/guard:turn` and
-  `/guard:audit-mode` are skipped on BOTH sides: the approval classifier skips them at
+  (Stop archives the turn and records the pending target, but spawns no judge).
+  `/guard:config` flips `edit_gate` and sets `mode` (writing the config key and, with a
+  session id, the live session state). Neither switch touches the other's feature.
+- **Control turns and exempt commands are never judged.** `/guard:config` and
+  `/guard:audit` are skipped on BOTH sides: the approval classifier skips them at
   UserPromptSubmit (`_CONTROL_CMD_RE` on the raw prompt), and `cmd_stop` skips them via
   `command_name` (extracted from the transcript's expanded
-  `<command-name>/guard:turn</command-name>`). This second skip is load-bearing — a
+  `<command-name>/guard:config</command-name>`). This second skip is load-bearing — a
   control turn's response is a one-line relay ("guard on") with no evidence, and
   without it the Stop judge falsely blocked it (session b30dbaec). The same
   `command_name` path skips any skill / slash command the user lists in
@@ -146,7 +153,8 @@ payloads, not memory.
   `manual` (default; no auto-audit, `/guard:audit` dispatches on demand), `subagent`
   (dispatch guardian each turn), or `headless` (in-hook judge that blocks). The two-axis
   criteria are identical across all three, and `guardian.md` mirrors them in prose. Bad
-  `mode` → the default (`manual`, via `_mode`). `set-mode` flips it, mirroring `toggle`.
+  `mode` → the default (`manual`, via `_mode`). `cmd_config` sets it (the config key and,
+  with a session id, the live session state).
   The approval gate is independent of `mode` (governed by `edit_gate`), so `manual`
   narrows auto-verification without weakening the gate.
 - **Manual mode + on-demand verify.** manual-mode Stop archives the turn, writes its
@@ -218,11 +226,11 @@ session on approval, `deny` blocks the call for the plan→approve workflow), `m
 (`"manual"`|`"subagent"`|`"headless"`, default
 `"manual"` — the evidence judge's control; `manual` is its practical off), `exempt_skills`
 (list of strings, default `[]`) — skills / slash commands whose turn the Stop judge
-skips, named with their plugin namespace (`plugin:skill`, e.g. `guard:turn`) or bare
+skips, named with their plugin namespace (`plugin:skill`, e.g. `guard:config`) or bare
 for un-namespaced skills, matched leading-`/`-stripped and case-insensitively (guard's
-own `turn`/`audit-mode`/`audit`/`exempt` control commands are always exempt regardless). Manage
-`exempt_skills` interactively with the `guard:exempt` skill (lists session skills →
-AskUserQuestion → records via the `exempt` CLI); no need to hand-edit. `refs_dir`
+own `config`/`audit` control commands are always exempt regardless). Manage
+`exempt_skills` interactively with the `guard:config` skill (which records the user's
+chosen names via the `exempt` CLI); no need to hand-edit. `refs_dir`
 (string, default `""`) — project-relative directory for the Grounded style's cited-doc
 copies; empty = the git-ignored `.claude/guard/refs/`, a tracked path (e.g.
 `"docs/refs"`) keeps the collected references under git; commits stay in the user's
@@ -257,8 +265,14 @@ printf '%s\n' \
   '{"promptId":"p1","origin":{"kind":"human"},"message":{"role":"user","content":"is redis faster?"}}' \
   '{"promptId":null,"message":{"role":"assistant","content":[{"type":"text","text":"Redis is always faster than Postgres."}]}}' > "$T"
 
+# show/change settings (deterministic CLI; no payload — session id from --session or
+# CLAUDE_CODE_SESSION_ID, project dir from CLAUDE_PROJECT_DIR). set writes guard.local.json
+# and, for edit_gate/mode, state/<sid>.json.
+"$H" config show --session s1
+"$H" config set edit_gate off --session s1
+
 # headless judge on the turn (real claude; unsupported claim -> block)
-echo '{"session_id":"s1","prompt":"/guard:audit-mode headless"}' | "$H" set-mode
+"$H" config set mode headless --session s1
 echo "{\"session_id\":\"s1\",\"prompt_id\":\"p1\",\"transcript_path\":\"$T\",\"last_assistant_message\":\"Redis is always faster than Postgres.\",\"stop_hook_active\":false}" | "$H" stop
 
 # gate, default gate_mode "ask": emits permissionDecision "ask" + records asked_prompt_id.
@@ -271,11 +285,11 @@ printf '{"gate_mode":"deny"}\n' > "$CLAUDE_PROJECT_DIR/.claude/guard.local.json"
 echo '{"session_id":"s2","prompt_id":"pG","tool_name":"Write","tool_input":{"file_path":"x"}}' | "$H" gate
 
 # subagent mode: Stop slices the turn to a file + injects a dispatch (no `decision`)
-echo '{"session_id":"s1","prompt":"/guard:audit-mode subagent"}' | "$H" set-mode
+"$H" config set mode subagent --session s1
 echo '{"session_id":"s1","prompt_id":"p1","claims":[{"claim":"x","evidence":"y"}]}' | "$H" record-verified
 ```
 
-`gate`, `toggle`, `set-mode`, subagent `stop`, `record-verified`, and session
+`gate`, `config`, subagent `stop`, `record-verified`, and session
 subcommands are deterministic (no CLI/auth). Headless `stop` and `user-prompt` spawn a
 real `claude`. Unit-test the slice directly:
 `_read_turn_from_transcript(path, prompt_id)` on a fixture JSONL.
