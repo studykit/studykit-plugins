@@ -15,21 +15,22 @@ Subcommands
                  which sees the last few archived user/assistant messages as context
                  (``_recent_dialogue``) so a short consent ("go ahead") arms only when
                  it answers a proposed plan. Only a user message can arm approval.
-                 guard's own ``/guard:config`` / ``/guard:audit`` commands are
+                 guard's own ``/guard:config`` / ``/guard:judge`` commands are
                  ignored here (not turns).
 - config         CLI (argv), run by the ``guard:config`` skill (forked) via Bash.
                  ``show`` prints the current settings; ``set <key> <value>`` changes one
-                 of ``edit_gate`` (on/off — the APPROVAL GATE), ``mode``
-                 (``manual``|``subagent``|``headless`` — the evidence judge, independent
-                 of the gate; ``manual`` is its practical off), ``gate_mode``
-                 (``ask``|``deny``), ``model``, ``effort``, or ``refs_dir``.
-                 ``edit_gate``/``mode`` also apply to the live session's
+                 of ``edit_gate`` (``ask``|``deny``|``off`` — the APPROVAL GATE, where
+                 ``off`` disables it and ``ask``/``deny`` pick how an unapproved edit is
+                 stopped), ``judge_gate`` (``manual``|``subagent``|``headless`` — the
+                 evidence judge, independent of the gate; ``manual`` is its practical
+                 off), ``model``, ``effort``, or ``refs_dir``.
+                 ``edit_gate``/``judge_gate`` also apply to the live session's
                  ``state/<sid>.json`` when a session id is available (``--session``, which
                  the forked skill passes as ``${CLAUDE_SESSION_ID}``, else the inherited
                  ``CLAUDE_CODE_SESSION_ID``); the rest are read from the config file at
                  use. Preserves every other key; ``exempt_skills`` is managed by
                  ``exempt``, not here. Not a hook event.
-- verify         UserPromptExpansion (matcher ``^(guard:)?audit$``). On demand, emit the
+- verify         UserPromptExpansion (matcher ``^(guard:)?judge$``). On demand, emit the
                  guardian-dispatch instruction for the last completed turn
                  (``pending_verify_prompt_id``, recorded by manual-mode Stop). Reads no
                  transcript — the slice is already on disk. The on-demand counterpart to
@@ -37,11 +38,11 @@ Subcommands
 - exempt         CLI (argv), run by the ``guard:config`` skill via Bash after the user
                  confirms an interactive selection. ``list``/``set``/``add``/
                  ``remove``/``clear`` the ``exempt_skills`` config key — that key ONLY,
-                 never ``edit_gate``/``mode``/state. Not a hook event.
-- gate           PreToolUse. When the approval gate is enabled, for the file-editing
-                 tools (Write/Edit/MultiEdit/NotebookEdit), stop an unapproved edit
-                 unless the session is approved. ``gate_mode`` picks how: ``ask``
-                 (default) escalates to Claude Code's permission prompt (the user
+                 never ``edit_gate``/``judge_gate``/state. Not a hook event.
+- gate           PreToolUse. When the approval gate is enabled (``edit_gate`` != ``off``),
+                 for the file-editing tools (Write/Edit/MultiEdit/NotebookEdit), stop an
+                 unapproved edit unless the session is approved. ``edit_gate`` picks how:
+                 ``ask`` (default) escalates to Claude Code's permission prompt (the user
                  approves inline; ``gate-approved`` then arms the session) and records
                  the turn in ``asked_prompt_id``; ``deny`` blocks the call with a
                  reason and records the turn's ``prompt_id`` in ``gated_prompt_id`` so
@@ -56,7 +57,7 @@ Subcommands
                  self-arm or disable the judge. Reads state (+ at most one
                  ``git check-ignore``) — no judge call. Bash and all
                  read/search tools always pass.
-- gate-approved  PostToolUse (Write/Edit/MultiEdit/NotebookEdit). gate_mode ``ask``
+- gate-approved  PostToolUse (Write/Edit/MultiEdit/NotebookEdit). ``edit_gate`` ``ask``
                  only: fires after an edit executed, i.e. the user approved the gate's
                  permission prompt. When the turn matches ``asked_prompt_id`` it arms
                  the session's ``approved`` so the rest of the task's edits pass. The
@@ -73,11 +74,11 @@ Subcommands
                  gated (``gated_prompt_id``), the slice contains a user ``!`` command
                  (its output arrives after the judged response, so it is neither
                  evidence nor auditable here), or the turn was opened by guard's own
-                 ``/guard:config`` / ``/guard:audit`` control
+                 ``/guard:config`` / ``/guard:judge`` control
                  command or a user-configured ``exempt_skills`` entry (skill output / a
-                 relay, not claims to ground). Otherwise branch on ``mode``.
+                 relay, not claims to ground). Otherwise branch on ``judge_gate``.
                  ``manual`` (default): do not audit — record the turn as the pending
-                 ``/guard:audit`` target and emit nothing. ``subagent``: do not
+                 ``/guard:judge`` target and emit nothing. ``subagent``: do not
                  judge/block — slice the turn to a file and emit additionalContext asking
                  the main agent to dispatch ``guard:guardian``. ``headless``: judge the
                  turn (+ VERIFIED_FACTS) on two axes; block on an unsupported claim or a
@@ -92,7 +93,7 @@ Subcommands
                  output style), not a hook event.
 
 State lives project-local under ``${CLAUDE_PROJECT_DIR}/.claude/guard/``:
-- ``state/<sid>.json``       — {edit_gate, approved, mode, last_audited_prompt_id, gated_prompt_id, asked_prompt_id, pending_verify_prompt_id, updated_at}
+- ``state/<sid>.json``       — {edit_gate, approved, judge_gate, last_audited_prompt_id, gated_prompt_id, asked_prompt_id, pending_verify_prompt_id, updated_at}
 - ``sessions/<sid>.jsonl``   — full session archive: one record per turn / verdict
 - ``turns/<sid>/<pid>.json`` — subagent and manual modes: the turn slice guard hands the
                                 guardian subagent ({user, tools[], assistant})
@@ -107,21 +108,20 @@ Configuration (optional) is a JSON object at
 ``${CLAUDE_PROJECT_DIR}/.claude/guard.local.json``: ``model`` (string, default
 ``"haiku"``), ``effort`` (one of low/medium/high/xhigh/max, default ``"medium"``
 — reasoning effort of the HEADLESS judge only; the subagent judge's model/effort come
-from the ``guardian`` agent's own frontmatter, not these keys), ``edit_gate`` (bool,
-default ``true``) — the session-start value of the APPROVAL GATE switch, ``gate_mode``
-(``"ask"``|``"deny"``, default ``"ask"``) — how the gate stops an unapproved edit:
-``ask`` escalates to Claude Code's permission prompt (approve inline; the approval
-arms the session for the rest of the task), ``deny`` blocks the call and drives the
-plan→approve workflow, and ``mode``
+from the ``guardian`` agent's own frontmatter, not these keys), ``edit_gate``
+(``"ask"``|``"deny"``|``"off"``, default ``"ask"``) — the APPROVAL GATE: ``off``
+disables it, ``ask`` escalates to Claude Code's permission prompt (approve inline; the
+approval arms the session for the rest of the task), ``deny`` blocks the call and
+drives the plan→approve workflow, and ``judge_gate``
 (``"manual"``|``"subagent"``|``"headless"``, default ``"manual"``) — how the Stop-time
 evidence judge runs, independent of the gate (manual: no auto-audit — the judge's
-practical off — verify on demand via ``/guard:audit``; subagent: dispatch the
+practical off — verify on demand via ``/guard:judge``; subagent: dispatch the
 ``guardian`` subagent each turn; headless: in-hook judge that blocks), and
 ``exempt_skills`` (list of strings, default ``[]``) — skills / slash
 commands whose turn the Stop judge must not audit, named with their plugin namespace
 (``plugin:skill``, e.g. ``guard:config``) or bare for un-namespaced skills; matched
 leading-``/``-stripped and case-insensitively (guard's own
-``config``/``audit`` control commands are always exempt regardless of this
+``config``/``judge`` control commands are always exempt regardless of this
 list), and ``refs_dir`` (string, default ``""``) — project-relative directory where
 the Grounded output style saves local copies of cited docs; empty means the
 git-ignored default ``.claude/guard/refs/``, a tracked path (e.g. ``"docs/refs"``)
@@ -130,7 +130,9 @@ the project root, or into guard's own config/state fall back to the default — 
 ``_refs_dir``). Unknown keys are ignored; a missing or malformed file falls
 back to all defaults. The judge always reads the repo (Read/Grep/Glob/Bash) to verify
 claims. The ``guard:config`` skill changes these through the ``config`` CLI: it writes
-guard.local.json and, for ``edit_gate`` / ``mode``, the live session's state.
+guard.local.json and, for ``edit_gate`` / ``judge_gate``, the live session's state.
+
+Requires Python 3.11+ (uses ``enum.StrEnum``).
 """
 
 from __future__ import annotations
@@ -144,8 +146,26 @@ import subprocess
 import sys
 import time
 from datetime import datetime, timezone
+from enum import StrEnum
 from pathlib import Path
 from typing import Any
+
+
+class EditGate(StrEnum):
+    """The approval-gate setting. ``off`` disables the gate; ``ask``/``deny`` enable it
+    and pick how an unapproved edit is stopped (see DEFAULT_CONFIG["edit_gate"])."""
+
+    ASK = "ask"
+    DENY = "deny"
+    OFF = "off"
+
+
+class JudgeGate(StrEnum):
+    """How the Stop-time evidence judge runs (see DEFAULT_CONFIG["judge_gate"])."""
+
+    MANUAL = "manual"
+    HEADLESS = "headless"
+    SUBAGENT = "subagent"
 
 STATE_DIR_REL = ".claude/guard"
 CONFIG_REL = ".claude/guard.local.json"
@@ -161,26 +181,24 @@ GIT_CHECK_TIMEOUT_SECONDS = 5
 DEFAULT_CONFIG: dict[str, Any] = {
     "model": "haiku",
     "effort": "medium",
-    # Approval-gate switch: gates the file-EDITING tools (Write/Edit/MultiEdit/
-    # NotebookEdit) until the user approves — hence "edit_gate". The evidence judge
-    # has no on/off flag of its own: `mode` governs it, and "manual" is its
-    # practical off (nothing runs unless the user asks via /guard:audit).
-    "edit_gate": True,
-    # How the gate stops an unapproved edit. "ask" (default) escalates to Claude
-    # Code's permission prompt so the user approves the edit inline (no typed
-    # approval); on that approval the PostToolUse `gate-approved` hook arms the
-    # session's approval so the rest of the task's edits pass without re-prompting —
-    # the click, not the model, arms it. "deny" instead blocks the tool call with a
-    # reason, forcing the model to present a plan and win approval in a message (the
-    # stricter plan→approve workflow).
-    "gate_mode": "ask",
-    "mode": "manual",
+    # Approval-gate setting: gates the file-EDITING tools (Write/Edit/MultiEdit/
+    # NotebookEdit) until the user approves — hence "edit_gate". "off" disables the
+    # gate entirely. "ask" (default) escalates to Claude Code's permission prompt so
+    # the user approves the edit inline (no typed approval); on that approval the
+    # PostToolUse `gate-approved` hook arms the session's approval so the rest of the
+    # task's edits pass without re-prompting — the click, not the model, arms it.
+    # "deny" instead blocks the tool call with a reason, forcing the model to present a
+    # plan and win approval in a message (the stricter plan→approve workflow). The
+    # evidence judge is a separate setting (`judge_gate`); "manual" is its practical
+    # off (nothing runs unless the user asks via /guard:judge).
+    "edit_gate": EditGate.ASK,
+    "judge_gate": JudgeGate.MANUAL,
     # Skills / slash commands whose turn the Stop judge must NOT audit. A turn opened
     # by one of these is skill output or a relay, not a body of technical claims to
     # ground. Values are the name as it appears after the slash, INCLUDING the plugin
     # namespace (e.g. "guard:config", "hindsight:review") or the bare name for an
     # un-namespaced skill ("deep-research"); matched leading-'/'-stripped and
-    # case-insensitively. guard's own config/audit control commands are always exempt
+    # case-insensitively. guard's own config/judge control commands are always exempt
     # regardless of this list.
     "exempt_skills": [],
     # Where the Grounded output style saves local copies of cited docs, relative to
@@ -193,20 +211,16 @@ DEFAULT_CONFIG: dict[str, Any] = {
 }
 
 VALID_EFFORTS = {"low", "medium", "high", "xhigh", "max"}
-# How the Stop-time evidence judge runs.
-# "manual" (default): the hook does NOT audit at Stop — it archives the turn and
+# The evidence-judge settings live on JudgeGate:
+# JudgeGate.MANUAL (default): the hook does NOT audit at Stop — it archives the turn and
 #   records it as the pending verify target; verification runs only on demand via
-#   `/guard:audit`, which dispatches the guardian. This is the judge's practical off.
-#   The approval gate is unaffected (it is governed by `edit_gate`, not `mode`).
-# "subagent": the hook does not judge/block — it injects the turn + verified paths as
-#   additionalContext and the main agent dispatches the `guardian` subagent to audit
-#   every turn.
-# "headless": spawn an isolated `claude` inside the hook and block the turn (the
+#   `/guard:judge`, which dispatches the guardian. This is the judge's practical off.
+#   The approval gate is unaffected (it is governed by `edit_gate`, not `judge_gate`).
+# JudgeGate.SUBAGENT: the hook does not judge/block — it injects the turn + verified
+#   paths as additionalContext and the main agent dispatches the `guardian` subagent to
+#   audit every turn.
+# JudgeGate.HEADLESS: spawn an isolated `claude` inside the hook and block the turn (the
 #   original path).
-VALID_MODES = {"manual", "subagent", "headless"}
-
-# How the approval gate stops an unapproved edit (see DEFAULT_CONFIG["gate_mode"]).
-VALID_GATE_MODES = {"ask", "deny"}
 
 # Tools the approval gate blocks before approval. Bash is intentionally NOT gated:
 # guard only guards the dedicated file-editing tools, and lets shell commands run.
@@ -335,11 +349,11 @@ def _read_payload() -> dict | None:
 
 _SESSION_ID_RE = re.compile(r"^[A-Za-z0-9._-]+$")
 # guard's own control commands, e.g. "/guard:config edit_gate off", "/config",
-# "/guard:audit". `config` is a forked skill and `audit` a UserPromptExpansion — either
+# "/guard:judge". `config` is a forked skill and `judge` a UserPromptExpansion — either
 # way the turn is a relay, not real work to log/judge. `(?=\s|$)` rather than `\b`: the
 # name must END here, not merely hit a word boundary — `\b` would also accept hyphenated
-# names from other plugins (e.g. `/audit-resolution` matching `audit`).
-_CONTROL_CMD_RE = re.compile(r"^/(guard:)?(config|audit)(?=\s|$)", re.IGNORECASE)
+# names from other plugins (e.g. `/judge-resolution` matching `judge`).
+_CONTROL_CMD_RE = re.compile(r"^/(guard:)?(config|judge)(?=\s|$)", re.IGNORECASE)
 # In the transcript, a slash command is expanded to
 # "<command-name>/guard:config</command-name>" (see session b30dbaec). Pull the command
 # name out of that tag; a raw typed form ("/guard:config edit_gate off") is handled by
@@ -402,7 +416,7 @@ def _turn_command_name(user_text: str) -> str:
 
 def _is_control_command_name(name: str) -> bool:
     """True when a normalized command name is one of guard's own control commands
-    (``config``/``audit``, with or without the ``guard:`` prefix)."""
+    (``config``/``judge``, with or without the ``guard:`` prefix)."""
     return bool(name) and bool(_CONTROL_CMD_RE.match("/" + name))
 
 
@@ -572,9 +586,12 @@ def _render_turn_for_judge(turn: dict[str, Any]) -> str:
 def _load_config(project_dir: Path) -> dict[str, Any]:
     """Load the JSON config at guard.local.json, if present. Fail-open to defaults.
 
-    Only keys present in DEFAULT_CONFIG are honored, and only when the supplied
-    value matches the default's type (str for ``model``, bool for the flags), so a
-    malformed value can never change a flag into something truthy by accident.
+    Only keys present in DEFAULT_CONFIG are honored, and only when the supplied value
+    matches the default's JSON type (str for ``model`` and the StrEnum-backed gate
+    fields, list for ``exempt_skills``), so a malformed value can never change a setting
+    by accident. The gate fields persist as plain strings, so they are validated as
+    ``str`` here and coerced to a valid enum member downstream (``_edit_gate`` /
+    ``_judge_gate``); a bad-but-string value is dropped there, not here.
     """
     config = dict(DEFAULT_CONFIG)
     path = project_dir / CONFIG_REL
@@ -587,7 +604,10 @@ def _load_config(project_dir: Path) -> dict[str, Any]:
     if not isinstance(data, dict):
         return config
     for key, default in DEFAULT_CONFIG.items():
-        if key in data and isinstance(data[key], type(default)):
+        # A StrEnum default round-trips through JSON as a plain str, so widen the
+        # accepted type to str for those keys (the enum accessor validates the value).
+        want = str if isinstance(default, StrEnum) else type(default)
+        if key in data and isinstance(data[key], want):
             config[key] = data[key]
     return config
 
@@ -621,19 +641,19 @@ def _write_config(project_dir: Path, data: dict[str, Any]) -> bool:
 
 def _read_state(project_dir: Path, session_id: str, config: dict[str, Any]) -> dict[str, Any]:
     default = {
-        "edit_gate": bool(config.get("edit_gate", True)),
+        "edit_gate": _edit_gate(config),
         "approved": False,
-        "mode": _mode(config),
+        "judge_gate": _judge_gate(config),
         # Per-turn guards keyed by the transcript prompt_id (a turn == one promptId).
         "last_audited_prompt_id": "",
         "gated_prompt_id": "",
-        # gate_mode "ask": the prompt_id of the turn whose edit the gate escalated to
+        # edit_gate "ask": the prompt_id of the turn whose edit the gate escalated to
         # the user's permission prompt. If that edit then executes, PostToolUse
         # (`gate-approved`) sees this marker match and arms the session's approval —
         # the user's click, not the model, is what arms it.
         "asked_prompt_id": "",
         # Manual mode: the most recent auditable turn's prompt_id, the target that
-        # `/guard:audit` dispatches the guardian for.
+        # `/guard:judge` dispatches the guardian for.
         "pending_verify_prompt_id": "",
         "updated_at": None,
     }
@@ -646,11 +666,9 @@ def _read_state(project_dir: Path, session_id: str, config: dict[str, Any]) -> d
         return default
     if not isinstance(data, dict):
         return default
-    keys = ("edit_gate", "approved", "mode", "last_audited_prompt_id", "gated_prompt_id",
+    keys = ("edit_gate", "approved", "judge_gate", "last_audited_prompt_id", "gated_prompt_id",
             "asked_prompt_id", "pending_verify_prompt_id", "updated_at")
     default.update({k: data[k] for k in keys if k in data})
-    if default["mode"] not in VALID_MODES:
-        default["mode"] = DEFAULT_CONFIG["mode"]
     return default
 
 
@@ -784,16 +802,22 @@ def _effort(config: dict[str, Any]) -> str:
     return value if value in VALID_EFFORTS else "medium"
 
 
-def _mode(config: dict[str, Any]) -> str:
-    default = DEFAULT_CONFIG["mode"]
-    value = str(config.get("mode", default)).lower()
-    return value if value in VALID_MODES else default
+def _judge_gate(cfg: dict[str, Any]) -> JudgeGate:
+    """The evidence-judge setting from a config or session-state dict, coerced to a
+    valid JudgeGate member (defaults on anything unrecognized)."""
+    try:
+        return JudgeGate(str(cfg.get("judge_gate", DEFAULT_CONFIG["judge_gate"])).lower())
+    except ValueError:
+        return JudgeGate(DEFAULT_CONFIG["judge_gate"])
 
 
-def _gate_mode(config: dict[str, Any]) -> str:
-    default = DEFAULT_CONFIG["gate_mode"]
-    value = str(config.get("gate_mode", default)).lower()
-    return value if value in VALID_GATE_MODES else default
+def _edit_gate(cfg: dict[str, Any]) -> EditGate:
+    """The approval-gate setting from a config or session-state dict, coerced to a
+    valid EditGate member (defaults on anything unrecognized)."""
+    try:
+        return EditGate(str(cfg.get("edit_gate", DEFAULT_CONFIG["edit_gate"])).lower())
+    except ValueError:
+        return EditGate(DEFAULT_CONFIG["edit_gate"])
 
 
 def run_judge(
@@ -1074,7 +1098,7 @@ def cmd_user_prompt() -> int:
     prompt = payload.get("prompt")
     prompt = prompt if isinstance(prompt, str) else ""
 
-    # guard's own control commands (`/guard:config ...`, `/guard:audit`) are not
+    # guard's own control commands (`/guard:config ...`, `/guard:judge`) are not
     # real turns — the forked `config` skill / the `verify` expansion handle them. Don't
     # log, don't start a turn, don't judge.
     if _CONTROL_CMD_RE.match(prompt.strip()):
@@ -1086,7 +1110,7 @@ def cmd_user_prompt() -> int:
 
     # Snapshot the recent dialogue BEFORE appending this prompt, so the context
     # block cannot duplicate the very message being classified.
-    dialogue = _recent_dialogue(project_dir, session_id) if state["edit_gate"] and prompt.strip() else ""
+    dialogue = _recent_dialogue(project_dir, session_id) if state["edit_gate"] != EditGate.OFF and prompt.strip() else ""
 
     _append_log(project_dir, session_id, {"role": "user", "text": prompt})
 
@@ -1094,7 +1118,7 @@ def cmd_user_prompt() -> int:
     # This hook only runs the approval classifier (below), which serves the approval
     # gate — skip it when the gate is off. The Stop judge reads the whole turn from
     # the transcript via prompt_id.
-    if not state["edit_gate"] or not prompt.strip():
+    if state["edit_gate"] == EditGate.OFF or not prompt.strip():
         return 0
 
     context_block = (
@@ -1155,7 +1179,7 @@ def cmd_plan_approved() -> int:
 
     config = _load_config(project_dir)
     state = _read_state(project_dir, session_id, config)
-    if not state["edit_gate"]:
+    if state["edit_gate"] == EditGate.OFF:
         return 0
 
     # Defensive: the hook matcher already scopes this to ExitPlanMode.
@@ -1198,7 +1222,7 @@ def _emit_expansion(msg: str) -> None:
 
 
 def cmd_verify() -> int:
-    """UserPromptExpansion for `/guard:audit`. On-demand audit of the last completed
+    """UserPromptExpansion for `/guard:judge`. On-demand audit of the last completed
     turn: emit the guardian-dispatch instruction for ``pending_verify_prompt_id`` (set
     by manual-mode Stop). Reads no transcript — the Stop hook already wrote the slice.
     Works in any mode, independent of the approval gate."""
@@ -1217,7 +1241,7 @@ def cmd_verify() -> int:
     turn_path = _turn_slice_file(project_dir, session_id, pid) if pid else None
     if not pid or turn_path is None or not turn_path.is_file():
         _emit_expansion("guard: no completed turn is available to verify yet. "
-                        "Ask something first, then run `/guard:audit`.")
+                        "Ask something first, then run `/guard:judge`.")
         _trace(project_dir, session_id, "verify", "no_pending", prompt_id=pid)
         return 0
 
@@ -1240,7 +1264,7 @@ def cmd_gate() -> int:
 
     config = _load_config(project_dir)
     state = _read_state(project_dir, session_id, config)
-    if not state["edit_gate"]:
+    if state["edit_gate"] == EditGate.OFF:
         return 0
 
     tool_name = payload.get("tool_name")
@@ -1283,13 +1307,14 @@ def cmd_gate() -> int:
 
     prompt_id = payload.get("prompt_id")
 
-    # gate_mode "ask": escalate to Claude Code's permission prompt instead of denying.
+    # edit_gate "ask": escalate to Claude Code's permission prompt instead of denying.
     # The user approves the edit inline (no typed approval); if it then executes, the
     # PostToolUse `gate-approved` hook arms the session's approval so the rest of the
     # task's edits pass. Record the turn's prompt_id as the marker that hook matches
     # against. Do NOT set gated_prompt_id here: unlike a hard deny, an approved "ask"
     # lets the edit happen, so the turn carries real work the Stop judge should audit.
-    if _gate_mode(config) == "ask":
+    # Read the setting from session state so a per-session override takes effect.
+    if state["edit_gate"] == EditGate.ASK:
         if isinstance(prompt_id, str) and prompt_id and state.get("asked_prompt_id") != prompt_id:
             state["asked_prompt_id"] = prompt_id
             _write_state(project_dir, session_id, state)
@@ -1309,7 +1334,7 @@ def cmd_gate() -> int:
         _trace(project_dir, session_id, "gate", "ask", tool=tool_name)
         return 0
 
-    # gate_mode "deny": block the edit. Record that this turn had a file edit denied
+    # edit_gate "deny": block the edit. Record that this turn had a file edit denied
     # for want of approval. The Stop judge reads this and skips auditing the turn:
     # after a gate denial the response is a plan / approval request, not a body of
     # technical claims to ground. Keyed by the transcript prompt_id so it matches the
@@ -1339,7 +1364,7 @@ def cmd_gate_approved() -> int:
     """PostToolUse (Write/Edit/MultiEdit/NotebookEdit). Arm the session's approval
     after the user approved a gate "ask" prompt.
 
-    In gate_mode "ask" the gate escalates an unapproved edit to Claude Code's
+    In edit_gate "ask" the gate escalates an unapproved edit to Claude Code's
     permission prompt and records the turn in ``asked_prompt_id``. PostToolUse fires
     only after the tool actually executed — i.e. the user approved the prompt — so a
     successful mutating edit whose turn matches that marker means the user just
@@ -1357,7 +1382,7 @@ def cmd_gate_approved() -> int:
 
     config = _load_config(project_dir)
     state = _read_state(project_dir, session_id, config)
-    if not state["edit_gate"] or state["approved"]:
+    if state["edit_gate"] == EditGate.OFF or state["approved"]:
         return 0
     if not _is_mutating(payload.get("tool_name")):
         return 0
@@ -1425,10 +1450,10 @@ def _is_guard_owned(project_dir: Path, target: Path) -> bool:
     These must never ride the git-ignore exemption: `.claude/guard/` is itself
     git-ignored, so without this exclusion the model could `Write`
     `state/<sid>.json` to arm its own approval, or edit `guard.local.json` to turn
-    the judge off / change `mode`. (`refs/` is the one deliberate hole and has its own
-    explicit allow, checked before this. The `exempt_skills` list is managed only
+    the judge off / change `judge_gate`. (`refs/` is the one deliberate hole and has its
+    own explicit allow, checked before this. The `exempt_skills` list is managed only
     through the `exempt` CLI — see `cmd_exempt` — which touches that one key and never
-    `edit_gate`/`mode`/state, so it can weaken the judge's coverage but not disable
+    `edit_gate`/`judge_gate`/state, so it can weaken the judge's coverage but not disable
     the gate.) Fail toward guard-owned (safe: no exemption) if the paths can't be
     resolved.
     """
@@ -1539,7 +1564,7 @@ def _guardian_dispatch_context(project_dir: Path, session_id: str, prompt_id: st
     """Build the additionalContext that asks the main agent to dispatch the guardian.
 
     The dispatch inputs are identical for the subagent-mode Stop auto-dispatch and the
-    on-demand ``/guard:audit`` path — only the leading sentence (``lead``) differs.
+    on-demand ``/guard:judge`` path — only the leading sentence (``lead``) differs.
     """
     verified_path = _verified_file(project_dir, session_id).resolve()
     dispatcher = Path(__file__).resolve()
@@ -1597,9 +1622,9 @@ def _stop_manual(project_dir: Path, session_id: str, state: dict[str, Any],
     """Manual mode Stop: record the turn as the pending verify target; do NOT audit.
 
     The turn is already in the session archive; here we persist just its slice and
-    remember its prompt_id so ``/guard:audit`` can dispatch the guardian for it
+    remember its prompt_id so ``/guard:judge`` can dispatch the guardian for it
     without any transcript access. The hook emits nothing and never blocks — the
-    approval gate still runs (it is governed by ``edit_gate``, not ``mode``).
+    approval gate still runs (it is governed by ``edit_gate``, not ``judge_gate``).
     """
     turn_path = _write_turn_slice(project_dir, session_id, prompt_id, turn)
     if turn_path is None:
@@ -1684,7 +1709,7 @@ def cmd_stop() -> int:
         return 0
 
     # Skip judging a turn opened by guard's own control command (`/guard:config`,
-    # `/guard:audit`) or by a user-configured exempt skill/command. Such a turn's
+    # `/guard:judge`) or by a user-configured exempt skill/command. Such a turn's
     # response is a relay or skill output, not a body of technical claims to ground —
     # e.g. relaying "guard on" has no evidence to cite and would be falsely blocked
     # (session b30dbaec). The approval classifier already skips control commands at
@@ -1698,9 +1723,9 @@ def cmd_stop() -> int:
     turn["assistant"] = response
 
     # Manual mode (default): the hook never audits or blocks at Stop. It records the
-    # turn as the pending on-demand target; the user runs `/guard:audit` to dispatch
+    # turn as the pending on-demand target; the user runs `/guard:judge` to dispatch
     # the guardian for it. The approval gate still runs (governed by `edit_gate`).
-    if state["mode"] == "manual":
+    if state["judge_gate"] == JudgeGate.MANUAL:
         return _stop_manual(project_dir, session_id, state, prompt_id, turn)
 
     # Subagent mode: the hook does not judge or block. It hands the turn off to the
@@ -1708,7 +1733,7 @@ def cmd_stop() -> int:
     # transcript + prompt_id as additionalContext (docs: a Stop hook may emit
     # additionalContext WITHOUT `decision`, and the conversation continues so the
     # agent can act on it).
-    if state["mode"] == "subagent":
+    if state["judge_gate"] == JudgeGate.SUBAGENT:
         return _stop_subagent(project_dir, session_id, state, prompt_id, turn)
 
     # Facts verified in earlier passed turns are reusable evidence: a claim that
@@ -1798,7 +1823,7 @@ def cmd_stop() -> int:
 def cmd_session_start() -> int:
     # Sweep both state and logs on the same age policy. State is intentionally NOT
     # cleared at SessionEnd: a session can be resumed later (`claude --resume`), and
-    # its gate/approved/mode flags must survive the gap. Age-based expiry is the
+    # its gate/approved/judge_gate flags must survive the gap. Age-based expiry is the
     # only reaper, so a resumed session keeps its state as long as it is touched
     # within the retention window.
     project_dir = _project_dir()
@@ -1869,7 +1894,7 @@ def cmd_exempt() -> int:
         exempt remove NAME [NAME…] — remove
         exempt clear               — empty the list
 
-    Edits ONLY the ``exempt_skills`` key — never ``edit_gate`` / ``mode`` / state —
+    Edits ONLY the ``exempt_skills`` key — never ``edit_gate`` / ``judge_gate`` / state —
     so it can change which skills' turns the Stop judge skips but cannot disable guard
     or touch the approval gate. Project dir from ``CLAUDE_PROJECT_DIR`` (Bash env), else
     the current working directory. Prints the resulting list for the skill to relay.
@@ -1924,16 +1949,6 @@ def cmd_exempt() -> int:
     return 0
 
 
-def _bool_arg(value: str) -> bool | None:
-    """Parse an on/off-style token for the ``edit_gate`` config value. None if unrecognized."""
-    v = value.strip().lower()
-    if v in ("on", "true", "1", "yes", "enable", "enabled"):
-        return True
-    if v in ("off", "false", "0", "no", "disable", "disabled"):
-        return False
-    return None
-
-
 def _parse_config_argv(argv: list[str]) -> tuple[list[str], str | None]:
     """Split a ``config`` CLI argv into positionals and the ``--session <id>`` value."""
     positional: list[str] = []
@@ -1954,11 +1969,11 @@ def _parse_config_argv(argv: list[str]) -> tuple[list[str], str | None]:
 
 
 def _apply_session_scalar(project_dir: Path, session_id: str | None, key: str, value: Any) -> None:
-    """Mirror an ``edit_gate`` / ``mode`` change into the live session's ``state/<sid>.json``
-    so it takes effect at once, not only for sessions started later. These two are the
-    only settings cached in session state (seeded from config at session start); the rest
-    are read from the config file at use, so writing the file is enough for them. No-op
-    without a session id."""
+    """Mirror an ``edit_gate`` / ``judge_gate`` change into the live session's
+    ``state/<sid>.json`` so it takes effect at once, not only for sessions started later.
+    These two are the only settings cached in session state (seeded from config at session
+    start); the rest are read from the config file at use, so writing the file is enough
+    for them. No-op without a session id."""
     if not session_id:
         return
     config = _load_config(project_dir)
@@ -1969,26 +1984,26 @@ def _apply_session_scalar(project_dir: Path, session_id: str | None, key: str, v
 
 def _config_show_lines(project_dir: Path, session_id: str | None) -> list[str]:
     """Render current guard settings for the ``guard:config`` skill to display. Shows the
-    guard.local.json defaults; for ``edit_gate`` / ``mode`` it also shows the live session
-    value when it differs from the default (the session may have been changed after)."""
+    guard.local.json defaults; for ``edit_gate`` / ``judge_gate`` it also shows the live
+    session value when it differs from the default (the session may have been changed
+    after)."""
     raw = _load_raw_config(project_dir)
     cfg = _load_config(project_dir)
     state = None
     if session_id and _state_file(project_dir, session_id).is_file():
         state = _read_state(project_dir, session_id, cfg)
 
-    gate_default = bool(cfg.get("edit_gate", True))
-    if state is not None and bool(state["edit_gate"]) != gate_default:
-        gate_line = (f"edit_gate: {str(bool(state['edit_gate'])).lower()} "
-                     f"(this session; default {str(gate_default).lower()})")
+    gate_default = _edit_gate(cfg)
+    if state is not None and _edit_gate(state) != gate_default:
+        gate_line = f"edit_gate: {_edit_gate(state)} (this session; default {gate_default})"
     else:
-        gate_line = f"edit_gate: {str(gate_default).lower()}"
+        gate_line = f"edit_gate: {gate_default}"
 
-    mode_default = _mode(cfg)
-    if state is not None and state["mode"] != mode_default:
-        mode_line = f"mode: {state['mode']} (this session; default {mode_default})"
+    judge_default = _judge_gate(cfg)
+    if state is not None and _judge_gate(state) != judge_default:
+        judge_line = f"judge_gate: {_judge_gate(state)} (this session; default {judge_default})"
     else:
-        mode_line = f"mode: {mode_default}"
+        judge_line = f"judge_gate: {judge_default}"
 
     exempt = _exempt_skills(cfg)
     refs_rel = raw.get("refs_dir") if isinstance(raw.get("refs_dir"), str) else ""
@@ -1996,8 +2011,7 @@ def _config_show_lines(project_dir: Path, session_id: str | None) -> list[str]:
         f"model: {cfg['model']}",
         f"effort: {_effort(cfg)}",
         gate_line,
-        f"gate_mode: {_gate_mode(cfg)}",
-        mode_line,
+        judge_line,
         "exempt_skills: " + (", ".join(sorted(exempt)) if exempt else "(none)"),
         "refs_dir: " + (refs_rel if refs_rel else "(default .claude/guard/refs/)"),
     ]
@@ -2009,10 +2023,11 @@ def cmd_config() -> int:
         config [show]                        — print the current settings
         config set <key> <value>             — change one setting
 
-    Settable keys: ``edit_gate`` (on/off — the approval gate), ``mode``
-    (manual|subagent|headless — the evidence judge), ``gate_mode`` (ask|deny), ``model``,
-    ``effort`` (low|medium|high|xhigh|max), ``refs_dir``. ``edit_gate`` and ``mode`` also
-    apply to the live session's ``state/<sid>.json`` when a session id is available
+    Settable keys: ``edit_gate`` (ask|deny|off — the approval gate; ``off`` disables it,
+    ``ask``/``deny`` pick how an unapproved edit is stopped), ``judge_gate``
+    (manual|subagent|headless — the evidence judge), ``model``,
+    ``effort`` (low|medium|high|xhigh|max), ``refs_dir``. ``edit_gate`` and ``judge_gate``
+    also apply to the live session's ``state/<sid>.json`` when a session id is available
     (``--session <id>``, which the forked skill passes as ``${CLAUDE_SESSION_ID}``, else
     the inherited ``CLAUDE_CODE_SESSION_ID``) so the change takes effect at once and
     persists as the new default; the rest are read from the config file at use. The gate
@@ -2041,25 +2056,23 @@ def cmd_config() -> int:
     raw = _load_raw_config(project_dir)
 
     if key == "edit_gate":
-        parsed = _bool_arg(value)
-        if parsed is None:
-            print(f"guard config: edit_gate must be on/off (got {value!r})", file=sys.stderr)
+        try:
+            v = EditGate(value.strip().lower())
+        except ValueError:
+            print(f"guard config: edit_gate must be one of {[e.value for e in EditGate]} "
+                  f"(got {value!r})", file=sys.stderr)
             return 0
-        raw["edit_gate"] = parsed
-        _apply_session_scalar(project_dir, session_id, "edit_gate", parsed)
-    elif key == "mode":
-        v = value.lower()
-        if v not in VALID_MODES:
-            print(f"guard config: mode must be one of {sorted(VALID_MODES)} (got {value!r})", file=sys.stderr)
+        raw["edit_gate"] = v.value
+        _apply_session_scalar(project_dir, session_id, "edit_gate", v.value)
+    elif key == "judge_gate":
+        try:
+            v = JudgeGate(value.strip().lower())
+        except ValueError:
+            print(f"guard config: judge_gate must be one of {[e.value for e in JudgeGate]} "
+                  f"(got {value!r})", file=sys.stderr)
             return 0
-        raw["mode"] = v
-        _apply_session_scalar(project_dir, session_id, "mode", v)
-    elif key == "gate_mode":
-        v = value.lower()
-        if v not in VALID_GATE_MODES:
-            print(f"guard config: gate_mode must be one of {sorted(VALID_GATE_MODES)} (got {value!r})", file=sys.stderr)
-            return 0
-        raw["gate_mode"] = v
+        raw["judge_gate"] = v.value
+        _apply_session_scalar(project_dir, session_id, "judge_gate", v.value)
     elif key == "effort":
         v = value.lower()
         if v not in VALID_EFFORTS:
@@ -2075,8 +2088,8 @@ def cmd_config() -> int:
     elif key == "refs_dir":
         raw["refs_dir"] = value  # "" resets to the default; _refs_dir validates at use
     else:
-        print(f"guard config: unknown or unsettable key {key!r}. Settable: edit_gate, mode, "
-              "gate_mode, model, effort, refs_dir (exempt_skills via the exempt CLI).",
+        print(f"guard config: unknown or unsettable key {key!r}. Settable: edit_gate, "
+              "judge_gate, model, effort, refs_dir (exempt_skills via the exempt CLI).",
               file=sys.stderr)
         return 0
 

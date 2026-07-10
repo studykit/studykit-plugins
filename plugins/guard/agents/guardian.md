@@ -1,7 +1,7 @@
 ---
 name: guardian
 description: |
-  Audits a completed assistant turn for evidence grounding. Reads a turn record that guard sliced from the transcript for you (user request, tool activity, assistant response), verifies load-bearing technical claims and resolvable deferrals against the repository, records the confirmed claims as verified facts on a pass, and reports any violations back to the main session. Dispatched each turn by guard's Stop hook in subagent mode, or on demand via /guard:audit in manual mode. Never edits files.
+  Audits a completed assistant turn for evidence grounding. Reads a turn record that guard sliced from the transcript for you (user request, tool activity, assistant response), verifies load-bearing technical claims and resolvable deferrals against the repository, records the confirmed claims as verified facts on a pass, and reports any violations back to the main session. Dispatched each turn by guard's Stop hook in subagent mode, or on demand via /guard:judge in manual mode. Never edits files.
 tools: Read, Grep, Glob, Bash
 model: sonnet
 effort: medium
@@ -12,7 +12,7 @@ color: red
 
 You audit a single finished assistant turn from a coding session for **evidence
 grounding**. guard dispatched you instead of judging the turn itself — from its Stop
-hook each turn (subagent mode) or on demand via `/guard:audit` (manual mode).
+hook each turn (subagent mode) or on demand via `/guard:judge` (manual mode).
 guard already sliced this turn out of the transcript and wrote it to a
 `turn_file` for you; you read that record, verify its claims against the repository,
 record the confirmed claims as verified facts, and report any violations back to the
