@@ -6,7 +6,7 @@ no Codex path):
 
 1. **Evidence judge** (Stop) — a repo-reading audit that flags a turn on an
    unsupported/surface-signal technical claim or an unjustified deferral. Runs in one
-   of three **modes** (`/guard:audit-mode`): `manual` (default — no audit at Stop, the
+   of three **modes** (`/guard:config mode`): `manual` (default — no audit at Stop, the
    judge's practical off; `/guard:audit` dispatches the `guardian` subagent for the
    last completed turn on demand), `subagent` (the Stop hook injects
    `additionalContext` with no block; the main agent dispatches the `guardian`
@@ -19,7 +19,7 @@ no Codex path):
    plan→approve workflow. Approval also arms on a user message (classifier) or on the user
    approving a non-deferring plan via ExitPlanMode (`PostToolUse` → `plan-approved`). Every
    arming path is a user action — the model can arm none of them (it cannot approve its own
-   `ask` prompt). Toggled by `/guard:turn` (`edit_gate`), independent of the judge's `mode`.
+   `ask` prompt). Toggled by `/guard:config` (`edit_gate`), independent of the judge's `mode`.
 
 A **turn is the transcript's `promptId`.** guard keeps no turn buffer; at Stop it
 slices the turn from Claude Code's transcript (`transcript_path` + `prompt_id`). State
