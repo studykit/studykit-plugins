@@ -361,6 +361,23 @@ class JiraIssueBackend:
             action="store_true",
             help="replace the provider copy even if it changed since the last fetch",
         )
+        resume = subparsers.add_parser(
+            "resume",
+            help="upsert the issue's Resume comment: update the existing one, else create it",
+        )
+        resume.add_argument("--type", default="task", help="workflow artifact type")
+        resume.add_argument("--issue", required=True, help="Jira issue key")
+        resume.add_argument(
+            "--body-file",
+            type=Path,
+            required=True,
+            help="path to the Resume body content file (must start with 'h2. Resume'; leading YAML frontmatter is stripped)",
+        )
+        resume.add_argument(
+            "--overwrite",
+            action="store_true",
+            help="replace the provider copy even if it changed since the last fetch",
+        )
 
     def run_comments(
         self,
@@ -389,6 +406,15 @@ class JiraIssueBackend:
                     artifact_type=args.type,
                     issue=args.issue,
                     comment_id=args.comment_id,
+                    body_file=args.body_file,
+                    overwrite=args.overwrite,
+                    runner=runner,
+                )
+            elif args.command == "resume":
+                payload = self._upsert_resume_comment(
+                    config=config,
+                    artifact_type=args.type,
+                    issue=args.issue,
                     body_file=args.body_file,
                     overwrite=args.overwrite,
                     runner=runner,
@@ -563,6 +589,94 @@ class JiraIssueBackend:
             "body_file_removed": body_removed,
             "cache_refreshed": bool(provider_payload.get("cache_refreshed")),
         }
+
+    def _upsert_resume_comment(
+        self,
+        *,
+        config: WorkflowConfig,
+        artifact_type: str,
+        issue: str,
+        body_file: Path,
+        overwrite: bool = False,
+        runner: CommandRunner | None,
+    ) -> dict[str, object]:
+        artifact_type = _required_text(artifact_type, "artifact type")
+        try:
+            site = resolve_jira_data_center_site(config.root)
+            issue_key = normalize_jira_issue_key(issue)
+        except JiraProviderError as exc:
+            raise IssueBackendError(str(exc)) from exc
+
+        body_path = body_file.expanduser()
+        if not body_path.is_file():
+            raise IssueBackendError(f"body file does not exist: {body_path}")
+        body = _strip_body_frontmatter(body_path.read_text(encoding="utf-8"))
+        if not _is_resume_comment_body(body):
+            raise IssueBackendError(
+                "comment resume requires a Resume body that starts with 'h2. Resume'"
+            )
+
+        # Refresh the comment projection first: discovery must see a Resume comment
+        # created remotely since the last fetch, otherwise the upsert would append
+        # a second one — the very duplicate this verb exists to prevent.
+        provider = JiraDataCenterIssueNativeProvider(runner=runner)
+        provider.call(
+            ProviderRequest(
+                role="issue",
+                kind="jira",
+                operation="get",
+                context=ProviderContext(
+                    project=config.root,
+                    artifact_type=artifact_type,
+                    cache_policy=CACHE_POLICY_REFRESH,
+                ),
+                payload={
+                    "issue": issue_key,
+                    "include_body": False,
+                    "include_comments": True,
+                    "include_relationships": False,
+                },
+            )
+        )
+        cache = JiraDataCenterIssueCache.for_project(config.root)
+        resume_ids = _find_resume_comment_ids(cache.comment_files(site, issue_key))
+
+        if len(resume_ids) > 1:
+            return {
+                "operation": "upsert_resume_comment",
+                "kind": "jira",
+                "issue": issue_key,
+                "status": "conflict",
+                "reason": "duplicate_resume_comments",
+                "comment_ids": resume_ids,
+                "body_file": str(body_path),
+                "body_file_removed": False,
+                "message": (
+                    f"found {len(resume_ids)} Resume comments "
+                    f"({', '.join(resume_ids)}); resolve the duplicates manually "
+                    "(keep one, delete the rest), then retry"
+                ),
+            }
+        if resume_ids:
+            return self._update_comment(
+                config=config,
+                artifact_type=artifact_type,
+                issue=issue,
+                comment_id=resume_ids[0],
+                body_file=body_file,
+                overwrite=overwrite,
+                runner=runner,
+            )
+        return self._append_comment(
+            config=config,
+            artifact_type=artifact_type,
+            issue=issue,
+            body_file=body_file,
+            state=None,
+            state_reason=None,
+            overwrite=overwrite,
+            runner=runner,
+        )
 
     # ------------------------------------------------------------------
     # attachments (Jira-only — not part of the shared IssueBackend protocol)
@@ -1730,6 +1844,15 @@ def _find_resume_comment_summary(
             "comment_file": display_project_path(path, project),
         }
     return None
+
+
+def _find_resume_comment_ids(comment_files: list[Path]) -> list[str]:
+    ids: list[str] = []
+    for path in comment_files:
+        frontmatter, body = _read_frontmatter_markdown(path)
+        if _is_resume_comment_body(body):
+            ids.append(str(frontmatter.get("provider_comment_id") or "").strip())
+    return ids
 
 
 def _is_resume_comment_body(body: str) -> bool:

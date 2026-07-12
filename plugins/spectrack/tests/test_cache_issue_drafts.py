@@ -1674,3 +1674,225 @@ def test_github_publish_accepts_assignee_me_and_resolves_current_login(tmp_path:
     create_request = next(r for r in runner.requests if r.args[:3] == ("gh", "issue", "create"))
     assert "--assignee" in create_request.args
     assert create_request.args[create_request.args.index("--assignee") + 1] == "studykit-bot"
+
+
+# ---------------------------------------------------------------------------
+# comment resume (idempotent Resume-comment upsert) — regression for bug #191
+# ---------------------------------------------------------------------------
+
+
+def _gh_resume_comment(
+    comment_number: str,
+    body: str,
+    *,
+    created: str = "2026-05-14T00:01:00Z",
+    updated: str = "2026-05-14T00:01:00Z",
+) -> dict[str, object]:
+    return {
+        "id": f"IC_node_{comment_number}",
+        "url": f"https://github.com/studykit/studykit-plugins/issues/72#issuecomment-{comment_number}",
+        "author": {"login": "studykit"},
+        "body": body,
+        "createdAt": created,
+        "updatedAt": updated,
+    }
+
+
+class GitHubResumeUpsertRunner:
+    """Fake runner for the ``comment resume`` upsert flow.
+
+    The upsert refreshes the comment projection first, then delegates to append
+    (create) or update (in place). ``comments`` is the remote comment set that
+    the refresh and the freshness checks observe — it decides which branch the
+    upsert takes.
+    """
+
+    def __init__(self, *, comments: list[dict[str, object]] | None = None) -> None:
+        self.requests: list[CommandRequest] = []
+        self.comments = comments or []
+        self.posted_bodies: list[str] = []
+        self.updated_bodies: list[str] = []
+
+    def _issue_payload(self) -> dict[str, object]:
+        return {
+            "number": 72,
+            "title": "Issue with resume",
+            "state": "OPEN",
+            "stateReason": None,
+            "body": "Cached body.",
+            "labels": [{"name": "task"}],
+            "comments": self.comments,
+            "url": "https://github.com/studykit/studykit-plugins/issues/72",
+            "createdAt": "2026-05-14T00:00:00Z",
+            "updatedAt": "2026-05-14T00:02:00Z",
+            "closedAt": None,
+        }
+
+    def __call__(self, request: CommandRequest) -> CommandResult:
+        self.requests.append(request)
+        args = request.args
+        if args == _gh_remote_args(_tmp_project_from_args(request)):
+            return CommandResult(
+                request=request,
+                returncode=0,
+                stdout="git@github.com:studykit/studykit-plugins.git\n",
+            )
+        if args == _gh_issue_view_args(72, ",".join(DEFAULT_ISSUE_FIELDS)):
+            return CommandResult(
+                request=request, returncode=0, stdout=json.dumps(self._issue_payload())
+            )
+        if args == _gh_issue_view_args(72, "number,title,body"):
+            return CommandResult(
+                request=request,
+                returncode=0,
+                stdout=json.dumps(
+                    {"number": 72, "title": "Issue with resume", "body": "Cached body."}
+                ),
+            )
+        if args == _gh_issue_view_args(72, "number,comments"):
+            return CommandResult(
+                request=request,
+                returncode=0,
+                stdout=json.dumps({"number": 72, "comments": self.comments}),
+            )
+        if args[:3] == ("gh", "issue", "comment"):
+            body_file = Path(args[args.index("--body-file") + 1])
+            self.posted_bodies.append(body_file.read_text(encoding="utf-8"))
+            return CommandResult(request=request, returncode=0)
+        if (
+            len(args) >= 7
+            and args[:2] == ("gh", "api")
+            and args[2].startswith("repos/studykit/studykit-plugins/issues/comments/")
+            and args[3:6] == ("-X", "PATCH", "--raw-field")
+        ):
+            body = args[6].removeprefix("body=")
+            self.updated_bodies.append(body)
+            cid = args[2].rsplit("/", 1)[-1]
+            return CommandResult(
+                request=request,
+                returncode=0,
+                stdout=json.dumps(
+                    {
+                        "id": int(cid),
+                        "body": body,
+                        "created_at": "2026-05-14T00:01:00Z",
+                        "updated_at": "2026-05-14T00:02:00Z",
+                    }
+                ),
+            )
+        if args == _gh_api_args("repos/studykit/studykit-plugins/issues/72"):
+            return CommandResult(
+                request=request,
+                returncode=0,
+                stdout=json.dumps({"id": 7200, "number": 72, "updated_at": "2026-05-14T00:02:00Z"}),
+            )
+        if args == _gh_api_args("repos/studykit/studykit-plugins/issues/72/parent"):
+            return CommandResult(request=request, returncode=404, stderr="not found")
+        if args in {
+            _gh_api_args("repos/studykit/studykit-plugins/issues/72/sub_issues", "--paginate"),
+            _gh_api_args("repos/studykit/studykit-plugins/issues/72/dependencies/blocked_by", "--paginate"),
+            _gh_api_args("repos/studykit/studykit-plugins/issues/72/dependencies/blocking", "--paginate"),
+            _gh_api_args("repos/studykit/studykit-plugins/issues/72/timeline", "--paginate"),
+        }:
+            return CommandResult(request=request, returncode=0, stdout="[]")
+        return CommandResult(request=request, returncode=127, stderr=f"unexpected command: {args}")
+
+
+def _run_github_resume(tmp_path: Path, body_file: Path, runner: GitHubResumeUpsertRunner):
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+    code = github_issue_comments_main(
+        [
+            "--project",
+            str(tmp_path),
+            "resume",
+            "--type",
+            "task",
+            "--issue",
+            "72",
+            "--body-file",
+            str(body_file),
+        ],
+        stdout=stdout,
+        stderr=stderr,
+        runner=runner,
+    )
+    return code, stdout, stderr
+
+
+def test_github_comment_resume_updates_existing_resume(tmp_path: Path) -> None:
+    _write_config(tmp_path)
+    resume = _gh_resume_comment("7700001", "## Resume\n\nOld state.\n")
+    _seed_cached_issue(tmp_path, comments=[resume])
+    body_file = _write_body_file(tmp_path, "## Resume\n\nNew state.\n", name="resume.md")
+    runner = GitHubResumeUpsertRunner(comments=[resume])
+
+    code, stdout, _ = _run_github_resume(tmp_path, body_file, runner)
+
+    payload = json.loads(stdout.getvalue())
+    assert code == 0
+    assert payload["operation"] == "update_comment"
+    assert payload["comment_id"] == "7700001"
+    # The regression guard: refreshing updates the one Resume comment in place —
+    # it must NOT post a second one.
+    assert runner.updated_bodies == ["## Resume\n\nNew state.\n"]
+    assert runner.posted_bodies == []
+    assert not body_file.exists()
+
+
+def test_github_comment_resume_creates_when_missing(tmp_path: Path) -> None:
+    _write_config(tmp_path)
+    # A non-Resume comment is present; discovery must ignore it and create.
+    note = _gh_resume_comment("9900001", "Just a note.\n")
+    _seed_cached_issue(tmp_path, comments=[note])
+    body_file = _write_body_file(tmp_path, "## Resume\n\nFirst state.\n", name="resume.md")
+    runner = GitHubResumeUpsertRunner(comments=[note])
+
+    code, stdout, _ = _run_github_resume(tmp_path, body_file, runner)
+
+    payload = json.loads(stdout.getvalue())
+    assert code == 0
+    assert payload["operation"] == "append_comment"
+    assert runner.posted_bodies == ["## Resume\n\nFirst state.\n"]
+    assert runner.updated_bodies == []
+    assert not body_file.exists()
+
+
+def test_github_comment_resume_rejects_non_resume_body(tmp_path: Path) -> None:
+    _write_config(tmp_path)
+    body_file = _write_body_file(tmp_path, "Just an update, no heading.\n", name="note.md")
+    runner = GitHubResumeUpsertRunner()
+
+    code, _, stderr = _run_github_resume(tmp_path, body_file, runner)
+
+    assert code == 2
+    assert "## Resume" in stderr.getvalue()
+    assert runner.posted_bodies == []
+    assert runner.updated_bodies == []
+    assert body_file.exists()
+
+
+def test_github_comment_resume_reports_duplicate_resumes(tmp_path: Path) -> None:
+    _write_config(tmp_path)
+    first = _gh_resume_comment(
+        "7700001", "## Resume\n\nOne.\n", created="2026-05-14T00:01:00Z", updated="2026-05-14T00:01:00Z"
+    )
+    second = _gh_resume_comment(
+        "7700002", "## Resume\n\nTwo.\n", created="2026-05-14T00:03:00Z", updated="2026-05-14T00:03:00Z"
+    )
+    _seed_cached_issue(tmp_path, comments=[first, second])
+    body_file = _write_body_file(tmp_path, "## Resume\n\nThree.\n", name="resume.md")
+    runner = GitHubResumeUpsertRunner(comments=[first, second])
+
+    code, stdout, _ = _run_github_resume(tmp_path, body_file, runner)
+
+    payload = json.loads(stdout.getvalue())
+    assert code == 3
+    assert payload["status"] == "conflict"
+    assert payload["reason"] == "duplicate_resume_comments"
+    assert sorted(payload["comment_ids"]) == ["7700001", "7700002"]
+    assert payload["body_file_removed"] is False
+    # Refuses to guess — no comment written.
+    assert runner.posted_bodies == []
+    assert runner.updated_bodies == []
+    assert body_file.exists()

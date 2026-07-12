@@ -550,3 +550,193 @@ def test_jira_append_accepts_free_form_state_verb(tmp_path: Path) -> None:
     write_requests = [request for request in runner.requests if request.args == curl_write_args()]
     assert any('\\"transition\\":{\\"id\\":\\"21\\"}' in str(request.input_text) for request in write_requests)
     assert not body_file.exists()
+
+
+# ---------------------------------------------------------------------------
+# comment resume (idempotent Resume-comment upsert) — regression for bug #191
+# ---------------------------------------------------------------------------
+
+
+def _jira_resume_comment(
+    comment_id: str,
+    body: str,
+    *,
+    created: str = "2026-05-15T09:30:00.000+0900",
+    updated: str = "2026-05-15T09:30:00.000+0900",
+) -> dict[str, object]:
+    return {
+        "id": comment_id,
+        "body": body,
+        "created": created,
+        "updated": updated,
+        "author": {"displayName": "Studykit"},
+    }
+
+
+def test_jira_comment_resume_updates_existing_resume(tmp_path: Path) -> None:
+    write_jira_config(tmp_path)
+    old_resume = _jira_resume_comment("30001", "h2. Resume\n\nOld state.\n")
+    _seed_cached_issue(tmp_path, comments=[old_resume])
+    body_file = _write_body_file(tmp_path, "h2. Resume\n\nNew state.\n", name="resume.md")
+    payload_with_resume = jira_issue_payload(comments=[old_resume])
+    runner = FakeRunner(
+        {
+            curl_args(jira_issue_url()): result(
+                curl_args(jira_issue_url()), stdout=json.dumps(payload_with_resume)
+            ),
+            curl_write_args(): result(
+                curl_write_args(),
+                stdout=json.dumps(
+                    {**old_resume, "body": "h2. Resume\n\nNew state.\n", "updated": "2026-05-15T10:05:00.000+0900"}
+                ),
+            ),
+            curl_args(jira_remote_links_url()): result(
+                curl_args(jira_remote_links_url()), stdout=json.dumps(remote_links_payload())
+            ),
+        }
+    )
+    stdout = io.StringIO()
+
+    code = jira_issue_comments_main(
+        [
+            "--project",
+            str(tmp_path),
+            "resume",
+            "--issue",
+            "TEST-1234",
+            "--body-file",
+            str(body_file),
+        ],
+        stdout=stdout,
+        runner=runner,
+    )
+
+    payload = json.loads(stdout.getvalue())
+    assert code == 0
+    assert payload["operation"] == "update_comment"
+    assert payload["comment_id"] == "30001"
+    # The regression guard: exactly one in-place PUT, never a second POST.
+    write_requests = [request for request in runner.requests if request.args == curl_write_args()]
+    assert len(write_requests) == 1
+    assert 'request = "PUT"' in str(write_requests[0].input_text)
+    assert f'url = "{jira_comment_url()}"' in str(write_requests[0].input_text)
+    assert not body_file.exists()
+
+
+def test_jira_comment_resume_creates_when_missing(tmp_path: Path) -> None:
+    write_jira_config(tmp_path)
+    _seed_cached_issue(tmp_path, comments=[])
+    body_file = _write_body_file(tmp_path, "h2. Resume\n\nFirst state.\n", name="resume.md")
+    runner = FakeRunner(
+        {
+            curl_args(jira_issue_url()): result(
+                curl_args(jira_issue_url()), stdout=json.dumps(jira_issue_payload(comments=[]))
+            ),
+            curl_write_args(): result(
+                curl_write_args(),
+                stdout=json.dumps(_jira_resume_comment("30009", "h2. Resume\n\nFirst state.\n")),
+            ),
+            curl_args(jira_remote_links_url()): result(
+                curl_args(jira_remote_links_url()), stdout=json.dumps(remote_links_payload())
+            ),
+        }
+    )
+    stdout = io.StringIO()
+
+    code = jira_issue_comments_main(
+        [
+            "--project",
+            str(tmp_path),
+            "resume",
+            "--issue",
+            "TEST-1234",
+            "--body-file",
+            str(body_file),
+        ],
+        stdout=stdout,
+        runner=runner,
+    )
+
+    payload = json.loads(stdout.getvalue())
+    assert code == 0
+    assert payload["operation"] == "append_comment"
+    write_requests = [request for request in runner.requests if request.args == curl_write_args()]
+    assert len(write_requests) == 1
+    assert 'request = "POST"' in str(write_requests[0].input_text)
+    assert '\\"body\\":\\"h2. Resume' in str(write_requests[0].input_text)
+    assert not body_file.exists()
+
+
+def test_jira_comment_resume_rejects_non_resume_body(tmp_path: Path) -> None:
+    write_jira_config(tmp_path)
+    body_file = _write_body_file(tmp_path, "Just an update, no heading.\n", name="note.md")
+    runner = FakeRunner({})
+    stderr = io.StringIO()
+
+    code = jira_issue_comments_main(
+        [
+            "--project",
+            str(tmp_path),
+            "resume",
+            "--issue",
+            "TEST-1234",
+            "--body-file",
+            str(body_file),
+        ],
+        stderr=stderr,
+        runner=runner,
+    )
+
+    assert code == 2
+    assert "h2. Resume" in stderr.getvalue()
+    assert runner.requests == []
+    assert body_file.exists()
+
+
+def test_jira_comment_resume_reports_duplicate_resumes(tmp_path: Path) -> None:
+    write_jira_config(tmp_path)
+    first = _jira_resume_comment("30001", "h2. Resume\n\nOne.\n")
+    second = _jira_resume_comment(
+        "30002",
+        "h2. Resume\n\nTwo.\n",
+        created="2026-05-15T09:35:00.000+0900",
+        updated="2026-05-15T09:35:00.000+0900",
+    )
+    _seed_cached_issue(tmp_path, comments=[first, second])
+    body_file = _write_body_file(tmp_path, "h2. Resume\n\nThree.\n", name="resume.md")
+    runner = FakeRunner(
+        {
+            curl_args(jira_issue_url()): result(
+                curl_args(jira_issue_url()),
+                stdout=json.dumps(jira_issue_payload(comments=[first, second])),
+            ),
+            curl_args(jira_remote_links_url()): result(
+                curl_args(jira_remote_links_url()), stdout=json.dumps(remote_links_payload())
+            ),
+        }
+    )
+    stdout = io.StringIO()
+
+    code = jira_issue_comments_main(
+        [
+            "--project",
+            str(tmp_path),
+            "resume",
+            "--issue",
+            "TEST-1234",
+            "--body-file",
+            str(body_file),
+        ],
+        stdout=stdout,
+        runner=runner,
+    )
+
+    payload = json.loads(stdout.getvalue())
+    assert code == 3
+    assert payload["status"] == "conflict"
+    assert payload["reason"] == "duplicate_resume_comments"
+    assert sorted(payload["comment_ids"]) == ["30001", "30002"]
+    assert payload["body_file_removed"] is False
+    write_requests = [request for request in runner.requests if request.args == curl_write_args()]
+    assert write_requests == []
+    assert body_file.exists()

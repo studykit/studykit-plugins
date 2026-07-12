@@ -21,7 +21,7 @@ Verb mapping
 ``fetch ...``                   ``FETCH`` with ``[...]``
 ``search ...``                  ``SEARCH`` with ``[...]``
 ``comment ...``                 ``COMMENTS`` with ``["append", ...]`` for legacy calls,
-                                or ``["append"|"update", ...]`` when explicit
+                                or ``["append"|"update"|"resume", ...]`` when explicit
 ``resume ...``                  ``RESUME`` with ``[...]``
 ``history ...``                 ``HISTORY`` with ``[...]`` (GitHub only)
 ``attach ...``                  ``ATTACH`` with ``[...]`` (Jira only)
@@ -195,7 +195,7 @@ _VERB_HELP: tuple[tuple[str, str, str | None], ...] = (
     ("update", "update title / body / labels / state", None),
     ("fetch", "fetch one or more issues into the cache", None),
     ("search", "search issues with the backend's native query", None),
-    ("comment", "append or update a comment from a body file", None),
+    ("comment", "append / update / resume (upsert Resume) a comment from a body file", None),
     ("resume", "find the current Resume comment for an issue", None),
     ("history", "show issue body or comment edit history", "github"),
     ("attach", "add/get issue file attachments", "jira"),
@@ -289,7 +289,7 @@ def main(
     if verb == "search":
         return run_intent(SEARCH, rest, **kwargs)
     if verb == "comment":
-        if rest and rest[0] in {"append", "update"}:
+        if rest and rest[0] in {"append", "update", "resume"}:
             return run_intent(COMMENTS, rest, **kwargs)
         return run_intent(COMMENTS, ["append", *rest], **kwargs)
     if verb == "resume":
