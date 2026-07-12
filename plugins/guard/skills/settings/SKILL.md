@@ -1,5 +1,5 @@
 ---
-name: config
+name: settings
 description: "View and change guard's settings for this project — the approval gate (edit_gate), the evidence judge (judge_gate), model, effort, refs_dir, and exempt_skills — recorded in .claude/guard.local.json. Use when the user wants to configure guard: disable the approval gate or switch it between ask/deny, change the judge_gate mode, set model/effort/refs_dir, or manage exempt skills. Claude Code only."
 argument-hint: '[key] [value]'
 context: fork
@@ -24,10 +24,10 @@ Fixed values for this run (already substituted — do not re-resolve):
 ## Commands
 
 - **Show current settings:**
-  `"${CLAUDE_SKILL_DIR}/../../scripts/guard_hook.py" config show --session ${CLAUDE_SESSION_ID}`
+  `"${CLAUDE_SKILL_DIR}/../../scripts/guard_hook.py" settings show --session ${CLAUDE_SESSION_ID}`
 - **Change one scalar setting:**
-  `"${CLAUDE_SKILL_DIR}/../../scripts/guard_hook.py" config set <key> <value> --session ${CLAUDE_SESSION_ID}`
-- **Manage the exempt list** (`exempt_skills`, a list — not settable via `config set`):
+  `"${CLAUDE_SKILL_DIR}/../../scripts/guard_hook.py" settings set <key> <value> --session ${CLAUDE_SESSION_ID}`
+- **Manage the exempt list** (`exempt_skills`, a list — not settable via `settings set`):
   `"${CLAUDE_SKILL_DIR}/../../scripts/guard_hook.py" exempt list | set <names…> | add <names…> | remove <names…> | clear`
 
 ## Settable keys
@@ -47,7 +47,7 @@ effect immediately.
 
 ## What to do
 
-1. Run `config show` and show the user the current settings.
+1. Run `settings show` and show the user the current settings.
 2. **If `$ARGUMENTS` already names a key (and, for a scalar, a value)** — apply it
    directly with the matching command, skip the menu.
 3. **Otherwise** call `AskUserQuestion` to ask which setting to change and to what: offer

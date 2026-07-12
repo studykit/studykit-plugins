@@ -6,7 +6,7 @@ no Codex path). Requires Python 3.11+ (the dispatcher uses `enum.StrEnum`):
 
 1. **Evidence judge** (Stop) — a repo-reading audit that flags a turn on an
    unsupported/surface-signal technical claim or an unjustified deferral. Runs in one
-   of three modes set by `judge_gate` (`/guard:config judge_gate`): `manual` (default —
+   of three modes set by `judge_gate` (`/guard:settings judge_gate`): `manual` (default —
    no audit at Stop, the judge's practical off; `/guard:judge` dispatches the `guardian`
    subagent for the last completed turn on demand), `subagent` (the Stop hook injects
    `additionalContext` with no block; the main agent dispatches the `guardian`
@@ -19,7 +19,7 @@ no Codex path). Requires Python 3.11+ (the dispatcher uses `enum.StrEnum`):
    blocks the call to drive the plan→approve workflow. Approval also arms on a user message
    (classifier) or on the user approving a non-deferring plan via ExitPlanMode (`PostToolUse`
    → `plan-approved`). Every arming path is a user action — the model can arm none of them
-   (it cannot approve its own `ask` prompt). Set by `/guard:config` (`edit_gate`),
+   (it cannot approve its own `ask` prompt). Set by `/guard:settings` (`edit_gate`),
    independent of the judge's `judge_gate`.
 
 A **turn is the transcript's `promptId`.** guard keeps no turn buffer; at Stop it

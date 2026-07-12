@@ -15,9 +15,9 @@ Subcommands
                  which sees the last few archived user/assistant messages as context
                  (``_recent_dialogue``) so a short consent ("go ahead") arms only when
                  it answers a proposed plan. Only a user message can arm approval.
-                 guard's own ``/guard:config`` / ``/guard:judge`` commands are
+                 guard's own ``/guard:settings`` / ``/guard:judge`` commands are
                  ignored here (not turns).
-- config         CLI (argv), run by the ``guard:config`` skill (forked) via Bash.
+- settings       CLI (argv), run by the ``guard:settings`` skill (forked) via Bash.
                  ``show`` prints the current settings; ``set <key> <value>`` changes one
                  of ``edit_gate`` (``ask``|``deny``|``off`` — the APPROVAL GATE, where
                  ``off`` disables it and ``ask``/``deny`` pick how an unapproved edit is
@@ -35,7 +35,7 @@ Subcommands
                  (``pending_verify_prompt_id``, recorded by manual-mode Stop). Reads no
                  transcript — the slice is already on disk. The on-demand counterpart to
                  auto-auditing; works in any mode.
-- exempt         CLI (argv), run by the ``guard:config`` skill via Bash after the user
+- exempt         CLI (argv), run by the ``guard:settings`` skill via Bash after the user
                  confirms an interactive selection. ``list``/``set``/``add``/
                  ``remove``/``clear`` the ``exempt_skills`` config key — that key ONLY,
                  never ``edit_gate``/``judge_gate``/state. Not a hook event.
@@ -74,7 +74,7 @@ Subcommands
                  gated (``gated_prompt_id``), the slice contains a user ``!`` command
                  (its output arrives after the judged response, so it is neither
                  evidence nor auditable here), or the turn was opened by guard's own
-                 ``/guard:config`` / ``/guard:judge`` control
+                 ``/guard:settings`` / ``/guard:judge`` control
                  command or a user-configured ``exempt_skills`` entry (skill output / a
                  relay, not claims to ground). Otherwise branch on ``judge_gate``.
                  ``manual`` (default): do not audit — record the turn as the pending
@@ -119,9 +119,9 @@ practical off — verify on demand via ``/guard:judge``; subagent: dispatch the
 ``guardian`` subagent each turn; headless: in-hook judge that blocks), and
 ``exempt_skills`` (list of strings, default ``[]``) — skills / slash
 commands whose turn the Stop judge must not audit, named with their plugin namespace
-(``plugin:skill``, e.g. ``guard:config``) or bare for un-namespaced skills; matched
+(``plugin:skill``, e.g. ``guard:settings``) or bare for un-namespaced skills; matched
 leading-``/``-stripped and case-insensitively (guard's own
-``config``/``judge`` control commands are always exempt regardless of this
+``settings``/``judge`` control commands are always exempt regardless of this
 list), and ``refs_dir`` (string, default ``""``) — project-relative directory where
 the Grounded output style saves local copies of cited docs; empty means the
 git-ignored default ``.claude/guard/refs/``, a tracked path (e.g. ``"docs/refs"``)
@@ -129,7 +129,7 @@ keeps the collected references under git (values resolving outside the project, 
 the project root, or into guard's own config/state fall back to the default — see
 ``_refs_dir``). Unknown keys are ignored; a missing or malformed file falls
 back to all defaults. The judge always reads the repo (Read/Grep/Glob/Bash) to verify
-claims. The ``guard:config`` skill changes these through the ``config`` CLI: it writes
+claims. The ``guard:settings`` skill changes these through the ``settings`` CLI: it writes
 guard.local.json and, for ``edit_gate`` / ``judge_gate``, the live session's state.
 
 Requires Python 3.11+ (uses ``enum.StrEnum``).
@@ -196,7 +196,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
     # Skills / slash commands whose turn the Stop judge must NOT audit. A turn opened
     # by one of these is skill output or a relay, not a body of technical claims to
     # ground. Values are the name as it appears after the slash, INCLUDING the plugin
-    # namespace (e.g. "guard:config", "hindsight:review") or the bare name for an
+    # namespace (e.g. "guard:settings", "hindsight:review") or the bare name for an
     # un-namespaced skill ("deep-research"); matched leading-'/'-stripped and
     # case-insensitively. guard's own config/judge control commands are always exempt
     # regardless of this list.
@@ -348,15 +348,18 @@ def _read_payload() -> dict | None:
 
 
 _SESSION_ID_RE = re.compile(r"^[A-Za-z0-9._-]+$")
-# guard's own control commands, e.g. "/guard:config edit_gate off", "/config",
-# "/guard:judge". `config` is a forked skill and `judge` a UserPromptExpansion — either
-# way the turn is a relay, not real work to log/judge. `(?=\s|$)` rather than `\b`: the
-# name must END here, not merely hit a word boundary — `\b` would also accept hyphenated
-# names from other plugins (e.g. `/judge-resolution` matching `judge`).
-_CONTROL_CMD_RE = re.compile(r"^/(guard:)?(config|judge)(?=\s|$)", re.IGNORECASE)
+# guard's own control commands, e.g. "/guard:settings edit_gate off", "/settings",
+# "/guard:judge". `settings` is a forked skill and `judge` a UserPromptExpansion — either
+# way the turn is a relay, not real work to log/judge. The name is `settings`, not
+# `config`, precisely so the bare form does NOT match Claude Code's built-in `/config`
+# command (which the optional `(guard:)?` would otherwise capture, making guard treat
+# every `/config` as its own control command). `(?=\s|$)` rather than `\b`: the name must
+# END here, not merely hit a word boundary — `\b` would also accept hyphenated names from
+# other plugins (e.g. `/judge-resolution` matching `judge`).
+_CONTROL_CMD_RE = re.compile(r"^/(guard:)?(settings|judge)(?=\s|$)", re.IGNORECASE)
 # In the transcript, a slash command is expanded to
-# "<command-name>/guard:config</command-name>" (see session b30dbaec). Pull the command
-# name out of that tag; a raw typed form ("/guard:config edit_gate off") is handled by
+# "<command-name>/guard:settings</command-name>" (see session b30dbaec). Pull the command
+# name out of that tag; a raw typed form ("/guard:settings edit_gate off") is handled by
 # the fallback in _turn_command_name.
 _COMMAND_NAME_RE = re.compile(r"<command-name>\s*(/?[^<\n]+?)\s*</command-name>", re.IGNORECASE)
 
@@ -400,8 +403,8 @@ def _turn_command_name(user_text: str) -> str:
     lowercased), or '' when the turn was not opened by a slash command.
 
     Slash commands reach the transcript expanded as
-    ``<command-name>/guard:config</command-name>``; a raw typed form
-    (``/guard:config edit_gate off``) is handled by the fallback.
+    ``<command-name>/guard:settings</command-name>``; a raw typed form
+    (``/guard:settings edit_gate off``) is handled by the fallback.
     """
     text = user_text.strip()
     m = _COMMAND_NAME_RE.search(text)
@@ -416,7 +419,7 @@ def _turn_command_name(user_text: str) -> str:
 
 def _is_control_command_name(name: str) -> bool:
     """True when a normalized command name is one of guard's own control commands
-    (``config``/``judge``, with or without the ``guard:`` prefix)."""
+    (``settings``/``judge``, with or without the ``guard:`` prefix)."""
     return bool(name) and bool(_CONTROL_CMD_RE.match("/" + name))
 
 
@@ -1098,7 +1101,7 @@ def cmd_user_prompt() -> int:
     prompt = payload.get("prompt")
     prompt = prompt if isinstance(prompt, str) else ""
 
-    # guard's own control commands (`/guard:config ...`, `/guard:judge`) are not
+    # guard's own control commands (`/guard:settings ...`, `/guard:judge`) are not
     # real turns — the forked `config` skill / the `verify` expansion handle them. Don't
     # log, don't start a turn, don't judge.
     if _CONTROL_CMD_RE.match(prompt.strip()):
@@ -1708,7 +1711,7 @@ def cmd_stop() -> int:
         _trace(project_dir, session_id, "stop", "skip_user_command", prompt_id=prompt_id)
         return 0
 
-    # Skip judging a turn opened by guard's own control command (`/guard:config`,
+    # Skip judging a turn opened by guard's own control command (`/guard:settings`,
     # `/guard:judge`) or by a user-configured exempt skill/command. Such a turn's
     # response is a relay or skill output, not a body of technical claims to ground —
     # e.g. relaying "guard on" has no evidence to cite and would be falsely blocked
@@ -1884,7 +1887,7 @@ def cmd_session_start() -> int:
 
 def cmd_exempt() -> int:
     """Manage the ``exempt_skills`` list in guard.local.json. Invoked by the
-    ``guard:config`` skill via Bash, AFTER the user has confirmed a selection
+    ``guard:settings`` skill via Bash, AFTER the user has confirmed a selection
     interactively (the skill drives the listing + AskUserQuestion; this only records
     the confirmed result). Argv:
 
@@ -1949,8 +1952,8 @@ def cmd_exempt() -> int:
     return 0
 
 
-def _parse_config_argv(argv: list[str]) -> tuple[list[str], str | None]:
-    """Split a ``config`` CLI argv into positionals and the ``--session <id>`` value."""
+def _parse_settings_argv(argv: list[str]) -> tuple[list[str], str | None]:
+    """Split a ``settings`` CLI argv into positionals and the ``--session <id>`` value."""
     positional: list[str] = []
     session: str | None = None
     i = 0
@@ -1983,7 +1986,7 @@ def _apply_session_scalar(project_dir: Path, session_id: str | None, key: str, v
 
 
 def _config_show_lines(project_dir: Path, session_id: str | None) -> list[str]:
-    """Render current guard settings for the ``guard:config`` skill to display. Shows the
+    """Render current guard settings for the ``guard:settings`` skill to display. Shows the
     guard.local.json defaults; for ``edit_gate`` / ``judge_gate`` it also shows the live
     session value when it differs from the default (the session may have been changed
     after)."""
@@ -2017,11 +2020,11 @@ def _config_show_lines(project_dir: Path, session_id: str | None) -> list[str]:
     ]
 
 
-def cmd_config() -> int:
-    """View/change guard.local.json settings — the CLI behind the ``guard:config`` skill.
+def cmd_settings() -> int:
+    """View/change guard.local.json settings — the CLI behind the ``guard:settings`` skill.
 
-        config [show]                        — print the current settings
-        config set <key> <value>             — change one setting
+        settings [show]                      — print the current settings
+        settings set <key> <value>           — change one setting
 
     Settable keys: ``edit_gate`` (ask|deny|off — the approval gate; ``off`` disables it,
     ``ask``/``deny`` pick how an unapproved edit is stopped), ``judge_gate``
@@ -2034,7 +2037,7 @@ def cmd_config() -> int:
     stays protected: ``exempt_skills`` is managed by the ``exempt`` CLI, not here, and
     every other key in the file is preserved. Project dir from ``CLAUDE_PROJECT_DIR``
     (Bash env), else the current directory."""
-    positional, session_arg = _parse_config_argv(sys.argv[2:])
+    positional, session_arg = _parse_settings_argv(sys.argv[2:])
     op = positional[0].lower() if positional else "show"
 
     pd_env = os.environ.get("CLAUDE_PROJECT_DIR")
@@ -2044,11 +2047,11 @@ def cmd_config() -> int:
     if op != "set":
         for line in _config_show_lines(project_dir, session_id):
             print(line)
-        _trace(project_dir, session_id, "config", "show")
+        _trace(project_dir, session_id, "settings", "show")
         return 0
 
     if len(positional) < 3:
-        print("guard config: usage: config set <key> <value>", file=sys.stderr)
+        print("guard settings: usage: settings set <key> <value>", file=sys.stderr)
         return 0
     key = positional[1].lower()
     value = positional[2]
@@ -2059,7 +2062,7 @@ def cmd_config() -> int:
         try:
             v = EditGate(value.strip().lower())
         except ValueError:
-            print(f"guard config: edit_gate must be one of {[e.value for e in EditGate]} "
+            print(f"guard settings: edit_gate must be one of {[e.value for e in EditGate]} "
                   f"(got {value!r})", file=sys.stderr)
             return 0
         raw["edit_gate"] = v.value
@@ -2068,7 +2071,7 @@ def cmd_config() -> int:
         try:
             v = JudgeGate(value.strip().lower())
         except ValueError:
-            print(f"guard config: judge_gate must be one of {[e.value for e in JudgeGate]} "
+            print(f"guard settings: judge_gate must be one of {[e.value for e in JudgeGate]} "
                   f"(got {value!r})", file=sys.stderr)
             return 0
         raw["judge_gate"] = v.value
@@ -2076,30 +2079,30 @@ def cmd_config() -> int:
     elif key == "effort":
         v = value.lower()
         if v not in VALID_EFFORTS:
-            print(f"guard config: effort must be one of {sorted(VALID_EFFORTS)} (got {value!r})", file=sys.stderr)
+            print(f"guard settings: effort must be one of {sorted(VALID_EFFORTS)} (got {value!r})", file=sys.stderr)
             return 0
         raw["effort"] = v
     elif key == "model":
         v = value.strip()
         if not v:
-            print("guard config: model must be a non-empty string", file=sys.stderr)
+            print("guard settings: model must be a non-empty string", file=sys.stderr)
             return 0
         raw["model"] = v
     elif key == "refs_dir":
         raw["refs_dir"] = value  # "" resets to the default; _refs_dir validates at use
     else:
-        print(f"guard config: unknown or unsettable key {key!r}. Settable: edit_gate, "
+        print(f"guard settings: unknown or unsettable key {key!r}. Settable: edit_gate, "
               "judge_gate, model, effort, refs_dir (exempt_skills via the exempt CLI).",
               file=sys.stderr)
         return 0
 
     if not _write_config(project_dir, raw):
-        print("guard config: failed to write .claude/guard.local.json", file=sys.stderr)
+        print("guard settings: failed to write .claude/guard.local.json", file=sys.stderr)
         return 0
 
     for line in _config_show_lines(project_dir, session_id):
         print(line)
-    _trace(project_dir, session_id, "config", "set", key=key)
+    _trace(project_dir, session_id, "settings", "set", key=key)
     return 0
 
 
@@ -2121,7 +2124,7 @@ SUBCOMMANDS = {
     "user-prompt": cmd_user_prompt,
     "plan-approved": cmd_plan_approved,
     "verify": cmd_verify,
-    "config": cmd_config,
+    "settings": cmd_settings,
     "gate": cmd_gate,
     "gate-approved": cmd_gate_approved,
     "record-verified": cmd_record_verified,
