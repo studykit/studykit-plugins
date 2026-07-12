@@ -36,7 +36,7 @@ guard adds three layers of control over the assistant's responses and actions:
    reads, and searches are never blocked.
 
 The two checks are controlled independently, and both are set from one command,
-`/guard:config`: the approval gate is one setting (`edit_gate` — `ask` by default,
+`/guard:settings`: the approval gate is one setting (`edit_gate` — `ask` by default,
 `deny` for the stricter workflow, or `off` to disable it), and the evidence judge is
 governed by `judge_gate` — `manual` (the default) runs nothing automatically, so it is
 the judge's practical off (see below).
@@ -72,20 +72,20 @@ style.
 
 guard exposes two commands:
 
-- **`/guard:config`** — view and change guard's settings for this project.
+- **`/guard:settings`** — view and change guard's settings for this project.
 - **`/guard:judge`** — judge the last completed turn on demand.
 
 ### Configure guard
 
-Run `/guard:config` to see guard's current settings and change any of them. With no
+Run `/guard:settings` to see guard's current settings and change any of them. With no
 arguments it shows the settings and lets you pick what to change; you can also name a
 setting and value directly:
 
 ```
-/guard:config                     # show settings, then pick what to change
-/guard:config edit_gate off       # turn the approval gate off
-/guard:config edit_gate deny      # block unapproved edits instead of prompting
-/guard:config judge_gate headless # switch the evidence judge to headless
+/guard:settings                     # show settings, then pick what to change
+/guard:settings edit_gate off       # turn the approval gate off
+/guard:settings edit_gate deny      # block unapproved edits instead of prompting
+/guard:settings judge_gate headless # switch the evidence judge to headless
 ```
 
 The settings it manages:
@@ -101,13 +101,13 @@ The settings it manages:
 
 Changes take effect immediately and persist as the project default in
 `.claude/guard.local.json` — `edit_gate` and `judge_gate` also switch the current session,
-so you don't have to restart. `/guard:config` is the only supported way to change these:
+so you don't have to restart. `/guard:settings` is the only supported way to change these:
 guard blocks direct writes to its own config, so nothing but your own action through
 this command can weaken the guard.
 
 ### Review modes
 
-The evidence judge runs in one of three modes, set with `/guard:config judge_gate <mode>`:
+The evidence judge runs in one of three modes, set with `/guard:settings judge_gate <mode>`:
 
 - **manual** (default) — no automatic review; run `/guard:judge` when you want the last
   completed turn checked. Ordinary turns cost nothing extra. Since nothing runs unless
@@ -198,7 +198,7 @@ Use `exempt_skills` for skills or slash commands whose output is a report or a r
 rather than claims about your codebase (e.g. a research skill) — guard won't review the
 turn they run in. List each by the name you invoke after the slash, **including its
 plugin namespace**: `hindsight:review`, or a bare name for an un-namespaced skill like
-`deep-research`. guard's own `/guard:config` and `/guard:judge` are always exempt.
+`deep-research`. guard's own `/guard:settings` and `/guard:judge` are always exempt.
 
 When a response cites official documentation, the Grounded output style saves a
 local copy of the cited content into the refs folder so the evidence stays
@@ -208,11 +208,11 @@ tracked folder to collect those references in your repository instead — they a
 then committed through your normal git workflow (guard never commits anything
 itself).
 
-You don't have to edit the file by hand. Run `/guard:config` and pick `exempt_skills`
+You don't have to edit the file by hand. Run `/guard:settings` and pick `exempt_skills`
 to review the current list and record which skills to exempt:
 
 ```
-/guard:config                     # then choose exempt_skills from the menu
+/guard:settings                     # then choose exempt_skills from the menu
 ```
 
 ## Logs
