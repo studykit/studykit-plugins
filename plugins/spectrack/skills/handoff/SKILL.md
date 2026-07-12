@@ -18,7 +18,7 @@ Leave durable continuation context for a fresh session that cannot see this conv
 ## Core rules
 
 - Refresh touched mid-flight issues before creating anything new. Each touched issue's current `Resume` comment should be enough for a fresh session to understand the current approach, waiting state, open questions, and next step.
-- The `Resume` comment starts with the provider heading for Resume: `## Resume` on GitHub, `h2. Resume` on Jira. Update the existing matching comment when one exists; create it only when missing. Use separate comments only for narrative-worthy events such as decision pivots, blocker resolutions, or approach changes. Routine progress belongs in the refreshed `Resume` comment or nowhere.
+- The `Resume` comment starts with the provider heading for Resume: `## Resume` on GitHub, `h2. Resume` on Jira. Refresh it with `spectrack issue comment resume`, which idempotently updates the existing Resume comment or creates it when missing — so repeated handoffs never leave duplicate Resume comments. Use separate comments only for narrative-worthy events such as decision pivots, blocker resolutions, or approach changes. Routine progress belongs in the refreshed `Resume` comment or nowhere.
 - Publish `review` issues only for residual session-level findings, gaps, or questions that cannot be cleanly anchored to an existing issue body, comment, parent issue, or commit message.
 - Resolve the relevant authoring contract from provider issue metadata before writing issue bodies or comments. Get user approval before provider mutations and respect freshness checks.
 - Commit relevant non-handoff code changes only when they belong to this session, split by coherent meaning, and leave unrelated user changes untouched.
