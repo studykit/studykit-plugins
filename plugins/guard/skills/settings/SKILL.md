@@ -3,8 +3,7 @@ name: settings
 description: "View and change guard's settings for this project — the approval gate (edit_gate), the evidence judge (judge_gate), model, effort, refs_dir, and exempt_skills — recorded in .claude/guard.local.json. Use when the user wants to configure guard: disable the approval gate or switch it between ask/deny, change the judge_gate mode, set model/effort/refs_dir, or manage exempt skills. Claude Code only."
 argument-hint: '[key] [value]'
 context: fork
-agent: general-purpose
-model: claude-sonnet-5
+model: sonnet
 disable-model-invocation: true
 allowed-tools: Bash, AskUserQuestion
 ---
