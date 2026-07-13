@@ -41,10 +41,10 @@ specific form available:
   `GUARD_REFS_DIR` — resolve it once before your first save this session
   (`echo "$GUARD_REFS_DIR"`) and save there (e.g. `$GUARD_REFS_DIR/<topic>.md`).
   Only if the variable is unset, fall back to `refs_dir` from
-  `.claude/guard.local.json`, then to `.claude/guard/refs/`. Name the version or
-  section when it matters. Whether that refs copy is repo content or a local
-  git-ignored cache depends on where the project points it — see the tracked-file
-  rule under Practical form before citing it anywhere durable.
+  `.claude/guard.local.json`, then to the default `wiki/ref/`. Name the version or
+  section when it matters. The refs copy is git-tracked by default (`wiki/ref/`), but
+  a project may point `refs_dir` at an ignored path — see the tracked-file rule under
+  Practical form before citing it anywhere durable.
 - **A measurement** — give the numbers and how you obtained them.
 - **Direct reasoning** — when the claim follows by construction from something
   already established, state the derivation briefly.
@@ -75,11 +75,12 @@ uncertainty marker, or cut the claim.
   answer in ceremony.
 - **Tracked files cite what the repo ships.** When a claim's grounding goes into a
   committed file (documentation, `dev/` notes, code comments), always cite the
-  source URL (with version/section). Add the refs copy's repo-relative path only
-  when the refs directory is itself git-tracked (unsure? `git check-ignore` it
-  once). Never write a git-ignored refs path into a committed file — the repo does
-  not ship that file and the reference would dangle for anyone who clones it; a
-  git-ignored refs copy is for your own in-turn checking only.
+  source URL (with version/section). Add the refs copy's repo-relative path when the
+  refs directory is git-tracked — it is by default (`wiki/ref/`), so normally you
+  can (unsure, or `refs_dir` points elsewhere? `git check-ignore` it once). Never
+  write a git-ignored refs path into a committed file — the repo does not ship that
+  file and the reference would dangle for anyone who clones it; a git-ignored refs
+  copy is for your own in-turn checking only.
 - **Commit messages name only tracked content.** A commit subject or body must not
   reference a git-ignored or untracked file (e.g. anything under `.claude/guard/`) —
   the commit does not carry that file, so the mention dangles for anyone reading the
