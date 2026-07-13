@@ -186,7 +186,7 @@ Configuration is optional. Create `.claude/guard.local.json` in your project:
 | `edit_gate` | The approval gate (holds back the file-editing tools until you approve): `off` disables it, `ask` prompts you to approve an unapproved edit inline (and opens the gate for the rest of the task), `deny` blocks it until you approve in a message | `"ask"` |
 | `judge_gate` | Session-start review mode for the evidence judge (`manual`/`subagent`/`headless`, see [Review modes](#review-modes)) | `"manual"` |
 | `exempt_skills` | Skills / slash commands whose turn the review skips, named `plugin:skill` (leading `/` and case ignored) | `[]` |
-| `refs_dir` | Project-relative folder where copies of cited official docs are saved. Empty means the git-ignored default `.claude/guard/refs/`; set a tracked path (e.g. `"docs/refs"`) to keep the collected references under git | `""` |
+| `refs_dir` | Project-relative folder where copies of cited official docs are saved. Empty means the git-tracked default `wiki/ref/`, so the collected references are committed with your repo; point it at a different tracked path (e.g. `"docs/refs"`) to override | `""` |
 
 `model` and `effort` apply to the **headless** review only; the **subagent** review
 runs on the `guardian` agent's own model and effort (Haiku / medium by default, set in
@@ -203,10 +203,10 @@ plugin namespace**: `hindsight:review`, or a bare name for an un-namespaced skil
 When a response cites official documentation, the Grounded output style saves a
 local copy of the cited content into the refs folder so the evidence stays
 inspectable, and the review checks that the copy exists. By default that folder
-(`.claude/guard/refs/`) is a per-machine cache you git-ignore; set `refs_dir` to a
-tracked folder to collect those references in your repository instead — they are
-then committed through your normal git workflow (guard never commits anything
-itself).
+(`wiki/ref/`) is git-tracked, so the collected references are committed with your
+repo through your normal git workflow (guard never commits anything itself) and a
+citation stays inspectable after the upstream page changes. Set `refs_dir` to a
+different tracked folder to collect them elsewhere.
 
 You don't have to edit the file by hand. Run `/guard:settings` and pick `exempt_skills`
 to review the current list and record which skills to exempt:

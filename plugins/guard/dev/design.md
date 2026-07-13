@@ -184,7 +184,7 @@ payloads, not memory.
   one `git check-ignore` for exemption 3 below (5s timeout, fail-toward-gating). It
   gates only `MUTATING_TOOLS`; Bash and reads/searches always pass.
 - **Three exemptions, all narrow.** The gate lets an unapproved write through only when:
-  1. **refs dir** — the target resolves inside the refs directory: `.claude/guard/refs/`
+  1. **refs dir** — the target resolves inside the refs directory: `wiki/ref/`
      by default, or the `refs_dir` config path (the Grounded output style tells the
      assistant to save cited docs there — guard must not forbid its own required
      behavior). Both paths `resolve()`d so `..` can't escape. `_refs_dir` honors a
@@ -222,7 +222,7 @@ payloads, not memory.
 Parsed by `_load_config`; fail-open to defaults. Both gate fields are `enum.StrEnum`
 members (`EditGate`, `JudgeGate`) — the reason guard requires Python 3.11+ (`StrEnum`
 "Added in version 3.11": https://docs.python.org/3/library/enum.html, excerpt saved at
-`docs/refs/python-strenum.md`). Keys: `model`
+`wiki/ref/python-strenum.md`). Keys: `model`
 (default `"haiku"`), `effort` (low/medium/high/xhigh/max, default `"medium"`), `edit_gate`
 (`"ask"`|`"deny"`|`"off"`, default `"ask"` — the approval gate: `off` disables it, `ask`
 escalates an unapproved edit to the permission prompt and arms the session on approval,
@@ -236,9 +236,9 @@ own `settings`/`judge` control commands are always exempt regardless). Manage
 `exempt_skills` interactively with the `guard:settings` skill (which records the user's
 chosen names via the `exempt` CLI); no need to hand-edit. `refs_dir`
 (string, default `""`) — project-relative directory for the Grounded style's cited-doc
-copies; empty = the git-ignored `.claude/guard/refs/`, a tracked path (e.g.
-`"docs/refs"`) keeps the collected references under git; commits stay in the user's
-normal workflow (guard never commits). `_refs_dir` validates the value (see the refs
+copies; empty = the git-tracked default `wiki/ref/` (references committed with the
+repo), a different tracked path (e.g. `"docs/refs"`) overrides it; commits stay in the
+user's normal workflow (guard never commits). `_refs_dir` validates the value (see the refs
 exemption above) and everything that names the location follows it: the gate
 exemption, the headless judge prompt (`__REFS_DIR__` substitution), the guardian
 dispatch inputs (`refs_dir`, with the `refs-dir` CLI subcommand as its fallback), and

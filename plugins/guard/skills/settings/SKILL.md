@@ -37,7 +37,7 @@ Fixed values for this run (already substituted — do not re-resolve):
 | `judge_gate` | `manual` / `subagent` / `headless` | The evidence judge. `manual` = off (audit only on demand via `/guard:judge`); `subagent` = in-session guardian each turn; `headless` = in-hook judge that blocks. |
 | `model` | a model name (e.g. `haiku`, `sonnet`) | Model the **headless** judge runs on. |
 | `effort` | `low` / `medium` / `high` / `xhigh` / `max` | **Headless** judge reasoning effort. |
-| `refs_dir` | a project-relative path, or empty | Where the Grounded style saves cited-doc copies. Empty = the git-ignored default `.claude/guard/refs/`; a tracked path (e.g. `docs/refs`) keeps them under git. |
+| `refs_dir` | a project-relative path, or empty | Where the Grounded style saves cited-doc copies. Empty = the git-tracked default `wiki/ref/`, committed with the repo; point it at a different tracked path (e.g. `docs/refs`) to override. |
 | `exempt_skills` | skill/command names, namespaced (e.g. `hindsight:review`) | Skills/commands whose finished turn the judge skips. Managed with the `exempt` verbs above. |
 
 `edit_gate` and `judge_gate` apply to the current session and become the new default;

@@ -47,7 +47,7 @@ Subcommands
                  the turn in ``asked_prompt_id``; ``deny`` blocks the call with a
                  reason and records the turn's ``prompt_id`` in ``gated_prompt_id`` so
                  Stop skips auditing a plan/approval-request response. Writes into the refs
-                 directory (``.claude/guard/refs/`` by default; the ``refs_dir``
+                 directory (``wiki/ref/`` by default; the ``refs_dir``
                  config key may move it) are exempt (the Grounded output style saves
                  cited docs there), as are writes that don't touch tracked project
                  source — targets outside the project dir (e.g. the scratchpad) and
@@ -124,10 +124,10 @@ leading-``/``-stripped and case-insensitively (guard's own
 ``settings``/``judge`` control commands are always exempt regardless of this
 list), and ``refs_dir`` (string, default ``""``) — project-relative directory where
 the Grounded output style saves local copies of cited docs; empty means the
-git-ignored default ``.claude/guard/refs/``, a tracked path (e.g. ``"docs/refs"``)
-keeps the collected references under git (values resolving outside the project, at
-the project root, or into guard's own config/state fall back to the default — see
-``_refs_dir``). Unknown keys are ignored; a missing or malformed file falls
+git-tracked default ``wiki/ref/``, so the collected references are committed with the
+repo (point it at a different tracked path, e.g. ``"docs/refs"``, to override; values
+resolving outside the project, at the project root, or into guard's own config/state
+fall back to the default — see ``_refs_dir``). Unknown keys are ignored; a missing or malformed file falls
 back to all defaults. The judge always reads the repo (Read/Grep/Glob/Bash) to verify
 claims. The ``guard:settings`` skill changes these through the ``settings`` CLI: it writes
 guard.local.json and, for ``edit_gate`` / ``judge_gate``, the live session's state.
@@ -202,11 +202,11 @@ DEFAULT_CONFIG: dict[str, Any] = {
     # regardless of this list.
     "exempt_skills": [],
     # Where the Grounded output style saves local copies of cited docs, relative to
-    # the project dir. Empty = the default git-ignored cache (`.claude/guard/refs/`).
-    # Point it at a tracked path (e.g. "docs/refs") to keep the collected references
-    # under git. Values that resolve outside the project, at the project root, or
-    # into guard's own config/state are ignored (fall back to the default) — see
-    # _refs_dir for why.
+    # the project dir. Empty = the default git-tracked `wiki/ref/`, so the collected
+    # references are committed with the repo. Point it at a different tracked path
+    # (e.g. "docs/refs") to override. Values that resolve outside the project, at the
+    # project root, or into guard's own config/state are ignored (fall back to the
+    # default) — see _refs_dir for why.
     "refs_dir": "",
 }
 
@@ -271,17 +271,17 @@ def _refs_dir(project_dir: Path, config: dict[str, Any] | None = None) -> Path:
     Writes here are the assistant grounding its own claims (per the output style),
     not implementing the user's task — so the approval gate exempts them.
 
-    Default is the git-ignored cache under guard's state tree; the ``refs_dir``
-    config key may point it at a project path instead (e.g. ``docs/refs``) so the
-    collected references are tracked by git. A configured value is honored only
-    when it resolves STRICTLY INSIDE the project and OUTSIDE guard's own
-    config/state: the gate's refs exemption is checked before its guard-owned
-    exclusion, so without this a ``refs_dir`` of ``.claude/guard`` (self-arm via
-    ``state/<sid>.json``, judge-off via ``guard.local.json``) or ``.`` (every
-    project write exempt) would neuter the gate. Invalid values fall back to the
-    default.
+    Default is ``wiki/ref/`` under the project, a git-tracked location so the
+    collected references are committed with the repo; the ``refs_dir`` config key
+    may point it at a different project path (e.g. ``docs/refs``). A configured
+    value is honored only when it resolves STRICTLY INSIDE the project and OUTSIDE
+    guard's own config/state: the gate's refs exemption is checked before its
+    guard-owned exclusion, so without this a ``refs_dir`` of ``.claude/guard``
+    (self-arm via ``state/<sid>.json``, judge-off via ``guard.local.json``) or
+    ``.`` (every project write exempt) would neuter the gate. Invalid values fall
+    back to the default.
     """
-    default = _state_root(project_dir) / "refs"
+    default = project_dir / "wiki" / "ref"
     raw = (config or {}).get("refs_dir", "")
     if not isinstance(raw, str) or not raw.strip():
         return default
@@ -1278,10 +1278,10 @@ def cmd_gate() -> int:
         return 0
 
     # Exempt the assistant's own evidence store: the Grounded output style
-    # tells it to save cited docs in the refs directory (`.claude/guard/refs/` by
-    # default; `refs_dir` may point it at a tracked path). Grounding a claim is
+    # tells it to save cited docs in the refs directory (`wiki/ref/` by
+    # default; `refs_dir` may point it at another tracked path). Grounding a claim is
     # not implementing the user's task, so those writes pass without approval. Note
-    # this is deliberately ONLY the refs dir — never the wider `.claude/guard/`
+    # this exemption is deliberately ONLY the refs dir — never guard's own `.claude/guard/`
     # tree, so the model can't write `state/<sid>.json` to arm its own approval
     # (_refs_dir rejects a refs_dir that resolves into guard's own files).
     tool_input = payload.get("tool_input")
@@ -1435,7 +1435,7 @@ def _tool_target_path(project_dir: Path, tool_input: Any) -> Path | None:
 
 def _targets_refs_dir(project_dir: Path, tool_input: Any, config: dict[str, Any]) -> bool:
     """True when a mutating tool's target path is inside the refs directory
-    (`.claude/guard/refs/` by default, or the validated `refs_dir` config path)."""
+    (`wiki/ref/` by default, or the validated `refs_dir` config path)."""
     target = _tool_target_path(project_dir, tool_input)
     if target is None:
         return False
@@ -2016,7 +2016,7 @@ def _config_show_lines(project_dir: Path, session_id: str | None) -> list[str]:
         gate_line,
         judge_line,
         "exempt_skills: " + (", ".join(sorted(exempt)) if exempt else "(none)"),
-        "refs_dir: " + (refs_rel if refs_rel else "(default .claude/guard/refs/)"),
+        "refs_dir: " + (refs_rel if refs_rel else "(default wiki/ref/)"),
     ]
 
 

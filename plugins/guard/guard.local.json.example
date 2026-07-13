@@ -3,6 +3,5 @@
   "effort": "medium",
   "edit_gate": "ask",
   "judge_gate": "manual",
-  "exempt_skills": ["deep-research", "hindsight:review"],
-  "refs_dir": "docs/refs"
+  "exempt_skills": ["deep-research", "hindsight:review"]
 }
