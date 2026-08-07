@@ -5,18 +5,6 @@
   },
   "plugins": [
     {
-      "name": "lang",
-      "source": {
-        "source": "local",
-        "path": "./plugins/lang"
-      },
-      "policy": {
-        "installation": "AVAILABLE",
-        "authentication": "ON_INSTALL"
-      },
-      "category": "Productivity"
-    },
-    {
       "name": "doc",
       "source": {
         "source": "local",
