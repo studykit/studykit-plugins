@@ -1,6 +1,6 @@
 ---
 name: settings
-description: "View and change guard's settings for this project — the approval gate (edit_gate), the evidence judge (judge_gate), model, effort, refs_dir, and exempt_skills — recorded in .claude/guard.local.json. Use when the user wants to configure guard: disable the approval gate or switch it between ask/deny, change the judge_gate mode, set model/effort/refs_dir, or manage exempt skills. Claude Code only."
+description: "View and change guard's settings for this project — the approval gate (edit_gate), the evidence judge (judge_gate), model, effort, refs_dir, exempt_skills, and writable_dirs — recorded in .claude/guard.local.json. Use when the user wants to configure guard: disable the approval gate or switch it between ask/deny, change the judge_gate mode, set model/effort/refs_dir, manage exempt skills, or choose folders the gate lets edits through (writable_dirs). Claude Code only."
 argument-hint: '[key] [value]'
 context: fork
 model: sonnet
@@ -22,12 +22,19 @@ Fixed values for this run (already substituted — do not re-resolve):
 
 ## Commands
 
+Every command that **changes** a setting must be prefixed with `GUARD_SETTINGS_SKILL=1`.
+guard refuses config-mutating calls without it, so that a settings change is something
+the user asked for through this skill rather than something an agent did on its own.
+Read-only commands (`settings show`, `exempt list`, `writable list`) need no prefix.
+
 - **Show current settings:**
   `"${CLAUDE_SKILL_DIR}/../../scripts/guard_hook.py" settings show --session ${CLAUDE_SESSION_ID}`
 - **Change one scalar setting:**
-  `"${CLAUDE_SKILL_DIR}/../../scripts/guard_hook.py" settings set <key> <value> --session ${CLAUDE_SESSION_ID}`
+  `GUARD_SETTINGS_SKILL=1 "${CLAUDE_SKILL_DIR}/../../scripts/guard_hook.py" settings set <key> <value> --session ${CLAUDE_SESSION_ID}`
 - **Manage the exempt list** (`exempt_skills`, a list — not settable via `settings set`):
-  `"${CLAUDE_SKILL_DIR}/../../scripts/guard_hook.py" exempt list | set <names…> | add <names…> | remove <names…> | clear`
+  `GUARD_SETTINGS_SKILL=1 "${CLAUDE_SKILL_DIR}/../../scripts/guard_hook.py" exempt list | set <names…> | add <names…> | remove <names…> | clear`
+- **Manage the writable folders** (`writable_dirs`, a list — not settable via `settings set`):
+  `GUARD_SETTINGS_SKILL=1 "${CLAUDE_SKILL_DIR}/../../scripts/guard_hook.py" writable list | set <dirs…> | add <dirs…> | remove <dirs…> | clear`
 
 ## Settable keys
 
@@ -39,10 +46,16 @@ Fixed values for this run (already substituted — do not re-resolve):
 | `effort` | `low` / `medium` / `high` / `xhigh` / `max` | **Headless** judge reasoning effort. |
 | `refs_dir` | a project-relative path, or empty | Where the Grounded style saves cited-doc copies. Empty = the git-tracked default `wiki/ref/`, committed with the repo; point it at a different tracked path (e.g. `docs/refs`) to override. |
 | `exempt_skills` | skill/command names, namespaced (e.g. `hindsight:review`) | Skills/commands whose finished turn the judge skips. Managed with the `exempt` verbs above. |
+| `writable_dirs` | project-relative folders (e.g. `build`, `docs/generated`) | Folders the approval gate lets edits through without asking. Managed with the `writable` verbs above. |
 
 `edit_gate` and `judge_gate` apply to the current session and become the new default;
-`model` / `effort` / `refs_dir` are read from the file when used, so they also take
-effect immediately.
+`model` / `effort` / `refs_dir` / `exempt_skills` / `writable_dirs` are read from the
+file when used, so they also take effect immediately.
+
+The `writable` CLI **rejects** a folder it cannot honor — absolute paths, `..`, the
+project root, and anything inside guard's own `.claude/guard` files — and prints why on
+stderr. That is not a failure to work around: relay the reason to the user and let them
+pick another folder. Never try to reach the same result by editing the config file.
 
 ## What to do
 
@@ -52,7 +65,9 @@ effect immediately.
 3. **Otherwise** call `AskUserQuestion` to ask which setting to change and to what: offer
    that key's valid values as options and note the current value. For `exempt_skills`,
    ask which namespaced skill/command names to exempt (the user provides them), then
-   record with `exempt set <names…>`.
+   record with `exempt set <names…>`. For `writable_dirs`, ask which project-relative
+   folders the gate should stop asking about (the user provides them), then record with
+   `writable set <dirs…>`.
 4. Apply the change with the CLI, then relay the resulting settings the command prints
    back to the user in a short summary. Report exactly what changed.
 

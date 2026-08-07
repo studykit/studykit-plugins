@@ -28,8 +28,10 @@ Subcommands
                  ``state/<sid>.json`` when a session id is available (``--session``, which
                  the forked skill passes as ``${CLAUDE_SESSION_ID}``, else the inherited
                  ``CLAUDE_CODE_SESSION_ID``); the rest are read from the config file at
-                 use. Preserves every other key; ``exempt_skills`` is managed by
-                 ``exempt``, not here. Not a hook event.
+                 use. Preserves every other key; the list keys are managed by their own
+                 CLIs (``exempt_skills`` by ``exempt``, ``writable_dirs`` by
+                 ``writable``), not here. Mutating verbs require the settings-skill
+                 marker — see ``_cli_write_allowed``. Not a hook event.
 - verify         UserPromptExpansion (matcher ``^(guard:)?judge$``). On demand, emit the
                  guardian-dispatch instruction for the last completed turn
                  (``pending_verify_prompt_id``, recorded by manual-mode Stop). Reads no
@@ -38,7 +40,14 @@ Subcommands
 - exempt         CLI (argv), run by the ``guard:settings`` skill via Bash after the user
                  confirms an interactive selection. ``list``/``set``/``add``/
                  ``remove``/``clear`` the ``exempt_skills`` config key — that key ONLY,
-                 never ``edit_gate``/``judge_gate``/state. Not a hook event.
+                 never ``edit_gate``/``judge_gate``/state. Mutating verbs require the
+                 settings-skill marker (``_cli_write_allowed``). Not a hook event.
+- writable       CLI (argv), same shape as ``exempt``, for the ``writable_dirs`` config
+                 key — the directories the user designated writable, which the approval
+                 gate exempts. Unusable values (absolute, ``..``, the project root,
+                 guard's own files) are REJECTED at set time rather than stored and
+                 dropped later, so the user is never left believing a directory is
+                 exempt when it is not. Not a hook event.
 - gate           PreToolUse. When the approval gate is enabled (``edit_gate`` != ``off``),
                  for the file-editing tools (Write/Edit/MultiEdit/NotebookEdit), stop an
                  unapproved edit unless the session is approved. ``edit_gate`` picks how:
@@ -46,17 +55,17 @@ Subcommands
                  approves inline; ``gate-approved`` then arms the session) and records
                  the turn in ``asked_prompt_id``; ``deny`` blocks the call with a
                  reason and records the turn's ``prompt_id`` in ``gated_prompt_id`` so
-                 Stop skips auditing a plan/approval-request response. Writes into the refs
-                 directory (``wiki/ref/`` by default; the ``refs_dir``
-                 config key may move it) are exempt (the Grounded output style saves
-                 cited docs there), as are writes that don't touch tracked project
-                 source — targets outside the project dir (e.g. the scratchpad) and
-                 git-ignored writes inside it (scratch/temp, ``**/*.local.*``,
-                 skill-authored docs like ``/handoff`` → ``.handover/``); guard's OWN
-                 config/state tree is excluded from those exemptions so the model can't
-                 self-arm or disable the judge. Reads state (+ at most one
-                 ``git check-ignore``) — no judge call. Bash and all
-                 read/search tools always pass.
+                 Stop skips auditing a plan/approval-request response. Four exemptions:
+                 writes into the refs directory (``wiki/ref/`` by default; the
+                 ``refs_dir`` config key may move it — the Grounded output style saves
+                 cited docs there); writes into a user-designated ``writable_dirs``
+                 entry; and writes that don't touch tracked project source — targets
+                 outside the project dir (e.g. the scratchpad) and git-ignored writes
+                 inside it (scratch/temp, ``**/*.local.*``, skill-authored docs like
+                 ``/handoff`` → ``.handover/``). guard's OWN config/state tree is
+                 excluded from all but the refs exemption, so the model can't self-arm
+                 or disable the judge. Reads state (+ at most one ``git check-ignore``)
+                 — no judge call. Bash and all read/search tools always pass.
 - gate-approved  PostToolUse (Write/Edit/MultiEdit/NotebookEdit). ``edit_gate`` ``ask``
                  only: fires after an edit executed, i.e. the user approved the gate's
                  permission prompt. When the turn matches ``asked_prompt_id`` it arms
@@ -127,7 +136,11 @@ the Grounded output style saves local copies of cited docs; empty means the
 git-tracked default ``wiki/ref/``, so the collected references are committed with the
 repo (point it at a different tracked path, e.g. ``"docs/refs"``, to override; values
 resolving outside the project, at the project root, or into guard's own config/state
-fall back to the default — see ``_refs_dir``). Unknown keys are ignored; a missing or malformed file falls
+fall back to the default — see ``_refs_dir``), and ``writable_dirs`` (list of strings,
+default ``[]``) — project-relative directories the user designated as freely writable,
+which the approval gate exempts; entries pass the same validation as ``refs_dir``
+(``_safe_project_subdir``) and invalid ones are dropped at use and rejected at set time
+by the ``writable`` CLI. Unknown keys are ignored; a missing or malformed file falls
 back to all defaults. The judge always reads the repo (Read/Grep/Glob/Bash) to verify
 claims. The ``guard:settings`` skill changes these through the ``settings`` CLI: it writes
 guard.local.json and, for ``edit_gate`` / ``judge_gate``, the live session's state.
@@ -172,6 +185,11 @@ CONFIG_REL = ".claude/guard.local.json"
 TRACE_FILE_NAME = "trace.log"
 TRACE_ENV_VAR = "GUARD_TRACE"
 TRACE_TRUTHY = {"1", "true", "yes", "on"}
+# Marker the `guard:settings` skill sets on the config-mutating CLI verbs. See
+# _cli_write_allowed for what this does and does not buy.
+CLI_WRITE_ENV_VAR = "GUARD_SETTINGS_SKILL"
+# List-CLI verbs that write the config; `list` and unknown verbs only report.
+_CLI_MUTATING_VERBS = {"set", "add", "remove", "rm", "clear"}
 ORPHAN_MAX_AGE_SECONDS = 7 * 24 * 60 * 60
 JUDGE_TIMEOUT_SECONDS = 90
 # `git check-ignore` in the gate must be quick; it is the only subprocess the gate
@@ -208,6 +226,14 @@ DEFAULT_CONFIG: dict[str, Any] = {
     # project root, or into guard's own config/state are ignored (fall back to the
     # default) — see _refs_dir for why.
     "refs_dir": "",
+    # Project-relative directories the user has designated as freely writable: the
+    # approval gate lets an unapproved write through when the target is inside one.
+    # The general form of the refs-dir hole — a user-chosen allowlist (build output, a
+    # generated-code drop zone, a scratch notes folder) rather than one location guard
+    # opened for itself. Each entry passes the same _safe_project_subdir validation as
+    # `refs_dir`, so "." or ".claude/guard" can never enter the list; invalid entries
+    # are dropped at use and rejected at set time by the `writable` CLI.
+    "writable_dirs": [],
 }
 
 VALID_EFFORTS = {"low", "medium", "high", "xhigh", "max"}
@@ -232,6 +258,27 @@ MUTATING_TOOLS = {"Write", "Edit", "MultiEdit", "NotebookEdit"}
 # --------------------------------------------------------------------------- #
 def _trace_enabled() -> bool:
     return os.environ.get(TRACE_ENV_VAR, "").strip().lower() in TRACE_TRUTHY
+
+
+def _cli_write_allowed() -> bool:
+    """True when a config-mutating CLI verb may write.
+
+    Bash is deliberately NOT gated (see MUTATING_TOOLS), so the model can invoke this
+    script directly — and the config-mutating verbs can weaken guard itself:
+    `settings set edit_gate off` disables the approval gate outright, and
+    `writable add <dir>` opens it for a directory. The `guard:settings` skill is
+    `disable-model-invocation: true` (user-invoked only) and sets this marker; a bare
+    model-issued Bash call does not have it.
+
+    This is a SPEED BUMP, NOT A SECURITY BOUNDARY: the variable name is in this file,
+    which the model can read, so a model that decides to defeat guard can set it. What
+    it buys is (a) the unreflective path — "this gate is in my way, let me widen it" —
+    fails closed, (b) the refusal names the user as the only legitimate widener, and
+    (c) the attempt lands in the trace as `refused_no_skill_marker`. A model that
+    deliberately sets the marker is outside guard's threat model, and either way the
+    Bash call is visible to the user in the transcript.
+    """
+    return os.environ.get(CLI_WRITE_ENV_VAR, "").strip().lower() in TRACE_TRUTHY
 
 
 def _project_dir() -> Path | None:
@@ -265,6 +312,50 @@ def _turn_slice_file(project_dir: Path, session_id: str, prompt_id: str) -> Path
     return _state_root(project_dir) / "turns" / session_id / f"{prompt_id}.json"
 
 
+def _safe_project_subdir(project_dir: Path, raw: Any) -> Path | None:
+    """Resolve a configured project-relative directory, or None if it is not safe.
+
+    The single implementation of guard's self-neutering defense, shared by every
+    config key that names a directory the approval gate treats specially
+    (``refs_dir``, ``writable_dirs``). A value is honored only when it resolves:
+
+    - inside the project, STRICTLY below it — ``project not in candidate.parents``
+      rejects the project root itself, because a path is never in its own
+      ``.parents`` and ``"."`` resolves to the project dir. A root-level exemption
+      would exempt every project write and neuter the gate, so this strictness is
+      load-bearing: do not relax it to a ``==``-tolerant containment test.
+    - outside guard's OWN config/state — a value of ``.claude/guard`` would let the
+      model write ``state/<sid>.json`` to arm its own approval, and
+      ``.claude/guard.local.json`` would let it turn the judge off. These exemptions
+      are checked BEFORE the gate's ``_is_guard_owned`` exclusion, so this check is
+      what closes that hole for the configured directory itself.
+
+    Note what this does NOT catch: an ANCESTOR of guard's state (e.g. ``.claude``)
+    is a legal value — it is neither the state root nor under it. Callers that use
+    the result to exempt a write must therefore still check the write's own target
+    with ``_is_guard_owned``; see the ``writable_dirs`` branch in ``cmd_gate``.
+
+    Returns the resolved absolute Path, or None when the value is unusable (not a
+    non-empty str, unresolvable, or failing either rule above). Callers decide what
+    None means: ``_refs_dir`` falls back to its default, ``_writable_dirs`` drops
+    the entry.
+    """
+    if not isinstance(raw, str) or not raw.strip():
+        return None
+    try:
+        candidate = (project_dir / raw.strip()).resolve()
+        project = project_dir.resolve()
+        state_root = _state_root(project_dir).resolve()
+        config_path = (project_dir / CONFIG_REL).resolve()
+    except OSError:
+        return None
+    if project not in candidate.parents:
+        return None
+    if candidate == state_root or state_root in candidate.parents or candidate == config_path:
+        return None
+    return candidate
+
+
 def _refs_dir(project_dir: Path, config: dict[str, Any] | None = None) -> Path:
     """Directory where the Grounded output style saves local copies of cited docs.
 
@@ -274,29 +365,12 @@ def _refs_dir(project_dir: Path, config: dict[str, Any] | None = None) -> Path:
     Default is ``wiki/ref/`` under the project, a git-tracked location so the
     collected references are committed with the repo; the ``refs_dir`` config key
     may point it at a different project path (e.g. ``docs/refs``). A configured
-    value is honored only when it resolves STRICTLY INSIDE the project and OUTSIDE
-    guard's own config/state: the gate's refs exemption is checked before its
-    guard-owned exclusion, so without this a ``refs_dir`` of ``.claude/guard``
-    (self-arm via ``state/<sid>.json``, judge-off via ``guard.local.json``) or
-    ``.`` (every project write exempt) would neuter the gate. Invalid values fall
-    back to the default.
+    value is honored only when ``_safe_project_subdir`` accepts it (strictly inside
+    the project, outside guard's own config/state — see there for why); anything
+    else falls back to the default, so ``refs_dir`` can never become a hole.
     """
     default = project_dir / "wiki" / "ref"
-    raw = (config or {}).get("refs_dir", "")
-    if not isinstance(raw, str) or not raw.strip():
-        return default
-    try:
-        candidate = (project_dir / raw.strip()).resolve()
-        project = project_dir.resolve()
-        state_root = _state_root(project_dir).resolve()
-        config_path = (project_dir / CONFIG_REL).resolve()
-    except OSError:
-        return default
-    if project not in candidate.parents:
-        return default
-    if candidate == state_root or state_root in candidate.parents or candidate == config_path:
-        return default
-    return candidate
+    return _safe_project_subdir(project_dir, (config or {}).get("refs_dir", "")) or default
 
 
 def _refs_rel(project_dir: Path, config: dict[str, Any]) -> str:
@@ -306,6 +380,43 @@ def _refs_rel(project_dir: Path, config: dict[str, Any]) -> str:
         return str(refs.resolve().relative_to(project_dir.resolve())) + "/"
     except (OSError, ValueError):
         return str(refs) + "/"
+
+
+def _project_rel(project_dir: Path, path: Path) -> str:
+    """Project-relative form of an absolute path, for display. Falls back to the
+    absolute path when it can't be made relative."""
+    try:
+        return str(path.resolve().relative_to(project_dir.resolve()))
+    except (OSError, ValueError):
+        return str(path)
+
+
+def _writable_dirs(project_dir: Path, config: dict[str, Any]) -> list[Path]:
+    """Project directories the user designated as freely writable (``writable_dirs``).
+
+    The general form of the refs-dir hole: where refs is a location guard opened for
+    its OWN required behavior, these are locations the USER chose, so the gate opens
+    on the same footing as every other arming path — an explicit user action.
+
+    Every entry passes ``_safe_project_subdir``, so a configured ``.`` or
+    ``.claude/guard`` never enters the list. Invalid entries are DROPPED (unlike
+    ``refs_dir``, which falls back to a default — there is no sensible default for
+    "also writable", and dropping keeps the remaining valid entries working). The
+    ``writable`` CLI rejects such values at set time so the user is told, rather than
+    silently believing a directory is exempt; this read path re-validates regardless,
+    because a hand-edited config never passed through that CLI.
+
+    Order-preserving and deduplicated; [] for a missing or malformed key.
+    """
+    raw = config.get("writable_dirs", [])
+    if not isinstance(raw, list):
+        return []
+    out: list[Path] = []
+    for entry in raw:
+        resolved = _safe_project_subdir(project_dir, entry)
+        if resolved is not None and resolved not in out:
+            out.append(resolved)
+    return out
 
 
 def _trace_file(project_dir: Path) -> Path:
@@ -429,6 +540,38 @@ def _norm_skill(name: Any) -> str:
     if not isinstance(name, str):
         return ""
     return name.strip().lstrip("/").lower()
+
+
+def _norm_dir(value: Any) -> str:
+    """Normalize a project-relative directory for storage in ``writable_dirs``.
+
+    Whitespace-stripped, leading ``./`` and surrounding slashes removed, POSIX
+    separators. NOT lowercased — unlike ``_norm_skill`` these are filesystem paths,
+    and case is significant on a case-sensitive filesystem, where lowercasing would
+    silently turn ``docs/API`` into a path that does not exist.
+
+    '' when the value is not a usable project-relative directory: not a str, empty,
+    the project root itself, absolute, or containing a ``..`` segment. Absolute
+    values are rejected for consistency with ``refs_dir`` (project-relative by
+    definition) so the config stays portable across clones and machines.
+
+    This is CLI-input policy, not the security boundary — ``_safe_project_subdir``
+    is, and the read path applies it to raw config entries that never passed through
+    here (a hand-edited file). Keep the two independent.
+    """
+    if not isinstance(value, str):
+        return ""
+    text = value.strip().replace("\\", "/")
+    # Reject absolutes BEFORE stripping slashes: stripping first would silently
+    # rewrite "/etc" into the relative "etc" and store a path the user never named.
+    if text.startswith("/"):
+        return ""
+    while text.startswith("./"):
+        text = text[2:]
+    text = text.rstrip("/")
+    if not text or text == "." or ".." in text.split("/"):
+        return ""
+    return text
 
 
 def _exempt_skills(config: dict[str, Any]) -> set[str]:
@@ -1285,9 +1428,30 @@ def cmd_gate() -> int:
     # tree, so the model can't write `state/<sid>.json` to arm its own approval
     # (_refs_dir rejects a refs_dir that resolves into guard's own files).
     tool_input = payload.get("tool_input")
+    # Resolved once and reused by every exemption below (`_targets_refs_dir` resolves
+    # it again internally; that one call is left alone since its signature is shared).
+    target = _tool_target_path(project_dir, tool_input)
+
     if _targets_refs_dir(project_dir, tool_input, config):
         _trace(project_dir, session_id, "gate", "allow_refs", tool=tool_name)
         return 0
+
+    # Exempt the directories the USER designated writable (`writable_dirs`) — the
+    # general form of the refs hole above, differing in what justifies it: refs is
+    # opened for guard's own required behavior, these because the user asked.
+    #
+    # `_is_guard_owned` here is LOAD-BEARING, not defense in depth. `_safe_project_subdir`
+    # rejects a configured `.claude/guard` (and the config file), but it accepts an
+    # ANCESTOR of them — `writable_dirs: [".claude"]` is a legal entry, and without this
+    # check a write to `.claude/guard/state/<sid>.json` (self-arm) or
+    # `.claude/guard.local.json` (judge off) would ride the exemption. Do not drop it as
+    # redundant with the config-time validation; it covers a case that validation cannot.
+    if target is not None and not _is_guard_owned(project_dir, target):
+        for wdir in _writable_dirs(project_dir, config):
+            if target == wdir or wdir in target.parents:
+                _trace(project_dir, session_id, "gate", "allow_writable_dir",
+                       tool=tool_name, dir=str(wdir))
+                return 0
 
     # Exempt writes that don't mutate the user's tracked project source. The gate
     # guards the user's task edits, not throwaway / side output. Two cases, both
@@ -1299,7 +1463,6 @@ def cmd_gate() -> int:
     #      classify an out-of-repo path, so this is a separate check.)
     #   2. git-ignored inside the repo — scratch/temp, local config (`**/*.local.*`),
     #      skill-authored docs (e.g. `/handoff` → `.handover/`).
-    target = _tool_target_path(project_dir, tool_input)
     if target is not None and not _is_guard_owned(project_dir, target):
         if _is_outside_project(project_dir, target):
             _trace(project_dir, session_id, "gate", "allow_outside_repo", tool=tool_name)
@@ -1453,11 +1616,20 @@ def _is_guard_owned(project_dir: Path, target: Path) -> bool:
     These must never ride the git-ignore exemption: `.claude/guard/` is itself
     git-ignored, so without this exclusion the model could `Write`
     `state/<sid>.json` to arm its own approval, or edit `guard.local.json` to turn
-    the judge off / change `judge_gate`. (`refs/` is the one deliberate hole and has its
-    own explicit allow, checked before this. The `exempt_skills` list is managed only
-    through the `exempt` CLI — see `cmd_exempt` — which touches that one key and never
-    `edit_gate`/`judge_gate`/state, so it can weaken the judge's coverage but not disable
-    the gate.) Fail toward guard-owned (safe: no exemption) if the paths can't be
+    the judge off / change `judge_gate`. (`refs/` is the one hole guard opens for its own
+    required behavior and has its own explicit allow, checked before this.)
+
+    This function is also what makes the `writable_dirs` exemption safe against an entry
+    that is an ANCESTOR of guard's state: `_safe_project_subdir` rejects `.claude/guard`
+    but accepts `.claude`, so only this check stops a write to `.claude/guard/state/...`
+    underneath such an entry. See the `writable_dirs` branch in `cmd_gate`.
+
+    The list keys are edited only through their own CLIs (`cmd_exempt`, `cmd_writable`),
+    which touch that one key and never `edit_gate`/`judge_gate`/state. Note the asymmetry:
+    `exempt_skills` narrows only the JUDGE's coverage, while `writable_dirs` narrows the
+    GATE itself — which is why its values are validated and its mutating verbs require the
+    settings-skill marker (`_cli_write_allowed`). Fail toward guard-owned (safe: no
+    exemption) if the paths can't be
     resolved.
     """
     try:
@@ -1909,6 +2081,13 @@ def cmd_exempt() -> int:
     pd_env = os.environ.get("CLAUDE_PROJECT_DIR")
     project_dir = Path(pd_env) if pd_env else Path.cwd()
 
+    if op in _CLI_MUTATING_VERBS and not _cli_write_allowed():
+        print("guard exempt: refusing to change settings outside /guard:settings. "
+              "Ask the user to run `/guard:settings` — only the user changes guard's "
+              "own configuration.", file=sys.stderr)
+        _trace(project_dir, None, "exempt", "refused_no_skill_marker", op=op)
+        return 0
+
     raw = _load_raw_config(project_dir)
     cur_raw = raw.get("exempt_skills")
     current: list[str] = []
@@ -1949,6 +2128,113 @@ def cmd_exempt() -> int:
 
     print("exempt_skills: " + (", ".join(current) if current else "(none)"))
     _trace(project_dir, None, "exempt", op, n=len(current), changed=changed)
+    return 0
+
+
+def cmd_writable() -> int:
+    """Manage the ``writable_dirs`` list in guard.local.json. Invoked by the
+    ``guard:settings`` skill via Bash, AFTER the user has confirmed a selection. Argv:
+
+        writable list               — print the current writable_dirs
+        writable set   DIR [DIR…]   — replace the list with exactly these
+        writable add   DIR [DIR…]   — add
+        writable remove DIR [DIR…]  — remove
+        writable clear              — empty the list
+
+    Values are PROJECT-RELATIVE directories (e.g. ``build``, ``docs/generated``).
+
+    Unlike ``exempt``, invalid values are REJECTED here with a message rather than
+    stored and dropped later. A silently-dropped entry would leave the user believing
+    a directory is exempt from the gate when it is not — a failure they would only
+    meet later as a surprise permission prompt, with nothing pointing at the cause.
+    Rejected: absolute paths, ``..``, the project root, and anything inside guard's
+    own config/state (which would let the gate be neutered — see
+    ``_safe_project_subdir``). Valid entries in the same call still apply; the read
+    path (``_writable_dirs``) re-validates regardless, so a hand-edited config that
+    never passed through here is still safe.
+
+    Edits ONLY the ``writable_dirs`` key — never ``edit_gate`` / ``judge_gate`` /
+    state. Project dir from ``CLAUDE_PROJECT_DIR`` (Bash env), else the cwd.
+    """
+    argv = sys.argv[2:]
+    op = argv[0].lower() if argv else "list"
+
+    pd_env = os.environ.get("CLAUDE_PROJECT_DIR")
+    project_dir = Path(pd_env) if pd_env else Path.cwd()
+
+    if op in _CLI_MUTATING_VERBS and not _cli_write_allowed():
+        print("guard writable: refusing to change settings outside /guard:settings. "
+              "Ask the user to run `/guard:settings` — only the user may widen the gate.",
+              file=sys.stderr)
+        _trace(project_dir, None, "writable", "refused_no_skill_marker", op=op)
+        return 0
+
+    names: list[str] = []
+    rejected: list[str] = []
+    removing = op in ("remove", "rm")
+    for a in argv[1:]:
+        n = _norm_dir(a)
+        # Additions are validated against the same rule the gate applies at use, so
+        # the user learns NOW that a value would never take effect. Removals skip it:
+        # an entry that is no longer valid must still be removable.
+        if n and (removing or _safe_project_subdir(project_dir, n) is not None):
+            if n not in names:
+                names.append(n)
+        else:
+            rejected.append(str(a))
+
+    raw = _load_raw_config(project_dir)
+    cur_raw = raw.get("writable_dirs")
+    current: list[str] = []
+    if isinstance(cur_raw, list):
+        for c in cur_raw:
+            n = _norm_dir(c)
+            if n and n not in current:
+                current.append(n)
+
+    changed = False
+    if op == "set":
+        changed = names != current
+        current = names
+    elif op == "add":
+        for n in names:
+            if n not in current:
+                current.append(n)
+                changed = True
+    elif removing:
+        for n in names:
+            if n in current:
+                current.remove(n)
+                changed = True
+    elif op == "clear":
+        changed = bool(current)
+        current = []
+    # "list" / unknown → report only
+
+    if changed:
+        raw["writable_dirs"] = current
+        if not _write_config(project_dir, raw):
+            print("guard writable: failed to write .claude/guard.local.json", file=sys.stderr)
+            return 0
+
+    if rejected:
+        print("guard writable: rejected " + ", ".join(repr(r) for r in rejected)
+              + " — must be a project-relative directory inside the project, not the "
+                "project root and not guard's own .claude/guard files", file=sys.stderr)
+
+    # Report what the GATE will honor, not what the file literally holds: a
+    # hand-edited entry that validation drops must not be echoed back as if it were
+    # in effect — that is the same false sense of exemption the set-time rejection
+    # above exists to prevent.
+    effective = [n for n in current if _safe_project_subdir(project_dir, n) is not None]
+    ignored = [n for n in current if n not in effective]
+    if ignored:
+        print("guard writable: ignoring " + ", ".join(repr(n) for n in ignored)
+              + " in .claude/guard.local.json — not a usable directory (see above); "
+                "the gate does not honor them", file=sys.stderr)
+    print("writable_dirs: " + (", ".join(effective) if effective else "(none)"))
+    _trace(project_dir, None, "writable", op,
+           n=len(current), changed=changed, rejected=len(rejected))
     return 0
 
 
@@ -2010,6 +2296,10 @@ def _config_show_lines(project_dir: Path, session_id: str | None) -> list[str]:
 
     exempt = _exempt_skills(cfg)
     refs_rel = raw.get("refs_dir") if isinstance(raw.get("refs_dir"), str) else ""
+    # Rendered from the merged config (via _writable_dirs) rather than raw, so what is
+    # shown is what the gate will actually honor — an entry dropped by validation must
+    # not appear here as if it were in effect.
+    wdirs = [_project_rel(project_dir, d) for d in _writable_dirs(project_dir, cfg)]
     return [
         f"model: {cfg['model']}",
         f"effort: {_effort(cfg)}",
@@ -2017,6 +2307,7 @@ def _config_show_lines(project_dir: Path, session_id: str | None) -> list[str]:
         judge_line,
         "exempt_skills: " + (", ".join(sorted(exempt)) if exempt else "(none)"),
         "refs_dir: " + (refs_rel if refs_rel else "(default wiki/ref/)"),
+        "writable_dirs: " + (", ".join(wdirs) if wdirs else "(none)"),
     ]
 
 
@@ -2048,6 +2339,13 @@ def cmd_settings() -> int:
         for line in _config_show_lines(project_dir, session_id):
             print(line)
         _trace(project_dir, session_id, "settings", "show")
+        return 0
+
+    if not _cli_write_allowed():
+        print("guard settings: refusing to change settings outside /guard:settings. "
+              "Ask the user to run `/guard:settings` — only the user changes guard's "
+              "own configuration.", file=sys.stderr)
+        _trace(project_dir, session_id, "settings", "refused_no_skill_marker")
         return 0
 
     if len(positional) < 3:
@@ -2092,8 +2390,8 @@ def cmd_settings() -> int:
         raw["refs_dir"] = value  # "" resets to the default; _refs_dir validates at use
     else:
         print(f"guard settings: unknown or unsettable key {key!r}. Settable: edit_gate, "
-              "judge_gate, model, effort, refs_dir (exempt_skills via the exempt CLI).",
-              file=sys.stderr)
+              "judge_gate, model, effort, refs_dir (exempt_skills via the exempt CLI, "
+              "writable_dirs via the writable CLI).", file=sys.stderr)
         return 0
 
     if not _write_config(project_dir, raw):
@@ -2131,6 +2429,7 @@ SUBCOMMANDS = {
     "stop": cmd_stop,
     "session-start": cmd_session_start,
     "exempt": cmd_exempt,
+    "writable": cmd_writable,
     "refs-dir": cmd_refs_dir,
 }
 

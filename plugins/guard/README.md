@@ -98,12 +98,16 @@ The settings it manages:
 | `effort` | `low` / `medium` / `high` / `xhigh` / `max` | **Headless** judge reasoning effort. |
 | `refs_dir` | a path, or empty | Where cited-doc copies are saved (see [Configuration](#configuration)). |
 | `exempt_skills` | skill / command names | Skills whose turn the judge skips (see [Configuration](#configuration)). |
+| `writable_dirs` | project folders | Folders the approval gate lets edits through without asking (see [Configuration](#configuration)). |
 
 Changes take effect immediately and persist as the project default in
 `.claude/guard.local.json` — `edit_gate` and `judge_gate` also switch the current session,
 so you don't have to restart. `/guard:settings` is the only supported way to change these:
-guard blocks direct writes to its own config, so nothing but your own action through
-this command can weaken the guard.
+guard blocks direct writes to its own config, and settings changes made any other way are
+refused. That refusal is a guardrail against a wrong turn, not a security boundary —
+guard never blocks shell commands, so a determined agent could still reach its
+configuration. What you can rely on is that it happens in the open: any such attempt is a
+visible command in your transcript.
 
 ### Review modes
 
@@ -161,8 +165,11 @@ The gate only guards your **tracked project source**. Writes elsewhere are never
 blocked — anything outside your project directory (such as scratch files under the
 temp dir), and git-ignored paths inside it: scratch and temp files, local config
 (`*.local.*`), and skill-authored output such as a handoff document written to an
-ignored `.handover/`. (guard's own config and state are the one exception: they stay
-protected even though they're git-ignored, so nothing can quietly disable the guard.)
+ignored `.handover/`. You can also name folders of your own with `writable_dirs`
+(below) — useful for build output or generated code, where an approval prompt is pure
+friction. (guard's own config and state are the one exception: they stay protected even
+though they're git-ignored, and no `writable_dirs` entry can expose them, so nothing can
+quietly disable the guard.)
 
 ## Configuration
 
@@ -175,7 +182,8 @@ Configuration is optional. Create `.claude/guard.local.json` in your project:
   "edit_gate": "ask",
   "judge_gate": "manual",
   "exempt_skills": ["deep-research", "hindsight:review"],
-  "refs_dir": "docs/refs"
+  "refs_dir": "docs/refs",
+  "writable_dirs": ["build", "docs/generated"]
 }
 ```
 
@@ -187,6 +195,7 @@ Configuration is optional. Create `.claude/guard.local.json` in your project:
 | `judge_gate` | Session-start review mode for the evidence judge (`manual`/`subagent`/`headless`, see [Review modes](#review-modes)) | `"manual"` |
 | `exempt_skills` | Skills / slash commands whose turn the review skips, named `plugin:skill` (leading `/` and case ignored) | `[]` |
 | `refs_dir` | Project-relative folder where copies of cited official docs are saved. Empty means the git-tracked default `wiki/ref/`, so the collected references are committed with your repo; point it at a different tracked path (e.g. `"docs/refs"`) to override | `""` |
+| `writable_dirs` | Project-relative folders the approval gate lets edits through without asking (e.g. build output, generated code) | `[]` |
 
 `model` and `effort` apply to the **headless** review only; the **subagent** review
 runs on the `guardian` agent's own model and effort (Haiku / medium by default, set in
@@ -208,11 +217,19 @@ repo through your normal git workflow (guard never commits anything itself) and 
 citation stays inspectable after the upstream page changes. Set `refs_dir` to a
 different tracked folder to collect them elsewhere.
 
-You don't have to edit the file by hand. Run `/guard:settings` and pick `exempt_skills`
-to review the current list and record which skills to exempt:
+Use `writable_dirs` for folders where an approval prompt is only friction — build
+output, generated code, a scratch notes folder. Edits inside them go through without
+asking, while the rest of your source stays gated. List them project-relative
+(`build`, `docs/generated`); absolute paths, `..`, and your project root are refused,
+as is anything inside guard's own `.claude/guard` files — no entry can be used to turn
+the guard off. Folders that are already git-ignored need no entry: they're exempt
+anyway.
+
+You don't have to edit the file by hand. Run `/guard:settings` and pick the list you
+want to change to review its current contents and record a new selection:
 
 ```
-/guard:settings                     # then choose exempt_skills from the menu
+/guard:settings                     # then choose exempt_skills or writable_dirs
 ```
 
 ## Logs

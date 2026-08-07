@@ -16,8 +16,9 @@ line-by-line walkthrough.
 | `PostToolUse` (matcher `ExitPlanMode`) | `plan-approved` | On plan approval, arm the gate when the plan defers no in-scope work. |
 | `PostToolUse` (`Write\|Edit\|MultiEdit\|NotebookEdit`) | `gate-approved` | `edit_gate` ask only: after the user approves an edit's permission prompt, arm the session for the rest of the task. |
 | (called via Bash, not a hook) | `record-verified` | Guardian appends a passed turn's claims to the verified store. |
-| (called via Bash, not a hook) | `settings` | `guard:settings` skill (forked) shows/sets guard.local.json settings; `edit_gate`/`judge_gate` also apply to the live session's `state/<sid>.json` (session id from `--session`/`CLAUDE_CODE_SESSION_ID`). Every other key preserved; never `exempt_skills`. |
+| (called via Bash, not a hook) | `settings` | `guard:settings` skill (forked) shows/sets guard.local.json settings; `edit_gate`/`judge_gate` also apply to the live session's `state/<sid>.json` (session id from `--session`/`CLAUDE_CODE_SESSION_ID`). Every other key preserved; never the list keys (`exempt_skills`, `writable_dirs`). |
 | (called via Bash, not a hook) | `exempt` | `guard:settings` skill records the user's confirmed `exempt_skills` selection (that key only). |
+| (called via Bash, not a hook) | `writable` | `guard:settings` skill records the user's confirmed `writable_dirs` selection (that key only); rejects unusable values at set time. |
 | `Stop` | `stop` | manual: record pending target, no audit. subagent: dispatch guardian. headless: in-hook judge that blocks. |
 | `SessionStart` | `session-start` | Age-sweep state/sessions/verified/turns; export `GUARD_REFS_DIR` (resolved refs dir) via `$CLAUDE_ENV_FILE`. |
 | (called via Bash, not a hook) | `refs-dir` | Print the resolved refs directory (guardian fallback; applies `refs_dir` validation). |
@@ -181,41 +182,71 @@ payloads, not memory.
   turn. `_read_turn_from_transcript` flags the turn (`has_user_command`) and `cmd_stop`
   skips it (`skip_user_command`); the `!` records are never collected or rendered.
 - **The gate runs no judge** (so PreToolUse stays fast); its only subprocess is at most
-  one `git check-ignore` for exemption 3 below (5s timeout, fail-toward-gating). It
-  gates only `MUTATING_TOOLS`; Bash and reads/searches always pass.
-- **Three exemptions, all narrow.** The gate lets an unapproved write through only when:
+  one `git check-ignore` for exemption 4 below (5s timeout, fail-toward-gating). The
+  `resolve()` calls the path exemptions make are `lstat` walks, not subprocesses, so
+  they don't touch this invariant. It gates only `MUTATING_TOOLS`; Bash and
+  reads/searches always pass.
+- **Four exemptions, all narrow.** The gate lets an unapproved write through only when:
   1. **refs dir** — the target resolves inside the refs directory: `wiki/ref/`
      by default, or the `refs_dir` config path (the Grounded output style tells the
      assistant to save cited docs there — guard must not forbid its own required
      behavior). Both paths `resolve()`d so `..` can't escape. `_refs_dir` honors a
-     configured value only when it resolves strictly inside the project and outside
-     guard's own config/state — this exemption is checked before the guard-owned
-     exclusion, so an unvalidated `refs_dir` of `.claude/guard` or `.` would let the
-     model self-arm or exempt every project write.
-  2. **outside the project dir** (`_is_outside_project`) — not under `CLAUDE_PROJECT_DIR`
+     configured value only when `_safe_project_subdir` accepts it — this exemption is
+     checked before the guard-owned exclusion, so an unvalidated `refs_dir` of
+     `.claude/guard` or `.` would let the model self-arm or exempt every project write.
+  2. **user-designated writable dirs** (`writable_dirs`, `_writable_dirs`) — the general
+     form of 1: where refs is a hole guard opened for its OWN required behavior, these
+     are directories the user named (build output, a generated-code drop zone), so this
+     exemption rests on a user action like every other arming path. Entries pass the
+     same `_safe_project_subdir` validation; invalid ones are dropped at use and
+     rejected at set time by the `writable` CLI. Unlike 1, this check **is** nested
+     under `_is_guard_owned`, and that is load-bearing rather than defensive — see the
+     `.claude` case below.
+  3. **outside the project dir** (`_is_outside_project`) — not under `CLAUDE_PROJECT_DIR`
      (e.g. the session scratchpad under `/private/tmp`). Not project source, and Bash
      can already write there ungated, so gating the file-edit tools is pure friction.
      `git check-ignore` can't classify an out-of-repo path, so this is a separate check
      (and skips the subprocess).
-  3. **git-ignored** inside the repo — `git check-ignore` reports the target ignored:
+  4. **git-ignored** inside the repo — `git check-ignore` reports the target ignored:
      scratch/temp, local config (`**/*.local.*`), skill-authored docs (`/handoff` →
      `.handover/`). Honors the global gitignore too.
-  **Guard's own config + state are excluded from exemptions 2–3**
+  **Guard's own config + state are excluded from exemptions 2–4**
   (`_is_guard_owned`): `.claude/guard/` is itself git-ignored, so without this the model
   could `Write` `state/<sid>.json` to arm its own approval or edit `guard.local.json`
-  to disable the judge / change `judge_gate`. refs/ is the one deliberate hole and is
-  checked first. Failing to resolve a path ⇒ treated as guard-owned (no exemption).
-  (`exempt_skills` is edited only via the `exempt` CLI — that one key, never
-  `edit_gate`/`judge_gate`/state — so it can narrow the judge's coverage but not disable
-  the gate.)
+  to disable the judge / change `judge_gate`. refs/ is the one hole guard opens for
+  itself and is checked first. Failing to resolve a path ⇒ treated as guard-owned (no
+  exemption).
+- **`_safe_project_subdir` is the single self-neutering defense**, shared by `refs_dir`
+  and `writable_dirs`: strictly inside the project (the root itself fails, because a
+  path is never in its own `.parents` — this is what rejects `"."`), and never guard's
+  state root, a path under it, or the config file. Keep it one implementation; two
+  copies means one of them gets fixed.
+  **What it deliberately does not catch: an ANCESTOR of guard's state.** `.claude` is
+  neither the state root nor under it, so `writable_dirs: [".claude"]` is a legal entry
+  — and without `_is_guard_owned` on the write's own target, `.claude/guard/state/<sid>.json`
+  (self-arm) or `.claude/guard.local.json` (judge off) would ride exemption 2. The
+  use-site check is what closes that, not the config validation; do not remove it as
+  redundant.
+- **The config-mutating CLIs can weaken guard, and Bash is ungated.** `settings set
+  edit_gate off`, `exempt`, and `writable` all reach guard's own configuration, and the
+  model can invoke this script through Bash (`MUTATING_TOOLS` excludes it by design).
+  `_cli_write_allowed` requires a marker (`GUARD_SETTINGS_SKILL`) that only the
+  user-invoked `guard:settings` skill sets, on the mutating verbs of all three —
+  covering only `writable` would be theater, since `edit_gate off` is the easier move.
+  **This is a speed bump, not a boundary**: the variable name is in the source the model
+  reads. It buys that the unreflective path fails closed, that the refusal names the
+  user as the only legitimate widener, and that attempts land in the trace as
+  `refused_no_skill_marker`. A model that deliberately sets the marker is outside
+  guard's threat model — and the Bash call is visible to the user either way. Read
+  verbs (`list`, `show`) need no marker.
 - **Gated turns aren't audited (deny only).** A gate *denial* records `gated_prompt_id`;
   Stop skips that turn (its response is a plan/approval request, not claims to ground). A
   new turn has a new prompt_id, so the flag self-expires. An `ask` escalation records
   `asked_prompt_id` instead and does **not** set `gated_prompt_id`: an approved ask lets
   the edit happen, so the turn carries real work the judge should still audit. `ask`
   arming (`cmd_gate_approved`) keys on that marker — only an edit the gate actually asked
-  about arms approval, so an exempt write (refs/gitignored/outside) succeeding while
-  unapproved never arms.
+  about arms approval, so an exempt write (refs/writable_dirs/gitignored/outside)
+  succeeding while unapproved never arms.
 
 ## Config (`.claude/guard.local.json`)
 
@@ -234,7 +265,15 @@ skips, named with their plugin namespace (`plugin:skill`, e.g. `guard:settings`)
 for un-namespaced skills, matched leading-`/`-stripped and case-insensitively (guard's
 own `settings`/`judge` control commands are always exempt regardless). Manage
 `exempt_skills` interactively with the `guard:settings` skill (which records the user's
-chosen names via the `exempt` CLI); no need to hand-edit. `refs_dir`
+chosen names via the `exempt` CLI); no need to hand-edit. `writable_dirs`
+(list of strings, default `[]`) — project-relative directories the user designated as
+freely writable, exempting them from the approval gate (exemption 2 above). Managed with
+the `writable` CLI, which rejects unusable values at set time rather than storing them
+to be dropped later: a silently-dropped entry would leave the user believing a directory
+is exempt, and they would meet the truth as a surprise permission prompt with nothing
+naming the cause. `_writable_dirs` re-validates at use via `_safe_project_subdir`, so a
+hand-edited file is still safe, and `writable list` reports only the entries the gate
+actually honors. `refs_dir`
 (string, default `""`) — project-relative directory for the Grounded style's cited-doc
 copies; empty = the git-tracked default `wiki/ref/` (references committed with the
 repo), a different tracked path (e.g. `"docs/refs"`) overrides it; commits stay in the
@@ -275,6 +314,10 @@ printf '%s\n' \
 "$H" settings show --session s1
 "$H" settings set edit_gate off --session s1
 
+# Config-mutating CLI verbs require the settings-skill marker (see _cli_write_allowed);
+# export it once for the recipe. Read verbs (`show`, `list`) need nothing.
+export GUARD_SETTINGS_SKILL=1
+
 # headless judge on the turn (real claude; unsupported claim -> block)
 "$H" settings set judge_gate headless --session s1
 echo "{\"session_id\":\"s1\",\"prompt_id\":\"p1\",\"transcript_path\":\"$T\",\"last_assistant_message\":\"Redis is always faster than Postgres.\",\"stop_hook_active\":false}" | "$H" stop
@@ -291,9 +334,48 @@ echo '{"session_id":"s2","prompt_id":"pG","tool_name":"Write","tool_input":{"fil
 # subagent mode: Stop slices the turn to a file + injects a dispatch (no `decision`)
 "$H" settings set judge_gate subagent --session s1
 echo '{"session_id":"s1","prompt_id":"p1","claims":[{"claim":"x","evidence":"y"}]}' | "$H" record-verified
+
+# --- gate exemptions (deterministic apart from one `git check-ignore`) ---
+# Helper: prints the permissionDecision, or nothing when the write is exempt.
+g(){ echo "{\"session_id\":\"$1\",\"prompt_id\":\"p1\",\"tool_name\":\"Write\",\"tool_input\":{\"file_path\":\"$2\"}}" | "$H" gate; }
+rm -f "$CLAUDE_PROJECT_DIR/.claude/guard.local.json"
+mkdir -p "$CLAUDE_PROJECT_DIR"/{build,src,wiki/ref}
+
+# writable_dirs: a designated dir passes, project source still asks.
+"$H" writable set build
+g sW build/out.txt          # -> empty (allow_writable_dir)
+g sW src/app.py             # -> "ask"
+g sW build/../src/app.py    # -> "ask" (both sides resolve(); `..` can't escape)
+
+# Unusable values are refused at set time (each prints a `rejected` line, list unchanged).
+for bad in . .. .claude/guard ../elsewhere /etc; do "$H" writable add "$bad"; done
+
+# A hand-edited config never passed the CLI, so the READ path must drop the same values.
+printf '{"writable_dirs":[".",".claude/guard","build"]}\n' > "$CLAUDE_PROJECT_DIR/.claude/guard.local.json"
+"$H" writable list                         # -> "build" only, + an `ignoring` note on stderr
+g sX src/app.py                            # -> "ask"  (`.` dropped)
+g sX .claude/guard/state/sX.json           # -> "ask"  (self-arm blocked)
+g sX build/out.txt                         # -> empty
+
+# The `.claude` ANCESTOR case — a legal entry whose guard-owned children must still be
+# gated. This is the case `_is_guard_owned` in the writable branch exists for.
+printf '{"writable_dirs":[".claude"]}\n' > "$CLAUDE_PROJECT_DIR/.claude/guard.local.json"
+g sY .claude/notes.md                      # -> empty (legal)
+g sY .claude/guard.local.json              # -> "ask" (judge-off blocked)
+g sY .claude/guard/state/sY.json           # -> "ask" (self-arm blocked)
+
+# An exempt write must NOT arm the session (asked_prompt_id was never set).
+printf '{"writable_dirs":["build"]}\n' > "$CLAUDE_PROJECT_DIR/.claude/guard.local.json"
+g sZ build/out.txt
+echo '{"session_id":"sZ","prompt_id":"p1","tool_name":"Write","tool_input":{"file_path":"build/out.txt"}}' | "$H" gate-approved
+g sZ src/app.py                            # -> still "ask"
+
+# The mutating CLI verbs refuse without the marker; reads still work.
+(unset GUARD_SETTINGS_SKILL; "$H" writable add src; "$H" settings set edit_gate off; "$H" writable list)
 ```
 
 `gate`, `settings`, subagent `stop`, `record-verified`, and session
 subcommands are deterministic (no CLI/auth). Headless `stop` and `user-prompt` spawn a
-real `claude`. Unit-test the slice directly:
-`_read_turn_from_transcript(path, prompt_id)` on a fixture JSONL.
+real `claude`. Two pure functions are directly unit-testable:
+`_read_turn_from_transcript(path, prompt_id)` on a fixture JSONL, and
+`_safe_project_subdir(project_dir, value)` on the rejection cases above.
