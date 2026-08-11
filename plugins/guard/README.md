@@ -70,10 +70,11 @@ style.
 
 ## Usage
 
-guard exposes two commands:
+guard exposes three commands:
 
 - **`/guard:settings`** — view and change guard's settings for this project.
 - **`/guard:judge`** — judge the last completed turn on demand.
+- **`/guard:explain-simple`** — explain something in plain language.
 
 ### Configure guard
 
@@ -136,6 +137,34 @@ Whatever the mode, you can review the last completed turn yourself at any time:
 
 guard dispatches the `guardian` subagent to review that turn and report anything it
 finds.
+
+### Explain something simply
+
+When an explanation was hard to follow — or you just want a plain-language
+walkthrough — ask for it directly:
+
+```
+/guard:explain-simple                       # re-explain the previous answer, simply
+/guard:explain-simple how the gate arms     # explain a topic
+/guard:explain-simple scripts/guard_hook.py # explain a file
+```
+
+guard dispatches the `simple-explainer` subagent in a **clean context**. That
+matters: an agent that just wrote a tangled explanation tends to restate it rather
+than rethink it, so the plain-language version is written by an agent that has not
+absorbed the original framing.
+
+It is not working blind, though. It receives what it needs — your question in your
+own words, the answer being simplified, and the files involved — and then reads the
+code itself to check the explanation before writing it.
+
+That handover goes through a brief file rather than a prompt, and guard tells you
+where it is. If an explanation comes back off-target, open the brief: it shows
+exactly what the subagent was told, which is usually where the problem is.
+
+The answer comes back as plain prose rather than guard's usual cited form — no
+`file:line` trail — but anything the subagent could not confirm is still called out
+as unconfirmed.
 
 ### The approval gate
 
