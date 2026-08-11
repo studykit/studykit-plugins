@@ -473,6 +473,50 @@ def test_top_usage_hides_labels_under_jira(tmp_path: Path) -> None:
         assert not line.strip().startswith("labels")
 
 
+@pytest.mark.parametrize(
+    ("config", "verb"),
+    [
+        (cfg, verb)
+        for cfg, verbs in (
+            (
+                _GITHUB_CONFIG,
+                ("new", "update", "fetch", "search", "comment", "resume",
+                 "history", "link", "labels", "state"),
+            ),
+            (
+                _JIRA_CONFIG,
+                ("new", "update", "fetch", "search", "comment", "resume",
+                 "attach", "link", "state"),
+            ),
+        )
+        for verb in verbs
+    ],
+)
+def test_verb_help_usage_names_the_invoked_verb(
+    tmp_path: Path, config: str, verb: str
+) -> None:
+    """Each verb's --help must advertise the path that verb dispatch accepts.
+
+    argparse builds a sub-parser's usage line from its parent's ``prog``, so a
+    parent left at a bare ``"issue"`` makes nested groups print a path the
+    dispatcher rejects outright (``issue append`` for ``issue comment``) or one
+    that omits the verb entirely (``usage: issue`` for ``issue link``). Assert
+    only the leading path token, not the flag list.
+    """
+
+    _write_config(tmp_path, config)
+    code, stdout, _ = _capture_help(
+        issue_main, [verb, "--help", "--project", str(tmp_path)]
+    )
+    assert code == 0
+    usage = stdout.splitlines()[0]
+    assert usage.startswith(f"usage: issue {verb}"), usage
+    # The routing token dispatch injects internally must not surface as a
+    # doubled or unknown verb (`issue new publish`, `issue update update`).
+    assert not usage.startswith(f"usage: issue {verb} {verb}"), usage
+    assert "publish" not in usage, usage
+
+
 def test_labels_lists_configured_labels(tmp_path: Path) -> None:
     _write_config(tmp_path, _GITHUB_CONFIG_WITH_LABELS)
     code, stdout, _ = _capture_help(issue_labels_main, ["--project", str(tmp_path)])

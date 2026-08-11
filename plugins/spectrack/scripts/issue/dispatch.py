@@ -59,7 +59,11 @@ class IntentSpec:
     ``add_args`` / ``run`` name the ``add_<intent>_args`` /
     ``run_<intent>`` pair on the resolved :class:`issue.backend.IssueBackend`
     driver. ``label`` is the error-message prefix surfaced on a clean
-    failure. The two flags capture the only per-intent deviations from the
+    failure; it names the *intent*, which for a few verbs differs from the
+    verb the user typed (``new`` → ``issue draft``, ``link`` → ``issue
+    relationship``, ``state``/``assign`` → ``issue fields``), so it must not
+    be reused as the argparse ``prog`` — see ``run_intent``'s ``prog``
+    parameter. The two flags capture the only per-intent deviations from the
     shared dispatch path:
 
     - ``require_jira`` — the intent exists only on the Jira backend, so a
@@ -95,6 +99,7 @@ def run_intent(
     spec: IntentSpec,
     argv: list[str] | None = None,
     *,
+    prog: str | None = None,
     stdout: TextIO | None = None,
     stderr: TextIO | None = None,
     runner: CommandRunner | None = None,
@@ -105,6 +110,13 @@ def run_intent(
     loads the config, selects the backend, lets the backend register its
     intent options on a shared parser, and dispatches to the backend's
     ``run_<intent>`` driver. Returns the process exit code.
+
+    ``prog`` is the command path as the user actually types it (e.g.
+    ``"issue comment"``). argparse derives every nested sub-parser's usage
+    line from its parent's ``prog``, so this is what keeps
+    ``issue comment --help`` from advertising a bare ``issue append`` that no
+    verb dispatch accepts. Callers pass the invoked verb; the fallback covers
+    direct ``run_intent`` use in tests and standalone entry points.
     """
 
     out = stdout or sys.stdout
@@ -157,7 +169,7 @@ def run_intent(
         )
         return 2
 
-    parser = argparse.ArgumentParser(prog="issue")
+    parser = argparse.ArgumentParser(prog=prog or spec.label)
     parser.add_argument(
         "--project",
         type=Path,
@@ -278,39 +290,43 @@ def main(
         _print_usage(err, _active_provider(args))
         return 2
 
+    # Every branch passes ``prog=f"issue {verb}"`` so each verb's own --help
+    # (and that of any nested sub-parser it registers) prints the path the
+    # user actually typed, which is not always the intent's ``label``.
     kwargs = {"stdout": out, "stderr": err, "runner": runner}
+    prog = f"issue {verb}"
 
     if verb == "new":
-        return run_intent(DRAFTS, ["publish", *rest], **kwargs)
+        return run_intent(DRAFTS, ["publish", *rest], prog=prog, **kwargs)
     if verb == "update":
-        return run_intent(WRITEBACK, ["update", *rest], **kwargs)
+        return run_intent(WRITEBACK, ["update", *rest], prog=prog, **kwargs)
     if verb == "fetch":
-        return run_intent(FETCH, rest, **kwargs)
+        return run_intent(FETCH, rest, prog=prog, **kwargs)
     if verb == "search":
-        return run_intent(SEARCH, rest, **kwargs)
+        return run_intent(SEARCH, rest, prog=prog, **kwargs)
     if verb == "comment":
         if rest and rest[0] in {"append", "update", "resume"}:
-            return run_intent(COMMENTS, rest, **kwargs)
-        return run_intent(COMMENTS, ["append", *rest], **kwargs)
+            return run_intent(COMMENTS, rest, prog=prog, **kwargs)
+        return run_intent(COMMENTS, ["append", *rest], prog=prog, **kwargs)
     if verb == "resume":
-        return run_intent(RESUME, rest, **kwargs)
+        return run_intent(RESUME, rest, prog=prog, **kwargs)
     if verb == "history":
-        return run_intent(HISTORY, rest, **kwargs)
+        return run_intent(HISTORY, rest, prog=prog, **kwargs)
     if verb == "attach":
-        return run_intent(ATTACH, rest, **kwargs)
+        return run_intent(ATTACH, rest, prog=prog, **kwargs)
     if verb == "link":
-        return run_intent(RELATIONSHIPS, rest, **kwargs)
+        return run_intent(RELATIONSHIPS, rest, prog=prog, **kwargs)
     if verb == "labels":
-        return run_intent(LABELS, rest, **kwargs)
+        return run_intent(LABELS, rest, prog=prog, **kwargs)
     if verb == "state":
-        return _run_state(rest, kwargs=kwargs, stderr=err)
+        return _run_state(rest, kwargs=kwargs, prog=prog, stderr=err)
     if verb in {"assign", "unassign", "set-type"}:
-        return run_intent(FIELDS, [verb, *rest], **kwargs)
+        return run_intent(FIELDS, [verb, *rest], prog=prog, **kwargs)
 
     raise AssertionError(f"unreachable verb dispatch: {verb}")
 
 
-def _run_state(rest: list[str], *, kwargs: dict, stderr: TextIO) -> int:
+def _run_state(rest: list[str], *, kwargs: dict, prog: str, stderr: TextIO) -> int:
     """Translate ``state <ref> <target> [opts]`` into fields-intent argv.
 
     ``--help`` for the ``state`` verb is forwarded to the fields intent so
@@ -318,7 +334,7 @@ def _run_state(rest: list[str], *, kwargs: dict, stderr: TextIO) -> int:
     ``reopen``, configured Jira state-transition verbs) is surfaced.
     """
     if rest and rest[0] in {"-h", "--help"}:
-        return run_intent(FIELDS, ["--help"], **kwargs)
+        return run_intent(FIELDS, ["--help"], prog=prog, **kwargs)
     if len(rest) < 2:
         stderr.write(
             "issue state: expected `<issue-ref> <target>` "
@@ -327,4 +343,4 @@ def _run_state(rest: list[str], *, kwargs: dict, stderr: TextIO) -> int:
         )
         return 2
     ref, target, *opts = rest
-    return run_intent(FIELDS, [target, ref, *opts], **kwargs)
+    return run_intent(FIELDS, [target, ref, *opts], prog=prog, **kwargs)

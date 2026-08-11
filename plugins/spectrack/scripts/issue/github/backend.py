@@ -805,9 +805,11 @@ class GitHubIssueBackend:
         publish = subparsers.add_parser(
             "publish",
             # `publish` is the internal routing token dispatch injects for the
-            # user-facing `new` verb; force the help usage to read `issue new`
-            # so it never advertises a verb the dispatcher rejects.
-            prog="issue new",
+            # user-facing `new` verb. Inheriting the parent's prog verbatim
+            # (rather than argparse's default of appending the token) keeps the
+            # usage line at `issue new`, so it never advertises a token the
+            # dispatcher rejects, while still listing every flag.
+            prog=parser.prog,
             help="publish a new GitHub issue from a body file",
             epilog=(
                 "Labels must already exist in the repository. If a label is "
@@ -1013,6 +1015,10 @@ class GitHubIssueBackend:
         subparsers = parser.add_subparsers(dest="command", required=True)
         update = subparsers.add_parser(
             "update",
+            # Dispatch injects `update` as the routing token for the verb of
+            # the same name; inherit the parent's prog so the usage line reads
+            # `issue update` rather than a doubled `issue update update`.
+            prog=parser.prog,
             help="update one GitHub issue body from a body file",
             epilog=(
                 "For a partial edit, seed --body-file from the cached body "
