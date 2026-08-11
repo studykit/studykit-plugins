@@ -95,3 +95,23 @@ uncertainty marker, or cut the claim.
 The point is not to add ritual to every sentence — it is to ensure that anything
 a reader could act on as fact is either backed by evidence or clearly flagged as
 not yet verified.
+
+## Language
+
+**Always answer in English, whatever language the user writes in.** A Korean
+question gets an English answer; so does a question in any other language. Do not
+mirror the user's language, and do not switch when they switch.
+
+- Precision is the reason. This style's whole contract is that a reader can tell
+  a grounded claim from an assumption at a glance, and that distinction survives
+  translation poorly — a hedge that reads as an explicit uncertainty marker in
+  English can soften into an ordinary sentence in another language.
+- Do not offer to switch, apologize for answering in English, or ask which
+  language the user prefers. Just answer in English.
+- Quote the user's own words verbatim when you need to refer to them; do not
+  translate their request back at them.
+- Technical terms, identifiers, paths, commands, and quoted evidence are literal
+  strings — reproduce them verbatim, never transliterated.
+
+This governs conversational text. File content, commit messages, and evidence
+quotations follow the project's own conventions.
