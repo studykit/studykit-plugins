@@ -14,6 +14,9 @@ if str(_SCRIPTS_DIR) not in sys.path:
 
 from mustread import (  # noqa: E402
     BACKLOG_TRIGGER_NOTE,
+    DRAFT_CONFIRMATION_NOTE,
+    DRAFT_CONFIRMATION_TYPES,
+    PLAN_MODE_TYPES,
     RESEARCH_CONSOLIDATION_NOTE,
     RESEARCH_RECORDING_NOTE,
     RETROACTIVE_PUBLISH_STATE_GITHUB,
@@ -432,18 +435,45 @@ def test_retroactive_mode_notes(artifact_type: str) -> None:
 @pytest.mark.parametrize(
     "artifact_type,side",
     [
-        ("spike", None),
-        ("epic", None),
-        ("review", None),
         ("spec", None),
         ("architecture", None),
     ],
 )
-def test_non_implementation_types_omit_notes(
-    artifact_type: str, side: str | None
-) -> None:
+def test_knowledge_types_omit_notes(artifact_type: str, side: str | None) -> None:
     resolution = resolve_authoring(artifact_type, side=side)
     assert resolution.notes == ()
+
+
+@pytest.mark.parametrize("artifact_type", sorted(DRAFT_CONFIRMATION_TYPES))
+def test_issue_types_emit_draft_confirmation_note(artifact_type: str) -> None:
+    mode = "backlog" if artifact_type in PLAN_MODE_TYPES else None
+    resolution = resolve_authoring(artifact_type, side="issue", mode=mode)
+    assert DRAFT_CONFIRMATION_NOTE in resolution.notes
+
+
+def test_draft_confirmation_note_precedes_mode_note() -> None:
+    # The mode note directs what to record; the gate must land before it.
+    resolution = resolve_authoring("task", side="issue", mode="backlog")
+    assert resolution.notes.index(DRAFT_CONFIRMATION_NOTE) < resolution.notes.index(
+        BACKLOG_TRIGGER_NOTE
+    )
+
+
+def test_retroactive_mode_omits_draft_confirmation_note() -> None:
+    # Retroactive bodies record work that already landed — no scope left to settle.
+    resolution = resolve_authoring("task", side="issue", mode="retroactive")
+    assert DRAFT_CONFIRMATION_NOTE not in resolution.notes
+
+
+def test_comment_scope_omits_draft_confirmation_note() -> None:
+    resolution = resolve_authoring("task", side="issue", scope="comment")
+    assert DRAFT_CONFIRMATION_NOTE not in resolution.notes
+
+
+def test_usecase_defers_to_interview_note_over_draft_confirmation() -> None:
+    # The interview note already owns the dialogue for usecase.
+    resolution = resolve_authoring("usecase", side="issue")
+    assert DRAFT_CONFIRMATION_NOTE not in resolution.notes
 
 
 def test_research_issue_emits_recording_phase_note() -> None:
@@ -501,7 +531,7 @@ def test_task_comment_scope_omits_notes() -> None:
     [
         ("task", "issue", "content", "task-issue", "task-issue"),
         ("bug", "issue", "content", "bug-issue", "bug-issue"),
-        ("spike", "issue", "content", "spike-issue", None),
+        ("spike", "issue", "content", "spike-issue", "spike-issue"),
         ("spec", "knowledge", "content", "spec-knowledge", None),
         (
             "task",
@@ -555,9 +585,6 @@ def test_to_markdown_lists_files_relative_to_a_declared_base() -> None:
 @pytest.mark.parametrize(
     "artifact_type,side",
     [
-        ("spike", None),
-        ("epic", None),
-        ("review", None),
         ("spec", None),
         ("architecture", None),
         ("ci", None),

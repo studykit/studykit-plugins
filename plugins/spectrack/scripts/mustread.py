@@ -76,14 +76,34 @@ RUNTIME_GROUNDED_TYPES = {"task", "bug", "spike"}
 # rejected on every other surface.
 AUTHORING_MODES = ("backlog", "retroactive")
 
+# Issue types whose bodies are settled with the user before publishing. The
+# contract files describe what a body must contain, not who decides it — without
+# this note the resolver's own output reads as "start drafting", which is how a
+# body gets published before its scope was ever agreed. Excludes `usecase`
+# (its interview note already owns the dialogue) and `retroactive` mode (the
+# work already landed, so there is no scope left to settle).
+DRAFT_CONFIRMATION_TYPES = {"task", "bug", "spike", "epic", "review"}
+
+DRAFT_CONFIRMATION_NOTE = (
+    "Settle the body with the user before publishing it. Draft it, present "
+    "the draft, and publish only after they confirm. When scope, acceptance "
+    "criteria, or the type choice itself rests on an assumption you cannot "
+    "ground in the request or the code, ask instead of filling it in — offer "
+    "selectable options where the choice is bounded. Skip this note only when "
+    "the user explicitly asked to publish without review."
+)
+
 BACKLOG_TRIGGER_NOTE = (
     "Backlog mode: this is the open, not-yet-done spec. Record at least "
     "Description; add Context, Acceptance Criteria, and — for a bug — "
     "Reproduction to whatever level of detail is useful, from a brief "
-    "capture to a complete spec (both are valid). Do not work out a cause, "
-    "an approach, or implementation steps in the body — those are decided "
-    "against the current code when the item is picked up for implementation. "
-    "Publish in the backend's open/unresolved state."
+    "capture to a complete spec (both are valid). Which of those the item "
+    "warrants is the user's call, not a depth you pick alone — a brief "
+    "capture is a body they agreed to keep thin, not one you filled in "
+    "without asking. Do not work out a cause, an approach, or implementation "
+    "steps in the body — those are decided against the current code when the "
+    "item is picked up for implementation. Publish in the backend's "
+    "open/unresolved state."
 )
 
 RETROACTIVE_TRIGGER_NOTE = (
@@ -438,6 +458,10 @@ def _common_notes(
     notes: list[str] = []
     if artifact_type == "usecase":
         notes.append(USECASE_INTERVIEW_NOTE)
+    # Ordered ahead of the mode notes: those direct what to record, and the
+    # gate has to land before the instruction to start recording.
+    if artifact_type in DRAFT_CONFIRMATION_TYPES and mode != "retroactive":
+        notes.append(DRAFT_CONFIRMATION_NOTE)
     if artifact_type in PLAN_MODE_TYPES:
         if mode == "backlog":
             notes.append(BACKLOG_TRIGGER_NOTE)

@@ -24,6 +24,17 @@ this project's backend, then `spectrack issue <verb> --help` for a verb's
 flags and usage.
 </commands>
 
+<authoring-issues>
+An issue body is settled with the user, not drafted unilaterally. Before
+publishing one, discuss what it should say, present the draft, and
+publish only after the user confirms it. Where the scope, the acceptance
+criteria, or the type choice itself is ambiguous, ask before drafting —
+use the `AskUserQuestion` tool with selectable options when the choice is
+bounded, so the user need not type a reply. A published issue whose scope
+was never agreed costs more to unwind than a question costs to ask.
+Publish without that exchange only when the user explicitly asked you to.
+</authoring-issues>
+
 <implementing-issues>
 A workflow `task` / `bug` / `spike` issue body is a spec — what / why /
 done — not a plan. Before settling the approach, read the issue's full
