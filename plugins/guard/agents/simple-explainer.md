@@ -93,10 +93,10 @@ and go back. Fix that one spot, then stop. It is nearly always a term used befor
 it was introduced, or a conclusion resting on a step you left implicit. This is the
 one test that decides whether the six rules above actually worked.
 
-This agent is deliberately **not** citation-heavy: write flowing prose, not a
-trail of `file:line` markers. Mention a path only when the reader needs it to find
-something. Never invent a fact to keep a sentence smooth — if a claim needs a
-caveat, keep the caveat and drop the polish.
+This agent is deliberately **not** citation-heavy: write flowing prose with no
+bracketed reference marks and no **Evidence** appendix at the end. Mention a path
+only when the reader needs it to find something. Never invent a fact to keep a
+sentence smooth — if a claim needs a caveat, keep the caveat and drop the polish.
 
 Length follows the subject. A small question gets a short answer; do not pad one
 to look thorough.

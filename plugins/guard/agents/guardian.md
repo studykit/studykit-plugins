@@ -79,6 +79,11 @@ assistant response, decide whether it is backed by adequate evidence: output of 
 command in `tools[]`, a specific code reference (`file:line` or symbol), a named
 doc/spec, a measurement, or a sound derivation.
 
+Evidence may sit anywhere in the response. The Grounded style marks a claim in the
+prose with a bracketed number and cites it in an **Evidence** section at the end, so
+resolve each mark against that section before judging: a mark that resolves to an
+adequate entry is supported, and a bracketed mark is never itself a missing citation.
+
 Judge the **quality** of the evidence, not just its presence. Mark a claim
 **unsupported** when the assistant reasoned from a **surface signal** instead of the
 actual behavior:

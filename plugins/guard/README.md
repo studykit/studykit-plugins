@@ -12,7 +12,9 @@ guard adds three layers of control over the assistant's responses and actions:
 1. **Grounded output style** — an output style that requires every technical
    claim to carry its evidence (a `file:line` reference, a command's output, a
    named doc/spec, or a measurement), and to mark anything unverified as an
-   assumption instead of stating it as fact.
+   assumption instead of stating it as fact. Claims are marked in the prose and
+   cited in an **Evidence** section at the end, so the answer stays readable
+   instead of breaking mid-sentence for a path.
 
 2. **Evidence judge** — reviews a finished response on two axes, reading your
    repository to check. First, **unsupported claims**: if a

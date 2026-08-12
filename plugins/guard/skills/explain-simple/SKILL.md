@@ -103,12 +103,13 @@ the answer, even if the subject is one you just worked on. Dispatch and relay.
 
 ## Notes
 
-The explanation is intentionally plain prose, not evidence-cited: no `file:line`
-trail, no quoted output blocks. That is a deliberate exception to guard's usual
-grounding form, scoped to this skill — the subagent still verifies what it says
-against the code, it just does not decorate the prose with coordinates. It is told
-to keep any caveat about what it could not confirm, so an uncertainty must survive
-into your relayed answer. Never delete one to make the result read more smoothly.
+The explanation is intentionally plain prose, not evidence-cited: no bracketed
+marks, no **Evidence** appendix, no quoted output blocks. That is a deliberate
+exception to guard's usual grounding form, scoped to this skill — the subagent still
+verifies what it says against the code, it just does not carry the citation
+apparatus. Do not add an Evidence section when you relay it. It is told to keep any
+caveat about what it could not confirm, so an uncertainty must survive into your
+relayed answer. Never delete one to make the result read more smoothly.
 
 Leave the brief file where you wrote it. It is the record of what the subagent was
 given, so it stays readable after the turn; the scratchpad is temporary storage and
