@@ -1134,10 +1134,11 @@ PLAN_DEFER_SCHEMA = {
 }
 
 EVIDENCE_SYSTEM = (
-    "You audit an assistant's response from a coding session on TWO axes: unsupported "
-    "technical claims (AXIS 1) and unjustified deferrals (AXIS 2), both defined below.\n\n"
+    "You audit an assistant's response from a coding session on TWO axes: "
+    "unsupported claims (AXIS 1) and unjustified deferrals (AXIS 2), both defined below.\n\n"
     "TRIAGE FIRST — before reading anything. Scan the response for something to verify: "
-    "a load-bearing technical claim or a deferral. If it has NEITHER — it only plans, "
+    "a load-bearing claim (per AXIS 1: any checkable statement, not only technical "
+    "behavior) or a deferral. If it has NEITHER — it only plans, "
     "asks the user a question, proposes an approach, or narrates an action already shown "
     "in TOOL_ACTIVITY — return verdict='pass' with empty `claims` and `deferrals` "
     "IMMEDIATELY, without reading the repository or calling any tool. Do not spend tool "
@@ -1153,16 +1154,26 @@ EVIDENCE_SYSTEM = (
     "confirmed (with their evidence) in earlier turns of this session. Treat them as "
     "established — a claim consistent with a verified fact is SUPPORTED and need not "
     "be re-derived.\n\n"
-    "AXIS 1 — unsupported or shallowly-supported technical claims. A technical claim "
-    "asserts how a system, tool, language, library, API, algorithm, configuration, or "
-    "codebase behaves or performs. For each load-bearing claim, decide if it is "
+    "AXIS 1 — unsupported or shallowly-supported claims. A claim is ANY statement the "
+    "reader could check and find wrong, not only technical behavior. Technical claims "
+    "are the obvious case (how a system, tool, library, API, algorithm, configuration, "
+    "or codebase behaves or performs), but the same bar applies to what a file "
+    "contains or lacks, history and process ('added for X', 'tests passed before'), "
+    "what a tool or subagent reported, counts and comparisons ('the only place', "
+    "'most of'), what the user decided earlier, and attributions of cause. A genuine "
+    "preference or aesthetic judgment is NOT a claim: 'cleaner' is a preference, "
+    "'allocates less' is a claim. For each load-bearing claim, decide if it is "
     "backed by adequate evidence: output of a command in TOOL_ACTIVITY, a specific "
     "code reference (file:line or symbol), a named doc/spec, a measurement, or a sound "
-    "derivation. Evidence may sit anywhere in the response: the Grounded style marks a "
-    "claim in the prose with a bracketed number and cites it in an Evidence section at "
-    "the end, so resolve each mark against that section before judging — a claim whose "
-    "mark resolves to an adequate entry is SUPPORTED, and a bracketed mark is never "
-    "itself a missing citation. Judge the QUALITY of the evidence, not just its presence — mark the "
+    "derivation. Evidence may sit anywhere in the response: the Grounded style keeps "
+    "citations out of the prose, so a claim carries a short reference mark (whose exact "
+    "form is up to the answer) and the citation sits in a References section closing the "
+    "answer. Resolve whatever marks you find against that section before judging: a "
+    "claim whose mark is backed by an adequate entry is SUPPORTED, and the mark's "
+    "presence is not itself a missing citation — but a mark resolving to NOTHING, or to "
+    "an entry that does not establish the claim, is UNSUPPORTED exactly as an uncited "
+    "claim would be. Follow the link; never credit a claim for merely carrying a mark. "
+    "Judge the QUALITY of the evidence, not just its presence — mark the "
     "claim UNSUPPORTED when the assistant reasoned from a SURFACE SIGNAL instead of "
     "the actual behavior: inferring what a function does from its NAME, a comment, a "
     "variable/type name, a filename, or a docstring without reading the body; assuming "
@@ -1174,7 +1185,7 @@ EVIDENCE_SYSTEM = (
     "(Read/Glob) and supports the claim — a docs claim with no existing local copy, "
     "or a path that is missing, is UNSUPPORTED. "
     "Statements explicitly flagged as unverified assumptions are NOT violations; "
-    "opinions and hedged suggestions are NOT claims.\n\n"
+    "genuine preferences and hedged suggestions are NOT claims.\n\n"
     "AXIS 2 — unjustified deferrals. The assistant must not punt on something it "
     "could resolve by reading the code. Flag every place it defers, postpones, or "
     "declares uncertainty about a matter of FACT that the repository would answer — "
@@ -1973,7 +1984,7 @@ def cmd_stop() -> int:
     if unsupported:
         lines = [f"- {c.get('claim', '').strip()}" for c in unsupported[:6] if c.get("claim")]
         sections.append(
-            "Technical claims stated as fact without adequate evidence — ground each "
+            "Claims stated as fact without adequate evidence — ground each "
             "(cite file:line, a command's output, a named doc/spec, or a measurement) "
             "or explicitly mark it as an unverified assumption:\n" + "\n".join(lines)
         )
@@ -2049,14 +2060,27 @@ def cmd_session_start() -> int:
     # a SessionStart hook may append `export` lines to $CLAUDE_ENV_FILE and the
     # variables reach all subsequent Bash commands
     # (https://code.claude.com/docs/en/hooks, "CLAUDE_ENV_FILE").
+    refs = _refs_dir(project_dir, _load_config(project_dir))
     env_file = os.environ.get("CLAUDE_ENV_FILE")
     if env_file:
-        refs = _refs_dir(project_dir, _load_config(project_dir))
         try:
             with open(env_file, "a", encoding="utf-8") as fh:
                 fh.write(f"export GUARD_REFS_DIR={shlex.quote(str(refs))}\n")
         except OSError:
             pass
+
+    # The Grounded style states the general rule — a doc-based claim cites the source
+    # URL and a local saved copy — but not where this project keeps that copy, which
+    # is per-project config (`refs_dir`). Inject the resolved path here instead: for
+    # SessionStart, plain stdout becomes context the model can act on (docs:
+    # https://code.claude.com/docs/en/hooks, "Exit code 0"). Without it the judge
+    # would fail a docs claim for a missing refs copy that nothing told the model
+    # where to write.
+    print(
+        "guard: when a claim rests on official documentation, save the cited content "
+        f"to this project's refs directory — {refs} — and cite both the source URL "
+        "and that local path. The same path is in $GUARD_REFS_DIR for Bash."
+    )
     _trace(project_dir, None, "session-start", "swept")
     return 0
 

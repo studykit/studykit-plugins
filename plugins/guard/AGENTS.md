@@ -5,7 +5,7 @@ Claude Code only (it relies on the `claude` CLI and Claude-specific hook payload
 no Codex path). Requires Python 3.11+ (the dispatcher uses `enum.StrEnum`):
 
 1. **Evidence judge** (Stop) — a repo-reading audit that flags a turn on an
-   unsupported/surface-signal technical claim or an unjustified deferral. Runs in one
+   unsupported/surface-signal claim or an unjustified deferral. Runs in one
    of three modes set by `judge_gate` (`/guard:settings judge_gate`): `manual` (default —
    no audit at Stop, the judge's practical off; `/guard:judge` dispatches the `guardian`
    subagent for the last completed turn on demand), `subagent` (the Stop hook injects

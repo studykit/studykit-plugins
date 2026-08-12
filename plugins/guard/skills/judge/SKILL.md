@@ -1,6 +1,6 @@
 ---
 name: judge
-description: 'On demand, judge the last completed turn for evidence grounding — guard dispatches the guardian subagent to check that turn''s technical claims against the repository. Use when you want a specific turn verified instead of guard auto-auditing every turn. Claude Code only.'
+description: 'On demand, judge the last completed turn for evidence grounding — guard dispatches the guardian subagent to check that turn''s claims against the repository. Use when you want a specific turn verified instead of guard auto-auditing every turn. Claude Code only.'
 argument-hint: ''
 disable-model-invocation: true
 ---

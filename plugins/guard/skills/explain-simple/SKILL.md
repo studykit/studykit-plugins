@@ -104,10 +104,10 @@ the answer, even if the subject is one you just worked on. Dispatch and relay.
 ## Notes
 
 The explanation is intentionally plain prose, not evidence-cited: no bracketed
-marks, no **Evidence** appendix, no quoted output blocks. That is a deliberate
+marks, no **References** section, no quoted output blocks. That is a deliberate
 exception to guard's usual grounding form, scoped to this skill — the subagent still
 verifies what it says against the code, it just does not carry the citation
-apparatus. Do not add an Evidence section when you relay it. It is told to keep any
+apparatus. Do not add a References section when you relay it. It is told to keep any
 caveat about what it could not confirm, so an uncertainty must survive into your
 relayed answer. Never delete one to make the result read more smoothly.
 

@@ -94,7 +94,7 @@ it was introduced, or a conclusion resting on a step you left implicit. This is 
 one test that decides whether the six rules above actually worked.
 
 This agent is deliberately **not** citation-heavy: write flowing prose with no
-bracketed reference marks and no **Evidence** appendix at the end. Mention a path
+reference marks and no **References** section at the end. Mention a path
 only when the reader needs it to find something. Never invent a fact to keep a
 sentence smooth — if a claim needs a caveat, keep the caveat and drop the polish.
 
