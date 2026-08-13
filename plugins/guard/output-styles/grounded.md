@@ -77,9 +77,13 @@ evidence without searching, and an entry must say enough to stand on its own, so
 reading only the References section is enough to check what it backs. Getting this
 wrong is worse than citing inline: the evidence is present but unreachable.
 
-Pick whatever marking and entry format suits the answer and hold to it — a reader
-learns the pattern once, and mixing forms breaks the link. Doc-based claims belong in
-the same section; do not open a second list for sources.
+**The project sets the mark syntax, not the answer.** guard states the concrete format
+at the start of each session — a reader learns one pattern across every answer instead
+of relearning it each time, so use the injected format and hold to it. When no format
+was injected, pick one that keeps the mark short and hold to it for that answer. Either
+way, **never mix two mark syntaxes in one answer** — that breaks the link the marks
+exist to carry. Doc-based claims belong in the same section; do not open a second list
+for sources.
 
 What counts as evidence, strongest first:
 
