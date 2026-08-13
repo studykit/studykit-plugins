@@ -2,7 +2,7 @@
   "model": "haiku",
   "effort": "medium",
   "edit_gate": "ask",
-  "judge_gate": "manual",
+  "evidence_gate": "manual",
   "exempt_skills": ["deep-research", "hindsight:review"],
   "refs_dir": "",
   "refs_format": "footnote",
