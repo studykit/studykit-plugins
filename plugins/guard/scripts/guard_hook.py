@@ -15,16 +15,16 @@ Subcommands
                  which sees the last few archived user/assistant messages as context
                  (``_recent_dialogue``) so a short consent ("go ahead") arms only when
                  it answers a proposed plan. Only a user message can arm approval.
-                 guard's own ``/guard:settings`` / ``/guard:judge`` commands are
+                 guard's own ``/guard:settings`` / ``/guard:audit-evidence`` commands are
                  ignored here (not turns).
 - settings       CLI (argv), run by the ``guard:settings`` skill (forked) via Bash.
                  ``show`` prints the current settings; ``set <key> <value>`` changes one
                  of ``edit_gate`` (``ask``|``deny``|``off`` — the APPROVAL GATE, where
                  ``off`` disables it and ``ask``/``deny`` pick how an unapproved edit is
-                 stopped), ``judge_gate`` (``manual``|``subagent``|``headless`` — the
+                 stopped), ``evidence_gate`` (``manual``|``subagent``|``headless`` — the
                  evidence judge, independent of the gate; ``manual`` is its practical
                  off), ``model``, ``effort``, or ``refs_dir``.
-                 ``edit_gate``/``judge_gate`` also apply to the live session's
+                 ``edit_gate``/``evidence_gate`` also apply to the live session's
                  ``state/<sid>.json`` when a session id is available (``--session``, which
                  the forked skill passes as ``${CLAUDE_SESSION_ID}``, else the inherited
                  ``CLAUDE_CODE_SESSION_ID``); the rest are read from the config file at
@@ -33,14 +33,14 @@ Subcommands
                  ``writable``), not here. Mutating verbs require the settings-skill
                  marker — see ``_cli_write_allowed``. Not a hook event.
 - verify         UserPromptExpansion (matcher ``^(guard:)?judge$``). On demand, emit the
-                 guardian-dispatch instruction for the last completed turn
+                 evidence auditor-dispatch instruction for the last completed turn
                  (``pending_verify_prompt_id``, recorded by manual-mode Stop). Reads no
                  transcript — the slice is already on disk. The on-demand counterpart to
                  auto-auditing; works in any mode.
 - exempt         CLI (argv), run by the ``guard:settings`` skill via Bash after the user
                  confirms an interactive selection. ``list``/``set``/``add``/
                  ``remove``/``clear`` the ``exempt_skills`` config key — that key ONLY,
-                 never ``edit_gate``/``judge_gate``/state. Mutating verbs require the
+                 never ``edit_gate``/``evidence_gate``/state. Mutating verbs require the
                  settings-skill marker (``_cli_write_allowed``). Not a hook event.
 - writable       CLI (argv), same shape as ``exempt``, for the ``writable_dirs`` config
                  key — the directories the user designated writable, which the approval
@@ -72,7 +72,7 @@ Subcommands
                  the session's ``approved`` so the rest of the task's edits pass. The
                  user's click arms it — the model cannot approve its own prompt. No-op
                  in ``deny`` mode and once already approved.
-- record-verified Append verified facts for a passed turn. Called by the guardian
+- record-verified Append verified facts for a passed turn. Called by the evidence auditor
                  subagent (subagent mode) via Bash so its confirmed claims reach the
                  verified store through the same single writer as the headless path.
 - stop           Stop. A turn == the transcript ``prompt_id``; guard reads the whole
@@ -83,13 +83,13 @@ Subcommands
                  gated (``gated_prompt_id``), the slice contains a user ``!`` command
                  (its output arrives after the judged response, so it is neither
                  evidence nor auditable here), or the turn was opened by guard's own
-                 ``/guard:settings`` / ``/guard:judge`` control
+                 ``/guard:settings`` / ``/guard:audit-evidence`` control
                  command or a user-configured ``exempt_skills`` entry (skill output / a
-                 relay, not claims to ground). Otherwise branch on ``judge_gate``.
+                 relay, not claims to ground). Otherwise branch on ``evidence_gate``.
                  ``manual`` (default): do not audit — record the turn as the pending
-                 ``/guard:judge`` target and emit nothing. ``subagent``: do not
+                 ``/guard:audit-evidence`` target and emit nothing. ``subagent``: do not
                  judge/block — slice the turn to a file and emit additionalContext asking
-                 the main agent to dispatch ``guard:guardian``. ``headless``: judge the
+                 the main agent to dispatch ``guard:evidence-auditor``. ``headless``: judge the
                  turn (+ VERIFIED_FACTS) on two axes; block on an unsupported claim or a
                  repo-resolvable deferral; on PASS append supported claims to the
                  verified store.
@@ -98,14 +98,14 @@ Subcommands
                  refs directory) via ``$CLAUDE_ENV_FILE`` for the session's Bash
                  environment.
 - refs-dir       Print the resolved refs directory (absolute), applying the
-                 ``refs_dir`` validation. Called via Bash (guardian fallback / the
+                 ``refs_dir`` validation. Called via Bash (evidence auditor fallback / the
                  output style), not a hook event.
 
 State lives project-local under ``${CLAUDE_PROJECT_DIR}/.claude/guard/``:
-- ``state/<sid>.json``       — {edit_gate, approved, judge_gate, last_audited_prompt_id, gated_prompt_id, asked_prompt_id, pending_verify_prompt_id, updated_at}
+- ``state/<sid>.json``       — {edit_gate, approved, evidence_gate, last_audited_prompt_id, gated_prompt_id, asked_prompt_id, pending_verify_prompt_id, updated_at}
 - ``sessions/<sid>.jsonl``   — full session archive: one record per turn / verdict
 - ``turns/<sid>/<pid>.json`` — subagent and manual modes: the turn slice guard hands the
-                                guardian subagent ({user, tools[], assistant})
+                                evidence auditor subagent ({user, tools[], assistant})
 - ``verified/<sid>.jsonl``   — verified facts from PASSED turns: {turn, claim, evidence}
 - ``trace.log``              — file-only debug trace (enabled by GUARD_TRACE)
 
@@ -117,15 +117,15 @@ Configuration (optional) is a JSON object at
 ``${CLAUDE_PROJECT_DIR}/.claude/guard.local.json``: ``model`` (string, default
 ``"haiku"``), ``effort`` (one of low/medium/high/xhigh/max, default ``"medium"``
 — reasoning effort of the HEADLESS judge only; the subagent judge's model/effort come
-from the ``guardian`` agent's own frontmatter, not these keys), ``edit_gate``
+from the ``evidence-auditor`` agent's own frontmatter, not these keys), ``edit_gate``
 (``"ask"``|``"deny"``|``"off"``, default ``"ask"``) — the APPROVAL GATE: ``off``
 disables it, ``ask`` escalates to Claude Code's permission prompt (approve inline; the
 approval arms the session for the rest of the task), ``deny`` blocks the call and
-drives the plan→approve workflow, and ``judge_gate``
+drives the plan→approve workflow, and ``evidence_gate``
 (``"manual"``|``"subagent"``|``"headless"``, default ``"manual"``) — how the Stop-time
 evidence judge runs, independent of the gate (manual: no auto-audit — the judge's
-practical off — verify on demand via ``/guard:judge``; subagent: dispatch the
-``guardian`` subagent each turn; headless: in-hook judge that blocks), and
+practical off — verify on demand via ``/guard:audit-evidence``; subagent: dispatch the
+``evidence-auditor`` subagent each turn; headless: in-hook judge that blocks), and
 ``exempt_skills`` (list of strings, default ``[]``) — skills / slash
 commands whose turn the Stop judge must not audit, named with their plugin namespace
 (``plugin:skill``, e.g. ``guard:settings``) or bare for un-namespaced skills; matched
@@ -143,7 +143,7 @@ which the approval gate exempts; entries pass the same validation as ``refs_dir`
 by the ``writable`` CLI. Unknown keys are ignored; a missing or malformed file falls
 back to all defaults. The judge always reads the repo (Read/Grep/Glob/Bash) to verify
 claims. The ``guard:settings`` skill changes these through the ``settings`` CLI: it writes
-guard.local.json and, for ``edit_gate`` / ``judge_gate``, the live session's state.
+guard.local.json and, for ``edit_gate`` / ``evidence_gate``, the live session's state.
 
 Requires Python 3.11+ (uses ``enum.StrEnum``).
 """
@@ -173,8 +173,8 @@ class EditGate(StrEnum):
     OFF = "off"
 
 
-class JudgeGate(StrEnum):
-    """How the Stop-time evidence judge runs (see DEFAULT_CONFIG["judge_gate"])."""
+class EvidenceGate(StrEnum):
+    """How the Stop-time evidence judge runs (see DEFAULT_CONFIG["evidence_gate"])."""
 
     MANUAL = "manual"
     HEADLESS = "headless"
@@ -207,10 +207,10 @@ DEFAULT_CONFIG: dict[str, Any] = {
     # task's edits pass without re-prompting — the click, not the model, arms it.
     # "deny" instead blocks the tool call with a reason, forcing the model to present a
     # plan and win approval in a message (the stricter plan→approve workflow). The
-    # evidence judge is a separate setting (`judge_gate`); "manual" is its practical
-    # off (nothing runs unless the user asks via /guard:judge).
+    # evidence judge is a separate setting (`evidence_gate`); "manual" is its practical
+    # off (nothing runs unless the user asks via /guard:audit-evidence).
     "edit_gate": EditGate.ASK,
-    "judge_gate": JudgeGate.MANUAL,
+    "evidence_gate": EvidenceGate.MANUAL,
     # Skills / slash commands whose turn the Stop judge must NOT audit. A turn opened
     # by one of these is skill output or a relay, not a body of technical claims to
     # ground. Values are the name as it appears after the slash, INCLUDING the plugin
@@ -226,6 +226,13 @@ DEFAULT_CONFIG: dict[str, Any] = {
     # project root, or into guard's own config/state are ignored (fall back to the
     # default) — see _refs_dir for why.
     "refs_dir": "",
+    # Which reference-mark format the Grounded style uses. The style itself states only
+    # that a mark must be short and must resolve; the concrete syntax is per-project
+    # because it depends on where the user READS the answers — a terminal renders
+    # `[[#^id]]` as inert text, an Obsidian vault turns it into a jump target. Injected
+    # at SessionStart (see cmd_session_start) rather than written into the style, so one
+    # style file serves both. Unknown values fall back to the default.
+    "refs_format": "footnote",
     # Project-relative directories the user has designated as freely writable: the
     # approval gate lets an unapproved write through when the target is inside one.
     # The general form of the refs-dir hole — a user-chosen allowlist (build output, a
@@ -237,15 +244,50 @@ DEFAULT_CONFIG: dict[str, Any] = {
 }
 
 VALID_EFFORTS = {"low", "medium", "high", "xhigh", "max"}
-# The evidence-judge settings live on JudgeGate:
-# JudgeGate.MANUAL (default): the hook does NOT audit at Stop — it archives the turn and
+
+# Reference-mark formats for the Grounded style, keyed by the `refs_format` config value.
+# Each value is the instruction injected at SessionStart — it must be self-contained,
+# because it is the ONLY place the concrete syntax is stated (the style file stays
+# format-agnostic on purpose; see the `refs_format` comment in DEFAULT_CONFIG).
+#
+# Both syntaxes are quoted from saved sources: wiki/ref/markdown-footnotes.md and
+# wiki/ref/obsidian-block-links.md. Footnote ids are REQUIRED to be numeric (user's
+# call) even though the spec allows words: the renderer numbers sequentially regardless,
+# so a number is what the reader sees anyway, and one form throughout keeps marks uniform
+# within an answer. `_check_reference_marks` enforces it — guard's rule is deliberately
+# stricter than Markdown's, and only for footnotes (Obsidian block ids stay descriptive).
+# Caveat on Obsidian: the same-note `[[#^id]]` form is NOT in its docs and
+# was verified by the user in the app — do not attribute it to Obsidian's documentation.
+REFS_FORMATS: dict[str, str] = {
+    "footnote": (
+        "Mark each claim with a Markdown footnote reference — a caret and a number in "
+        "brackets, `[^1]` — and close the answer with a References section "
+        "whose entries are footnote definitions: `[^1]: path/to/file.ext:12-14 — "
+        '"the quoted line"`. Identifiers must be NUMBERS — `[^1]`, `[^2]` — numbered in '
+        "order of first appearance. Markdown also permits word identifiers, but do not "
+        "use them here: the renderer numbers footnotes sequentially regardless, so a "
+        "number is what the reader sees anyway, and one form throughout keeps the marks "
+        "uniform. Reuse one number for a source cited more than once."
+    ),
+    "obsidian": (
+        "Mark each claim with an Obsidian same-note block link — `[[#^some-id]]` — and "
+        "close the answer with a References section whose entries carry the matching "
+        "block identifier: a blank space, a caret, and the id at the END of the entry "
+        'line, e.g. `path/to/file.ext:12-14 — "the quoted line" ^some-id`. Block ids '
+        "may use only Latin letters, numbers, and dashes; prefer a short descriptive id "
+        "over a number. Reuse one id for a source cited more than once."
+    ),
+}
+DEFAULT_REFS_FORMAT = "footnote"
+# The evidence-judge settings live on EvidenceGate:
+# EvidenceGate.MANUAL (default): the hook does NOT audit at Stop — it archives the turn and
 #   records it as the pending verify target; verification runs only on demand via
-#   `/guard:judge`, which dispatches the guardian. This is the judge's practical off.
-#   The approval gate is unaffected (it is governed by `edit_gate`, not `judge_gate`).
-# JudgeGate.SUBAGENT: the hook does not judge/block — it injects the turn + verified
-#   paths as additionalContext and the main agent dispatches the `guardian` subagent to
+#   `/guard:audit-evidence`, which dispatches the evidence auditor. This is the judge's practical off.
+#   The approval gate is unaffected (it is governed by `edit_gate`, not `evidence_gate`).
+# EvidenceGate.SUBAGENT: the hook does not judge/block — it injects the turn + verified
+#   paths as additionalContext and the main agent dispatches the `evidence-auditor` subagent to
 #   audit every turn.
-# JudgeGate.HEADLESS: spawn an isolated `claude` inside the hook and block the turn (the
+# EvidenceGate.HEADLESS: spawn an isolated `claude` inside the hook and block the turn (the
 #   original path).
 
 # Tools the approval gate blocks before approval. Bash is intentionally NOT gated:
@@ -304,10 +346,10 @@ def _verified_file(project_dir: Path, session_id: str) -> Path:
 
 
 def _turn_slice_file(project_dir: Path, session_id: str, prompt_id: str) -> Path:
-    """File holding one turn's transcript slice, handed to the guardian subagent.
+    """File holding one turn's transcript slice, handed to the evidence auditor subagent.
 
     guard slices the transcript itself (single slice implementation) and writes just
-    that turn here, so guardian reads one turn — not the whole transcript.
+    that turn here, so the auditor reads one turn — not the whole transcript.
     """
     return _state_root(project_dir) / "turns" / session_id / f"{prompt_id}.json"
 
@@ -371,6 +413,19 @@ def _refs_dir(project_dir: Path, config: dict[str, Any] | None = None) -> Path:
     """
     default = project_dir / "wiki" / "ref"
     return _safe_project_subdir(project_dir, (config or {}).get("refs_dir", "")) or default
+
+
+def _refs_format(config: dict[str, Any] | None = None) -> str:
+    """The `refs_format` key, narrowed to a name REFS_FORMATS actually defines.
+
+    An unknown or non-string value falls back to the default rather than raising: this
+    feeds a SessionStart injection, and a typo in the config must not cost the session
+    its reference-format instruction entirely.
+    """
+    raw = (config or {}).get("refs_format", DEFAULT_REFS_FORMAT)
+    if isinstance(raw, str) and raw.strip().lower() in REFS_FORMATS:
+        return raw.strip().lower()
+    return DEFAULT_REFS_FORMAT
 
 
 def _refs_rel(project_dir: Path, config: dict[str, Any]) -> str:
@@ -460,14 +515,17 @@ def _read_payload() -> dict | None:
 
 _SESSION_ID_RE = re.compile(r"^[A-Za-z0-9._-]+$")
 # guard's own control commands, e.g. "/guard:settings edit_gate off", "/settings",
-# "/guard:judge". `settings` is a forked skill and `judge` a UserPromptExpansion — either
-# way the turn is a relay, not real work to log/judge. The name is `settings`, not
-# `config`, precisely so the bare form does NOT match Claude Code's built-in `/config`
-# command (which the optional `(guard:)?` would otherwise capture, making guard treat
-# every `/config` as its own control command). `(?=\s|$)` rather than `\b`: the name must
-# END here, not merely hit a word boundary — `\b` would also accept hyphenated names from
-# other plugins (e.g. `/judge-resolution` matching `judge`).
-_CONTROL_CMD_RE = re.compile(r"^/(guard:)?(settings|judge)(?=\s|$)", re.IGNORECASE)
+# "/guard:audit-evidence". `settings` is a forked skill and `audit-evidence` a
+# UserPromptExpansion — either way the turn is a relay, not real work to log/judge. The
+# name is `settings`, not `config`, precisely so the bare form does NOT match Claude Code's
+# built-in `/config` command (which the optional `(guard:)?` would otherwise capture,
+# making guard treat every `/config` as its own control command). `(?=\s|$)` rather than
+# `\b`: the name must END here, not merely hit a word boundary — `\b` would also accept a
+# longer hyphenated name from another plugin (`/settings-export` matching `settings`), and
+# it is what keeps `audit-evidence` from matching a bare `/audit`.
+# `audit-comment` is deliberately ABSENT: that skill's relayed findings are claims about
+# real files, so its turn stays auditable like any other work.
+_CONTROL_CMD_RE = re.compile(r"^/(guard:)?(settings|audit-evidence)(?=\s|$)", re.IGNORECASE)
 # In the transcript, a slash command is expanded to
 # "<command-name>/guard:settings</command-name>" (see session b30dbaec). Pull the command
 # name out of that tag; a raw typed form ("/guard:settings edit_gate off") is handled by
@@ -737,7 +795,7 @@ def _load_config(project_dir: Path) -> dict[str, Any]:
     fields, list for ``exempt_skills``), so a malformed value can never change a setting
     by accident. The gate fields persist as plain strings, so they are validated as
     ``str`` here and coerced to a valid enum member downstream (``_edit_gate`` /
-    ``_judge_gate``); a bad-but-string value is dropped there, not here.
+    ``_evidence_gate``); a bad-but-string value is dropped there, not here.
     """
     config = dict(DEFAULT_CONFIG)
     path = project_dir / CONFIG_REL
@@ -789,7 +847,7 @@ def _read_state(project_dir: Path, session_id: str, config: dict[str, Any]) -> d
     default = {
         "edit_gate": _edit_gate(config),
         "approved": False,
-        "judge_gate": _judge_gate(config),
+        "evidence_gate": _evidence_gate(config),
         # Per-turn guards keyed by the transcript prompt_id (a turn == one promptId).
         "last_audited_prompt_id": "",
         "gated_prompt_id": "",
@@ -799,8 +857,12 @@ def _read_state(project_dir: Path, session_id: str, config: dict[str, Any]) -> d
         # the user's click, not the model, is what arms it.
         "asked_prompt_id": "",
         # Manual mode: the most recent auditable turn's prompt_id, the target that
-        # `/guard:judge` dispatches the guardian for.
+        # `/guard:audit-evidence` dispatches the evidence auditor for.
         "pending_verify_prompt_id": "",
+        # The prompt_id whose reference marks were already reported broken. Blocking the
+        # same turn twice would trap the session: the fixed response arrives under the
+        # SAME prompt_id, so without this the check would re-run and re-block.
+        "last_marks_prompt_id": "",
         "updated_at": None,
     }
     path = _state_file(project_dir, session_id)
@@ -812,8 +874,8 @@ def _read_state(project_dir: Path, session_id: str, config: dict[str, Any]) -> d
         return default
     if not isinstance(data, dict):
         return default
-    keys = ("edit_gate", "approved", "judge_gate", "last_audited_prompt_id", "gated_prompt_id",
-            "asked_prompt_id", "pending_verify_prompt_id", "updated_at")
+    keys = ("edit_gate", "approved", "evidence_gate", "last_audited_prompt_id", "gated_prompt_id",
+            "asked_prompt_id", "pending_verify_prompt_id", "last_marks_prompt_id", "updated_at")
     default.update({k: data[k] for k in keys if k in data})
     return default
 
@@ -948,13 +1010,13 @@ def _effort(config: dict[str, Any]) -> str:
     return value if value in VALID_EFFORTS else "medium"
 
 
-def _judge_gate(cfg: dict[str, Any]) -> JudgeGate:
+def _evidence_gate(cfg: dict[str, Any]) -> EvidenceGate:
     """The evidence-judge setting from a config or session-state dict, coerced to a
-    valid JudgeGate member (defaults on anything unrecognized)."""
+    valid EvidenceGate member (defaults on anything unrecognized)."""
     try:
-        return JudgeGate(str(cfg.get("judge_gate", DEFAULT_CONFIG["judge_gate"])).lower())
+        return EvidenceGate(str(cfg.get("evidence_gate", DEFAULT_CONFIG["evidence_gate"])).lower())
     except ValueError:
-        return JudgeGate(DEFAULT_CONFIG["judge_gate"])
+        return EvidenceGate(DEFAULT_CONFIG["evidence_gate"])
 
 
 def _edit_gate(cfg: dict[str, Any]) -> EditGate:
@@ -1166,9 +1228,13 @@ EVIDENCE_SYSTEM = (
     "backed by adequate evidence: output of a command in TOOL_ACTIVITY, a specific "
     "code reference (file:line or symbol), a named doc/spec, a measurement, or a sound "
     "derivation. Evidence may sit anywhere in the response: the Grounded style keeps "
-    "citations out of the prose, so a claim carries a short reference mark (whose exact "
-    "form is up to the answer) and the citation sits in a References section closing the "
-    "answer. Resolve whatever marks you find against that section before judging: a "
+    "citations out of the prose, so a claim carries a short reference mark and the "
+    "citation sits in a References section closing the answer. This project's mark "
+    "format is: __REFS_FORMAT__ Judge whether marks RESOLVE, not whether they match "
+    "that syntax — a resolvable mark in the other form is not a violation, though an "
+    "answer must not mix the two forms (guard's Stop hook checks that mechanically, so "
+    "it is not yours to police). "
+    "Resolve whatever marks you find against that section before judging: a "
     "claim whose mark is backed by an adequate entry is SUPPORTED, and the mark's "
     "presence is not itself a missing citation — but a mark resolving to NOTHING, or to "
     "an entry that does not establish the claim, is UNSUPPORTED exactly as an uncited "
@@ -1259,7 +1325,7 @@ def cmd_user_prompt() -> int:
     prompt = payload.get("prompt")
     prompt = prompt if isinstance(prompt, str) else ""
 
-    # guard's own control commands (`/guard:settings ...`, `/guard:judge`) are not
+    # guard's own control commands (`/guard:settings ...`, `/guard:audit-evidence`) are not
     # real turns — the forked `config` skill / the `verify` expansion handle them. Don't
     # log, don't start a turn, don't judge.
     if _CONTROL_CMD_RE.match(prompt.strip()):
@@ -1383,8 +1449,8 @@ def _emit_expansion(msg: str) -> None:
 
 
 def cmd_verify() -> int:
-    """UserPromptExpansion for `/guard:judge`. On-demand audit of the last completed
-    turn: emit the guardian-dispatch instruction for ``pending_verify_prompt_id`` (set
+    """UserPromptExpansion for `/guard:audit-evidence`. On-demand audit of the last completed
+    turn: emit the evidence auditor-dispatch instruction for ``pending_verify_prompt_id`` (set
     by manual-mode Stop). Reads no transcript — the Stop hook already wrote the slice.
     Works in any mode, independent of the approval gate."""
     project_dir = _project_dir()
@@ -1402,15 +1468,15 @@ def cmd_verify() -> int:
     turn_path = _turn_slice_file(project_dir, session_id, pid) if pid else None
     if not pid or turn_path is None or not turn_path.is_file():
         _emit_expansion("guard: no completed turn is available to verify yet. "
-                        "Ask something first, then run `/guard:judge`.")
+                        "Ask something first, then run `/guard:audit-evidence`.")
         _trace(project_dir, session_id, "verify", "no_pending", prompt_id=pid)
         return 0
 
-    context = _guardian_dispatch_context(
+    context = _auditor_dispatch_context(
         project_dir, session_id, pid, turn_path,
         "guard (verify): audit the last completed turn on request.")
     _emit_expansion(context)
-    _trace(project_dir, session_id, "verify", "dispatch_guardian", prompt_id=pid)
+    _trace(project_dir, session_id, "verify", "dispatch_evidence auditor", prompt_id=pid)
     return 0
 
 
@@ -1631,7 +1697,7 @@ def _is_guard_owned(project_dir: Path, target: Path) -> bool:
     These must never ride the git-ignore exemption: `.claude/guard/` is itself
     git-ignored, so without this exclusion the model could `Write`
     `state/<sid>.json` to arm its own approval, or edit `guard.local.json` to turn
-    the judge off / change `judge_gate`. (`refs/` is the one hole guard opens for its own
+    the judge off / change `evidence_gate`. (`refs/` is the one hole guard opens for its own
     required behavior and has its own explicit allow, checked before this.)
 
     This function is also what makes the `writable_dirs` exemption safe against an entry
@@ -1640,7 +1706,7 @@ def _is_guard_owned(project_dir: Path, target: Path) -> bool:
     underneath such an entry. See the `writable_dirs` branch in `cmd_gate`.
 
     The list keys are edited only through their own CLIs (`cmd_exempt`, `cmd_writable`),
-    which touch that one key and never `edit_gate`/`judge_gate`/state. Note the asymmetry:
+    which touch that one key and never `edit_gate`/`evidence_gate`/state. Note the asymmetry:
     `exempt_skills` narrows only the JUDGE's coverage, while `writable_dirs` narrows the
     GATE itself — which is why its values are validated and its mutating verbs require the
     settings-skill marker (`_cli_write_allowed`). Fail toward guard-owned (safe: no
@@ -1692,7 +1758,7 @@ def _git_ignored(project_dir: Path, target: Path) -> bool:
 def cmd_record_verified() -> int:
     """Append verified facts for a passed turn (subagent-mode single writer).
 
-    The ``guardian`` subagent calls this via Bash on a PASS so its confirmed claims
+    The ``evidence-auditor`` subagent calls this via Bash on a PASS so its confirmed claims
     accumulate in ``verified/<sid>.jsonl`` exactly as the headless path does through
     ``_append_verified``. Funneling the write through the dispatcher keeps state
     writes single-writer and needs no approval (Bash is never gated).
@@ -1730,9 +1796,9 @@ def _write_turn_slice(project_dir: Path, session_id: str, prompt_id: str,
     """Write this turn's slice ({user, tools, assistant}) to its ``turn_file``.
 
     The single slice-writer, shared by subagent-mode Stop (which then dispatches the
-    guardian) and manual-mode Stop (which records it as the pending on-demand target).
+    evidence auditor) and manual-mode Stop (which records it as the pending on-demand target).
     Internal flags (has_user_command / origin_kind / command_name — all handled before
-    this point) are not part of the guardian's schema, so drop them. Returns the path,
+    this point) are not part of the evidence auditor's schema, so drop them. Returns the path,
     or None on a write failure (caller fails open).
     """
     slice_out = {k: v for k, v in turn.items()
@@ -1749,27 +1815,27 @@ def _write_turn_slice(project_dir: Path, session_id: str, prompt_id: str,
     return turn_path
 
 
-def _guardian_dispatch_context(project_dir: Path, session_id: str, prompt_id: str,
+def _auditor_dispatch_context(project_dir: Path, session_id: str, prompt_id: str,
                                turn_path: Path, lead: str) -> str:
-    """Build the additionalContext that asks the main agent to dispatch the guardian.
+    """Build the additionalContext that asks the main agent to dispatch the evidence auditor.
 
     The dispatch inputs are identical for the subagent-mode Stop auto-dispatch and the
-    on-demand ``/guard:judge`` path — only the leading sentence (``lead``) differs.
+    on-demand ``/guard:audit-evidence`` path — only the leading sentence (``lead``) differs.
     """
     verified_path = _verified_file(project_dir, session_id).resolve()
     dispatcher = Path(__file__).resolve()
     refs_path = _refs_dir(project_dir, _load_config(project_dir))
     return (
         lead + " "
-        "Dispatch the guardian subagent with the Agent tool "
-        "(subagent_type: \"guard:guardian\"), passing it these inputs verbatim:\n"
+        "Dispatch the evidence auditor subagent with the Agent tool "
+        "(subagent_type: \"guard:evidence-auditor\"), passing it these inputs verbatim:\n"
         f"- session_id: {session_id}\n"
         f"- prompt_id: {prompt_id}\n"
         f"- turn_file: {turn_path.resolve()}\n"
         f"- verified_file: {verified_path}\n"
         f"- dispatcher: {dispatcher}\n"
         f"- refs_dir: {refs_path}\n"
-        "guardian reads the turn record at turn_file "
+        "evidence auditor reads the turn record at turn_file "
         "(`{user, tools[], assistant}`), audits it for unsupported "
         "claims and resolvable deferrals, records the verified facts on a pass, and "
         "reports any violations back. If it reports violations, address them; "
@@ -1783,7 +1849,7 @@ def _stop_subagent(project_dir: Path, session_id: str, state: dict[str, Any],
 
     guard slices the turn from the transcript itself and writes just that turn to a
     ``turn_file``; the dispatch names that file, the verified store, and this
-    dispatcher, so the main agent can dispatch the ``guard:guardian`` subagent without
+    dispatcher, so the main agent can dispatch the ``guard:evidence-auditor`` subagent without
     exposing the whole transcript. Guarded to fire once per turn via
     ``last_audited_prompt_id`` — parity with the headless path judging a turn once.
     """
@@ -1798,12 +1864,12 @@ def _stop_subagent(project_dir: Path, session_id: str, state: dict[str, Any],
     state["last_audited_prompt_id"] = prompt_id
     _write_state(project_dir, session_id, state)
 
-    context = _guardian_dispatch_context(
+    context = _auditor_dispatch_context(
         project_dir, session_id, prompt_id, turn_path,
         "guard (subagent mode): audit the turn that just finished before wrapping up.")
     output = {"hookSpecificOutput": {"hookEventName": "Stop", "additionalContext": context}}
     json.dump(output, sys.stdout)
-    _trace(project_dir, session_id, "stop", "dispatch_guardian", prompt_id=prompt_id)
+    _trace(project_dir, session_id, "stop", "dispatch_evidence auditor", prompt_id=prompt_id)
     return 0
 
 
@@ -1812,9 +1878,9 @@ def _stop_manual(project_dir: Path, session_id: str, state: dict[str, Any],
     """Manual mode Stop: record the turn as the pending verify target; do NOT audit.
 
     The turn is already in the session archive; here we persist just its slice and
-    remember its prompt_id so ``/guard:judge`` can dispatch the guardian for it
+    remember its prompt_id so ``/guard:audit-evidence`` can dispatch the evidence auditor for it
     without any transcript access. The hook emits nothing and never blocks — the
-    approval gate still runs (it is governed by ``edit_gate``, not ``judge_gate``).
+    approval gate still runs (it is governed by ``edit_gate``, not ``evidence_gate``).
     """
     turn_path = _write_turn_slice(project_dir, session_id, prompt_id, turn)
     if turn_path is None:
@@ -1823,6 +1889,115 @@ def _stop_manual(project_dir: Path, session_id: str, state: dict[str, Any],
     _write_state(project_dir, session_id, state)
     _trace(project_dir, session_id, "stop", "manual_pending", prompt_id=prompt_id)
     return 0
+
+
+# Reference-mark syntaxes the checker recognizes, independent of `refs_format`: the
+# judge is told to accept any mark that RESOLVES, so the check must too — otherwise a
+# turn using the other project's syntax would be reported as broken rather than merely
+# off-format. Both capture the identifier in group 1.
+_MARK_FOOTNOTE = re.compile(r"\[\^([^\]\s]+)\]")
+_MARK_OBSIDIAN = re.compile(r"\[\[#\^([^\]\s]+)\]\]")
+# An entry DEFINES an id: a footnote definition at line start (`[^id]: …`), or an
+# Obsidian block id at end of line (` ^id`). Anchored per line, since both forms are
+# positional — a footnote definition mid-sentence is a reference, not a definition.
+_DEF_FOOTNOTE = re.compile(r"^\s*\[\^([^\]\s]+)\]:", re.MULTILINE)
+_DEF_OBSIDIAN = re.compile(r"[ \t]\^([A-Za-z0-9-]+)\s*$", re.MULTILINE)
+# Fenced and inline code are stripped before scanning: a code block quoting `[^1]` as an
+# EXAMPLE (this repo's own docs do exactly that) is not a citation, and treating it as
+# one would block a turn for correctly documenting the syntax.
+_FENCE = re.compile(r"```.*?```|~~~.*?~~~", re.DOTALL)
+_INLINE_CODE = re.compile(r"`[^`\n]*`")
+
+
+def _strip_code(text: str) -> str:
+    """Blank out fenced and inline code so example marks inside it are not scanned."""
+    return _INLINE_CODE.sub(" ", _FENCE.sub(" ", text))
+
+
+def _split_references(text: str) -> tuple[str, str]:
+    """Split a response into (prose, references-section) at the LAST References heading.
+
+    Last rather than first: a turn may mention the words "References section" in prose
+    while the real section is the one closing the answer. When no heading is found the
+    references half is empty, which makes every mark unresolved — handled by the caller,
+    which only reports when a section actually exists.
+    """
+    matches = list(re.finditer(r"(?im)^\s{0,3}#{1,6}\s*references\b.*$", text))
+    if not matches:
+        return text, ""
+    cut = matches[-1].start()
+    return text[:cut], text[cut:]
+
+
+def _check_reference_marks(response: str) -> list[str]:
+    """Verify every prose mark resolves to an entry and every entry is cited.
+
+    Pure text matching — no model judgment — so this runs in every ``evidence_gate`` mode
+    and a false positive is a bug in the patterns, not a misjudgment. Returns a list of
+    human-readable problems; empty means the References section is internally consistent.
+
+    Returns no problems when the response has no References section at all: whether a
+    turn OWED one is a judgment about its claims, which is the evidence judge's job, not
+    this check's.
+    """
+    prose_raw, refs_raw = _split_references(response)
+    if not refs_raw.strip():
+        return []
+    prose, refs = _strip_code(prose_raw), _strip_code(refs_raw)
+
+    cited: list[str] = []
+    for pat in (_MARK_OBSIDIAN, _MARK_FOOTNOTE):
+        cited.extend(m.group(1) for m in pat.finditer(prose))
+    # An Obsidian mark `[[#^id]]` also matches the footnote pattern's inner `[^id]`, so
+    # dedupe by id rather than trying to make the two patterns mutually exclusive.
+    cited_ids = dict.fromkeys(cited)
+
+    defined: list[str] = []
+    for pat in (_DEF_FOOTNOTE, _DEF_OBSIDIAN):
+        defined.extend(m.group(1) for m in pat.finditer(refs))
+    defined_ids = dict.fromkeys(defined)
+    # A numbered list (`1. path — "quote"`) is a legitimate entry format that defines no
+    # id at all. With no ids on either side there is nothing to cross-check; with ids in
+    # the prose but none in the section, fall through so the dangling marks are reported.
+    if not defined_ids and not cited_ids:
+        return []
+
+    problems: list[str] = []
+    for ident in cited_ids:
+        if ident not in defined_ids:
+            problems.append(f"mark for `{ident}` in the prose has no entry in References")
+    for ident in defined_ids:
+        if ident not in cited_ids:
+            problems.append(f"References entry `{ident}` is never cited in the prose")
+
+    # One syntax per answer. An Obsidian mark `[[#^id]]` contains a footnote mark `[^id]`
+    # as a substring, so a footnote mark only counts when it is NOT part of one: blank the
+    # Obsidian marks first, then scan what remains.
+    prose_wo_obsidian = _MARK_OBSIDIAN.sub(" ", prose)
+    footnote_ids = dict.fromkeys(m.group(1) for m in _MARK_FOOTNOTE.finditer(prose_wo_obsidian))
+    obsidian_ids = dict.fromkeys(m.group(1) for m in _MARK_OBSIDIAN.finditer(prose))
+    # Mixing the two forms is the failure `grounded.md` names directly — "a reader learns
+    # the pattern once, and mixing forms breaks the link" — so it is reported even though
+    # every individual mark may resolve.
+    if footnote_ids and obsidian_ids:
+        problems.append(
+            "the answer mixes both mark syntaxes — footnote "
+            + ", ".join(f"`[^{i}]`" for i in list(footnote_ids)[:3])
+            + " and Obsidian "
+            + ", ".join(f"`[[#^{i}]]`" for i in list(obsidian_ids)[:3])
+            + "; use one form throughout"
+        )
+    # Footnote ids must be numeric. Markdown itself allows words, but guard requires one
+    # form so marks stay uniform — and since the renderer numbers footnotes sequentially
+    # no matter the label, a number is what the reader sees anyway. Footnotes only:
+    # Obsidian block ids are descriptive by design.
+    worded = [i for i in footnote_ids if not i.isdigit()]
+    if worded:
+        problems.append(
+            "footnote ids must be numbers, not words: "
+            + ", ".join(f"`[^{i}]`" for i in worded)
+        )
+    return problems
 
 
 def cmd_stop() -> int:
@@ -1844,8 +2019,8 @@ def cmd_stop() -> int:
     # record (`origin.kind == "task-notification"`, promptSource "system", NOT isMeta —
     # otherwise indistinguishable from a typed prompt). It is not the assistant answering
     # a user, so it does not belong in the archive; and in subagent mode auditing it is
-    # self-perpetuating (the guardian dispatch is itself a background task whose
-    # completion is another task-notification → guardian re-dispatched ad infinitum,
+    # self-perpetuating (the auditor dispatch is itself a background task whose
+    # completion is another task-notification → evidence auditor re-dispatched ad infinitum,
     # verified 2.1.197). (older CC / no prompt yet → turn is None; nothing to skip here,
     # the judge path below still fails open on skip_no_prompt_id.)
     prompt_id = payload.get("prompt_id")
@@ -1868,6 +2043,35 @@ def cmd_stop() -> int:
 
     if not response.strip():
         return 0
+
+    # Reference-mark integrity runs BEFORE every judge-specific skip below and before the
+    # evidence_gate branches, so it applies in all three modes — including `manual`, the
+    # judge's off switch. It needs only the response text: no transcript slice, no judge,
+    # no tokens. The skips below exist because a turn's CLAIMS may not be worth judging
+    # (a plan after a gate denial, skill output, a `!` command's late evidence), but none
+    # of that makes a dangling mark acceptable — a mark resolving to nothing is the
+    # failure the Grounded style calls worse than citing inline, since the evidence is
+    # present but unreachable. Being deterministic text matching, a false block here would
+    # be a pattern bug, not a misjudgment.
+    #
+    # `prompt_id` may be absent (older CC), so the once-per-turn guard falls back to the
+    # response text: re-blocking is keyed on identity of what was already reported.
+    marks_key = prompt_id if isinstance(prompt_id, str) and prompt_id else f"len:{len(response)}"
+    if state.get("last_marks_prompt_id") != marks_key:
+        problems = _check_reference_marks(response)
+        if problems:
+            state["last_marks_prompt_id"] = marks_key
+            _write_state(project_dir, session_id, state)
+            reason = (
+                "guard: the References section does not line up with the prose. "
+                "Every mark must point to one entry, and every entry must be cited:\n"
+                + "\n".join(f"- {p}" for p in problems)
+                + "\n\nFix the marks and entries, then finish."
+            )
+            json.dump({"decision": "block", "reason": reason}, sys.stdout)
+            _trace(project_dir, session_id, "stop", "block_marks",
+                   prompt_id=prompt_id, problems=len(problems))
+            return 0
 
     # The turn is identified by the transcript prompt_id; guard reads the whole turn
     # from Claude Code's transcript. Without them (older CC / no prompt yet) there is
@@ -1899,7 +2103,7 @@ def cmd_stop() -> int:
         return 0
 
     # Skip judging a turn opened by guard's own control command (`/guard:settings`,
-    # `/guard:judge`) or by a user-configured exempt skill/command. Such a turn's
+    # `/guard:audit-evidence`) or by a user-configured exempt skill/command. Such a turn's
     # response is a relay or skill output, not a body of technical claims to ground —
     # e.g. relaying "guard on" has no evidence to cite and would be falsely blocked
     # (session b30dbaec). The approval classifier already skips control commands at
@@ -1913,17 +2117,17 @@ def cmd_stop() -> int:
     turn["assistant"] = response
 
     # Manual mode (default): the hook never audits or blocks at Stop. It records the
-    # turn as the pending on-demand target; the user runs `/guard:judge` to dispatch
-    # the guardian for it. The approval gate still runs (governed by `edit_gate`).
-    if state["judge_gate"] == JudgeGate.MANUAL:
+    # turn as the pending on-demand target; the user runs `/guard:audit-evidence` to dispatch
+    # the evidence auditor for it. The approval gate still runs (governed by `edit_gate`).
+    if state["evidence_gate"] == EvidenceGate.MANUAL:
         return _stop_manual(project_dir, session_id, state, prompt_id, turn)
 
     # Subagent mode: the hook does not judge or block. It hands the turn off to the
-    # main agent, which dispatches the `guardian` subagent to audit. We inject the
+    # main agent, which dispatches the `evidence-auditor` subagent to audit. We inject the
     # transcript + prompt_id as additionalContext (docs: a Stop hook may emit
     # additionalContext WITHOUT `decision`, and the conversation continues so the
     # agent can act on it).
-    if state["judge_gate"] == JudgeGate.SUBAGENT:
+    if state["evidence_gate"] == EvidenceGate.SUBAGENT:
         return _stop_subagent(project_dir, session_id, state, prompt_id, turn)
 
     # Facts verified in earlier passed turns are reusable evidence: a claim that
@@ -1953,6 +2157,11 @@ def cmd_stop() -> int:
     # The judge prompt names the refs directory (where the Grounded style saves
     # cited-doc copies) so it checks the configured location, not the default.
     evidence_system = EVIDENCE_SYSTEM.replace("__REFS_DIR__", _refs_rel(project_dir, config))
+    # The judge is told the SAME format text the SessionStart hook injected, so it never
+    # grades against a syntax the model was not given. It stays a grading aid, not a new
+    # violation class: an unresolvable mark was already unsupported, and a resolvable
+    # mark in the wrong syntax is a style nit the judge is told to let pass.
+    evidence_system = evidence_system.replace("__REFS_FORMAT__", REFS_FORMATS[_refs_format(config)])
     verdict = run_judge(project_dir, evidence_system, judge_input, EVIDENCE_SCHEMA, config)
     if verdict is None:
         return 0  # fail open
@@ -2013,7 +2222,7 @@ def cmd_stop() -> int:
 def cmd_session_start() -> int:
     # Sweep both state and logs on the same age policy. State is intentionally NOT
     # cleared at SessionEnd: a session can be resumed later (`claude --resume`), and
-    # its gate/approved/judge_gate flags must survive the gap. Age-based expiry is the
+    # its gate/approved/evidence_gate flags must survive the gap. Age-based expiry is the
     # only reaper, so a resumed session keeps its state as long as it is touched
     # within the retention window.
     project_dir = _project_dir()
@@ -2036,7 +2245,7 @@ def cmd_session_start() -> int:
                     entry.unlink()
             except OSError:
                 pass
-    # turns/ holds one dir per session of guardian turn-slice files; sweep stale dirs.
+    # turns/ holds one dir per session of evidence auditor turn-slice files; sweep stale dirs.
     turns_root = root / "turns"
     if turns_root.is_dir():
         try:
@@ -2060,12 +2269,15 @@ def cmd_session_start() -> int:
     # a SessionStart hook may append `export` lines to $CLAUDE_ENV_FILE and the
     # variables reach all subsequent Bash commands
     # (https://code.claude.com/docs/en/hooks, "CLAUDE_ENV_FILE").
-    refs = _refs_dir(project_dir, _load_config(project_dir))
+    session_cfg = _load_config(project_dir)
+    refs = _refs_dir(project_dir, session_cfg)
+    refs_format = _refs_format(session_cfg)
     env_file = os.environ.get("CLAUDE_ENV_FILE")
     if env_file:
         try:
             with open(env_file, "a", encoding="utf-8") as fh:
                 fh.write(f"export GUARD_REFS_DIR={shlex.quote(str(refs))}\n")
+                fh.write(f"export GUARD_REFS_FORMAT={shlex.quote(refs_format)}\n")
         except OSError:
             pass
 
@@ -2081,6 +2293,12 @@ def cmd_session_start() -> int:
         f"to this project's refs directory — {refs} — and cite both the source URL "
         "and that local path. The same path is in $GUARD_REFS_DIR for Bash."
     )
+    # Same reasoning as the refs path above: the style requires a short mark that
+    # resolves but deliberately does not fix the syntax, because the right syntax
+    # depends on where the user reads the answer. Inject the resolved format so every
+    # turn in the session marks references the same way — and so the judge, which is
+    # told the identical text, is checking the format the model was actually given.
+    print(f"guard: reference-mark format for this project ({refs_format}) — {REFS_FORMATS[refs_format]}")
     _trace(project_dir, None, "session-start", "swept")
     return 0
 
@@ -2097,7 +2315,7 @@ def cmd_exempt() -> int:
         exempt remove NAME [NAME…] — remove
         exempt clear               — empty the list
 
-    Edits ONLY the ``exempt_skills`` key — never ``edit_gate`` / ``judge_gate`` / state —
+    Edits ONLY the ``exempt_skills`` key — never ``edit_gate`` / ``evidence_gate`` / state —
     so it can change which skills' turns the Stop judge skips but cannot disable guard
     or touch the approval gate. Project dir from ``CLAUDE_PROJECT_DIR`` (Bash env), else
     the current working directory. Prints the resulting list for the skill to relay.
@@ -2181,7 +2399,7 @@ def cmd_writable() -> int:
     path (``_writable_dirs``) re-validates regardless, so a hand-edited config that
     never passed through here is still safe.
 
-    Edits ONLY the ``writable_dirs`` key — never ``edit_gate`` / ``judge_gate`` /
+    Edits ONLY the ``writable_dirs`` key — never ``edit_gate`` / ``evidence_gate`` /
     state. Project dir from ``CLAUDE_PROJECT_DIR`` (Bash env), else the cwd.
     """
     argv = sys.argv[2:]
@@ -2286,7 +2504,7 @@ def _parse_settings_argv(argv: list[str]) -> tuple[list[str], str | None]:
 
 
 def _apply_session_scalar(project_dir: Path, session_id: str | None, key: str, value: Any) -> None:
-    """Mirror an ``edit_gate`` / ``judge_gate`` change into the live session's
+    """Mirror an ``edit_gate`` / ``evidence_gate`` change into the live session's
     ``state/<sid>.json`` so it takes effect at once, not only for sessions started later.
     These two are the only settings cached in session state (seeded from config at session
     start); the rest are read from the config file at use, so writing the file is enough
@@ -2301,7 +2519,7 @@ def _apply_session_scalar(project_dir: Path, session_id: str | None, key: str, v
 
 def _config_show_lines(project_dir: Path, session_id: str | None) -> list[str]:
     """Render current guard settings for the ``guard:settings`` skill to display. Shows the
-    guard.local.json defaults; for ``edit_gate`` / ``judge_gate`` it also shows the live
+    guard.local.json defaults; for ``edit_gate`` / ``evidence_gate`` it also shows the live
     session value when it differs from the default (the session may have been changed
     after)."""
     raw = _load_raw_config(project_dir)
@@ -2316,11 +2534,11 @@ def _config_show_lines(project_dir: Path, session_id: str | None) -> list[str]:
     else:
         gate_line = f"edit_gate: {gate_default}"
 
-    judge_default = _judge_gate(cfg)
-    if state is not None and _judge_gate(state) != judge_default:
-        judge_line = f"judge_gate: {_judge_gate(state)} (this session; default {judge_default})"
+    judge_default = _evidence_gate(cfg)
+    if state is not None and _evidence_gate(state) != judge_default:
+        judge_line = f"evidence_gate: {_evidence_gate(state)} (this session; default {judge_default})"
     else:
-        judge_line = f"judge_gate: {judge_default}"
+        judge_line = f"evidence_gate: {judge_default}"
 
     exempt = _exempt_skills(cfg)
     refs_rel = raw.get("refs_dir") if isinstance(raw.get("refs_dir"), str) else ""
@@ -2335,6 +2553,7 @@ def _config_show_lines(project_dir: Path, session_id: str | None) -> list[str]:
         judge_line,
         "exempt_skills: " + (", ".join(sorted(exempt)) if exempt else "(none)"),
         "refs_dir: " + (refs_rel if refs_rel else "(default wiki/ref/)"),
+        f"refs_format: {_refs_format(cfg)}",
         "writable_dirs: " + (", ".join(wdirs) if wdirs else "(none)"),
     ]
 
@@ -2346,9 +2565,11 @@ def cmd_settings() -> int:
         settings set <key> <value>           — change one setting
 
     Settable keys: ``edit_gate`` (ask|deny|off — the approval gate; ``off`` disables it,
-    ``ask``/``deny`` pick how an unapproved edit is stopped), ``judge_gate``
+    ``ask``/``deny`` pick how an unapproved edit is stopped), ``evidence_gate``
     (manual|subagent|headless — the evidence judge), ``model``,
-    ``effort`` (low|medium|high|xhigh|max), ``refs_dir``. ``edit_gate`` and ``judge_gate``
+    ``effort`` (low|medium|high|xhigh|max), ``refs_dir``, ``refs_format``
+    (footnote|obsidian — the reference-mark syntax injected at SessionStart).
+    ``edit_gate`` and ``evidence_gate``
     also apply to the live session's ``state/<sid>.json`` when a session id is available
     (``--session <id>``, which the forked skill passes as ``${CLAUDE_SESSION_ID}``, else
     the inherited ``CLAUDE_CODE_SESSION_ID``) so the change takes effect at once and
@@ -2393,15 +2614,15 @@ def cmd_settings() -> int:
             return 0
         raw["edit_gate"] = v.value
         _apply_session_scalar(project_dir, session_id, "edit_gate", v.value)
-    elif key == "judge_gate":
+    elif key == "evidence_gate":
         try:
-            v = JudgeGate(value.strip().lower())
+            v = EvidenceGate(value.strip().lower())
         except ValueError:
-            print(f"guard settings: judge_gate must be one of {[e.value for e in JudgeGate]} "
+            print(f"guard settings: evidence_gate must be one of {[e.value for e in EvidenceGate]} "
                   f"(got {value!r})", file=sys.stderr)
             return 0
-        raw["judge_gate"] = v.value
-        _apply_session_scalar(project_dir, session_id, "judge_gate", v.value)
+        raw["evidence_gate"] = v.value
+        _apply_session_scalar(project_dir, session_id, "evidence_gate", v.value)
     elif key == "effort":
         v = value.lower()
         if v not in VALID_EFFORTS:
@@ -2416,10 +2637,19 @@ def cmd_settings() -> int:
         raw["model"] = v
     elif key == "refs_dir":
         raw["refs_dir"] = value  # "" resets to the default; _refs_dir validates at use
+    elif key == "refs_format":
+        v = value.strip().lower()
+        # Rejected at set time rather than silently defaulted at use: a typo here would
+        # otherwise look accepted while the session kept injecting the old format.
+        if v not in REFS_FORMATS:
+            print(f"guard settings: refs_format must be one of {sorted(REFS_FORMATS)} "
+                  f"(got {value!r})", file=sys.stderr)
+            return 0
+        raw["refs_format"] = v
     else:
         print(f"guard settings: unknown or unsettable key {key!r}. Settable: edit_gate, "
-              "judge_gate, model, effort, refs_dir (exempt_skills via the exempt CLI, "
-              "writable_dirs via the writable CLI).", file=sys.stderr)
+              "evidence_gate, model, effort, refs_dir, refs_format (exempt_skills via the "
+              "exempt CLI, writable_dirs via the writable CLI).", file=sys.stderr)
         return 0
 
     if not _write_config(project_dir, raw):
@@ -2435,7 +2665,7 @@ def cmd_settings() -> int:
 def cmd_refs_dir() -> int:
     """Print the resolved refs directory (absolute), applying `refs_dir` validation.
 
-    The single query point for "where do cited-doc copies go": the guardian falls
+    The single query point for "where do cited-doc copies go": the evidence auditor falls
     back to it when its dispatch omits `refs_dir`, and anything with the script
     path can use it instead of re-implementing _refs_dir's fallback rules.
     """

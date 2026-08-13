@@ -5,5 +5,6 @@
   "judge_gate": "manual",
   "exempt_skills": ["deep-research", "hindsight:review"],
   "refs_dir": "",
+  "refs_format": "footnote",
   "writable_dirs": ["build", "docs/generated"]
 }
