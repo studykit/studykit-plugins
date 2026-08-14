@@ -1,10 +1,6 @@
 ---
 name: audit-resolution
 description: "Validate the recorded root cause and proposed approach or fix of a published workflow `task` or `bug` issue against the actual code and git history. Use when the user wants an independent resolution audit for an existing issue."
-argument-hint: "<issue-ref>"
-disable-model-invocation: true
-allowed-tools:
-  - Agent
 ---
 
 # Audit Resolution
@@ -16,15 +12,14 @@ code and its git history, not the issue's internal plausibility.
 
 ## Flow
 
-1. **Parse the issue ref.** Take the first `$ARGUMENTS` token as the issue ref.
+1. **Parse the issue ref.** Take the first recognizable issue ref from the
+   user's request.
    If there is no recognizable ref, abort with `Usage: <issue-ref>`.
 
-2. **Dispatch `resolution-auditor`.** Call `Agent` with `subagent_type:
-   spectrack:resolution-auditor`, naming the published issue ref (published
+2. **Dispatch `resolution-auditor`.** Use the host's subagent facility with the
+   registered `spectrack:resolution-auditor` role, naming the published issue ref (published
    mode). It fetches the issue, validates the recorded cause and approach
    against the code read-only, appends a single verdict comment to the issue,
    and returns a `<report>` with a `verdict`.
 
 3. **Report.** Emit the auditor's `<report>` without adding new conclusions.
-
-$ARGUMENTS

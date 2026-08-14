@@ -1,0 +1,7 @@
+interface:
+  display_name: "SpecTrack Implement Issue"
+  short_description: "Implement an approved workflow issue"
+  default_prompt: "Implement issue #123"
+
+policy:
+  allow_implicit_invocation: false

@@ -1,14 +1,6 @@
 ---
 name: handoff
 description: "Wrap a workflow session: refresh in-flight issue Resume comments and capture residual session findings, gaps, or questions as review issues."
-argument-hint: "[additional requirements]"
-disable-model-invocation: true
-allowed-tools:
-  - 'Bash(spectrack:*)'
-  - 'Bash(date:*)'
-  - 'Bash(git status:*)'
-  - 'Bash(git log:*)'
-  - 'Bash(git diff:*)'
 ---
 
 # Workflow Session Handoff
@@ -48,9 +40,8 @@ When drafting provider content, keep it factual and durable. Do not paste or sum
 
 ## Additional Requirements
 
-Treat `$ARGUMENTS` as extra user constraints and incorporate them where relevant.
-
-$ARGUMENTS
+Treat any extra constraints in the user's current request as part of the
+handoff requirements.
 
 ## Output
 

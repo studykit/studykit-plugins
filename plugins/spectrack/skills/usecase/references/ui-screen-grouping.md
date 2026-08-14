@@ -35,8 +35,8 @@ the user can react to a concrete visual.
 
 1. Confirm with the user that a mock is wanted; mocks are
    throwaway, not deliverables.
-2. Dispatch `Agent(subagent_type: "spectrack:mock-html-generator")`
-   with:
+2. Use the host's subagent facility with the registered
+   `spectrack:mock-html-generator` role, with:
    - The participating `usecase` issue refs (the agent will fetch them
      via `spectrack issue fetch`).
    - The screen-group label.

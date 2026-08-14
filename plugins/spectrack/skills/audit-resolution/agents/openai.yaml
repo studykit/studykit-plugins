@@ -1,0 +1,7 @@
+interface:
+  display_name: "SpecTrack Resolution Audit"
+  short_description: "Validate a workflow issue diagnosis against code"
+  default_prompt: "Audit the resolution for issue #123"
+
+policy:
+  allow_implicit_invocation: false

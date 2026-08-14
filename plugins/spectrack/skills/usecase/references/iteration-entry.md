@@ -1,7 +1,7 @@
 # Iteration Entry Procedure
 
 Use this procedure when the caller invokes the skill with
-`$ARGUMENTS == "iterate"`, names an existing `usecase` issue ref, or
+the user's request is `iterate`, names an existing `usecase` issue ref, or
 explicitly asks to resume an earlier discovery session. The goal is
 to surface what is still open so the session picks up coherently —
 without re-asking questions the prior session already settled.

@@ -9,8 +9,8 @@ task `completed`, then run the End-Iteration procedure below.
 
 ## End-Iteration procedure
 
-1. **Dispatch the explorer** — `Agent(subagent_type:
-   "spectrack:usecase-explorer")`. Pass:
+1. **Dispatch the explorer** — use the host's subagent facility with the
+   registered `spectrack:usecase-explorer` role. Pass:
    - The list of `usecase` issue refs created or refined this session.
    - An absolute output path for the advisory exploration report
      under `$(spectrack project-dir .spectrack-cache/usecase-explorations/<session-slug>.md)`.
@@ -28,8 +28,8 @@ task `completed`, then run the End-Iteration procedure below.
    `./progressive-extraction.md`. Skip the candidates the user
    rejects.
 
-3. **Dispatch the reviewer** — `Agent(subagent_type:
-   "spectrack:usecase-reviewer")`. Pass:
+3. **Dispatch the reviewer** — use the host's subagent facility with the
+   registered `spectrack:usecase-reviewer` role. Pass:
    - The updated list of `usecase` issue refs (including any
      candidates reflected in step 2).
    - The absolute draft directory for per-finding `review` issue

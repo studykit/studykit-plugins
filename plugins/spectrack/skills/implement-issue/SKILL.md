@@ -1,11 +1,6 @@
 ---
 name: implement-issue
 description: "Implement a workflow `task`, `bug`, or `spike` issue from its spec. Use when the user gives an issue ref and wants the work implemented. Settle the implementation approach against the current code, get user approval, run size and resolution audits, dispatch `issue-implementer` in an isolated worktree, then run `implementation-auditor` when implementation succeeds."
-argument-hint: "<issue-ref> [additional requirements]"
-disable-model-invocation: true
-model: opus
-allowed-tools:
-  - Agent
 ---
 
 # Implement
@@ -22,8 +17,8 @@ result, read-only).
 
 ## Flow
 
-1. **Parse the issue ref.** Take the first `$ARGUMENTS` token as the
-   issue ref. If there is no recognizable ref, abort with `Usage:
+1. **Parse the issue ref.** Take the first recognizable issue ref in the user's
+   request. If there is no recognizable ref, abort with `Usage:
    <issue-ref> [additional requirements]`. Everything past the ref is
    extra requirements, forwarded verbatim.
 
@@ -43,8 +38,8 @@ result, read-only).
      current code when the body does not already pin one — the spec leaves
      the cause to implement time. Locate the code the Acceptance Criteria
      implicate.
-   - **Decide the approach.** Work the approach out in plan mode (or via a
-     `Plan` subagent where the runtime provides one), grounded in the
+   - **Decide the approach.** Work the approach out using the host's planning
+     facility (or a read-only planning subagent where available), grounded in the
      current code, and **get the user's explicit approval** of the approach
      before going further.
    - **Audit.** Run the size and resolution audits and read the full audit
@@ -63,8 +58,9 @@ result, read-only).
    approach; the body carries none and is never edited into a stored plan
    here.
 
-3. **Dispatch `issue-implementer`.** Call `Agent` with `subagent_type:
-   spectrack:issue-implementer` **and `isolation: "worktree"`** —
+3. **Dispatch `issue-implementer`.** Use the host's subagent facility with the
+   registered `spectrack:issue-implementer` role and an isolated worktree when
+   the host supports it —
    this skill always dispatches implementation in worktree mode. Pass the
    issue ref, the extra requirements verbatim, and the settled approach
    from step 2 as the `plan` (the implementer's plan of record — the body
@@ -73,12 +69,10 @@ result, read-only).
 
 4. **Dispatch `implementation-auditor`** only when the implementer's
    `state` is `implemented` — `paused` and `failed` leave no pushed
-   branch to audit. Call `Agent` with `subagent_type:
-   spectrack:implementation-auditor`, passing `issue-ref` (the same ref)
+   branch to audit. Use the host's subagent facility with the registered
+   `spectrack:implementation-auditor` role, passing the issue ref
    and `report` (the implementer's `<report>` block, inline). It is
    read-only and returns a `<report>` with a `verdict`.
 
 5. **Report.** Emit the implementer's `<report>`; when the audit ran, emit
    the auditor's `<report>` directly after without adding new conclusions.
-
-$ARGUMENTS

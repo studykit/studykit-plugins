@@ -1,18 +1,6 @@
 ---
 name: usecase
 description: "Shape a rough product idea into concrete workflow `usecase` issues through a Socratic, one-question-at-a-time interview. Use when the user wants to discover, refine, resume, or iterate product use cases before implementation. Publishes each confirmed use case as its own workflow `usecase` issue and wraps up with missed-case and quality review."
-argument-hint: "<idea or vague concept to turn into use cases, or 'iterate' to resume>"
-disable-model-invocation: true
-allowed-tools:
-  - Read
-  - Write
-  - Edit
-  - Bash
-  - Grep
-  - Glob
-  - Agent
-  - WebSearch
-  - WebFetch
 ---
 
 # Use Case Discovery (Workflow)
@@ -22,7 +10,8 @@ through one-question-at-a-time dialogue. Confirmed use cases are
 published as standalone workflow `usecase` issues; knowledge-page
 edits are out of scope for this session.
 
-Discover use cases for: **$ARGUMENTS**
+Use the idea or iteration request supplied in the user's current request. If it
+is missing, ask for it before starting discovery.
 
 ## Scope
 
@@ -45,13 +34,13 @@ Out of scope in this skill:
 
 ## Modes
 
-Determine the mode from `$ARGUMENTS` and the configured issue
+Determine the mode from the user's request and the configured issue
 backend's current `usecase` issues:
 
-- **New discovery** — `$ARGUMENTS` is an idea (free prose) and the
+- **New discovery** — the user provides an idea (free prose) and the
   backend has no in-progress `usecase` issues that match the idea.
   Run the interview from scratch.
-- **Iteration** — `$ARGUMENTS` literally is `iterate`, or names an
+- **Iteration** — the user says `iterate`, names an
   existing `usecase` issue ref, or the user explicitly asks to resume.
   Run `references/iteration-entry.md`.
 

@@ -927,8 +927,8 @@ def test_write_creates_agents_md_with_knowledge_root(tmp_path: Path) -> None:
         "repo_relative": "wiki/spectrack",
     }
     assert result["codex_agents"]["restart_required"] is True
-    assert (tmp_path / CODEX_CONFIG_RELATIVE_PATH).exists()
-    assert (tmp_path / CODEX_SPECTRACK_AGENT_DIR / "issue-implementer.toml").exists()
+    assert not (tmp_path / CODEX_CONFIG_RELATIVE_PATH).exists()
+    assert (tmp_path / CODEX_SPECTRACK_AGENT_DIR / "spectrack-issue-implementer.toml").exists()
 
 
 def test_write_appends_knowledge_root_when_agents_md_exists(tmp_path: Path) -> None:
@@ -979,25 +979,22 @@ def test_write_omits_agents_md_update_when_knowledge_path_absent(
     assert result["codex_agents"]["operation"] == "install_codex_agents"
     assert not (tmp_path / AGENTS_FILENAME).exists()
     assert not (tmp_path / CLAUDE_FILENAME).exists()
-    assert (tmp_path / CODEX_CONFIG_RELATIVE_PATH).exists()
+    assert not (tmp_path / CODEX_CONFIG_RELATIVE_PATH).exists()
 
 
 def test_install_codex_agents_creates_project_roles(tmp_path: Path) -> None:
     result = install_codex_agents(tmp_path)
 
     config_path = tmp_path / CODEX_CONFIG_RELATIVE_PATH
-    config_text = config_path.read_text(encoding="utf-8")
-    role_path = tmp_path / CODEX_SPECTRACK_AGENT_DIR / "issue-implementer.toml"
+    role_path = tmp_path / CODEX_SPECTRACK_AGENT_DIR / "spectrack-issue-implementer.toml"
     role_text = role_path.read_text(encoding="utf-8")
 
-    tomllib.loads(config_text)
     tomllib.loads(role_text)
-    assert result["config_action"] == "create"
+    assert not config_path.exists()
+    assert result["config_action"] == "skip"
     assert len(result["agents"]) == len(SPECTRACK_CODEX_AGENT_ROLES)
-    assert CODEX_AGENT_INSTALL_MARKER_BEGIN in config_text
-    assert CODEX_AGENT_INSTALL_MARKER_END in config_text
-    assert '[agents."spectrack:issue-implementer"]' in config_text
-    assert 'config_file = "spectrack/agents/issue-implementer.toml"' in config_text
+    assert 'name = "spectrack:issue-implementer"' in role_text
+    assert 'description = "SpecTrack implementer for an approved task, bug, or spike approach; implements, verifies Acceptance Criteria, commits, and refreshes Resume."' in role_text
     assert "developer_instructions = '''" in role_text
     assert "SpecTrack `spectrack:issue-implementer` custom agent in Codex" in role_text
     assert "# Issue Implementer" in role_text
@@ -1005,7 +1002,7 @@ def test_install_codex_agents_creates_project_roles(tmp_path: Path) -> None:
     assert "enabled = false" in role_text
 
 
-def test_install_codex_agents_replaces_managed_block_only(tmp_path: Path) -> None:
+def test_install_codex_agents_removes_legacy_managed_block_only(tmp_path: Path) -> None:
     codex_dir = tmp_path / ".codex"
     codex_dir.mkdir()
     config_path = codex_dir / "config.toml"
@@ -1030,12 +1027,13 @@ def test_install_codex_agents_replaces_managed_block_only(tmp_path: Path) -> Non
     result = install_codex_agents(tmp_path)
     text = config_path.read_text(encoding="utf-8")
 
-    assert result["config_action"] == "update"
+    assert result["config_action"] == "remove"
     assert 'sandbox_mode = "workspace-write"' in text
     assert "[features]\nhooks = true" in text
     assert "[agents.old]" not in text
-    assert text.count(CODEX_AGENT_INSTALL_MARKER_BEGIN) == 1
-    assert '[agents."spectrack:resolution-auditor"]' in text
+    assert CODEX_AGENT_INSTALL_MARKER_BEGIN not in text
+    assert CODEX_AGENT_INSTALL_MARKER_END not in text
+    assert (tmp_path / CODEX_SPECTRACK_AGENT_DIR / "spectrack-resolution-auditor.toml").exists()
 
 
 def test_install_codex_agents_is_idempotent(tmp_path: Path) -> None:
@@ -1231,8 +1229,9 @@ def test_setup_skill_uses_short_install_name() -> None:
     skill_dirs = sorted(path.parent.name for path in (_PLUGIN_ROOT / "skills").glob("*/SKILL.md"))
 
     assert skill.exists()
-    assert (_PLUGIN_ROOT / "skills" / "setup" / "agents" / "openai.yaml").exists()
     assert "setup" in skill_dirs
+    for skill_name in skill_dirs:
+        assert (_PLUGIN_ROOT / "skills" / skill_name / "agents" / "openai.yaml").exists()
     assert yaml.safe_load(skill.read_text(encoding="utf-8").split("---", 2)[1])["name"] == "setup"
 
 
