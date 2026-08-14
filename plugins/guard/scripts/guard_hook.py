@@ -180,8 +180,14 @@ class EvidenceGate(StrEnum):
     HEADLESS = "headless"
     SUBAGENT = "subagent"
 
-STATE_DIR_REL = ".claude/guard"
-CONFIG_REL = ".claude/guard.local.json"
+# Codex adapters set GUARD_HOST before importing this module. Keep the historical
+# Claude paths intact while preventing one host from interpreting the other's state.
+if os.environ.get("GUARD_HOST") == "codex":
+    STATE_DIR_REL = ".codex/guard"
+    CONFIG_REL = ".codex/guard.local.json"
+else:
+    STATE_DIR_REL = ".claude/guard"
+    CONFIG_REL = ".claude/guard.local.json"
 TRACE_FILE_NAME = "trace.log"
 TRACE_ENV_VAR = "GUARD_TRACE"
 TRACE_TRUTHY = {"1", "true", "yes", "on"}
@@ -324,7 +330,7 @@ def _cli_write_allowed() -> bool:
 
 
 def _project_dir() -> Path | None:
-    value = os.environ.get("CLAUDE_PROJECT_DIR")
+    value = os.environ.get("GUARD_PROJECT_DIR") or os.environ.get("CLAUDE_PROJECT_DIR")
     return Path(value) if value else None
 
 

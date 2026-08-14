@@ -1,7 +1,7 @@
 {
   "name": "guard",
-  "version": "0.26.0",
-  "description": "Enforce evidence-backed claims in Claude Code. Ships a Grounded output style, logs each session's user/assistant turns with the assistant's claims and their supporting evidence, and (on demand via /guard:audit-evidence by default, or automatically each turn in subagent/headless mode) audits a turn for grounding — dispatching the evidence auditor subagent or an isolated headless judge that blocks. The approval gate (edit_gate) and the evidence judge (evidence_gate) are set with /guard:settings and controlled independently. Also ships /guard:audit-comment, which audits and fixes source comments for restating the code, going stale, or leaving intent unrecorded. Requires Python 3.11+. Claude Code only.",
+  "version": "0.27.0",
+  "description": "Enforce evidence-backed claims and gate file edits behind explicit user approval in Claude Code and Codex. Requires Python 3.11+.",
   "author": {
     "name": "studykit"
   },
@@ -14,6 +14,6 @@
     "hallucination-guard",
     "hooks",
     "output-style",
-    "claude-code"
+    "claude-code", "codex"
   ]
 }

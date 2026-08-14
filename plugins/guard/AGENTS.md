@@ -1,8 +1,8 @@
 # guard — contributor notes
 
-`guard` is two capabilities over one stdlib dispatcher (`scripts/guard_hook.py`),
-Claude Code only (it relies on the `claude` CLI and Claude-specific hook payloads;
-no Codex path). Requires Python 3.11+ (the dispatcher uses `enum.StrEnum`):
+`guard` supports Claude Code and Codex. Shared state/configuration helpers live in
+`scripts/guard_hook.py`; runtime payload parsing and hook output stay in host adapters.
+Requires Python 3.11+ (the dispatcher uses `enum.StrEnum`).
 
 1. **Evidence judge** (Stop) — a repo-reading audit that flags a turn on an
    unsupported/surface-signal claim or an unjustified deferral. Runs in one
@@ -22,9 +22,9 @@ no Codex path). Requires Python 3.11+ (the dispatcher uses `enum.StrEnum`):
    (it cannot approve its own `ask` prompt). Set by `/guard:settings` (`edit_gate`),
    independent of the judge's `evidence_gate`.
 
-A **turn is the transcript's `promptId`.** guard keeps no turn buffer; at Stop it
-slices the turn from Claude Code's transcript (`transcript_path` + `prompt_id`). State
-lives under `${CLAUDE_PROJECT_DIR}/.claude/guard/`.
+Claude slices turns from its transcript. Codex saves each documented `turn_id`'s prompt,
+tool activity, and final response in a guard-owned record because its transcript format is
+not a stable hook interface. State is host-specific under `.claude/guard/` or `.codex/guard/`.
 
 The source is the truth for control flow, and its comments carry the *why* next to the
 code. When editing, record what must not regress — don't restate function bodies here.
