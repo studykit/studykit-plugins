@@ -22,6 +22,10 @@ Surfaces:
 The active issue provider selects provider-keyed fragments. Pass
 ``--provider`` to preview a specific one, or omit it to load the project's
 ``.spectrack/config.yml``.
+
+``--no-mustread`` previews what a project with ``mustread: false`` receives:
+the ``<authoring-resolver>`` block is dropped. It pairs with ``--provider``;
+without it the project's own config decides.
 """
 
 from __future__ import annotations
@@ -57,12 +61,12 @@ def available_agents() -> list[str]:
     return sorted(p.stem for p in _AGENTS_DIR.glob("*.md"))
 
 
-def synthesize_config(provider: str) -> WorkflowConfig:
-    """Build a minimal config whose only meaningful field is the issue provider.
+def synthesize_config(provider: str, *, mustread: bool = True) -> WorkflowConfig:
+    """Build a minimal config carrying the fields the build functions read.
 
-    The build functions read just ``config.issues.kind`` to pick
-    provider-keyed fragments, so a synthetic config is enough to preview any
-    provider without a configured project on disk.
+    Those are ``config.issues.kind`` (picks provider-keyed fragments) and
+    ``config.mustread`` (gates the authoring-resolver block), so a synthetic
+    config is enough to preview either without a configured project on disk.
     """
 
     return WorkflowConfig(
@@ -74,15 +78,16 @@ def synthesize_config(provider: str) -> WorkflowConfig:
         knowledge=ProviderConfig(role="knowledge", kind=provider),
         issue_id_format="",
         commit_refs=CommitRefsConfig(enabled=True),
+        mustread=mustread,
         raw={},
     )
 
 
-def resolve_config(provider: str | None) -> WorkflowConfig:
+def resolve_config(provider: str | None, *, mustread: bool = True) -> WorkflowConfig:
     """Synthesize from ``--provider`` or load the project config; error if neither."""
 
     if provider is not None:
-        return synthesize_config(provider)
+        return synthesize_config(provider, mustread=mustread)
     project_dir = workflow_project_dir_from_env() or Path.cwd()
     config = load_workflow_config(project_dir)
     if config is None:
@@ -153,6 +158,11 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
              "Omit for the base subagent policy only.",
     )
     parser.add_argument(
+        "--no-mustread", action="store_true",
+        help="Preview the output for a project with `mustread: false` in "
+             ".spectrack/config.yml. Only applies with --provider.",
+    )
+    parser.add_argument(
         "--list-agents", action="store_true",
         help="List the per-agent block names and exit.",
     )
@@ -164,7 +174,7 @@ def main(argv: list[str]) -> int:
     if args.list_agents:
         print("\n".join(available_agents()))
         return 0
-    config = resolve_config(args.provider)
+    config = resolve_config(args.provider, mustread=not args.no_mustread)
     blocks = render_surface(
         args.surface, config, runtime=args.runtime, agent=args.agent,
     )

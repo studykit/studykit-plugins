@@ -88,6 +88,10 @@ class WorkflowConfig:
     knowledge: ProviderConfig
     issue_id_format: str
     commit_refs: CommitRefsConfig
+    # Whether injected authoring context requires `spectrack mustread` before
+    # drafting. Only gates the requirement, not the CLI: the command stays
+    # runnable by hand so contracts remain inspectable while disabled.
+    mustread: bool = True
     raw: Mapping[str, Any] = field(default_factory=dict)
 
     def provider_for_role(self, role: str) -> str:
@@ -108,6 +112,7 @@ class WorkflowConfig:
             },
             "issue_id_format": self.issue_id_format,
             "commit_refs": self.commit_refs.to_json(),
+            "mustread": self.mustread,
         }
 
 
@@ -156,6 +161,7 @@ def parse_workflow_config(raw: Mapping[str, Any], *, path: Path) -> WorkflowConf
         path=path,
     )
     commit_refs = _parse_commit_refs(raw.get("commit_refs"), path=path)
+    mustread = _parse_mustread(raw.get("mustread"), path=path)
 
     return WorkflowConfig(
         path=path.resolve(),
@@ -166,6 +172,7 @@ def parse_workflow_config(raw: Mapping[str, Any], *, path: Path) -> WorkflowConf
         knowledge=knowledge,
         issue_id_format=issue_id_format,
         commit_refs=commit_refs,
+        mustread=mustread,
         raw=dict(raw),
     )
 
@@ -255,6 +262,12 @@ def _parse_commit_refs(value: Any, *, path: Path) -> CommitRefsConfig:
         style = "disabled"
     settings = {key: item for key, item in value.items() if key not in {"enabled", "style"}}
     return CommitRefsConfig(enabled=enabled, style=style, settings=settings)
+
+
+def _parse_mustread(value: Any, *, path: Path) -> bool:
+    if value is None:
+        return True
+    return _parse_bool(value, path=path, field="mustread")
 
 
 def _normalize_commit_ref_style(value: str | None, *, path: Path) -> str:

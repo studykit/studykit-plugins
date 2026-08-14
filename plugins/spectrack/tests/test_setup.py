@@ -1377,3 +1377,24 @@ def test_build_config_omits_labels_when_not_provided(tmp_path: Path) -> None:
     )
 
     assert "labels" not in raw["providers"]["issues"]
+
+
+def test_build_config_omits_mustread_when_enabled(tmp_path: Path) -> None:
+    """The loader defaults to true, so the default config stays free of the key."""
+
+    raw = _github_github_config(tmp_path)
+
+    assert "mustread" not in raw
+
+
+def test_build_config_writes_mustread_when_disabled(tmp_path: Path) -> None:
+    raw = build_config(
+        project=tmp_path,
+        issue_provider="github",
+        knowledge_provider="github",
+        github_repo="studykit/studykit-plugins",
+        mustread=False,
+    )
+
+    assert raw["mustread"] is False
+    assert parse_workflow_config(raw, path=tmp_path / ".spectrack" / "config.yml").mustread is False

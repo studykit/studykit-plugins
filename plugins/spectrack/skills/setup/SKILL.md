@@ -32,6 +32,7 @@ spectrack setup.py build-config --project <project-root> --issue-provider <provi
 spectrack setup.py build-config --issue-provider jira --knowledge-provider <provider> --jira-snapshot-hidden-comment-marker '!git-event' <options...>
 spectrack setup.py build-config --issue-provider jira --knowledge-provider <provider> --jira-epic-field-name <id> --jira-epic-field-link <id> --jira-epic-field-status <id> [--jira-epic-issue-type <NAME>] <options...>
 spectrack setup.py build-config --issue-provider jira --knowledge-provider <provider> --jira-state-transition <verb>=<transition> [--jira-state-transition <verb>=<transition> ...] <options...>
+spectrack setup.py build-config --project <project-root> --issue-provider <provider> --knowledge-provider <provider> --disable-mustread <options...>
 spectrack setup.py write --project <project-root> --config <reviewed-yaml-file>
 spectrack config.py --project <project-root> --require
 ```
@@ -41,7 +42,8 @@ spectrack config.py --project <project-root> --require
 1. Resolve the repository root. Prefer `git rev-parse --show-toplevel`; if the
    project is not a Git repository, use the user's explicit target directory.
 2. If `.spectrack/config.yml` already exists, summarize its issue provider,
-   knowledge provider, and commit reference style. Do not overwrite it unless
+   knowledge provider, commit reference style, and whether `mustread` is
+   required. Do not overwrite it unless
    the user explicitly requests overwrite; pass `--force` only after that
    confirmation.
 3. Collect the issue provider: `github`, `jira`, or `filesystem`. Ask the user
@@ -80,8 +82,14 @@ spectrack config.py --project <project-root> --require
    automation comments by body marker. If the user gives markers such as
    `!git-event`, pass each one with
    `--jira-snapshot-hidden-comment-marker`.
-8. Collect the commit reference style.
-9. For GitHub issue providers, after the `owner/repo` slug is settled and
+8. Ask whether artifact drafting should require `spectrack mustread` to be run
+   first. By default, mustread is required and ensures contract information is
+   loaded before drafting issues or creating artifacts. When disabled with
+   `--disable-mustread`, users can draft artifacts without running mustread,
+   though contract references may be less complete. When the user chooses to
+   disable mustread, pass `--disable-mustread` to `build-config`.
+9. Collect the commit reference style.
+10. For GitHub issue providers, after the `owner/repo` slug is settled and
    before `build-config`, run `ensure-github-labels` to create any missing
    canonical issue-type labels (`task`, `bug`, `spike`, `epic`, `review`,
    `usecase`, `research`) in the repository. Existing labels are skipped, not
@@ -90,15 +98,15 @@ spectrack config.py --project <project-root> --require
    (the command emits a JSON `labels` array) so the written config records the
    full label set under `providers.issues.settings.labels`. Skip this step for
    `jira` and `filesystem` issue providers.
-10. Run `capabilities` for the selected providers and show limitations before
+11. Run `capabilities` for the selected providers and show limitations before
    confirmation.
-11. Run `build-config`, show the generated YAML and warnings to the user, and
+12. Run `build-config`, show the generated YAML and warnings to the user, and
    ask for explicit confirmation before writing.
-12. After confirmation, write with `write --config <reviewed-yaml-file>`. The
+13. After confirmation, write with `write --config <reviewed-yaml-file>`. The
    write step also installs SpecTrack Codex agent roles. Tell Codex users to
    restart Codex before using newly installed roles. Then verify with
    `config.py --require`.
-13. `write` also records the configured knowledge folder under a
+14. `write` also records the configured knowledge folder under a
    `## SpecTrack Knowledge` section in `<project-root>/AGENTS.md`
    (auto-created when missing) and creates `<project-root>/CLAUDE.md`
    as a `@AGENTS.md` shim if absent. The generated section records the

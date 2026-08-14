@@ -240,3 +240,61 @@ issue_id_format: jira
 
     with pytest.raises(WorkflowConfigError, match="issue_id_format"):
         load_workflow_config(tmp_path)
+
+
+def test_mustread_defaults_to_enabled_when_absent(tmp_path: Path) -> None:
+    _config_path(tmp_path).write_text(
+        """
+version: 1
+providers:
+  issues:
+    kind: github
+  knowledge:
+    kind: github
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    config = load_workflow_config(tmp_path)
+
+    assert config is not None
+    assert config.mustread is True
+
+
+def test_mustread_can_be_disabled(tmp_path: Path) -> None:
+    _config_path(tmp_path).write_text(
+        """
+version: 1
+providers:
+  issues:
+    kind: github
+  knowledge:
+    kind: github
+mustread: false
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    config = load_workflow_config(tmp_path)
+
+    assert config is not None
+    assert config.mustread is False
+    assert config.to_json()["mustread"] is False
+
+
+def test_mustread_rejects_non_boolean(tmp_path: Path) -> None:
+    _config_path(tmp_path).write_text(
+        """
+version: 1
+providers:
+  issues:
+    kind: github
+  knowledge:
+    kind: github
+mustread: maybe
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(WorkflowConfigError, match="mustread"):
+        load_workflow_config(tmp_path)

@@ -24,6 +24,7 @@ Schema version 1 supports:
 - Knowledge provider.
 - Issue ID format.
 - Commit reference style.
+- Authoring contract enforcement (`mustread`).
 
 Example:
 
@@ -142,6 +143,25 @@ Supported commit reference styles:
 The default is `provider-native`.
 
 When `commit_refs.enabled` is `false`, the loader normalizes the style to `disabled`.
+
+### Authoring Contract Enforcement
+
+`mustread` is a top-level boolean. The default is `true`.
+
+```yaml
+mustread: false
+```
+
+When `true`, injected session and subagent context requires running
+`spectrack mustread` to resolve authoring contracts before drafting any issue
+or knowledge artifact.
+
+When `false`, that requirement is dropped: the `<authoring-resolver>` block is
+omitted from injected context on both surfaces. The `spectrack mustread`
+command itself keeps working, so contracts stay inspectable on demand.
+
+Only `true` and `false` (and their YAML string forms) are accepted; any other
+value is a configuration error. An absent key means `true`.
 
 ## Canonical Values
 

@@ -61,6 +61,10 @@ issue_id_format: github
 commit_refs:
   enabled: true
   style: provider-native
+
+# Require `spectrack mustread` before drafting issues and knowledge
+# artifacts. Defaults to true; set false to skip the authoring contracts.
+mustread: true
 ```
 
 For the full schema and per-provider fields, see

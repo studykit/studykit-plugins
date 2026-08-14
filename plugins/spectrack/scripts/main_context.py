@@ -41,6 +41,11 @@ _KNOWN_RUNTIMES = {"claude", "codex", "hermes"}
 
 _PLACEHOLDER_RE = re.compile(r"\{\{(\w+)\}\}")
 
+_AUTHORING_RESOLVER_BLOCK_RE = re.compile(
+    r"\n?<authoring-resolver>\s*\n?.*?\n?\s*</authoring-resolver>\n?",
+    re.DOTALL,
+)
+
 
 def render(text: str, ctx: dict[str, str]) -> str:
     """Substitute ``{{NAME}}`` placeholders against ``ctx``.
@@ -84,6 +89,8 @@ def build_session_policy_context(
         "SNIPPET_PRD_PATH": _read_fragment("snippets/prd-path.md").strip(),
         "SPECTRACK_ISSUE_PROVIDER": issue_provider,
     })
+    if not _mustread_enabled(config):
+        rendered = _strip_authoring_resolver(rendered)
     return _wrap_policy(rendered)
 
 
@@ -107,6 +114,8 @@ def build_subagent_policy_context(
         "SNIPPET_PRD_PATH": _read_fragment("snippets/prd-path.md").strip(),
         "SPECTRACK_ISSUE_PROVIDER": issue_provider,
     })
+    if not _mustread_enabled(config):
+        rendered = _strip_authoring_resolver(rendered)
     agent_block = _build_agent_context_block(agent_type, issue_provider)
     merged = _merge_commands_blocks(rendered, agent_block)
     return _wrap_policy(merged)
@@ -150,6 +159,29 @@ def _merge_commands_blocks(base: str, per_agent: str) -> str:
 
 def _wrap_policy(text: str) -> str:
     return f"<policy>\n{text.strip()}\n</policy>"
+
+
+def _mustread_enabled(config: Any) -> bool:
+    """Whether injected context should require the mustread resolver.
+
+    Absent or unreadable config keeps the requirement: the gate is the safe
+    default, so only an explicit ``mustread: false`` removes it.
+    """
+
+    value = getattr(config, "mustread", True)
+    return True if value is None else bool(value)
+
+
+def _strip_authoring_resolver(text: str) -> str:
+    """Remove the whole <authoring-resolver> block, not just its snippet.
+
+    The template wraps the snippet in a header that reads as an instruction on
+    its own, so dropping only the snippet would leave a resolver directive
+    pointing at nothing.
+    """
+
+    stripped = _AUTHORING_RESOLVER_BLOCK_RE.sub("\n\n", text, count=1)
+    return re.sub(r"\n{3,}", "\n\n", stripped).strip()
 
 
 def _build_agent_context_block(

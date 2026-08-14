@@ -12,6 +12,11 @@ The operational rule is:
 required_authoring_files are read before a workflow artifact write
 ```
 
+This rule is opt-out per repository. Setting `mustread: false` in
+`.spectrack/config.yml` removes the requirement from injected context, so the
+enforcement described below does not apply to that project. See
+`spectrack-configuration.md`.
+
 ## Layer Boundaries
 
 ### Main assistant

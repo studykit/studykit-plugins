@@ -501,6 +501,7 @@ def build_config(
     filesystem_issues_path: str | None = None,
     commit_ref_style: str = "provider-native",
     commit_refs_enabled: bool = True,
+    mustread: bool = True,
     mode: str = "remote-native",
     probe_remote: bool = False,
     remote: str = "origin",
@@ -581,6 +582,10 @@ def build_config(
             "style": effective_commit_style,
         },
     }
+    # Written only when disabled: the loader already defaults to true, so
+    # emitting the key on every setup would add a line that says nothing.
+    if not mustread:
+        raw["mustread"] = False
 
     parse_workflow_config(raw, path=project / CONFIG_RELATIVE_PATH)
     return raw
@@ -883,6 +888,7 @@ def existing_config_summary(project: Path) -> dict[str, Any]:
             "issues": config.issues.kind,
             "knowledge": config.knowledge.kind,
             "commit_refs": config.commit_refs.style,
+            "mustread": config.mustread,
         }
     )
     return summary
@@ -1188,6 +1194,11 @@ def _add_config_build_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--filesystem-issues-path", default="workflow/issues", help="filesystem issue provider path")
     parser.add_argument("--commit-ref-style", choices=sorted(COMMIT_REF_STYLES), default="provider-native")
     parser.add_argument("--disable-commit-refs", action="store_true", help="disable commit references")
+    parser.add_argument(
+        "--disable-mustread",
+        action="store_true",
+        help="do not require `spectrack mustread` before drafting artifacts",
+    )
 
 
 def _config_from_args(args: argparse.Namespace) -> dict[str, Any]:
@@ -1218,6 +1229,7 @@ def _config_from_args(args: argparse.Namespace) -> dict[str, Any]:
         filesystem_issues_path=args.filesystem_issues_path,
         commit_ref_style=args.commit_ref_style,
         commit_refs_enabled=not args.disable_commit_refs,
+        mustread=not args.disable_mustread,
         mode=args.mode,
         probe_remote=args.probe_git_remote,
         remote=args.remote,

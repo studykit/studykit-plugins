@@ -108,3 +108,40 @@ def test_main_list_agents(capsys) -> None:
     assert main(["--list-agents"]) == 0
     out = capsys.readouterr().out
     assert "issue-implementer" in out
+
+
+def _render_no_mustread(surface: str, provider: str, *, agent: str | None = None) -> str:
+    config = synthesize_config(provider, mustread=False)
+    return "\n\n".join(
+        render_surface(surface, config, runtime="claude", agent=agent)
+    )
+
+
+def test_disabled_mustread_drops_authoring_resolver_on_session() -> None:
+    text = _render_no_mustread("session", "github")
+    assert "<authoring-resolver>" not in text
+    assert "spectrack mustread" not in text
+
+
+def test_disabled_mustread_drops_authoring_resolver_on_subagent() -> None:
+    text = _render_no_mustread("subagent", "github", agent="issue-implementer")
+    assert "<authoring-resolver>" not in text
+    assert "spectrack mustread" not in text
+
+
+def test_disabled_mustread_keeps_other_blocks() -> None:
+    """Only the resolver block goes; the rest of the policy is untouched."""
+
+    text = _render_no_mustread("session", "github")
+    assert "<policy>" in text and "</policy>" in text
+    assert "<launcher>" in text
+    assert "<commands>" in text
+    assert "<prd-path>" in text
+    assert "\n\n\n" not in text
+
+
+def test_no_mustread_flag_matches_disabled_config(capsys: pytest.CaptureFixture[str]) -> None:
+    assert main(["--surface", "session", "--provider", "github", "--no-mustread"]) == 0
+    flag_output = capsys.readouterr().out
+    assert "<authoring-resolver>" not in flag_output
+    assert _render_no_mustread("session", "github") in flag_output
