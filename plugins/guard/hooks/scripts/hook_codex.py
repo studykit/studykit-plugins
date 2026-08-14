@@ -22,7 +22,8 @@ sys.path.insert(0, str(_SCRIPTS))
 import guard_hook as core  # noqa: E402
 
 _APPROVAL = re.compile(
-    r"\b(approve|approved|go ahead|proceed|implement it|do it|start implementation)\b",
+    r"\b(approve|approved|go ahead|proceed|implement it|do it|start implementation)\b|"
+    r"(?:진행|수정해|수정해줘|구현해|구현해줘|해제해|해제해줘|시작해|시작해줘)",
     re.IGNORECASE,
 )
 _PATCH_PATH = re.compile(r"^\*\*\* (?:Add|Update|Delete) File: (.+)$", re.MULTILINE)
@@ -128,9 +129,11 @@ def _handle_prompt(project_dir: Path, payload: dict[str, Any], session_id: str, 
         pending = state.get("pending_verify_prompt_id")
         if isinstance(pending, str) and pending and _turn_path(project_dir, session_id, pending).is_file():
             _emit({"hookSpecificOutput": {"hookEventName": "UserPromptSubmit", "additionalContext": (
-                "guard: audit the saved turn before answering. Spawn one read-only subagent, give it "
+                "guard: audit the saved turn before answering. Spawn the read-only "
+                "guard_evidence_auditor named subagent in a fresh context, give it "
                 f"the turn file {_turn_path(project_dir, session_id, pending)}, and have it verify the "
-                "assistant claims against the repository."
+                "assistant claims against the repository. If that agent is unavailable, tell the user "
+                "to run $guard:setup in this project."
             )}})
 
 
@@ -191,9 +194,11 @@ def _handle_stop(project_dir: Path, payload: dict[str, Any], session_id: str, tu
     state["last_audited_prompt_id"] = turn_id
     core._write_state(project_dir, session_id, state)
     _emit({"decision": "block", "reason": (
-        "guard: before completing, spawn a read-only evidence auditor subagent. Give it the saved "
-        f"turn record at {_turn_path(project_dir, session_id, turn_id)} and have it check the response's "
-        "claims against the repository; then address any violations."
+        "guard: before completing, spawn the read-only guard_evidence_auditor named subagent in a fresh "
+        "context. Give it "
+        f"the saved turn record at {_turn_path(project_dir, session_id, turn_id)} and have it check the "
+        "response's claims against the repository; then address any violations. If that agent is unavailable, "
+        "tell the user to run $guard:setup in this project."
     )})
 
 

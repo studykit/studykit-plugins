@@ -1,16 +1,19 @@
 ---
 name: audit-evidence
-description: 'On demand, audit the last completed turn for evidence grounding — guard dispatches the evidence-auditor subagent to check that turn''s claims against the repository. Use when you want a specific turn verified instead of guard auto-auditing every turn. Claude Code only.'
+description: 'On demand, audit the last completed turn for evidence grounding — guard dispatches the evidence-auditor subagent to check that turn''s claims against the repository. In Codex, run guard:setup first to install the named auditor. Use when you want a specific turn verified instead of guard auto-auditing every turn.'
 argument-hint: ''
 disable-model-invocation: true
 ---
 
-This command is handled by a guard hook, which fires the moment you type
-`/guard:audit-evidence` and targets the last completed turn. It has already run. The hook emits
-a `<system-reminder>` carrying the evidence auditor dispatch inputs (session_id, prompt_id,
+This command is handled by a guard hook, which targets the last completed turn.
+The hook emits the evidence-auditor dispatch inputs (session_id, prompt_id,
 turn_file, verified_file, dispatcher).
 
-**Follow that dispatch instruction:** dispatch the `guard:evidence-auditor` subagent with the
+In Codex, run `$guard:setup` once per project first. It installs the project-local
+`guard_evidence_auditor` named agent. Dispatch that named agent read-only with the
+turn file supplied by the hook.
+
+**Follow that dispatch instruction:** dispatch the requested evidence-auditor subagent with the
 Agent tool exactly as the reminder specifies, then relay its verdict — if it reports
 violations, address them; otherwise state that the turn passed.
 

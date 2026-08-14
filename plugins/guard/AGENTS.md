@@ -24,7 +24,9 @@ Requires Python 3.11+ (the dispatcher uses `enum.StrEnum`).
 
 Claude slices turns from its transcript. Codex saves each documented `turn_id`'s prompt,
 tool activity, and final response in a guard-owned record because its transcript format is
-not a stable hook interface. State is host-specific under `.claude/guard/` or `.codex/guard/`.
+not a stable hook interface. Codex projects must run `$guard:setup` once to install the
+project-local `guard_evidence_auditor` named agent. State is host-specific under
+`.claude/guard/` or `.codex/guard/`.
 
 The source is the truth for control flow, and its comments carry the *why* next to the
 code. When editing, record what must not regress — don't restate function bodies here.
