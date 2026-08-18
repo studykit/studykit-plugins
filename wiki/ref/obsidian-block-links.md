@@ -3,8 +3,8 @@
 Source: <https://obsidian.md/help/links> (reached via 301 redirect from
 `https://help.obsidian.md/links`). Fetched 2026-08-13.
 
-Saved because guard's `refs_format: obsidian` injects this syntax into the session,
-so the shipped text must rest on an inspectable copy rather than recollection.
+Saved while guard shipped a per-project Obsidian mark format (removed in v0.28.1).
+Kept as an inspectable copy of the syntax for answers read in an Obsidian vault.
 
 ## Defining a block identifier
 

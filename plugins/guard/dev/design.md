@@ -19,8 +19,8 @@ line-by-line walkthrough.
 | (called via Bash, not a hook) | `settings` | `guard:settings` skill (forked) shows/sets guard.local.json settings; `edit_gate`/`evidence_gate` also apply to the live session's `state/<sid>.json` (session id from `--session`/`CLAUDE_CODE_SESSION_ID`). Every other key preserved; never the list keys (`exempt_skills`, `writable_dirs`). |
 | (called via Bash, not a hook) | `exempt` | `guard:settings` skill records the user's confirmed `exempt_skills` selection (that key only). |
 | (called via Bash, not a hook) | `writable` | `guard:settings` skill records the user's confirmed `writable_dirs` selection (that key only); rejects unusable values at set time. |
-| `Stop` | `stop` | Reference-mark check (all modes, blocks). manual: record pending target, no audit. subagent: dispatch evidence auditor. headless: in-hook judge that blocks. |
-| `SessionStart` | `session-start` | Age-sweep state/sessions/verified/turns; inject the per-project refs settings (dir + mark format) the style cannot hardcode. |
+| `Stop` | `stop` | manual: record pending target, no audit. subagent: dispatch evidence auditor. headless: in-hook judge that blocks. |
+| `SessionStart` | `session-start` | Age-sweep state/sessions/verified/turns; inject the per-project refs directory the style cannot hardcode. |
 | (called via Bash, not a hook) | `refs-dir` | Print the resolved refs directory (auditor fallback; applies `refs_dir` validation). |
 
 ## Storage layout (`${CLAUDE_PROJECT_DIR}/.claude/guard/`)
@@ -153,21 +153,13 @@ payloads, not memory.
   user-invoked skill reaches the transcript as a namespaced `<command-name>` just like
   a command (skill output is not a body of technical claims to ground). Both modes
   honor it (checked before the `evidence_gate` branch).
-- **Reference-mark integrity needs no judge, so it is not gated like one.** An
-  unresolvable mark is decidable by text alone, which puts it in a different class from
-  every other check here: it runs in *every* `evidence_gate` mode (including `manual`, the
-  judge's off switch) and ahead of the judge-specific skips. Those skips exist because a
-  turn's *claims* may not be worth judging — a plan after a gate denial, skill output,
-  a `!` command's late-arriving evidence — and none of that makes a dangling mark
-  acceptable. A false block here would be a pattern bug, not a misjudgment, which is why
-  it may block where a model-driven check should not.
-  Scope is drawn to keep it that way. Whether a turn *owed* a References section is a
-  judgment about its claims, so a response without one is clean; a mark quoted as an
-  example (this repo's docs do it constantly) is not a citation. Two rules go beyond
-  resolvability because they too are mechanically decidable: no mixing the two syntaxes,
-  and numeric footnote ids. Mixing is a real failure even when every mark resolves — a
-  reader who must learn two mark forms mid-answer loses the link the marks exist to
-  carry.
+- **Mark resolution is the judge's call, not a mechanical gate.** guard once ran a
+  deterministic Stop-time check on reference marks (dangling mark, unused entry, mixed
+  syntax, non-numeric footnote id) and blocked on it in every `evidence_gate` mode. It was
+  removed with the `refs_format` setting: guard no longer fixes a mark syntax, so there is
+  no format to enforce, and whether a mark resolves to adequate evidence is a judgment
+  about the claim — which is the evidence judge's job and follows the `evidence_gate`
+  modes like every other criterion. Nothing at Stop blocks on marks now.
 - **Three modes, one criteria.** `evidence_gate` selects only *how/when* the Stop audit runs —
   `manual` (default; no auto-audit, `/guard:audit-evidence` dispatches on demand), `subagent`
   (dispatch evidence auditor each turn), or `headless` (in-hook judge that blocks). The two-axis
@@ -206,7 +198,7 @@ payloads, not memory.
   reads/searches always pass.
 - **Four exemptions, all narrow.** The gate lets an unapproved write through only when:
   1. **refs dir** — the target resolves inside the refs directory: `wiki/ref/`
-     by default, or the `refs_dir` config path (the Grounded output style tells the
+     by default, or the `refs_dir` config path (the injected contract tells the
      assistant to save cited docs there — guard must not forbid its own required
      behavior). Both paths `resolve()`d so `..` can't escape. `_refs_dir` honors a
      configured value only when `_safe_project_subdir` accepts it — this exemption is
@@ -292,7 +284,7 @@ is exempt, and they would meet the truth as a surprise permission prompt with no
 naming the cause. `_writable_dirs` re-validates at use via `_safe_project_subdir`, so a
 hand-edited file is still safe, and `writable list` reports only the entries the gate
 actually honors. `refs_dir`
-(string, default `""`) — project-relative directory for the Grounded style's cited-doc
+(string, default `""`) — project-relative directory for guard's cited-doc
 copies; empty = the git-tracked default `wiki/ref/` (references committed with the
 repo), a different tracked path (e.g. `"docs/refs"`) overrides it; commits stay in the
 user's normal workflow (guard never commits). `_refs_dir` validates the value (see the refs
@@ -300,24 +292,9 @@ exemption above) and everything that names the location follows it: the gate
 exemption, the headless judge prompt (`__REFS_DIR__` substitution), the evidence auditor
 dispatch inputs (`refs_dir`, with the `refs-dir` CLI subcommand as its fallback), and
 the output style (which reads `GUARD_REFS_DIR` — exported by the SessionStart hook via
-`$CLAUDE_ENV_FILE`, per the official hooks docs — before its first save). `refs_format`
-(string, default `"footnote"`; `footnote` | `obsidian`) — the reference-mark syntax.
-It is config rather than style text because the right syntax depends on where the user
-*reads* answers: a terminal renders `[[#^id]]` as inert text, an Obsidian vault turns it
-into a jump target — so one style file serves both, and the style file itself names no
-syntax. Numeric footnote ids are guard's rule, deliberately stricter than Markdown (which
-permits word ids): the renderer numbers footnotes sequentially whatever the label says, so
-a number is what the reader sees anyway. Both syntaxes are quoted from copies saved under
-the refs dir, so what ships rests on something inspectable rather than recollection.
-One string per format serves both the session injection and the judge, so the judge can
-never grade against a syntax the model was not given. That shared string is a grading
-*aid*, not a new violation class: an unresolvable mark was already unsupported, so both
-judge paths are told to accept a resolvable mark in the other syntax and to leave the
-mix/numeric rules to the Stop check, which decides them mechanically. A bad value
-resolves differently on each side on purpose — the read path falls back to the default (a
-config typo must not cost a session its format instruction) while the `settings` CLI
-refuses it outright (a typo that looked accepted would silently keep injecting the old
-format). Only keys whose value matches the
+`$CLAUDE_ENV_FILE`, per the official hooks docs — before its first save). guard fixes no
+reference-mark syntax: both judge paths are told to check that a mark *resolves* and never
+to grade its form. Only keys whose value matches the
 default's type are honored (a malformed value can't flip a flag); unknown keys ignored;
 missing/malformed file → all defaults. `guard.local.json.example`
 ships at the plugin root. The judge always reads the repo (`--allowedTools

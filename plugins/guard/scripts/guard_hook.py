@@ -57,7 +57,7 @@ Subcommands
                  reason and records the turn's ``prompt_id`` in ``gated_prompt_id`` so
                  Stop skips auditing a plan/approval-request response. Four exemptions:
                  writes into the refs directory (``wiki/ref/`` by default; the
-                 ``refs_dir`` config key may move it — the Grounded output style saves
+                 ``refs_dir`` config key may move it — guard's evidence contract saves
                  cited docs there); writes into a user-designated ``writable_dirs``
                  entry; and writes that don't touch tracked project source — targets
                  outside the project dir (e.g. the scratchpad) and git-ignored writes
@@ -132,7 +132,7 @@ commands whose turn the Stop judge must not audit, named with their plugin names
 leading-``/``-stripped and case-insensitively (guard's own
 ``settings``/``judge`` control commands are always exempt regardless of this
 list), and ``refs_dir`` (string, default ``""``) — project-relative directory where
-the Grounded output style saves local copies of cited docs; empty means the
+guard saves local copies of cited docs; empty means the
 git-tracked default ``wiki/ref/``, so the collected references are committed with the
 repo (point it at a different tracked path, e.g. ``"docs/refs"``, to override; values
 resolving outside the project, at the project root, or into guard's own config/state
@@ -225,20 +225,13 @@ DEFAULT_CONFIG: dict[str, Any] = {
     # case-insensitively. guard's own config/judge control commands are always exempt
     # regardless of this list.
     "exempt_skills": [],
-    # Where the Grounded output style saves local copies of cited docs, relative to
+    # Where guard saves local copies of cited docs, relative to
     # the project dir. Empty = the default git-tracked `wiki/ref/`, so the collected
     # references are committed with the repo. Point it at a different tracked path
     # (e.g. "docs/refs") to override. Values that resolve outside the project, at the
     # project root, or into guard's own config/state are ignored (fall back to the
     # default) — see _refs_dir for why.
     "refs_dir": "",
-    # Which reference-mark format the Grounded style uses. The style itself states only
-    # that a mark must be short and must resolve; the concrete syntax is per-project
-    # because it depends on where the user READS the answers — a terminal renders
-    # `[[#^id]]` as inert text, an Obsidian vault turns it into a jump target. Injected
-    # at SessionStart (see cmd_session_start) rather than written into the style, so one
-    # style file serves both. Unknown values fall back to the default.
-    "refs_format": "footnote",
     # Project-relative directories the user has designated as freely writable: the
     # approval gate lets an unapproved write through when the target is inside one.
     # The general form of the refs-dir hole — a user-chosen allowlist (build output, a
@@ -251,40 +244,6 @@ DEFAULT_CONFIG: dict[str, Any] = {
 
 VALID_EFFORTS = {"low", "medium", "high", "xhigh", "max"}
 
-# Reference-mark formats for the Grounded style, keyed by the `refs_format` config value.
-# Each value is the instruction injected at SessionStart — it must be self-contained,
-# because it is the ONLY place the concrete syntax is stated (the style file stays
-# format-agnostic on purpose; see the `refs_format` comment in DEFAULT_CONFIG).
-#
-# Both syntaxes are quoted from saved sources: wiki/ref/markdown-footnotes.md and
-# wiki/ref/obsidian-block-links.md. Footnote ids are REQUIRED to be numeric (user's
-# call) even though the spec allows words: the renderer numbers sequentially regardless,
-# so a number is what the reader sees anyway, and one form throughout keeps marks uniform
-# within an answer. `_check_reference_marks` enforces it — guard's rule is deliberately
-# stricter than Markdown's, and only for footnotes (Obsidian block ids stay descriptive).
-# Caveat on Obsidian: the same-note `[[#^id]]` form is NOT in its docs and
-# was verified by the user in the app — do not attribute it to Obsidian's documentation.
-REFS_FORMATS: dict[str, str] = {
-    "footnote": (
-        "Mark each claim with a Markdown footnote reference — a caret and a number in "
-        "brackets, `[^1]` — and close the answer with a References section "
-        "whose entries are footnote definitions: `[^1]: path/to/file.ext:12-14 — "
-        '"the quoted line"`. Identifiers must be NUMBERS — `[^1]`, `[^2]` — numbered in '
-        "order of first appearance. Markdown also permits word identifiers, but do not "
-        "use them here: the renderer numbers footnotes sequentially regardless, so a "
-        "number is what the reader sees anyway, and one form throughout keeps the marks "
-        "uniform. Reuse one number for a source cited more than once."
-    ),
-    "obsidian": (
-        "Mark each claim with an Obsidian same-note block link — `[[#^some-id]]` — and "
-        "close the answer with a References section whose entries carry the matching "
-        "block identifier: a blank space, a caret, and the id at the END of the entry "
-        'line, e.g. `path/to/file.ext:12-14 — "the quoted line" ^some-id`. Block ids '
-        "may use only Latin letters, numbers, and dashes; prefer a short descriptive id "
-        "over a number. Reuse one id for a source cited more than once."
-    ),
-}
-DEFAULT_REFS_FORMAT = "footnote"
 # The evidence-judge settings live on EvidenceGate:
 # EvidenceGate.MANUAL (default): the hook does NOT audit at Stop — it archives the turn and
 #   records it as the pending verify target; verification runs only on demand via
@@ -405,7 +364,7 @@ def _safe_project_subdir(project_dir: Path, raw: Any) -> Path | None:
 
 
 def _refs_dir(project_dir: Path, config: dict[str, Any] | None = None) -> Path:
-    """Directory where the Grounded output style saves local copies of cited docs.
+    """Directory where guard saves local copies of cited docs.
 
     Writes here are the assistant grounding its own claims (per the output style),
     not implementing the user's task — so the approval gate exempts them.
@@ -419,19 +378,6 @@ def _refs_dir(project_dir: Path, config: dict[str, Any] | None = None) -> Path:
     """
     default = project_dir / "wiki" / "ref"
     return _safe_project_subdir(project_dir, (config or {}).get("refs_dir", "")) or default
-
-
-def _refs_format(config: dict[str, Any] | None = None) -> str:
-    """The `refs_format` key, narrowed to a name REFS_FORMATS actually defines.
-
-    An unknown or non-string value falls back to the default rather than raising: this
-    feeds a SessionStart injection, and a typo in the config must not cost the session
-    its reference-format instruction entirely.
-    """
-    raw = (config or {}).get("refs_format", DEFAULT_REFS_FORMAT)
-    if isinstance(raw, str) and raw.strip().lower() in REFS_FORMATS:
-        return raw.strip().lower()
-    return DEFAULT_REFS_FORMAT
 
 
 def _refs_rel(project_dir: Path, config: dict[str, Any]) -> str:
@@ -865,10 +811,6 @@ def _read_state(project_dir: Path, session_id: str, config: dict[str, Any]) -> d
         # Manual mode: the most recent auditable turn's prompt_id, the target that
         # `/guard:audit-evidence` dispatches the evidence auditor for.
         "pending_verify_prompt_id": "",
-        # The prompt_id whose reference marks were already reported broken. Blocking the
-        # same turn twice would trap the session: the fixed response arrives under the
-        # SAME prompt_id, so without this the check would re-run and re-block.
-        "last_marks_prompt_id": "",
         "updated_at": None,
     }
     path = _state_file(project_dir, session_id)
@@ -881,7 +823,7 @@ def _read_state(project_dir: Path, session_id: str, config: dict[str, Any]) -> d
     if not isinstance(data, dict):
         return default
     keys = ("edit_gate", "approved", "evidence_gate", "last_audited_prompt_id", "gated_prompt_id",
-            "asked_prompt_id", "pending_verify_prompt_id", "last_marks_prompt_id", "updated_at")
+            "asked_prompt_id", "pending_verify_prompt_id", "updated_at")
     default.update({k: data[k] for k in keys if k in data})
     return default
 
@@ -1233,13 +1175,9 @@ EVIDENCE_SYSTEM = (
     "'allocates less' is a claim. For each load-bearing claim, decide if it is "
     "backed by adequate evidence: output of a command in TOOL_ACTIVITY, a specific "
     "code reference (file:line or symbol), a named doc/spec, a measurement, or a sound "
-    "derivation. Evidence may sit anywhere in the response: the Grounded style keeps "
-    "citations out of the prose, so a claim carries a short reference mark and the "
-    "citation sits in a References section closing the answer. This project's mark "
-    "format is: __REFS_FORMAT__ Judge whether marks RESOLVE, not whether they match "
-    "that syntax — a resolvable mark in the other form is not a violation, though an "
-    "answer must not mix the two forms (guard's Stop hook checks that mechanically, so "
-    "it is not yours to police). "
+    "derivation. Evidence may sit anywhere in the response — including a References "
+    "section closing the answer, with a short mark on the claim. Judge whether a mark "
+    "RESOLVES, never whether it matches any particular syntax. "
     "Resolve whatever marks you find against that section before judging: a "
     "claim whose mark is backed by an adequate entry is SUPPORTED, and the mark's "
     "presence is not itself a missing citation — but a mark resolving to NOTHING, or to "
@@ -1507,7 +1445,7 @@ def cmd_gate() -> int:
     if state["approved"]:
         return 0
 
-    # Exempt the assistant's own evidence store: the Grounded output style
+    # Exempt the assistant's own evidence store: guard's evidence contract
     # tells it to save cited docs in the refs directory (`wiki/ref/` by
     # default; `refs_dir` may point it at another tracked path). Grounding a claim is
     # not implementing the user's task, so those writes pass without approval. Note
@@ -1897,115 +1835,6 @@ def _stop_manual(project_dir: Path, session_id: str, state: dict[str, Any],
     return 0
 
 
-# Reference-mark syntaxes the checker recognizes, independent of `refs_format`: the
-# judge is told to accept any mark that RESOLVES, so the check must too — otherwise a
-# turn using the other project's syntax would be reported as broken rather than merely
-# off-format. Both capture the identifier in group 1.
-_MARK_FOOTNOTE = re.compile(r"\[\^([^\]\s]+)\]")
-_MARK_OBSIDIAN = re.compile(r"\[\[#\^([^\]\s]+)\]\]")
-# An entry DEFINES an id: a footnote definition at line start (`[^id]: …`), or an
-# Obsidian block id at end of line (` ^id`). Anchored per line, since both forms are
-# positional — a footnote definition mid-sentence is a reference, not a definition.
-_DEF_FOOTNOTE = re.compile(r"^\s*\[\^([^\]\s]+)\]:", re.MULTILINE)
-_DEF_OBSIDIAN = re.compile(r"[ \t]\^([A-Za-z0-9-]+)\s*$", re.MULTILINE)
-# Fenced and inline code are stripped before scanning: a code block quoting `[^1]` as an
-# EXAMPLE (this repo's own docs do exactly that) is not a citation, and treating it as
-# one would block a turn for correctly documenting the syntax.
-_FENCE = re.compile(r"```.*?```|~~~.*?~~~", re.DOTALL)
-_INLINE_CODE = re.compile(r"`[^`\n]*`")
-
-
-def _strip_code(text: str) -> str:
-    """Blank out fenced and inline code so example marks inside it are not scanned."""
-    return _INLINE_CODE.sub(" ", _FENCE.sub(" ", text))
-
-
-def _split_references(text: str) -> tuple[str, str]:
-    """Split a response into (prose, references-section) at the LAST References heading.
-
-    Last rather than first: a turn may mention the words "References section" in prose
-    while the real section is the one closing the answer. When no heading is found the
-    references half is empty, which makes every mark unresolved — handled by the caller,
-    which only reports when a section actually exists.
-    """
-    matches = list(re.finditer(r"(?im)^\s{0,3}#{1,6}\s*references\b.*$", text))
-    if not matches:
-        return text, ""
-    cut = matches[-1].start()
-    return text[:cut], text[cut:]
-
-
-def _check_reference_marks(response: str) -> list[str]:
-    """Verify every prose mark resolves to an entry and every entry is cited.
-
-    Pure text matching — no model judgment — so this runs in every ``evidence_gate`` mode
-    and a false positive is a bug in the patterns, not a misjudgment. Returns a list of
-    human-readable problems; empty means the References section is internally consistent.
-
-    Returns no problems when the response has no References section at all: whether a
-    turn OWED one is a judgment about its claims, which is the evidence judge's job, not
-    this check's.
-    """
-    prose_raw, refs_raw = _split_references(response)
-    if not refs_raw.strip():
-        return []
-    prose, refs = _strip_code(prose_raw), _strip_code(refs_raw)
-
-    cited: list[str] = []
-    for pat in (_MARK_OBSIDIAN, _MARK_FOOTNOTE):
-        cited.extend(m.group(1) for m in pat.finditer(prose))
-    # An Obsidian mark `[[#^id]]` also matches the footnote pattern's inner `[^id]`, so
-    # dedupe by id rather than trying to make the two patterns mutually exclusive.
-    cited_ids = dict.fromkeys(cited)
-
-    defined: list[str] = []
-    for pat in (_DEF_FOOTNOTE, _DEF_OBSIDIAN):
-        defined.extend(m.group(1) for m in pat.finditer(refs))
-    defined_ids = dict.fromkeys(defined)
-    # A numbered list (`1. path — "quote"`) is a legitimate entry format that defines no
-    # id at all. With no ids on either side there is nothing to cross-check; with ids in
-    # the prose but none in the section, fall through so the dangling marks are reported.
-    if not defined_ids and not cited_ids:
-        return []
-
-    problems: list[str] = []
-    for ident in cited_ids:
-        if ident not in defined_ids:
-            problems.append(f"mark for `{ident}` in the prose has no entry in References")
-    for ident in defined_ids:
-        if ident not in cited_ids:
-            problems.append(f"References entry `{ident}` is never cited in the prose")
-
-    # One syntax per answer. An Obsidian mark `[[#^id]]` contains a footnote mark `[^id]`
-    # as a substring, so a footnote mark only counts when it is NOT part of one: blank the
-    # Obsidian marks first, then scan what remains.
-    prose_wo_obsidian = _MARK_OBSIDIAN.sub(" ", prose)
-    footnote_ids = dict.fromkeys(m.group(1) for m in _MARK_FOOTNOTE.finditer(prose_wo_obsidian))
-    obsidian_ids = dict.fromkeys(m.group(1) for m in _MARK_OBSIDIAN.finditer(prose))
-    # Mixing the two forms is the failure `grounded.md` names directly — "a reader learns
-    # the pattern once, and mixing forms breaks the link" — so it is reported even though
-    # every individual mark may resolve.
-    if footnote_ids and obsidian_ids:
-        problems.append(
-            "the answer mixes both mark syntaxes — footnote "
-            + ", ".join(f"`[^{i}]`" for i in list(footnote_ids)[:3])
-            + " and Obsidian "
-            + ", ".join(f"`[[#^{i}]]`" for i in list(obsidian_ids)[:3])
-            + "; use one form throughout"
-        )
-    # Footnote ids must be numeric. Markdown itself allows words, but guard requires one
-    # form so marks stay uniform — and since the renderer numbers footnotes sequentially
-    # no matter the label, a number is what the reader sees anyway. Footnotes only:
-    # Obsidian block ids are descriptive by design.
-    worded = [i for i in footnote_ids if not i.isdigit()]
-    if worded:
-        problems.append(
-            "footnote ids must be numbers, not words: "
-            + ", ".join(f"`[^{i}]`" for i in worded)
-        )
-    return problems
-
-
 def cmd_stop() -> int:
     project_dir = _project_dir()
     payload = _read_payload()
@@ -2049,35 +1878,6 @@ def cmd_stop() -> int:
 
     if not response.strip():
         return 0
-
-    # Reference-mark integrity runs BEFORE every judge-specific skip below and before the
-    # evidence_gate branches, so it applies in all three modes — including `manual`, the
-    # judge's off switch. It needs only the response text: no transcript slice, no judge,
-    # no tokens. The skips below exist because a turn's CLAIMS may not be worth judging
-    # (a plan after a gate denial, skill output, a `!` command's late evidence), but none
-    # of that makes a dangling mark acceptable — a mark resolving to nothing is the
-    # failure the Grounded style calls worse than citing inline, since the evidence is
-    # present but unreachable. Being deterministic text matching, a false block here would
-    # be a pattern bug, not a misjudgment.
-    #
-    # `prompt_id` may be absent (older CC), so the once-per-turn guard falls back to the
-    # response text: re-blocking is keyed on identity of what was already reported.
-    marks_key = prompt_id if isinstance(prompt_id, str) and prompt_id else f"len:{len(response)}"
-    if state.get("last_marks_prompt_id") != marks_key:
-        problems = _check_reference_marks(response)
-        if problems:
-            state["last_marks_prompt_id"] = marks_key
-            _write_state(project_dir, session_id, state)
-            reason = (
-                "guard: the References section does not line up with the prose. "
-                "Every mark must point to one entry, and every entry must be cited:\n"
-                + "\n".join(f"- {p}" for p in problems)
-                + "\n\nFix the marks and entries, then finish."
-            )
-            json.dump({"decision": "block", "reason": reason}, sys.stdout)
-            _trace(project_dir, session_id, "stop", "block_marks",
-                   prompt_id=prompt_id, problems=len(problems))
-            return 0
 
     # The turn is identified by the transcript prompt_id; guard reads the whole turn
     # from Claude Code's transcript. Without them (older CC / no prompt yet) there is
@@ -2160,14 +1960,9 @@ def cmd_stop() -> int:
         + verified_block
         + _render_turn_for_judge(turn)
     )
-    # The judge prompt names the refs directory (where the Grounded style saves
+    # The judge prompt names the refs directory (where guard saves
     # cited-doc copies) so it checks the configured location, not the default.
     evidence_system = EVIDENCE_SYSTEM.replace("__REFS_DIR__", _refs_rel(project_dir, config))
-    # The judge is told the SAME format text the SessionStart hook injected, so it never
-    # grades against a syntax the model was not given. It stays a grading aid, not a new
-    # violation class: an unresolvable mark was already unsupported, and a resolvable
-    # mark in the wrong syntax is a style nit the judge is told to let pass.
-    evidence_system = evidence_system.replace("__REFS_FORMAT__", REFS_FORMATS[_refs_format(config)])
     verdict = run_judge(project_dir, evidence_system, judge_input, EVIDENCE_SCHEMA, config)
     if verdict is None:
         return 0  # fail open
@@ -2270,24 +2065,22 @@ def cmd_session_start() -> int:
             except OSError:
                 pass
     # Persist the resolved refs directory into the session's Bash environment
-    # (GUARD_REFS_DIR) so the Grounded output style resolves it with one `echo`
+    # (GUARD_REFS_DIR) so a Bash caller resolves it with one `echo`
     # instead of re-deriving the `refs_dir` validation from the raw config. Docs:
     # a SessionStart hook may append `export` lines to $CLAUDE_ENV_FILE and the
     # variables reach all subsequent Bash commands
     # (https://code.claude.com/docs/en/hooks, "CLAUDE_ENV_FILE").
     session_cfg = _load_config(project_dir)
     refs = _refs_dir(project_dir, session_cfg)
-    refs_format = _refs_format(session_cfg)
     env_file = os.environ.get("CLAUDE_ENV_FILE")
     if env_file:
         try:
             with open(env_file, "a", encoding="utf-8") as fh:
                 fh.write(f"export GUARD_REFS_DIR={shlex.quote(str(refs))}\n")
-                fh.write(f"export GUARD_REFS_FORMAT={shlex.quote(refs_format)}\n")
         except OSError:
             pass
 
-    # The Grounded style states the general rule — a doc-based claim cites the source
+    # The injected contract states the general rule — a doc-based claim cites the source
     # URL and a local saved copy — but not where this project keeps that copy, which
     # is per-project config (`refs_dir`). Inject the resolved path here instead: for
     # SessionStart, plain stdout becomes context the model can act on (docs:
@@ -2299,12 +2092,6 @@ def cmd_session_start() -> int:
         f"to this project's refs directory — {refs} — and cite both the source URL "
         "and that local path. The same path is in $GUARD_REFS_DIR for Bash."
     )
-    # Same reasoning as the refs path above: the style requires a short mark that
-    # resolves but deliberately does not fix the syntax, because the right syntax
-    # depends on where the user reads the answer. Inject the resolved format so every
-    # turn in the session marks references the same way — and so the judge, which is
-    # told the identical text, is checking the format the model was actually given.
-    print(f"guard: reference-mark format for this project ({refs_format}) — {REFS_FORMATS[refs_format]}")
     _trace(project_dir, None, "session-start", "swept")
     return 0
 
@@ -2559,7 +2346,6 @@ def _config_show_lines(project_dir: Path, session_id: str | None) -> list[str]:
         judge_line,
         "exempt_skills: " + (", ".join(sorted(exempt)) if exempt else "(none)"),
         "refs_dir: " + (refs_rel if refs_rel else "(default wiki/ref/)"),
-        f"refs_format: {_refs_format(cfg)}",
         "writable_dirs: " + (", ".join(wdirs) if wdirs else "(none)"),
     ]
 
@@ -2573,8 +2359,7 @@ def cmd_settings() -> int:
     Settable keys: ``edit_gate`` (ask|deny|off — the approval gate; ``off`` disables it,
     ``ask``/``deny`` pick how an unapproved edit is stopped), ``evidence_gate``
     (manual|subagent|headless — the evidence judge), ``model``,
-    ``effort`` (low|medium|high|xhigh|max), ``refs_dir``, ``refs_format``
-    (footnote|obsidian — the reference-mark syntax injected at SessionStart).
+    ``effort`` (low|medium|high|xhigh|max), ``refs_dir``.
     ``edit_gate`` and ``evidence_gate``
     also apply to the live session's ``state/<sid>.json`` when a session id is available
     (``--session <id>``, which the forked skill passes as ``${CLAUDE_SESSION_ID}``, else
@@ -2643,18 +2428,9 @@ def cmd_settings() -> int:
         raw["model"] = v
     elif key == "refs_dir":
         raw["refs_dir"] = value  # "" resets to the default; _refs_dir validates at use
-    elif key == "refs_format":
-        v = value.strip().lower()
-        # Rejected at set time rather than silently defaulted at use: a typo here would
-        # otherwise look accepted while the session kept injecting the old format.
-        if v not in REFS_FORMATS:
-            print(f"guard settings: refs_format must be one of {sorted(REFS_FORMATS)} "
-                  f"(got {value!r})", file=sys.stderr)
-            return 0
-        raw["refs_format"] = v
     else:
         print(f"guard settings: unknown or unsettable key {key!r}. Settable: edit_gate, "
-              "evidence_gate, model, effort, refs_dir, refs_format (exempt_skills via the "
+              "evidence_gate, model, effort, refs_dir (exempt_skills via the "
               "exempt CLI, writable_dirs via the writable CLI).", file=sys.stderr)
         return 0
 

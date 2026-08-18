@@ -2,8 +2,8 @@
 
 Source: <https://www.markdownguide.org/extended-syntax/#footnotes>. Fetched 2026-08-13.
 
-Saved because guard's `refs_format: footnote` injects this syntax into the session, so
-the shipped text must rest on an inspectable copy rather than recollection.
+Saved while guard shipped a per-project footnote mark format (removed in v0.28.1).
+Kept as an inspectable copy of the syntax for answers that use footnote citations.
 
 ## Reference syntax
 

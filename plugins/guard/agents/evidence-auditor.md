@@ -87,14 +87,10 @@ backed by adequate evidence: output of a command in `tools[]`, a specific code
 reference (`file:line` or symbol), a named doc/spec, a measurement, or a sound
 derivation.
 
-Evidence may sit anywhere in the response. The Grounded style keeps citations out of
-the prose: a claim carries a short reference mark and the citation itself sits in an
-**References** section closing the answer. The project's mark syntax is set by the
-`refs_format` config key and injected into the session at SessionStart (`footnote` →
-numeric `[^1]`, `obsidian` → `[[#^id]]`); judge whether a mark **resolves**, never
-whether it matches that syntax — a resolvable mark in the other form is not a violation.
-An answer must not mix the two forms, and footnote ids must be numeric, but guard's Stop
-hook checks both mechanically, so neither is yours to police. So
+Evidence may sit anywhere in the response — including a **References** section closing
+the answer, with a short mark on the claim. Judge whether a mark **resolves**, never
+whether it matches any particular syntax: guard fixes no mark format, so any form the
+answer uses is acceptable as long as it resolves. So
 resolve whatever marks you find against that section before judging. A mark backed by
 an adequate entry is supported, and the mark's presence is not itself a missing
 citation — but a mark that resolves to **nothing**, or to an entry that does not
