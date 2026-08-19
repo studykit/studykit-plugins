@@ -2,7 +2,9 @@
   "model": "haiku",
   "effort": "medium",
   "edit_gate": "ask",
-  "evidence_gate": "manual",
+  "audit_gate": "manual",
+  "audit_claims": true,
+  "audit_deferrals": true,
   "exempt_skills": ["deep-research", "hindsight:review"],
   "refs_dir": "",
   "writable_dirs": ["build", "docs/generated"]

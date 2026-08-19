@@ -185,7 +185,11 @@ def _handle_stop(project_dir: Path, payload: dict[str, Any], session_id: str, tu
     state = core._read_state(project_dir, session_id, config)
     if state.get("gated_prompt_id") == turn_id:
         return
-    if state["evidence_gate"] == core.EvidenceGate.MANUAL:
+    want_claims, want_deferrals = core._audit_claims(state), core._audit_deferrals(state)
+    # Both axes off: nothing for the auditor to report, so do not block for one.
+    if not want_claims and not want_deferrals:
+        return
+    if state["audit_gate"] == core.AuditGate.MANUAL:
         state["pending_verify_prompt_id"] = turn_id
         core._write_state(project_dir, session_id, state)
         return
@@ -193,11 +197,17 @@ def _handle_stop(project_dir: Path, payload: dict[str, Any], session_id: str, tu
     # one continuation prompt, where the main agent can dispatch the auditor.
     state["last_audited_prompt_id"] = turn_id
     core._write_state(project_dir, session_id, state)
+    if want_claims and want_deferrals:
+        scope = "the response's claims and deferrals"
+    elif want_claims:
+        scope = "the response's claims ONLY (skip the deferral axis; report no deferrals)"
+    else:
+        scope = "the response's deferrals ONLY (skip the claim axis; report no claims)"
     _emit({"decision": "block", "reason": (
         "guard: before completing, spawn the read-only guard_evidence_auditor named subagent in a fresh "
         "context. Give it "
-        f"the saved turn record at {_turn_path(project_dir, session_id, turn_id)} and have it check the "
-        "response's claims against the repository; then address any violations. If that agent is unavailable, "
+        f"the saved turn record at {_turn_path(project_dir, session_id, turn_id)} and have it check "
+        f"{scope} against the repository; then address any violations. If that agent is unavailable, "
         "tell the user to run $guard:setup in this project."
     )})
 

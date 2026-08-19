@@ -21,10 +21,10 @@ Subcommands
                  ``show`` prints the current settings; ``set <key> <value>`` changes one
                  of ``edit_gate`` (``ask``|``deny``|``off`` — the APPROVAL GATE, where
                  ``off`` disables it and ``ask``/``deny`` pick how an unapproved edit is
-                 stopped), ``evidence_gate`` (``manual``|``subagent``|``headless`` — the
+                 stopped), ``audit_gate`` (``manual``|``subagent``|``headless`` — the
                  evidence judge, independent of the gate; ``manual`` is its practical
                  off), ``model``, ``effort``, or ``refs_dir``.
-                 ``edit_gate``/``evidence_gate`` also apply to the live session's
+                 ``edit_gate``/``audit_gate`` also apply to the live session's
                  ``state/<sid>.json`` when a session id is available (``--session``, which
                  the forked skill passes as ``${CLAUDE_SESSION_ID}``, else the inherited
                  ``CLAUDE_CODE_SESSION_ID``); the rest are read from the config file at
@@ -40,7 +40,7 @@ Subcommands
 - exempt         CLI (argv), run by the ``guard:settings`` skill via Bash after the user
                  confirms an interactive selection. ``list``/``set``/``add``/
                  ``remove``/``clear`` the ``exempt_skills`` config key — that key ONLY,
-                 never ``edit_gate``/``evidence_gate``/state. Mutating verbs require the
+                 never ``edit_gate``/``audit_gate``/state. Mutating verbs require the
                  settings-skill marker (``_cli_write_allowed``). Not a hook event.
 - writable       CLI (argv), same shape as ``exempt``, for the ``writable_dirs`` config
                  key — the directories the user designated writable, which the approval
@@ -85,7 +85,7 @@ Subcommands
                  evidence nor auditable here), or the turn was opened by guard's own
                  ``/guard:settings`` / ``/guard:audit-evidence`` control
                  command or a user-configured ``exempt_skills`` entry (skill output / a
-                 relay, not claims to ground). Otherwise branch on ``evidence_gate``.
+                 relay, not claims to ground). Otherwise branch on ``audit_gate``.
                  ``manual`` (default): do not audit — record the turn as the pending
                  ``/guard:audit-evidence`` target and emit nothing. ``subagent``: do not
                  judge/block — slice the turn to a file and emit additionalContext asking
@@ -102,7 +102,7 @@ Subcommands
                  output style), not a hook event.
 
 State lives project-local under ``${CLAUDE_PROJECT_DIR}/.claude/guard/``:
-- ``state/<sid>.json``       — {edit_gate, approved, evidence_gate, last_audited_prompt_id, gated_prompt_id, asked_prompt_id, pending_verify_prompt_id, updated_at}
+- ``state/<sid>.json``       — {edit_gate, approved, audit_gate, audit_claims, audit_deferrals, last_audited_prompt_id, gated_prompt_id, asked_prompt_id, pending_verify_prompt_id, updated_at}
 - ``sessions/<sid>.jsonl``   — full session archive: one record per turn / verdict
 - ``turns/<sid>/<pid>.json`` — subagent and manual modes: the turn slice guard hands the
                                 evidence auditor subagent ({user, tools[], assistant})
@@ -121,7 +121,7 @@ from the ``evidence-auditor`` agent's own frontmatter, not these keys), ``edit_g
 (``"ask"``|``"deny"``|``"off"``, default ``"ask"``) — the APPROVAL GATE: ``off``
 disables it, ``ask`` escalates to Claude Code's permission prompt (approve inline; the
 approval arms the session for the rest of the task), ``deny`` blocks the call and
-drives the plan→approve workflow, and ``evidence_gate``
+drives the plan→approve workflow, and ``audit_gate``
 (``"manual"``|``"subagent"``|``"headless"``, default ``"manual"``) — how the Stop-time
 evidence judge runs, independent of the gate (manual: no auto-audit — the judge's
 practical off — verify on demand via ``/guard:audit-evidence``; subagent: dispatch the
@@ -143,7 +143,7 @@ which the approval gate exempts; entries pass the same validation as ``refs_dir`
 by the ``writable`` CLI. Unknown keys are ignored; a missing or malformed file falls
 back to all defaults. The judge always reads the repo (Read/Grep/Glob/Bash) to verify
 claims. The ``guard:settings`` skill changes these through the ``settings`` CLI: it writes
-guard.local.json and, for ``edit_gate`` / ``evidence_gate``, the live session's state.
+guard.local.json and, for ``edit_gate`` / ``audit_gate``, the live session's state.
 
 Requires Python 3.11+ (uses ``enum.StrEnum``).
 """
@@ -173,8 +173,8 @@ class EditGate(StrEnum):
     OFF = "off"
 
 
-class EvidenceGate(StrEnum):
-    """How the Stop-time evidence judge runs (see DEFAULT_CONFIG["evidence_gate"])."""
+class AuditGate(StrEnum):
+    """How the Stop-time evidence judge runs (see DEFAULT_CONFIG["audit_gate"])."""
 
     MANUAL = "manual"
     HEADLESS = "headless"
@@ -213,10 +213,17 @@ DEFAULT_CONFIG: dict[str, Any] = {
     # task's edits pass without re-prompting — the click, not the model, arms it.
     # "deny" instead blocks the tool call with a reason, forcing the model to present a
     # plan and win approval in a message (the stricter plan→approve workflow). The
-    # evidence judge is a separate setting (`evidence_gate`); "manual" is its practical
+    # evidence judge is a separate setting (`audit_gate`); "manual" is its practical
     # off (nothing runs unless the user asks via /guard:audit-evidence).
     "edit_gate": EditGate.ASK,
-    "evidence_gate": EvidenceGate.MANUAL,
+    "audit_gate": AuditGate.MANUAL,
+    # The two axes the evidence judge checks, switched independently. `audit_gate`
+    # picks HOW/WHEN the audit runs; these pick WHAT it looks for within that one run.
+    # Split so a project can keep the claim check while dropping the deferral check (or
+    # the reverse) without giving up the judge entirely. With both off the audit is
+    # skipped outright — a run that can report nothing is pure cost.
+    "audit_claims": True,
+    "audit_deferrals": True,
     # Skills / slash commands whose turn the Stop judge must NOT audit. A turn opened
     # by one of these is skill output or a relay, not a body of technical claims to
     # ground. Values are the name as it appears after the slash, INCLUDING the plugin
@@ -243,16 +250,20 @@ DEFAULT_CONFIG: dict[str, Any] = {
 }
 
 VALID_EFFORTS = {"low", "medium", "high", "xhigh", "max"}
+# Accepted spellings for the boolean axis switches. The CLI takes a string argument, so
+# "off"/"no"/"0" must map to False rather than land in the config as a truthy string.
+_BOOL_TRUE = {"true", "on", "yes", "1"}
+_BOOL_FALSE = {"false", "off", "no", "0"}
 
-# The evidence-judge settings live on EvidenceGate:
-# EvidenceGate.MANUAL (default): the hook does NOT audit at Stop — it archives the turn and
+# The evidence-judge settings live on AuditGate:
+# AuditGate.MANUAL (default): the hook does NOT audit at Stop — it archives the turn and
 #   records it as the pending verify target; verification runs only on demand via
 #   `/guard:audit-evidence`, which dispatches the evidence auditor. This is the judge's practical off.
-#   The approval gate is unaffected (it is governed by `edit_gate`, not `evidence_gate`).
-# EvidenceGate.SUBAGENT: the hook does not judge/block — it injects the turn + verified
+#   The approval gate is unaffected (it is governed by `edit_gate`, not `audit_gate`).
+# AuditGate.SUBAGENT: the hook does not judge/block — it injects the turn + verified
 #   paths as additionalContext and the main agent dispatches the `evidence-auditor` subagent to
 #   audit every turn.
-# EvidenceGate.HEADLESS: spawn an isolated `claude` inside the hook and block the turn (the
+# AuditGate.HEADLESS: spawn an isolated `claude` inside the hook and block the turn (the
 #   original path).
 
 # Tools the approval gate blocks before approval. Bash is intentionally NOT gated:
@@ -747,7 +758,7 @@ def _load_config(project_dir: Path) -> dict[str, Any]:
     fields, list for ``exempt_skills``), so a malformed value can never change a setting
     by accident. The gate fields persist as plain strings, so they are validated as
     ``str`` here and coerced to a valid enum member downstream (``_edit_gate`` /
-    ``_evidence_gate``); a bad-but-string value is dropped there, not here.
+    ``_audit_gate``); a bad-but-string value is dropped there, not here.
     """
     config = dict(DEFAULT_CONFIG)
     path = project_dir / CONFIG_REL
@@ -799,7 +810,9 @@ def _read_state(project_dir: Path, session_id: str, config: dict[str, Any]) -> d
     default = {
         "edit_gate": _edit_gate(config),
         "approved": False,
-        "evidence_gate": _evidence_gate(config),
+        "audit_gate": _audit_gate(config),
+        "audit_claims": _audit_claims(config),
+        "audit_deferrals": _audit_deferrals(config),
         # Per-turn guards keyed by the transcript prompt_id (a turn == one promptId).
         "last_audited_prompt_id": "",
         "gated_prompt_id": "",
@@ -822,7 +835,8 @@ def _read_state(project_dir: Path, session_id: str, config: dict[str, Any]) -> d
         return default
     if not isinstance(data, dict):
         return default
-    keys = ("edit_gate", "approved", "evidence_gate", "last_audited_prompt_id", "gated_prompt_id",
+    keys = ("edit_gate", "approved", "audit_gate", "audit_claims", "audit_deferrals",
+            "last_audited_prompt_id", "gated_prompt_id",
             "asked_prompt_id", "pending_verify_prompt_id", "updated_at")
     default.update({k: data[k] for k in keys if k in data})
     return default
@@ -953,18 +967,44 @@ def _read_verified_facts(project_dir: Path, session_id: str) -> list[dict[str, s
 # --------------------------------------------------------------------------- #
 # headless judge
 # --------------------------------------------------------------------------- #
+def _parse_bool(value: str) -> bool | None:
+    """Parse a CLI boolean; None when the spelling is not recognized (the caller
+    reports the error rather than guessing a default)."""
+    v = value.strip().lower()
+    if v in _BOOL_TRUE:
+        return True
+    if v in _BOOL_FALSE:
+        return False
+    return None
+
+
 def _effort(config: dict[str, Any]) -> str:
     value = str(config.get("effort", "medium")).lower()
     return value if value in VALID_EFFORTS else "medium"
 
 
-def _evidence_gate(cfg: dict[str, Any]) -> EvidenceGate:
+def _audit_gate(cfg: dict[str, Any]) -> AuditGate:
     """The evidence-judge setting from a config or session-state dict, coerced to a
-    valid EvidenceGate member (defaults on anything unrecognized)."""
+    valid AuditGate member (defaults on anything unrecognized)."""
     try:
-        return EvidenceGate(str(cfg.get("evidence_gate", DEFAULT_CONFIG["evidence_gate"])).lower())
+        return AuditGate(str(cfg.get("audit_gate", DEFAULT_CONFIG["audit_gate"])).lower())
     except ValueError:
-        return EvidenceGate(DEFAULT_CONFIG["evidence_gate"])
+        return AuditGate(DEFAULT_CONFIG["audit_gate"])
+
+
+def _audit_claims(cfg: dict[str, Any]) -> bool:
+    """Whether the judge checks axis 1 (unsupported claims). Non-bool values fall back
+    to the default rather than Python truthiness, so a stray "false" string cannot
+    silently disable an axis."""
+    v = cfg.get("audit_claims", DEFAULT_CONFIG["audit_claims"])
+    return v if isinstance(v, bool) else bool(DEFAULT_CONFIG["audit_claims"])
+
+
+def _audit_deferrals(cfg: dict[str, Any]) -> bool:
+    """Whether the judge checks axis 2 (unjustified deferrals). Same coercion rule as
+    _audit_claims."""
+    v = cfg.get("audit_deferrals", DEFAULT_CONFIG["audit_deferrals"])
+    return v if isinstance(v, bool) else bool(DEFAULT_CONFIG["audit_deferrals"])
 
 
 def _edit_gate(cfg: dict[str, Any]) -> EditGate:
@@ -1215,6 +1255,30 @@ EVIDENCE_SYSTEM = (
     "Set verdict='block' if at least one load-bearing claim is unsupported OR at "
     "least one deferral is resolvable from the repo. Return only JSON."
 )
+# Appended to the judge/auditor prompt when the user disabled one axis. The schema
+# still requires both arrays, so the disabled one is asked for empty rather than
+# dropped — changing the schema per-run would fork the contract for no gain.
+_AXIS_OFF_NOTE = {
+    "claims": ("\n\nAXIS 1 IS DISABLED for this run. Do NOT audit claims and do NOT read "
+               "the repository on their account: return `claims` as an empty array. Judge "
+               "AXIS 2 (deferrals) only, and set verdict='block' only on a resolvable "
+               "deferral."),
+    "deferrals": ("\n\nAXIS 2 IS DISABLED for this run. Do NOT audit deferrals: return "
+                  "`deferrals` as an empty array. Judge AXIS 1 (claims) only, and set "
+                  "verdict='block' only on an unsupported claim."),
+}
+
+
+def _axis_scoped_system(system: str, want_claims: bool, want_deferrals: bool) -> str:
+    """Narrow a judge prompt to the enabled axes. Callers must not pass both-off — that
+    case skips the audit entirely rather than asking for an empty verdict."""
+    if not want_claims:
+        return system + _AXIS_OFF_NOTE["claims"]
+    if not want_deferrals:
+        return system + _AXIS_OFF_NOTE["deferrals"]
+    return system
+
+
 EVIDENCE_SCHEMA = {
     "type": "object",
     "properties": {
@@ -1416,9 +1480,16 @@ def cmd_verify() -> int:
         _trace(project_dir, session_id, "verify", "no_pending", prompt_id=pid)
         return 0
 
+    if not _audit_claims(state) and not _audit_deferrals(state):
+        _emit_expansion("guard: both audit_claims and audit_deferrals are off, so there is "
+                        "nothing to audit. Turn one on with `/guard:settings`.")
+        _trace(project_dir, session_id, "verify", "axes_off", prompt_id=pid)
+        return 0
+
     context = _auditor_dispatch_context(
         project_dir, session_id, pid, turn_path,
-        "guard (verify): audit the last completed turn on request.")
+        "guard (verify): audit the last completed turn on request.",
+        _audit_claims(state), _audit_deferrals(state))
     _emit_expansion(context)
     _trace(project_dir, session_id, "verify", "dispatch_evidence auditor", prompt_id=pid)
     return 0
@@ -1641,7 +1712,7 @@ def _is_guard_owned(project_dir: Path, target: Path) -> bool:
     These must never ride the git-ignore exemption: `.claude/guard/` is itself
     git-ignored, so without this exclusion the model could `Write`
     `state/<sid>.json` to arm its own approval, or edit `guard.local.json` to turn
-    the judge off / change `evidence_gate`. (`refs/` is the one hole guard opens for its own
+    the judge off / change `audit_gate`. (`refs/` is the one hole guard opens for its own
     required behavior and has its own explicit allow, checked before this.)
 
     This function is also what makes the `writable_dirs` exemption safe against an entry
@@ -1650,7 +1721,7 @@ def _is_guard_owned(project_dir: Path, target: Path) -> bool:
     underneath such an entry. See the `writable_dirs` branch in `cmd_gate`.
 
     The list keys are edited only through their own CLIs (`cmd_exempt`, `cmd_writable`),
-    which touch that one key and never `edit_gate`/`evidence_gate`/state. Note the asymmetry:
+    which touch that one key and never `edit_gate`/`audit_gate`/state. Note the asymmetry:
     `exempt_skills` narrows only the JUDGE's coverage, while `writable_dirs` narrows the
     GATE itself — which is why its values are validated and its mutating verbs require the
     settings-skill marker (`_cli_write_allowed`). Fail toward guard-owned (safe: no
@@ -1760,15 +1831,29 @@ def _write_turn_slice(project_dir: Path, session_id: str, prompt_id: str,
 
 
 def _auditor_dispatch_context(project_dir: Path, session_id: str, prompt_id: str,
-                               turn_path: Path, lead: str) -> str:
+                               turn_path: Path, lead: str,
+                               want_claims: bool = True, want_deferrals: bool = True) -> str:
     """Build the additionalContext that asks the main agent to dispatch the evidence auditor.
 
     The dispatch inputs are identical for the subagent-mode Stop auto-dispatch and the
     on-demand ``/guard:audit-evidence`` path — only the leading sentence (``lead``) differs.
+    The axis switches ride along as an explicit ``axes`` input: the auditor cannot read
+    the config itself, so a disabled axis must be named here or it will audit both.
     """
     verified_path = _verified_file(project_dir, session_id).resolve()
     dispatcher = Path(__file__).resolve()
     refs_path = _refs_dir(project_dir, _load_config(project_dir))
+    if want_claims and want_deferrals:
+        axes = "both (unsupported claims and unjustified deferrals)"
+        audits = "audits it for unsupported claims and resolvable deferrals"
+    elif want_claims:
+        axes = ("claims only — audit AXIS 1 (unsupported claims) and SKIP AXIS 2; "
+                "report no deferrals")
+        audits = "audits it for unsupported claims only"
+    else:
+        axes = ("deferrals only — audit AXIS 2 (unjustified deferrals) and SKIP AXIS 1; "
+                "report no claims")
+        audits = "audits it for resolvable deferrals only"
     return (
         lead + " "
         "Dispatch the evidence auditor subagent with the Agent tool "
@@ -1779,10 +1864,10 @@ def _auditor_dispatch_context(project_dir: Path, session_id: str, prompt_id: str
         f"- verified_file: {verified_path}\n"
         f"- dispatcher: {dispatcher}\n"
         f"- refs_dir: {refs_path}\n"
+        f"- axes: {axes}\n"
         "evidence auditor reads the turn record at turn_file "
-        "(`{user, tools[], assistant}`), audits it for unsupported "
-        "claims and resolvable deferrals, records the verified facts on a pass, and "
-        "reports any violations back. If it reports violations, address them; "
+        f"(`{{user, tools[], assistant}}`), {audits}, records the verified facts on a "
+        "pass, and reports any violations back. If it reports violations, address them; "
         "otherwise continue."
     )
 
@@ -1810,7 +1895,8 @@ def _stop_subagent(project_dir: Path, session_id: str, state: dict[str, Any],
 
     context = _auditor_dispatch_context(
         project_dir, session_id, prompt_id, turn_path,
-        "guard (subagent mode): audit the turn that just finished before wrapping up.")
+        "guard (subagent mode): audit the turn that just finished before wrapping up.",
+        _audit_claims(state), _audit_deferrals(state))
     output = {"hookSpecificOutput": {"hookEventName": "Stop", "additionalContext": context}}
     json.dump(output, sys.stdout)
     _trace(project_dir, session_id, "stop", "dispatch_evidence auditor", prompt_id=prompt_id)
@@ -1824,7 +1910,7 @@ def _stop_manual(project_dir: Path, session_id: str, state: dict[str, Any],
     The turn is already in the session archive; here we persist just its slice and
     remember its prompt_id so ``/guard:audit-evidence`` can dispatch the evidence auditor for it
     without any transcript access. The hook emits nothing and never blocks — the
-    approval gate still runs (it is governed by ``edit_gate``, not ``evidence_gate``).
+    approval gate still runs (it is governed by ``edit_gate``, not ``audit_gate``).
     """
     turn_path = _write_turn_slice(project_dir, session_id, prompt_id, turn)
     if turn_path is None:
@@ -1922,10 +2008,19 @@ def cmd_stop() -> int:
 
     turn["assistant"] = response
 
+    # Both axes off: there is nothing for the judge to report, so run none of the
+    # paths — no judge spawn, no dispatch, and no pending target for
+    # `/guard:audit-evidence` to pick up. The approval gate is unaffected.
+    want_claims = _audit_claims(state)
+    want_deferrals = _audit_deferrals(state)
+    if not want_claims and not want_deferrals:
+        _trace(project_dir, session_id, "stop", "skip_axes_off", prompt_id=prompt_id)
+        return 0
+
     # Manual mode (default): the hook never audits or blocks at Stop. It records the
     # turn as the pending on-demand target; the user runs `/guard:audit-evidence` to dispatch
     # the evidence auditor for it. The approval gate still runs (governed by `edit_gate`).
-    if state["evidence_gate"] == EvidenceGate.MANUAL:
+    if state["audit_gate"] == AuditGate.MANUAL:
         return _stop_manual(project_dir, session_id, state, prompt_id, turn)
 
     # Subagent mode: the hook does not judge or block. It hands the turn off to the
@@ -1933,7 +2028,7 @@ def cmd_stop() -> int:
     # transcript + prompt_id as additionalContext (docs: a Stop hook may emit
     # additionalContext WITHOUT `decision`, and the conversation continues so the
     # agent can act on it).
-    if state["evidence_gate"] == EvidenceGate.SUBAGENT:
+    if state["audit_gate"] == AuditGate.SUBAGENT:
         return _stop_subagent(project_dir, session_id, state, prompt_id, turn)
 
     # Facts verified in earlier passed turns are reusable evidence: a claim that
@@ -1962,7 +2057,9 @@ def cmd_stop() -> int:
     )
     # The judge prompt names the refs directory (where guard saves
     # cited-doc copies) so it checks the configured location, not the default.
-    evidence_system = EVIDENCE_SYSTEM.replace("__REFS_DIR__", _refs_rel(project_dir, config))
+    evidence_system = _axis_scoped_system(
+        EVIDENCE_SYSTEM.replace("__REFS_DIR__", _refs_rel(project_dir, config)),
+        want_claims, want_deferrals)
     verdict = run_judge(project_dir, evidence_system, judge_input, EVIDENCE_SCHEMA, config)
     if verdict is None:
         return 0  # fail open
@@ -1979,10 +2076,14 @@ def cmd_stop() -> int:
     # `verdict` field — the judge sometimes returns verdict="block" while every
     # item is actually fine (e.g. a deferral it correctly marked not-resolvable).
     # Blocking only on real violations avoids those false positives.
+    # A disabled axis contributes no violations even if the judge reported some: the
+    # axis switches are filtered here, at the one place blocking is decided, so a
+    # prompt that over-reports cannot resurrect an axis the user turned off.
     unsupported = [c for c in verdict.get("claims", [])
-                   if isinstance(c, dict) and c.get("supported") is False]
+                   if isinstance(c, dict) and c.get("supported") is False] if want_claims else []
     resolvable = [d for d in verdict.get("deferrals", [])
-                  if isinstance(d, dict) and d.get("resolvable_from_repo") is True]
+                  if isinstance(d, dict) and d.get("resolvable_from_repo") is True
+                  ] if want_deferrals else []
 
     if not unsupported and not resolvable:
         # Passed turn: collect its supported claims as verified facts for reuse.
@@ -2023,7 +2124,7 @@ def cmd_stop() -> int:
 def cmd_session_start() -> int:
     # Sweep both state and logs on the same age policy. State is intentionally NOT
     # cleared at SessionEnd: a session can be resumed later (`claude --resume`), and
-    # its gate/approved/evidence_gate flags must survive the gap. Age-based expiry is the
+    # its gate/approved/audit_gate flags must survive the gap. Age-based expiry is the
     # only reaper, so a resumed session keeps its state as long as it is touched
     # within the retention window.
     project_dir = _project_dir()
@@ -2108,7 +2209,7 @@ def cmd_exempt() -> int:
         exempt remove NAME [NAME…] — remove
         exempt clear               — empty the list
 
-    Edits ONLY the ``exempt_skills`` key — never ``edit_gate`` / ``evidence_gate`` / state —
+    Edits ONLY the ``exempt_skills`` key — never ``edit_gate`` / ``audit_gate`` / state —
     so it can change which skills' turns the Stop judge skips but cannot disable guard
     or touch the approval gate. Project dir from ``CLAUDE_PROJECT_DIR`` (Bash env), else
     the current working directory. Prints the resulting list for the skill to relay.
@@ -2192,7 +2293,7 @@ def cmd_writable() -> int:
     path (``_writable_dirs``) re-validates regardless, so a hand-edited config that
     never passed through here is still safe.
 
-    Edits ONLY the ``writable_dirs`` key — never ``edit_gate`` / ``evidence_gate`` /
+    Edits ONLY the ``writable_dirs`` key — never ``edit_gate`` / ``audit_gate`` /
     state. Project dir from ``CLAUDE_PROJECT_DIR`` (Bash env), else the cwd.
     """
     argv = sys.argv[2:]
@@ -2297,7 +2398,7 @@ def _parse_settings_argv(argv: list[str]) -> tuple[list[str], str | None]:
 
 
 def _apply_session_scalar(project_dir: Path, session_id: str | None, key: str, value: Any) -> None:
-    """Mirror an ``edit_gate`` / ``evidence_gate`` change into the live session's
+    """Mirror an ``edit_gate`` / ``audit_gate`` change into the live session's
     ``state/<sid>.json`` so it takes effect at once, not only for sessions started later.
     These two are the only settings cached in session state (seeded from config at session
     start); the rest are read from the config file at use, so writing the file is enough
@@ -2312,7 +2413,7 @@ def _apply_session_scalar(project_dir: Path, session_id: str | None, key: str, v
 
 def _config_show_lines(project_dir: Path, session_id: str | None) -> list[str]:
     """Render current guard settings for the ``guard:settings`` skill to display. Shows the
-    guard.local.json defaults; for ``edit_gate`` / ``evidence_gate`` it also shows the live
+    guard.local.json defaults; for ``edit_gate`` / ``audit_gate`` it also shows the live
     session value when it differs from the default (the session may have been changed
     after)."""
     raw = _load_raw_config(project_dir)
@@ -2327,11 +2428,21 @@ def _config_show_lines(project_dir: Path, session_id: str | None) -> list[str]:
     else:
         gate_line = f"edit_gate: {gate_default}"
 
-    judge_default = _evidence_gate(cfg)
-    if state is not None and _evidence_gate(state) != judge_default:
-        judge_line = f"evidence_gate: {_evidence_gate(state)} (this session; default {judge_default})"
+    judge_default = _audit_gate(cfg)
+    if state is not None and _audit_gate(state) != judge_default:
+        judge_line = f"audit_gate: {_audit_gate(state)} (this session; default {judge_default})"
     else:
-        judge_line = f"evidence_gate: {judge_default}"
+        judge_line = f"audit_gate: {judge_default}"
+
+    def axis_line(key: str, reader) -> str:
+        default = reader(cfg)
+        shown = "on" if default else "off"
+        if state is not None and reader(state) != default:
+            return f"{key}: {'on' if reader(state) else 'off'} (this session; default {shown})"
+        return f"{key}: {shown}"
+
+    claims_line = axis_line("audit_claims", _audit_claims)
+    deferrals_line = axis_line("audit_deferrals", _audit_deferrals)
 
     exempt = _exempt_skills(cfg)
     refs_rel = raw.get("refs_dir") if isinstance(raw.get("refs_dir"), str) else ""
@@ -2344,6 +2455,8 @@ def _config_show_lines(project_dir: Path, session_id: str | None) -> list[str]:
         f"effort: {_effort(cfg)}",
         gate_line,
         judge_line,
+        claims_line,
+        deferrals_line,
         "exempt_skills: " + (", ".join(sorted(exempt)) if exempt else "(none)"),
         "refs_dir: " + (refs_rel if refs_rel else "(default wiki/ref/)"),
         "writable_dirs: " + (", ".join(wdirs) if wdirs else "(none)"),
@@ -2357,10 +2470,10 @@ def cmd_settings() -> int:
         settings set <key> <value>           — change one setting
 
     Settable keys: ``edit_gate`` (ask|deny|off — the approval gate; ``off`` disables it,
-    ``ask``/``deny`` pick how an unapproved edit is stopped), ``evidence_gate``
+    ``ask``/``deny`` pick how an unapproved edit is stopped), ``audit_gate``
     (manual|subagent|headless — the evidence judge), ``model``,
     ``effort`` (low|medium|high|xhigh|max), ``refs_dir``.
-    ``edit_gate`` and ``evidence_gate``
+    ``edit_gate`` and ``audit_gate``
     also apply to the live session's ``state/<sid>.json`` when a session id is available
     (``--session <id>``, which the forked skill passes as ``${CLAUDE_SESSION_ID}``, else
     the inherited ``CLAUDE_CODE_SESSION_ID``) so the change takes effect at once and
@@ -2405,15 +2518,23 @@ def cmd_settings() -> int:
             return 0
         raw["edit_gate"] = v.value
         _apply_session_scalar(project_dir, session_id, "edit_gate", v.value)
-    elif key == "evidence_gate":
+    elif key == "audit_gate":
         try:
-            v = EvidenceGate(value.strip().lower())
+            v = AuditGate(value.strip().lower())
         except ValueError:
-            print(f"guard settings: evidence_gate must be one of {[e.value for e in EvidenceGate]} "
+            print(f"guard settings: audit_gate must be one of {[e.value for e in AuditGate]} "
                   f"(got {value!r})", file=sys.stderr)
             return 0
-        raw["evidence_gate"] = v.value
-        _apply_session_scalar(project_dir, session_id, "evidence_gate", v.value)
+        raw["audit_gate"] = v.value
+        _apply_session_scalar(project_dir, session_id, "audit_gate", v.value)
+    elif key in ("audit_claims", "audit_deferrals"):
+        v = _parse_bool(value)
+        if v is None:
+            print(f"guard settings: {key} must be one of "
+                  f"{sorted(_BOOL_TRUE | _BOOL_FALSE)} (got {value!r})", file=sys.stderr)
+            return 0
+        raw[key] = v
+        _apply_session_scalar(project_dir, session_id, key, v)
     elif key == "effort":
         v = value.lower()
         if v not in VALID_EFFORTS:
@@ -2430,8 +2551,9 @@ def cmd_settings() -> int:
         raw["refs_dir"] = value  # "" resets to the default; _refs_dir validates at use
     else:
         print(f"guard settings: unknown or unsettable key {key!r}. Settable: edit_gate, "
-              "evidence_gate, model, effort, refs_dir (exempt_skills via the "
-              "exempt CLI, writable_dirs via the writable CLI).", file=sys.stderr)
+              "audit_gate, audit_claims, audit_deferrals, model, effort, refs_dir "
+              "(exempt_skills via the exempt CLI, writable_dirs via the writable CLI).",
+              file=sys.stderr)
         return 0
 
     if not _write_config(project_dir, raw):

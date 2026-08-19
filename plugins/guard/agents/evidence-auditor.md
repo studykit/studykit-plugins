@@ -35,6 +35,13 @@ The dispatching message names these verbatim. All are required except `refs_dir`
 - **`refs_dir`** — absolute path to the directory where the assistant saves local
   copies of cited docs (the project may point this at a git-tracked folder). If the
   dispatch omits it, resolve it yourself: `"<dispatcher>" refs-dir` prints the path.
+- **`axes`** — which of the two audits below to run. The user switches each axis on or
+  off independently (`audit_claims` / `audit_deferrals`), so a dispatch may name
+  "claims only" or "deferrals only" instead of "both". **Audit only the named axes**:
+  skip the disabled one entirely — do not read the repository on its account, do not
+  report its findings, and leave its section out of your report. A turn whose only
+  problem falls under a disabled axis **passes**. If the dispatch omits `axes`, audit
+  both.
 
 If any required input is missing, stop and say so. Do not guess paths.
 
@@ -58,7 +65,8 @@ evidence**: a claim consistent with a verified fact is SUPPORTED and need not be
 re-derived.
 
 **Triage first.** After reading `turn_file`, scan the `assistant` text for something to
-verify — a load-bearing claim (Axis 1: any checkable statement) or a deferral. If it
+verify under the **enabled** axes — a load-bearing claim (Axis 1: any checkable
+statement) or a deferral (Axis 2). If it
 has neither (it only plans, asks the user a question, proposes an approach, or
 narrates an action already shown in `tools[]`), the turn passes with nothing to record: **do not read the repository**,
 record no verified facts, and report `verdict: pass` (recorded: 0). Do not open the repo
@@ -70,6 +78,9 @@ definition. Ground every judgment in the turn record, the verified facts, and wh
 read from the repo.
 
 ## Audit — two axes
+
+Run only the axes `axes` names. Both are described below; a disabled one is not your
+concern this run.
 
 ### Axis 1 — unsupported or shallowly-supported claims
 
@@ -135,7 +146,8 @@ For each, actually look in the repo:
 
 ## Outcome
 
-**If there is at least one unsupported claim OR at least one resolvable deferral**,
+Judge only the enabled axes. **If there is at least one unsupported claim OR at least
+one resolvable deferral, counting only the enabled axes**,
 the turn does **not** pass. Do **not** record verified facts. Report the violations to
 the main session as a concrete, actionable list (see below). The main agent acts on
 them — you do not edit anything.

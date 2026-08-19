@@ -16,7 +16,7 @@ line-by-line walkthrough.
 | `PostToolUse` (matcher `ExitPlanMode`) | `plan-approved` | On plan approval, arm the gate when the plan defers no in-scope work. |
 | `PostToolUse` (`Write\|Edit\|MultiEdit\|NotebookEdit`) | `gate-approved` | `edit_gate` ask only: after the user approves an edit's permission prompt, arm the session for the rest of the task. |
 | (called via Bash, not a hook) | `record-verified` | Evidence auditor appends a passed turn's claims to the verified store. |
-| (called via Bash, not a hook) | `settings` | `guard:settings` skill (forked) shows/sets guard.local.json settings; `edit_gate`/`evidence_gate` also apply to the live session's `state/<sid>.json` (session id from `--session`/`CLAUDE_CODE_SESSION_ID`). Every other key preserved; never the list keys (`exempt_skills`, `writable_dirs`). |
+| (called via Bash, not a hook) | `settings` | `guard:settings` skill (forked) shows/sets guard.local.json settings; `edit_gate`/`audit_gate`/`audit_claims`/`audit_deferrals` also apply to the live session's `state/<sid>.json` (session id from `--session`/`CLAUDE_CODE_SESSION_ID`). Every other key preserved; never the list keys (`exempt_skills`, `writable_dirs`). |
 | (called via Bash, not a hook) | `exempt` | `guard:settings` skill records the user's confirmed `exempt_skills` selection (that key only). |
 | (called via Bash, not a hook) | `writable` | `guard:settings` skill records the user's confirmed `writable_dirs` selection (that key only); rejects unusable values at set time. |
 | `Stop` | `stop` | manual: record pending target, no audit. subagent: dispatch evidence auditor. headless: in-hook judge that blocks. |
@@ -103,7 +103,7 @@ payloads, not memory.
   passes `--session ${CLAUDE_SESSION_ID}`. For the main session this id equals the hook
   payload's `session_id` that state is keyed on (one id per session; not separately
   probed against a live payload here). `cmd_settings` writes `guard.local.json` (that key
-  only) plus, for `edit_gate`/`evidence_gate`, the session state; it runs only from the
+  only) plus, for `edit_gate`/`audit_gate`, the session state; it runs only from the
   user-invoked (`disable-model-invocation`) skill, which the model cannot trigger.
 
 ## Design invariants (why, not how)
@@ -124,7 +124,7 @@ payloads, not memory.
   permission prompt, so all three are genuine user actions; a deferring plan does not
   arm, and a judge failure never arms (fail toward the closed gate — the opposite of the
   evidence judge's fail-open).
-  The `settings` skill (it sets `edit_gate`/`evidence_gate`, never `approved`) and the model
+  The `settings` skill (it sets `edit_gate`/`audit_gate`, never `approved`) and the model
   cannot arm it by either path. The
   classifier sees the tail of the session archive as conversation context
   (`_recent_dialogue`) — used only to resolve what the message refers to, so a bare
@@ -137,9 +137,9 @@ payloads, not memory.
   (`if explicit: approved=True elif starts_unrelated_task: approved=False`).
 - **Two independent settings.** Session `edit_gate` governs ONLY the approval gate
   (gate + classifier + plan-approval early-return when `off`); the evidence judge has no
-  setting of its own — `evidence_gate` is its control, and `manual` is its practical off
+  setting of its own — `audit_gate` is its control, and `manual` is its practical off
   (Stop archives the turn and records the pending target, but spawns no judge).
-  `/guard:settings` sets `edit_gate` and `evidence_gate` (writing the config key and, with a
+  `/guard:settings` sets `edit_gate` and `audit_gate` (writing the config key and, with a
   session id, the live session state). Neither setting touches the other's feature.
 - **Control turns and exempt commands are never judged.** `/guard:settings` and
   `/guard:audit-evidence` are skipped on BOTH sides: the approval classifier skips them at
@@ -152,21 +152,39 @@ payloads, not memory.
   `exempt_skills` — named with its plugin namespace (`plugin:skill`), since a
   user-invoked skill reaches the transcript as a namespaced `<command-name>` just like
   a command (skill output is not a body of technical claims to ground). Both modes
-  honor it (checked before the `evidence_gate` branch).
+  honor it (checked before the `audit_gate` branch).
 - **Mark resolution is the judge's call, not a mechanical gate.** guard once ran a
   deterministic Stop-time check on reference marks (dangling mark, unused entry, mixed
-  syntax, non-numeric footnote id) and blocked on it in every `evidence_gate` mode. It was
+  syntax, non-numeric footnote id) and blocked on it in every `audit_gate` mode. It was
   removed with the `refs_format` setting: guard no longer fixes a mark syntax, so there is
   no format to enforce, and whether a mark resolves to adequate evidence is a judgment
-  about the claim — which is the evidence judge's job and follows the `evidence_gate`
+  about the claim — which is the evidence judge's job and follows the `audit_gate`
   modes like every other criterion. Nothing at Stop blocks on marks now.
-- **Three modes, one criteria.** `evidence_gate` selects only *how/when* the Stop audit runs —
+- **Renamed from `evidence_gate`, with no fallback.** The old key is ignored outright: a
+  config still carrying it silently gets the `audit_gate` default (`manual`). Deliberate —
+  guard is pre-1.0 and read-compat for one renamed key is not worth a permanent branch in
+  `_load_config`. The cost is real and accepted: a project that had set `headless` drops to
+  `manual` on upgrade without a warning, so the rename must be called out in the release
+  notes rather than absorbed by the code.
+- **Mode and criteria are separate settings.** `audit_gate` picks *how/when* the audit
+  runs; `audit_claims` / `audit_deferrals` pick *which axis* it looks for. Split because
+  the two axes fail differently — a project that wants its claims grounded may still want
+  to defer work openly, and forcing one setting to carry both meant turning off the whole
+  judge to escape either. The axis filter is applied at the single place blocking is
+  decided (the `unsupported`/`resolvable` comprehensions in `cmd_stop`), so a judge that
+  over-reports cannot resurrect a disabled axis; the prompts are narrowed too
+  (`_axis_scoped_system` for headless, the `axes` dispatch input for the auditor) only so
+  a disabled axis costs no repo reads. **Both off skips the audit outright** in every
+  mode — no judge spawn, no dispatch, and manual mode records no pending target — since a
+  run that can report nothing is pure cost. The approval gate is untouched by either
+  switch.
+- **Three modes, one criteria.** `audit_gate` selects only *how/when* the Stop audit runs —
   `manual` (default; no auto-audit, `/guard:audit-evidence` dispatches on demand), `subagent`
   (dispatch evidence auditor each turn), or `headless` (in-hook judge that blocks). The two-axis
   criteria are identical across all three, and `evidence-auditor.md` mirrors them in prose. Bad
-  `evidence_gate` → the default (`manual`, via `_evidence_gate`). `cmd_settings` sets it (the config
+  `audit_gate` → the default (`manual`, via `_audit_gate`). `cmd_settings` sets it (the config
   key and, with a session id, the live session state).
-  The approval gate is independent of `evidence_gate` (governed by `edit_gate`), so `manual`
+  The approval gate is independent of `audit_gate` (governed by `edit_gate`), so `manual`
   narrows auto-verification without weakening the gate.
 - **Manual mode + on-demand verify.** manual-mode Stop archives the turn, writes its
   slice (shared `_write_turn_slice`), and records `pending_verify_prompt_id` — then emits
@@ -223,7 +241,7 @@ payloads, not memory.
   **Guard's own config + state are excluded from exemptions 2–4**
   (`_is_guard_owned`): `.claude/guard/` is itself git-ignored, so without this the model
   could `Write` `state/<sid>.json` to arm its own approval or edit `guard.local.json`
-  to disable the judge / change `evidence_gate`. refs/ is the one hole guard opens for
+  to disable the judge / change `audit_gate`. refs/ is the one hole guard opens for
   itself and is checked first. Failing to resolve a path ⇒ treated as guard-owned (no
   exemption).
 - **`_safe_project_subdir` is the single self-neutering defense**, shared by `refs_dir`
@@ -261,13 +279,13 @@ payloads, not memory.
 ## Config (`.claude/guard.local.json`)
 
 Parsed by `_load_config`; fail-open to defaults. Both gate fields are `enum.StrEnum`
-members (`EditGate`, `EvidenceGate`) — the reason guard requires Python 3.11+ (`StrEnum`
+members (`EditGate`, `AuditGate`) — the reason guard requires Python 3.11+ (`StrEnum`
 "Added in version 3.11": https://docs.python.org/3/library/enum.html, excerpt saved at
 `wiki/ref/python-strenum.md`). Keys: `model`
 (default `"haiku"`), `effort` (low/medium/high/xhigh/max, default `"medium"`), `edit_gate`
 (`"ask"`|`"deny"`|`"off"`, default `"ask"` — the approval gate: `off` disables it, `ask`
 escalates an unapproved edit to the permission prompt and arms the session on approval,
-`deny` blocks the call for the plan→approve workflow), `evidence_gate`
+`deny` blocks the call for the plan→approve workflow), `audit_gate`
 (`"manual"`|`"subagent"`|`"headless"`, default
 `"manual"` — the evidence judge's control; `manual` is its practical off), `exempt_skills`
 (list of strings, default `[]`) — skills / slash commands whose turn the Stop judge
@@ -322,7 +340,7 @@ printf '%s\n' \
 
 # show/change settings (deterministic CLI; no payload — session id from --session or
 # CLAUDE_CODE_SESSION_ID, project dir from CLAUDE_PROJECT_DIR). set writes guard.local.json
-# and, for edit_gate/evidence_gate, state/<sid>.json.
+# and, for edit_gate/audit_gate, state/<sid>.json.
 "$H" settings show --session s1
 "$H" settings set edit_gate off --session s1
 
@@ -331,7 +349,7 @@ printf '%s\n' \
 export GUARD_SETTINGS_SKILL=1
 
 # headless judge on the turn (real claude; unsupported claim -> block)
-"$H" settings set evidence_gate headless --session s1
+"$H" settings set audit_gate headless --session s1
 echo "{\"session_id\":\"s1\",\"prompt_id\":\"p1\",\"transcript_path\":\"$T\",\"last_assistant_message\":\"Redis is always faster than Postgres.\",\"stop_hook_active\":false}" | "$H" stop
 
 # gate, default edit_gate "ask": emits permissionDecision "ask" + records asked_prompt_id.
@@ -344,7 +362,7 @@ printf '{"edit_gate":"deny"}\n' > "$CLAUDE_PROJECT_DIR/.claude/guard.local.json"
 echo '{"session_id":"s2","prompt_id":"pG","tool_name":"Write","tool_input":{"file_path":"x"}}' | "$H" gate
 
 # subagent mode: Stop slices the turn to a file + injects a dispatch (no `decision`)
-"$H" settings set evidence_gate subagent --session s1
+"$H" settings set audit_gate subagent --session s1
 echo '{"session_id":"s1","prompt_id":"p1","claims":[{"claim":"x","evidence":"y"}]}' | "$H" record-verified
 
 # --- gate exemptions (deterministic apart from one `git check-ignore`) ---
