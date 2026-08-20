@@ -1,5 +1,5 @@
 ---
-name: explain-simple
+name: simply-explain
 description: "Explain something in plain language, in a clean context. With an argument, explains that topic, file, or question; with none, re-explains the previous answer simply. guard dispatches the simple-explainer subagent so the explanation is written fresh rather than by the agent that already tangled it. Use when an explanation was hard to follow, or when you want a plain-language walkthrough of a topic or file. Claude Code only."
 argument-hint: '[topic | file | question]'
 disable-model-invocation: true

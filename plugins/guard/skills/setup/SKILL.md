@@ -1,17 +1,17 @@
 ---
 name: setup
-description: Install guard's read-only Codex evidence-auditor agent in the current project's .codex/agents directory. Use when guard is installed in Codex and automatic or on-demand evidence audits need their named subagent.
+description: Install guard's read-only Codex claims-auditor agent in the current project's .codex/agents directory. Use when guard is installed in Codex and automatic or on-demand evidence audits need their named subagent.
 disable-model-invocation: true
 ---
 
 # Guard setup
 
 This setup is needed only for Codex. It installs a project-local custom agent
-named `guard_evidence_auditor`; it does not change any user-level Codex
+named `guard_claims_auditor`; it does not change any user-level Codex
 configuration.
 
 First identify the current project's Git root. Explain that installation will
-create `.codex/agents/guard_evidence_auditor.toml`, then obtain the user's
+create `.codex/agents/guard_claims_auditor.toml`, then obtain the user's
 explicit confirmation before making that change. A direct request to install it
 counts as that confirmation.
 

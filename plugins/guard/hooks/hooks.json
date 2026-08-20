@@ -15,13 +15,35 @@
     ],
     "UserPromptExpansion": [
       {
-        "matcher": "^(guard:)?audit-evidence$",
+        "matcher": "^(guard:)?audit-claims$",
         "hooks": [
           {
             "type": "command",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/guard_hook.py\" verify",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/guard_hook.py\" verify claims",
             "timeout": 5,
-            "description": "On demand, dispatch the evidence auditor to audit the last completed turn."
+            "description": "On demand, dispatch the claims auditor for the last completed turn."
+          }
+        ]
+      },
+      {
+        "matcher": "^(guard:)?audit-deferrals$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/guard_hook.py\" verify deferrals",
+            "timeout": 5,
+            "description": "On demand, dispatch the deferrals auditor for the last completed turn."
+          }
+        ]
+      },
+      {
+        "matcher": "^(guard:)?audit-korean$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/guard_hook.py\" verify korean",
+            "timeout": 5,
+            "description": "On demand, dispatch the korean auditor for the last completed turn."
           }
         ]
       }

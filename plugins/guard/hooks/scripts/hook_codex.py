@@ -125,12 +125,12 @@ def _handle_prompt(project_dir: Path, payload: dict[str, Any], session_id: str, 
         core._write_state(project_dir, session_id, state)
     _save_turn(project_dir, session_id, turn_id, {"user": prompt, "tools": [], "assistant": ""})
 
-    if prompt.strip().lower().startswith("/guard:audit-evidence"):
+    if prompt.strip().lower().startswith("/guard:audit-claims"):
         pending = state.get("pending_verify_prompt_id")
         if isinstance(pending, str) and pending and _turn_path(project_dir, session_id, pending).is_file():
             _emit({"hookSpecificOutput": {"hookEventName": "UserPromptSubmit", "additionalContext": (
                 "guard: audit the saved turn before answering. Spawn the read-only "
-                "guard_evidence_auditor named subagent in a fresh context, give it "
+                "guard_claims_auditor named subagent in a fresh context, give it "
                 f"the turn file {_turn_path(project_dir, session_id, pending)}, and have it verify the "
                 "assistant claims against the repository. If that agent is unavailable, tell the user "
                 "to run $guard:setup in this project."
@@ -197,8 +197,9 @@ def _handle_stop(project_dir: Path, payload: dict[str, Any], session_id: str, tu
     if state.get("gated_prompt_id") == turn_id:
         return
     want_claims, want_deferrals = core._audit_claims(state), core._audit_deferrals(state)
-    # Both axes off: nothing for the auditor to report, so do not block for one.
-    if not want_claims and not want_deferrals:
+    want_korean = core._audit_korean(state)
+    # Every axis off: nothing for the auditor to report, so do not block for one.
+    if not (want_claims or want_deferrals or want_korean):
         return
     if state["audit_gate"] == core.AuditGate.MANUAL:
         state["pending_verify_prompt_id"] = turn_id
@@ -208,14 +209,20 @@ def _handle_stop(project_dir: Path, payload: dict[str, Any], session_id: str, tu
     # one continuation prompt, where the main agent can dispatch the auditor.
     state["last_audited_prompt_id"] = turn_id
     core._write_state(project_dir, session_id, state)
-    if want_claims and want_deferrals:
-        scope = "the response's claims and deferrals"
-    elif want_claims:
-        scope = "the response's claims ONLY (skip the deferral axis; report no deferrals)"
-    else:
-        scope = "the response's deferrals ONLY (skip the claim axis; report no claims)"
+    # Table-driven, not a branch per combination: three independent axes have seven
+    # valid states. Mirrors core._auditor_dispatch_context so both hosts name the axes
+    # the same way.
+    _SCOPE = {"claims": "claims", "deferrals": "deferrals", "korean": "Korean naturalness"}
+    on = [f for f in core._AXIS_FIELDS if {"claims": want_claims,
+                                          "deferrals": want_deferrals,
+                                          "korean": want_korean}[f]]
+    off = [f for f in core._AXIS_FIELDS if f not in on]
+    scope = "the response's " + ", ".join(_SCOPE[f] for f in on)
+    if off:
+        scope += (" ONLY (skip " + ", ".join(_SCOPE[f] for f in off)
+                  + "; report those empty)")
     _emit({"decision": "block", "reason": (
-        "guard: before completing, spawn the read-only guard_evidence_auditor named subagent in a fresh "
+        "guard: before completing, spawn the read-only guard_claims_auditor named subagent in a fresh "
         "context. Give it "
         f"the saved turn record at {_turn_path(project_dir, session_id, turn_id)} and have it check "
         f"{scope} against the repository; then address any violations. If that agent is unavailable, "

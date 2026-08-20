@@ -15,13 +15,13 @@ Subcommands
                  which sees the last few archived user/assistant messages as context
                  (``_recent_dialogue``) so a short consent ("go ahead") arms only when
                  it answers a proposed plan. Only a user message can arm approval.
-                 guard's own ``/guard:settings`` / ``/guard:audit-evidence`` commands are
+                 guard's own ``/guard:settings`` / ``/guard:audit-claims`` commands are
                  ignored here (not turns).
 - settings       CLI (argv), run by the ``guard:settings`` skill (forked) via Bash.
                  ``show`` prints the current settings; ``set <key> <value>`` changes one
                  of ``edit_gate`` (``ask``|``deny``|``off`` — the APPROVAL GATE, where
                  ``off`` disables it and ``ask``/``deny`` pick how an unapproved edit is
-                 stopped), ``audit_gate`` (``manual``|``subagent``|``headless`` — the
+                 stopped), ``audit_gate`` (``manual``|``headless`` — the
                  evidence judge, independent of the gate; ``manual`` is its practical
                  off), ``model``, ``effort``, or ``refs_dir``.
                  ``edit_gate``/``audit_gate`` also apply to the live session's
@@ -33,7 +33,7 @@ Subcommands
                  ``writable``), not here. Mutating verbs require the settings-skill
                  marker — see ``_cli_write_allowed``. Not a hook event.
 - verify         UserPromptExpansion (matcher ``^(guard:)?judge$``). On demand, emit the
-                 evidence auditor-dispatch instruction for the last completed turn
+                 claims auditor-dispatch instruction for the last completed turn
                  (``pending_verify_prompt_id``, recorded by manual-mode Stop). Reads no
                  transcript — the slice is already on disk. The on-demand counterpart to
                  auto-auditing; works in any mode.
@@ -72,9 +72,6 @@ Subcommands
                  the session's ``approved`` so the rest of the task's edits pass. The
                  user's click arms it — the model cannot approve its own prompt. No-op
                  in ``deny`` mode and once already approved.
-- record-verified Append verified facts for a passed turn. Called by the evidence auditor
-                 subagent (subagent mode) via Bash so its confirmed claims reach the
-                 verified store through the same single writer as the headless path.
 - stop           Stop. A turn == the transcript ``prompt_id``; guard reads the whole
                  turn from Claude Code's transcript (``transcript_path`` +
                  ``prompt_id``, both in the payload) via ``_read_turn_from_transcript``
@@ -83,29 +80,27 @@ Subcommands
                  gated (``gated_prompt_id``), the slice contains a user ``!`` command
                  (its output arrives after the judged response, so it is neither
                  evidence nor auditable here), or the turn was opened by guard's own
-                 ``/guard:settings`` / ``/guard:audit-evidence`` control
+                 ``/guard:settings`` / ``/guard:audit-claims`` control
                  command or a user-configured ``exempt_skills`` entry (skill output / a
                  relay, not claims to ground). Otherwise branch on ``audit_gate``.
                  ``manual`` (default): do not audit — record the turn as the pending
-                 ``/guard:audit-evidence`` target and emit nothing. ``subagent``: do not
-                 judge/block — slice the turn to a file and emit additionalContext asking
-                 the main agent to dispatch ``guard:evidence-auditor``. ``headless``: judge the
-                 turn (+ VERIFIED_FACTS) on two axes; block on an unsupported claim or a
-                 repo-resolvable deferral; on PASS append supported claims to the
-                 verified store.
+                 ``/guard:audit-*`` target and emit nothing. ``headless``: spawn ONE
+                 JUDGE PER ENABLED AXIS in parallel (see run_judges_parallel), block on
+                 any axis's violation, and on a fully-audited PASS append the claims
+                 judge's supported claims to the verified store.
 - session-start  SessionStart. Sweep state/sessions/verified files and turns/ dirs
                  older than retention, and export ``GUARD_REFS_DIR`` (the resolved
                  refs directory) via ``$CLAUDE_ENV_FILE`` for the session's Bash
                  environment.
 - refs-dir       Print the resolved refs directory (absolute), applying the
-                 ``refs_dir`` validation. Called via Bash (evidence auditor fallback / the
+                 ``refs_dir`` validation. Called via Bash (claims auditor fallback / the
                  output style), not a hook event.
 
 State lives project-local under ``${CLAUDE_PROJECT_DIR}/.claude/guard/``:
 - ``state/<sid>.json``       — {edit_gate, approved, audit_gate, audit_claims, audit_deferrals, last_audited_prompt_id, gated_prompt_id, asked_prompt_id, pending_verify_prompt_id, updated_at}
 - ``sessions/<sid>.jsonl``   — full session archive: one record per turn / verdict
-- ``turns/<sid>/<pid>.json`` — subagent and manual modes: the turn slice guard hands the
-                                evidence auditor subagent ({user, tools[], assistant})
+- ``turns/<sid>/<pid>.json`` — manual mode: the turn slice guard hands a per-axis
+                                auditor subagent ({user, tools[], assistant})
 - ``verified/<sid>.jsonl``   — verified facts from PASSED turns: {turn, claim, evidence}
 - ``trace.log``              — file-only debug trace (enabled by GUARD_TRACE)
 
@@ -116,16 +111,16 @@ expired only by the age-based sweep at SessionStart (see ORPHAN_MAX_AGE_SECONDS)
 Configuration (optional) is a JSON object at
 ``${CLAUDE_PROJECT_DIR}/.claude/guard.local.json``: ``model`` (string, default
 ``"haiku"``), ``effort`` (one of low/medium/high/xhigh/max, default ``"medium"``
-— reasoning effort of the HEADLESS judge only; the subagent judge's model/effort come
-from the ``evidence-auditor`` agent's own frontmatter, not these keys), ``edit_gate``
+— reasoning effort of the HEADLESS judges only; an auditor subagent's model/effort come
+from the ``claims-auditor`` agent's own frontmatter, not these keys), ``edit_gate``
 (``"ask"``|``"deny"``|``"off"``, default ``"ask"``) — the APPROVAL GATE: ``off``
 disables it, ``ask`` escalates to Claude Code's permission prompt (approve inline; the
 approval arms the session for the rest of the task), ``deny`` blocks the call and
 drives the plan→approve workflow, and ``audit_gate``
-(``"manual"``|``"subagent"``|``"headless"``, default ``"manual"``) — how the Stop-time
+(``"manual"``|``"headless"``, default ``"manual"``) — how the Stop-time
 evidence judge runs, independent of the gate (manual: no auto-audit — the judge's
-practical off — verify on demand via ``/guard:audit-evidence``; subagent: dispatch the
-``evidence-auditor`` subagent each turn; headless: in-hook judge that blocks), and
+practical off — audit on demand via the per-axis ``/guard:audit-*`` commands;
+headless: one in-hook judge per enabled axis, blocking on a violation), and
 ``exempt_skills`` (list of strings, default ``[]``) — skills / slash
 commands whose turn the Stop judge must not audit, named with their plugin namespace
 (``plugin:skill``, e.g. ``guard:settings``) or bare for un-namespaced skills; matched
@@ -161,7 +156,7 @@ import time
 from datetime import datetime, timezone
 from enum import StrEnum
 from pathlib import Path
-from typing import Any
+from typing import Any, NamedTuple
 
 
 class EditGate(StrEnum):
@@ -178,7 +173,6 @@ class AuditGate(StrEnum):
 
     MANUAL = "manual"
     HEADLESS = "headless"
-    SUBAGENT = "subagent"
 
 # Codex adapters set GUARD_HOST before importing this module. Keep the historical
 # Claude paths intact while preventing one host from interpreting the other's state.
@@ -214,7 +208,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
     # "deny" instead blocks the tool call with a reason, forcing the model to present a
     # plan and win approval in a message (the stricter plan→approve workflow). The
     # evidence judge is a separate setting (`audit_gate`); "manual" is its practical
-    # off (nothing runs unless the user asks via /guard:audit-evidence).
+    # off (nothing runs unless the user asks via /guard:audit-claims).
     "edit_gate": EditGate.ASK,
     "audit_gate": AuditGate.MANUAL,
     # The two axes the evidence judge checks, switched independently. `audit_gate`
@@ -224,6 +218,13 @@ DEFAULT_CONFIG: dict[str, Any] = {
     # skipped outright — a run that can report nothing is pure cost.
     "audit_claims": True,
     "audit_deferrals": True,
+    # Third axis: does a Korean response read as natural Korean, or as translated
+    # English? Governed by `audit_gate` with the other two — it is an audit of the
+    # finished turn, so HOW/WHEN it runs is the same one question. Defaults OFF, unlike
+    # the other two axes: most projects answer in English, where this axis reports
+    # nothing, so making it opt-in keeps it from being pure cost. The axis self-skips on
+    # a non-Korean response (see KOREAN_SYSTEM).
+    "audit_korean": False,
     # Skills / slash commands whose turn the Stop judge must NOT audit. A turn opened
     # by one of these is skill output or a relay, not a body of technical claims to
     # ground. Values are the name as it appears after the slash, INCLUDING the plugin
@@ -258,11 +259,8 @@ _BOOL_FALSE = {"false", "off", "no", "0"}
 # The evidence-judge settings live on AuditGate:
 # AuditGate.MANUAL (default): the hook does NOT audit at Stop — it archives the turn and
 #   records it as the pending verify target; verification runs only on demand via
-#   `/guard:audit-evidence`, which dispatches the evidence auditor. This is the judge's practical off.
+#   `/guard:audit-claims`, which dispatches the claims auditor. This is the judge's practical off.
 #   The approval gate is unaffected (it is governed by `edit_gate`, not `audit_gate`).
-# AuditGate.SUBAGENT: the hook does not judge/block — it injects the turn + verified
-#   paths as additionalContext and the main agent dispatches the `evidence-auditor` subagent to
-#   audit every turn.
 # AuditGate.HEADLESS: spawn an isolated `claude` inside the hook and block the turn (the
 #   original path).
 
@@ -322,7 +320,7 @@ def _verified_file(project_dir: Path, session_id: str) -> Path:
 
 
 def _turn_slice_file(project_dir: Path, session_id: str, prompt_id: str) -> Path:
-    """File holding one turn's transcript slice, handed to the evidence auditor subagent.
+    """File holding one turn's transcript slice, handed to the claims auditor subagent.
 
     guard slices the transcript itself (single slice implementation) and writes just
     that turn here, so the auditor reads one turn — not the whole transcript.
@@ -478,17 +476,19 @@ def _read_payload() -> dict | None:
 
 _SESSION_ID_RE = re.compile(r"^[A-Za-z0-9._-]+$")
 # guard's own control commands, e.g. "/guard:settings edit_gate off", "/settings",
-# "/guard:audit-evidence". `settings` is a forked skill and `audit-evidence` a
+# "/guard:audit-claims". `settings` is a forked skill and each `audit-<axis>` a
 # UserPromptExpansion — either way the turn is a relay, not real work to log/judge. The
 # name is `settings`, not `config`, precisely so the bare form does NOT match Claude Code's
 # built-in `/config` command (which the optional `(guard:)?` would otherwise capture,
 # making guard treat every `/config` as its own control command). `(?=\s|$)` rather than
 # `\b`: the name must END here, not merely hit a word boundary — `\b` would also accept a
 # longer hyphenated name from another plugin (`/settings-export` matching `settings`), and
-# it is what keeps `audit-evidence` from matching a bare `/audit`.
+# it is what keeps `audit-claims` from matching a bare `/audit`.
 # `audit-comment` is deliberately ABSENT: that skill's relayed findings are claims about
 # real files, so its turn stays auditable like any other work.
-_CONTROL_CMD_RE = re.compile(r"^/(guard:)?(settings|audit-evidence)(?=\s|$)", re.IGNORECASE)
+_CONTROL_CMD_RE = re.compile(
+    r"^/(guard:)?(settings|audit-claims|audit-deferrals|audit-korean)(?=\s|$)",
+    re.IGNORECASE)
 # In the transcript, a slash command is expanded to
 # "<command-name>/guard:settings</command-name>" (see session b30dbaec). Pull the command
 # name out of that tag; a raw typed form ("/guard:settings edit_gate off") is handled by
@@ -813,6 +813,7 @@ def _read_state(project_dir: Path, session_id: str, config: dict[str, Any]) -> d
         "audit_gate": _audit_gate(config),
         "audit_claims": _audit_claims(config),
         "audit_deferrals": _audit_deferrals(config),
+        "audit_korean": _audit_korean(config),
         # Per-turn guards keyed by the transcript prompt_id (a turn == one promptId).
         "last_audited_prompt_id": "",
         "gated_prompt_id": "",
@@ -822,7 +823,7 @@ def _read_state(project_dir: Path, session_id: str, config: dict[str, Any]) -> d
         # the user's click, not the model, is what arms it.
         "asked_prompt_id": "",
         # Manual mode: the most recent auditable turn's prompt_id, the target that
-        # `/guard:audit-evidence` dispatches the evidence auditor for.
+        # `/guard:audit-claims` dispatches the claims auditor for.
         "pending_verify_prompt_id": "",
         "updated_at": None,
     }
@@ -836,6 +837,7 @@ def _read_state(project_dir: Path, session_id: str, config: dict[str, Any]) -> d
     if not isinstance(data, dict):
         return default
     keys = ("edit_gate", "approved", "audit_gate", "audit_claims", "audit_deferrals",
+            "audit_korean",
             "last_audited_prompt_id", "gated_prompt_id",
             "asked_prompt_id", "pending_verify_prompt_id", "updated_at")
     default.update({k: data[k] for k in keys if k in data})
@@ -1007,6 +1009,13 @@ def _audit_deferrals(cfg: dict[str, Any]) -> bool:
     return v if isinstance(v, bool) else bool(DEFAULT_CONFIG["audit_deferrals"])
 
 
+def _audit_korean(cfg: dict[str, Any]) -> bool:
+    """Whether the judge checks axis 3 (Korean naturalness). Same coercion rule as
+    _audit_claims, but the default is False — see DEFAULT_CONFIG["audit_korean"]."""
+    v = cfg.get("audit_korean", DEFAULT_CONFIG["audit_korean"])
+    return v if isinstance(v, bool) else bool(DEFAULT_CONFIG["audit_korean"])
+
+
 def _edit_gate(cfg: dict[str, Any]) -> EditGate:
     """The approval-gate setting from a config or session-state dict, coerced to a
     valid EditGate member (defaults on anything unrecognized)."""
@@ -1070,6 +1079,79 @@ def run_judge(
         return None
 
     return _parse_judge_output(project_dir, proc.stdout)
+
+
+def _judge_argv(project_dir: Path, system_prompt: str, user_prompt: str, schema: dict,
+                config: dict[str, str], tools: str | None) -> list[str] | None:
+    """The ``claude`` argv for one judge, or None when the binary is missing.
+
+    ``tools`` None means the child gets NO tool access. An axis that judges the response
+    text alone (Korean naturalness) must not be handed the repository: it cannot use it,
+    and withholding it is what keeps that judge to a few seconds instead of ~30.
+    """
+    claude = shutil.which("claude")
+    if claude is None:
+        _trace(project_dir, None, "judge", "no_claude_binary")
+        return None
+    cmd = [
+        claude, "-p", user_prompt,
+        "--safe-mode",
+        "--model", config.get("model", "haiku"),
+        "--effort", _effort(config),
+        "--output-format", "json",
+        "--system-prompt", system_prompt,
+        "--json-schema", json.dumps(schema),
+        "--no-session-persistence",
+    ]
+    if tools is not None:
+        cmd += ["--allowedTools", tools]
+    return cmd
+
+
+def run_judges_parallel(
+    project_dir: Path,
+    jobs: list[tuple[str, str, str, dict, str | None]],
+    config: dict[str, str],
+) -> dict[str, dict | None]:
+    """Spawn every judge at once and collect them against ONE shared deadline.
+
+    ``jobs`` is a list of (key, system_prompt, user_prompt, schema, tools). Returns
+    {key: verdict-or-None}: a key maps to None when its judge failed, timed out, or
+    could not be spawned, so the caller sees PARTIAL results instead of losing every
+    axis to one bad child. Callers must decide what a missing axis means — silence is
+    not a pass.
+
+    The deadline covers the GROUP, not each child: they run concurrently, so the wall
+    clock is the slowest one. Giving each its own full ``JUDGE_TIMEOUT_SECONDS`` would
+    let a slow set outlive the Stop hook's own timeout and be killed mid-write.
+    """
+    results: dict[str, dict | None] = {key: None for key, _, _, _, _ in jobs}
+    procs: list[tuple[str, subprocess.Popen]] = []
+    for key, system_prompt, user_prompt, schema, tools in jobs:
+        argv = _judge_argv(project_dir, system_prompt, user_prompt, schema, config, tools)
+        if argv is None:
+            continue
+        try:
+            procs.append((key, subprocess.Popen(
+                argv, cwd=str(project_dir), stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE, text=True)))
+        except OSError as e:
+            _trace(project_dir, None, "judge", "spawn_failed", axis=key, error=repr(e))
+    deadline = time.monotonic() + JUDGE_TIMEOUT_SECONDS
+    for key, proc in procs:
+        try:
+            out, err = proc.communicate(timeout=max(0.1, deadline - time.monotonic()))
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            proc.communicate()
+            _trace(project_dir, None, "judge", "timeout", axis=key)
+            continue
+        if proc.returncode != 0:
+            _trace(project_dir, None, "judge", "nonzero_exit", axis=key,
+                   code=proc.returncode, stderr=err[:300])
+            continue
+        results[key] = _parse_judge_output(project_dir, out)
+    return results
 
 
 def _parse_judge_output(project_dir: Path, stdout: str) -> dict | None:
@@ -1183,103 +1265,132 @@ PLAN_DEFER_SCHEMA = {
     "additionalProperties": False,
 }
 
-EVIDENCE_SYSTEM = (
-    "You audit an assistant's response from a coding session on TWO axes: "
-    "unsupported claims (AXIS 1) and unjustified deferrals (AXIS 2), both defined below.\n\n"
-    "TRIAGE FIRST — before reading anything. Scan the response for something to verify: "
-    "a load-bearing claim (per AXIS 1: any checkable statement, not only technical "
-    "behavior) or a deferral. If it has NEITHER — it only plans, "
-    "asks the user a question, proposes an approach, or narrates an action already shown "
-    "in TOOL_ACTIVITY — return verdict='pass' with empty `claims` and `deferrals` "
-    "IMMEDIATELY, without reading the repository or calling any tool. Do not spend tool "
-    "calls on a turn that asserts nothing verifiable.\n\n"
-    "OTHERWISE, when there IS a claim or deferral to check, you have the repository "
-    "available and MUST read it (Read/Grep/Glob/Bash) to judge each one — do not "
-    "assume.\n\n"
-    "A TOOL_ACTIVITY block may precede the response: it is the commands the assistant "
-    "actually ran this turn and their output. Treat that output as first-class "
-    "evidence — a claim that restates or directly follows from a command's output in "
-    "TOOL_ACTIVITY is SUPPORTED even if the response does not re-cite it.\n\n"
-    "A VERIFIED_FACTS block may also precede the response: these are claims already "
-    "confirmed (with their evidence) in earlier turns of this session. Treat them as "
-    "established — a claim consistent with a verified fact is SUPPORTED and need not "
-    "be re-derived.\n\n"
-    "AXIS 1 — unsupported or shallowly-supported claims. A claim is ANY statement the "
-    "reader could check and find wrong, not only technical behavior. Technical claims "
-    "are the obvious case (how a system, tool, library, API, algorithm, configuration, "
-    "or codebase behaves or performs), but the same bar applies to what a file "
-    "contains or lacks, history and process ('added for X', 'tests passed before'), "
-    "what a tool or subagent reported, counts and comparisons ('the only place', "
-    "'most of'), what the user decided earlier, and attributions of cause. A genuine "
-    "preference or aesthetic judgment is NOT a claim: 'cleaner' is a preference, "
-    "'allocates less' is a claim. For each load-bearing claim, decide if it is "
-    "backed by adequate evidence: output of a command in TOOL_ACTIVITY, a specific "
-    "code reference (file:line or symbol), a named doc/spec, a measurement, or a sound "
-    "derivation. Evidence may sit anywhere in the response — including a References "
-    "section closing the answer, with a short mark on the claim. Judge whether a mark "
-    "RESOLVES, never whether it matches any particular syntax. "
-    "Resolve whatever marks you find against that section before judging: a "
-    "claim whose mark is backed by an adequate entry is SUPPORTED, and the mark's "
-    "presence is not itself a missing citation — but a mark resolving to NOTHING, or to "
-    "an entry that does not establish the claim, is UNSUPPORTED exactly as an uncited "
-    "claim would be. Follow the link; never credit a claim for merely carrying a mark. "
-    "Judge the QUALITY of the evidence, not just its presence — mark the "
-    "claim UNSUPPORTED when the assistant reasoned from a SURFACE SIGNAL instead of "
-    "the actual behavior: inferring what a function does from its NAME, a comment, a "
-    "variable/type name, a filename, or a docstring without reading the body; assuming "
-    "a caller's or dependency's behavior without opening it; or building a conclusion "
-    "on an earlier UNVERIFIED ASSUMPTION. Open the real definition and confirm. A "
-    "cited file:line that does not actually establish the claim counts as unsupported. "
-    "When a claim cites OFFICIAL DOCUMENTATION, the response must also point to a "
-    "local saved copy under `__REFS_DIR__`; verify that file actually exists "
-    "(Read/Glob) and supports the claim — a docs claim with no existing local copy, "
-    "or a path that is missing, is UNSUPPORTED. "
-    "Statements explicitly flagged as unverified assumptions are NOT violations; "
-    "genuine preferences and hedged suggestions are NOT claims.\n\n"
-    "AXIS 2 — unjustified deferrals. The assistant must not punt on something it "
-    "could resolve by reading the code. Flag every place it defers, postpones, or "
-    "declares uncertainty about a matter of FACT that the repository would answer — "
-    "phrased as an 'open question', 'TBD', 'to be decided', 'deferred', 'needs "
-    "investigation', 'unclear', 'would need to check', 'left for later', or an "
-    "equivalent in any language (including Korean: '미정', '추후', '확인 필요', "
-    "'결정 안 됨'). For each, actually look in the repo. A deferral is RESOLVABLE (a "
-    "violation) when the answer is discoverable from the code, config, tests, or docs "
-    "in this repository — the assistant should have looked instead of deferring. A "
-    "deferral is LEGITIMATE (not a violation) only when it genuinely requires a human "
-    "product/policy/taste decision, external input the repo cannot contain, or "
-    "runtime data not yet available. A question the assistant explicitly hands to the "
-    "user as their decision (\"your call\", \"email vs log — up to you\") is LEGITIMATE "
-    "unless the repo already fixes the answer. Do NOT flag a genuine product/UX/policy "
-    "choice as resolvable. Only flag a deferral resolvable when you can name the "
-    "concrete file/symbol that answers it.\n\n"
-    "Set verdict='block' if at least one load-bearing claim is unsupported OR at "
-    "least one deferral is resolvable from the repo. Return only JSON."
+# --------------------------------------------------------------------------- #
+# per-axis judges
+#
+# One judge per axis, each carrying its axis text VERBATIM. The text is NOT
+# shortened for the split: a trimmed Korean prompt was measured flagging
+# `prompt_id`, 커밋, 리팩토링 and `git rebase` as unnatural, so the loanword and
+# identifier protections are load-bearing rather than padding. Each judge gets
+# only the tools its axis needs (AXIS_JUDGES below) — the Korean axis needs none,
+# which is what makes it ~10s against ~30s for a repo-reading judge.
+# --------------------------------------------------------------------------- #
+_EVIDENCE_PREAMBLE = (
+    'A TOOL_ACTIVITY block may precede the response: it is the commands the '
+    'assistant actually ran this turn and their output. Treat that output as '
+    'first-class evidence — a claim that restates or directly follows from a '
+    "command's output in TOOL_ACTIVITY is SUPPORTED even if the response does not "
+    're-cite it.\n\nA VERIFIED_FACTS block may also precede the response: these are '
+    'claims already confirmed (with their evidence) in earlier turns of this '
+    'session. Treat them as established — a claim consistent with a verified fact '
+    'is SUPPORTED and need not be re-derived.'
 )
-# Appended to the judge/auditor prompt when the user disabled one axis. The schema
-# still requires both arrays, so the disabled one is asked for empty rather than
-# dropped — changing the schema per-run would fork the contract for no gain.
-_AXIS_OFF_NOTE = {
-    "claims": ("\n\nAXIS 1 IS DISABLED for this run. Do NOT audit claims and do NOT read "
-               "the repository on their account: return `claims` as an empty array. Judge "
-               "AXIS 2 (deferrals) only, and set verdict='block' only on a resolvable "
-               "deferral."),
-    "deferrals": ("\n\nAXIS 2 IS DISABLED for this run. Do NOT audit deferrals: return "
-                  "`deferrals` as an empty array. Judge AXIS 1 (claims) only, and set "
-                  "verdict='block' only on an unsupported claim."),
-}
 
+_TRIAGE = (
+    'TRIAGE FIRST — before reading anything. Scan the response for something to '
+    'verify on your axis. If it has NOTHING, return an EMPTY array IMMEDIATELY, '
+    'without reading the repository or calling any tool. Do not spend tool calls '
+    'on a turn that asserts nothing verifiable.'
+)
 
-def _axis_scoped_system(system: str, want_claims: bool, want_deferrals: bool) -> str:
-    """Narrow a judge prompt to the enabled axes. Callers must not pass both-off — that
-    case skips the audit entirely rather than asking for an empty verdict."""
-    if not want_claims:
-        return system + _AXIS_OFF_NOTE["claims"]
-    if not want_deferrals:
-        return system + _AXIS_OFF_NOTE["deferrals"]
-    return system
+CLAIMS_SYSTEM = (
+    "You audit an assistant's turn from a coding session on ONE axis, defined "
+    "below. Judge nothing else. Return only JSON with a `claims` array.\n\n"
+    + _TRIAGE + "\n\n"
+    + _EVIDENCE_PREAMBLE + "\n\n"
+    +
+    'AXIS 1 — unsupported or shallowly-supported claims. A claim is ANY statement '
+    'the reader could check and find wrong, not only technical behavior. '
+    'Technical claims are the obvious case (how a system, tool, library, API, '
+    'algorithm, configuration, or codebase behaves or performs), but the same bar '
+    "applies to what a file contains or lacks, history and process ('added for "
+    "X', 'tests passed before'), what a tool or subagent reported, counts and "
+    "comparisons ('the only place', 'most of'), what the user decided earlier, "
+    'and attributions of cause. A genuine preference or aesthetic judgment is NOT '
+    "a claim: 'cleaner' is a preference, 'allocates less' is a claim. For each "
+    'load-bearing claim, decide if it is backed by adequate evidence: output of a '
+    'command in TOOL_ACTIVITY, a specific code reference (file:line or symbol), a '
+    'named doc/spec, a measurement, or a sound derivation. Evidence may sit '
+    'anywhere in the response — including a References section closing the '
+    'answer, with a short mark on the claim. Judge whether a mark RESOLVES, never '
+    'whether it matches any particular syntax. Resolve whatever marks you find '
+    'against that section before judging: a claim whose mark is backed by an '
+    "adequate entry is SUPPORTED, and the mark's presence is not itself a missing "
+    'citation — but a mark resolving to NOTHING, or to an entry that does not '
+    'establish the claim, is UNSUPPORTED exactly as an uncited claim would be. '
+    'Follow the link; never credit a claim for merely carrying a mark. Judge the '
+    'QUALITY of the evidence, not just its presence — mark the claim UNSUPPORTED '
+    'when the assistant reasoned from a SURFACE SIGNAL instead of the actual '
+    'behavior: inferring what a function does from its NAME, a comment, a '
+    'variable/type name, a filename, or a docstring without reading the body; '
+    "assuming a caller's or dependency's behavior without opening it; or building "
+    'a conclusion on an earlier UNVERIFIED ASSUMPTION. Open the real definition '
+    'and confirm. A cited file:line that does not actually establish the claim '
+    'counts as unsupported. When a claim cites OFFICIAL DOCUMENTATION, the '
+    'response must also point to a local saved copy under `__REFS_DIR__`; verify '
+    'that file actually exists (Read/Glob) and supports the claim — a docs claim '
+    'with no existing local copy, or a path that is missing, is UNSUPPORTED. '
+    'Statements explicitly flagged as unverified assumptions are NOT violations; '
+    'genuine preferences and hedged suggestions are NOT claims.'
+)
 
+DEFERRALS_SYSTEM = (
+    "You audit an assistant's turn from a coding session on ONE axis, defined "
+    "below. Judge nothing else. Return only JSON with a `deferrals` array.\n\n"
+    + _TRIAGE + "\n\n"
+    + _EVIDENCE_PREAMBLE + "\n\n"
+    +
+    'AXIS 2 — unjustified deferrals. The assistant must not punt on something it '
+    'could resolve by reading the code. Flag every place it defers, postpones, or '
+    'declares uncertainty about a matter of FACT that the repository would answer '
+    "— phrased as an 'open question', 'TBD', 'to be decided', 'deferred', 'needs "
+    "investigation', 'unclear', 'would need to check', 'left for later', or an "
+    "equivalent in any language (including Korean: '미정', '추후', '확인 필요', '결정 안 "
+    "됨'). For each, actually look in the repo. A deferral is RESOLVABLE (a "
+    'violation) when the answer is discoverable from the code, config, tests, or '
+    'docs in this repository — the assistant should have looked instead of '
+    'deferring. A deferral is LEGITIMATE (not a violation) only when it genuinely '
+    'requires a human product/policy/taste decision, external input the repo '
+    'cannot contain, or runtime data not yet available. A question the assistant '
+    'explicitly hands to the user as their decision ("your call", "email vs log — '
+    'up to you") is LEGITIMATE unless the repo already fixes the answer. Do NOT '
+    'flag a genuine product/UX/policy choice as resolvable. Only flag a deferral '
+    'resolvable when you can name the concrete file/symbol that answers it.'
+)
 
-EVIDENCE_SCHEMA = {
+KOREAN_SYSTEM = (
+    "You audit an assistant's turn from a coding session on ONE axis, defined "
+    "below. Judge nothing else. Return only JSON with a `korean` array.\n\n"
+    + _TRIAGE + "\n\n"
+    +
+    'AXIS 3 — unnatural Korean. FIRST, decide the language of the assistant '
+    'response. If it is not substantially in Korean, return `korean` as an EMPTY '
+    'ARRAY immediately and audit nothing on this axis — an English (or any '
+    'non-Korean) response is never a violation here, no matter how it is phrased. '
+    'Judge the PROSE only: code, identifiers, paths, commands, log output, quoted '
+    'English terms, and established loanwords that Korean developers actually say '
+    "('커밋', '파일', '후킹', '리팩토링') are all fine and must NOT be flagged. Do not ask "
+    'for a pure-Korean rewrite of a technical term; a translated identifier is '
+    'worse than the English one. Flag a phrase ONLY when it reads as '
+    'machine-translated English rather than something a Korean developer would '
+    "write: English word order forced into Korean, a chain of '~에 대한' / '~를 위한' "
+    "noun stacks where a verb is natural ('~에 대한 처리를 수행합니다' → '~를 처리합니다'), "
+    "redundant '해당/상기/동일한' where a plain demonstrative works, literal calques "
+    "('존재하지 않습니다' → '없습니다'), mismatched particles (은/는, 이/가, 을/를), or a "
+    'sentence so long its subject and verb no longer agree. SEPARATELY, the register '
+    "must be 존댓말: a Korean response holds the -습니다/-입니다 form throughout. Flag "
+    "반말, bare 해체 endings, and a drift out of 존댓말 partway through (it usually "
+    "starts once the writing turns technical). The user writing in 반말 does not "
+    "license a 반말 answer. This is not a translationese test — a sentence can be "
+    'natural Korean and still be the wrong register. For each finding give the '
+    'offending `phrase` verbatim from the response and a `suggestion` that a Korean '
+    'developer would actually write. Report only phrases you would genuinely '
+    'rewrite — style you merely dislike is not a violation.'
+)
+
+# One narrow schema per axis. Each judge returns only its own array, so a judge
+# cannot report on an axis it was not asked about.
+CLAIMS_SCHEMA = {
     "type": "object",
     "properties": {
         "claims": {
@@ -1296,6 +1407,14 @@ EVIDENCE_SCHEMA = {
                 "additionalProperties": False,
             },
         },
+    },
+    "required": ["claims"],
+    "additionalProperties": False,
+}
+
+DEFERRALS_SCHEMA = {
+    "type": "object",
+    "properties": {
         "deferrals": {
             "type": "array",
             "items": {
@@ -1310,12 +1429,72 @@ EVIDENCE_SCHEMA = {
                 "additionalProperties": False,
             },
         },
-        "verdict": {"type": "string", "enum": ["pass", "block"]},
-        "summary": {"type": "string"},
     },
-    "required": ["claims", "deferrals", "verdict", "summary"],
+    "required": ["deferrals"],
     "additionalProperties": False,
 }
+
+KOREAN_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "korean": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "phrase": {"type": "string"},
+                    "unnatural": {"type": "boolean"},
+                    "suggestion": {"type": "string"},
+                    "reasoning": {"type": "string"},
+                },
+                "required": ["phrase", "unnatural", "suggestion", "reasoning"],
+                "additionalProperties": False,
+            },
+        },
+    },
+    "required": ["korean"],
+    "additionalProperties": False,
+}
+
+# Field order is the order findings appear in the block message.
+_AXIS_FIELDS = ("claims", "deferrals", "korean")
+
+
+class AxisJudge(NamedTuple):
+    """Everything needed to spawn one axis's judge and read its answer back.
+
+    ``tools`` is the ``--allowedTools`` value, or None for a judge that gets no tool
+    access at all. The Korean axis is None deliberately: it judges prose and never
+    needs the repository, and withholding the tools is what keeps it fast.
+    ``violates`` picks the finding records that count as violations for that axis.
+    """
+
+    field: str
+    system: str
+    schema: dict
+    tools: str | None
+    violates: Any
+    label: str
+
+
+AXIS_JUDGES: dict[str, AxisJudge] = {
+    "claims": AxisJudge(
+        "claims", CLAIMS_SYSTEM, CLAIMS_SCHEMA, "Read,Grep,Glob,Bash",
+        lambda r: r.get("supported") is False, "unsupported claims"),
+    "deferrals": AxisJudge(
+        "deferrals", DEFERRALS_SYSTEM, DEFERRALS_SCHEMA, "Read,Grep,Glob",
+        lambda r: r.get("resolvable_from_repo") is True, "resolvable deferrals"),
+    "korean": AxisJudge(
+        "korean", KOREAN_SYSTEM, KOREAN_SCHEMA, None,
+        lambda r: r.get("unnatural") is True, "unnatural Korean"),
+}
+
+
+def _enabled_axes(state: dict[str, Any]) -> list[str]:
+    """The axis fields switched on, in _AXIS_FIELDS order."""
+    on = {"claims": _audit_claims(state), "deferrals": _audit_deferrals(state),
+          "korean": _audit_korean(state)}
+    return [f for f in _AXIS_FIELDS if on[f]]
 
 
 # --------------------------------------------------------------------------- #
@@ -1333,7 +1512,7 @@ def cmd_user_prompt() -> int:
     prompt = payload.get("prompt")
     prompt = prompt if isinstance(prompt, str) else ""
 
-    # guard's own control commands (`/guard:settings ...`, `/guard:audit-evidence`) are not
+    # guard's own control commands (`/guard:settings ...`, `/guard:audit-claims`) are not
     # real turns — the forked `config` skill / the `verify` expansion handle them. Don't
     # log, don't start a turn, don't judge.
     if _CONTROL_CMD_RE.match(prompt.strip()):
@@ -1457,10 +1636,22 @@ def _emit_expansion(msg: str) -> None:
 
 
 def cmd_verify() -> int:
-    """UserPromptExpansion for `/guard:audit-evidence`. On-demand audit of the last completed
-    turn: emit the evidence auditor-dispatch instruction for ``pending_verify_prompt_id`` (set
-    by manual-mode Stop). Reads no transcript — the Stop hook already wrote the slice.
-    Works in any mode, independent of the approval gate."""
+    """UserPromptExpansion for the per-axis ``/guard:audit-*`` commands.
+
+    The axis comes from argv (``verify claims`` | ``deferrals`` | ``korean``), one per
+    command, so each skill audits exactly its own axis. Targets
+    ``pending_verify_prompt_id`` (set by manual-mode Stop) and reads no transcript — the
+    Stop hook already wrote the slice. Works in any ``audit_gate`` mode and is
+    independent of the approval gate.
+
+    An axis switched off is still auditable here: the switch governs the AUTOMATIC
+    Stop-time audit, while running the command is the user asking for this one audit
+    now. Refusing it would leave the user no way to check an axis they keep off by
+    default, which is the main reason to keep the axis off in the first place.
+    """
+    axis = sys.argv[2].strip().lower() if len(sys.argv) > 2 else "claims"
+    if axis not in AXIS_AUDITORS:
+        return 0
     project_dir = _project_dir()
     payload = _read_payload()
     if payload is None or project_dir is None:
@@ -1475,23 +1666,16 @@ def cmd_verify() -> int:
     pid = state.get("pending_verify_prompt_id") or ""
     turn_path = _turn_slice_file(project_dir, session_id, pid) if pid else None
     if not pid or turn_path is None or not turn_path.is_file():
-        _emit_expansion("guard: no completed turn is available to verify yet. "
-                        "Ask something first, then run `/guard:audit-evidence`.")
-        _trace(project_dir, session_id, "verify", "no_pending", prompt_id=pid)
-        return 0
-
-    if not _audit_claims(state) and not _audit_deferrals(state):
-        _emit_expansion("guard: both audit_claims and audit_deferrals are off, so there is "
-                        "nothing to audit. Turn one on with `/guard:settings`.")
-        _trace(project_dir, session_id, "verify", "axes_off", prompt_id=pid)
+        _emit_expansion("guard: no completed turn is available to audit yet. "
+                        f"Ask something first, then run `/guard:audit-{axis}`.")
+        _trace(project_dir, session_id, "verify", "no_pending", axis=axis, prompt_id=pid)
         return 0
 
     context = _auditor_dispatch_context(
         project_dir, session_id, pid, turn_path,
-        "guard (verify): audit the last completed turn on request.",
-        _audit_claims(state), _audit_deferrals(state))
+        "guard: audit the last completed turn on request.", axis)
     _emit_expansion(context)
-    _trace(project_dir, session_id, "verify", "dispatch_evidence auditor", prompt_id=pid)
+    _trace(project_dir, session_id, "verify", "dispatch", axis=axis, prompt_id=pid)
     return 0
 
 
@@ -1770,50 +1954,14 @@ def _git_ignored(project_dir: Path, target: Path) -> bool:
     return proc.returncode == 0
 
 
-def cmd_record_verified() -> int:
-    """Append verified facts for a passed turn (subagent-mode single writer).
-
-    The ``evidence-auditor`` subagent calls this via Bash on a PASS so its confirmed claims
-    accumulate in ``verified/<sid>.jsonl`` exactly as the headless path does through
-    ``_append_verified``. Funneling the write through the dispatcher keeps state
-    writes single-writer and needs no approval (Bash is never gated).
-
-    Stdin payload: ``{session_id, prompt_id, claims: [{claim, evidence}, ...]}``.
-    """
-    project_dir = _project_dir()
-    payload = _read_payload()
-    if payload is None or project_dir is None:
-        return 0
-    session_id = _session_id(payload)
-    if session_id is None:
-        return 0
-    prompt_id = payload.get("prompt_id")
-    prompt_id = prompt_id if isinstance(prompt_id, str) else ""
-    raw_claims = payload.get("claims")
-    if not isinstance(raw_claims, list):
-        return 0
-    # Reuse _append_verified: it keeps only supported claims, so mark each supported.
-    verdict = {
-        "claims": [
-            {"claim": c.get("claim", ""), "evidence": c.get("evidence", ""), "supported": True}
-            for c in raw_claims
-            if isinstance(c, dict) and c.get("claim")
-        ]
-    }
-    _append_verified(project_dir, session_id, prompt_id, verdict)
-    _trace(project_dir, session_id, "record-verified", "recorded",
-           prompt_id=prompt_id, n=len(verdict["claims"]))
-    return 0
-
-
 def _write_turn_slice(project_dir: Path, session_id: str, prompt_id: str,
                       turn: dict[str, Any]) -> Path | None:
     """Write this turn's slice ({user, tools, assistant}) to its ``turn_file``.
 
-    The single slice-writer, shared by subagent-mode Stop (which then dispatches the
-    evidence auditor) and manual-mode Stop (which records it as the pending on-demand target).
+    The single slice-writer, shared by manual-mode Stop (whose slice the on-demand
+    claims auditor) and manual-mode Stop (which records it as the pending on-demand target).
     Internal flags (has_user_command / origin_kind / command_name — all handled before
-    this point) are not part of the evidence auditor's schema, so drop them. Returns the path,
+    this point) are not part of the claims auditor's schema, so drop them. Returns the path,
     or None on a write failure (caller fails open).
     """
     slice_out = {k: v for k, v in turn.items()
@@ -1830,77 +1978,52 @@ def _write_turn_slice(project_dir: Path, session_id: str, prompt_id: str,
     return turn_path
 
 
-def _auditor_dispatch_context(project_dir: Path, session_id: str, prompt_id: str,
-                               turn_path: Path, lead: str,
-                               want_claims: bool = True, want_deferrals: bool = True) -> str:
-    """Build the additionalContext that asks the main agent to dispatch the evidence auditor.
+# The subagent that audits one axis on demand, per axis. Each has its own agent
+# definition because the tool grant lives in that file's frontmatter: the Korean
+# auditor is declared with no tools at all, which the headless path expresses as a
+# missing --allowedTools flag (AXIS_JUDGES) and this path cannot express any other way.
+AXIS_AUDITORS = {
+    "claims": ("guard:claims-auditor", "unsupported claims"),
+    "deferrals": ("guard:deferrals-auditor", "deferrals the repository could resolve"),
+    "korean": ("guard:korean-auditor", "Korean prose that reads as translated English"),
+}
 
-    The dispatch inputs are identical for the subagent-mode Stop auto-dispatch and the
-    on-demand ``/guard:audit-evidence`` path — only the leading sentence (``lead``) differs.
-    The axis switches ride along as an explicit ``axes`` input: the auditor cannot read
-    the config itself, so a disabled axis must be named here or it will audit both.
+
+def _auditor_dispatch_context(project_dir: Path, session_id: str, prompt_id: str,
+                              turn_path: Path, lead: str, axis: str) -> str:
+    """Build the additionalContext asking the main agent to dispatch one axis's auditor.
+
+    One axis per dispatch: each ``/guard:audit-*`` command owns a single axis, so the
+    auditor is told what to audit by WHICH agent is dispatched rather than by an argument
+    it has to be trusted to honor.
+
+    The inputs are deliberately thin. The auditors are read-only and take the turn in
+    whatever shape they are handed, so they need no session/turn identity and no write
+    path — guard supplies the turn slice it already wrote, plus the transcript as a
+    fallback for a truncated tool output, and (for claims) where cited-doc copies live.
     """
-    verified_path = _verified_file(project_dir, session_id).resolve()
-    dispatcher = Path(__file__).resolve()
-    refs_path = _refs_dir(project_dir, _load_config(project_dir))
-    if want_claims and want_deferrals:
-        axes = "both (unsupported claims and unjustified deferrals)"
-        audits = "audits it for unsupported claims and resolvable deferrals"
-    elif want_claims:
-        axes = ("claims only — audit AXIS 1 (unsupported claims) and SKIP AXIS 2; "
-                "report no deferrals")
-        audits = "audits it for unsupported claims only"
-    else:
-        axes = ("deferrals only — audit AXIS 2 (unjustified deferrals) and SKIP AXIS 1; "
-                "report no claims")
-        audits = "audits it for resolvable deferrals only"
+    agent, what = AXIS_AUDITORS[axis]
+    inputs = [f"- turn record: {turn_path.resolve()}"]
+    if axis != "korean":
+        # Only these two ground claims in tool output that guard's slice may truncate.
+        # A pointer, not a path: this context is built on the `/guard:audit-*` turn,
+        # after the Stop payload that carried the transcript path is gone. Naming the
+        # turn id beats persisting a path that may already be stale.
+        inputs.append(f"- turn id (for locating this turn in the session transcript, "
+                      f"if a tool output in the record is truncated): {prompt_id}")
+    if axis == "claims":
+        inputs.append(f"- refs directory: {_refs_dir(project_dir, _load_config(project_dir))}")
+        vf = _verified_file(project_dir, session_id).resolve()
+        if vf.is_file():
+            inputs.append(f"- verified facts: {vf}")
     return (
         lead + " "
-        "Dispatch the evidence auditor subagent with the Agent tool "
-        "(subagent_type: \"guard:evidence-auditor\"), passing it these inputs verbatim:\n"
-        f"- session_id: {session_id}\n"
-        f"- prompt_id: {prompt_id}\n"
-        f"- turn_file: {turn_path.resolve()}\n"
-        f"- verified_file: {verified_path}\n"
-        f"- dispatcher: {dispatcher}\n"
-        f"- refs_dir: {refs_path}\n"
-        f"- axes: {axes}\n"
-        "evidence auditor reads the turn record at turn_file "
-        f"(`{{user, tools[], assistant}}`), {audits}, records the verified facts on a "
-        "pass, and reports any violations back. If it reports violations, address them; "
-        "otherwise continue."
+        f"Dispatch the {agent} subagent with the Agent tool "
+        f"(subagent_type: \"{agent}\"), passing it these inputs verbatim:\n"
+        + "\n".join(inputs) + "\n"
+        f"It audits the turn for {what} and reports back. It writes nothing. If it "
+        "reports violations, address them; otherwise continue."
     )
-
-
-def _stop_subagent(project_dir: Path, session_id: str, state: dict[str, Any],
-                   prompt_id: str, turn: dict[str, Any]) -> int:
-    """Subagent mode Stop: inject a dispatch instruction instead of judging inline.
-
-    guard slices the turn from the transcript itself and writes just that turn to a
-    ``turn_file``; the dispatch names that file, the verified store, and this
-    dispatcher, so the main agent can dispatch the ``guard:evidence-auditor`` subagent without
-    exposing the whole transcript. Guarded to fire once per turn via
-    ``last_audited_prompt_id`` — parity with the headless path judging a turn once.
-    """
-    if state.get("last_audited_prompt_id") == prompt_id:
-        _trace(project_dir, session_id, "stop", "skip_audited", prompt_id=prompt_id)
-        return 0
-
-    turn_path = _write_turn_slice(project_dir, session_id, prompt_id, turn)
-    if turn_path is None:
-        return 0  # fail open
-
-    state["last_audited_prompt_id"] = prompt_id
-    _write_state(project_dir, session_id, state)
-
-    context = _auditor_dispatch_context(
-        project_dir, session_id, prompt_id, turn_path,
-        "guard (subagent mode): audit the turn that just finished before wrapping up.",
-        _audit_claims(state), _audit_deferrals(state))
-    output = {"hookSpecificOutput": {"hookEventName": "Stop", "additionalContext": context}}
-    json.dump(output, sys.stdout)
-    _trace(project_dir, session_id, "stop", "dispatch_evidence auditor", prompt_id=prompt_id)
-    return 0
 
 
 def _stop_manual(project_dir: Path, session_id: str, state: dict[str, Any],
@@ -1908,7 +2031,7 @@ def _stop_manual(project_dir: Path, session_id: str, state: dict[str, Any],
     """Manual mode Stop: record the turn as the pending verify target; do NOT audit.
 
     The turn is already in the session archive; here we persist just its slice and
-    remember its prompt_id so ``/guard:audit-evidence`` can dispatch the evidence auditor for it
+    remember its prompt_id so ``/guard:audit-claims`` can dispatch the claims auditor for it
     without any transcript access. The hook emits nothing and never blocks — the
     approval gate still runs (it is governed by ``edit_gate``, not ``audit_gate``).
     """
@@ -1941,7 +2064,7 @@ def cmd_stop() -> int:
     # otherwise indistinguishable from a typed prompt). It is not the assistant answering
     # a user, so it does not belong in the archive; and in subagent mode auditing it is
     # self-perpetuating (the auditor dispatch is itself a background task whose
-    # completion is another task-notification → evidence auditor re-dispatched ad infinitum,
+    # completion is another task-notification → claims auditor re-dispatched ad infinitum,
     # verified 2.1.197). (older CC / no prompt yet → turn is None; nothing to skip here,
     # the judge path below still fails open on skip_no_prompt_id.)
     prompt_id = payload.get("prompt_id")
@@ -1995,7 +2118,7 @@ def cmd_stop() -> int:
         return 0
 
     # Skip judging a turn opened by guard's own control command (`/guard:settings`,
-    # `/guard:audit-evidence`) or by a user-configured exempt skill/command. Such a turn's
+    # `/guard:audit-claims`) or by a user-configured exempt skill/command. Such a turn's
     # response is a relay or skill output, not a body of technical claims to ground —
     # e.g. relaying "guard on" has no evidence to cite and would be falsely blocked
     # (session b30dbaec). The approval classifier already skips control commands at
@@ -2010,114 +2133,138 @@ def cmd_stop() -> int:
 
     # Both axes off: there is nothing for the judge to report, so run none of the
     # paths — no judge spawn, no dispatch, and no pending target for
-    # `/guard:audit-evidence` to pick up. The approval gate is unaffected.
-    want_claims = _audit_claims(state)
-    want_deferrals = _audit_deferrals(state)
-    if not want_claims and not want_deferrals:
+    # `/guard:audit-claims` to pick up. The approval gate is unaffected.
+    axes = _enabled_axes(state)
+    # No axis enabled: nothing for any judge to report, so run none of them — no spawn,
+    # no dispatch, and no pending target for `/guard:audit-*` to pick up. The approval
+    # gate is unaffected.
+    if not axes:
         _trace(project_dir, session_id, "stop", "skip_axes_off", prompt_id=prompt_id)
         return 0
 
     # Manual mode (default): the hook never audits or blocks at Stop. It records the
-    # turn as the pending on-demand target; the user runs `/guard:audit-evidence` to dispatch
-    # the evidence auditor for it. The approval gate still runs (governed by `edit_gate`).
+    # turn as the pending on-demand target; the user runs one of the per-axis
+    # `/guard:audit-*` commands to audit it. The approval gate still runs (it is
+    # governed by `edit_gate`, not `audit_gate`).
     if state["audit_gate"] == AuditGate.MANUAL:
         return _stop_manual(project_dir, session_id, state, prompt_id, turn)
 
-    # Subagent mode: the hook does not judge or block. It hands the turn off to the
-    # main agent, which dispatches the `evidence-auditor` subagent to audit. We inject the
-    # transcript + prompt_id as additionalContext (docs: a Stop hook may emit
-    # additionalContext WITHOUT `decision`, and the conversation continues so the
-    # agent can act on it).
-    if state["audit_gate"] == AuditGate.SUBAGENT:
-        return _stop_subagent(project_dir, session_id, state, prompt_id, turn)
+    turn["assistant"] = response
 
     # Facts verified in earlier passed turns are reusable evidence: a claim that
-    # matches one need not be re-derived. Provide them as VERIFIED_FACTS context.
+    # matches one need not be re-derived. Only the claims judge can use them.
     verified = _read_verified_facts(project_dir, session_id)
     verified_block = ""
     if verified:
-        lines = [f"- {v['claim']}" + (f"  [evidence: {v['evidence']}]" if v.get("evidence") else "")
-                 for v in verified[-VERIFIED_CONTEXT_MAX:]]
+        lines_v = [f"- {v['claim']}" + (f"  [evidence: {v['evidence']}]" if v.get("evidence") else "")
+                   for v in verified[-VERIFIED_CONTEXT_MAX:]]
         verified_block = (
             "<<<VERIFIED_FACTS (already confirmed earlier this session — treat as "
             "established; a claim consistent with these is supported)\n"
-            + "\n".join(lines) + "\nVERIFIED_FACTS\n\n"
+            + "\n".join(lines_v) + "\nVERIFIED_FACTS\n\n"
         )
 
-    # Judge the whole turn: user request + the commands run this turn and their
-    # output (first-class evidence) + the assistant response.
-    judge_input = (
-        "Audit the assistant's turn below. Treat the commands in TOOL_ACTIVITY and "
-        "their output as first-class evidence for the assistant's claims, alongside "
-        "VERIFIED_FACTS and what you can read from the repository. USER_REQUEST is "
-        "context (e.g. facts the user already confirmed). Return only the JSON "
-        "verdict.\n\n"
-        + verified_block
-        + _render_turn_for_judge(turn)
-    )
-    # The judge prompt names the refs directory (where guard saves
-    # cited-doc copies) so it checks the configured location, not the default.
-    evidence_system = _axis_scoped_system(
-        EVIDENCE_SYSTEM.replace("__REFS_DIR__", _refs_rel(project_dir, config)),
-        want_claims, want_deferrals)
-    verdict = run_judge(project_dir, evidence_system, judge_input, EVIDENCE_SCHEMA, config)
-    if verdict is None:
-        return 0  # fail open
+    rendered = _render_turn_for_judge(turn)
+    refs_rel = _refs_rel(project_dir, config)
+    jobs: list[tuple[str, str, str, dict, str | None]] = []
+    for field in axes:
+        j = AXIS_JUDGES[field]
+        # The Korean axis judges prose alone: it gets the response without the evidence
+        # blocks it cannot use, which is also most of the token saving from the split.
+        if field == "korean":
+            user = ("Audit the assistant's response below on your single axis. Return "
+                    "only the JSON verdict.\n\n<<<ASSISTANT_RESPONSE\n"
+                    + str(turn.get("assistant", "")) + "\nASSISTANT_RESPONSE")
+        else:
+            user = ("Audit the assistant's turn below on your single axis. Treat the "
+                    "commands in TOOL_ACTIVITY and their output as first-class evidence, "
+                    "alongside VERIFIED_FACTS and what you can read from the repository. "
+                    "USER_REQUEST is context (e.g. facts the user already confirmed). "
+                    "Return only the JSON verdict.\n\n" + verified_block + rendered)
+        jobs.append((field, j.system.replace("__REFS_DIR__", refs_rel), user, j.schema, j.tools))
+
+    verdicts = run_judges_parallel(project_dir, jobs, config)
+
+    # Every axis failed: fail open, exactly as the single judge did on a None verdict.
+    if all(v is None for v in verdicts.values()):
+        _trace(project_dir, session_id, "stop", "all_judges_failed", axes=",".join(axes))
+        return 0
+
+    # A judge that did not report is NOT a pass. Name the axis in the block reason so
+    # its silence is never read as a clean result, and never record verified facts for
+    # a turn whose audit was incomplete.
+    missing = [f for f in axes if verdicts.get(f) is None]
 
     _append_log(project_dir, session_id, {
         "role": "judge",
-        "verdict": verdict.get("verdict"),
-        "summary": verdict.get("summary", ""),
-        "claims": verdict.get("claims", []),
-        "deferrals": verdict.get("deferrals", []),
+        "axes": axes,
+        "missing": missing,
+        **{f: (verdicts[f] or {}).get(f, []) for f in axes},
     })
 
-    # Decide blocking from the concrete violation lists, not the model's own
-    # `verdict` field — the judge sometimes returns verdict="block" while every
-    # item is actually fine (e.g. a deferral it correctly marked not-resolvable).
-    # Blocking only on real violations avoids those false positives.
-    # A disabled axis contributes no violations even if the judge reported some: the
-    # axis switches are filtered here, at the one place blocking is decided, so a
-    # prompt that over-reports cannot resurrect an axis the user turned off.
-    unsupported = [c for c in verdict.get("claims", [])
-                   if isinstance(c, dict) and c.get("supported") is False] if want_claims else []
-    resolvable = [d for d in verdict.get("deferrals", [])
-                  if isinstance(d, dict) and d.get("resolvable_from_repo") is True
-                  ] if want_deferrals else []
+    # Violations come from the concrete finding records, not from any judge's own
+    # verdict field — a judge sometimes calls a turn blocked while every item it listed
+    # is actually fine. Each axis has its own predicate (AXIS_JUDGES[...].violates), and
+    # only ENABLED axes are in `axes` at all, so a disabled axis cannot contribute here.
+    found: dict[str, list[dict]] = {}
+    for field in axes:
+        v = verdicts.get(field)
+        if v is None:
+            continue
+        items = v.get(field, [])
+        pred = AXIS_JUDGES[field].violates
+        found[field] = [r for r in items if isinstance(r, dict) and pred(r)]
 
-    if not unsupported and not resolvable:
-        # Passed turn: collect its supported claims as verified facts for reuse.
-        _append_verified(project_dir, session_id, prompt_id, verdict)
-        _trace(project_dir, session_id, "stop", "pass", verdict=verdict.get("verdict"))
+    if not any(found.values()) and not missing:
+        # Passed turn, fully audited: collect its supported claims as verified facts.
+        cv = verdicts.get("claims")
+        if cv is not None:
+            _append_verified(project_dir, session_id, prompt_id, cv)
+        _trace(project_dir, session_id, "stop", "pass", axes=",".join(axes))
         return 0
 
     sections: list[str] = []
-    if unsupported:
-        lines = [f"- {c.get('claim', '').strip()}" for c in unsupported[:6] if c.get("claim")]
+    if found.get("claims"):
+        lines_c = [f"- {c.get('claim', '').strip()}" for c in found["claims"][:6] if c.get("claim")]
         sections.append(
             "Claims stated as fact without adequate evidence — ground each "
             "(cite file:line, a command's output, a named doc/spec, or a measurement) "
-            "or explicitly mark it as an unverified assumption:\n" + "\n".join(lines)
+            "or explicitly mark it as an unverified assumption:\n" + "\n".join(lines_c)
         )
-    if resolvable:
-        lines = []
-        for d in resolvable[:6]:
+    if found.get("deferrals"):
+        lines_d = []
+        for d in found["deferrals"][:6]:
             item = d.get("item", "").strip()
             how = d.get("how_to_resolve", "").strip()
-            lines.append(f"- {item}" + (f" — resolve by: {how}" if how else ""))
+            lines_d.append(f"- {item}" + (f" — resolve by: {how}" if how else ""))
         sections.append(
             "Questions you deferred that the repository can answer — do NOT punt "
             "these as 'open question', 'TBD', 'deferred', or 'needs investigation'. "
-            "Read the code and resolve them now:\n" + "\n".join(lines)
+            "Read the code and resolve them now:\n" + "\n".join(lines_d)
+        )
+    if found.get("korean"):
+        lines_k = []
+        for k in found["korean"][:6]:
+            phrase = k.get("phrase", "").strip()
+            fix = k.get("suggestion", "").strip()
+            lines_k.append(f"- {phrase}" + (f" → {fix}" if fix else ""))
+        sections.append(
+            "Korean phrasing that reads as translated rather than written. Rewrite "
+            "these the way a Korean developer would say them, then finish (leave code, "
+            "identifiers, paths, and established loanwords as they are):\n" + "\n".join(lines_k)
+        )
+    if missing:
+        sections.append(
+            "guard could not audit these axes this turn (the judge failed or timed "
+            "out), so treat them as UNCHECKED rather than clean: " + ", ".join(missing)
         )
     if not sections:
-        sections.append("(see the judge's claims/deferrals in the log)")
+        return 0
 
     reason = "guard: finish the work before stopping.\n\n" + "\n\n".join(sections)
-    output = {"decision": "block", "reason": reason}
-    json.dump(output, sys.stdout)
+    json.dump({"decision": "block", "reason": reason}, sys.stdout)
     _trace(project_dir, session_id, "stop", "block",
-           claims=len(unsupported), deferrals=len(resolvable))
+           **{f: len(found.get(f, [])) for f in axes}, missing=",".join(missing))
     return 0
 
 
@@ -2147,7 +2294,7 @@ def cmd_session_start() -> int:
                     entry.unlink()
             except OSError:
                 pass
-    # turns/ holds one dir per session of evidence auditor turn-slice files; sweep stale dirs.
+    # turns/ holds one dir per session of claims auditor turn-slice files; sweep stale dirs.
     turns_root = root / "turns"
     if turns_root.is_dir():
         try:
@@ -2443,6 +2590,7 @@ def _config_show_lines(project_dir: Path, session_id: str | None) -> list[str]:
 
     claims_line = axis_line("audit_claims", _audit_claims)
     deferrals_line = axis_line("audit_deferrals", _audit_deferrals)
+    korean_line = axis_line("audit_korean", _audit_korean)
 
     exempt = _exempt_skills(cfg)
     refs_rel = raw.get("refs_dir") if isinstance(raw.get("refs_dir"), str) else ""
@@ -2457,6 +2605,7 @@ def _config_show_lines(project_dir: Path, session_id: str | None) -> list[str]:
         judge_line,
         claims_line,
         deferrals_line,
+        korean_line,
         "exempt_skills: " + (", ".join(sorted(exempt)) if exempt else "(none)"),
         "refs_dir: " + (refs_rel if refs_rel else "(default wiki/ref/)"),
         "writable_dirs: " + (", ".join(wdirs) if wdirs else "(none)"),
@@ -2471,7 +2620,7 @@ def cmd_settings() -> int:
 
     Settable keys: ``edit_gate`` (ask|deny|off — the approval gate; ``off`` disables it,
     ``ask``/``deny`` pick how an unapproved edit is stopped), ``audit_gate``
-    (manual|subagent|headless — the evidence judge), ``model``,
+    (manual|headless — the evidence judge), ``model``,
     ``effort`` (low|medium|high|xhigh|max), ``refs_dir``.
     ``edit_gate`` and ``audit_gate``
     also apply to the live session's ``state/<sid>.json`` when a session id is available
@@ -2527,7 +2676,7 @@ def cmd_settings() -> int:
             return 0
         raw["audit_gate"] = v.value
         _apply_session_scalar(project_dir, session_id, "audit_gate", v.value)
-    elif key in ("audit_claims", "audit_deferrals"):
+    elif key in ("audit_claims", "audit_deferrals", "audit_korean"):
         v = _parse_bool(value)
         if v is None:
             print(f"guard settings: {key} must be one of "
@@ -2551,7 +2700,8 @@ def cmd_settings() -> int:
         raw["refs_dir"] = value  # "" resets to the default; _refs_dir validates at use
     else:
         print(f"guard settings: unknown or unsettable key {key!r}. Settable: edit_gate, "
-              "audit_gate, audit_claims, audit_deferrals, model, effort, refs_dir "
+              "audit_gate, audit_claims, audit_deferrals, audit_korean, model, effort, "
+              "refs_dir "
               "(exempt_skills via the exempt CLI, writable_dirs via the writable CLI).",
               file=sys.stderr)
         return 0
@@ -2569,7 +2719,7 @@ def cmd_settings() -> int:
 def cmd_refs_dir() -> int:
     """Print the resolved refs directory (absolute), applying `refs_dir` validation.
 
-    The single query point for "where do cited-doc copies go": the evidence auditor falls
+    The single query point for "where do cited-doc copies go": the claims auditor falls
     back to it when its dispatch omits `refs_dir`, and anything with the script
     path can use it instead of re-implementing _refs_dir's fallback rules.
     """
@@ -2651,7 +2801,6 @@ SUBCOMMANDS = {
     "settings": cmd_settings,
     "gate": cmd_gate,
     "gate-approved": cmd_gate_approved,
-    "record-verified": cmd_record_verified,
     "stop": cmd_stop,
     "session-start": cmd_session_start,
     "exempt": cmd_exempt,

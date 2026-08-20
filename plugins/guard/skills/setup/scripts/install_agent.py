@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Install guard's project-local Codex evidence auditor agent."""
+"""Install guard's project-local Codex claims auditor agent."""
 
 from __future__ import annotations
 
@@ -17,15 +17,15 @@ def main() -> int:
     project = Path(args.project).expanduser().resolve()
     if not project.is_dir():
         parser.error(f"project is not a directory: {project}")
-    template = Path(__file__).resolve().parents[1] / "templates" / "evidence-auditor.toml"
-    target = project / ".codex" / "agents" / "guard_evidence_auditor.toml"
+    template = Path(__file__).resolve().parents[1] / "templates" / "claims-auditor.toml"
+    target = project / ".codex" / "agents" / "guard_claims_auditor.toml"
     if target.exists() and not args.force:
         print(f"left existing agent unchanged: {target}")
         return 0
 
     target.parent.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(template, target)
-    print(f"installed guard evidence auditor: {target}")
+    print(f"installed guard claims auditor: {target}")
     return 0
 
 

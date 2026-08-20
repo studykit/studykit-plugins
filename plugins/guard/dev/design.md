@@ -10,17 +10,16 @@ line-by-line walkthrough.
 
 | Event | Subcommand | Role |
 | --- | --- | --- |
-| `UserPromptSubmit` | `user-prompt` | Update approval state. Ignores `/guard:settings` / `/guard:audit-evidence`. |
-| `UserPromptExpansion` (matcher `^(guard:)?audit-evidence$`) | `verify` | On demand, dispatch the evidence auditor for the last completed turn (`pending_verify_prompt_id`). |
+| `UserPromptSubmit` | `user-prompt` | Update approval state. Ignores `/guard:settings` / `/guard:audit-{claims,deferrals,korean}`. |
+| `UserPromptExpansion` (matcher `^(guard:)?audit-<axis>$`, one per axis) | `verify <axis>` | On demand, dispatch **that axis's** auditor for the last completed turn (`pending_verify_prompt_id`). The axis rides in argv, not in a dispatch input the auditor has to be trusted to honor. |
 | `PreToolUse` (`Write\|Edit\|MultiEdit\|NotebookEdit`) | `gate` | Stop unapproved file edits — `ask` (default) escalates to the permission prompt, `deny` blocks the call (`edit_gate`). |
 | `PostToolUse` (matcher `ExitPlanMode`) | `plan-approved` | On plan approval, arm the gate when the plan defers no in-scope work. |
 | `PostToolUse` (`Write\|Edit\|MultiEdit\|NotebookEdit`) | `gate-approved` | `edit_gate` ask only: after the user approves an edit's permission prompt, arm the session for the rest of the task. |
 | `PostToolUse` (`Write\|Edit\|MultiEdit\|NotebookEdit`) | `refs-index` | Block when a file saved in the refs dir is not listed in that dir's `AGENTS.md`. |
-| (called via Bash, not a hook) | `record-verified` | Evidence auditor appends a passed turn's claims to the verified store. |
-| (called via Bash, not a hook) | `settings` | `guard:settings` skill (forked) shows/sets guard.local.json settings; `edit_gate`/`audit_gate`/`audit_claims`/`audit_deferrals` also apply to the live session's `state/<sid>.json` (session id from `--session`/`CLAUDE_CODE_SESSION_ID`). Every other key preserved; never the list keys (`exempt_skills`, `writable_dirs`). |
+| (called via Bash, not a hook) | `settings` | `guard:settings` skill (forked) shows/sets guard.local.json settings; `edit_gate`/`audit_gate`/`audit_claims`/`audit_deferrals`/`audit_korean` also apply to the live session's `state/<sid>.json` (session id from `--session`/`CLAUDE_CODE_SESSION_ID`). Every other key preserved; never the list keys (`exempt_skills`, `writable_dirs`). |
 | (called via Bash, not a hook) | `exempt` | `guard:settings` skill records the user's confirmed `exempt_skills` selection (that key only). |
 | (called via Bash, not a hook) | `writable` | `guard:settings` skill records the user's confirmed `writable_dirs` selection (that key only); rejects unusable values at set time. |
-| `Stop` | `stop` | manual: record pending target, no audit. subagent: dispatch evidence auditor. headless: in-hook judge that blocks. |
+| `Stop` | `stop` | manual: record pending target, no audit. headless: one in-hook judge **per enabled axis**, spawned in parallel; blocks on any axis's violation. |
 | `SessionStart` | `session-start` | Age-sweep state/sessions/verified/turns; inject the per-project refs directory the style cannot hardcode. |
 | (called via Bash, not a hook) | `refs-dir` | Print the resolved refs directory (auditor fallback; applies `refs_dir` validation). |
 
@@ -33,16 +32,22 @@ Stop it reconstructs the turn from Claude Code's transcript, sliced by `prompt_i
   keyed on `prompt_id` that keep each once-only action once-only (audited, gated, asked,
   pending verify, marks reported). `_read_state` honors only known keys, so a
   hand-edited or stale file degrades to defaults instead of injecting state.
-- `sessions/<sid>.jsonl` — full session archive, one line per user/assistant/gate/judge record.
-- `turns/<sid>/<prompt_id>.json` — **subagent and manual modes**: the turn slice guard
-  cut from the transcript (`{user, tools[], assistant}`) and hands to the `evidence-auditor`
-  subagent, so the auditor reads one turn, not the whole transcript. Subagent mode dispatches
-  immediately; manual mode leaves it for `/guard:audit-evidence` (targeting
-  `pending_verify_prompt_id`). Headless mode judges in-process and writes no turn file.
-- `verified/<sid>.jsonl` — supported claims from PASSED turns only (`{ts, turn, claim,
-  evidence}`, `turn` = prompt_id), replayed to later Stops as a VERIFIED_FACTS block
-  so an established fact isn't re-derived. Only passed turns contribute, so a
-  blocked/unsupported claim never becomes "verified".
+- `sessions/<sid>.jsonl` — full session archive, one line per user/assistant/gate/judge
+  record. A judge record carries `axes` (what ran) and `missing` (what failed) alongside
+  the per-axis findings, so a partial audit is legible after the fact and not mistaken
+  for an axis that found nothing.
+- `turns/<sid>/<prompt_id>.json` — **manual mode only**: the turn slice guard cut from
+  the transcript (`{user, tools[], assistant}`) and hands to whichever axis auditor is
+  dispatched, so the auditor reads one turn, not the whole transcript. Manual-mode Stop
+  writes it and records `pending_verify_prompt_id`; the per-axis `/guard:audit-*`
+  commands read it back. Headless mode judges in-process and writes no turn file.
+- `verified/<sid>.jsonl` — supported claims from FULLY-AUDITED PASSED turns only (`{ts,
+  turn, claim, evidence}`, `turn` = prompt_id), replayed to later Stops as a
+  VERIFIED_FACTS block so an established fact isn't re-derived. Only passed turns
+  contribute, so a blocked/unsupported claim never becomes "verified" — and a turn with
+  a *missing* axis (a judge that failed) contributes nothing either, even when every
+  axis that did report was clean: a partially-audited turn is not evidence that the
+  claim survived the audit.
 - `trace.log` — file-only debug trace (`GUARD_TRACE` truthy).
 
 State survives session end (a resumed `claude --resume` must keep its flags);
@@ -72,15 +77,17 @@ payloads, not memory.
   are skipped. `_read_turn_from_transcript(path, prompt_id)` is unit-testable on a
   fixture JSONL.
 - **A background-agent completion opens its own transcript turn** (`origin.kind ==
-  "task-notification"`, `promptSource: "system"`, NOT `isMeta`; verified 2.1.197). In
-  subagent mode this would loop — the auditor dispatch is itself a background task, so
-  its completion re-dispatches it. `cmd_stop` skips these
+  "task-notification"`, `promptSource: "system"`, NOT `isMeta`; verified 2.1.197). An
+  auditor dispatch is itself a background task, so auditing its completion would
+  re-dispatch it — the loop no auto-dispatch mode exists to hit any more, but the skip
+  still guards the on-demand path and the Codex adapter. `cmd_stop` skips these
   (`skip_task_notification`) from BOTH archive and judge. Ordering that must not
   regress: the skip precedes `_append_log`, and `_append_log` stays ahead of the
   `stop_hook_active` check (so a corrected response after a headless block is still
   archived).
 - **A Stop hook may inject `additionalContext` without `decision`** and the
-  conversation continues — the subagent-dispatch mechanism. `stop_hook_active: true`
+  conversation continues — the auditor-dispatch mechanism, still used by the Codex
+  adapter and by `UserPromptExpansion` on the Claude side. `stop_hook_active: true`
   ⇒ guard already blocked this turn, so Stop returns at once.
 - **`PostToolUse(ExitPlanMode)` fires only on plan approval.** Verified against live
   payloads (probe on Claude Code 2.1.x): approving a plan fires BOTH `PreToolUse` and
@@ -138,12 +145,12 @@ payloads, not memory.
   (`if explicit: approved=True elif starts_unrelated_task: approved=False`).
 - **Two independent settings.** Session `edit_gate` governs ONLY the approval gate
   (gate + classifier + plan-approval early-return when `off`); the evidence judge has no
-  setting of its own — `audit_gate` is its control, and `manual` is its practical off
-  (Stop archives the turn and records the pending target, but spawns no judge).
-  `/guard:settings` sets `edit_gate` and `audit_gate` (writing the config key and, with a
-  session id, the live session state). Neither setting touches the other's feature.
-- **Control turns and exempt commands are never judged.** `/guard:settings` and
-  `/guard:audit-evidence` are skipped on BOTH sides: the approval classifier skips them at
+  setting of its own — `audit_gate` is its control, and `manual` (the default) is its
+  practical off (Stop archives the turn and records the pending target, but spawns no
+  judge). `/guard:settings` sets `edit_gate` and `audit_gate` (writing the config key and,
+  with a session id, the live session state). Neither setting touches the other's feature.
+- **Control turns and exempt commands are never judged.** `/guard:settings` and all three
+  `/guard:audit-{claims,deferrals,korean}` commands are skipped on BOTH sides: the approval classifier skips them at
   UserPromptSubmit (`_CONTROL_CMD_RE` on the raw prompt), and `cmd_stop` skips them via
   `command_name` (extracted from the transcript's expanded
   `<command-name>/guard:settings</command-name>`). This second skip is load-bearing — a
@@ -153,7 +160,10 @@ payloads, not memory.
   `exempt_skills` — named with its plugin namespace (`plugin:skill`), since a
   user-invoked skill reaches the transcript as a namespaced `<command-name>` just like
   a command (skill output is not a body of technical claims to ground). Both modes
-  honor it (checked before the `audit_gate` branch).
+  honor it (checked before the `audit_gate` branch). `audit-comment` is deliberately NOT
+  in `_CONTROL_CMD_RE` — that skill relays findings about real files, so its turn stays
+  auditable — and the regex's `(?=\s|$)` is what keeps `audit-claims` from matching a
+  bare `/audit`.
 - **Mark resolution is the judge's call, not a mechanical gate.** guard once ran a
   deterministic Stop-time check on reference marks (dangling mark, unused entry, mixed
   syntax, non-numeric footnote id) and blocked on it in every `audit_gate` mode. It was
@@ -184,47 +194,108 @@ payloads, not memory.
   official docs a subagent runs its own system prompt, which is why
   `agents/simple-explainer.md` carries its own copy of the explain-clearly rules rather
   than inheriting them.
-- **Renamed from `evidence_gate`, with no fallback.** The old key is ignored outright: a
-  config still carrying it silently gets the `audit_gate` default (`manual`). Deliberate —
-  guard is pre-1.0 and read-compat for one renamed key is not worth a permanent branch in
-  `_load_config`. The cost is real and accepted: a project that had set `headless` drops to
-  `manual` on upgrade without a warning, so the rename must be called out in the release
-  notes rather than absorbed by the code.
+- **Renamed keys and dropped modes get no fallback.** `evidence_gate` → `audit_gate` is
+  ignored outright (a config still carrying the old key silently gets the `audit_gate`
+  default), and the dropped `subagent` mode behaves the same way: `"audit_gate":
+  "subagent"` passes `_load_config`'s type check as a string but fails `_audit_gate`'s
+  enum coercion, so it lands on `manual`. Deliberate — guard is pre-1.0 and read-compat
+  for renamed keys and retired enum members is not worth a permanent branch in
+  `_load_config`. The cost is real and accepted: a project that had set `subagent` loses
+  its Stop-time auditing entirely on upgrade, with no warning, so this belongs in the
+  release notes rather than in migration code.
 - **Mode and criteria are separate settings.** `audit_gate` picks *how/when* the audit
-  runs; `audit_claims` / `audit_deferrals` pick *which axis* it looks for. Split because
-  the two axes fail differently — a project that wants its claims grounded may still want
-  to defer work openly, and forcing one setting to carry both meant turning off the whole
-  judge to escape either. The axis filter is applied at the single place blocking is
-  decided (the `unsupported`/`resolvable` comprehensions in `cmd_stop`), so a judge that
-  over-reports cannot resurrect a disabled axis; the prompts are narrowed too
-  (`_axis_scoped_system` for headless, the `axes` dispatch input for the auditor) only so
-  a disabled axis costs no repo reads. **Both off skips the audit outright** in every
-  mode — no judge spawn, no dispatch, and manual mode records no pending target — since a
-  run that can report nothing is pure cost. The approval gate is untouched by either
-  switch.
-- **Three modes, one criteria.** `audit_gate` selects only *how/when* the Stop audit runs —
-  `manual` (default; no auto-audit, `/guard:audit-evidence` dispatches on demand), `subagent`
-  (dispatch evidence auditor each turn), or `headless` (in-hook judge that blocks). The two-axis
-  criteria are identical across all three, and `evidence-auditor.md` mirrors them in prose. Bad
-  `audit_gate` → the default (`manual`, via `_audit_gate`). `cmd_settings` sets it (the config
-  key and, with a session id, the live session state).
-  The approval gate is independent of `audit_gate` (governed by `edit_gate`), so `manual`
-  narrows auto-verification without weakening the gate.
-- **Manual mode + on-demand verify.** manual-mode Stop archives the turn, writes its
-  slice (shared `_write_turn_slice`), and records `pending_verify_prompt_id` — then emits
-  nothing. `/guard:audit-evidence` (`cmd_verify`, UserPromptExpansion) reads that pending target's
-  slice off disk and emits the same auditor-dispatch context as subagent Stop
-  (`_auditor_dispatch_context`), so it needs no transcript access. `/guard:audit-evidence` is a
-  control command (in `_CONTROL_CMD_RE`), so its own turn is skipped and never becomes the
-  pending target.
-- **Judge once per turn.** headless relies on the payload's `stop_hook_active`;
-  subagent (which never blocks, so that flag won't be set on the next Stop) instead
-  guards on `last_audited_prompt_id == prompt_id`. manual writes no dispatch, so it needs
-  no once-guard.
-- **Verified facts flow forward through a single writer.** Both modes append via the
-  dispatcher (`record-verified` for the auditor, direct for headless) — never a parallel
-  writer. This is the one intentional break from per-turn isolation, and only passed,
-  evidence-backed claims cross the boundary, never raw prior-turn text.
+  runs; `audit_claims` / `audit_deferrals` / `audit_korean` pick *which axes* run. Split
+  because the axes fail differently — a project that wants its claims grounded
+  may still want to defer work openly, and forcing one setting to carry both meant turning
+  off the whole judge to escape either. `audit_korean` (axis 3, natural Korean vs 번역체)
+  defaults **off**, unlike the other two: it reports nothing on an English response, so an
+  English-only project should not pay a judge spawn for it. It is governed by `audit_gate`
+  with the others — it audits the finished turn, so *how/when* is the same one question.
+  Since headless spawns one judge per axis, a disabled axis is simply never spawned;
+  there is no prompt-level "this axis is off" note any more, and nothing for an
+  over-reporting judge to resurrect (an axis absent from `_enabled_axes` has no verdict
+  to read). The axis filter still lands at the single place blocking is decided (the
+  per-axis `violates` predicates in `cmd_stop`). **All axes off skips the audit
+  outright** in every mode — no judge spawn, no dispatch, and manual mode records no
+  pending target — since a run that can report nothing is pure cost. The approval gate is
+  untouched by any of the switches. An axis switched off is nonetheless auditable *on
+  demand*: the switch governs the automatic Stop-time audit, and refusing the command
+  would leave no way to check the very axis a project keeps off by default.
+- **Two modes, one set of criteria.** `manual` (default; no auto-audit — the per-axis
+  `/guard:audit-*` commands dispatch on demand) or `headless` (in-hook judges that block).
+  The criteria are identical across both, and each auditor agent definition mirrors its
+  axis's judge prompt in prose — when one changes, the other has to. Bad `audit_gate` →
+  the default (`manual`, via `_audit_gate`). The approval gate is independent of
+  `audit_gate` (governed by `edit_gate`), so `manual` narrows auto-verification without
+  weakening the gate.
+- **Headless fans out: one judge per enabled axis, spawned in parallel.**
+  `run_judges_parallel` `Popen`s every enabled axis at once and collects them. The win is
+  measured, not assumed, and comes from the **per-axis tool budget** rather than from the
+  concurrency alone: claims gets `Read,Grep,Glob,Bash`, deferrals `Read,Grep,Glob`, and
+  korean **no `--allowedTools` flag at all** — an axis that judges prose cannot use the
+  repository, and withholding it takes that judge from ~30s (any repo-reading judge) to
+  ~5-13s. A full three-axis fan-out measured 21.7s wall clock against 29-41s for the old
+  single combined judge. The timeout is a **group** deadline, not per child: they run
+  concurrently, so the wall clock is the slowest one, and giving each its own full
+  `JUDGE_TIMEOUT_SECONDS` would let a slow set outlive the Stop hook's own timeout and be
+  killed mid-write. The **axis text is copied verbatim into each judge and must not be
+  trimmed for the split** — a shortened Korean prompt was measured demanding that
+  `prompt_id`, 커밋, 리팩토링 and `git rebase` be translated, so the loanword and
+  identifier carve-outs are load-bearing, not padding. The user prompt is split the same
+  way: the Korean judge gets the response text alone, with neither TOOL_ACTIVITY nor
+  VERIFIED_FACTS, since it cannot use evidence it is not judging against — which is most
+  of the token saving. `AXIS_JUDGES` is the one table holding each axis's
+  field/system/schema/tools/predicate/label, so adding an axis does not mean touching the
+  fan-out. The single-child `run_judge` is NOT dead code: the approval classifier and the
+  plan-defer judge each run exactly one judge on a blocking path where there is nothing to
+  fan out, so they keep the simpler `subprocess.run` shape.
+- **A judge that did not report is UNCHECKED, never a pass.** With N children some can
+  fail while others answer, so silence needs its own meaning: **all** failed → fail open
+  (return 0, exactly as the single judge did on a `None` verdict); **some** failed → block
+  on whatever the reporting axes found *and* name the failed axes in the reason as
+  "UNCHECKED rather than clean". Verified facts are recorded only on a pass that was
+  **fully** audited (no violations *and* no missing axes) — folding a partial audit into
+  the verified store would launder an unexamined claim into an established fact.
+- **Manual mode + on-demand verify, per axis.** manual-mode Stop archives the turn, writes
+  its slice (shared `_write_turn_slice`), and records `pending_verify_prompt_id` — then
+  emits nothing. Each `/guard:audit-<axis>` command has its own `UserPromptExpansion`
+  matcher and passes its axis to `cmd_verify` in argv; `_auditor_dispatch_context` takes
+  that one `axis` and dispatches exactly one agent from `AXIS_AUDITORS`. One axis per
+  dispatch is the point: the auditor learns what to audit from *which agent was
+  dispatched*, not from an `axes` argument it has to be trusted to honor. It reads the
+  pending slice off disk, so it needs no transcript access. `verified_file` / `dispatcher`
+  / `refs_dir` go to the **claims** auditor only — it is the sole writer of verified
+  facts, and the other two axes produce nothing reusable. All three commands are in
+  `_CONTROL_CMD_RE`, so their own turns are skipped and never become the pending target.
+- **The auditor agents cannot express "no tools"; the headless judges can.** The Korean
+  axis needs zero repository access, and headless says so by omitting `--allowedTools`
+  entirely. `agents/korean-auditor.md` cannot: per the official agent docs, omitting
+  `tools` inherits *every* tool, and an empty/unresolvable list makes Claude Code refuse
+  to launch the subagent — so it is declared `tools: Read`, the smallest set that still
+  lets it read its `turn_file`. The asymmetry is a platform limit, not an oversight; do
+  not "fix" it by emptying the frontmatter.
+- **Judge once per turn.** headless relies on the payload's `stop_hook_active`. manual
+  writes no dispatch, so it needs no once-guard; `last_audited_prompt_id` survives in the
+  state schema for the Codex adapter, whose non-blocking dispatch cannot rely on that
+  flag.
+- **Verified facts belong to the headless path alone.** `cmd_stop` is both the only
+  writer (`_append_verified`) and the only reader (`_read_verified_facts`), so the store
+  needs no cross-process writer and the auditors are strictly read-only. The
+  `record-verified` subcommand that let an auditor subagent write was deleted with
+  `subagent` mode: the cache exists to spare an EVERY-TURN judge from re-deriving a
+  claim, and the only every-turn path now maintains it inline. An on-demand audit has
+  nothing to add — under `manual` nothing reads the store, and under `headless` the
+  judge already wrote it. Only passed, evidence-backed claims cross a turn boundary,
+  never raw prior-turn text.
+- **The Codex side was deliberately left on the old shape.** `hooks/hooks.codex.json`,
+  `hooks/scripts/hook_codex.py`, and `skills/setup/` still block-and-dispatch a SINGLE
+  `guard_claims_auditor` covering every enabled axis, with the axis list carried as
+  dispatch text and the once-guard on `last_audited_prompt_id`. That is intentional, not
+  drift: the fan-out is built on `claude -p` subprocesses and per-agent tool grants that
+  have no Codex equivalent yet, and Codex will get its own migration. The adapter survived
+  the refactor because the only judge-side names it reaches into are `AuditGate.MANUAL`
+  and `core._AXIS_FIELDS` (plus the axis accessors and the shared state/config helpers) —
+  none of the fan-out. Keep those stable, and do not "unify" the Codex path by accident.
 - **Assistant tool output is first-class evidence** (rendered as TOOL_ACTIVITY) — a
   claim that restates or follows from a command's output there is supported without a
   re-cite. **User-run `!` commands are NOT evidence and their turn is not judged.** A
@@ -306,12 +377,19 @@ Parsed by `_load_config`; fail-open to defaults. Both gate fields are `enum.StrE
 members (`EditGate`, `AuditGate`) — the reason guard requires Python 3.11+ (`StrEnum`
 "Added in version 3.11": https://docs.python.org/3/library/enum.html, excerpt saved at
 `wiki/ref/python-strenum.md`). Keys: `model`
-(default `"haiku"`), `effort` (low/medium/high/xhigh/max, default `"medium"`), `edit_gate`
+(default `"haiku"`), `effort` (low/medium/high/xhigh/max, default `"medium"` — the
+reasoning effort of the HEADLESS judges only; an auditor subagent's model/effort come from
+its own agent frontmatter), `edit_gate`
 (`"ask"`|`"deny"`|`"off"`, default `"ask"` — the approval gate: `off` disables it, `ask`
 escalates an unapproved edit to the permission prompt and arms the session on approval,
 `deny` blocks the call for the plan→approve workflow), `audit_gate`
-(`"manual"`|`"subagent"`|`"headless"`, default
-`"manual"` — the evidence judge's control; `manual` is its practical off), `exempt_skills`
+(`"manual"`|`"headless"`, default
+`"manual"` — the evidence judge's control; `manual` is its practical off, and a stale
+`"subagent"` falls through the enum coercion to it), `audit_claims` / `audit_deferrals`
+(booleans, default `true`) and `audit_korean` (boolean, default **`false`** — see the
+axis invariant for why this one is opt-in), the three axis switches; all axes off skips
+the audit outright. Non-bool values fall back to the default rather than to Python
+truthiness, so a stringy `"false"` cannot silently disable an axis. `exempt_skills`
 (list of strings, default `[]`) — skills / slash commands whose turn the Stop judge
 skips, named with their plugin namespace (`plugin:skill`, e.g. `guard:settings`) or bare
 for un-namespaced skills, matched leading-`/`-stripped and case-insensitively (guard's
@@ -331,7 +409,9 @@ copies; empty = the git-tracked default `wiki/ref/` (references committed with t
 repo), a different tracked path (e.g. `"docs/refs"`) overrides it; commits stay in the
 user's normal workflow (guard never commits). `_refs_dir` validates the value (see the refs
 exemption above) and everything that names the location follows it: the gate
-exemption, the headless judge prompt (`__REFS_DIR__` substitution), the evidence auditor
+exemption, the headless claims judge's prompt (`__REFS_DIR__` substitution — the
+substitution is applied to every axis's system prompt, but only the claims axis carries
+the token), the claims auditor's
 dispatch inputs (`refs_dir`, with the `refs-dir` CLI subcommand as its fallback), and
 and the SessionStart context line, which states the refs rule to the agent and names the
 resolved path (also exported as `GUARD_REFS_DIR` via `$CLAUDE_ENV_FILE`, per the official
@@ -342,10 +422,11 @@ reference-mark syntax: both judge paths are told to check that a mark *resolves*
 to grade its form. Only keys whose value matches the
 default's type are honored (a malformed value can't flip a flag); unknown keys ignored;
 missing/malformed file → all defaults. `guard.local.json.example`
-ships at the plugin root. The judge always reads the repo (`--allowedTools
-Read,Grep,Glob,Bash`, no `--disallowedTools` — room to extend, e.g. a verification
-artifact); isolation comes from `--safe-mode` + `--no-session-persistence`, not from
-withholding tools.
+ships at the plugin root. Judge tools are per axis, not global (`AXIS_JUDGES`; no
+`--disallowedTools` — room to extend, e.g. a verification artifact), and the Korean axis
+gets none; **isolation is `--safe-mode` + `--no-session-persistence`, never the tool
+list** — withholding tools from the Korean axis is a speed decision, and must not be
+mistaken for the sandbox.
 
 ## Manual testing
 
@@ -375,9 +456,33 @@ printf '%s\n' \
 # export it once for the recipe. Read verbs (`show`, `list`) need nothing.
 export GUARD_SETTINGS_SKILL=1
 
-# headless judge on the turn (real claude; unsupported claim -> block)
+# headless fan-out (real claude, one child per enabled axis). Two axes by default;
+# switch the third on to spawn all three. `time` it — the wall clock should stay near
+# the SLOWEST axis, not their sum (that is the whole point of the parallel spawn), and
+# the trace shows one judge line per axis.
 "$H" settings set audit_gate headless --session s1
-echo "{\"session_id\":\"s1\",\"prompt_id\":\"p1\",\"transcript_path\":\"$T\",\"last_assistant_message\":\"Redis is always faster than Postgres.\",\"stop_hook_active\":false}" | "$H" stop
+"$H" settings set audit_korean on --session s1
+S="{\"session_id\":\"s1\",\"prompt_id\":\"p1\",\"transcript_path\":\"$T\",\"last_assistant_message\":\"Redis is always faster than Postgres.\",\"stop_hook_active\":false}"
+time (echo "$S" | "$H" stop)          # unsupported claim -> block; korean axis self-skips (English)
+
+# A missing axis must be reported UNCHECKED, not folded into a pass. Every axis failing
+# is the fail-open case: shim a `claude` that always exits nonzero, PREPENDED to PATH
+# (do not replace PATH — this script's own shebang still needs python3 ≥ 3.11).
+D=$(mktemp -d); printf '#!/bin/sh\nexit 1\n' > "$D/claude"; chmod +x "$D/claude"
+(PATH="$D:$PATH"; echo "$S" | "$H" stop)   # -> empty; trace: one nonzero_exit per axis + all_judges_failed
+# A PARTIAL failure has to be provoked per axis (e.g. shrink JUDGE_TIMEOUT_SECONDS so the
+# repo-reading axes time out while korean still answers). The block reason must then name
+# the timed-out axes as "UNCHECKED rather than clean", and verified/<sid>.jsonl must gain
+# nothing even when every axis that did report was clean.
+
+# Per-axis helper for the cases below.
+ax(){ for k in claims deferrals korean; do
+        case " $* " in *" $k "*) v=on;; *) v=off;; esac
+        "$H" settings set "audit_$k" "$v" --session s1 >/dev/null; done; }
+
+ax korean; time (echo "$S" | "$H" stop)  # korean alone: no --allowedTools, so seconds not ~30s
+ax;        echo "$S" | "$H" stop          # every axis off -> empty; trace: skip_axes_off
+ax claims deferrals                       # back to the defaults
 
 # gate, default edit_gate "ask": emits permissionDecision "ask" + records asked_prompt_id.
 # The matching PostToolUse (user approved the prompt) arms the session's approval.
@@ -388,9 +493,16 @@ echo '{"session_id":"s1","prompt_id":"pA","tool_name":"Write","tool_input":{"fil
 printf '{"edit_gate":"deny"}\n' > "$CLAUDE_PROJECT_DIR/.claude/guard.local.json"
 echo '{"session_id":"s2","prompt_id":"pG","tool_name":"Write","tool_input":{"file_path":"x"}}' | "$H" gate
 
-# subagent mode: Stop slices the turn to a file + injects a dispatch (no `decision`)
-"$H" settings set audit_gate subagent --session s1
-echo '{"session_id":"s1","prompt_id":"p1","claims":[{"claim":"x","evidence":"y"}]}' | "$H" record-verified
+# manual mode (default): Stop only slices the turn to a file + records the pending
+# target; it emits nothing. Then each /guard:audit-<axis> expansion dispatches exactly
+# one auditor for it — deterministic (no `claude`), so it is the cheapest way to check
+# the per-axis dispatch text and that only `claims` receives verified_file/dispatcher.
+"$H" settings set audit_gate manual --session s1
+echo "$S" | "$H" stop                  # -> empty; writes turns/s1/p1.json
+for ax in claims deferrals korean; do
+  echo '{"session_id":"s1"}' | "$H" verify "$ax"
+done
+"$H" verify bogus < /dev/null           # unknown axis -> no output at all
 
 # --- gate exemptions (deterministic apart from one `git check-ignore`) ---
 # Helper: prints the permissionDecision, or nothing when the write is exempt.
@@ -431,8 +543,9 @@ g sZ src/app.py                            # -> still "ask"
 (unset GUARD_SETTINGS_SKILL; "$H" writable add src; "$H" settings set edit_gate off; "$H" writable list)
 ```
 
-`gate`, `settings`, subagent `stop`, `record-verified`, and session
+`gate`, `settings`, manual-mode `stop`, `verify`, and the session
 subcommands are deterministic (no CLI/auth). Headless `stop` and `user-prompt` spawn a
-real `claude`. Two pure functions are directly unit-testable:
+real `claude` — headless now spawns one per enabled axis, so budget for that when timing
+it. Two pure functions are directly unit-testable:
 `_read_turn_from_transcript(path, prompt_id)` on a fixture JSONL, and
 `_safe_project_subdir(project_dir, value)` on the rejection cases above.

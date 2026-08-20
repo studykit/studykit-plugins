@@ -5,7 +5,14 @@
   "audit_gate": "manual",
   "audit_claims": true,
   "audit_deferrals": true,
-  "exempt_skills": ["deep-research", "hindsight:review"],
+  "audit_korean": false,
+  "exempt_skills": [
+    "deep-research",
+    "hindsight:review"
+  ],
   "refs_dir": "",
-  "writable_dirs": ["build", "docs/generated"]
+  "writable_dirs": [
+    "build",
+    "docs/generated"
+  ]
 }
