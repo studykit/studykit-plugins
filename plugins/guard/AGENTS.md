@@ -24,19 +24,9 @@ Requires Python 3.11+ (the dispatcher uses `enum.StrEnum`).
    only place blocking is decided, and an axis whose judge failed is reported as
    UNCHECKED rather than folded into a pass.
 
-2. **Approval gate** — stop file mutation until the user explicitly approves. `edit_gate`
-   is one tri-state setting: `off` disables the gate; `ask` (default) escalates an
-   unapproved edit to Claude Code's permission prompt — the user approves the edit inline
-   and `PostToolUse` → `gate-approved` arms the session for the rest of the task; `deny`
-   blocks the call to drive the plan→approve workflow. Approval also arms on a user message
-   (classifier) or on the user approving a non-deferring plan via ExitPlanMode (`PostToolUse`
-   → `plan-approved`). Every arming path is a user action — the model can arm none of them
-   (it cannot approve its own `ask` prompt). Set by `/guard:settings` (`edit_gate`),
-   independent of the judge's `audit_gate`.
-
-3. **Refs index** (PostToolUse) — a file saved into the refs directory must be listed in
+2. **Refs index** (PostToolUse) — a file saved into the refs directory must be listed in
    that directory's `AGENTS.md`; `refs-index` blocks the turn until it is. Independent of
-   both gates above.
+   the audit setting.
 
 Claude slices turns from its transcript. Codex saves each documented `turn_id`'s prompt,
 tool activity, and final response in a guard-owned record because its transcript format is

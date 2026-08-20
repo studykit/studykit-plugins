@@ -131,14 +131,14 @@
     {
       "name": "guard",
       "source": "./plugins/guard",
-      "description": "Enforce evidence-backed claims and gate file edits behind explicit user approval in Claude Code and Codex. Requires Python 3.11+.",
+      "description": "Audit an assistant's finished turn against the repository on three axes — unsupported claims, deferrals the repo could answer, and unnatural Korean — in Claude Code and Codex. Requires Python 3.11+.",
       "author": {
         "name": "studykit"
       },
       "repository": "https://github.com/studykit/studykit-plugins",
       "license": "MIT",
       "category": "development",
-      "keywords": ["evidence", "claims", "grounding", "hallucination-guard", "approval-gate", "hooks", "output-style", "claude-code", "codex"]
+      "keywords": ["evidence", "claims", "grounding", "hallucination-guard", "korean", "audit", "hooks", "output-style", "claude-code", "codex"]
     },
     {
       "name": "hindsight",

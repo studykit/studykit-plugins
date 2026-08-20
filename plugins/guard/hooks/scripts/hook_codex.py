@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import json
 import os
-import re
 import subprocess
 import sys
 from pathlib import Path
@@ -20,14 +19,6 @@ os.environ.setdefault("GUARD_HOST", "codex")
 _SCRIPTS = Path(__file__).resolve().parents[2] / "scripts"
 sys.path.insert(0, str(_SCRIPTS))
 import guard_hook as core  # noqa: E402
-
-_APPROVAL = re.compile(
-    r"\b(approve|approved|go ahead|proceed|implement it|do it|start implementation)\b|"
-    r"(?:진행|수정해|수정해줘|구현해|구현해줘|해제해|해제해줘|시작해|시작해줘)",
-    re.IGNORECASE,
-)
-_PATCH_PATH = re.compile(r"^\*\*\* (?:Add|Update|Delete) File: (.+)$", re.MULTILINE)
-
 
 def _payload() -> dict[str, Any]:
     try:
@@ -83,28 +74,6 @@ def _emit(value: dict[str, Any]) -> None:
     json.dump(value, sys.stdout)
 
 
-def _patch_targets(project_dir: Path, command: str) -> list[Path]:
-    targets: list[Path] = []
-    for raw in _PATCH_PATH.findall(command):
-        path = Path(raw)
-        try:
-            targets.append((path if path.is_absolute() else project_dir / path).resolve())
-        except OSError:
-            continue
-    return targets
-
-
-def _is_exempt_target(project_dir: Path, target: Path, config: dict[str, Any]) -> bool:
-    if core._is_guard_owned(project_dir, target):
-        return False
-    refs = core._refs_dir(project_dir, config)
-    if target == refs or refs in target.parents:
-        return True
-    if core._is_outside_project(project_dir, target) or core._git_ignored(project_dir, target):
-        return True
-    return any(target == folder or folder in target.parents for folder in core._writable_dirs(project_dir, config))
-
-
 def _handle_session_start(project_dir: Path) -> None:
     # The shared maintenance logic writes no Codex-specific state beyond the
     # host-selected paths and emits useful policy context on stdout.
@@ -117,12 +86,6 @@ def _handle_prompt(project_dir: Path, payload: dict[str, Any], session_id: str, 
     prompt = prompt if isinstance(prompt, str) else ""
     config = core._load_config(project_dir)
     state = core._read_state(project_dir, session_id, config)
-    if _APPROVAL.search(prompt):
-        state["approved"] = True
-        core._write_state(project_dir, session_id, state)
-    elif prompt.strip():
-        state["approved"] = False
-        core._write_state(project_dir, session_id, state)
     _save_turn(project_dir, session_id, turn_id, {"user": prompt, "tools": [], "assistant": ""})
 
     if prompt.strip().lower().startswith("/guard:audit-claims"):
@@ -135,26 +98,6 @@ def _handle_prompt(project_dir: Path, payload: dict[str, Any], session_id: str, 
                 "assistant claims against the repository. If that agent is unavailable, tell the user "
                 "to run $guard:setup in this project."
             )}})
-
-
-def _handle_pre_tool(project_dir: Path, payload: dict[str, Any], session_id: str) -> None:
-    config = core._load_config(project_dir)
-    state = core._read_state(project_dir, session_id, config)
-    if state["edit_gate"] == core.EditGate.OFF or state.get("approved"):
-        return
-    tool_input = payload.get("tool_input")
-    command = tool_input.get("command") if isinstance(tool_input, dict) else ""
-    targets = _patch_targets(project_dir, command) if isinstance(command, str) else []
-    if targets and all(_is_exempt_target(project_dir, target, config) for target in targets):
-        return
-    turn_id = _turn_id(payload)
-    if turn_id:
-        state["gated_prompt_id"] = turn_id
-        core._write_state(project_dir, session_id, state)
-    _emit({"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": (
-        "guard: file edits are blocked until the user explicitly approves implementation. "
-        "Present a plan and wait for the user's approval, then retry."
-    )}})
 
 
 def _handle_post_tool(project_dir: Path, payload: dict[str, Any], session_id: str, turn_id: str) -> None:
@@ -194,8 +137,6 @@ def _handle_stop(project_dir: Path, payload: dict[str, Any], session_id: str, tu
     _save_turn(project_dir, session_id, turn_id, turn)
     config = core._load_config(project_dir)
     state = core._read_state(project_dir, session_id, config)
-    if state.get("gated_prompt_id") == turn_id:
-        return
     want_claims, want_deferrals = core._audit_claims(state), core._audit_deferrals(state)
     want_korean = core._audit_korean(state)
     # Every axis off: nothing for the auditor to report, so do not block for one.
@@ -243,8 +184,6 @@ def main() -> int:
         return 0
     elif event == "UserPromptSubmit":
         _handle_prompt(project_dir, payload, session_id, turn_id)
-    elif event == "PreToolUse":
-        _handle_pre_tool(project_dir, payload, session_id)
     elif event == "PostToolUse":
         _handle_post_tool(project_dir, payload, session_id, turn_id)
     elif event == "Stop":

@@ -1,7 +1,6 @@
 {
   "model": "haiku",
   "effort": "medium",
-  "edit_gate": "ask",
   "audit_gate": "manual",
   "audit_claims": true,
   "audit_deferrals": true,
@@ -10,9 +9,5 @@
     "deep-research",
     "hindsight:review"
   ],
-  "refs_dir": "",
-  "writable_dirs": [
-    "build",
-    "docs/generated"
-  ]
+  "refs_dir": ""
 }

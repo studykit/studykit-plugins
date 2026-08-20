@@ -1,7 +1,7 @@
 {
   "name": "guard",
-  "version": "0.37.0",
-  "description": "Enforce evidence-backed claims and gate file edits behind explicit user approval in Claude Code and Codex. Requires Python 3.11+.",
+  "version": "0.38.0",
+  "description": "Audit an assistant's finished turn against the repository on three axes — unsupported claims, deferrals the repo could answer, and unnatural Korean — in Claude Code and Codex. Requires Python 3.11+.",
   "author": {
     "name": "studykit"
   },
@@ -14,6 +14,7 @@
     "hallucination-guard",
     "hooks",
     "output-style",
-    "claude-code", "codex"
+    "claude-code",
+    "codex"
   ]
 }
