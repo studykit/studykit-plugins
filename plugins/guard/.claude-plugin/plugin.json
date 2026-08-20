@@ -1,6 +1,6 @@
 {
   "name": "guard",
-  "version": "0.36.0",
+  "version": "0.37.0",
   "description": "Enforce evidence-backed claims and gate file edits behind explicit user approval in Claude Code and Codex. Requires Python 3.11+.",
   "author": {
     "name": "studykit"
