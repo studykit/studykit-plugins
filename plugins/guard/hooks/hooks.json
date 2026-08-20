@@ -59,6 +59,12 @@
             "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/guard_hook.py\" gate-approved",
             "timeout": 10,
             "description": "In edit_gate ask, arm the approval gate after the user approves an edit's permission prompt."
+          },
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/guard_hook.py\" refs-index",
+            "timeout": 10,
+            "description": "After a write inside the refs dir, require the saved file to be listed in the refs index (AGENTS.md)."
           }
         ]
       }
@@ -82,7 +88,7 @@
             "type": "command",
             "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/guard_hook.py\" session-start",
             "timeout": 5,
-            "description": "Sweep guard state and logs past the retention window."
+            "description": "Sweep guard state and logs past the retention window, export GUARD_REFS_DIR, and state the refs rule as session context."
           }
         ]
       }

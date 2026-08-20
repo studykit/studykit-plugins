@@ -170,6 +170,17 @@ def _handle_post_tool(project_dir: Path, payload: dict[str, Any], session_id: st
     turn.setdefault("tools", []).append({"command": command[:core.TOOL_CONTEXT_MAX_CHARS], "output": output[:core.TOOL_RESULT_MAX_CHARS]})
     _save_turn(project_dir, session_id, turn_id, turn)
 
+    # A reference saved into the refs dir must be listed in the index; same rule as
+    # Claude's `refs-index` hook, applied here because Codex routes every event
+    # through this one adapter.
+    config = core._load_config(project_dir)
+    if core._targets_refs_dir(project_dir, tool_input, config):
+        target = core._tool_target_path(project_dir, tool_input)
+        if target is not None and target.name not in core._REFS_INDEX_SKIP:
+            reason = core.refs_index_gap(project_dir, target, config)
+            if reason is not None:
+                _emit({"decision": "block", "reason": reason})
+
 
 def _handle_stop(project_dir: Path, payload: dict[str, Any], session_id: str, turn_id: str) -> None:
     if payload.get("stop_hook_active") is True:

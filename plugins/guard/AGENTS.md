@@ -25,6 +25,10 @@ Requires Python 3.11+ (the dispatcher uses `enum.StrEnum`).
    (it cannot approve its own `ask` prompt). Set by `/guard:settings` (`edit_gate`),
    independent of the judge's `audit_gate`.
 
+3. **Refs index** (PostToolUse) — a file saved into the refs directory must be listed in
+   that directory's `AGENTS.md`; `refs-index` blocks the turn until it is. Independent of
+   both gates above.
+
 Claude slices turns from its transcript. Codex saves each documented `turn_id`'s prompt,
 tool activity, and final response in a guard-owned record because its transcript format is
 not a stable hook interface. Codex projects must run `$guard:setup` once to install the

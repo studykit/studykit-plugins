@@ -15,6 +15,7 @@ line-by-line walkthrough.
 | `PreToolUse` (`Write\|Edit\|MultiEdit\|NotebookEdit`) | `gate` | Stop unapproved file edits — `ask` (default) escalates to the permission prompt, `deny` blocks the call (`edit_gate`). |
 | `PostToolUse` (matcher `ExitPlanMode`) | `plan-approved` | On plan approval, arm the gate when the plan defers no in-scope work. |
 | `PostToolUse` (`Write\|Edit\|MultiEdit\|NotebookEdit`) | `gate-approved` | `edit_gate` ask only: after the user approves an edit's permission prompt, arm the session for the rest of the task. |
+| `PostToolUse` (`Write\|Edit\|MultiEdit\|NotebookEdit`) | `refs-index` | Block when a file saved in the refs dir is not listed in that dir's `AGENTS.md`. |
 | (called via Bash, not a hook) | `record-verified` | Evidence auditor appends a passed turn's claims to the verified store. |
 | (called via Bash, not a hook) | `settings` | `guard:settings` skill (forked) shows/sets guard.local.json settings; `edit_gate`/`audit_gate`/`audit_claims`/`audit_deferrals` also apply to the live session's `state/<sid>.json` (session id from `--session`/`CLAUDE_CODE_SESSION_ID`). Every other key preserved; never the list keys (`exempt_skills`, `writable_dirs`). |
 | (called via Bash, not a hook) | `exempt` | `guard:settings` skill records the user's confirmed `exempt_skills` selection (that key only). |
@@ -160,6 +161,29 @@ payloads, not memory.
   no format to enforce, and whether a mark resolves to adequate evidence is a judgment
   about the claim — which is the evidence judge's job and follows the `audit_gate`
   modes like every other criterion. Nothing at Stop blocks on marks now.
+- **A saved reference must be indexed.** `refs-index` (PostToolUse) blocks when a file
+  written inside the refs dir is not named in that directory's `AGENTS.md`. A reference
+  nothing points at is one the next reader never finds, so the index is part of the
+  save, not a courtesy. It runs *after* the write, not as a PreToolUse gate: the natural
+  order is save-then-index, and blocking the save would demand an index row for a file
+  that does not exist yet. Matching is a substring search for the file name anywhere in
+  the index — the index is prose a human maintains, so pinning the check to a table
+  layout would fail the first time someone reformats it. `AGENTS.md` and its `CLAUDE.md`
+  shim are skipped (`_REFS_INDEX_SKIP`) or writing the index would trip its own hook.
+  The check itself is `refs_index_gap`, shared by both hosts: Claude registers a
+  `refs-index` subcommand, Codex calls it from its single PostToolUse adapter.
+- **The Simple output style is opt-in, and nothing may depend on it.**
+  `output-styles/simple.md` omits `force-for-plugin` (which defaults to false), so enabling guard does not
+  switch a user's output style — they select **Simple** in `/config` (or set
+  `outputStyle`) themselves. Deliberate: the style rewrites how every answer in the
+  session is written, which is too large a change to impose on someone who installed
+  guard for its gates. The consequence is a rule for authors — no guard behavior may be
+  implemented in the style file, because it is inactive for most users. Anything that
+  must always hold goes in the SessionStart context (`guard_hook.py`), a judge prompt,
+  or an agent definition. Note the style also does not reach subagents at all: per the
+  official docs a subagent runs its own system prompt, which is why
+  `agents/simple-explainer.md` carries its own copy of the explain-clearly rules rather
+  than inheriting them.
 - **Renamed from `evidence_gate`, with no fallback.** The old key is ignored outright: a
   config still carrying it silently gets the `audit_gate` default (`manual`). Deliberate —
   guard is pre-1.0 and read-compat for one renamed key is not worth a permanent branch in
@@ -309,8 +333,11 @@ user's normal workflow (guard never commits). `_refs_dir` validates the value (s
 exemption above) and everything that names the location follows it: the gate
 exemption, the headless judge prompt (`__REFS_DIR__` substitution), the evidence auditor
 dispatch inputs (`refs_dir`, with the `refs-dir` CLI subcommand as its fallback), and
-the output style (which reads `GUARD_REFS_DIR` — exported by the SessionStart hook via
-`$CLAUDE_ENV_FILE`, per the official hooks docs — before its first save). guard fixes no
+and the SessionStart context line, which states the refs rule to the agent and names the
+resolved path (also exported as `GUARD_REFS_DIR` via `$CLAUDE_ENV_FILE`, per the official
+hooks docs, so a Bash caller resolves it with one `echo`). The output style carries no
+refs instruction: it is user-selected (no `force-for-plugin`), so nothing load-bearing
+may depend on it being active. guard fixes no
 reference-mark syntax: both judge paths are told to check that a mark *resolves* and never
 to grade its form. Only keys whose value matches the
 default's type are honored (a malformed value can't flip a flag); unknown keys ignored;

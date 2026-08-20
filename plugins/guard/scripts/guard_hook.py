@@ -2580,8 +2580,72 @@ def cmd_refs_dir() -> int:
     return 0
 
 
+REFS_INDEX_NAME = "AGENTS.md"
+# Files in the refs dir that are the index machinery itself, never indexed entries.
+_REFS_INDEX_SKIP = {REFS_INDEX_NAME, "CLAUDE.md"}
+
+
+def cmd_refs_index() -> int:
+    """PostToolUse: after a write inside the refs dir, require the new file to be
+    listed in the refs index (``AGENTS.md``).
+
+    A saved reference nothing points at is a file the next reader never finds, so the
+    index is the deliverable, not a courtesy. This fires *after* the write (PostToolUse)
+    rather than blocking it: the natural order is save-then-index, and blocking the save
+    would force the index entry to be written first, for a file that does not exist yet.
+
+    Blocks with ``decision: "block"`` so the reason returns to the model as work to
+    finish, and stays silent in every other case — a write outside the refs dir, the
+    index itself, or a file already listed.
+    """
+    project_dir = _project_dir()
+    payload = _read_payload()
+    if payload is None or project_dir is None:
+        return 0
+
+    config = _load_config(project_dir)
+    tool_input = payload.get("tool_input")
+    if not _targets_refs_dir(project_dir, tool_input, config):
+        return 0
+    target = _tool_target_path(project_dir, tool_input)
+    if target is None or target.name in _REFS_INDEX_SKIP:
+        return 0
+
+    reason = refs_index_gap(project_dir, target, config)
+    if reason is None:
+        _trace(project_dir, None, "refs-index", "listed", file=target.name)
+        return 0
+
+    json.dump({"decision": "block", "reason": reason}, sys.stdout)
+    _trace(project_dir, None, "refs-index", "missing", file=target.name)
+    return 0
+
+
+def refs_index_gap(project_dir: Path, target: Path, config: dict[str, Any]) -> str | None:
+    """The block reason when ``target`` is missing from the refs index, else None.
+
+    Host-neutral so both adapters enforce one rule. Matching is by file name anywhere
+    in the index text rather than by table structure: the index is prose a human
+    maintains, and pinning the check to a column layout would fail the moment someone
+    reformats it.
+    """
+    index = _refs_dir(project_dir, config) / REFS_INDEX_NAME
+    try:
+        if target.name in index.read_text(encoding="utf-8"):
+            return None
+    except OSError:
+        pass  # No index yet: the first saved reference is what creates it.
+    return (
+        f"guard: `{target.name}` is saved but not listed in the reference index. "
+        f"Add a row for it to `{_project_rel(project_dir, index)}` — file name, what "
+        "it covers, and the source — so the next reader finds it without opening "
+        "every file. Then continue."
+    )
+
+
 SUBCOMMANDS = {
     "user-prompt": cmd_user_prompt,
+    "refs-index": cmd_refs_index,
     "plan-approved": cmd_plan_approved,
     "verify": cmd_verify,
     "settings": cmd_settings,
