@@ -1,6 +1,6 @@
 {
   "name": "guard",
-  "version": "0.41.0",
+  "version": "0.42.0",
   "description": "When a turn ends, guard asks the session to run its router subagent over the response; the router names which audit agents would actually find something in it \u2014 unsupported claims, deferrals the repo could answer, unnatural Korean, comments in the source it edited \u2014 each with a reason, and they run in parallel. One switch per agent, all off until you turn one on. Claude Code and Codex. Requires Python 3.11+.",
   "author": {
     "name": "studykit"

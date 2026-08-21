@@ -2,8 +2,6 @@
 name: settings
 description: "View and change guard's settings for this project — one setting per audit agent, named after it (claims-auditor, deferrals-auditor, korean-corrector, comment-corrector), each off / fresh / reuse, plus router_model, refs_dir, and exempt_skills — recorded in .claude/guard.local.json. Use when the user wants to configure guard: turn the claim, deferral, Korean-naturalness, or comment check on or off, keep one of them running across turns instead of respawning it, set the router's model or refs_dir, or manage exempt skills. Claude Code only."
 argument-hint: '[key] [value]'
-context: fork
-model: sonnet
 disable-model-invocation: true
 allowed-tools: Bash, AskUserQuestion
 ---
@@ -12,6 +10,11 @@ You configure **guard** for this project. Every setting lives in
 `.claude/guard.local.json` and you change it **only** through guard's CLI — never by
 editing that file with Write/Edit. The CLI is the one supported writer: it validates
 each value and mirrors the change into the live session, which a hand-edit does not.
+
+This skill runs **in the current session**, not in a forked context: it is a handful of
+Bash calls and a short summary, and paying for a separate context to make them cost more
+than it saved — the fork had to be told the session id and the CLI path, then relay its
+result back.
 
 Fixed values for this run (already substituted — do not re-resolve):
 

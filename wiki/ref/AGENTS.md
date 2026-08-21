@@ -28,6 +28,7 @@ listed here.
 | `claude-code-stop-hook-decision-control.md` | Stop hook output: `decision: "block"` vs `hookSpecificOutput.additionalContext`, their shared loop protections, and how `additionalContext` reaches the model | code.claude.com/docs/en/hooks |
 | `claude-code-subagent-resume.md` | Naming a subagent at dispatch, resuming one by name with `SendMessage` (full history retained, auto-resume in background), and how long subagent transcripts persist | code.claude.com/docs/en/sub-agents |
 | `claude-code-subagent-frontmatter.md` | Subagent frontmatter fields; `tools` omitted inherits all, no way to express none | code.claude.com/docs/en/sub-agents |
+| `claude-code-subagent-memory.md` | The `memory` frontmatter field: `user`/`project`/`local` scopes and their directories, MEMORY.md auto-injection limits, and the fact that it silently enables Write/Edit | code.claude.com/docs/en/sub-agents |
 | `jira-wiki-markup-notation.md` | Jira wiki markup notation (headings, effects, lists, links, tables, code) | Jira `WikiRendererHelpAction.jspa` |
 | `markdown-footnotes.md` | Markdown footnote syntax (extended) | markdownguide.org/extended-syntax |
 | `obsidian-block-links.md` | Obsidian block identifiers and block links | obsidian.md/help/links |

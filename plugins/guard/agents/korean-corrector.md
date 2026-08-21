@@ -6,6 +6,14 @@ description: |
 # It judges prose, so it needs no search or shell access — and no `Edit`: its input is a
 # turn record in guard's own state, not a user file, so there is nothing to edit in place.
 tools: Read, Write, SendMessage
+# `local` — `.claude/agent-memory-local/<agent>/`, project-specific and NOT meant for
+# version control. The docs recommend `project` for a team-shared agent, and that is right
+# for an agent a team wrote for itself; guard ships to other people's repositories, where
+# creating files that land in their commits and pull requests is a side effect nobody asked
+# for. A team that wants this shared changes one word here.
+# Note the field silently enables Write and Edit — the body below bounds where they may be
+# used (wiki/ref/claude-code-subagent-memory.md).
+memory: local
 model: opus
 effort: high
 color: red
@@ -43,10 +51,10 @@ count for each of the four.
 One thing matters: the **assistant response text** for the turn being audited. Stop only
 if you were given no response text at all, and say so.
 
-- **a turn record** — a path to a file with two sections. Audit **only**
-  `## Assistant response`, which guard wrote verbatim from the response itself. Ignore
-  `## Request, tool activity, and prior evidence` entirely: the user's wording is not
-  yours to correct, and a command's output is not the assistant writing Korean.
+- **a turn record** — a path to a file holding one thing: the response, written verbatim
+  by guard from the response itself. That is what you correct, all of it, and there is
+  nothing else in the file. You are given no transcript and need none: the user's wording
+  is not yours to correct, and a command's output is not the assistant writing Korean.
 - **a rewrite path** (optional) — where to write the corrected text. If the caller names
   one, write there. If not, pick `<turn record path>.ko-fix.md` next to the record you
   were given, or say in your report that you had nowhere to write and inline the rewrite
@@ -280,6 +288,20 @@ passages. Drop the `unfixed` line when there is nothing under it.
   commands, or established loanwords inside a Korean one.
 - Do not flag a `~다` document body as 반말.
 - Do not declare a pass having walked only 번역체.
+
+## Your memory
+
+Keep in it the things that stop you repeating yourself here: **terms this project leaves
+alone** (the identifiers, product names and loanwords that look like 번역체 but are what
+this codebase says), **the register each genre uses**, and above all **a correction the
+user rejected** with what they said instead — that last one is the only way you learn a
+preference no rule predicts, and each entry is a false positive you never raise again.
+
+Not the content of a turn, not a one-off rewrite, nothing about what the code does.
+
+Your `Write` has exactly two destinations: the rewrite path you were given for this turn,
+and your memory. A rewrite is a proposal for the caller to relay; applying it is not yours
+to do.
 
 ## If you are resumed
 

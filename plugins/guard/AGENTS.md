@@ -7,10 +7,17 @@ Requires Python 3.11+ (`enum.StrEnum`).
 **guard makes no model call.** When a turn finishes it asks the main agent, through
 `additionalContext`, to dispatch one subagent — `guard:router` — that reads the turn and
 names which of guard's audit agents would actually find something in it, with a reason
-for each; the main agent then dispatches those, concurrently. guard audits nothing
-itself, every audit criterion lives in an agent definition under `agents/`, and the
-router's per-agent cue lives in `agents/router.md`. One home per criterion is the point
-of the shape.
+for each; the main agent then dispatches those, concurrently. guard audits nothing itself,
+and every audit criterion lives in an agent definition under `agents/`.
+
+Where each piece of text lives is decided by how often it is paid for, and that split must
+hold: `additionalContext` reaches the main agent on **every** routed turn, so it carries
+only what changes per turn (paths, which agents are on, each one's mode). `agents/router.md`
+is read once per routed turn by the router alone, so it carries the triage method and the
+cue per candidate. `hooks/context/dispatch-playbook.md` is read only by whoever is sent to
+a section, so it carries how to dispatch an agent and what to do with its report — the text
+that is identical every turn and needed only for the agents actually picked. The router
+names sections; nobody re-types their contents.
 
 The router used to be a `claude -p` child guard spawned from the hook. It is worth
 knowing why it is not, because the reasons are all still true: a spawned child blocked
@@ -52,25 +59,50 @@ paths guard had to tell apart from a clean verdict. As a subagent, none of that 
    - It names **agents**, never guard's own skills. Those are
      `disable-model-invocation: true` because they are the user's entry point, so a hook
      must not reach through them.
-   - The roster and the STEP 2 dispatch blocks cover the same eligible set. The blocks are
-     the real bound on what can be dispatched: a key the router invents has no block, so
-     a switched-off agent stays unreachable even if the router names it anyway.
+   - The roster offers only the eligible set, and the playbook is the second bound: a key
+     the router invents has no section to follow, so a switched-off agent stays unreachable
+     even if the router names it anyway.
    - guard writes the turn record's **response** section itself, from the Stop payload's
      `last_assistant_message`. That is the text being audited, so it must not pass through
      the author's hands; the main session appends only what guard cannot see — the
      request, the tool activity, and earlier evidence the claims rest on. That second half
      is asked for as inclusion, never selection, because the author curating its own
      evidence is the failure that shape invites.
+   - Nobody gathers the session's history. The record holds the response and nothing else;
+     the agents that may need more (`needs_history`: the two auditors) get a transcript
+     path, the turn id, and the `transcript` subcommand, and extract what they want into
+     their own file. The main agent gathering it would put the largest cost of an audit in
+     the context the user is talking to and would route the record of a turn through that
+     turn's author. When extraction fails the agent may ask the main session, but that
+     answer is testimony and its report has to say so.
+
+   The four audit agents carry `memory: local`, so what they learn about a project stays in
+   that checkout and out of version control. The docs recommend `project` and that is right
+   for an agent a team wrote for itself; guard runs in other people's repositories, where
+   creating files that turn up in their commits is a side effect nobody asked for. A team
+   that wants it shared changes one word. Memory and `reuse` are
+   different axes and neither replaces the other: memory is cross-session, curated and
+   small — the conventions, where the answers live, a verdict the user overturned — while
+   `reuse` is within-session and uncurated. Two consequences that must not be lost. The
+   field silently enables Write and Edit, so each agent's body bounds them to its own
+   memory directory and every "read-only" claim about the auditors is phrased that way.
+   And memory tells an agent where to look, never what is true: a claim remembered as
+   settled is still re-checked against the repository, or the auditors would start passing
+   claims on their own past say-so. The router has no memory, on purpose — its answer must
+   come from this turn, not from a habit.
 
 2. **Post-edit** (PostToolUse on the write tools) — records the turn's edited source
    files for a later `comment-corrector` recommendation, and blocks until a file saved
    in the refs directory is listed in that directory's `AGENTS.md`. Both independent of
    the agent settings.
 
-guard keeps no copy of a turn. It reads the transcript only to learn how a turn was
-*opened* (`_turn_identity`), and both users of that are skips: a `task-notification` turn
-is a background agent reporting in, and recommending an audit there puts guard in a loop
-with itself; a turn opened by a control command or an exempt skill has nothing to audit.
+guard reads the transcript for two unrelated purposes, and keeping them apart matters. At
+Stop it reads a single record to learn how the turn was *opened* (`_turn_identity`), and both
+users of that are skips: a `task-notification` turn is a background agent reporting in, and
+recommending an audit there puts guard in a loop with itself; a turn opened by a control
+command or an exempt skill has nothing to audit. Separately, the `transcript` subcommand
+slices turns out of the file on an agent's request — never on a schedule, and always into a
+file rather than onto stdout.
 
 Codex is different by necessity: its transcript is not a stable hook interface, so its
 adapter keeps its own turn record, and it has one named agent rather than a set — a

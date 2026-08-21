@@ -283,17 +283,12 @@ def _turn_record_file(project_dir: Path, session_id: str, prompt_id: str) -> Pat
     it out that many times, in a message the main agent composes itself, which is exactly
     where a turn quietly becomes a paraphrase of the turn. One file, read by everyone.
 
-    Ownership is split, and the split is the point:
-
-    - guard writes the RESPONSE section itself, at Stop, from ``last_assistant_message``
-      in the payload. It is the text being audited, so it is the one part that must not
-      pass through the author's hands — and guard is handed it for free.
-    - the main agent appends everything else, because guard cannot see it: the request,
-      the turn's tool activity, and whatever earlier evidence the response's claims rest
-      on. guard has no transcript slice any more and no window past this turn.
-
-    See ``_append_turn_instruction`` for why the second half is asked for as inclusion
-    rather than selection.
+guard owns the file completely — it holds the response and nothing else. Nobody
+    appends to it. What surrounds the response (the request, the turn's tool activity,
+    what an earlier turn established) lives in the transcript, and an agent that needs any
+    of it runs `transcript turn|find|index` and gets its own extract file. That keeps the
+    author of the turn out of the record of the turn, which is the property the whole
+    design rests on.
     """
     return _state_root(project_dir) / "turns" / session_id / f"{prompt_id}.md"
 
@@ -301,12 +296,22 @@ def _turn_record_file(project_dir: Path, session_id: str, prompt_id: str) -> Pat
 # Section headings in the turn record. Fixed strings, because both the instruction that
 # asks for a section and the agent definitions that say which section to read name them.
 TURN_RESPONSE_HEADING = "## Assistant response (written by guard, verbatim)"
-TURN_CONTEXT_HEADING = "## Request, tool activity, and prior evidence"
 
 
 def _write_turn_response(project_dir: Path, session_id: str, prompt_id: str,
                          response: str) -> Path | None:
-    """Write the record with the response section filled in. Returns the path, or None.
+    """Write the record: the response being audited, verbatim, and nothing else.
+
+    guard writes this from the Stop payload's ``last_assistant_message``, not from the
+    transcript, because the payload is the one copy that is guaranteed complete at Stop
+    time and needs no parsing. It is the text being audited, so it is also the one thing
+    that must not pass through the author's hands on the way to an auditor.
+
+    Nothing else goes in the file. The request, this turn's tool activity and whatever an
+    earlier turn established are all in the transcript already, and an agent that needs
+    them extracts what it needs with the ``transcript`` subcommand. Accumulating them here
+    on every turn would write a full record for every turn to serve the few that are ever
+    audited, and would go stale the moment the session continued.
 
     Best-effort, and a failure is silent: the recommendation is emitted anyway, and the
     main agent is asked to create the file if it is not there. A guard that refused to
@@ -316,10 +321,8 @@ def _write_turn_response(project_dir: Path, session_id: str, prompt_id: str,
     path = _turn_record_file(project_dir, session_id, prompt_id)
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(
-            f"{TURN_RESPONSE_HEADING}\n\n{response.rstrip()}\n\n"
-            f"{TURN_CONTEXT_HEADING}\n\n(to be appended by the main session)\n",
-            encoding="utf-8")
+        path.write_text(f"{TURN_RESPONSE_HEADING}\n\n{response.rstrip()}\n",
+                        encoding="utf-8")
     except OSError:
         return None
     return path
@@ -523,19 +526,379 @@ def _exempt_skills(config: dict[str, Any]) -> set[str]:
     return {n for n in (_norm_skill(c) for c in raw) if n}
 
 
+# Text the host injects into a `user` record that is not the user talking: hook output,
+# slash-command envelopes, `!` command echoes, the compaction caveat. Matched as a prefix
+# on the record's text. Without this filter the record's "user request" is whatever the
+# host happened to prepend, which is both wrong and the kind of wrong an auditor cannot
+# detect — it has no other copy of the request to compare against. The same list drives
+# hindsight's transcript renderer (`plugins/hindsight/skills/review/scripts/render.py`).
+# A user `!` command's records. Not evidence, and the turn that carries one is not audited:
+# the `!` output arrives after the response guard would be judging.
+_BASH_TAG = "<bash-input>"
+
+_INJECTED_PREFIXES = (
+    "<system-reminder", "<command-name>", "<command-message>", "<command-args",
+    "<local-command", "<bash-input", "<bash-stdout", "<bash-stderr", "Caveat:",
+    "<task-notification", "<user-prompt-submit-hook>",
+)
+
+# Caps on the tool activity guard slices into a turn record. Generous, because the record
+# is a file rather than context — but not unbounded: whoever is dispatched Reads the whole
+# file, so an uncapped 5MB transcript turn would arrive in an auditor's context intact.
+# Per-result first, so one runaway command cannot crowd out ten useful ones, then a total.
+TOOL_RESULT_MAX_CHARS = 4000
+TOOL_ACTIVITY_MAX_CHARS = 30000
+
+
+def _transcript_records(path: Path):
+    """Yield the transcript's records as dicts, in file order. Malformed lines skipped.
+
+    Streamed with ``errors="replace"``: these files reach several megabytes, and one
+    undecodable byte must not cost the whole read.
+    """
+    try:
+        fh = path.open(encoding="utf-8", errors="replace")
+    except OSError:
+        return
+    with fh:
+        for line in fh:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                rec = json.loads(line)
+            except (json.JSONDecodeError, ValueError):
+                continue
+            if isinstance(rec, dict):
+                yield rec
+
+
+def _turn_slice(transcript_path: Any, prompt_id: Any) -> dict[str, Any] | None:
+    """Everything guard can read about one turn from the transcript. None when it cannot.
+
+    Returns ``{origin_kind, command_name, user, tools, has_user_command}``. A turn is
+    anchored on the FIRST record whose top-level ``promptId`` equals ``prompt_id``, and the
+    slice runs to the next record carrying a DIFFERENT non-empty promptId. That positional
+    rule is not a convenience: only ``user`` records carry a promptId at all — the assistant
+    records, and the ``tool_use`` blocks inside them, carry none — so a filter on promptId
+    would drop precisely the tool activity this exists to collect. Verified on a real
+    4.8MB, 21-turn transcript: promptIds occur in contiguous runs, one run per turn.
+
+    Skipped: ``isMeta`` (guard's own injected feedback), ``isSidechain`` (a subagent's
+    records, which are not this turn's activity even when they share the file), and user
+    text that is really host-injected envelope (``_INJECTED_PREFIXES``). A user `!` command
+    is not evidence and is not collected; it only sets ``has_user_command``.
+
+    Fail-open throughout: an unreadable transcript, a malformed line, or a prompt_id absent
+    from the file yields None or a partial slice, never a raise.
+    """
+    if not isinstance(transcript_path, str) or not isinstance(prompt_id, str) or not prompt_id:
+        return None
+    path = Path(transcript_path)
+    if not path.is_file():
+        return None
+
+    user = ""
+    assistant: list[str] = []
+    tools: list[dict[str, str]] = []
+    has_user_command = False
+    origin_kind = ""
+    command_name = ""
+    in_turn = False
+
+    for rec in _transcript_records(path):
+        rec_pid = rec.get("promptId")
+        if not in_turn:
+            if rec_pid != prompt_id:
+                continue
+            in_turn = True
+            origin = rec.get("origin")
+            if isinstance(origin, dict):
+                origin_kind = str(origin.get("kind") or "")
+            anchor = _message_of(rec).get("content")
+            command_name = _turn_command_name(anchor if isinstance(anchor, str) else "")
+        elif isinstance(rec_pid, str) and rec_pid and rec_pid != prompt_id:
+            break
+
+        if rec.get("isMeta") is True or rec.get("isSidechain") is True:
+            continue
+
+        content = _message_of(rec).get("content")
+        if isinstance(content, str):
+            if _BASH_TAG in content or "<bash-stdout>" in content or "<bash-stderr>" in content:
+                has_user_command = True
+            elif not user and not content.lstrip().startswith(_INJECTED_PREFIXES):
+                user = content
+            continue
+        if not isinstance(content, list):
+            continue
+        for part in content:
+            if not isinstance(part, dict):
+                continue
+            ptype = part.get("type")
+            if ptype == "text":
+                txt = str(part.get("text", "")).strip()
+                if txt:
+                    assistant.append(txt)
+            elif ptype == "tool_use":
+                name = part.get("name", "tool")
+                inp = part.get("input")
+                cmd = inp.get("command") if isinstance(inp, dict) else None
+                if not isinstance(cmd, str) or not cmd:
+                    cmd = f"[{name}] {json.dumps(inp, ensure_ascii=False)[:400]}"
+                tools.append({"command": cmd, "output": ""})
+            elif ptype == "tool_result":
+                res = part.get("content")
+                if isinstance(res, list):
+                    res = " ".join(str(x.get("text", "")) for x in res if isinstance(x, dict))
+                out = str(res if res is not None else "")
+                # Attach to the most recent call still lacking output.
+                for t in reversed(tools):
+                    if not t["output"]:
+                        t["output"] = out
+                        break
+                else:
+                    tools.append({"command": "[tool_result]", "output": out})
+
+    if not in_turn:
+        return None
+    return {
+        "origin_kind": origin_kind,
+        "command_name": command_name,
+        "user": user,
+        "assistant": "\n\n".join(assistant),
+        "tools": tools,
+        "has_user_command": has_user_command,
+    }
+
+
+def _extract_dir(project_dir: Path, session_id: str) -> Path:
+    return _state_root(project_dir) / "extracts" / (session_id or "unknown")
+
+
+def _write_extract(path: Path, body: str) -> bool:
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(body, encoding="utf-8")
+        return True
+    except OSError:
+        return False
+
+
+def _render_turn(turn: dict[str, Any], turn_id: str) -> str:
+    """One turn as an extract file reads: request, tool activity, response. Verbatim.
+
+    Verbatim is the whole point of extracting with a script instead of asking an agent to
+    write down what happened. A copy made by the turn's own author gets tidied, and a
+    tidied turn is one where the claim actually made is no longer the claim being audited.
+    Truncation is marked in place so a reader can tell a short command from a cut one.
+    """
+    parts: list[str] = []
+    for t in turn.get("tools", []):
+        if not isinstance(t, dict):
+            continue
+        out = str(t.get("output", ""))
+        if len(out) > TOOL_RESULT_MAX_CHARS:
+            out = out[:TOOL_RESULT_MAX_CHARS] + "\n…(output truncated by guard)"
+        parts.append(f"$ {t.get('command', '')}\n→ {out}")
+    activity = "\n\n".join(parts).strip()
+    if len(activity) > TOOL_ACTIVITY_MAX_CHARS:
+        # Keep the TAIL: the later calls are the ones the response was written from.
+        activity = ("…(earlier tool activity in this turn omitted by guard)\n"
+                    + activity[-TOOL_ACTIVITY_MAX_CHARS:])
+    return "\n\n".join([
+        f"# Turn {turn_id}",
+        "## The user's request",
+        (str(turn.get("user", "")).strip() or "(not in the transcript)"),
+        "## Tool activity",
+        (activity or "(none)"),
+        "## What the assistant said",
+        (str(turn.get("assistant", "")).strip() or "(not in the transcript)"),
+    ]) + "\n"
+
+
+def _turn_index(path: Path) -> list[dict[str, str]]:
+    """Every turn in the transcript, in order: its id, when it started, its opening line.
+
+    An index, not content — small enough that an agent can read it whole and then ask for
+    the two or three turns that look relevant. Turns opened by a host-injected envelope
+    (a task-notification, a hook relay) are labelled as such rather than dropped: an agent
+    looking for where a number came from is better served by seeing the gap.
+    """
+    out: list[dict[str, str]] = []
+    for rec in _transcript_records(path):
+        pid = rec.get("promptId")
+        if not isinstance(pid, str) or not pid:
+            continue
+        if out and out[-1]["turn"] == pid:
+            continue
+        content = _message_of(rec).get("content")
+        text = content if isinstance(content, str) else ""
+        head = " ".join(text.split())
+        kind = ""
+        if head.lstrip().startswith(_INJECTED_PREFIXES):
+            kind = " [host-injected]"
+            head = head[:80]
+        out.append({
+            "turn": pid,
+            "at": str(rec.get("timestamp") or ""),
+            "head": (head[:160] or "(no text)") + kind,
+        })
+    return out
+
+
+def _turn_window(order: list[str], since: str, until: str, last: str) -> set[str]:
+    """Which turn ids an extraction may look at, given the caller's window.
+
+    A session transcript runs to megabytes and hundreds of turns, and an agent auditing
+    the turn that just finished has no use for turn 3. Bounding the scan is therefore an
+    input, not an optimization: without it `find` returns matches from an hour ago with
+    equal prominence, and the agent pays to read them.
+
+    ``since``/``until`` are turn ids, inclusive on both ends; an id that is not in the
+    transcript is ignored rather than treated as empty, since the alternative is an
+    extraction that silently returns nothing. ``last`` keeps the N most recent turns of
+    whatever survives, so `--until <the audited turn> --last 10` reads as "the ten turns
+    ending at this one" — which is the shape an auditor actually asks for.
+    """
+    lo, hi = 0, len(order)
+    if since and since in order:
+        lo = order.index(since)
+    if until and until in order:
+        hi = order.index(until) + 1
+    window = order[lo:hi]
+    try:
+        n = int(last)
+    except (TypeError, ValueError):
+        n = 0
+    if n > 0:
+        window = window[-n:]
+    return set(window)
+
+
+def cmd_transcript() -> int:
+    """Extract part of the session transcript INTO A FILE and print only its path.
+
+    Argv::
+
+        transcript index|turn|find --transcript P
+                   [--turn ID] [--pattern RE]
+                   [--since ID] [--until ID] [--last N] [--out F]
+
+    Written for the audit agents, not for the main session. An agent auditing a claim needs
+    to know what the session actually ran and said — often several turns back — and there
+    are three bad ways to give it that. Asking the main agent to write it down makes the
+    turn's own author the source for the record of the turn. Having guard accumulate every
+    turn into a file, forever, pays for a full record on every turn to serve the few that
+    are ever audited. Printing the extract to stdout puts it in the CALLER's context, which
+    is the cost this whole design exists to avoid.
+
+    So: the extract goes to a file, stdout carries the path and a one-line summary, and the
+    agent Reads what it asked for — or hands the path to another agent, which is the cheap
+    way for two of them to look at the same evidence.
+
+    Fail-open like every other subcommand: an unreadable transcript, an unknown turn, or a
+    bad pattern prints a one-line reason and exits 0. An agent that cannot get an extract
+    must say so and judge on what it has, not stall.
+    """
+    argv = sys.argv[2:]
+    op = argv[0].lower() if argv else ""
+    opts: dict[str, str] = {}
+    i = 1
+    while i < len(argv) - 1:
+        if argv[i].startswith("--"):
+            opts[argv[i][2:]] = argv[i + 1]
+            i += 2
+        else:
+            i += 1
+
+    if op not in ("index", "turn", "find"):
+        print("guard transcript: expected `index`, `turn`, or `find`.", file=sys.stderr)
+        return 0
+    tpath = opts.get("transcript", "")
+    path = Path(tpath) if tpath else None
+    if path is None or not path.is_file():
+        print(f"guard transcript: no readable transcript at {tpath or '(none given)'}",
+              file=sys.stderr)
+        return 0
+
+    pd_env = os.environ.get("CLAUDE_PROJECT_DIR")
+    project_dir = Path(pd_env) if pd_env else Path.cwd()
+    session_id = opts.get("session", "") or path.stem
+    out = Path(opts["out"]) if opts.get("out") else None
+    rows = _turn_index(path)
+    order = [r["turn"] for r in rows]
+    window = _turn_window(order, opts.get("since", ""), opts.get("until", ""),
+                          opts.get("last", ""))
+
+    if op == "index":
+        shown = [r for r in rows if r["turn"] in window]
+        body = "# Turns in this session\n\n" + "\n".join(
+            f"- `{r['turn']}` {r['at']} — {r['head']}" for r in shown) + "\n"
+        dest = out or _extract_dir(project_dir, session_id) / "index.md"
+        if not _write_extract(dest, body):
+            print(f"guard transcript: could not write {dest}", file=sys.stderr)
+            return 0
+        print(f"{dest}\n{len(shown)} of {len(rows)} turns, oldest first.")
+        _trace(project_dir, session_id, "transcript", "index", turns=len(shown))
+        return 0
+
+    if op == "turn":
+        turn_id = opts.get("turn", "")
+        turn = _turn_slice(str(path), turn_id)
+        if turn is None:
+            print(f"guard transcript: turn {turn_id or '(none given)'} is not in "
+                  f"{path.name}", file=sys.stderr)
+            return 0
+        body = _render_turn(turn, turn_id)
+        dest = out or _extract_dir(project_dir, session_id) / f"turn-{turn_id}.md"
+        if not _write_extract(dest, body):
+            print(f"guard transcript: could not write {dest}", file=sys.stderr)
+            return 0
+        print(f"{dest}\n{len(turn.get('tools', []))} tool calls, {len(body)} chars.")
+        _trace(project_dir, session_id, "transcript", "turn", turn=turn_id,
+               tools=len(turn.get("tools", [])))
+        return 0
+
+    pattern = opts.get("pattern", "")
+    try:
+        rx = re.compile(pattern, re.IGNORECASE)
+    except (re.error, TypeError):
+        print(f"guard transcript: {pattern!r} is not a valid regex", file=sys.stderr)
+        return 0
+    hits: list[str] = []
+    seen: set[str] = set()
+    current = ""
+    for rec in _transcript_records(path):
+        pid = rec.get("promptId")
+        if isinstance(pid, str) and pid:
+            current = pid
+        if current not in window or rec.get("isSidechain") is True:
+            continue
+        blob = json.dumps(_message_of(rec).get("content"), ensure_ascii=False)
+        m = rx.search(blob)
+        if m:
+            lo = max(0, m.start() - 200)
+            hits.append(f"- turn `{current}`: …{blob[lo:m.end() + 200]}…")
+            seen.add(current)
+    body = (f"# Matches for `{pattern}`\n\n"
+            f"Searched {len(window)} of {len(order)} turns.\n\n"
+            + ("\n".join(hits) if hits else "(no match)") + "\n")
+    dest = out or _extract_dir(project_dir, session_id) / "find.md"
+    if not _write_extract(dest, body):
+        print(f"guard transcript: could not write {dest}", file=sys.stderr)
+        return 0
+    print(f"{dest}\n{len(hits)} matches across {len(seen)} turns; "
+          f"searched {len(window)} of {len(order)}.")
+    _trace(project_dir, session_id, "transcript", "find", hits=len(hits))
+    return 0
+
+
 def _turn_identity(transcript_path: Any, prompt_id: Any) -> dict[str, str] | None:
     """What KIND of turn this is, read from the transcript anchor. Never its content.
 
     Returns ``{origin_kind, command_name}``, or None (fail-open) when the transcript is
-    unreadable or the prompt_id is not in it.
-
-    guard used to reconstruct the whole turn here — request, tool activity, response —
-    and hand it to the agents as a file. It no longer does: the main agent already holds
-    the turn it just produced, so it can pass the text to the router and to the agents
-    itself, and a second copy cut by guard was work and storage for nothing.
-
-    What guard still cannot get from the payload is how the turn was OPENED, and both
-    users of it are skips, not audits:
+    unreadable or the prompt_id is not in it. Both users of it are skips, not audits:
 
     - ``origin_kind`` — a typed prompt is ``"human"``; a background subagent's
       completion opens a NEW turn (fresh promptId) anchored on a ``<task-notification>``
@@ -546,8 +909,10 @@ def _turn_identity(transcript_path: Any, prompt_id: Any) -> dict[str, str] | Non
     - ``command_name`` — the slash command that opened the turn, so a turn that is
       guard's own control command or a user-exempted skill can be skipped.
 
-    Only the ANCHOR record is examined. Records derived from the turn carry
-    ``promptId=None``, and nothing about them changes the turn's kind.
+    Only the ANCHOR record is examined; records derived from the turn carry
+    ``promptId=None`` and nothing about them changes the turn's kind. Kept separate from
+    ``_turn_slice`` because the two skips must be decided before guard does any work, and
+    reading one record is cheaper than slicing a turn out of a multi-megabyte file.
     """
     if not isinstance(transcript_path, str) or not isinstance(prompt_id, str) or not prompt_id:
         return None
@@ -642,6 +1007,11 @@ def _read_state(project_dir: Path, session_id: str, config: dict[str, Any]) -> d
         # The most recent auditable turn's prompt_id — the target a `/guard:audit-*`
         # command dispatches its agent for. Recorded by every Stop, switches or not.
         "pending_verify_prompt_id": "",
+        # The session's transcript, recorded at Stop so the on-demand `/guard:*` path can
+        # hand it to an agent that needs history. That payload does not carry it, and the
+        # path is a session-long fact, so remembering it is cheaper than making the agent
+        # go looking for a file it has no reliable way to name.
+        "transcript_path": "",
         # Source files written during one turn, accumulated by PostToolUse and read back
         # at Stop to decide whether `comment-corrector` has anything to look at. Stored
         # WITH the prompt_id it belongs to: a bare list would outlive its turn and point
@@ -660,6 +1030,7 @@ def _read_state(project_dir: Path, session_id: str, config: dict[str, Any]) -> d
     if not isinstance(data, dict):
         return default
     keys = (*AUDIT_AGENTS, "last_audited_prompt_id", "pending_verify_prompt_id",
+            "transcript_path",
             "edited_prompt_id", "edited_files", "updated_at")
     default.update({k: data[k] for k in keys if k in data})
     return default
@@ -725,35 +1096,41 @@ def _router_model(cfg: dict[str, Any]) -> str:
 # the agents guard can recommend
 # --------------------------------------------------------------------------- #
 class AuditAgent(NamedTuple):
-    """One agent guard can recommend, plus everything its dispatch text needs.
+    """One agent guard can recommend. Mechanical facts only — no prose.
 
     Keyed in ``AUDIT_AGENTS`` by the agent's own bare name, which is also its config
-    switch key and, namespaced, its ``subagent_type``. One string for one agent: the
-    setting the user types, the key in the state file, and the agent that gets
-    dispatched cannot drift apart because they are the same string.
+    switch key, its playbook section, and — namespaced — its ``subagent_type``. One string
+    for one agent: the setting the user types, the key in the state file, the section that
+    says how to dispatch it, and the agent that gets dispatched cannot drift apart because
+    they are the same string.
 
     ``reads`` is what the agent is pointed at — ``"turn"`` for the turn record guard
-    sliced, ``"files"`` for the source files the turn edited — and it selects the inputs
-    the dispatch carries. ``verify_command`` marks the agents that also have their own
+    wrote, ``"files"`` for the source files the turn edited. It selects the paths the
+    dispatch carries and gates eligibility, since a ``"files"`` agent with no edited file
+    has no input at all. ``verify_command`` marks the agents that also have their own
     ``/guard:*`` command over the last completed turn; it is what stops ``cmd_verify``
     from dispatching an agent no command can reach.
 
-    No cue for the router here: the router's cue per agent is its own instruction, and it
-    lives in ``agents/router.md``. Keeping it out of this table is what keeps the Stop
-    hook's ``additionalContext`` small — that text enters the main agent's context on
-    every routed turn, so a paragraph per candidate would be paid for every turn.
+    ``needs_history`` is whether this agent may need to look past the response — at the
+    request, at what the turn ran, at what an earlier turn established. Those agents are
+    given the transcript path and the turn id so they can extract what they need with the
+    ``transcript`` subcommand; the others are not, because a pointer an agent has no use
+    for is one it may chase anyway. Two need it: `claims-auditor`, since a claim made here
+    is often grounded by a command run three turns ago, and `deferrals-auditor`, since the
+    request is what separates a deferral the assistant owed from a decision it correctly
+    handed back. The correctors do not — Korean prose is judged as prose, and comments are
+    judged against the code under them.
+
+    What the agent DOES, how to dispatch it, and what to do with its report are all in
+    ``hooks/context/dispatch-playbook.md``, under the section named by this key. None of
+    it belongs here: every string guard prints is paid for in the main agent's context on
+    the turn it prints it, and this text is the same on every turn — so it is stored once
+    and read only when a turn is actually routed to that agent.
     """
 
-    what: str
     reads: str
     verify_command: bool
-    tail: str
-
-    @property
-    def summary(self) -> str:
-        """The agent's one-line job, phrased for what it was actually handed."""
-        subject = "the turn" if self.reads == "turn" else "the files it is given"
-        return f"audits {subject} for {self.what}"
+    needs_history: bool
 
 
 # The plugin namespace every agent name is qualified with to become a `subagent_type`.
@@ -777,66 +1154,14 @@ def _instance_name(name: str) -> str:
     return "guard-" + name
 
 
-def _dispatch_line(key: str, mode: AgentMode, cont: str) -> str:
-    """How to get this agent working, given its mode.
-
-    Under ``FRESH`` this is a plain dispatch. Under ``REUSE`` it is "resume the named
-    instance if it exists, else dispatch under that name", which is the documented shape:
-    a completed subagent that receives a ``SendMessage`` auto-resumes with its full
-    history, and no agent-teams setting is needed for a plain message
-    (``wiki/ref/claude-code-subagent-resume.md``).
-
-    The order matters — resume first, dispatch second. Written the other way round the
-    main agent spawns a second instance under a name that is already taken, and then
-    there are two of them with divergent histories and no way to tell which one answered.
-    """
-    agent_id = _agent_id(key)
-    if mode is not AgentMode.REUSE:
-        return (f"{cont}Dispatch it with the Agent tool (subagent_type: \"{agent_id}\"), "
-                f"passing these inputs:")
-    inst = _instance_name(key)
-    return (f"{cont}This agent is in REUSE mode. If `{inst}` already exists in this "
-            f"session, SendMessage it (to: \"{inst}\") — it resumes with everything it "
-            f"has already read and judged. Only if it does not exist, dispatch it with "
-            f"the Agent tool (subagent_type: \"{agent_id}\", name: \"{inst}\"). Either "
-            f"way, give it these inputs:")
-
-
 # Order here is the order the agents appear in a recommendation. The two read-only
 # auditors come first: their findings may change what the correctors should be run on.
 AUDIT_AGENTS: dict[str, AuditAgent] = {
-    "claims-auditor": AuditAgent(
-        what="claims asserted without adequate evidence",
-        reads="turn",
-        verify_command=True,
-        tail="It writes nothing. If it reports violations, address them; otherwise continue.",
-    ),
-    "deferrals-auditor": AuditAgent(
-        what="work punted as TBD / 확인 필요 that the repository could have answered",
-        reads="turn",
-        verify_command=True,
-        tail="It writes nothing. If it reports violations, address them; otherwise continue.",
-    ),
-    "korean-corrector": AuditAgent(
-        what="Korean prose that reads as translated English rather than written",
-        reads="turn",
-        verify_command=True,
-        tail=("On violations it also writes the corrected response to the rewrite path "
-              "and names it in its report; read that file and use its text as the "
-              "corrected wording, keeping any phrase it listed as unfixed for yourself "
-              "to resolve. On a pass it writes nothing and there is nothing to do."),
-    ),
-    "comment-corrector": AuditAgent(
-        what=("comments that are false, that only restate the code, or that are missing "
-              "where the intent is not obvious"),
-        reads="files",
-        verify_command=False,
-        tail=("It EDITS the comments in place, so its changes are already in the files "
-              "when it reports. Relay what it changed AND what it left unfixed — an "
-              "unfixed finding needs the user — and do not re-edit its work."),
-    ),
+    "claims-auditor": AuditAgent(reads="turn", verify_command=True, needs_history=True),
+    "deferrals-auditor": AuditAgent(reads="turn", verify_command=True, needs_history=True),
+    "korean-corrector": AuditAgent(reads="turn", verify_command=True, needs_history=False),
+    "comment-corrector": AuditAgent(reads="files", verify_command=False, needs_history=False),
 }
-
 
 
 # Source files whose comments `comment-corrector` can judge. Deliberately not "every
@@ -853,11 +1178,20 @@ _SOURCE_SUFFIXES = frozenset({
 # --------------------------------------------------------------------------- #
 # the router
 #
-# guard makes NO model call of its own. When a turn finishes and the gate is open,
-# the Stop hook decides one mechanical thing — is any agent even eligible — and then
-# asks the main agent to dispatch ONE subagent, the router, whose whole job is to read
-# the finished response and say which of the eligible specialists would find something
-# in it.
+# guard makes NO model call of its own. When a turn finishes, the Stop hook decides one
+# mechanical thing — is any agent even eligible — and then asks the main agent to dispatch
+# ONE subagent, the router. The router reads the finished response and answers with the
+# INSTRUCTIONS: which of the eligible specialists would find something in it, why each,
+# and the dispatch for each.
+#
+# It writes the dispatch rather than guard printing it because of where the cost falls.
+# guard's context lands in the main agent on every routed turn; the router's own
+# definition is read once, by the router, and only when a turn is actually routed. A
+# per-candidate dispatch block in the hook's `additionalContext` is paid four times over
+# on every turn to be used at most four times and usually zero — the router clearing a
+# turn is the common case. So the hook carries only what the router cannot know (where
+# the record is, which agents are on, their modes, the edited files, the rewrite path)
+# and `agents/router.md` carries everything that describes an agent.
 #
 # That the router is an agent and not a `claude -p` child guard spawns itself is the
 # design. A spawned child made the Stop hook block for the router's whole runtime at
@@ -879,34 +1213,19 @@ _SOURCE_SUFFIXES = frozenset({
 # the edited-file list, the router's picks and its reason per pick. Routing a two-line
 # verdict through a file would only add a read.
 #
-# The roster is built HERE, not in `agents/router.md`, and it lists only the agents
-# this turn is eligible for. The router's definition holds the method — triage, not
-# adjudication — while the per-agent cue stays next to the agent table it belongs to.
-# An agent absent from the roster cannot be picked, which beats describing a disabled
-# agent and appending "but this one is off".
+# The roster is built HERE, not in `agents/router.md`, because eligibility is per turn
+# and per project: which switches are on, and which files this turn wrote. The router's
+# definition holds everything that is the same every turn — the method, and the dispatch
+# template per agent. An agent absent from the roster cannot be picked, which beats
+# describing a disabled agent and appending "but this one is off".
+#
+# The result-handling line for an agent therefore exists in two places: `AuditAgent.tail`
+# here, for the on-demand `/guard:*` path where no router runs, and the same guidance in
+# `agents/router.md` for the routed path. Editing one means editing the other — a real
+# cost, accepted because the alternative is Python parsing its own prose out of a
+# markdown file, or the routed path paying for four blocks to use one.
 # --------------------------------------------------------------------------- #
 ROUTER_AGENT = "guard:router"
-
-
-def _router_roster(keys: list[str], edited: list[str]) -> str:
-    """The candidate list handed to the router: the eligible keys, one per line.
-
-    Keys only. What each key means, and the cue for picking it, is in the router's own
-    definition — repeating it here would put a paragraph per candidate into the main
-    agent's context on every routed turn.
-
-    Only eligible keys are listed, and the dispatch blocks printed below the roster cover
-    exactly the same set, so a key the router invents has nothing to dispatch. That is the
-    real bound on the answer; the roster is what stops it being reached for in the first
-    place.
-    """
-    lines = []
-    for key in keys:
-        line = f"- `{key}`"
-        if AUDIT_AGENTS[key].reads == "files":
-            line += " (this turn wrote: " + ", ".join(Path(f).name for f in edited) + ")"
-        lines.append(line)
-    return "\n".join(lines)
 
 
 def _eligible_agents(state: dict[str, Any], edited: list[str]) -> list[str]:
@@ -964,117 +1283,105 @@ def _agent_inputs(project_dir: Path, session_id: str, prompt_id: str, key: str,
     return inputs
 
 
-def _agent_blocks(project_dir: Path, session_id: str, prompt_id: str, keys: list[str],
-                  edited: list[str], numbered: bool,
-                  modes: dict[str, AgentMode]) -> list[str]:
-    """One dispatch block per agent: its name, its job, and the inputs it needs.
+# The playbook the main agent is sent to by section name. Resolved from this file's own
+# location rather than from `CLAUDE_PLUGIN_ROOT`: the same script is the Codex adapter's
+# library and a plain CLI the settings skill calls over Bash, and only one of those three
+# has the env var set.
+PLAYBOOK_REL = "hooks/context/dispatch-playbook.md"
 
-    The agents are named individually and each carries its own inputs, so an agent
-    learns what to audit from WHICH agent was dispatched rather than from a scope
-    argument it has to be trusted to honor. That is why a multi-agent recommendation is
-    a list of separate dispatches and never one agent told to cover several axes.
 
-    Guard names the AGENTS here, never its own `/guard:*` skills. Those skills are
-    `disable-model-invocation: true` — the user's own entry point, not something a hook
-    may reach through — and the Agent tool is the only path guard asks the main agent to
-    take.
+def _playbook_path() -> Path:
+    return Path(__file__).resolve().parent.parent / PLAYBOOK_REL
 
-    ``modes`` carries each key's ``AgentMode``; it is passed in rather than re-read from
-    config because the caller has already resolved it from session state, which can differ
-    from the file for the live session.
+
+def _agent_pointer(project_dir: Path, session_id: str, prompt_id: str, keys: list[str],
+                   edited: list[str], modes: dict[str, AgentMode]) -> str:
+    """Name the playbook sections for these agents and hand over their per-turn inputs.
+
+    This is the whole dispatch instruction, and what is NOT in it is the point: how to
+    dispatch an agent, what its report means, and what to do about it are the same on every
+    turn, so they are stored once in the playbook and read only when a turn is actually
+    routed. What guard prints is only what the playbook cannot know — which agents, in
+    which mode, and the paths for this turn.
+
+    The alternative, printing each agent's dispatch block here, costs the same text in the
+    main agent's context on every routed turn, times every candidate, to be used by at
+    most the ones the router picks and usually none. Having the ROUTER reproduce those
+    blocks instead is no better: it makes an LLM re-type instructions it was handed, which
+    is exactly where wording drifts.
+
+    ``modes`` is passed in rather than re-read from config because the caller resolved it
+    from session state, which can differ from the file for the live session.
     """
-    blocks: list[str] = []
-    for n, key in enumerate(keys, 1):
-        spec = AUDIT_AGENTS[key]
-        # Continuation lines are indented only under a number, where the indent is what
-        # keeps one agent's inputs from reading as the next agent's.
-        head, cont = (f"{n}. ", "   ") if numbered else ("", "")
-        blocks.append(
-            f"{head}`{key}` — {spec.summary}.\n"
-            + _dispatch_line(key, modes[key], cont) + "\n"
-            + "\n".join(cont + line for line in _agent_inputs(
-                project_dir, session_id, prompt_id, key, edited))
-            + f"\n{cont}{spec.tail}"
-        )
-    return blocks
+    lines = [f"Follow {_playbook_path()} — the sections named below, in this order:"]
+    for key in keys:
+        lines.append(f"- `{key}` = {modes[key].value}")
+        lines.extend("  " + line for line in _agent_inputs(
+            project_dir, session_id, prompt_id, key, edited))
+    return "\n".join(lines)
 
 
-def _append_turn_instruction(project_dir: Path, session_id: str, prompt_id: str,
-                             which: str) -> str:
-    """The step asking the MAIN AGENT to complete the record guard started.
+def _history_step(transcript: str, prompt_id: str) -> str:
+    """The pointer an agent needs to look past the response, for the agents that may.
 
-    guard has already written the response. What it asks for is the half it cannot see —
-    and the shape of the ask matters more than the wording, because two different failures
-    are possible here.
+    Not a task for the main agent — that is the point. It used to be: guard asked the main
+    session to copy this turn's request and tool activity into the record and to search back
+    for whatever earlier evidence a claim rested on. That put the largest cost guard has in
+    the one context the user is talking to, before anything was even known to need it, and
+    it made the turn's own author the source for the record of the turn.
 
-    The first is a paraphrase. An agent writing out its own turn tends to tidy it, and a
-    tidied turn is one where the claim actually made is no longer the claim being audited.
-    That is why the response is guard's to write and why this asks for a copy, stated as a
-    prohibition.
-
-    The second is curation, and it only appears once earlier evidence is in scope — which
-    it must be: a claim in this turn is often grounded by a command run three turns ago,
-    and an auditor that never sees it reports a backed claim as unbacked. False positives
-    are the failure that teaches the user to stop reading guard. But "include what is
-    relevant" asked of the claim's own author invites picking exactly the evidence that
-    supports it. So this asks for INCLUSION, never selection: err toward including, and
-    keep your reasoning about why the claim holds out of it. The auditor has the
-    repository and can check what the record does not cover; what it cannot do is
-    un-see a curated case for the defence.
+    Now guard hands over a transcript path, the turn's id, and the command that reads them.
+    The agent extracts what it wants, into its own file. Both problems go away at once: the
+    main agent gathers nothing, and no copy passes through the author.
     """
-    path = _turn_record_file(project_dir, session_id, prompt_id).resolve()
     return (
-        f"STEP 0 — complete the turn record at {path}. guard has already written "
-        f"{which} into it verbatim; do not edit that section. Under "
-        f"\"{TURN_CONTEXT_HEADING.lstrip('# ')}\", append:\n"
-        "   - the user's request for this turn, copied;\n"
-        "   - the tool activity this turn ran — what you ran and what came back, copied, "
-        "not described;\n"
-        "   - anything from EARLIER in the session that the response's statements rest "
-        "on: a command whose output a claim is repeating, a file you read, a number you "
-        "are carrying forward. Include it rather than judging it relevant — if you are "
-        "unsure whether something is load-bearing, put it in. What must NOT go in is your "
-        "own case for why the response is right; the agents form their own view, and an "
-        "argument in the record is the one thing that can bias every one of them at once."
-        "\n   Create the file if it is missing (write both sections, response first). "
-        "Every agent below reads this one file."
+        f"For an agent that needs more than the response — what was asked, what this turn "
+        f"ran, what an earlier turn established — pass these along too, and let the agent "
+        f"extract what it wants:\n"
+        f"- transcript: {transcript}\n"
+        f"- this turn's id: {prompt_id}\n"
+        f"- extract with: {Path(__file__).resolve()} transcript index|turn|find "
+        f"--transcript <path> [--turn <id>] [--pattern <re>] [--until <id>] [--last <n>]\n"
+        f"Do not gather any of it yourself."
     )
 
 
 def _dispatch_context(project_dir: Path, session_id: str, prompt_id: str, lead: str,
                       keys: list[str], modes: dict[str, AgentMode],
-                      edited: list[str] | None = None) -> str:
+                      edited: list[str] | None = None, transcript: str = "") -> str:
     """``additionalContext`` asking the main agent to dispatch these agents directly.
 
     The no-router path: the user named the audit themselves with a `/guard:audit-*`
     command, so there is nothing to triage and routing it would only add a hop.
     """
     keys = list(keys)
-    blocks = _agent_blocks(project_dir, session_id, prompt_id, keys, edited or [],
-                           len(keys) > 1, modes)
     parts = [lead]
-    if any(AUDIT_AGENTS[k].reads == "turn" for k in keys):
-        parts.append(_append_turn_instruction(project_dir, session_id, prompt_id,
-                                              "the response being audited"))
-    return "\n\n".join(parts + blocks)
+    parts.append(_agent_pointer(project_dir, session_id, prompt_id, keys, edited or [],
+                                modes))
+    if transcript and any(AUDIT_AGENTS[k].needs_history for k in keys):
+        parts.append(_history_step(transcript, prompt_id))
+    return "\n\n".join(parts)
 
 
 def _router_context(project_dir: Path, session_id: str, prompt_id: str, lead: str,
                     eligible: list[str], edited: list[str], modes: dict[str, AgentMode],
-                    config: dict[str, Any]) -> str:
-    """``additionalContext`` for the Stop path: route first, then dispatch what it names.
+                    config: dict[str, Any], transcript: str = "") -> str:
+    """``additionalContext`` for the Stop path: route, then act on what comes back.
 
-    Everything both steps need is in this one message, on purpose. The alternative — the
-    router reports back and a second hook builds the real dispatch — would put a round
-    trip between "which agents" and "how to dispatch them", and guard has nothing to add
-    in between: it knows every candidate's inputs already.
+    The main agent gathers nothing here, and that is deliberate. An earlier shape had it
+    complete a turn record before routing — copying this turn's tool output and searching
+    back for whatever a claim rested on. That paid the largest cost guard has in the one
+    context the user is waiting on, on every routed turn including the many the router then
+    clears, and it made the turn's author the source for the record of the turn. Now the
+    record holds only the response, guard wrote it, and an agent that needs more is handed
+    the transcript and the command to extract from it.
 
-    So the turn is written once to a file, the router is told what it may choose from,
-    and each candidate's dispatch block is printed below it in advance. The main agent
-    writes the record, routes, then dispatches the subset the router names — all of them
-    reading that same file. The roster carries the ELIGIBLE agents only, and the blocks cover
-    exactly the same set: a switch the user turned off is not offered and has no block, so
-    it cannot be reached even if the router names it anyway.
+    Keeping this message short is the other half of the same point — it enters the main
+    agent's context at the end of every routed turn. So it carries only what nothing else
+    can know: where the record is, which agents the user has switched on, the mode of each,
+    the files this turn wrote, where a long rewrite may go, the transcript pointer for the
+    agents that may need history, and where the instructions are. Everything that reads the
+    same on every turn is in the playbook, read only by whoever is sent to that section.
 
     Deliberately absent: any summary of the turn, from guard or from the main agent.
     Priming an audit with the author's account of the work is how an unexamined claim
@@ -1087,30 +1394,32 @@ def _router_context(project_dir: Path, session_id: str, prompt_id: str, lead: st
     checks. It is also the cheapest agent here, so continuity buys the least.
     """
     model = _router_model(config)
-    model_line = (f"\n   Dispatch it with model: {model}." if model else "")
-    blocks = _agent_blocks(project_dir, session_id, prompt_id, eligible, edited, True,
-                           modes)
-    return (
-        lead
-        + "\n\n"
-        + _append_turn_instruction(project_dir, session_id, prompt_id,
-                                   "the response you just finished")
-        + "\n\nSTEP 1 — route. Dispatch `" + ROUTER_AGENT + "` with the Agent tool "
-        "(subagent_type: \"" + ROUTER_AGENT + "\"), passing these inputs:"
-        + f"\n   - turn record: {_turn_record_file(project_dir, session_id, prompt_id).resolve()}"
-        + "\n   - candidate agents (it may name only these, by their `key`):\n"
-        + "\n".join("     " + line for line in _router_roster(eligible, edited).splitlines())
-        + model_line
-        + "\n   It reports which candidates are worth running, with a reason for each. An "
-        "empty answer is a normal result: it means the turn has nothing for any of them, "
-        "and then you say nothing about auditing and continue.\n\n"
-        "STEP 2 — dispatch what it named, and only that, in ONE message so they run "
-        "concurrently. The blocks below are every candidate; use the ones it picked. "
-        "Relay each agent's own reason from the router's report when you report back — a "
-        "pick that plainly misread the turn is worth saying so about rather than working "
-        "around.\n\n"
-        + "\n\n".join(blocks)
-    )
+    record = _turn_record_file(project_dir, session_id, prompt_id).resolve()
+    route = [
+        f"STEP 1 — route. Follow {_playbook_path()}, section `router`: dispatch "
+        f"`{ROUTER_AGENT}` with the Agent tool (subagent_type: \"{ROUTER_AGENT}\")"
+        + (f", model: {model}" if model else "") + ", passing:",
+        f"- turn record (the response, verbatim; guard wrote it): {record}",
+        "- candidates (it may name only these):",
+    ]
+    for key in eligible:
+        route.append(f"  - `{key}` = {modes[key].value}")
+        if AUDIT_AGENTS[key].reads == "files":
+            route.append("    files this turn wrote:")
+            route.extend(f"      {f}" for f in edited)
+    if "korean-corrector" in eligible:
+        route.append("- rewrite path for `korean-corrector`: "
+                     f"{_korean_rewrite_file(project_dir, session_id, prompt_id).resolve()}")
+    parts = [
+        lead,
+        "\n".join(route),
+        "STEP 2 — then follow the playbook section for each agent it named, in the order it "
+        "named them, dispatching them in ONE message. `none`, or nothing named, means the "
+        "turn had nothing for any of them — say nothing about auditing and continue.",
+    ]
+    if transcript and any(AUDIT_AGENTS[k].needs_history for k in eligible):
+        parts.append(_history_step(transcript, prompt_id))
+    return "\n\n".join(parts)
 
 
 # The lead for a routed turn. There is no second mode: a switch the user turned on is
@@ -1118,9 +1427,9 @@ def _router_context(project_dir: Path, session_id: str, prompt_id: str, lead: st
 # that trains them to wave it through. What the main agent must not do is quietly swallow
 # the result — the report is the point.
 _ROUTE_LEAD = (
-    "guard: audit the turn you just finished, then act on what the agents report. Route "
-    "it first to find which agents are worth running, dispatch those, and report what "
-    "they found; a clean result is one line."
+    "guard: audit the turn you just finished. Route it first — the router reads the turn "
+    "and names which agents are worth running; then follow their playbook sections and "
+    "report what they found. A clean result is one line."
 )
 
 
@@ -1218,7 +1527,8 @@ def cmd_verify() -> int:
     context = _dispatch_context(
         project_dir, session_id, pid,
         "guard: audit the last completed turn, on request.", [key],
-        {key: _agent_mode(state, key)})
+        {key: _agent_mode(state, key)},
+        transcript=str(state.get("transcript_path") or ""))
     _emit_expansion(context)
     _trace(project_dir, session_id, "verify", "dispatch", agent=key, prompt_id=pid)
     return 0
@@ -1387,6 +1697,8 @@ def cmd_stop() -> int:
     # not pass through the author's hands. An hour-old turn the user asks about is still
     # quoted exactly.
     state["pending_verify_prompt_id"] = prompt_id
+    if isinstance(payload.get("transcript_path"), str):
+        state["transcript_path"] = payload["transcript_path"]
     _write_turn_response(project_dir, session_id, prompt_id, response)
 
     # Once per turn. `stop_hook_active` already covers the normal path, but the
@@ -1413,8 +1725,10 @@ def cmd_stop() -> int:
     state["last_audited_prompt_id"] = prompt_id
     _write_state(project_dir, session_id, state)
 
+    transcript = payload.get("transcript_path")
     context = _router_context(project_dir, session_id, prompt_id, _ROUTE_LEAD,
-                              eligible, edited, modes, config)
+                              eligible, edited, modes, config,
+                              transcript if isinstance(transcript, str) else "")
     # `additionalContext`, not `decision: "block"`. Per the official hooks docs
     # (https://code.claude.com/docs/en/hooks, "Stop decision control"; excerpt saved at
     # wiki/ref/claude-code-stop-hook-decision-control.md) the two continue the
@@ -1500,6 +1814,18 @@ def cmd_session_start() -> int:
         "and that local path. The same path is in $GUARD_REFS_DIR for Bash."
     )
 
+    # Name the playbook once, at the session's opening, when guard has anything switched
+    # on. The Stop hook repeats the path on each routed turn — one line, and it must,
+    # because context compaction can drop this one — but stating it here is what lets that
+    # line stay a path instead of an explanation of what the file is for.
+    if any(_switch_on(session_cfg, k) for k in AUDIT_AGENTS):
+        print(
+            "guard: audits are on for this project. When a turn finishes, guard names the "
+            f"agents to consider and points at {_playbook_path()}, which says how to "
+            "dispatch each one and what to do with what it reports. Read only the sections "
+            "you are named; do not read the file until then."
+        )
+
     # The standing reuse policy is stated ONCE, here, rather than in every Stop
     # recommendation. Reuse is a session-long fact — the instance lives under the session
     # id — so the session's opening is where it belongs, and repeating it per turn would
@@ -1514,11 +1840,10 @@ def cmd_session_start() -> int:
     if reused:
         named = ", ".join(f"{_agent_id(k)} as `{_instance_name(k)}`" for k in reused)
         print(
-            "guard: these audit agents run as ONE instance for this session, not a fresh "
-            f"one per turn — {named}. Dispatch each under that name the first time it is "
-            "needed, then SendMessage the name on later turns so it keeps what it has "
-            "already read and judged. They can also message each other and you by name. "
-            "Every other guard agent, the router included, is a fresh instance each time."
+            "guard: these audit agents run as ONE instance for this whole session, not a "
+            f"fresh one per turn — {named}. Keep those instances; they can message each "
+            "other and you by name. Every other guard agent, the router included, is "
+            "fresh each time. The playbook says how to reach a reused instance."
         )
     _trace(project_dir, None, "session-start", "swept")
     return 0
@@ -1851,6 +2176,7 @@ SUBCOMMANDS = {
     "session-start": cmd_session_start,
     "exempt": cmd_exempt,
     "refs-dir": cmd_refs_dir,
+    "transcript": cmd_transcript,
 }
 
 
