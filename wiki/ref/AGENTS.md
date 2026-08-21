@@ -13,17 +13,20 @@ never commits.
 **Adding a reference:** save the excerpt as `<topic>.md` with `Source:` and
 `Retrieved:` lines at the top, then add a row below. A file missing from this index
 reads as a file nobody saved — the index is how the next reader finds it without
-opening ten files. guard's `refs-index` hook fails the write when a new file is not
+opening ten files. guard's `post-edit` hook fails the write when a new file is not
 listed here.
 
 ## Index
 
 | File | Subject | Source |
 | --- | --- | --- |
+| `claude-code-headless-child-flags.md` | Flags for a lightweight `claude -p` child: `--safe-mode` disables hooks while keeping auth, why `--bare` is rejected, and a probe table showing that omitting `--allowedTools` does NOT withhold tools | `claude --help` + probes (2.1.238) |
 | `claude-code-hooks-session-env.md` | SessionStart env persistence (`$CLAUDE_ENV_FILE`) and hook output fields | code.claude.com/docs/en/hooks |
 | `claude-code-output-styles.md` | Output-style frontmatter schema, plugin `output-styles/` discovery, subagent scope | code.claude.com/docs/en/output-styles |
 | `claude-code-pretooluse-permission-decision.md` | PreToolUse `permissionDecision` values | code.claude.com/docs/en/hooks |
 | `claude-code-prompt-hooks.md` | Prompt-type hooks | code.claude.com/docs/en/hooks |
+| `claude-code-stop-hook-decision-control.md` | Stop hook output: `decision: "block"` vs `hookSpecificOutput.additionalContext`, their shared loop protections, and how `additionalContext` reaches the model | code.claude.com/docs/en/hooks |
+| `claude-code-subagent-resume.md` | Naming a subagent at dispatch, resuming one by name with `SendMessage` (full history retained, auto-resume in background), and how long subagent transcripts persist | code.claude.com/docs/en/sub-agents |
 | `claude-code-subagent-frontmatter.md` | Subagent frontmatter fields; `tools` omitted inherits all, no way to express none | code.claude.com/docs/en/sub-agents |
 | `jira-wiki-markup-notation.md` | Jira wiki markup notation (headings, effects, lists, links, tables, code) | Jira `WikiRendererHelpAction.jspa` |
 | `markdown-footnotes.md` | Markdown footnote syntax (extended) | markdownguide.org/extended-syntax |

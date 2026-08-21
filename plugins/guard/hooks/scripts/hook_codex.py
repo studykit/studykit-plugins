@@ -81,6 +81,13 @@ def _handle_session_start(project_dir: Path) -> None:
     core.cmd_session_start()
 
 
+# Caps on what one tool call contributes to Codex's turn record. Codex keeps a record of
+# its own because its transcript is not a stable hook interface; Claude no longer keeps
+# one at all (its main agent writes the turn), so these live here rather than in core.
+TOOL_CONTEXT_MAX_CHARS = 12000
+TOOL_RESULT_MAX_CHARS = 2000
+
+
 def _handle_prompt(project_dir: Path, payload: dict[str, Any], session_id: str, turn_id: str) -> None:
     prompt = payload.get("prompt")
     prompt = prompt if isinstance(prompt, str) else ""
@@ -88,7 +95,7 @@ def _handle_prompt(project_dir: Path, payload: dict[str, Any], session_id: str, 
     state = core._read_state(project_dir, session_id, config)
     _save_turn(project_dir, session_id, turn_id, {"user": prompt, "tools": [], "assistant": ""})
 
-    if prompt.strip().lower().startswith("/guard:audit-claims"):
+    if prompt.strip().lower().startswith("/guard:claims-auditor"):
         pending = state.get("pending_verify_prompt_id")
         if isinstance(pending, str) and pending and _turn_path(project_dir, session_id, pending).is_file():
             _emit({"hookSpecificOutput": {"hookEventName": "UserPromptSubmit", "additionalContext": (
@@ -108,14 +115,16 @@ def _handle_post_tool(project_dir: Path, payload: dict[str, Any], session_id: st
     command = tool_input.get("command") if isinstance(tool_input, dict) else None
     tool_name = payload.get("tool_name") if isinstance(payload.get("tool_name"), str) else "tool"
     if not isinstance(command, str):
-        command = f"[{tool_name}] {json.dumps(tool_input, ensure_ascii=False)[:core.TOOL_CONTEXT_MAX_CHARS]}"
+        command = f"[{tool_name}] {json.dumps(tool_input, ensure_ascii=False)[:TOOL_CONTEXT_MAX_CHARS]}"
     output = json.dumps(tool_response, ensure_ascii=False) if not isinstance(tool_response, str) else tool_response
-    turn.setdefault("tools", []).append({"command": command[:core.TOOL_CONTEXT_MAX_CHARS], "output": output[:core.TOOL_RESULT_MAX_CHARS]})
+    turn.setdefault("tools", []).append({"command": command[:TOOL_CONTEXT_MAX_CHARS], "output": output[:TOOL_RESULT_MAX_CHARS]})
     _save_turn(project_dir, session_id, turn_id, turn)
 
     # A reference saved into the refs dir must be listed in the index; same rule as
-    # Claude's `refs-index` hook, applied here because Codex routes every event
-    # through this one adapter.
+    # Claude's `post-edit` hook, applied here because Codex routes every event through
+    # this one adapter. Claude's other `post-edit` job — recording the turn's edited
+    # source files — is deliberately not mirrored: it exists only to point
+    # `comment-corrector` at them, and Codex has no agent for that yet.
     config = core._load_config(project_dir)
     if core._targets_refs_dir(project_dir, tool_input, config):
         target = core._tool_target_path(project_dir, tool_input)
@@ -123,6 +132,13 @@ def _handle_post_tool(project_dir: Path, payload: dict[str, Any], session_id: st
             reason = core.refs_index_gap(project_dir, target, config)
             if reason is not None:
                 _emit({"decision": "block", "reason": reason})
+
+
+# How each shared recommendation key reads in the sentence handed to Codex's single
+# named agent. Keys absent here have no Codex agent and are dropped.
+_SCOPE = {"claims-auditor": "the response's claims",
+          "deferrals-auditor": "deferrals the repository could resolve",
+          "korean-corrector": "whether the Korean reads as translated English"}
 
 
 def _handle_stop(project_dir: Path, payload: dict[str, Any], session_id: str, turn_id: str) -> None:
@@ -137,37 +153,48 @@ def _handle_stop(project_dir: Path, payload: dict[str, Any], session_id: str, tu
     _save_turn(project_dir, session_id, turn_id, turn)
     config = core._load_config(project_dir)
     state = core._read_state(project_dir, session_id, config)
-    want_claims, want_deferrals = core._audit_claims(state), core._audit_deferrals(state)
-    want_korean = core._audit_korean(state)
-    # Every axis off: nothing for the auditor to report, so do not block for one.
-    if not (want_claims or want_deferrals or want_korean):
-        return
-    if state["audit_gate"] == core.AuditGate.MANUAL:
-        state["pending_verify_prompt_id"] = turn_id
+    # Recorded whether or not a switch is on: it is what `$guard:claims-auditor` is
+    # pointed at, and switching the automatic recommendation off is not meant to take
+    # away the user's own command.
+    state["pending_verify_prompt_id"] = turn_id
+    # Codex command hooks cannot launch an agent themselves, and unlike Claude's Stop
+    # there is no continuation to piggyback on — so the once-guard cannot lean on
+    # `stop_hook_active` and keys on the turn id instead.
+    if state.get("last_audited_prompt_id") == turn_id:
         core._write_state(project_dir, session_id, state)
         return
-    # Codex command hooks cannot launch an agent themselves.  A Stop block creates
-    # one continuation prompt, where the main agent can dispatch the auditor.
+    # Neither reuse nor routing exists here. `reuse` is a named instance addressed with
+    # `SendMessage`, and this adapter has neither — `core._eligible_agents` only asks
+    # whether a mode is `off`, so the value costs nothing and means nothing on Codex.
+    #
+    # No router here either. Claude's Stop asks its main agent to dispatch `guard:router`, a
+    # subagent that reads the turn and names which of the eligible agents would find
+    # something in it. Codex ships one named agent, installed by `$guard:setup`, and a
+    # router that can only forward to that same agent decides nothing — so Codex
+    # recommends the whole ELIGIBLE set, unrouted, and is correspondingly noisier.
+    # Fixing that means giving Codex the agent set first, not adding a router.
+    #
+    # `_SCOPE` filters before the once-guard is spent, not after: a turn whose only
+    # recommendation is one Codex cannot act on must stay eligible for the next event
+    # rather than be marked audited on the strength of a message never sent.
+    keys = [k for k in core._eligible_agents(state, []) if k in _SCOPE]
+    if not keys:
+        core._write_state(project_dir, session_id, state)
+        return
     state["last_audited_prompt_id"] = turn_id
     core._write_state(project_dir, session_id, state)
-    # Table-driven, not a branch per combination: three independent axes have seven
-    # valid states. Mirrors core._axis_dispatch_context so both hosts name the axes
-    # the same way.
-    _SCOPE = {"claims": "claims", "deferrals": "deferrals", "korean": "Korean naturalness"}
-    on = [f for f in core._AXIS_FIELDS if {"claims": want_claims,
-                                          "deferrals": want_deferrals,
-                                          "korean": want_korean}[f]]
-    off = [f for f in core._AXIS_FIELDS if f not in on]
-    scope = "the response's " + ", ".join(_SCOPE[f] for f in on)
-    if off:
-        scope += (" ONLY (skip " + ", ".join(_SCOPE[f] for f in off)
-                  + "; report those empty)")
+
+    # Codex has ONE named agent (`guard_claims_auditor`, installed by `$guard:setup`),
+    # so the per-agent fan-out Claude gets is expressed here as a scope sentence handed
+    # to that single agent. The eligibility rules are shared (`core._eligible_agents`);
+    # what Claude adds on top is the router.
+    scope = ", ".join(_SCOPE[k] for k in keys)
     _emit({"decision": "block", "reason": (
-        "guard: before completing, spawn the read-only guard_claims_auditor named subagent in a fresh "
-        "context. Give it "
-        f"the saved turn record at {_turn_path(project_dir, session_id, turn_id)} and have it check "
-        f"{scope} against the repository; then address any violations. If that agent is unavailable, "
-        "tell the user to run $guard:setup in this project."
+        "guard: before completing, audit the turn you just finished. Spawn the "
+        "read-only guard_claims_auditor named subagent in a fresh context, give it the "
+        f"saved turn record at {_turn_path(project_dir, session_id, turn_id)}, and have "
+        f"it check {scope} against the repository; then address what it reports. If that "
+        "agent is unavailable, tell the user to run $guard:setup in this project."
     )})
 
 

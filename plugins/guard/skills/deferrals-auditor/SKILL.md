@@ -1,5 +1,5 @@
 ---
-name: audit-deferrals
+name: deferrals-auditor
 description: 'On demand, audit the last completed turn for unjustified deferrals — guard dispatches the deferrals-auditor subagent to find questions punted as "TBD" / "확인 필요" that the repository can answer. Use when an answer left too much open. Claude Code only.'
 argument-hint: ''
 disable-model-invocation: true
@@ -13,7 +13,7 @@ tool exactly as the reminder specifies, then relay its verdict — if it reports
 violations, address them; otherwise state that the turn passed.
 
 This checks work punted that the repository could have answered, and nothing else. For
-the other checks, run `/guard:audit-claims` and `/guard:correct-korean`.
+the other checks, run `/guard:claims-auditor` and `/guard:korean-corrector`.
 
 If the reminder instead says there is nothing to audit (no completed turn yet), relay
 that in one line and take no further action.

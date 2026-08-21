@@ -1,5 +1,5 @@
 ---
-name: correct-comment
+name: comment-corrector
 description: "Audit source-code comments in the given files and fix what the audit finds: comments that only restate what the code already says, comments whose claims are false, and places where non-obvious intent or a hazard is left unrecorded. guard dispatches the comment-corrector subagent, which judges the comments in a fresh context and applies the fixes in place. Requires a file or directory argument. Claude Code only."
 argument-hint: '<file | directory> [more paths…]'
 disable-model-invocation: true

@@ -10,41 +10,34 @@ line-by-line walkthrough.
 
 | Event | Subcommand | Role |
 | --- | --- | --- |
-| `UserPromptSubmit` | `user-prompt` | Archive the user turn to the session log. Ignores `/guard:settings` / `/guard:audit-{claims,deferrals,korean}`. |
-| `UserPromptExpansion` (one matcher per axis: `audit-claims`, `audit-deferrals`, `correct-korean`) | `verify <axis>` | On demand, dispatch **that axis's** agent for the last completed turn (`pending_verify_prompt_id`). The axis rides in argv, not in a dispatch input the agent has to be trusted to honor. The command verb tracks what the agent does: the two auditors report, the Korean corrector rewrites. |
-| `PostToolUse` (`Write\|Edit\|MultiEdit\|NotebookEdit`) | `refs-index` | Block when a file saved in the refs dir is not listed in that dir's `AGENTS.md`. |
-| (called via Bash, not a hook) | `settings` | `guard:settings` skill (forked) shows/sets guard.local.json settings; `audit_gate`/`audit_claims`/`audit_deferrals`/`audit_korean` also apply to the live session's `state/<sid>.json` (session id from `--session`/`CLAUDE_CODE_SESSION_ID`). Every other key preserved; never the list key (`exempt_skills`). |
+| `UserPromptSubmit` | `user-prompt` | Trace only. guard keeps no record of the prompt; the hook stays registered so a "guard said nothing" report can be told apart from a hook that never ran. |
+| `UserPromptExpansion` (one matcher per agent: `claims-auditor`, `deferrals-auditor`, `korean-corrector`) | `verify <agent>` | On demand, dispatch **that agent** for the last completed turn. The agent name rides in argv, not in a dispatch input the model has to be trusted to honor. |
+| `PostToolUse` (`Write\|Edit\|MultiEdit\|NotebookEdit`) | `post-edit` | Record a source file this turn wrote (the candidate list for a `comment-corrector` recommendation), then block when a file saved in the refs dir is not listed in that dir's `AGENTS.md`. |
+| (called via Bash, not a hook) | `settings` | `guard:settings` skill (forked) shows/sets guard.local.json settings; the four agent modes also apply to the live session's `state/<sid>.json` (session id from `--session`/`CLAUDE_CODE_SESSION_ID`). A mode change away from `reuse` also prints a stand-down note, the only channel guard has to a running instance. Every other key preserved; never the list key (`exempt_skills`). |
 | (called via Bash, not a hook) | `exempt` | `guard:settings` skill records the user's confirmed `exempt_skills` selection (that key only). |
-| `Stop` | `stop` | manual: record pending target, no audit. headless: one in-hook judge **per enabled axis**, spawned in parallel; blocks on any axis's violation. |
-| `SessionStart` | `session-start` | Age-sweep state/sessions/verified/turns; inject the per-project refs directory the style cannot hardcode. |
+| `Stop` | `stop` | Write the response section of the turn record and mark the turn as the on-demand target — always. Then, when any agent is not `off`, emit `additionalContext` asking the main agent to complete the record, dispatch `guard:router` over it, and dispatch the agents it names (resuming a named instance where the mode is `reuse`). |
+| `SessionStart` | `session-start` | Sweep state and turn records past retention, export `GUARD_REFS_DIR`, state the refs rule as session context, and — when any agent is in `reuse` — state the standing reuse policy once. |
 | (called via Bash, not a hook) | `refs-dir` | Print the resolved refs directory (auditor fallback; applies `refs_dir` validation). |
 
 ## Storage layout (`${CLAUDE_PROJECT_DIR}/.claude/guard/`)
 
-A **turn is the transcript's `promptId`**. guard keeps no turn buffer of its own; at
-Stop it reconstructs the turn from Claude Code's transcript, sliced by `prompt_id`.
+A **turn is the transcript's `promptId`**. guard keeps no copy of a turn's content: it
+reads the transcript only for the turn's *kind* (`_turn_identity`), and the turn itself is
+written by the main agent.
 
-- `state/<sid>.json` — the session's live judge settings (`audit_gate` and the three axis
-  switches), plus the per-turn markers keyed on `prompt_id` that keep each once-only
-  action once-only (`last_audited_prompt_id`, `pending_verify_prompt_id`).
+- `state/<sid>.json` — the session's live agent modes (one key per agent, named after it,
+  valued `off`/`fresh`/`reuse`), the per-turn markers keyed on `prompt_id` that keep each once-only action once-only
+  (`last_audited_prompt_id`, `pending_verify_prompt_id`), and the turn's edited source
+  files (`edited_prompt_id` + `edited_files`). The edited list is stored WITH the prompt_id
+  it belongs to, not as a bare list: PostToolUse appends and Stop reads back, and without
+  the id a previous turn's files would ride into this turn's recommendation.
   `_read_state` honors only known keys, so a hand-edited or stale file degrades to
   defaults instead of injecting state.
-- `sessions/<sid>.jsonl` — full session archive, one line per user/assistant/judge
-  record. A judge record carries `axes` (what ran) and `missing` (what failed) alongside
-  the per-axis findings, so a partial audit is legible after the fact and not mistaken
-  for an axis that found nothing.
-- `turns/<sid>/<prompt_id>.json` — **manual mode only**: the turn slice guard cut from
-  the transcript (`{user, tools[], assistant}`) and hands to whichever axis auditor is
-  dispatched, so the auditor reads one turn, not the whole transcript. Manual-mode Stop
-  writes it and records `pending_verify_prompt_id`; the per-axis on-demand commands
-  commands read it back. Headless mode judges in-process and writes no turn file.
-- `verified/<sid>.jsonl` — supported claims from FULLY-AUDITED PASSED turns only (`{ts,
-  turn, claim, evidence}`, `turn` = prompt_id), replayed to later Stops as a
-  VERIFIED_FACTS block so an established fact isn't re-derived. Only passed turns
-  contribute, so a blocked/unsupported claim never becomes "verified" — and a turn with
-  a *missing* axis (a judge that failed) contributes nothing either, even when every
-  axis that did report was clean: a partially-audited turn is not evidence that the
-  claim survived the audit.
+- `turns/<sid>/<prompt_id>.md` — the turn every agent in one recommendation reads, in two
+  sections. guard writes the **response** section at every Stop from the payload's
+  `last_assistant_message`; the main session appends the **request, tool activity, and
+  prior evidence** section. `<prompt_id>.ko-fix.md` beside it is where `korean-corrector`
+  writes its rewrite.
 - `trace.log` — file-only debug trace (`GUARD_TRACE` truthy).
 
 State survives session end (a resumed `claude --resume` must keep its flags);
@@ -67,25 +60,27 @@ payloads, not memory.
   needs ≥ 2.1.196); the hook input schema is in the official hooks docs
   (https://code.claude.com/docs/en/hooks). Re-verify against those docs and a live Stop
   payload before relying on this.
-- **Transcript slice.** The anchor record has `promptId == prompt_id` (a typed prompt:
-  `origin={"kind":"human"}` + str content). Derived records — assistant text,
-  tool_use/tool_result — have `promptId=None` and stay in the slice; the slice ends at
-  the next different non-empty promptId. `isMeta:true` records (guard's own feedback)
-  are skipped. `_read_turn_from_transcript(path, prompt_id)` is unit-testable on a
-  fixture JSONL.
+- **Turn anchor.** The anchor record is the one whose top-level `promptId == prompt_id`
+  (a typed prompt: `origin={"kind":"human"}` + str content). Records derived from the turn
+  carry `promptId=None`. guard reads the anchor and stops — `_turn_identity` needs the
+  turn's kind, not its content — so the slice-boundary rules that used to matter here (the
+  next different non-empty promptId ends the slice; `isMeta:true` records are guard's own
+  feedback and are skipped) no longer bear on anything. They are recorded in case a future
+  change needs to walk the turn again; do not re-add the walk without a reason.
 - **A background-agent completion opens its own transcript turn** (`origin.kind ==
-  "task-notification"`, `promptSource: "system"`, NOT `isMeta`; verified 2.1.197). An
-  auditor dispatch is itself a background task, so auditing its completion would
-  re-dispatch it — the loop no auto-dispatch mode exists to hit any more, but the skip
-  still guards the on-demand path and the Codex adapter. `cmd_stop` skips these
-  (`skip_task_notification`) from BOTH archive and judge. Ordering that must not
-  regress: the skip precedes `_append_log`, and `_append_log` stays ahead of the
-  `stop_hook_active` check (so a corrected response after a headless block is still
-  archived).
-- **A Stop hook may inject `additionalContext` without `decision`** and the
-  conversation continues — the auditor-dispatch mechanism, still used by the Codex
-  adapter and by `UserPromptExpansion` on the Claude side. `stop_hook_active: true`
-  ⇒ guard already blocked this turn, so Stop returns at once.
+  "task-notification"`, `promptSource: "system"`, NOT `isMeta`; verified 2.1.197). This is
+  load-bearing: the recommendation asks the main agent to dispatch agents, each dispatch is
+  a background task whose completion opens a turn, and recommending an audit *of that turn*
+  would dispatch again without end. `cmd_stop` skips these (`skip_task_notification`).
+- **`hookSpecificOutput.additionalContext` on Stop continues the conversation.** Claude
+  acts on the text in the same turn, exactly as with `decision: "block"`, and under the
+  same loop protections — `stop_hook_active` plus an 8-consecutive-continuation cap. The
+  only difference is presentation: block surfaces as a hook error, `additionalContext` as
+  `Stop hook feedback`. Source: official hooks docs
+  (https://code.claude.com/docs/en/hooks, "Stop decision control"), excerpt saved at
+  `wiki/ref/claude-code-stop-hook-decision-control.md`, fetched 2026-08-21. This is why
+  guard's recommendation is `additionalContext` and its refs-index gap is still a block:
+  one is guidance from a working hook, the other is unfinished work.
 - **A forked skill can reach the pre-fork session id** — the load-bearing fact behind
   `guard:settings` (`context: fork`) writing the live session's `state/<sid>.json`.
   `${CLAUDE_SESSION_ID}` is a skill-content *substitution* expanded in the parent (per the
@@ -98,53 +93,81 @@ payloads, not memory.
   passes `--session ${CLAUDE_SESSION_ID}`. For the main session this id equals the hook
   payload's `session_id` that state is keyed on (one id per session; not separately
   probed against a live payload here). `cmd_settings` writes `guard.local.json` (that key
-  only) plus, for `audit_gate` and the axis switches, the session state; it runs only from
+  only) plus, for the four agent modes, the session state; it runs only from
   the user-invoked (`disable-model-invocation`) skill, which the model cannot trigger.
 
 ## Design invariants (why, not how)
 
 - **Always exit 0; fail open.** Blocking is a decision payload on stdout, never a
-  non-zero exit. Any judge failure (missing binary, timeout, unparseable output)
-  leaves state untouched and does not block — guard must never harass the user
+  non-zero exit. Any internal failure — an unreadable transcript, a state file that will
+  not write — leaves state untouched and says nothing: guard must never harass the user
   because its own machinery broke.
-- **The evidence judge has no setting of its own** beyond `audit_gate`, and `manual` (the
-  default) is its practical off: Stop archives the turn and records the pending target,
-  but spawns no judge. `/guard:settings` sets it (writing the config key and, with a
-  session id, the live session state).
-- **Control turns and exempt commands are never judged.** `/guard:settings` and all three
-  `/guard:audit-{claims,deferrals,korean}` commands are skipped on BOTH sides: the
-  UserPromptSubmit archive skips them (`_CONTROL_CMD_RE` on the raw prompt, so they never
-  become a turn in the log), and `cmd_stop` skips them via
-  `command_name` (extracted from the transcript's expanded
+- **guard routes; the agents audit; guard runs no model.** No judgment about the *content*
+  of a turn happens in the hook. Stop asks the main agent to dispatch one subagent — the
+  router — which reads the turn and names which eligible agents would find something in it;
+  the main agent dispatches those. Three shapes were tried before this one. Auditing inside
+  the hook (the old `headless`) meant every criterion existed twice, once as a judge prompt
+  and once as an agent definition, and they drifted. Picking agents by lexical pattern meant
+  guard could detect `TBD` but not "asserted without evidence", which is the axis that
+  matters most — so it named the claims auditor every turn, which is the same as naming
+  none. Spawning the router as a `claude -p` child worked, but see the next invariant.
+- **The router is a subagent, not a child process.** Every problem it used to have came
+  from being a process guard spawned: the Stop hook blocked for the router's whole runtime
+  at the end of every turn the user was waiting on; the child needed `--safe-mode` or
+  guard's own Stop hook fired inside it and recursed; it needed an explicit
+  `--disallowedTools` list because omitting `--allowedTools` leaves a child fully tooled
+  (probed on 2.1.238 — the intuition is wrong, and `wiki/ref/claude-code-headless-child-flags.md`
+  has the table); `--bare` was lighter but took auth down to `ANTHROPIC_API_KEY` only, so
+  it would silently never run for an OAuth user; and spawn failure, timeout, non-zero exit
+  and unparseable output were four failure paths guard had to tell apart from a clean
+  verdict, in code and in the trace. As a subagent, the host runs it, its model lives in
+  its definition, and the hook returns immediately. Do not reintroduce the child.
+- **The router triages; it does not adjudicate.** Per agent it answers one question — is
+  there material here — with a materiality bar (a five-word acknowledgement is Korean and
+  is technically a statement; naming agents for it is the noise that makes the whole
+  recommendation ignorable). Whether a claim is adequately backed, a deferral legitimate,
+  or some Korean any good is the agent's call, and the agent reads the turn itself. This
+  line is stated in `agents/router.md` per candidate, and it is the thing most easily lost
+  in an edit: a router that starts judging quality stops naming the agent that would have
+  judged it properly.
+- **The router's cue lives in its own definition; the roster in the hook.**
+  `agents/router.md` holds the method and one section per candidate; `_router_roster`
+  emits only the eligible keys. Moving the cues into the dispatch text would put a
+  paragraph per candidate into the main agent's context on every routed turn — the
+  `additionalContext` is paid for on every turn, the agent definition only when the router
+  runs. What bounds the answer is not the roster but the STEP 2 blocks: they cover exactly
+  the eligible set, so a key the router invents has nothing to dispatch.
+- **The router's reason is part of the output, not decoration.** Each pick carries one
+  sentence naming what in the response triggered it, quoted where possible, and the main
+  agent is told to relay it. A recommendation nobody can second-guess is one that gets
+  waved through, which is the failure this whole shape is built to avoid.
+- **Control turns and exempt commands never get a recommendation.** `/guard:settings` and
+  all of `/guard:{claims,deferrals}-auditor` / `/guard:korean-corrector` are skipped on
+  BOTH sides: `_CONTROL_CMD_RE` matches the raw prompt at UserPromptSubmit, and `cmd_stop`
+  skips them via `command_name` (extracted from the transcript's expanded
   `<command-name>/guard:settings</command-name>`). This second skip is load-bearing — a
-  control turn's response is a one-line relay ("guard on") with no evidence, and
-  without it the Stop judge falsely blocked it (session b30dbaec). The same
-  `command_name` path skips any skill / slash command the user lists in
-  `exempt_skills` — named with its plugin namespace (`plugin:skill`), since a
-  user-invoked skill reaches the transcript as a namespaced `<command-name>` just like
-  a command (skill output is not a body of technical claims to ground). Both modes
-  honor it (checked before the `audit_gate` branch). `correct-comment` is deliberately NOT
-  in `_CONTROL_CMD_RE` — that skill relays findings about real files and reports edits
-  made to them, so its turn stays auditable — and the regex's `(?=\s|$)` is what keeps
-  `audit-claims` from matching a bare `/audit`.
-- **Mark resolution is the judge's call, not a mechanical gate.** guard once ran a
-  deterministic Stop-time check on reference marks (dangling mark, unused entry, mixed
-  syntax, non-numeric footnote id) and blocked on it in every `audit_gate` mode. It was
-  removed with the `refs_format` setting: guard no longer fixes a mark syntax, so there is
-  no format to enforce, and whether a mark resolves to adequate evidence is a judgment
-  about the claim — which is the evidence judge's job and follows the `audit_gate`
-  modes like every other criterion. Nothing at Stop blocks on marks now.
-- **A saved reference must be indexed.** `refs-index` (PostToolUse) blocks when a file
-  written inside the refs dir is not named in that directory's `AGENTS.md`. A reference
-  nothing points at is one the next reader never finds, so the index is part of the
-  save, not a courtesy. It runs *after* the write, not as a PreToolUse gate: the natural
-  order is save-then-index, and blocking the save would demand an index row for a file
-  that does not exist yet. Matching is a substring search for the file name anywhere in
-  the index — the index is prose a human maintains, so pinning the check to a table
+  control turn's response is a one-line relay ("guard on") with no evidence, and without
+  it Stop falsely blocked such a turn (session b30dbaec). The same `command_name` path
+  skips any skill / slash command the user lists in `exempt_skills` — named with its
+  plugin namespace (`plugin:skill`), since a user-invoked skill reaches the transcript as
+  a namespaced `<command-name>` just like a command (skill output is not a body of
+  technical claims to ground). `comment-corrector` is deliberately NOT in
+  `_CONTROL_CMD_RE` — that skill relays findings about real files and reports edits made to
+  them, so its turn stays auditable — and the regex's `(?=\s|$)` is what keeps
+  `claims-auditor` from matching a bare `/claims`.
+- **A saved reference must be indexed.** The `post-edit` hook (PostToolUse) blocks when a
+  file written inside the refs dir is not named in that directory's `AGENTS.md`. A
+  reference nothing points at is one the next reader never finds, so the index is part of
+  the save, not a courtesy. It runs *after* the write, not as a PreToolUse gate: the
+  natural order is save-then-index, and blocking the save would demand an index row for a
+  file that does not exist yet. Matching is a substring search for the file name anywhere
+  in the index — the index is prose a human maintains, so pinning the check to a table
   layout would fail the first time someone reformats it. `AGENTS.md` and its `CLAUDE.md`
   shim are skipped (`_REFS_INDEX_SKIP`) or writing the index would trip its own hook.
-  The check itself is `refs_index_gap`, shared by both hosts: Claude registers a
-  `refs-index` subcommand, Codex calls it from its single PostToolUse adapter.
+  The check itself is `refs_index_gap`, shared by both hosts: Claude reaches it through
+  `post-edit`, Codex from its single PostToolUse adapter. This one stays a
+  `decision: "block"` rather than `additionalContext`: it is unfinished work, not
+  guidance.
 - **The Simple output style is opt-in, and nothing may depend on it.**
   `output-styles/simple.md` omits `force-for-plugin` (which defaults to false), so enabling guard does not
   switch a user's output style — they select **Simple** in `/config` (or set
@@ -152,183 +175,195 @@ payloads, not memory.
   session is written, which is too large a change to impose on someone who installed
   guard for its gates. The consequence is a rule for authors — no guard behavior may be
   implemented in the style file, because it is inactive for most users. Anything that
-  must always hold goes in the SessionStart context (`guard_hook.py`), a judge prompt,
+  must always hold goes in the SessionStart context (`guard_hook.py`)
   or an agent definition. Note the style also does not reach subagents at all: per the
   official docs a subagent runs its own system prompt, which is why
   `agents/simple-explainer.md` carries its own copy of the explain-clearly rules rather
   than inheriting them.
-- **Renamed keys and dropped modes get no fallback.** `evidence_gate` → `audit_gate` is
-  ignored outright (a config still carrying the old key silently gets the `audit_gate`
-  default), and the dropped `subagent` mode behaves the same way: `"audit_gate":
-  "subagent"` passes `_load_config`'s type check as a string but fails `_audit_gate`'s
-  enum coercion, so it lands on `manual`. Deliberate — guard is pre-1.0 and read-compat
-  for renamed keys and retired enum members is not worth a permanent branch in
-  `_load_config`. The cost is real and accepted: a project that had set `subagent` loses
-  its Stop-time auditing entirely on upgrade, with no warning, so this belongs in the
-  release notes rather than in migration code.
-- **Mode and criteria are separate settings.** `audit_gate` picks *how/when* the audit
-  runs; `audit_claims` / `audit_deferrals` / `audit_korean` pick *which axes* run. Split
-  because the axes fail differently — a project that wants its claims grounded
-  may still want to defer work openly, and forcing one setting to carry both meant turning
-  off the whole judge to escape either. `audit_korean` (axis 3, natural Korean vs 번역체)
-  defaults **off**, unlike the other two: it reports nothing on an English response, so an
-  English-only project should not pay a judge spawn for it. It is governed by `audit_gate`
-  with the others — it audits the finished turn, so *how/when* is the same one question.
-  Since headless spawns one judge per axis, a disabled axis is simply never spawned;
-  there is no prompt-level "this axis is off" note any more, and nothing for an
-  over-reporting judge to resurrect (an axis absent from `_enabled_axes` has no verdict
-  to read). The axis filter still lands at the single place blocking is decided (the
-  per-axis `violates` predicates in `cmd_stop`). **All axes off skips the audit
-  outright** in every mode — no judge spawn, no dispatch, and manual mode records no
-  pending target — since a run that can report nothing is pure cost. An axis switched off
-  is nonetheless auditable *on demand*: the switch governs the automatic Stop-time audit, and refusing the command
-  would leave no way to check the very axis a project keeps off by default.
-- **Two modes, one set of criteria.** `manual` (default; no auto-audit — the per-axis
-  the per-axis on-demand commands dispatch) or `headless` (in-hook judges that block).
-  The criteria are identical across both, and each auditor agent definition mirrors its
-  axis's judge prompt in prose — when one changes, the other has to. Bad `audit_gate` →
-  the default (`manual`, via `_audit_gate`). `refs-index` is independent of `audit_gate`,
-  so `manual` narrows auto-verification without dropping the index rule.
-- **Headless fans out: one judge per enabled axis, spawned in parallel.**
-  `run_judges_parallel` `Popen`s every enabled axis at once and collects them. The win is
-  measured, not assumed, and comes from the **per-axis tool budget** rather than from the
-  concurrency alone: claims gets `Read,Grep,Glob,Bash`, deferrals `Read,Grep,Glob`, and
-  korean **no `--allowedTools` flag at all** — an axis that judges prose cannot use the
-  repository, and withholding it takes that judge from ~30s (any repo-reading judge) to
-  ~5-13s. A full three-axis fan-out measured 21.7s wall clock against 29-41s for the old
-  single combined judge. The timeout is a **group** deadline, not per child: they run
-  concurrently, so the wall clock is the slowest one, and giving each its own full
-  `JUDGE_TIMEOUT_SECONDS` would let a slow set outlive the Stop hook's own timeout and be
-  killed mid-write. The **axis text is copied verbatim into each judge and must not be
-  trimmed for the split** — a shortened Korean prompt was measured demanding that
-  `prompt_id`, 커밋, 리팩토링 and `git rebase` be translated, so the loanword and
-  identifier carve-outs are load-bearing, not padding. The user prompt is split the same
-  way: the Korean judge gets the response text alone, with neither TOOL_ACTIVITY nor
-  VERIFIED_FACTS, since it cannot use evidence it is not judging against — which is most
-  of the token saving. `AXIS_JUDGES` is the one table holding each axis's
-  field/system/schema/tools/predicate/label, so adding an axis does not mean touching the
-  fan-out.
-- **A judge that did not report is UNCHECKED, never a pass.** With N children some can
-  fail while others answer, so silence needs its own meaning: **all** failed → fail open
-  (return 0, exactly as the single judge did on a `None` verdict); **some** failed → block
-  on whatever the reporting axes found *and* name the failed axes in the reason as
-  "UNCHECKED rather than clean". Verified facts are recorded only on a pass that was
-  **fully** audited (no violations *and* no missing axes) — folding a partial audit into
-  the verified store would launder an unexamined claim into an established fact.
-- **Manual mode + on-demand verify, per axis.** manual-mode Stop archives the turn, writes
-  its slice (shared `_write_turn_slice`), and records `pending_verify_prompt_id` — then
-  emits nothing. Each per-axis command has its own `UserPromptExpansion`
-  matcher and passes its axis to `cmd_verify` in argv; `_axis_dispatch_context` takes
-  that one `axis` and dispatches exactly one agent from `AXIS_AGENTS`. One axis per
-  dispatch is the point: the auditor learns what to audit from *which agent was
-  dispatched*, not from an `axes` argument it has to be trusted to honor. It reads the
-  pending slice off disk, so it needs no transcript access. All three commands are in
-  `_CONTROL_CMD_RE`, so their own turns are skipped and never become the pending target —
-  the names there must track the skill directories, so renaming a command means editing
-  that regex, the matcher in `hooks/hooks.json`, and the skill's `name:` together.
-- **The dispatch passes only what the agent cannot obtain itself.** That is the turn record
-  (guard sliced it, so nothing else knows the path) and, for Korean, a rewrite path — and
-  nothing more. Not the refs directory: the agent resolves it with the `refs-dir`
-  subcommand. Not the repository: it is the working tree the agent already runs in. Not a
-  turn id or transcript path: `_write_turn_slice` writes tool outputs uncut (only the
-  headless `_render_turn_for_judge` truncates, and it never reads the slice), so a
-  transcript fallback has nothing to recover — and a pointer an agent cannot use is one it
-  may chase anyway. Not the verified-facts store: only `cmd_stop`'s headless branch writes
-  it, so on the manual path it is stale or absent, and seeding an audit with facts this run
-  never established is how an unexamined claim becomes an established one. `session_id` and
-  `prompt_id` stay parameters of `_axis_dispatch_context` because they build those paths;
-  they are never handed to an agent. When an agent needs something else, it asks the main
-  session where to look and then looks itself — an answer from the turn's own author is a
-  claim, not evidence.
-- **The subagent agents cannot express "no tools"; the headless judges can.** The Korean
-  axis needs zero repository access, and headless says so by omitting `--allowedTools`
-  entirely. A subagent frontmatter cannot: per the official agent docs
-  (`wiki/ref/claude-code-subagent-frontmatter.md`), omitting `tools` inherits *every*
-  tool, and an empty/unresolvable list makes Claude Code refuse to launch the subagent.
-  So `agents/korean-corrector.md` names its tools explicitly — `Read, Write`, the
-  smallest set that lets it read its `turn_file` and emit its rewrite. The asymmetry is a
-  platform limit, not an oversight; do not "fix" it by emptying the frontmatter.
-- **Two of the three on-demand agents report; the third corrects.** `claims-auditor` and
-  `deferrals-auditor` are read-only by design — their findings need a human decision about
-  the *work*, and an agent that rewrote a claim to match the evidence would be laundering
-  the failure it was dispatched to surface. Korean and comments are different: the finding
-  *is* the fix (this phrase reads wrong → this is what it should say), so
-  `korean-corrector` and `comment-corrector` carry the repair. The `-auditor` /
-  `-corrector` suffix is the contract, so keep it honest — an agent granted `Edit`/`Write`
-  on what it judges must not be called an auditor.
-- **Bulk main↔subagent payloads travel as a file path, not as text.** Already how the turn
-  record reaches every axis and how the Korean rewrite comes back, and the rule generalizes:
-  when either direction has more than a few paragraphs to hand over, write it and pass the
-  path. Text pasted into a dispatch or a report is spent from the receiver's context whether
-  or not it is needed, and the receiver usually relays a summary anyway; a path costs one
-  line and is read only if it matters. This is why `comment-corrector` holds `Write` despite
-  editing in place — `Edit` cannot create the report file. Keep the payload inside guard's
-  own state (or beside the audited files) so nothing lands where the user did not ask for it.
-  The two auditors are the deliberate exception: they hold no `Write`, because their output
-  is a short fixed-shape `<report>` block that cannot grow past a few lines, and granting a
-  write path to an agent whose whole contract is "changes nothing" would cost more than the
-  context it saves.
+- **Eligibility is mechanical; selection is the router's.** The four agent modes and one
+  prerequisite (a `reads="files"` agent needs a source file the turn actually wrote, since
+  that list is its whole input and the router cannot invent one) decide what the router may
+  choose from. Nothing else. In particular there is no Hangul-ratio test for
+  `korean-corrector`: deciding whether a response is Korean enough to audit is a reading
+  task, and a ratio has to guess how many English identifiers a Korean answer may carry
+  before it stops counting as Korean.
+- **The per-agent settings are the only control, and each is named after its agent.**
+  There is no gate in front of them. `audit_gate` (`off`/`ask`/`auto`) used to be one, and
+  removing it removed a whole class of question — "the switch is on but is the gate open,
+  and does `ask` mean the user is asked before or after routing" — that the user had to
+  hold in their head to predict what guard would do. Now: an agent not `off` means it can
+  be recommended; all four `off` means guard emits nothing and makes no model call, which
+  is what `audit_gate off` used to mean. All four ship `off`, so installing guard does not
+  start auditing; and the key is the agent's own bare name, so `settings set
+  korean-corrector reuse`, `/guard:korean-corrector`, and
+  `subagent_type: "guard:korean-corrector"` are one string. Renaming an agent means
+  renaming its directory under `agents/`, its skill directory and `name:`, its
+  `AUDIT_AGENTS` key, its `hooks.json` matcher, and `_CONTROL_CMD_RE` — together, or the
+  vocabulary splits again.
+- **The value is a mode, not a boolean, so reuse cannot disagree with the switch.**
+  `AgentMode` is `off` / `fresh` / `reuse`, and how an agent runs is therefore the same
+  setting as whether it runs. The alternative — a boolean per agent plus a `reuse_agents`
+  list — allows a state that means nothing (an agent named in the reuse list while it is
+  switched off) and forces every reader to consult two keys to answer one question. The
+  boolean CLI words survive as aliases (`on` → `fresh`, `off` → `off`) because that is
+  what a setting here has always been set with, and `on` has to keep meaning something:
+  it means the mode every agent definition was written for.
+- **Reuse trades independence for continuity, which is why it is a setting and not a
+  default.** A reused instance already knows the repository and the session's conventions,
+  stops re-deriving the same thing every turn, and can be asked follow-ups ("you cleared
+  this claim two turns ago — does the change I just made break it?"). A fresh instance
+  cannot inherit its own mistake: a verdict a reused instance got wrong sits in its history
+  as settled, and every later turn is built on it. Continuity is worth most where the
+  judgment is about text and conventions (the correctors); independence is worth most where
+  it is about whether something is true (the auditors). guard states the trade-off and lets
+  the user choose it per agent; it does not pick sides by defaulting one of them on.
+  Two consequences in the agent definitions: each of the four carries an "If you are
+  resumed" section telling it to judge the record it was just handed rather than remember a
+  verdict, and the "fresh context" wording had to become "by a reader rather than its
+  author" — that is the guarantee reuse preserves, where an empty context is not.
+- **Reuse is per session, and guard cannot see the instances.** Subagent transcripts live
+  under the session id (`wiki/ref/claude-code-subagent-resume.md`), so a new session starts
+  every agent fresh whatever the config says, and guard has no handle on a running
+  instance: no registry, no way to stop one. Two things follow. The instance name is
+  *derived* (`_instance_name` → `guard-<agent>`), so both sides can name it without either
+  tracking it. And a mode change away from `reuse` has to be *reported* — `cmd_settings`
+  prints a stand-down note, and the forked settings skill relays it — because the session
+  holding that instance is the only party that can retire it. The standing policy is stated
+  once at SessionStart instead, so the per-turn text carries only the mechanic.
+- **The router is never reused.** Its question is about one turn; an instance carrying the
+  last five can answer it from the wrong one, silently, at the step nothing else checks. It
+  is also the cheapest agent in the set, so continuity buys the least there.
+- **Reuse needs `SendMessage` in the agent's `tools:`, and the router must not have it.**
+  `tools` is an allowlist when present (`wiki/ref/claude-code-subagent-frontmatter.md`), so
+  the four audit agents list `SendMessage` and the router does not. This also fixes an older
+  inconsistency: the auditor definitions have always said "ask the main session where to
+  look", with no tool to ask with. The discipline they already carry is what keeps that
+  safe — ask for a pointer, then look yourself, because an answer from the turn's author is
+  a claim, not evidence. The router is excluded on purpose: it triages what it was handed
+  and has nothing to negotiate.
+- **The agent settings govern what guard says unasked, never what the user may ask for.** Each
+  per-agent command has its own `UserPromptExpansion` matcher and passes its agent name to
+  `cmd_verify` in argv; `_dispatch_context` dispatches exactly that one agent. It does not
+  consult the mode's on/off-ness at all — refusing `/guard:korean-corrector` because it is `off`
+  would take away the only way to check the very thing a project keeps off by default,
+  which is the main reason to keep it off. `pending_verify_prompt_id` is only a "has a turn
+  finished yet" check there; the agent gets the turn from the main agent like any other.
+  `AUDIT_AGENTS[...].verify_command` is what keeps `comment-corrector` out of that path: it
+  has a skill but no turn-record command, since its input is files rather than the turn.
+- **Earlier evidence is in scope, and it is asked for as inclusion, not selection.** A
+  claim made in this turn is often grounded by a command run three turns ago, and an
+  auditor that never sees it reports a backed claim as unbacked — the false positive that
+  teaches the user to stop reading guard. So the record's evidence section explicitly
+  reaches past the turn. But "include what is relevant", asked of the claim's own author,
+  invites picking exactly the evidence that supports it. Hence the three-part shape of
+  `_append_turn_instruction`: err toward including, keep your argument for why the claim
+  holds out of the file, and — on the reading side — `claims-auditor` treats that section
+  as evidence *offered* and checks the repository itself before calling anything
+  unsupported. Do not soften this into "summarize the relevant context": a summary of
+  evidence is an argument about evidence.
+- **The dispatch passes only what the agent cannot obtain itself.** That is the turn
+  record's path, and for Korean a rewrite path — nothing more. Not the refs directory: the
+  agent resolves it with the `refs-dir` subcommand. Not the repository: it is the working
+  tree the agent already runs in. Not a transcript path: a pointer an agent cannot use is
+  one it may chase anyway. Not a summary of the turn either, from guard or from the main
+  agent — priming an audit with the author's own account of the work is how an unexamined
+  claim becomes an established one, and it is why the STEP 0 instruction forbids
+  summarizing rather than merely asking for the text. `comment-corrector` is the one agent
+  handed something other than the turn record, for the same reason: it audits files, and
+  the list of files this turn edited is exactly what it cannot work out for itself (its own
+  skill refuses to guess). `session_id` / `prompt_id` stay parameters of the dispatch
+  builders because they build those paths; they are never handed to an agent. When an agent
+  needs something else, it asks the main session where to look and then looks itself — an
+  answer from the turn's own author is a claim, not evidence.
+- **The turn record is split by who can be trusted with which half.** It travels as a file
+  because a routed turn has up to five readers (the router, then the agents it names) that
+  must all see the *same* text, and pasting it into each dispatch means the main agent
+  writing its own turn out several times — which is where a turn quietly becomes a
+  paraphrase of the turn. Ownership follows from what each party can actually vouch for:
+  - guard writes the **response** section, at every Stop, from `last_assistant_message` in
+    the payload. It is the text being audited, so it is the one part that must not pass
+    through the author's hands — and guard is handed it for free. It stopped cutting the
+    turn out of the transcript, but it never had to give up this piece.
+  - the main session appends **request, tool activity, and prior evidence**, because guard
+    cannot see any of it: it has no slice any more and no window past this turn.
+  The `_write_turn_response` failure path is silent and the instruction says "create the
+  file if it is missing", so a scratch-file error costs at most the verbatim guarantee, not
+  the recommendation.
+- **File or prose is a per-case choice.** A file earns its place when the text has several
+  readers who must all see the same thing (the turn record) or is long enough to crowd out
+  the message carrying it (the Korean rewrite, `comment-corrector`'s report — which is why
+  that agent holds `Write` despite editing in place). Everything short and single-hop stays
+  prose: the roster, the edited-file list, the router's picks and reasons. Routing a
+  two-line verdict through a file only adds a read. The two auditors hold no `Write` at
+  all: their output is a short fixed-shape `<report>`, and granting a write path to an
+  agent whose whole contract is "changes nothing" would cost more than the context it saves.
+- **Two agents report; two correct.** `claims-auditor` and `deferrals-auditor` are
+  read-only by design — their findings need a human decision about the *work*, and an
+  agent that rewrote a claim to match the evidence would be laundering the failure it was
+  dispatched to surface. Korean and comments are different: the finding *is* the fix (this
+  phrase reads wrong → this is what it should say), so `korean-corrector` and
+  `comment-corrector` carry the repair. The `-auditor` / `-corrector` suffix is the
+  contract, so keep it honest — an agent granted `Edit`/`Write` on what it audits must not
+  be called an auditor. The consequence: `comment-corrector on` means unattended edits to
+  the files the turn just wrote, which is why its dispatch text tells the main agent to
+  relay what was left unfixed.
 - **The Korean corrector writes a file; the comment corrector edits in place.** Not an
   inconsistency — the inputs differ. `comment-corrector` is pointed at source files, so
-  fixing means `Edit` on those files. `korean-corrector` is pointed at a turn slice in
+  fixing means `Edit` on those files. `korean-corrector` is pointed at a turn record in
   guard's own state, which is a record of prose the assistant already emitted: editing it
   changes nothing anyone reads. So the correction has to be a new artifact, and
-  `_korean_rewrite_file` puts it beside the slice (`<prompt_id>.ko-fix.md`) rather than in
+  `_korean_rewrite_file` puts it beside the record (`<prompt_id>.ko-fix.md`) rather than in
   the user's tree. guard never reads it back; only the main agent does, told the path in
   its dispatch text. Do not "unify" these two by giving the Korean agent `Edit`.
-- **Only the on-demand Korean path corrects; the headless judge still only judges.** The
-  headless judges run inside the Stop hook to decide whether to block, so a rewrite there
-  would be produced before the user has seen the response and discarded on a pass. The
-  headless Korean judge therefore keeps its no-tools, findings-only shape, and
-  `AXIS_JUDGES` is unaffected by the corrector change. Only `AXIS_AGENTS`,
-  `_AXIS_DISPATCH_TAIL`, and the agent files moved.
-- **Judge once per turn.** headless relies on the payload's `stop_hook_active`. manual
-  writes no dispatch, so it needs no once-guard; `last_audited_prompt_id` survives in the
-  state schema for the Codex adapter, whose non-blocking dispatch cannot rely on that
-  flag.
-- **Verified facts belong to the headless path alone.** `cmd_stop` is both the only
-  writer (`_append_verified`) and the only reader (`_read_verified_facts`), so the store
-  needs no cross-process writer and the auditors are strictly read-only. The
-  `record-verified` subcommand that let an auditor subagent write was deleted with
-  `subagent` mode: the cache exists to spare an EVERY-TURN judge from re-deriving a
-  claim, and the only every-turn path now maintains it inline. An on-demand audit has
-  nothing to add — under `manual` nothing reads the store, and under `headless` the
-  judge already wrote it. Only passed, evidence-backed claims cross a turn boundary,
-  never raw prior-turn text.
-- **The Codex side was deliberately left on the old shape.** `hooks/hooks.codex.json`,
-  `hooks/scripts/hook_codex.py`, and `skills/setup/` still block-and-dispatch a SINGLE
-  `guard_claims_auditor` covering every enabled axis, with the axis list carried as
-  dispatch text and the once-guard on `last_audited_prompt_id`. That is intentional, not
-  drift: the fan-out is built on `claude -p` subprocesses and per-agent tool grants that
-  have no Codex equivalent yet, and Codex will get its own migration. The adapter survived
-  the refactor because the only judge-side names it reaches into are `AuditGate.MANUAL`
-  and `core._AXIS_FIELDS` (plus the axis accessors and the shared state/config helpers) —
-  none of the fan-out. Keep those stable, and do not "unify" the Codex path by accident.
-- **Assistant tool output is first-class evidence** (rendered as TOOL_ACTIVITY) — a
-  claim that restates or follows from a command's output there is supported without a
-  re-cite. **User-run `!` commands are NOT evidence and their turn is not judged.** A
-  `!` command inherits the preceding typed prompt's promptId, so its output records
-  land in the slice *after* the response guard already judged — the evidence would
-  arrive later than the claims it supports, and cannot be judged coherently in that
-  turn. `_read_turn_from_transcript` flags the turn (`has_user_command`) and `cmd_stop`
-  skips it (`skip_user_command`); the `!` records are never collected or rendered.
+- **Recommend once per turn, and spend the marker before emitting.** Two independent
+  guards: `stop_hook_active` covers the ordinary continuation, and
+  `last_audited_prompt_id` covers what it cannot — the recommendation asks the main agent
+  to dispatch background agents, each of whose completions opens a transcript turn of its
+  own, and the marker does not depend on the payload flag surviving that. It is written
+  *before* the emit, so a turn whose first recommendation is still being acted on cannot
+  collect a second. Codex spends its marker only after filtering to agents it actually has,
+  since marking a turn audited for a message never sent burns the turn's one chance.
+- **Codex shares eligibility, not the router.** `core._eligible_agents` is common, so both
+  hosts agree on what an agent is *available* for. The router is not shared, and the reason
+  is no longer a missing binary: Codex ships **one** named agent (`guard_claims_auditor`,
+  installed by `$guard:setup`), and a router that can only forward to that same agent
+  decides nothing. So Codex recommends the whole eligible set, unrouted and correspondingly
+  noisier, rendering the choice as a scope sentence via `_SCOPE` in the adapter. A key
+  absent from `_SCOPE` is dropped, which is how `comment-corrector` stays Claude-only while
+  the eligibility code stays host-agnostic. Codex also keeps its own turn record
+  (`_save_turn`), unlike Claude, because its transcript is not a stable hook interface —
+  the caps for that record (`TOOL_CONTEXT_MAX_CHARS`, `TOOL_RESULT_MAX_CHARS`) live in the
+  adapter for the same reason. Reuse is Claude-only too, and for a plainer reason: the
+  mode's whole mechanism is a named instance addressed with `SendMessage`, and the Codex
+  adapter has neither. `core._eligible_agents` only asks whether a mode is `off`, so a
+  `reuse` value costs Codex nothing and means nothing there. Closing either gap means
+  giving Codex the agent set first, not adding a router; keep `_SCOPE` as the seam and do
+  not push host detail into `_eligible_agents`.
+- **Assistant tool output is first-class evidence.** The turn record is required to carry
+  what the assistant ran and what came back, because a claim that restates or follows from
+  a command's output there is supported without a re-cite. Note what is no longer a rule: a
+  user-run `!` command used to disqualify its whole turn, because its output records landed
+  in guard's slice *after* the response an audit would judge, so the evidence arrived later
+  than the claims. guard no longer cuts the slice — the main agent writes the record, and
+  by then the `!` output either is or is not part of what it is describing. The skip is
+  gone; do not re-add it without re-establishing the ordering problem it solved.
 - **`_safe_project_subdir` is guard's self-neutering defense** for the one config key that
   names a directory guard treats specially (`refs_dir`): strictly inside the project (the
   root itself fails, because a path is never in its own `.parents` — this is what rejects
   `"."`), and never guard's state root, a path under it, or the config file. Without it a
   `refs_dir` of `.claude/guard` would make guard's own state a directory it invites the
-  model to write into, and `.claude/guard.local.json` would put the judge switch there.
+  model to write into, and `.claude/guard.local.json` would put the agent settings there.
   Keep it one implementation; two copies means one of them gets fixed.
   **What it deliberately does not catch: an ANCESTOR of guard's state.** `.claude` is
   neither the state root nor under it, so it is a legal value — the rule is containment,
   not reachability, and anything else that starts trusting a configured directory has to
   bring its own check on the actual target rather than assume this one covered it.
 - **The config-mutating CLIs can weaken guard, and Bash is ungated.** `settings set
-  audit_gate manual` and `exempt add <skill>` both reach guard's own configuration, and
+  claims-auditor off` and `exempt add <skill>` both reach guard's own configuration, and
   the model can invoke this script through Bash — nothing stops it. `_cli_write_allowed`
   requires a marker (`GUARD_SETTINGS_SKILL`) that only the user-invoked `guard:settings`
   skill sets, on the mutating verbs of both — covering only `exempt` would be theater,
-  since `audit_gate manual` is the easier move.
+  since switching an agent off is the easier move.
   **This is a speed bump, not a boundary**: the variable name is in the source the model
   reads. It buys that the unreflective path ("this audit is in my way, let me turn it
   off") fails closed, that the refusal names the user as the only legitimate widener, and
@@ -338,125 +373,181 @@ payloads, not memory.
 
 ## Config (`.claude/guard.local.json`)
 
-Parsed by `_load_config`; fail-open to defaults. `audit_gate` is an `enum.StrEnum`
-member (`AuditGate`) — the reason guard requires Python 3.11+ (`StrEnum`
-"Added in version 3.11": https://docs.python.org/3/library/enum.html, excerpt saved at
-`wiki/ref/python-strenum.md`). Keys: `model`
-(default `"haiku"`), `effort` (low/medium/high/xhigh/max, default `"medium"` — the
-reasoning effort of the HEADLESS judges only; an auditor subagent's model/effort come from
-its own agent frontmatter), `audit_gate`
-(`"manual"`|`"headless"`, default
-`"manual"` — the evidence judge's control; `manual` is its practical off, and a stale
-`"subagent"` falls through the enum coercion to it), `audit_claims` / `audit_deferrals`
-(booleans, default `true`) and `audit_korean` (boolean, default **`false`** — see the
-axis invariant for why this one is opt-in), the three axis switches; all axes off skips
-the audit outright. Non-bool values fall back to the default rather than to Python
-truthiness, so a stringy `"false"` cannot silently disable an axis. `exempt_skills`
-(list of strings, default `[]`) — skills / slash commands whose turn the Stop judge
+Parsed by `_load_config`; fail-open to defaults. Only keys whose value matches the
+default's type are honored; unknown
+keys are ignored and a missing or malformed file falls back to every default.
+`guard.local.json.example` ships at the plugin root.
+
+Keys: one boolean per agent, named after that agent — `claims-auditor`,
+`deferrals-auditor`, `korean-corrector`, `comment-corrector`, **all default `false`** —
+which together are the only control over whether guard says anything unasked. See the
+invariants above for why the value is a mode rather than a boolean, why reuse is the user's
+call, and why they all ship off. A value that is not a mode word reads as `off` — the safe
+direction, since the alternative is guard acting on a setting the user did not write.
+
+One subtlety `_load_config` must keep: an `AgentMode` default round-trips through JSON as a
+plain `str`, and `isinstance("reuse", AgentMode)` is False, so the accepted type is widened
+to `str` for those keys. Without that widening every mode in the file is dropped and only
+the session state is ever honored — which is exactly the bug this shape introduced once.
+
+`router_model` (string, default `""`) — a model override for the router agent alone. Empty
+means guard prints no model line at all and `agents/router.md` decides, which is where a
+subagent's model normally comes from; the key exists for a project that wants the router
+cheaper or sharper than the plugin ships it. It is never validated against a list of names
+(an alias, a full id, and a provider's own name are all legitimate, and the set moves).
+Every agent the router names brings its own model and effort from its own frontmatter in
+`agents/`, which is also where its criteria live — a second copy in guard's config would
+let the two disagree about the same agent.
+
+Getting the router's model wrong costs in both directions, which is why the default is left
+to the agent rather than pinned to the cheapest thing that runs. A router that misses means
+the audit silently never happens — the exact failure guard exists to prevent. A router that
+cannot tell a backed claim from one that merely sounds backed names every agent every turn,
+which is the same as naming none, because the user stops reading the recommendation.
+
+`exempt_skills` (list of strings, default `[]`) — skills / slash commands whose turn Stop
 skips, named with their plugin namespace (`plugin:skill`, e.g. `guard:settings`) or bare
-for un-namespaced skills, matched leading-`/`-stripped and case-insensitively (guard's
-own `settings`/`judge` control commands are always exempt regardless). Manage
-`exempt_skills` interactively with the `guard:settings` skill (which records the user's
-chosen names via the `exempt` CLI); no need to hand-edit. `refs_dir`
-(string, default `""`) — project-relative directory for guard's cited-doc
-copies; empty = the git-tracked default `wiki/ref/` (references committed with the
-repo), a different tracked path (e.g. `"docs/refs"`) overrides it; commits stay in the
-user's normal workflow (guard never commits). `_refs_dir` validates the value (see
-`_safe_project_subdir` above) and everything that names the location follows it: the
-`refs-index` check, the headless claims judge's prompt (`__REFS_DIR__` substitution — the
-substitution is applied to every axis's system prompt, but only the claims axis carries
-the token), the claims auditor's
-dispatch inputs (`refs_dir`, with the `refs-dir` CLI subcommand as its fallback), and
-the SessionStart context line, which states the refs rule to the agent and names the
-resolved path (also exported as `GUARD_REFS_DIR` via `$CLAUDE_ENV_FILE`, per the official
-hooks docs, so a Bash caller resolves it with one `echo`). The output style carries no
-refs instruction: it is user-selected (no `force-for-plugin`), so nothing load-bearing
-may depend on it being active. guard fixes no
-reference-mark syntax: both judge paths are told to check that a mark *resolves* and never
-to grade its form. Only keys whose value matches the
-default's type are honored (a malformed value can't flip a flag); unknown keys ignored;
-missing/malformed file → all defaults. `guard.local.json.example`
-ships at the plugin root. Judge tools are per axis, not global (`AXIS_JUDGES`; no
-`--disallowedTools` — room to extend, e.g. a verification artifact), and the Korean axis
-gets none; **isolation is `--safe-mode` + `--no-session-persistence`, never the tool
-list** — withholding tools from the Korean axis is a speed decision, and must not be
-mistaken for the sandbox.
+for un-namespaced skills, matched leading-`/`-stripped and case-insensitively (guard's own
+control commands are always exempt regardless). Manage it interactively with the
+`guard:settings` skill (which records the user's chosen names via the `exempt` CLI); no
+need to hand-edit.
+
+`refs_dir` (string, default `""`) — project-relative directory for guard's cited-doc
+copies; empty = the git-tracked default `wiki/ref/` (references committed with the repo), a
+different tracked path (e.g. `"docs/refs"`) overrides it; commits stay in the user's normal
+workflow (guard never commits). `_refs_dir` validates the value (see `_safe_project_subdir`
+above) and everything that names the location follows it: the `post-edit` index check, the
+claims auditor's own resolution (via the `refs-dir` CLI subcommand), and the SessionStart
+context line, which states the refs rule to the agent and names the resolved path (also
+exported as `GUARD_REFS_DIR` via `$CLAUDE_ENV_FILE`, per the official hooks docs, so a Bash
+caller resolves it with one `echo`). The output style carries no refs instruction: it is
+user-selected (no `force-for-plugin`), so nothing load-bearing may depend on it being
+active. guard fixes no reference-mark syntax — `claims-auditor` is told to check that a
+mark *resolves*, never to grade its form.
 
 ## Manual testing
 
-Drive subcommands with synthetic payloads and `GUARD_TRACE=1`. Because `stop` reads
-the turn from a transcript, build a small fixture JSONL and pass its path +
-`prompt_id`:
+**Everything the hook does is deterministic and runs without the CLI or auth.** That is new:
+the router used to be a real `claude` child, so testing meant tolerating a model's
+nondeterminism and a 5-11s wait per turn. It is a subagent now, so the hook's whole job is
+eligibility plus text generation, and every case below is an exact assertion.
+
+What this recipe can no longer check is the routing itself — whether the router picks the
+right agents. That lives in `agents/router.md` and is exercised by using guard, not by this
+script. What it does check is that the router is *asked* correctly: the right candidates,
+the same turn-record path for every agent, and nothing offered that is set to `off`.
 
 ```bash
 export CLAUDE_PROJECT_DIR=/tmp/guard-test/proj
 export CLAUDE_PLUGIN_ROOT=/path/to/plugins/guard
 export GUARD_TRACE=1
 H="$CLAUDE_PLUGIN_ROOT/scripts/guard_hook.py"
+# From scratch every time: the recipe leans on the once-per-turn guard, so a leftover
+# state file from a previous run turns the recommendation checks silently into no-ops.
+rm -rf "$CLAUDE_PROJECT_DIR"; mkdir -p "$CLAUDE_PROJECT_DIR/src"
+T=/tmp/guard-test/tx.jsonl; : > "$T"
 
-# fixture transcript: typed prompt (anchor p1) + assistant reply
-T=/tmp/guard-test/tx.jsonl
-printf '%s\n' \
-  '{"promptId":"p1","origin":{"kind":"human"},"message":{"role":"user","content":"is redis faster?"}}' \
-  '{"promptId":null,"message":{"role":"assistant","content":[{"type":"text","text":"Redis is always faster than Postgres."}]}}' > "$T"
+# The transcript is still needed, but only for the turn's ANCHOR: `stop` reads how the turn
+# was opened (origin kind, command name) and nothing else.
+anchor(){ printf '{"promptId":"%s","origin":{"kind":"%s"},"message":{"role":"user","content":"%s"}}\n' \
+  "$1" "${2:-human}" "${3:-q}" >> "$T"; }
+run(){ anchor "$1"; echo "{\"session_id\":\"s1\",\"prompt_id\":\"$1\",\"transcript_path\":\"$T\",\"last_assistant_message\":\"$2\",\"stop_hook_active\":false}" \
+  | "$H" stop | python3 -c 'import json,sys;d=sys.stdin.read();print(json.loads(d)["hookSpecificOutput"]["additionalContext"] if d.strip() else "(EMPTY)")'; }
 
-# show/change settings (deterministic CLI; no payload — session id from --session or
-# CLAUDE_CODE_SESSION_ID, project dir from CLAUDE_PROJECT_DIR). set writes guard.local.json
-# and, for audit_gate and the axis switches, state/<sid>.json.
-"$H" settings show --session s1
-"$H" settings set effort high --session s1
+"$H" settings show --session s1        # read verbs need no marker
+export GUARD_SETTINGS_SKILL=1         # mutating verbs do — see _cli_write_allowed
 
-# Config-mutating CLI verbs require the settings-skill marker (see _cli_write_allowed);
-# export it once for the recipe. Read verbs (`show`, `list`) need nothing.
-export GUARD_SETTINGS_SKILL=1
+# All four off (the shipped default): NOTHING is emitted, but the pending target must
+# still be recorded or every /guard:* audit command breaks in the state guard installs in.
+run p0 "Redis is always faster."        # -> (EMPTY); trace: none_eligible
+python3 -c "import json;print(json.load(open('$CLAUDE_PROJECT_DIR/.claude/guard/state/s1.json'))['pending_verify_prompt_id'])"
 
-# headless fan-out (real claude, one child per enabled axis). Two axes by default;
-# switch the third on to spawn all three. `time` it — the wall clock should stay near
-# the SLOWEST axis, not their sum (that is the whole point of the parallel spawn), and
-# the trace shows one judge line per axis.
-"$H" settings set audit_gate headless --session s1
-"$H" settings set audit_korean on --session s1
-S="{\"session_id\":\"s1\",\"prompt_id\":\"p1\",\"transcript_path\":\"$T\",\"last_assistant_message\":\"Redis is always faster than Postgres.\",\"stop_hook_active\":false}"
-time (echo "$S" | "$H" stop)          # unsupported claim -> block; korean axis self-skips (English)
+# guard writes the response section itself, on EVERY Stop, whatever the modes say. This is the
+# verbatim guarantee — check it survived, including multi-line and non-ASCII text.
+cat "$CLAUDE_PROJECT_DIR/.claude/guard/turns/s1/p0.md"
+#   -> "## Assistant response (written by guard, verbatim)" holding the exact response,
+#      then the empty "## Request, tool activity, and prior evidence" section.
 
-# A missing axis must be reported UNCHECKED, not folded into a pass. Every axis failing
-# is the fail-open case: shim a `claude` that always exits nonzero, PREPENDED to PATH
-# (do not replace PATH — this script's own shebang still needs python3 ≥ 3.11).
-D=$(mktemp -d); printf '#!/bin/sh\nexit 1\n' > "$D/claude"; chmod +x "$D/claude"
-(PATH="$D:$PATH"; echo "$S" | "$H" stop)   # -> empty; trace: one nonzero_exit per axis + all_judges_failed
-# A PARTIAL failure has to be provoked per axis (e.g. shrink JUDGE_TIMEOUT_SECONDS so the
-# repo-reading axes time out while korean still answers). The block reason must then name
-# the timed-out axes as "UNCHECKED rather than clean", and verified/<sid>.jsonl must gain
-# nothing even when every axis that did report was clean.
+# One agent not-off is guard on. Check the shape, not just non-emptiness:
+"$H" settings set claims-auditor fresh --session s1     # "on" is an accepted alias
+"$H" settings set korean-corrector fresh --session s1
+run p1 "Redis는 Postgres보다 항상 빠릅니다."
+#   -> STEP 0 says COMPLETE the record (not write it), forbids editing guard's section,
+#      asks for earlier evidence, and forbids the main agent's own case for the claim;
+#      STEP 1 dispatches guard:router with that same path and exactly two candidates;
+#      STEP 2 carries one block per candidate, each pointing at that same path,
+#      korean-corrector also getting p1.ko-fix.md.
 
-# Per-axis helper for the cases below.
-ax(){ for k in claims deferrals korean; do
-        case " $* " in *" $k "*) v=on;; *) v=off;; esac
-        "$H" settings set "audit_$k" "$v" --session s1 >/dev/null; done; }
+# The roster must never offer a switched-off agent, and STEP 2 must never carry a block for
+# one — the blocks are what actually bounds the dispatch.
+"$H" settings set korean-corrector off --session s1
+run p2 "Redis는 Postgres보다 항상 빠릅니다."   # -> claims-auditor alone, in both places
 
-ax korean; time (echo "$S" | "$H" stop)  # korean alone: no --allowedTools, so seconds not ~30s
-ax;        echo "$S" | "$H" stop          # every axis off -> empty; trace: skip_axes_off
-ax claims deferrals                       # back to the defaults
-
-# manual mode (default): Stop only slices the turn to a file + records the pending
-# target; it emits nothing. Then each per-axis expansion dispatches exactly
-# one auditor for it — deterministic (no `claude`), so it is the cheapest way to check
-# the per-axis dispatch text and that only `claims` receives verified_file/dispatcher.
-"$H" settings set audit_gate manual --session s1
-echo "$S" | "$H" stop                  # -> empty; writes turns/s1/p1.json
-for ax in claims deferrals korean; do
-  echo '{"session_id":"s1"}' | "$H" verify "$ax"
+# comment-corrector needs a source file the turn actually WROTE, and the file must exist.
+echo 'x = 1' > "$CLAUDE_PROJECT_DIR/src/cache.py"
+"$H" settings set comment-corrector on --session s1
+for f in src/cache.py notes.md; do
+  echo "{\"session_id\":\"s1\",\"prompt_id\":\"p3\",\"tool_input\":{\"file_path\":\"$CLAUDE_PROJECT_DIR/$f\"}}" | "$H" post-edit
 done
-"$H" verify bogus < /dev/null           # unknown axis -> no output at all
+python3 -c "import json;print(json.load(open('$CLAUDE_PROJECT_DIR/.claude/guard/state/s1.json'))['edited_files'])"  # cache.py only
+run p3 "Refactored the cache."          # -> comment-corrector offered, "this turn wrote: cache.py"
+run p4 "Refactored the cache."          # -> claims-auditor only: p4 wrote nothing
+
+# Recommend-once: a second Stop on the same prompt_id is silent even with
+# stop_hook_active false.
+echo "{\"session_id\":\"s1\",\"prompt_id\":\"p4\",\"transcript_path\":\"$T\",\"last_assistant_message\":\"x\",\"stop_hook_active\":false}" | "$H" stop
+#   -> empty; trace: skip_already_recommended
+
+# A background agent's completion must NOT draw a recommendation, or each audit dispatch
+# recommends an audit of its own completion, without end.
+anchor p5 task-notification '<task-notification>done</task-notification>'
+echo "{\"session_id\":\"s1\",\"prompt_id\":\"p5\",\"transcript_path\":\"$T\",\"last_assistant_message\":\"the agent reported\",\"stop_hook_active\":false}" | "$H" stop
+#   -> empty; trace: skip_task_notification
+
+# guard's own control turns and exempt skills are skipped by command name.
+anchor p6 human '/guard:settings show'
+echo "{\"session_id\":\"s1\",\"prompt_id\":\"p6\",\"transcript_path\":\"$T\",\"last_assistant_message\":\"guard on\",\"stop_hook_active\":false}" | "$H" stop
+#   -> empty; trace: skip_exempt_skill
+
+# Reuse mode changes the dispatch line, not the inputs, and the CLI must report the
+# transition in both directions — that print is guard's only channel to a live instance.
+"$H" settings set korean-corrector reuse --session s1
+#   -> settings, then a note naming `guard-korean-corrector` and how to address it
+run p9 "Redis는 Postgres보다 항상 빠릅니다."
+#   -> korean-corrector's block says: SendMessage `guard-korean-corrector` if it exists,
+#      else dispatch with name: "guard-korean-corrector". RESUME BEFORE DISPATCH — the
+#      other order spawns a second instance under a taken name.
+echo '{"session_id":"s1"}' | "$H" session-start
+#   -> the standing reuse policy, stated once, naming that instance
+"$H" settings set korean-corrector fresh --session s1
+#   -> a stand-down note: stop sending to it, spawn new ones from the next turn
+"$H" settings set korean-corrector fresh --session s1
+#   -> no note: nothing changed, so there is nothing to retire
+
+# On-demand dispatch must work with every agent OFF — the invariant most easily broken by
+# a change to the recommendation path. No router is involved: the user already chose.
+for k in claims-auditor deferrals-auditor korean-corrector; do
+  "$H" settings set $k off --session s1
+  echo '{"session_id":"s1"}' | "$H" verify $k; echo
+done
+echo '{"session_id":"s1"}' | "$H" verify comment-corrector  # no output: no turn-record command
+"$H" verify bogus < /dev/null                               # unknown name -> no output at all
+
+# Unknown keys and unknown values are both rejected outright rather than silently accepted.
+"$H" settings set audit_gate off --session s1        # -> error naming the four agent keys
+"$H" settings set claims-auditor maybe --session s1  # -> error naming off/fresh/reuse
 
 # The mutating CLI verbs refuse without the marker; reads still work.
-(unset GUARD_SETTINGS_SKILL; "$H" exempt add some-skill; "$H" settings set audit_gate headless; "$H" exempt list)
+(unset GUARD_SETTINGS_SKILL; "$H" exempt add some-skill; "$H" settings set claims-auditor off; "$H" exempt list)
 ```
 
-`settings`, `exempt`, manual-mode `stop`, `verify`, `refs-index`, and the session
-subcommands are deterministic (no CLI/auth). Only headless `stop` spawns a
-real `claude` — one child per enabled axis, so budget for that when timing
-it. Two pure functions are directly unit-testable:
-`_read_turn_from_transcript(path, prompt_id)` on a fixture JSONL, and
-`_safe_project_subdir(project_dir, value)` on its rejection cases (`"."`, `".."`,
-`".claude/guard"`, `"../elsewhere"`, `"/etc"` — all None; a plain subdirectory resolves).
+Directly unit-testable without any subprocess: `_write_turn_response` (both headings
+present, response exact, parent dir created, and a read-only dir returning None rather
+than raising), `_turn_identity(path, prompt_id)` on a
+fixture JSONL (a typed prompt, a `task-notification`, a slash command, a prompt_id absent
+from the file), `_safe_project_subdir(project_dir, value)` on its rejection cases (`"."`,
+`".."`, `".claude/guard"`, `"../elsewhere"`, `"/etc"` — all None; a plain subdirectory
+resolves), `_eligible_agents(state, edited)` on the `reads="files"` prerequisite, `_parse_mode` /
+`_agent_mode` on the aliases and on a junk value (which must read as `off`), `_load_config`
+on a mode written into the file (it must survive the type gate — see the Config section),
+and `_router_roster`, which must never mention an agent outside the list it was given.

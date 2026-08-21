@@ -1,5 +1,5 @@
 ---
-name: correct-korean
+name: korean-corrector
 description: 'On demand, audit the last completed turn''s Korean for whether it reads as something a Korean developer would write, and get the corrected text — guard dispatches the korean-corrector subagent, which counts findings on four axes: tangled sentences (복합문), 번역체, AI literary reflexes (비유·대구·볼드 남발), and register wrong for the genre, then rewrites the response to repair them. A non-Korean response is never flagged. Claude Code only.'
 argument-hint: ''
 disable-model-invocation: true
@@ -32,7 +32,7 @@ all four were checked rather than only the easy one:
   document body such as an issue, commit message, or design doc. One response often
   holds both, and each part is judged against its own genre.
 
-For the other checks, run `/guard:audit-claims` and `/guard:audit-deferrals`.
+For the other checks, run `/guard:claims-auditor` and `/guard:deferrals-auditor`.
 
 Identifiers, paths, commands and established loanwords are left as they are, in the
 rewrite as much as in the findings — the corrector never translates a technical term, and

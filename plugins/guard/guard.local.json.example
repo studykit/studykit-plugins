@@ -1,10 +1,9 @@
 {
-  "model": "haiku",
-  "effort": "medium",
-  "audit_gate": "manual",
-  "audit_claims": true,
-  "audit_deferrals": true,
-  "audit_korean": false,
+  "claims-auditor": "off",
+  "deferrals-auditor": "off",
+  "korean-corrector": "off",
+  "comment-corrector": "off",
+  "router_model": "",
   "exempt_skills": [
     "deep-research",
     "hindsight:review"
