@@ -22,6 +22,7 @@ if str(_HOOK_SCRIPTS_DIR) not in sys.path:
 import hook  # noqa: E402
 from main_context import (  # noqa: E402
     _merge_commands_blocks,
+    _strip_jira_format,
     render as render_template,
 )
 from command import CommandRequest, CommandResult  # noqa: E402
@@ -125,6 +126,8 @@ def expected_session_start_context(
         "SNIPPET_PRD_PATH": main_context_fragment("snippets/prd-path.md"),
         "SPECTRACK_ISSUE_PROVIDER": issue_kind,
     })
+    if issue_kind != "jira":
+        rendered = _strip_jira_format(rendered)
     return _wrap_policy(rendered)
 
 
@@ -145,6 +148,8 @@ def expected_subagent_start_context(
         "SNIPPET_PRD_PATH": main_context_fragment("snippets/prd-path.md"),
         "SPECTRACK_ISSUE_PROVIDER": issue_kind,
     })
+    if issue_kind != "jira":
+        rendered = _strip_jira_format(rendered)
     agent_name = (agent_type or "").rsplit(":", 1)[-1].strip().lower() if agent_type else ""
     agent_block = ""
     if agent_name == "issue-implementer":
@@ -955,6 +960,27 @@ def test_codex_session_start_migrates_legacy_split_state(
     state = json.loads(state_file.read_text(encoding="utf-8"))
     assert state["env"]["SPECTRACK_SESSION_ID"] == session_id
     assert state["flags"]["session_policy"] is True
+
+
+@pytest.mark.parametrize("runtime", ["claude", "codex"])
+def test_session_start_injects_jira_format_directive_for_jira_projects(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    runtime: str,
+) -> None:
+    """A Jira project must receive the wiki-markup directive end to end."""
+
+    _write_jira_config(tmp_path)
+
+    out = _run_session_start(tmp_path, monkeypatch, runtime=runtime)
+
+    payload = json.loads(out)
+    context = payload["hookSpecificOutput"]["additionalContext"]
+    assert context == expected_session_start_context(
+        runtime=runtime, issue_kind="jira"
+    )
+    assert "<jira-format>" in context
+    assert "jira-format-corrector" in context
 
 
 @pytest.mark.parametrize("runtime", ["claude", "codex"])

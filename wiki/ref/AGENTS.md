@@ -24,6 +24,7 @@ listed here.
 | `claude-code-output-styles.md` | Output-style frontmatter schema, plugin `output-styles/` discovery, subagent scope | code.claude.com/docs/en/output-styles |
 | `claude-code-pretooluse-permission-decision.md` | PreToolUse `permissionDecision` values | code.claude.com/docs/en/hooks |
 | `claude-code-prompt-hooks.md` | Prompt-type hooks | code.claude.com/docs/en/hooks |
+| `jira-wiki-markup-notation.md` | Jira wiki markup notation (headings, effects, lists, links, tables, code) | Jira `WikiRendererHelpAction.jspa` |
 | `markdown-footnotes.md` | Markdown footnote syntax (extended) | markdownguide.org/extended-syntax |
 | `obsidian-block-links.md` | Obsidian block identifiers and block links | obsidian.md/help/links |
 | `openai-codex-hooks-2026-08-14.md` | Codex plugin hook env vars and payloads | learn.chatgpt.com/docs/hooks |

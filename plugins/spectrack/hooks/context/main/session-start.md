@@ -35,6 +35,19 @@ was never agreed costs more to unwind than a question costs to ask.
 Publish without that exchange only when the user explicitly asked you to.
 </authoring-issues>
 
+<jira-format>
+Jira renders issue descriptions and comments as Jira wiki markup, not
+Markdown. A Markdown draft does not fail — it publishes and renders as
+literal punctuation. So before you present an issue or comment draft to
+the user, and before you publish one, write the draft to a file and
+dispatch the `jira-format-corrector` agent on that absolute path. It
+validates the markup, rewrites Markdown-only forms in place, and reports
+what it changed. Present the corrected draft — and anything the agent
+flagged as needing your decision — to the user; publish only after they
+confirm. This applies to every issue and comment body, whichever way you
+came to draft it.
+</jira-format>
+
 <implementing-issues>
 A workflow `task` / `bug` / `spike` issue body is a spec — what / why /
 done — not a plan. Before settling the approach, read the issue's full

@@ -145,3 +145,56 @@ def test_no_mustread_flag_matches_disabled_config(capsys: pytest.CaptureFixture[
     flag_output = capsys.readouterr().out
     assert "<authoring-resolver>" not in flag_output
     assert _render_no_mustread("session", "github") in flag_output
+
+
+def test_jira_format_block_is_injected_for_jira_sessions() -> None:
+    text = _render("session", "jira")
+    assert "<jira-format>" in text
+    assert "jira-format-corrector" in text
+
+
+@pytest.mark.parametrize("provider", ["github", "filesystem"])
+def test_jira_format_block_is_absent_for_other_providers(provider: str) -> None:
+    text = _render("session", provider)
+    assert "<jira-format>" not in text
+    assert "jira-format-corrector" not in text
+    assert "\n\n\n" not in text
+
+
+def test_jira_format_block_is_injected_for_jira_subagents() -> None:
+    """Subagents publish bodies and comments too, so they need the directive.
+
+    A subagent cannot dispatch the auditor, so its block tells it to emit wiki
+    markup directly rather than to delegate the check.
+    """
+
+    text = _render("subagent", "jira", agent="usecase-reviewer")
+    assert "<jira-format>" in text
+
+
+@pytest.mark.parametrize("provider", ["github", "filesystem"])
+def test_jira_format_block_is_absent_for_other_subagents(provider: str) -> None:
+    text = _render("subagent", provider, agent="usecase-reviewer")
+    assert "<jira-format>" not in text
+    assert "\n\n\n" not in text
+
+
+def test_agent_jira_format_block_replaces_the_generic_one() -> None:
+    """A per-agent <jira-format> block wins, so the rules are not stated twice."""
+
+    text = _render("subagent", "jira", agent="jira-format-corrector")
+    assert text.count("<jira-format>") == 1
+    assert "Emit wiki markup directly" not in text
+
+
+def test_jira_format_block_survives_disabled_mustread() -> None:
+    """The wiki-markup directive is not gated by mustread.
+
+    mustread is a per-project switch, but a Markdown body published to Jira
+    renders as literal punctuation regardless — so the directive must stay.
+    """
+
+    text = _render_no_mustread("session", "jira")
+    assert "<authoring-resolver>" not in text
+    assert "<jira-format>" in text
+    assert "jira-format-corrector" in text

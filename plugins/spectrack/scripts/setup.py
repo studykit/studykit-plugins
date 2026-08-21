@@ -623,6 +623,7 @@ CODEX_AGENT_INSTALL_MARKER_END = "# END spectrack custom agents"
 SPECTRACK_CODEX_AGENT_ROLES: Mapping[str, str] = {
     "implementation-auditor": "SpecTrack auditor that verifies an issue-implementer report against the issue, branch, commits, and Resume comment.",
     "issue-implementer": "SpecTrack implementer for an approved task, bug, or spike approach; implements, verifies Acceptance Criteria, commits, and refreshes Resume.",
+    "jira-format-corrector": "SpecTrack corrector that rewrites a Jira issue or comment draft file into valid Jira wiki markup, correcting Markdown-only syntax in place.",
     "mock-html-generator": "SpecTrack mock generator for throwaway HTML/CSS screen mockups grounded in selected usecase issues.",
     "resolution-auditor": "SpecTrack auditor that validates a recorded root cause and approach or fix against real code and git history.",
     "task-size-auditor": "SpecTrack auditor that checks whether a task body is correctly sized or should be split, promoted, or decomposed.",

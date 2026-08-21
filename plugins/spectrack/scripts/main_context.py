@@ -46,6 +46,15 @@ _AUTHORING_RESOLVER_BLOCK_RE = re.compile(
     re.DOTALL,
 )
 
+# The Jira wiki-markup directive is provider-specific, so it is stripped for
+# every non-Jira issue provider. It is deliberately independent of the mustread
+# gate: mustread can be disabled per project, and a Markdown body published to
+# Jira renders as literal punctuation either way.
+_JIRA_FORMAT_BLOCK_RE = re.compile(
+    r"\n?<jira-format>\s*\n?.*?\n?\s*</jira-format>\n?",
+    re.DOTALL,
+)
+
 
 def render(text: str, ctx: dict[str, str]) -> str:
     """Substitute ``{{NAME}}`` placeholders against ``ctx``.
@@ -91,6 +100,8 @@ def build_session_policy_context(
     })
     if not _mustread_enabled(config):
         rendered = _strip_authoring_resolver(rendered)
+    if issue_provider != "jira":
+        rendered = _strip_jira_format(rendered)
     return _wrap_policy(rendered)
 
 
@@ -116,7 +127,13 @@ def build_subagent_policy_context(
     })
     if not _mustread_enabled(config):
         rendered = _strip_authoring_resolver(rendered)
+    if issue_provider != "jira":
+        rendered = _strip_jira_format(rendered)
     agent_block = _build_agent_context_block(agent_type, issue_provider)
+    # An agent whose own block carries <jira-format> owns the markup rules in
+    # full (the format corrector does), so the generic block would only repeat it.
+    if agent_block and _JIRA_FORMAT_BLOCK_RE.search(agent_block):
+        rendered = _strip_jira_format(rendered)
     merged = _merge_commands_blocks(rendered, agent_block)
     return _wrap_policy(merged)
 
@@ -181,6 +198,13 @@ def _strip_authoring_resolver(text: str) -> str:
     """
 
     stripped = _AUTHORING_RESOLVER_BLOCK_RE.sub("\n\n", text, count=1)
+    return re.sub(r"\n{3,}", "\n\n", stripped).strip()
+
+
+def _strip_jira_format(text: str) -> str:
+    """Remove the <jira-format> block for non-Jira issue providers."""
+
+    stripped = _JIRA_FORMAT_BLOCK_RE.sub("\n\n", text, count=1)
     return re.sub(r"\n{3,}", "\n\n", stripped).strip()
 
 

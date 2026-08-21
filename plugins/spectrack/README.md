@@ -14,6 +14,10 @@ draft, publish, refresh, and link work items without leaving the session.
 Issue tracking and knowledge documentation are configured independently, so
 mixed setups (e.g., Jira issues + GitHub repository `wiki/`) are supported.
 
+On Jira projects, issue and comment bodies must be Jira wiki markup rather than
+Markdown. The assistant checks each draft against that markup and fixes wrong
+syntax before showing you the draft for confirmation.
+
 ## Installation
 
 Install from the studykit plugin marketplace inside Claude Code or Codex, or

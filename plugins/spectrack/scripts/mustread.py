@@ -298,20 +298,15 @@ def _resolve_authoring_github_knowledge(
 def _resolve_authoring_jira_issue(
     artifact_type: str, target: str | None, scope: str, mode: str | None
 ) -> tuple[list[str], list[str]]:
-    convention = "providers/issue/jira/convention.md"
-    match (scope, target):
-        case ("comment", _):
-            return [convention], []
-        case (_, str()):
-            return [convention], []
-        case _:
-            if mode == "backlog":
-                return [convention], []
-            parts = [convention]
-            notes = (
-                [RETROACTIVE_PUBLISH_STATE_JIRA] if mode == "retroactive" else []
-            )
-            return parts, notes
+    # Jira wiki-markup rendering is not an authoring file: the
+    # `jira-format-corrector` agent owns those rules and is dispatched from the
+    # always-injected `<jira-format>` context block. Keeping them out of the
+    # resolver is deliberate — mustread can be disabled per project, and a
+    # Markdown body published to Jira renders as literal punctuation either way.
+    if scope == "comment" or target is not None:
+        return [], []
+    notes = [RETROACTIVE_PUBLISH_STATE_JIRA] if mode == "retroactive" else []
+    return [], notes
 
 
 def absolute_authoring_paths(parts: Iterable[str]) -> tuple[Path, ...]:

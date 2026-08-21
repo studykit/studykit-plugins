@@ -225,7 +225,6 @@ providers:
 
     assert issue_resolution.provider == "jira"
     assert "contracts/issue/common.md" in _rel_paths(issue_resolution.files)
-    assert "providers/issue/jira/convention.md" in _rel_paths(issue_resolution.files)
     assert knowledge_resolution.provider == "github"
     assert _rel_paths(knowledge_resolution.files) == [
         "contracts/knowledge/body.md",
@@ -280,9 +279,7 @@ def test_comment_scope_jira_issue_resolution_uses_only_comment_relevant_files() 
 
     assert resolution.side == "issue"
     assert resolution.provider == "jira"
-    assert _rel_paths(resolution.files) == [
-        "providers/issue/jira/convention.md",
-    ]
+    assert _rel_paths(resolution.files) == []
 
 
 def test_invalid_provider_for_side_is_rejected() -> None:
