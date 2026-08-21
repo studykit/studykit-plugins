@@ -37,13 +37,13 @@
         ]
       },
       {
-        "matcher": "^(guard:)?audit-korean$",
+        "matcher": "^(guard:)?correct-korean$",
         "hooks": [
           {
             "type": "command",
             "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/guard_hook.py\" verify korean",
             "timeout": 5,
-            "description": "On demand, dispatch the korean auditor for the last completed turn."
+            "description": "On demand, dispatch the Korean corrector for the last completed turn."
           }
         ]
       }

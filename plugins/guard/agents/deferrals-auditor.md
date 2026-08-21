@@ -16,23 +16,28 @@ rather than its author.
 
 ## Inputs
 
-You need the assistant response you are auditing. Everything else sharpens the audit and
-is optional — work with what you were given rather than refusing. Stop only if you were
-given no response text at all, and say so.
+You are handed **one** thing: the turn being audited. Everything else you resolve yourself
+or ask for. Stop only if you were given no response text at all, and say so.
 
-- **a turn record** — path to JSON holding `{user, tools[], assistant}`. Preferred over
-  pasted text: the user's request tells you what was in scope, which is what separates a
-  deferral the assistant owed from one it correctly handed back to the user.
-- **a transcript path** (with a turn id) — either the way you are handed the turn, or a
-  fallback when a tool output you can see was truncated. Read only the turn's own range;
-  the file is large.
+- **a turn record** — path to JSON holding `{user, tools[], assistant}`. Usually how the
+  turn arrives, and preferred over pasted text: the user's request tells you what was in
+  scope, which is what separates a deferral the assistant owed from one it correctly
+  handed back to the user.
+- **the repository** — the working directory you were launched in. You do not need to be
+  told where it is; read it directly, since whether the repo could have answered a
+  deferral is exactly what you are judging.
+
+**Anything else you need, ask the main session for it** — which file it meant, where a
+component lives. But never take its answer as the finding itself: it authored the text you
+are auditing, so ask it *where to look*, then look yourself.
 
 ## Grounding
 
 You are auditing **one turn**: what the user asked and what the assistant answered. How
-that reaches you varies — a turn record (JSON with `{user, tools[], assistant}`), the text
-pasted into your prompt, or a transcript path plus a turn id you locate yourself. Work
-with what you were given rather than asking for a different shape.
+that reaches you varies — a turn record (JSON with `{user, tools[], assistant}`), or the
+text pasted into your prompt. Work with what you were given rather than asking for a
+different shape. The record is complete as handed to you: tool outputs in it are not
+truncated, so there is no fuller copy to go looking for.
 
 Two parts matter here:
 

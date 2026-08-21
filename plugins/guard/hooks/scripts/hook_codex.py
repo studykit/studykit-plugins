@@ -151,7 +151,7 @@ def _handle_stop(project_dir: Path, payload: dict[str, Any], session_id: str, tu
     state["last_audited_prompt_id"] = turn_id
     core._write_state(project_dir, session_id, state)
     # Table-driven, not a branch per combination: three independent axes have seven
-    # valid states. Mirrors core._auditor_dispatch_context so both hosts name the axes
+    # valid states. Mirrors core._axis_dispatch_context so both hosts name the axes
     # the same way.
     _SCOPE = {"claims": "claims", "deferrals": "deferrals", "korean": "Korean naturalness"}
     on = [f for f in core._AXIS_FIELDS if {"claims": want_claims,

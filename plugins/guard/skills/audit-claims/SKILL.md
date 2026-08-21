@@ -13,7 +13,7 @@ tool exactly as the reminder specifies, then relay its verdict — if it reports
 violations, address them; otherwise state that the turn passed.
 
 This checks claims asserted without adequate evidence and nothing else. For the other
-checks, run `/guard:audit-deferrals` and `/guard:audit-korean`.
+checks, run `/guard:audit-deferrals` and `/guard:correct-korean`.
 
 The auditor records the turn's confirmed claims as verified facts on a pass, so later
 turns can reuse them without re-deriving.

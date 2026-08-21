@@ -38,7 +38,7 @@ Read-only commands (`settings show`, `exempt list`) need no prefix.
 
 | Key | Values | What it controls |
 | --- | --- | --- |
-| `audit_gate` | `manual` / `headless` | How the Stop-time audit runs. `manual` (default) = no audit at Stop; audit on demand with `/guard:audit-claims`, `/guard:audit-deferrals`, `/guard:audit-korean`. `headless` = one in-hook judge per enabled axis, in parallel, blocking on a violation. |
+| `audit_gate` | `manual` / `headless` | How the Stop-time audit runs. `manual` (default) = no audit at Stop; audit on demand with `/guard:audit-claims`, `/guard:audit-deferrals`, `/guard:correct-korean`. `headless` = one in-hook judge per enabled axis, in parallel, blocking on a violation. |
 | `audit_claims` | `on` / `off` | Axis 1 of the judge — flags statements asserted without adequate evidence. `off` stops the judge checking claims. |
 | `audit_deferrals` | `on` / `off` | Axis 2 of the judge — flags work punted as "TBD" / "확인 필요" that the repo could have answered. `off` stops the judge checking deferrals. |
 | `audit_korean` | `on` / `off` | Axis 3 of the judge — **off by default**. When a response is in Korean, flags 번역체 (translated-sounding) phrasing and a register that is not 존댓말. An English response is never flagged, and identifiers, paths, commands, and established loanwords (커밋, 리팩토링) are left alone. |

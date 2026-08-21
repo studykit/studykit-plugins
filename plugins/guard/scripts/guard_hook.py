@@ -28,9 +28,10 @@ Subcommands
                  Mutating verbs require the settings-skill marker — see
                  ``_cli_write_allowed``. Not a hook event.
 - verify         UserPromptExpansion, one matcher per axis
-                 (``^(guard:)?audit-{claims,deferrals,korean}$``). On demand, emit the
-                 dispatch instruction for that ONE axis's auditor over the last completed
-                 turn (``pending_verify_prompt_id``, recorded by manual-mode Stop). An
+                 (``^(guard:)?audit-{claims,deferrals}$``, ``^(guard:)?correct-korean$``).
+                 On demand, emit the dispatch instruction for that ONE axis's agent
+                 over the last completed turn (``pending_verify_prompt_id``, recorded by
+                 manual-mode Stop). An
                  axis switched off is still auditable this way — the switch governs the
                  automatic audit, not what the user may ask for.
 - exempt         CLI (argv), run by the ``guard:settings`` skill via Bash after the user
@@ -255,6 +256,17 @@ def _turn_slice_file(project_dir: Path, session_id: str, prompt_id: str) -> Path
     return _state_root(project_dir) / "turns" / session_id / f"{prompt_id}.json"
 
 
+def _korean_rewrite_file(project_dir: Path, session_id: str, prompt_id: str) -> Path:
+    """File the Korean corrector writes its rewritten response to.
+
+    Beside the turn slice, inside guard's own state: the rewrite is a proposal for the
+    main agent to relay, not a user artifact, so it must not land in the user's tree.
+    guard never reads it back — only the corrector writes it and only the main agent,
+    told the path in its dispatch, reads it.
+    """
+    return _state_root(project_dir) / "turns" / session_id / f"{prompt_id}.ko-fix.md"
+
+
 def _safe_project_subdir(project_dir: Path, raw: Any) -> Path | None:
     """Resolve a configured project-relative directory, or None if it is not safe.
 
@@ -369,7 +381,7 @@ def _read_payload() -> dict | None:
 
 _SESSION_ID_RE = re.compile(r"^[A-Za-z0-9._-]+$")
 # guard's own control commands, e.g. "/guard:settings audit_gate manual", "/settings",
-# "/guard:audit-claims". `settings` is a forked skill and each `audit-<axis>` a
+# "/guard:audit-claims". `settings` is a forked skill and each per-axis command a
 # UserPromptExpansion — either way the turn is a relay, not real work to log/judge. The
 # name is `settings`, not `config`, precisely so the bare form does NOT match Claude Code's
 # built-in `/config` command (which the optional `(guard:)?` would otherwise capture,
@@ -377,10 +389,10 @@ _SESSION_ID_RE = re.compile(r"^[A-Za-z0-9._-]+$")
 # `\b`: the name must END here, not merely hit a word boundary — `\b` would also accept a
 # longer hyphenated name from another plugin (`/settings-export` matching `settings`), and
 # it is what keeps `audit-claims` from matching a bare `/audit`.
-# `audit-comment` is deliberately ABSENT: that skill's relayed findings are claims about
-# real files, so its turn stays auditable like any other work.
+# `correct-comment` is deliberately ABSENT: that skill's relayed findings are claims about
+# real files and about edits made to them, so its turn stays auditable like any other work.
 _CONTROL_CMD_RE = re.compile(
-    r"^/(guard:)?(settings|audit-claims|audit-deferrals|audit-korean)(?=\s|$)",
+    r"^/(guard:)?(settings|audit-claims|audit-deferrals|correct-korean)(?=\s|$)",
     re.IGNORECASE)
 # In the transcript, a slash command is expanded to
 # "<command-name>/guard:settings</command-name>" (see session b30dbaec). Pull the command
@@ -1210,7 +1222,7 @@ def cmd_verify() -> int:
     default, which is the main reason to keep the axis off in the first place.
     """
     axis = sys.argv[2].strip().lower() if len(sys.argv) > 2 else "claims"
-    if axis not in AXIS_AUDITORS:
+    if axis not in AXIS_AGENTS:
         return 0
     project_dir = _project_dir()
     payload = _read_payload()
@@ -1231,7 +1243,7 @@ def cmd_verify() -> int:
         _trace(project_dir, session_id, "verify", "no_pending", axis=axis, prompt_id=pid)
         return 0
 
-    context = _auditor_dispatch_context(
+    context = _axis_dispatch_context(
         project_dir, session_id, pid, turn_path,
         "guard: audit the last completed turn on request.", axis)
     _emit_expansion(context)
@@ -1297,51 +1309,66 @@ def _write_turn_slice(project_dir: Path, session_id: str, prompt_id: str,
     return turn_path
 
 
-# The subagent that audits one axis on demand, per axis. Each has its own agent
-# definition because the tool grant lives in that file's frontmatter: the Korean
-# auditor is declared with no tools at all, which the headless path expresses as a
-# missing --allowedTools flag (AXIS_JUDGES) and this path cannot express any other way.
-AXIS_AUDITORS = {
+# The subagent handling one axis on demand, per axis. Each has its own agent
+# definition because the tool grant lives in that file's frontmatter, and the grants
+# differ: claims and deferrals read the repository, while the Korean axis needs no
+# repository access and instead needs `Write` to emit its corrected text. The headless
+# judges express the Korean axis's zero-tool need as a missing --allowedTools flag
+# (AXIS_JUDGES); a subagent frontmatter cannot express it at all.
+AXIS_AGENTS = {
     "claims": ("guard:claims-auditor", "unsupported claims"),
     "deferrals": ("guard:deferrals-auditor", "deferrals the repository could resolve"),
-    "korean": ("guard:korean-auditor", "Korean prose that reads as translated English"),
+    "korean": ("guard:korean-corrector", "Korean prose that reads as translated English"),
+}
+
+# What the main agent does with each axis's report. Only the Korean axis produces a
+# corrected artifact, so only it needs the main agent told where to find one.
+_AXIS_DISPATCH_TAIL = {
+    "claims": "It writes nothing. If it reports violations, address them; otherwise continue.",
+    "deferrals": "It writes nothing. If it reports violations, address them; otherwise continue.",
+    "korean": ("On violations it also writes the corrected response to the rewrite path "
+               "and names it in its report; read that file and use its text as the "
+               "corrected wording, keeping any phrase it listed as unfixed for yourself "
+               "to resolve. On a pass it writes nothing and there is nothing to do."),
 }
 
 
-def _auditor_dispatch_context(project_dir: Path, session_id: str, prompt_id: str,
-                              turn_path: Path, lead: str, axis: str) -> str:
-    """Build the additionalContext asking the main agent to dispatch one axis's auditor.
+def _axis_dispatch_context(project_dir: Path, session_id: str, prompt_id: str,
+                           turn_path: Path, lead: str, axis: str) -> str:
+    """Build the additionalContext asking the main agent to dispatch one axis's agent.
 
-    One axis per dispatch: each ``/guard:audit-*`` command owns a single axis, so the
-    auditor is told what to audit by WHICH agent is dispatched rather than by an argument
-    it has to be trusted to honor.
+    One axis per dispatch: each per-axis command owns a single axis, so the agent is told
+    what to audit by WHICH agent is dispatched rather than by an argument it has to be
+    trusted to honor.
 
-    The inputs are deliberately thin. The auditors are read-only and take the turn in
-    whatever shape they are handed, so they need no session/turn identity and no write
-    path — guard supplies the turn slice it already wrote, plus the transcript as a
-    fallback for a truncated tool output, and (for claims) where cited-doc copies live.
+    Pass ONLY what the agent cannot get for itself. That is the turn record — guard sliced
+    it, so nothing else knows the path — and, for Korean, somewhere to write. Everything
+    else the agent resolves on its own or asks the main agent for: the refs directory
+    comes from the `refs-dir` subcommand, and the repository it audits against is simply
+    the working tree. `session_id` / `prompt_id` are here to BUILD those two paths, never
+    to be handed over: an agent auditing one turn has no use for guard's identifiers, and
+    an extra pointer is one more thing it can wander into instead of auditing.
+
+    The verified-facts store is deliberately NOT passed. Only `cmd_stop`'s headless branch
+    writes it, so on the manual path that dispatches these agents it is either absent or a
+    leftover from an earlier headless stretch of the same session — and priming an audit
+    with facts this run never established is how an unexamined claim becomes an
+    established one.
     """
-    agent, what = AXIS_AUDITORS[axis]
+    agent, what = AXIS_AGENTS[axis]
+    # The turn record is the whole input: `_write_turn_slice` dumps the tool outputs
+    # uncut (only the headless judge's `_render_turn_for_judge` truncates, and it never
+    # reads this file), so there is nothing for a transcript fallback to recover.
     inputs = [f"- turn record: {turn_path.resolve()}"]
-    if axis != "korean":
-        # Only these two ground claims in tool output that guard's slice may truncate.
-        # A pointer, not a path: this context is built on the `/guard:audit-*` turn,
-        # after the Stop payload that carried the transcript path is gone. Naming the
-        # turn id beats persisting a path that may already be stale.
-        inputs.append(f"- turn id (for locating this turn in the session transcript, "
-                      f"if a tool output in the record is truncated): {prompt_id}")
-    if axis == "claims":
-        inputs.append(f"- refs directory: {_refs_dir(project_dir, _load_config(project_dir))}")
-        vf = _verified_file(project_dir, session_id).resolve()
-        if vf.is_file():
-            inputs.append(f"- verified facts: {vf}")
+    if axis == "korean":
+        inputs.append(f"- rewrite path (write the corrected text here): "
+                      f"{_korean_rewrite_file(project_dir, session_id, prompt_id).resolve()}")
     return (
         lead + " "
         f"Dispatch the {agent} subagent with the Agent tool "
         f"(subagent_type: \"{agent}\"), passing it these inputs verbatim:\n"
         + "\n".join(inputs) + "\n"
-        f"It audits the turn for {what} and reports back. It writes nothing. If it "
-        "reports violations, address them; otherwise continue."
+        f"It audits the turn for {what} and reports back. {_AXIS_DISPATCH_TAIL[axis]}"
     )
 
 

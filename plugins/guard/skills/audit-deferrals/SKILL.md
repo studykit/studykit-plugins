@@ -13,7 +13,7 @@ tool exactly as the reminder specifies, then relay its verdict — if it reports
 violations, address them; otherwise state that the turn passed.
 
 This checks work punted that the repository could have answered, and nothing else. For
-the other checks, run `/guard:audit-claims` and `/guard:audit-korean`.
+the other checks, run `/guard:audit-claims` and `/guard:correct-korean`.
 
 If the reminder instead says there is nothing to audit (no completed turn yet), relay
 that in one line and take no further action.

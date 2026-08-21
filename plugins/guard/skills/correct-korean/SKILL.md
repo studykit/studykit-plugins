@@ -1,18 +1,23 @@
 ---
-name: audit-korean
-description: 'On demand, audit the last completed turn''s Korean for whether it reads as something a Korean developer would write — guard dispatches the korean-auditor subagent, which counts findings on four axes: tangled sentences (복합문), 번역체, AI literary reflexes (비유·대구·볼드 남발), and register wrong for the genre. A non-Korean response is never flagged. Claude Code only.'
+name: correct-korean
+description: 'On demand, audit the last completed turn''s Korean for whether it reads as something a Korean developer would write, and get the corrected text — guard dispatches the korean-corrector subagent, which counts findings on four axes: tangled sentences (복합문), 번역체, AI literary reflexes (비유·대구·볼드 남발), and register wrong for the genre, then rewrites the response to repair them. A non-Korean response is never flagged. Claude Code only.'
 argument-hint: ''
 disable-model-invocation: true
 ---
 
 This command is handled by a guard hook, which targets the last completed turn and
-emits the dispatch inputs for the `korean-auditor` subagent.
+emits the dispatch inputs for the `korean-corrector` subagent, including the path it
+should write the corrected text to.
 
-**Follow that dispatch instruction:** dispatch `guard:korean-auditor` with the Agent
-tool exactly as the reminder specifies, then relay its verdict — if it reports
-violations, address them; otherwise state that the turn passed.
+**Follow that dispatch instruction:** dispatch `guard:korean-corrector` with the Agent
+tool exactly as the reminder specifies, then act on its verdict. On a pass, state that
+the turn passed and stop. On violations, read the rewrite file it names and use that text
+as the corrected wording — it repaired the findings in a fresh context, so do not
+re-translate or re-style it yourself. Relay the four counts and the phrase-level list so
+the user can check the rewrite rather than trust it, and call out anything the corrector
+listed as unfixed: those are yours to resolve.
 
-The auditor walks the text once per axis and reports a count for each, so a pass shows
+The corrector walks the text once per axis and reports a count for each, so a pass shows
 all four were checked rather than only the easy one:
 
 - **복합문** — sentences with too many clauses to read in one pass. Korean puts the
@@ -29,13 +34,14 @@ all four were checked rather than only the easy one:
 
 For the other checks, run `/guard:audit-claims` and `/guard:audit-deferrals`.
 
-Identifiers, paths, commands and established loanwords are left as they are — the
-auditor never asks for a technical term to be translated, and never flags a `~다`
-document body as 반말.
+Identifiers, paths, commands and established loanwords are left as they are, in the
+rewrite as much as in the findings — the corrector never translates a technical term, and
+never flags a `~다` document body as 반말. The rewrite keeps the response's structure and
+claims untouched; it repairs how the text reads, never what it says.
 
 If the reminder instead says there is nothing to audit (no completed turn yet), relay
 that in one line and take no further action.
 
 Do not read guard's state files or investigate how the pending turn is tracked — the
-hook has already selected the turn; your only job is to dispatch the auditor when the
-reminder asks for it.
+hook has already selected the turn. Your only job is to dispatch the corrector when the
+reminder asks for it, and then to read the one rewrite file it names.

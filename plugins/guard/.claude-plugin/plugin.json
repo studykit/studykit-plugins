@@ -1,6 +1,6 @@
 {
   "name": "guard",
-  "version": "0.38.0",
+  "version": "0.39.0",
   "description": "Audit an assistant's finished turn against the repository on three axes — unsupported claims, deferrals the repo could answer, and unnatural Korean — in Claude Code and Codex. Requires Python 3.11+.",
   "author": {
     "name": "studykit"

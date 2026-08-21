@@ -7,8 +7,9 @@ Requires Python 3.11+ (the dispatcher uses `enum.StrEnum`).
 1. **Evidence judge** (Stop) — a repo-reading audit of the finished turn, run in one of
    two modes set by `audit_gate` (`/guard:settings`): `manual` (default — no audit at
    Stop; it only records the turn as the pending target, and the user audits on demand
-   with `/guard:audit-claims`, `/guard:audit-deferrals`, or `/guard:audit-korean`, each
-   dispatching its own auditor subagent) or `headless` (**one isolated `claude` per
+   with `/guard:audit-claims`, `/guard:audit-deferrals`, or `/guard:correct-korean`, each
+   dispatching its own subagent — the first two report only, while Korean also rewrites
+   the response and hands back the corrected text) or `headless` (**one isolated `claude` per
    enabled axis, spawned in parallel** inside the Stop hook, blocking on a violation).
    Three independent axis switches pick what is checked: `audit_claims` (asserted
    without adequate evidence), `audit_deferrals` (work punted the repo could answer),
