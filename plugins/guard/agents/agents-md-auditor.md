@@ -6,8 +6,11 @@ description: |
 # if the thing on the other end exists and answers the question. `Grep`/`Glob` settle the
 # axis that separates this agent from a style checker: whether a sentence in the file is
 # something the code already shows, which can only be answered by going and looking at the
-# code. `Bash` is for `git log`/`git ls-files` — how big the project is and how recently a
-# named path moved is what tells a map that has drifted from one that was never right.
+# code. `git log`/`git ls-files` are worth reaching for — how big the project is and how
+# recently a named path moved is what tells a map that has drifted from one that was never
+# right. That is what the tool is for here, not the boundary of what it may do: the host
+# injects a standing instruction to prefer `Bash` wherever it can do the job, so a comment
+# narrowing it to a purpose list would be contradicted on every turn.
 # No `SendMessage`: the whole input is on disk, so there is nothing to ask the author that
 # reading the repository would not answer better.
 tools: Read, Grep, Glob, Bash

@@ -1,0 +1,3 @@
+# Memory index
+
+- [injected bypass reminder](injected_bypass_reminder.md) — A runtime system-reminder telling agents to prefer raw Bash over Read/Edit/Write appears mid-session in bypassPermissions interactive sessions (and…

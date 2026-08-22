@@ -37,6 +37,7 @@ listed here.
 | `markdown-footnotes.md` | Markdown footnote syntax (extended) | markdownguide.org/extended-syntax |
 | `obsidian-block-links.md` | Obsidian block identifiers and block links | obsidian.md/help/links |
 | `openai-codex-hooks-2026-08-14.md` | Codex plugin hook env vars and payloads | learn.chatgpt.com/docs/hooks |
+| `openai-codex-pretooluse-payload.md` | Codex `PreToolUse` payload fields — carries no `agent_id`/`agent_type` | learn.chatgpt.com/docs/hooks |
 | `openai-codex-skills-2026-08-14.md` | Codex `SKILL.md` requirements | learn.chatgpt.com/docs/build-skills |
 | `openai-codex-subagents-2026-08-14.md` | Codex custom agents (TOML under `.codex/agents/`) | learn.chatgpt.com/docs/agent-configuration/subagents |
 | `python-strenum.md` | `enum.StrEnum` version added and string behavior | docs.python.org/3/library/enum |

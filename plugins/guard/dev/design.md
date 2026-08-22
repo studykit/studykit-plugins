@@ -1287,12 +1287,21 @@ content; the hook is the check on location. `deferrals-auditor` additionally car
 asymmetric rule in prose — never store a remembered `legitimate` — because that specific
 direction is the one that reproduces itself.
 
-**Codex is not wired.** Codex lists `PreToolUse` among its events and its decision can deny
-before a tool runs (`guide/adapter-guide.md`), but what is documented there about `agent_type`
-is the `SubagentStart` payload, not `PreToolUse`. Registering the hook on a payload that may
-not identify the agent would cost a process per edit to accomplish nothing, so
-`hooks.codex.json` is unchanged. What has to be established first: whether a Codex
-`PreToolUse` payload carries `agent_type`, and what a plugin subagent reports in it.
+**Codex cannot express this rule, and that is now checked rather than suspected.** Codex
+lists `PreToolUse` and its decision can deny before a tool runs, but the event's payload is
+`turn_id`, `tool_name`, `tool_use_id`, `tool_input` over the common fields — and carries
+**no `agent_id` and no `agent_type`**; those two are documented for `SubagentStart` and
+`SubagentStop` only. Excerpt: `wiki/ref/openai-codex-pretooluse-payload.md`, fetched
+2026-08-23. So a hook registered there could not tell a report-only agent's write from any
+other and would deny everything or nothing. `hooks.codex.json` is unchanged.
+
+The remaining route is correlation: record identity at `SubagentStart`, which does carry
+`agent_id`/`agent_type` plus the parent `session_id`, and look it up from `PreToolUse` by a
+field both events share. One measurement decides whether that is possible at all — whether a
+Codex subagent's `PreToolUse` reports the subagent's `session_id` or the parent's. If it
+reports the parent's, nothing separates the subagent's writes from the main thread's and the
+approach is dead. `codex-cli` is installed on this machine, so this is a measurement rather
+than a question.
 
 ## Codex: hooks must be trusted, or guard is silent
 

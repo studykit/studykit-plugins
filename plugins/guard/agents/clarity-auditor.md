@@ -2,12 +2,14 @@
 name: clarity-auditor
 description: |
   Audits one finished turn for whether its intended reader can follow it. Reports; edits nothing.
-# `Bash` is for guard's `transcript` extractor: whether a term was already explained is a
-# question about earlier turns, and the extractor is the only way to answer it. `Grep`/`Glob`
-# and `Read` are for the repository, which settles whether a name the answer used is a real
-# identifier the reader can go look at or a term the answer invented. `SendMessage` asks the
-# main session what a passage was meant to convey — never whether it was clear, which is the
-# question being audited.
+# What each tool is FOR, not a limit on it — the host injects a standing instruction to route
+# work through `Bash` wherever it can do the job, so a comment here narrowing `Bash` to a
+# purpose list would be contradicted on every turn and is not written that way.
+# guard's `transcript` extractor is the reason `Bash` is present: whether a term was already
+# explained is a question about earlier turns and the extractor is the only route to them.
+# The repository settles whether a name the answer used is a real identifier the reader can go
+# look at or a term the answer invented. `SendMessage` asks the main session what a passage was
+# meant to convey — never whether it was clear, which is the question being audited.
 tools: Read, Grep, Glob, Bash, SendMessage
 # `user`, not `local` like guard's other agents — the only one, deliberately. What this agent
 # needs to remember is a *person*: their field, how long they have worked in it, what
