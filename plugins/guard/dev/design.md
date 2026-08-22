@@ -11,9 +11,9 @@ line-by-line walkthrough.
 | Event | Subcommand | Role |
 | --- | --- | --- |
 | `UserPromptSubmit` | `user-prompt` | Trace only. guard keeps no record of the prompt; the hook stays registered so a "guard said nothing" report can be told apart from a hook that never ran. |
-| `UserPromptExpansion` (one matcher per agent: `claims-auditor`, `deferrals-auditor`, `korean-corrector`) | `verify <agent>` | On demand, dispatch **that agent** for the last completed turn. The agent name rides in argv, not in a dispatch input the model has to be trusted to honor. |
+| `UserPromptExpansion` (one matcher per agent: `claims-auditor`, `deferrals-auditor`, `clarity-auditor`, `korean-corrector`) | `verify <agent>` | On demand, dispatch **that agent** for the last completed turn. The agent name rides in argv, not in a dispatch input the model has to be trusted to honor. |
 | `PostToolUse` (`Write\|Edit\|MultiEdit\|NotebookEdit`) | `post-edit` | Record a source file this turn wrote (the candidate list for a `comment-corrector` recommendation), then block when a file saved in the refs dir is not listed in that dir's `AGENTS.md`. |
-| (called via Bash, not a hook) | `settings` | `guard:settings` skill (in-session) shows/sets guard.local.json settings; the four agent modes also apply to the live session's `state/<sid>.json` (session id from `--session`/`CLAUDE_CODE_SESSION_ID`). A mode change away from `reuse` also prints a stand-down note, the only channel guard has to a running instance. Every other key preserved; never the list key (`exempt_skills`). |
+| (called via Bash, not a hook) | `settings` | `guard:settings` skill (in-session) shows/sets guard.local.json settings; the agent modes also apply to the live session's `state/<sid>.json` (session id from `--session`/`CLAUDE_CODE_SESSION_ID`). A mode change away from `reuse` also prints a stand-down note, the only channel guard has to a running instance. Every other key preserved; never the list key (`exempt_skills`). |
 | (called via Bash, not a hook) | `exempt` | `guard:settings` skill records the user's confirmed `exempt_skills` selection (that key only). |
 | `Stop` | `stop` | Write the response section of the turn record and mark the turn as the on-demand target — always. Then, when any agent is not `off`, emit `additionalContext` asking the main agent to dispatch `guard:router` over the record, carrying the eligible agents with their modes and this turn's paths. The router names sections of `hooks/context/dispatch-playbook.md`; the main agent follows those, completing the record's second section only if a named section asks for it. |
 | `SessionStart` | `session-start` | Sweep state and turn records past retention, export `GUARD_REFS_DIR`, state the refs rule as session context, name the dispatch playbook once when any agent is on, and — when any agent is in `reuse` — state the standing reuse policy once. |
@@ -34,10 +34,11 @@ written by the main agent.
   the id a previous turn's files would ride into this turn's recommendation.
   `_read_state` honors only known keys, so a hand-edited or stale file degrades to
   defaults instead of injecting state.
-- `turns/<sid>/<prompt_id>.md` — the response being audited, verbatim, written by guard at
-  every Stop from the payload's `last_assistant_message`. That is the file's whole content;
-  nobody appends to it. `<prompt_id>.ko-fix.md` beside it is where `korean-corrector` writes
-  its rewrite.
+- `turns/<sid>/<prompt_id>.md` — the answer to the user's question, one file per typed
+  prompt. The session writes it during the turn (the path comes from `UserPromptSubmit`);
+  guard fills it in at Stop from `last_assistant_message` only when the turn left it empty,
+  which is the fallback, not the path. The correctors edit it in place, so it is also the
+  file the user is shown at the end.
 - `extracts/<sid>/…` — whatever an agent pulled out of the transcript: `index.md`,
   `turn-<id>.md`, `find.md`, or a `--out` path it chose. Written by the `transcript`
   subcommand on request, never on a schedule, and swept with the rest of the session's
@@ -79,11 +80,26 @@ payloads, not memory.
   next different non-empty promptId ends the slice; `isMeta:true` records are guard's own
   feedback and are skipped) no longer bear on anything. They are recorded in case a future
   change needs to walk the turn again; do not re-add the walk without a reason.
-- **A background-agent completion opens its own transcript turn** (`origin.kind ==
-  "task-notification"`, `promptSource: "system"`, NOT `isMeta`; verified 2.1.197). This is
-  load-bearing: the recommendation asks the main agent to dispatch agents, each dispatch is
-  a background task whose completion opens a turn, and recommending an audit *of that turn*
-  would dispatch again without end. `cmd_stop` skips these (`skip_task_notification`).
+- **Machinery reporting in opens its own transcript turn**, with a fresh promptId and
+  `promptSource: "system"`. Two kinds observed: `origin.kind == "task-notification"` for a
+  background agent's completion (NOT `isMeta`; verified 2.1.197) and `origin.kind ==
+  "peer"` for an inbound `SendMessage` from a subagent or another session (`isMeta: true`;
+  verified 2.1.239). This is load-bearing: the recommendation asks the main agent to
+  dispatch agents, and those agents both complete and message back, so an audit *of such a
+  turn* dispatches again without end. `cmd_stop` audits only `origin.kind == "human"` and
+  skips every other named kind (`skip_nonhuman_turn`), which is what keeps a kind added
+  later from reopening the loop; an *absent* kind still audits, so guard cannot go silently
+  dormant if `origin` stops being emitted.
+
+  Shipping only the `task-notification` skip left `peer` open and the loop was observed in
+  a real session (2.1.239): the `claims-auditor` asked the session a question via
+  `SendMessage`, the reply opened a `peer` turn, guard handed that turn an answer file of
+  its own and recommended a full audit of guard's own audit report — two extra rounds, and
+  the main agent ended up opening the audit memo instead of the answer. Hence the second
+  half of the rule: one user question, one answer file. `UserPromptSubmit` (which fires only
+  for a typed prompt) and the Stop dispatch name the same path, the correctors edit that
+  file, and the playbook's `Presenting the result` opens that file and forbids starting
+  another for the audit report.
 - **`hookSpecificOutput.additionalContext` on Stop continues the conversation.** Claude
   acts on the text in the same turn, exactly as with `decision: "block"`, and under the
   same loop protections — `stop_hook_active` plus an 8-consecutive-continuation cap. The
@@ -172,21 +188,28 @@ payloads, not memory.
   main session's account of it, and to say in its report that the finding rests on that
   rather than on the transcript. An agent that cannot get either reports what it could not
   check; it never treats unverifiable as verified.
-- **Text is stored where it is read, not where it is emitted.** Three homes, and the split
-  is by how often each is paid for. `additionalContext` is paid in the main agent's context
-  on *every* routed turn, so it carries only what changes per turn: the record path, which
-  agents are on, each one's mode, the files this turn wrote, the rewrite path.
-  `agents/router.md` is paid once per routed turn, in the router's own context, so it
-  carries the triage method and the cue per candidate. `hooks/context/dispatch-playbook.md`
-  is paid only by whoever is sent to a section, so it carries how to dispatch an agent,
-  what its report means, and what to do about it — the text that reads identically every
-  turn and is needed only for the agents actually picked.
+- **Text is stored where it is read, not where it is emitted.** Three homes, split by how
+  often each is paid for. `additionalContext` is paid in the main agent's context on *every*
+  routed turn, so it is one imperative plus a list of fields — the paths, which agents are
+  on, each one's mode — and nothing that reads the same twice. `agents/router.md` is paid
+  once per routed turn, in the router's own context, so it holds the triage method, the cue
+  per candidate, and the shape of the report. `hooks/context/dispatch-playbook.md` is paid
+  only by whoever is sent to a section, so it holds how to dispatch an agent and what to do
+  with its report — needed only for the agents actually picked.
 
-  Two temptations to refuse. Printing each candidate's dispatch block in the hook output
-  pays for four blocks on every turn to use at most four and usually none, since the common
-  case is the router clearing the turn. Having the *router* write those blocks instead is no
-  better: it makes an LLM re-type instructions it was handed, which is exactly where wording
-  drifts from the file that owns it. The router names sections; the main agent reads them.
+  The test for any line in the hook output is: could the playbook or the router's own
+  definition have said this instead? If yes it belongs there. That test removed the whole
+  procedure from the hook, and it is why there is **no `router` section in the playbook** —
+  the router's report names the playbook and the sections to follow, so the main agent never
+  reads a section about routing.
+
+  Three temptations to refuse. Printing each candidate's dispatch block in the hook pays for
+  four blocks every turn to use at most four and usually none, the common case being the
+  router clearing the turn. Having the *router* write those blocks instead makes an LLM
+  re-type instructions it was handed, which is where wording drifts from the file that owns
+  it — it names sections, it does not reproduce them. And restating the procedure "so the
+  main agent does not have to look it up" is paying every turn to save one Read on the turns
+  that route.
 - **What bounds the dispatch is the playbook, not the roster.** A key the router invents
   has no section, so a switched-off agent stays unreachable even when it is named anyway.
   The roster is what stops it being reached for in the first place; the missing section is
@@ -246,8 +269,8 @@ payloads, not memory.
   removing it removed a whole class of question — "the switch is on but is the gate open,
   and does `ask` mean the user is asked before or after routing" — that the user had to
   hold in their head to predict what guard would do. Now: an agent not `off` means it can
-  be recommended; all four `off` means guard emits nothing and makes no model call, which
-  is what `audit_gate off` used to mean. All four ship `off`, so installing guard does not
+  be recommended; every switch `off` means guard emits nothing and makes no model call, which
+  is what `audit_gate off` used to mean. Every switch ships `off`, so installing guard does not
   start auditing; and the key is the agent's own bare name, so `settings set
   korean-corrector reuse`, `/guard:korean-corrector`, and
   `subagent_type: "guard:korean-corrector"` are one string. Renaming an agent means
@@ -286,7 +309,7 @@ payloads, not memory.
   once at SessionStart instead, so the per-turn text carries only the mechanic.
 - **Memory is what the agent knows about the project; reuse is what the instance saw this
   session.** Both exist, they are different axes, and neither substitutes for the other.
-  The four audit agents carry `memory: local` — conventions, where the answers live, a
+  The audit agents carry `memory: local` — conventions, where the answers live, a
   correction the user rejected. The docs recommend `project`, and for an agent a team wrote
   for itself that is right; guard is installed from a marketplace and runs in repositories
   it does not own, where `project` would create files that land in someone else's commits
@@ -307,7 +330,7 @@ payloads, not memory.
   is also the cheapest agent in the set, so continuity buys the least there.
 - **Reuse needs `SendMessage` in the agent's `tools:`, and the router must not have it.**
   `tools` is an allowlist when present (`wiki/ref/claude-code-subagent-frontmatter.md`), so
-  the four audit agents list `SendMessage` and the router does not. This also fixes an older
+  the audit agents list `SendMessage` and the router does not. This also fixes an older
   inconsistency: the auditor definitions have always said "ask the main session where to
   look", with no tool to ask with. The discipline they already carry is what keeps that
   safe — ask for a pointer, then look yourself, because an answer from the turn's author is
@@ -333,8 +356,8 @@ payloads, not memory.
   as evidence *offered* and checks the repository itself before calling anything
   unsupported. Do not soften this into "summarize the relevant context": a summary of
   evidence is an argument about evidence.
-- **The dispatch passes only what the agent cannot obtain itself.** That is the turn
-  record's path, and for Korean a rewrite path — nothing more. Not the refs directory: the
+- **The dispatch passes only what the agent cannot obtain itself.** That is the answer
+  file's path — nothing more. Not the refs directory: the
   agent resolves it with the `refs-dir` subcommand. Not the repository: it is the working
   tree the agent already runs in. Not a transcript path: a pointer an agent cannot use is
   one it may chase anyway. Not a summary of the turn either, from guard or from the main
@@ -379,14 +402,32 @@ payloads, not memory.
   be called an auditor. The consequence: `comment-corrector on` means unattended edits to
   the files the turn just wrote, which is why its dispatch text tells the main agent to
   relay what was left unfixed.
-- **The Korean corrector writes a file; the comment corrector edits in place.** Not an
-  inconsistency — the inputs differ. `comment-corrector` is pointed at source files, so
-  fixing means `Edit` on those files. `korean-corrector` is pointed at a turn record in
-  guard's own state, which is a record of prose the assistant already emitted: editing it
-  changes nothing anyone reads. So the correction has to be a new artifact, and
-  `_korean_rewrite_file` puts it beside the record (`<prompt_id>.ko-fix.md`) rather than in
-  the user's tree. guard never reads it back; only the main agent does, told the path in
-  its dispatch text. Do not "unify" these two by giving the Korean agent `Edit`.
+- **`clarity-auditor` audits against a reader, and says so when it has none.** Its three
+  axes are not symmetric in what they need. "Is there a concrete example" is answerable from
+  the answer alone. "Is this term unexplained" needs the session — a term defined two turns
+  ago is defined, and the windowed `transcript find --until <this turn>` is the only way to
+  know, because an explanation *later* in the session could not have helped a reader reading
+  this turn. "Is this pitched right" needs the reader profile and nothing else can substitute.
+  So with no profile it runs axes 1 (narrowed to terms the answer itself leaves undefined)
+  and 2, reports `profile: MISSING`, and skips axis 3 by name. The alternative — picking a
+  level — fails in both directions at once: assume a beginner and every technical term is a
+  finding, assume an expert and nothing ever is. A named gap is the only honest state, and it
+  is also the one the user can fix (`/guard:reader-profile`).
+
+  Two consequences. The profile is `memory: user`, the only non-`local` memory in guard,
+  because it describes a person rather than a checkout. And it is only ever written from what
+  the user said — never inferred from the repository, since the code someone works in is not
+  evidence of their vocabulary, and a guess written to memory becomes a calibration fact for
+  months.
+
+- **Both correctors edit in place; only their targets differ.** `comment-corrector` edits
+  the source files the turn wrote, `korean-corrector` edits the answer file. That the second
+  one is possible at all is the point of the answer file: when the corrector's input was a
+  transcript of prose the assistant had already said, a correction could only be a new
+  artifact the user then had to be talked into reading, and the rewrite (`.ko-fix.md`) plus
+  the relay of its path existed for that reason alone. An answer the user has not read yet
+  can simply be fixed, one `Edit` per finding, which also makes the diff the findings. Do
+  not reintroduce a rewrite file.
 - **Recommend once per turn, and spend the marker before emitting.** Two independent
   guards: `stop_hook_active` covers the ordinary continuation, and
   `last_audited_prompt_id` covers what it cannot — the recommendation asks the main agent
@@ -411,14 +452,16 @@ payloads, not memory.
   `reuse` value costs Codex nothing and means nothing there. Closing either gap means
   giving Codex the agent set first, not adding a router; keep `_SCOPE` as the seam and do
   not push host detail into `_eligible_agents`.
-- **Assistant tool output is first-class evidence.** The turn record is required to carry
-  what the assistant ran and what came back, because a claim that restates or follows from
-  a command's output there is supported without a re-cite. Note what is no longer a rule: a
-  user-run `!` command used to disqualify its whole turn, because its output records landed
-  in guard's slice *after* the response an audit would judge, so the evidence arrived later
-  than the claims. guard no longer cuts the slice — the main agent writes the record, and
-  by then the `!` output either is or is not part of what it is describing. The skip is
-  gone; do not re-add it without re-establishing the ordering problem it solved.
+- **Assistant tool output is first-class evidence, and the auditor fetches it itself.** A
+  claim that restates or follows from a command this turn ran is supported without a
+  re-cite — but the answer file holds only the answer, so the auditor gets that output from
+  a `transcript turn` extract rather than from the record. Two rules that used to live here
+  are gone and should not come back by habit. The record no longer carries a tool-activity
+  section, so nothing asks the turn's own author to assemble the evidence it will be judged
+  on. And a user-run `!` command no longer disqualifies its turn: that skip existed because
+  guard cut the slice itself and the `!` output landed *after* the response an audit would
+  judge, so evidence arrived later than the claims. guard cuts no slice at Stop, so the
+  ordering problem is gone with it — do not re-add the skip without re-establishing it.
 - **`_safe_project_subdir` is guard's self-neutering defense** for the one config key that
   names a directory guard treats specially (`refs_dir`): strictly inside the project (the
   root itself fails, because a path is never in its own `.parents` — this is what rejects
@@ -529,7 +572,7 @@ run(){ anchor "$1"; echo "{\"session_id\":\"s1\",\"prompt_id\":\"$1\",\"transcri
 "$H" settings show --session s1        # read verbs need no marker
 export GUARD_SETTINGS_SKILL=1         # mutating verbs do — see _cli_write_allowed
 
-# All four off (the shipped default): NOTHING is emitted, but the pending target must
+# All switches off (the shipped default): NOTHING is emitted, but the pending target must
 # still be recorded or every /guard:* audit command breaks in the state guard installs in.
 run p0 "Redis is always faster."        # -> (EMPTY); trace: none_eligible
 python3 -c "import json;print(json.load(open('$CLAUDE_PROJECT_DIR/.claude/guard/state/s1.json'))['pending_verify_prompt_id'])"
@@ -544,12 +587,10 @@ cat "$CLAUDE_PROJECT_DIR/.claude/guard/turns/s1/p0.md"
 "$H" settings set claims-auditor fresh --session s1     # "on" is an accepted alias
 "$H" settings set korean-corrector fresh --session s1
 run p1 "Redis는 Postgres보다 항상 빠릅니다."
-#   -> STEP 1 routes and says to gather NOTHING yet: it names the playbook's `router`
-#      section, dispatches guard:router with the record path and exactly two candidates
-#      with their modes, and adds p1.ko-fix.md because korean-corrector is among them.
-#      STEP 2 defers completing the record to the sections that ask for it.
-#      There must be no unconditional "complete the record" step, and nothing here
-#      describes what an agent does or how to dispatch it — that is the playbook's.
+#   -> one imperative plus fields: the playbook path, the answer file, exactly two
+#      candidates with their modes, and the transcript + turn id. Nothing here describes
+#      what an agent does, how to dispatch it, or what to do with its report — those are
+#      the playbook's, and the router's answer is what names the sections.
 cat "$CLAUDE_PROJECT_DIR/.claude/guard/turns/s1/p1.md"
 #   -> the second section reads "Not collected" and carries the ask for earlier evidence
 #      plus the ban on the main agent's own case for the claim. Nothing collected it.
@@ -574,11 +615,24 @@ run p4 "Refactored the cache."          # -> claims-auditor only: p4 wrote nothi
 echo "{\"session_id\":\"s1\",\"prompt_id\":\"p4\",\"transcript_path\":\"$T\",\"last_assistant_message\":\"x\",\"stop_hook_active\":false}" | "$H" stop
 #   -> empty; trace: skip_already_recommended
 
-# A background agent's completion must NOT draw a recommendation, or each audit dispatch
-# recommends an audit of its own completion, without end.
+# Only a turn a person typed is audited. A background agent's completion and a subagent's
+# SendMessage both open turns of their own, and both are turns guard's own dispatch caused —
+# auditing either recommends an audit of guard auditing, without end. A kind guard has never
+# seen must skip too; an absent kind must still audit, or guard goes silently dormant.
 anchor p5 task-notification '<task-notification>done</task-notification>'
-echo "{\"session_id\":\"s1\",\"prompt_id\":\"p5\",\"transcript_path\":\"$T\",\"last_assistant_message\":\"the agent reported\",\"stop_hook_active\":false}" | "$H" stop
-#   -> empty; trace: skip_task_notification
+anchor p5b peer 'Another Claude session sent a message: <agent-message from="guard:claims-auditor">where is X?</agent-message>'
+anchor p5c cron 'scheduled'
+for p in p5 p5b p5c; do
+  echo "{\"session_id\":\"s1\",\"prompt_id\":\"$p\",\"transcript_path\":\"$T\",\"last_assistant_message\":\"the agent reported\",\"stop_hook_active\":false}" | "$H" stop
+done
+#   -> all three empty; trace: skip_nonhuman_turn with origin_kind naming which
+#   -> and no turn record written for any of them: `ls .claude/guard/turns/s1/` has no p5*
+
+# No `origin` at all is the fail-open direction and must still audit (`anchor` always writes
+# one, so this anchor is hand-rolled).
+printf '{"promptId":"p5d","message":{"role":"user","content":"q"}}\n' >> "$T"
+echo "{\"session_id\":\"s1\",\"prompt_id\":\"p5d\",\"transcript_path\":\"$T\",\"last_assistant_message\":\"Redis는 항상 빠릅니다.\",\"stop_hook_active\":false}" | "$H" stop
+#   -> a recommendation, NOT empty
 
 # guard's own control turns and exempt skills are skipped by command name.
 anchor p6 human '/guard:settings show'
@@ -610,7 +664,8 @@ echo '{"session_id":"s1"}' | "$H" verify comment-corrector  # no output: no turn
 "$H" verify bogus < /dev/null                               # unknown name -> no output at all
 
 # Unknown keys and unknown values are both rejected outright rather than silently accepted.
-"$H" settings set audit_gate off --session s1        # -> error naming the four agent keys
+"$H" settings set audit_gate off --session s1   # -> error listing the settable keys;
+#   `audit_gate` was the old off/ask/auto gate in front of the switches and must stay rejected
 "$H" settings set claims-auditor maybe --session s1  # -> error naming off/fresh/reuse
 
 # The mutating CLI verbs refuse without the marker; reads still work.

@@ -136,6 +136,13 @@ def _handle_post_tool(project_dir: Path, payload: dict[str, Any], session_id: st
 
 # How each shared recommendation key reads in the sentence handed to Codex's single
 # named agent. Keys absent here have no Codex agent and are dropped.
+#
+# `clarity-auditor` is absent on purpose, and this is not an omission to fix. It needs two
+# things Codex does not have: the session's transcript, to tell a term this session already
+# explained from one it never did (Codex's transcript is not a stable hook interface, which
+# is why this adapter keeps its own turn record), and agent memory, to hold the reader
+# profile it calibrates against. Without either it would have nothing to audit against and
+# would report `profile: MISSING` on every turn.
 _SCOPE = {"claims-auditor": "the response's claims",
           "deferrals-auditor": "deferrals the repository could resolve",
           "korean-corrector": "whether the Korean reads as translated English"}

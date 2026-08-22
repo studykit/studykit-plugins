@@ -8,28 +8,28 @@ because its own machinery broke).
 
 Subcommands
 -----------
-- user-prompt    UserPromptSubmit. Archive the user turn to the session log. That log is
-                 the human-readable session record and the only place the user's own
-                 wording is kept; the Stop audit reads the turn itself from the
-                 transcript by ``prompt_id``, so nothing is derived here. guard's own
-                 ``/guard:settings`` / ``/guard:audit-*`` commands are ignored (not
-                 turns).
-- settings       CLI (argv), run by the ``guard:settings`` skill (forked) via Bash.
+- user-prompt    UserPromptSubmit. Name the file this turn's answer is to be written to,
+                 so the answer exists somewhere editable while the turn is still running.
+                 It has to be this hook: by Stop the answer is already printed, and a
+                 printed answer cannot be corrected. guard keeps no copy of the prompt.
+                 Silent when every agent is off and for guard's own control commands.
+- settings       CLI (argv), run by the ``guard:settings`` skill via Bash, in-session.
                  ``show`` prints the current settings; ``set <key> <value>`` changes one
                  of the per-agent settings — each named after the agent it controls
                  (``claims-auditor`` / ``deferrals-auditor`` / ``korean-corrector`` /
-                 ``comment-corrector``), valued ``off``/``fresh``/``reuse`` — or
-                 ``router_model`` / ``refs_dir``. The agent settings also apply to the live
-                 session's ``state/<sid>.json`` when a session id is available
-                 (``--session``, which the forked skill passes as
+                 ``clarity-auditor`` / ``comment-corrector``), valued
+                 ``off``/``fresh``/``reuse`` — or ``router_model`` / ``refs_dir``. The agent
+                 settings also apply to the live session's ``state/<sid>.json`` when a
+                 session id is available (``--session``, which the skill passes as
                  ``${CLAUDE_SESSION_ID}``, else the inherited
                  ``CLAUDE_CODE_SESSION_ID``); the rest are read from the config file at
                  use. Preserves every other key; ``exempt_skills`` is managed by the
                  ``exempt`` CLI, not here. Mutating verbs require the settings-skill
                  marker — see ``_cli_write_allowed``. Not a hook event.
-- verify         UserPromptExpansion, one matcher per axis
-                 (``^(guard:)?{claims,deferrals}-auditor$``, ``^(guard:)?korean-corrector$``).
-                 On demand, emit the dispatch instruction for that ONE axis's agent
+- verify         UserPromptExpansion, one matcher per agent
+                 (``^(guard:)?{claims,deferrals,clarity}-auditor$``,
+                 ``^(guard:)?korean-corrector$``).
+                 On demand, emit the dispatch instruction for that ONE agent
                  over the last completed turn (``pending_verify_prompt_id``, recorded by
                  every Stop). A switch that is off is still auditable this way — the
                  switch governs what guard recommends unasked, not what the user may ask
@@ -39,42 +39,51 @@ Subcommands
                  ``remove``/``clear`` the ``exempt_skills`` config key — that key ONLY,
                  never the switches/state. Mutating verbs require the settings-skill
                  marker (``_cli_write_allowed``). Not a hook event.
-- stop           Stop. A turn == the transcript ``prompt_id``; guard reads the whole
-                 turn from Claude Code's transcript (``transcript_path`` +
-                 ``prompt_id``, both in the payload) via ``_read_turn_from_transcript``
-                 — user request, tool activity, and response. Skips when
-                 ``stop_hook_active``, the prompt_id/transcript are absent, the slice
-                 contains a user ``!`` command (its output arrives after the response it
-                 would have to support, so it is neither evidence nor auditable here),
-                 or the turn was opened by guard's own ``/guard:settings`` /
-                 ``/guard:audit-*`` control command or a user-configured
-                 ``exempt_skills`` entry (skill output / a relay, not claims to ground).
-                 Otherwise it archives the turn, writes its slice, and records it as the
-                 pending ``/guard:audit-*`` target — in every gate mode. Then, unless
-                 the gate is ``off``, it emits ``additionalContext`` asking the main
-                 agent to dispatch THE ROUTER (``ROUTER_AGENT``) over the turn, choosing
-                 from the eligible agents, and then to dispatch the ones it names,
-                 concurrently — under ``ask`` after the user says yes, under ``auto``
-                 straight away. guard runs no model itself and never blocks here.
+- stop           Stop. A turn == the transcript ``prompt_id``. guard reads ONE transcript
+                 record, for the turn's kind only (``_turn_identity``) — never its content,
+                 which is the main agent's to write. Skips when ``stop_hook_active``, when
+                 the prompt_id is absent, when the turn was opened by anything other than a
+                 person typing (a background agent's completion, a subagent's
+                 ``SendMessage``: guard's own dispatch causes those, so auditing them loops),
+                 and when it was opened by one of guard's control commands or a configured
+                 ``exempt_skills`` entry. Otherwise it records the turn as the pending
+                 ``/guard:<agent>`` target and fills in the answer file if the turn left it
+                 empty — both regardless of the switches, because the on-demand commands
+                 must work in a project that keeps everything off. Then, when any agent is
+                 not ``off``, it emits ``additionalContext`` asking the main agent to
+                 dispatch the router (``ROUTER_AGENT``) over the answer file with the
+                 eligible agents and their modes, and to follow the sections its report
+                 names. guard runs no model itself and never blocks here.
 - post-edit      PostToolUse (Write/Edit/MultiEdit/NotebookEdit). Records a source
                  file written this turn (the list a ``comment-corrector``
                  recommendation is built from), and requires a file saved inside the
                  refs directory to be listed in that directory's ``AGENTS.md``, blocking
                  until it is. Both are independent of the agent switches.
-- session-start  SessionStart. Sweep state files and turns/ dirs
-                 older than retention, and export ``GUARD_REFS_DIR`` (the resolved
-                 refs directory) via ``$CLAUDE_ENV_FILE`` for the session's Bash
-                 environment.
+- session-start  SessionStart. Sweep state files and turns/ dirs older than retention,
+                 export ``GUARD_REFS_DIR`` (the resolved refs directory) via
+                 ``$CLAUDE_ENV_FILE``, and state as session context: the refs rule always,
+                 the dispatch playbook's path when any agent is on, and the standing reuse
+                 policy when any agent is in ``reuse``. Each is said ONCE here rather than
+                 in every Stop, which is the whole reason this hook prints anything.
+- transcript     CLI (argv), run by an audit agent via Bash. ``index`` / ``turn`` / ``find``
+                 over the session transcript, bounded by ``--since`` / ``--until`` /
+                 ``--last``. Writes an extract FILE and prints only its path plus a
+                 one-line summary, so nothing lands in a context that did not ask for it.
+                 Only on an agent's request, never on a schedule. Not a hook event.
 - refs-dir       Print the resolved refs directory (absolute), applying the
                  ``refs_dir`` validation. Called via Bash (claims auditor fallback / the
                  output style), not a hook event.
 
 State lives project-local under ``${CLAUDE_PROJECT_DIR}/.claude/guard/``:
-- ``state/<sid>.json``       — {<agent modes>, edited_prompt_id, edited_files, last_audited_prompt_id, pending_verify_prompt_id, updated_at}
-- ``turns/<sid>/<pid>.md``   — the turn every agent in one recommendation reads; guard
-                                names the path, the MAIN AGENT writes it (see
-                                ``_turn_record_file``). ``<pid>.ko-fix.md`` beside it is
-                                where the Korean corrector puts its rewrite.
+- ``state/<sid>.json``       — {<agent modes>, edited_prompt_id, edited_files, last_audited_prompt_id, pending_verify_prompt_id, transcript_path, updated_at}
+- ``turns/<sid>/<pid>.md``   — the turn's ANSWER. guard names the path at the start of the
+                                turn and the main agent writes the substance there; the
+                                agents audit it and the correctors edit it in place, so the
+                                corrected file is what the user is shown. guard fills it in
+                                only if the turn left it empty (see ``_write_turn_response``).
+- ``extracts/<sid>/…``       — what an agent pulled out of the transcript, written by the
+                                ``transcript`` subcommand on request and swept with the
+                                rest of the session's state.
 - ``trace.log``              — file-only debug trace (enabled by GUARD_TRACE)
 
 State is retained across the end of a session so a resumed session
@@ -83,14 +92,16 @@ expired only by the age-based sweep at SessionStart (see ORPHAN_MAX_AGE_SECONDS)
 
 Configuration (optional) is a JSON object at
 ``${CLAUDE_PROJECT_DIR}/.claude/guard.local.json``: one ``AgentMode`` per agent, keyed by
-that agent's own name — ``claims-auditor`` / ``deferrals-auditor`` / ``korean-corrector``
-/ ``comment-corrector``, each ``"off"`` (the default) / ``"fresh"`` / ``"reuse"`` — which
+that agent's own name — ``claims-auditor`` / ``deferrals-auditor`` / ``clarity-auditor`` /
+``korean-corrector`` / ``comment-corrector``, each ``"off"`` (the default) / ``"fresh"`` /
+``"reuse"`` — which
 together are the only control over whether guard says anything unasked and over whether an
 agent is respawned per turn or held open for the session; ``exempt_skills`` (list of strings, default
 ``[]``) — skills / slash commands whose turn Stop must not audit, named with their
 plugin namespace (``plugin:skill``, e.g. ``guard:settings``) or bare for un-namespaced
-skills; matched leading-``/``-stripped and case-insensitively (guard's own
-``settings``/``audit-*`` control commands are always exempt regardless of this list),
+skills; matched leading-``/``-stripped and case-insensitively (guard's own control
+commands — ``settings``, ``reader-profile`` and the per-agent ones — are always exempt
+regardless of this list),
 and ``refs_dir`` (string, default ``""``) — project-relative directory where guard saves
 local copies of cited docs; empty means the git-tracked default ``wiki/ref/``, so the
 collected references are committed with the repo (point it at a different tracked path,
@@ -196,7 +207,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
     # an `AgentMode`, so how the agent runs is the same setting as whether it runs: there
     # is no separate reuse list that could name an agent that is off.
     #
-    # These are the ONLY control over whether guard says anything unasked. All four off
+    # These are the ONLY control over whether guard says anything unasked. All of them off
     # (the default) is guard silent at Stop: no router, no recommendation, nothing added
     # to the main agent's context. There is deliberately no separate mode setting in
     # front of them — switching one on IS switching guard on, and a project that wants
@@ -207,6 +218,11 @@ DEFAULT_CONFIG: dict[str, Any] = {
     # ships off — guard installed is guard available, not guard running.
     "claims-auditor": AgentMode.OFF,
     "deferrals-auditor": AgentMode.OFF,
+    # Can the intended reader follow the answer? The only agent whose verdict depends on
+    # who is reading, which is why it carries `memory: user` rather than `local` and why
+    # it degrades loudly — with no reader profile it says so and checks less, instead of
+    # guessing a level and flagging either every technical term or none of them.
+    "clarity-auditor": AgentMode.OFF,
     # Does a Korean response read as natural Korean, or as translated English?
     # Switching it on in an English-answering project costs nothing on those turns: the
     # router reads the response and simply does not pick it.
@@ -283,8 +299,11 @@ def _turn_record_file(project_dir: Path, session_id: str, prompt_id: str) -> Pat
     it out that many times, in a message the main agent composes itself, which is exactly
     where a turn quietly becomes a paraphrase of the turn. One file, read by everyone.
 
-guard owns the file completely — it holds the response and nothing else. Nobody
-    appends to it. What surrounds the response (the request, the turn's tool activity,
+The file is the ANSWER, not a record of it. guard names the path at the start of the
+    turn, the main agent writes the substance there, the agents audit and correct it in
+    place, and the corrected file is what the user is shown — so the same text never has to
+    be printed twice, once flawed and once fixed. guard writes it only as a fallback, when
+    the turn ended with nothing there. What surrounds the response (the request, the turn's tool activity,
     what an earlier turn established) lives in the transcript, and an agent that needs any
     of it runs `transcript turn|find|index` and gets its own extract file. That keeps the
     author of the turn out of the record of the turn, which is the property the whole
@@ -295,48 +314,44 @@ guard owns the file completely — it holds the response and nothing else. Nobod
 
 # Section headings in the turn record. Fixed strings, because both the instruction that
 # asks for a section and the agent definitions that say which section to read name them.
-TURN_RESPONSE_HEADING = "## Assistant response (written by guard, verbatim)"
+# Header on the copy GUARD writes, and only on that copy. The normal case is the main agent
+# authoring this file during the turn — the file IS the answer, not a transcript of it — so
+# there is no heading at all then. guard writes only when the turn ended with nothing there,
+# and then the header is the honest label: this is a fallback, taken from the payload after
+# the fact, and whatever the reply actually said is what the user already read.
+TURN_FALLBACK_HEADER = (
+    "<!-- guard: the turn ended without this file being written, so guard filled it in from "
+    "the response it was handed. Audit it as the answer; corrections still go here. -->"
+)
 
 
 def _write_turn_response(project_dir: Path, session_id: str, prompt_id: str,
                          response: str) -> Path | None:
-    """Write the record: the response being audited, verbatim, and nothing else.
+    """Fill in the answer file IF the turn left it empty. Returns the path, or None.
 
-    guard writes this from the Stop payload's ``last_assistant_message``, not from the
-    transcript, because the payload is the one copy that is guaranteed complete at Stop
-    time and needs no parsing. It is the text being audited, so it is also the one thing
-    that must not pass through the author's hands on the way to an auditor.
+    Not an overwrite, ever. The main agent is asked at the start of the turn to write its
+    answer here, and by Stop that file may already hold the answer plus whatever a corrector
+    has done to it — clobbering it with the payload copy would throw away the corrections
+    and replace the working document with a snapshot of an earlier state.
 
-    Nothing else goes in the file. The request, this turn's tool activity and whatever an
-    earlier turn established are all in the transcript already, and an agent that needs
-    them extracts what it needs with the ``transcript`` subcommand. Accumulating them here
-    on every turn would write a full record for every turn to serve the few that are ever
-    audited, and would go stale the moment the session continued.
+    So this is the fallback for a turn that ignored the ask, and it matters that there is
+    one: the on-demand `/guard:*` commands audit the last completed turn whatever the
+    settings say, and with no file at all they would have nothing to point an agent at.
 
-    Best-effort, and a failure is silent: the recommendation is emitted anyway, and the
-    main agent is asked to create the file if it is not there. A guard that refused to
-    recommend because it could not write a scratch file would be failing closed on its own
-    plumbing.
+    Best-effort, and a failure is silent: the recommendation goes out anyway and the main
+    agent is asked to create the file. A guard that refused to recommend because it could
+    not write a scratch file would be failing closed on its own plumbing.
     """
     path = _turn_record_file(project_dir, session_id, prompt_id)
     try:
+        if path.exists() and path.stat().st_size > 0:
+            return path
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(f"{TURN_RESPONSE_HEADING}\n\n{response.rstrip()}\n",
+        path.write_text(f"{TURN_FALLBACK_HEADER}\n\n{response.rstrip()}\n",
                         encoding="utf-8")
     except OSError:
         return None
     return path
-
-
-def _korean_rewrite_file(project_dir: Path, session_id: str, prompt_id: str) -> Path:
-    """File the Korean corrector writes its rewritten response to.
-
-    Beside the turn record, inside guard's own state: the rewrite is a proposal for the
-    main agent to relay, not a user artifact, so it must not land in the user's tree.
-    guard never reads it back — only the corrector writes it and only the main agent,
-    told the path in its dispatch, reads it.
-    """
-    return _state_root(project_dir) / "turns" / session_id / f"{prompt_id}.ko-fix.md"
 
 
 def _safe_project_subdir(project_dir: Path, raw: Any) -> Path | None:
@@ -454,8 +469,12 @@ _SESSION_ID_RE = re.compile(r"^[A-Za-z0-9._-]+$")
 # it is what keeps `claims-auditor` from matching a bare `/claims`.
 # `comment-corrector` is deliberately ABSENT: that skill's relayed findings are claims about
 # real files and about edits made to them, so its turn stays auditable like any other work.
+# `reader-profile` is here for a different reason from the rest: its turn is an interview
+# about the user, so the "answer" is the user's own words read back to them, and auditing
+# that would have guard grading the user on how they described themselves.
 _CONTROL_CMD_RE = re.compile(
-    r"^/(guard:)?(settings|claims-auditor|deferrals-auditor|korean-corrector)(?=\s|$)",
+    r"^/(guard:)?(settings|reader-profile|claims-auditor|deferrals-auditor"
+    r"|clarity-auditor|korean-corrector)(?=\s|$)",
     re.IGNORECASE)
 # In the transcript, a slash command is expanded to
 # "<command-name>/guard:settings</command-name>" (see session b30dbaec). Pull the command
@@ -502,8 +521,8 @@ def _turn_command_name(user_text: str) -> str:
 
 def _is_control_command_name(name: str) -> bool:
     """True when a normalized command name is one of guard's own control commands
-    (``settings``/``*-auditor``/``korean-corrector``, with or without the ``guard:``
-    prefix)."""
+    (``settings``/``reader-profile``/``*-auditor``/``korean-corrector``, with or without
+    the ``guard:`` prefix)."""
     return bool(name) and bool(_CONTROL_CMD_RE.match("/" + name))
 
 
@@ -900,12 +919,14 @@ def _turn_identity(transcript_path: Any, prompt_id: Any) -> dict[str, str] | Non
     Returns ``{origin_kind, command_name}``, or None (fail-open) when the transcript is
     unreadable or the prompt_id is not in it. Both users of it are skips, not audits:
 
-    - ``origin_kind`` — a typed prompt is ``"human"``; a background subagent's
-      completion opens a NEW turn (fresh promptId) anchored on a ``<task-notification>``
-      record (``origin.kind == "task-notification"``, promptSource "system", NOT
-      ``isMeta``, so otherwise indistinguishable from a typed prompt). Recommending an
-      audit there is self-perpetuating: the audit dispatch is itself a background task
-      whose completion is another task-notification (verified 2.1.197).
+    - ``origin_kind`` — a typed prompt is ``"human"``. Anything else that opens a turn is
+      machinery reporting in, and each such kind arrives with a fresh promptId and
+      ``promptSource`` "system": ``"task-notification"`` for a background subagent's
+      completion (NOT ``isMeta``, so otherwise indistinguishable from a typed prompt) and
+      ``"peer"`` for an inbound ``SendMessage`` from a subagent or another session
+      (``isMeta``). Both observed in 2.1.239. Recommending an audit on either is
+      self-perpetuating, because guard's own dispatch is what produces them: the audit
+      agents are background tasks, and they message the session back.
     - ``command_name`` — the slash command that opened the turn, so a turn that is
       guard's own control command or a user-exempted skill can be skipped.
 
@@ -1115,11 +1136,12 @@ class AuditAgent(NamedTuple):
     request, at what the turn ran, at what an earlier turn established. Those agents are
     given the transcript path and the turn id so they can extract what they need with the
     ``transcript`` subcommand; the others are not, because a pointer an agent has no use
-    for is one it may chase anyway. Two need it: `claims-auditor`, since a claim made here
-    is often grounded by a command run three turns ago, and `deferrals-auditor`, since the
+    for is one it may chase anyway. Three need it: `claims-auditor`, since a claim made here
+    is often grounded by a command run three turns ago; `deferrals-auditor`, since the
     request is what separates a deferral the assistant owed from a decision it correctly
-    handed back. The correctors do not — Korean prose is judged as prose, and comments are
-    judged against the code under them.
+    handed back; and `clarity-auditor`, since whether a term still needs explaining depends
+    on whether an earlier turn already explained it. The correctors do not — Korean prose is
+    judged as prose, and comments are judged against the code under them.
 
     What the agent DOES, how to dispatch it, and what to do with its report are all in
     ``hooks/context/dispatch-playbook.md``, under the section named by this key. None of
@@ -1159,6 +1181,7 @@ def _instance_name(name: str) -> str:
 AUDIT_AGENTS: dict[str, AuditAgent] = {
     "claims-auditor": AuditAgent(reads="turn", verify_command=True, needs_history=True),
     "deferrals-auditor": AuditAgent(reads="turn", verify_command=True, needs_history=True),
+    "clarity-auditor": AuditAgent(reads="turn", verify_command=True, needs_history=True),
     "korean-corrector": AuditAgent(reads="turn", verify_command=True, needs_history=False),
     "comment-corrector": AuditAgent(reads="files", verify_command=False, needs_history=False),
 }
@@ -1189,9 +1212,9 @@ _SOURCE_SUFFIXES = frozenset({
 # definition is read once, by the router, and only when a turn is actually routed. A
 # per-candidate dispatch block in the hook's `additionalContext` is paid four times over
 # on every turn to be used at most four times and usually zero — the router clearing a
-# turn is the common case. So the hook carries only what the router cannot know (where
-# the record is, which agents are on, their modes, the edited files, the rewrite path)
-# and `agents/router.md` carries everything that describes an agent.
+# turn is the common case. So the hook carries only what the router cannot know (where the
+# answer file is, which agents are on, their modes, the edited files, the transcript
+# pointer) and `agents/router.md` carries everything that describes an agent.
 #
 # That the router is an agent and not a `claude -p` child guard spawns itself is the
 # design. A spawned child made the Stop hook block for the router's whole runtime at
@@ -1260,27 +1283,21 @@ def _agent_inputs(project_dir: Path, session_id: str, prompt_id: str, key: str,
                   edited: list[str]) -> list[str]:
     """The dispatch inputs for one agent: ONLY what the main agent cannot supply itself.
 
-    For a turn-reading agent that is the path to the turn record — the same path for
-    every agent in one recommendation, so they all read the identical text — plus, for
-    the Korean corrector, somewhere to put a long rewrite. The main agent writes the
-    record; see ``_turn_record_file`` for why the turn travels as a file.
+    For a turn-reading agent that is the answer file — the same path for every agent in one
+    dispatch, so they all read and correct the one document the user will be shown.
 
-    For ``comment-corrector`` it is instead the source files this turn edited, recorded
-    by PostToolUse: a main agent asked to recall which files it wrote will approximate,
-    and this is the one agent that EDITS what it is pointed at.
+    For ``comment-corrector`` it is instead the source files this turn edited, recorded by
+    PostToolUse: a main agent asked to recall which files it wrote will approximate, and
+    this is the one agent pointed at the repository rather than at the answer.
 
-    ``session_id`` / ``prompt_id`` are here to BUILD the rewrite path, never to be handed
-    over: an agent auditing one turn has no use for guard's identifiers, and an extra
-    pointer is one more thing it can wander into instead of auditing.
+    ``session_id`` / ``prompt_id`` are here to BUILD that path, never to be handed over: an
+    agent working on one turn has no use for guard's identifiers, and an extra pointer is
+    one more thing it can wander into instead of doing its job.
     """
     if AUDIT_AGENTS[key].reads == "files":
         return ["- files to audit (comments only, in place):"] + [f"    {p}" for p in edited]
-    inputs = ["- turn record: "
-              f"{_turn_record_file(project_dir, session_id, prompt_id).resolve()}"]
-    if key == "korean-corrector":
-        inputs.append("- rewrite path (write the corrected text here): "
-                      f"{_korean_rewrite_file(project_dir, session_id, prompt_id).resolve()}")
-    return inputs
+    return ["- answer file: "
+            f"{_turn_record_file(project_dir, session_id, prompt_id).resolve()}"]
 
 
 # The playbook the main agent is sent to by section name. Resolved from this file's own
@@ -1313,37 +1330,12 @@ def _agent_pointer(project_dir: Path, session_id: str, prompt_id: str, keys: lis
     ``modes`` is passed in rather than re-read from config because the caller resolved it
     from session state, which can differ from the file for the live session.
     """
-    lines = [f"Follow {_playbook_path()} — the sections named below, in this order:"]
+    lines = [f"Follow {_playbook_path()}, these sections in this order:"]
     for key in keys:
-        lines.append(f"- `{key}` = {modes[key].value}")
+        lines.append(f"- `{key}`={modes[key].value}")
         lines.extend("  " + line for line in _agent_inputs(
             project_dir, session_id, prompt_id, key, edited))
     return "\n".join(lines)
-
-
-def _history_step(transcript: str, prompt_id: str) -> str:
-    """The pointer an agent needs to look past the response, for the agents that may.
-
-    Not a task for the main agent — that is the point. It used to be: guard asked the main
-    session to copy this turn's request and tool activity into the record and to search back
-    for whatever earlier evidence a claim rested on. That put the largest cost guard has in
-    the one context the user is talking to, before anything was even known to need it, and
-    it made the turn's own author the source for the record of the turn.
-
-    Now guard hands over a transcript path, the turn's id, and the command that reads them.
-    The agent extracts what it wants, into its own file. Both problems go away at once: the
-    main agent gathers nothing, and no copy passes through the author.
-    """
-    return (
-        f"For an agent that needs more than the response — what was asked, what this turn "
-        f"ran, what an earlier turn established — pass these along too, and let the agent "
-        f"extract what it wants:\n"
-        f"- transcript: {transcript}\n"
-        f"- this turn's id: {prompt_id}\n"
-        f"- extract with: {Path(__file__).resolve()} transcript index|turn|find "
-        f"--transcript <path> [--turn <id>] [--pattern <re>] [--until <id>] [--last <n>]\n"
-        f"Do not gather any of it yourself."
-    )
 
 
 def _dispatch_context(project_dir: Path, session_id: str, prompt_id: str, lead: str,
@@ -1355,38 +1347,38 @@ def _dispatch_context(project_dir: Path, session_id: str, prompt_id: str, lead: 
     command, so there is nothing to triage and routing it would only add a hop.
     """
     keys = list(keys)
-    parts = [lead]
-    parts.append(_agent_pointer(project_dir, session_id, prompt_id, keys, edited or [],
-                                modes))
+    block = _agent_pointer(project_dir, session_id, prompt_id, keys, edited or [], modes)
     if transcript and any(AUDIT_AGENTS[k].needs_history for k in keys):
-        parts.append(_history_step(transcript, prompt_id))
-    return "\n\n".join(parts)
+        block += f"\n- history: transcript {transcript}, turn {prompt_id}"
+    return "\n\n".join([lead, block])
 
 
 def _router_context(project_dir: Path, session_id: str, prompt_id: str, lead: str,
                     eligible: list[str], edited: list[str], modes: dict[str, AgentMode],
                     config: dict[str, Any], transcript: str = "") -> str:
-    """``additionalContext`` for the Stop path: route, then act on what comes back.
+    """``additionalContext`` for the Stop path: the playbook pointer, then this turn's data.
 
-    The main agent gathers nothing here, and that is deliberate. An earlier shape had it
-    complete a turn record before routing — copying this turn's tool output and searching
-    back for whatever a claim rested on. That paid the largest cost guard has in the one
-    context the user is waiting on, on every routed turn including the many the router then
-    clears, and it made the turn's author the source for the record of the turn. Now the
-    record holds only the response, guard wrote it, and an agent that needs more is handed
-    the transcript and the command to extract from it.
+    Every line here is paid in the main agent's context at the end of EVERY routed turn,
+    including the many the router then clears, so the test each line has to pass is: could
+    the playbook have said this instead? If yes, it is deleted from here and said there,
+    where it is read once by whoever needs it.
 
-    Keeping this message short is the other half of the same point — it enters the main
-    agent's context at the end of every routed turn. So it carries only what nothing else
-    can know: where the record is, which agents the user has switched on, the mode of each,
-    the files this turn wrote, where a long rewrite may go, the transcript pointer for the
-    agents that may need history, and where the instructions are. Everything that reads the
-    same on every turn is in the playbook, read only by whoever is sent to that section.
+    Everything that used to spell out the procedure failed that test and is gone. What is
+    left is one imperative and a list of fields, because the ROUTER now returns the next
+    instruction itself: it names the playbook and the sections to follow, so the main agent
+    never reads a section about routing and the playbook has none. The rest — dispatch in one
+    message, in the order named, a clean result is one line, gather nothing yourself — is in
+    the playbook's `Dispatching` section, read once by whoever is sent there.
 
-    Deliberately absent: any summary of the turn, from guard or from the main agent.
-    Priming an audit with the author's account of the work is how an unexamined claim
-    becomes an established one — every agent here reads the turn itself and forms its own
-    view, which is also why the record is required to be verbatim.
+    What is left cannot come from anywhere else: where the playbook is, where the record is,
+    which agents are switched on and in what mode, the files this turn wrote, where a long
+    rewrite may go, and the transcript pointer for the agents whose section asks for it. The
+    field names are terse on purpose — the playbook says what each one is for.
+
+    Deliberately absent: any summary of the turn, from guard or from the main agent. Priming
+    an audit with the author's account of the work is how an unexamined claim becomes an
+    established one — every agent reads the turn itself and forms its own view, which is why
+    the record is required to be verbatim.
 
     The ROUTER is always a fresh instance, whatever the agents are set to. Its question is
     about this turn, and an instance carrying the last five turns is one that can answer it
@@ -1394,32 +1386,19 @@ def _router_context(project_dir: Path, session_id: str, prompt_id: str, lead: st
     checks. It is also the cheapest agent here, so continuity buys the least.
     """
     model = _router_model(config)
-    record = _turn_record_file(project_dir, session_id, prompt_id).resolve()
-    route = [
-        f"STEP 1 — route. Follow {_playbook_path()}, section `router`: dispatch "
-        f"`{ROUTER_AGENT}` with the Agent tool (subagent_type: \"{ROUTER_AGENT}\")"
-        + (f", model: {model}" if model else "") + ", passing:",
-        f"- turn record (the response, verbatim; guard wrote it): {record}",
-        "- candidates (it may name only these):",
+    fields = [
+        f"- playbook: {_playbook_path()}",
+        f"- answer file: {_turn_record_file(project_dir, session_id, prompt_id).resolve()}",
+        "- candidates: " + ", ".join(f"`{k}`={modes[k].value}" for k in eligible),
     ]
-    for key in eligible:
-        route.append(f"  - `{key}` = {modes[key].value}")
-        if AUDIT_AGENTS[key].reads == "files":
-            route.append("    files this turn wrote:")
-            route.extend(f"      {f}" for f in edited)
-    if "korean-corrector" in eligible:
-        route.append("- rewrite path for `korean-corrector`: "
-                     f"{_korean_rewrite_file(project_dir, session_id, prompt_id).resolve()}")
-    parts = [
-        lead,
-        "\n".join(route),
-        "STEP 2 — then follow the playbook section for each agent it named, in the order it "
-        "named them, dispatching them in ONE message. `none`, or nothing named, means the "
-        "turn had nothing for any of them — say nothing about auditing and continue.",
-    ]
+    files_agent = [k for k in eligible if AUDIT_AGENTS[k].reads == "files"]
+    if files_agent:
+        fields.append(f"- files for `{files_agent[0]}`: " + ", ".join(edited))
     if transcript and any(AUDIT_AGENTS[k].needs_history for k in eligible):
-        parts.append(_history_step(transcript, prompt_id))
-    return "\n\n".join(parts)
+        fields.append(f"- history: transcript {transcript}, turn {prompt_id}")
+    if model:
+        fields.append(f"- router model: {model}")
+    return lead + "\n\n" + "\n".join(fields)
 
 
 # The lead for a routed turn. There is no second mode: a switch the user turned on is
@@ -1427,26 +1406,42 @@ def _router_context(project_dir: Path, session_id: str, prompt_id: str, lead: st
 # that trains them to wave it through. What the main agent must not do is quietly swallow
 # the result — the report is the point.
 _ROUTE_LEAD = (
-    "guard: audit the turn you just finished. Route it first — the router reads the turn "
-    "and names which agents are worth running; then follow their playbook sections and "
-    "report what they found. A clean result is one line."
+    "guard: audit the turn you just finished. Dispatch `guard:router` (subagent_type: "
+    "\"guard:router\") with the inputs below and follow its report."
 )
 
 
 # --------------------------------------------------------------------------- #
 # subcommands
 # --------------------------------------------------------------------------- #
+# What the main agent is told at the START of a turn, when guard has anything switched on.
+# It fires on EVERY prompt, including the many that are never audited, so it is one sentence
+# and a path.
+#
+# The substance goes in the FILE and the reply stays short, and that ordering is the whole
+# point: it makes the full text cross the wire once. Answer in the reply and the audited
+# version has to be printed a second time; answer in the file and a correction is a small
+# edit to it, with the reply carrying only what changed. The file is also the only version
+# that CAN be corrected — a reply that has already been printed cannot be, and the earlier
+# shape left the user reading the flawed text with a list of fixes underneath it.
+_DRAFT_LEAD = (
+    "guard: put your answer's substance in {path}; keep the reply short and name that path. "
+    "guard audits that file when the turn ends."
+)
+
+
 def cmd_user_prompt() -> int:
-    """UserPromptSubmit. Trace only.
+    """UserPromptSubmit. Names the file the turn's answer is written to.
 
-    guard keeps no record of the user's prompt. It used to archive one, as the other half
-    of a turn store the audit agents read from; now the main agent supplies the turn to
-    whoever needs it, and an archive nothing reads is just a copy of the user's words
-    sitting in the repository.
+    guard keeps no copy of the user's prompt — it used to, as half of a turn store nothing
+    reads any more. What this hook does now is hand over the draft path, and it has to be
+    this hook because a Stop hook is too late for it: by the time Stop runs, the answer has
+    already been printed to the user, and a printed answer cannot be corrected. Audit-then-
+    correct only works if the answer also exists somewhere editable, and only the main agent
+    can put it there while the turn is still running.
 
-    The hook stays registered because the trace is how a "guard said nothing" report gets
-    diagnosed: without it there is no way to tell a turn guard skipped from a hook that
-    never ran.
+    Silent when every agent is off, so an unconfigured guard adds nothing to any prompt. Also
+    silent for guard's own control commands, whose turns are never audited.
     """
     project_dir = _project_dir()
     payload = _read_payload()
@@ -1460,7 +1455,18 @@ def cmd_user_prompt() -> int:
     if _CONTROL_CMD_RE.match(prompt.strip()):
         _trace(project_dir, session_id, "user-prompt", "skip_control_cmd")
         return 0
-    _trace(project_dir, session_id, "user-prompt", "seen")
+
+    config = _load_config(project_dir)
+    state = _read_state(project_dir, session_id, config)
+    prompt_id = payload.get("prompt_id")
+    if not any(_switch_on(state, k) for k in AUDIT_AGENTS) or not (
+            isinstance(prompt_id, str) and prompt_id):
+        _trace(project_dir, session_id, "user-prompt", "seen")
+        return 0
+
+    path = _turn_record_file(project_dir, session_id, prompt_id).resolve()
+    print(_DRAFT_LEAD.format(path=path))
+    _trace(project_dir, session_id, "user-prompt", "draft_path", prompt_id=prompt_id)
     return 0
 
 
@@ -1498,7 +1504,7 @@ def cmd_verify() -> int:
 
     ``pending_verify_prompt_id`` names the turn, and the record for it already holds that
     turn's response — every Stop writes that section, whatever the switches say, which is
-    what makes this command work in a project that keeps all four off. The main agent
+    what makes this command work in a project that keeps every switch off. The main agent
     still appends the request, the tool activity, and the earlier evidence, exactly as on
     a routed turn.
     """
@@ -1667,14 +1673,23 @@ def cmd_stop() -> int:
     state = _read_state(project_dir, session_id, config)
 
     # How the turn was opened decides whether guard says anything at all. Two skips, and
-    # the first is not politeness: a `task-notification` turn is a background agent
-    # reporting in, and recommending an audit of it puts guard in a loop with itself,
-    # since the audit it recommends is another background agent.
+    # the first is not politeness: guard audits an answer to the USER, so a turn opened by
+    # anything other than a person typing is machinery reporting in — a background agent's
+    # completion, a subagent's `SendMessage` — and auditing it puts guard in a loop with
+    # itself, since guard's own dispatch is what produced it. The turn also gets no record
+    # file and does not become the `/guard:audit-*` target, so the main agent is left
+    # holding exactly one answer file per question: the user's.
+    #
+    # Every named non-human kind is skipped rather than a list of the two seen so far, so a
+    # kind added later cannot reopen the loop. An ABSENT kind still audits: if `origin`
+    # stops being emitted, guard staying noisy is recoverable and guard going silently
+    # dormant is not.
     identity = _turn_identity(payload.get("transcript_path"), prompt_id)
     if identity is not None:
-        if identity["origin_kind"] == "task-notification":
-            _trace(project_dir, session_id, "stop", "skip_task_notification",
-                   prompt_id=prompt_id)
+        origin_kind = identity["origin_kind"]
+        if origin_kind and origin_kind != "human":
+            _trace(project_dir, session_id, "stop", "skip_nonhuman_turn",
+                   prompt_id=prompt_id, origin_kind=origin_kind)
             return 0
         # A turn opened by guard's own control command (`/guard:settings`,
         # `/guard:audit-*`) or by a user-configured exempt skill is skill output or a

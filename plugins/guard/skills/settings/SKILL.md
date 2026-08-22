@@ -1,6 +1,6 @@
 ---
 name: settings
-description: "View and change guard's settings for this project — one setting per audit agent, named after it (claims-auditor, deferrals-auditor, korean-corrector, comment-corrector), each off / fresh / reuse, plus router_model, refs_dir, and exempt_skills — recorded in .claude/guard.local.json. Use when the user wants to configure guard: turn the claim, deferral, Korean-naturalness, or comment check on or off, keep one of them running across turns instead of respawning it, set the router's model or refs_dir, or manage exempt skills. Claude Code only."
+description: "View and change guard's settings for this project — one setting per audit agent, named after it (claims-auditor, deferrals-auditor, clarity-auditor, korean-corrector, comment-corrector), each off / fresh / reuse, plus router_model, refs_dir, and exempt_skills — recorded in .claude/guard.local.json. Use when the user wants to configure guard: turn the claim, deferral, clarity, Korean-naturalness, or comment check on or off, keep one of them running across turns instead of respawning it, set the router's model or refs_dir, or manage exempt skills. Claude Code only."
 argument-hint: '[key] [value]'
 disable-model-invocation: true
 allowed-tools: Bash, AskUserQuestion
@@ -20,7 +20,7 @@ Fixed values for this run (already substituted — do not re-resolve):
 
 - guard CLI: `"${CLAUDE_SKILL_DIR}/../../scripts/guard_hook.py"`
 - session id: `${CLAUDE_SESSION_ID}` — pass it as `--session ${CLAUDE_SESSION_ID}` so
-  the four agent switches take effect in the **current** session, not only in sessions
+  the agent switches take effect in the **current** session, not only in sessions
   started later.
 
 ## Commands
@@ -43,6 +43,7 @@ Read-only commands (`settings show`, `exempt list`) need no prefix.
 | --- | --- | --- |
 | `claims-auditor` | `off` / `fresh` / `reuse` | Admits `guard:claims-auditor` — it flags statements asserted without adequate evidence. |
 | `deferrals-auditor` | `off` / `fresh` / `reuse` | Admits `guard:deferrals-auditor` — it flags work punted as "TBD" / "확인 필요" that the repo could have answered. |
+| `clarity-auditor` | `off` / `fresh` / `reuse` | Admits `guard:clarity-auditor` — it flags terms used but never explained, mechanisms given with no concrete example, and explanation pitched wrong for you. It calibrates against a reader profile; without one it says so and checks less, so run `/guard:reader-profile` before relying on it. |
 | `korean-corrector` | `off` / `fresh` / `reuse` | Admits `guard:korean-corrector` — it flags 번역체 phrasing and a register that is not 존댓말, and hands back the corrected text. Identifiers, paths, commands, and established loanwords (커밋, 리팩토링) are left alone. |
 | `comment-corrector` | `off` / `fresh` / `reuse` | Admits `guard:comment-corrector`, for the source files the turn actually edited. Note this one **edits those files in place**, so its fixes land without being asked. |
 | `router_model` | a model name, or empty | Model the **router** runs on. Empty (the default) leaves the choice to the router's own definition in the plugin's `agents/`. Every agent the router names uses its own model, so this changes which audits get picked, never how one is done. |
@@ -88,8 +89,9 @@ an English turn. The router itself is always a fresh instance — its question i
 turn, and an instance carrying five of them can answer from the wrong one.
 
 A setting that is off does **not** disable the matching command.
-`/guard:claims-auditor`, `/guard:deferrals-auditor`, `/guard:korean-corrector` and
-`/guard:comment-corrector` are you asking for that one audit now, and they work whatever
+`/guard:claims-auditor`, `/guard:deferrals-auditor`, `/guard:clarity-auditor`,
+`/guard:korean-corrector` and `/guard:comment-corrector` are you asking for that one audit
+now, and they work whatever
 the settings say — which is the whole reason it is safe to leave them off.
 
 The agent settings apply to the current session and become the new default; `router_model` /

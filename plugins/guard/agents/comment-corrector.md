@@ -1,7 +1,7 @@
 ---
 name: comment-corrector
 description: |
-  Audits source-code comments for whether they earn their place and fixes what it finds, in place. Corrects comments whose claims are false, deletes comments that restate what the code already says, and writes the missing comment where non-obvious intent, a trade-off, or a hazard is left unrecorded. Edits comments only, never code. Dispatched by guard's router when a turn reshaped code, or by the /guard:comment-corrector skill on request — either way by a reader rather than the author of the comments.
+  Audits the comments in the source files a turn wrote and fixes them in place: false claims corrected, restatements deleted, missing rationale written. Comments only, never code.
 # `Edit` to fix comments in place, `Write` only to emit a long report as a file (it can
 # create files, which `Edit` cannot) — never to rewrite a file it was asked to audit.
 tools: Read, Grep, Glob, Bash, Edit, Write, SendMessage
@@ -217,8 +217,11 @@ Three hard limits on every edit.
 
 ## Output
 
-Report to the main session as plain prose. Your edits are already in the files — the report
-explains them, so the user can review the diff knowing what each change was for.
+Report to the main session as plain prose, **in English**. Your edits are already in the
+files — the report explains them, so the user can review the diff knowing what each change
+was for. The report is machinery talking to machinery, so it is English whatever language
+the comments are in; the comments themselves keep the file's language, as step 3 says. A
+comment you quote is quoted verbatim, in whatever language it was written.
 
 **When the report runs long, write it to a file and hand back the path.** Past roughly
 thirty findings, or an audit spanning many files, a report pasted into your reply crowds out

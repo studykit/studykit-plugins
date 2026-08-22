@@ -131,7 +131,7 @@
     {
       "name": "guard",
       "source": "./plugins/guard",
-      "description": "When a turn ends, guard asks the session to run its router subagent over the response; the router names which audit agents would actually find something in it — unsupported claims, deferrals the repo could answer, unnatural Korean, comments in the source it edited — each with a reason, and they run in parallel. One switch per agent, all off until you turn one on. Claude Code and Codex. Requires Python 3.11+.",
+      "description": "When a turn ends, guard asks the session to run its router subagent over the response; the router names which audit agents would actually find something in it — unsupported claims, deferrals the repo could answer, explanation the reader cannot follow, unnatural Korean, comments in the source it edited — each with a reason, and they run in parallel. One switch per agent, all off until you turn one on. Claude Code and Codex. Requires Python 3.11+.",
       "author": {
         "name": "studykit"
       },

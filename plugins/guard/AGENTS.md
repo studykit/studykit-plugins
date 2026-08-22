@@ -11,13 +11,14 @@ for each; the main agent then dispatches those, concurrently. guard audits nothi
 and every audit criterion lives in an agent definition under `agents/`.
 
 Where each piece of text lives is decided by how often it is paid for, and that split must
-hold: `additionalContext` reaches the main agent on **every** routed turn, so it carries
-only what changes per turn (paths, which agents are on, each one's mode). `agents/router.md`
-is read once per routed turn by the router alone, so it carries the triage method and the
-cue per candidate. `hooks/context/dispatch-playbook.md` is read only by whoever is sent to
-a section, so it carries how to dispatch an agent and what to do with its report — the text
-that is identical every turn and needed only for the agents actually picked. The router
-names sections; nobody re-types their contents.
+hold: `additionalContext` reaches the main agent on **every** routed turn, so it is one
+imperative plus a list of fields (paths, which agents are on, each one's mode).
+`agents/router.md` is read once per routed turn by the router alone, so it carries the
+triage method, the cue per candidate, and the shape of the report.
+`hooks/context/dispatch-playbook.md` is read only by whoever is sent to a section, so it
+carries how to dispatch an agent and what to do with its report. The router's report names
+the playbook and the sections to follow — which is why the playbook has no `router` section
+and the main agent never reads one. Nobody re-types another home's text.
 
 The router used to be a `claude -p` child guard spawned from the hook. It is worth
 knowing why it is not, because the reasons are all still true: a spawned child blocked
@@ -29,10 +30,11 @@ paths guard had to tell apart from a clean verdict. As a subagent, none of that 
 
 1. **Audit recommendation** (Stop) — every turn is marked as the on-demand target, so the
    user-invoked `/guard:claims-auditor`, `/guard:deferrals-auditor`,
-   `/guard:korean-corrector` and `/guard:comment-corrector` work whatever the settings
-   say. The four per-agent settings then decide what reaches the main agent unasked. Each
+   `/guard:clarity-auditor`, `/guard:korean-corrector` and `/guard:comment-corrector` work
+   whatever the settings
+   say. The per-agent settings then decide what reaches the main agent unasked. Each
    is named after the agent it controls, so one string is the setting, the state key, the
-   command, and the `subagent_type`. All four ship `off`: guard installed is guard
+   command, and the `subagent_type`. Every switch ships `off`: guard installed is guard
    available, not guard running, and with none on the hook emits nothing at all.
 
    The value is a mode, not a boolean — `off` / `fresh` / `reuse` — so how an agent runs
@@ -69,14 +71,25 @@ paths guard had to tell apart from a clean verdict. As a subagent, none of that 
      is asked for as inclusion, never selection, because the author curating its own
      evidence is the failure that shape invites.
    - Nobody gathers the session's history. The record holds the response and nothing else;
-     the agents that may need more (`needs_history`: the two auditors) get a transcript
+     the agents that may need more (`needs_history`: the three auditors) get a transcript
      path, the turn id, and the `transcript` subcommand, and extract what they want into
      their own file. The main agent gathering it would put the largest cost of an audit in
      the context the user is talking to and would route the record of a turn through that
      turn's author. When extraction fails the agent may ask the main session, but that
      answer is testimony and its report has to say so.
 
-   The four audit agents carry `memory: local`, so what they learn about a project stays in
+   `clarity-auditor` is the one agent whose verdict depends on **who is reading**, and two
+   things follow that must not be flattened into the others' shape. Its memory is `user`, not
+   `local`: what it stores is a person — their field, their experience, their vocabulary —
+   and none of that changes when they switch repositories, so relearning it per checkout
+   would start every new project uncalibrated. And it degrades **loudly**: with no reader
+   profile it says so and checks less (missing examples still, calibration not at all)
+   rather than assuming a level. Assuming a beginner flags every technical term; assuming an
+   expert passes everything; both are worse than a named gap, and the profile is established
+   by `/guard:reader-profile` asking the user rather than by inferring anything from the
+   repository — a repository says what the code is, never what its author knows.
+
+   guard's other audit agents carry `memory: local`, so what they learn about a project stays in
    that checkout and out of version control. The docs recommend `project` and that is right
    for an agent a team wrote for itself; guard runs in other people's repositories, where
    creating files that turn up in their commits is a side effect nobody asked for. A team
@@ -98,9 +111,19 @@ paths guard had to tell apart from a clean verdict. As a subagent, none of that 
 
 guard reads the transcript for two unrelated purposes, and keeping them apart matters. At
 Stop it reads a single record to learn how the turn was *opened* (`_turn_identity`), and both
-users of that are skips: a `task-notification` turn is a background agent reporting in, and
-recommending an audit there puts guard in a loop with itself; a turn opened by a control
-command or an exempt skill has nothing to audit. Separately, the `transcript` subcommand
+users of that are skips: only a turn a person typed is audited, because guard audits an
+answer to the *user*, and every other origin is machinery guard's own dispatch set in motion
+— a background agent's completion, a subagent's `SendMessage` back — so auditing it loops
+guard against itself; separately, a turn opened by a control command or an exempt skill has
+nothing to audit. The loop is not hypothetical: shipping the `task-notification` skip alone
+left `peer` open, and one audit whose auditor messaged the session back cost the user two
+extra rounds and, because the relay turn was handed an answer file of its own, ended with
+the audit memo opened in place of the answer. Hence two rules. The skip covers every named
+non-human kind rather than the kinds seen so far, and an absent kind still audits — guard
+noisy is recoverable, guard silently dormant is not. And one user question gets exactly one
+answer file, which is the file the correctors edit and the one the main agent opens; the
+`UserPromptSubmit` draft path and the Stop dispatch name the same file, and nothing else in
+the audit is allowed to become a document. Separately, the `transcript` subcommand
 slices turns out of the file on an agent's request — never on a schedule, and always into a
 file rather than onto stdout.
 
