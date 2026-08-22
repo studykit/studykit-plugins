@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/guard_hook.py\" user-prompt",
+            "command": "uv run --script \"${CLAUDE_PLUGIN_ROOT}/scripts/guard_hook.py\" user-prompt",
             "timeout": 120,
             "description": "Name the file this turn's answer is written to, so the audit has something editable to correct. Silent when every agent is off, when the session is muted, and on guard's own control commands. guard keeps no copy of the prompt."
           }
@@ -19,7 +19,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/guard_hook.py\" toggle",
+            "command": "uv run --script \"${CLAUDE_PLUGIN_ROOT}/scripts/guard_hook.py\" toggle",
             "timeout": 5,
             "description": "Mute or unmute guard's automatic audit for this session (arg: on|off, empty flips)."
           }
@@ -30,7 +30,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/guard_hook.py\" verify claims-auditor",
+            "command": "uv run --script \"${CLAUDE_PLUGIN_ROOT}/scripts/guard_hook.py\" verify claims-auditor",
             "timeout": 5,
             "description": "On demand, dispatch the claims auditor for the last completed turn."
           }
@@ -41,7 +41,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/guard_hook.py\" verify deferrals-auditor",
+            "command": "uv run --script \"${CLAUDE_PLUGIN_ROOT}/scripts/guard_hook.py\" verify deferrals-auditor",
             "timeout": 5,
             "description": "On demand, dispatch the deferrals auditor for the last completed turn."
           }
@@ -52,7 +52,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/guard_hook.py\" verify clarity-auditor",
+            "command": "uv run --script \"${CLAUDE_PLUGIN_ROOT}/scripts/guard_hook.py\" verify clarity-auditor",
             "timeout": 5,
             "description": "On demand, dispatch the clarity auditor for the last completed turn."
           }
@@ -63,7 +63,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/guard_hook.py\" verify korean-corrector",
+            "command": "uv run --script \"${CLAUDE_PLUGIN_ROOT}/scripts/guard_hook.py\" verify korean-corrector",
             "timeout": 5,
             "description": "On demand, dispatch the Korean corrector for the last completed turn."
           }
@@ -76,7 +76,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/guard_hook.py\" post-edit",
+            "command": "uv run --script \"${CLAUDE_PLUGIN_ROOT}/scripts/guard_hook.py\" post-edit",
             "timeout": 10,
             "description": "Record a source file or an agent instruction file written this turn (for a comment-corrector or agents-md-auditor recommendation), and require a file saved inside the refs dir to be listed in the refs index (AGENTS.md)."
           }
@@ -88,7 +88,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/guard_hook.py\" stop",
+            "command": "uv run --script \"${CLAUDE_PLUGIN_ROOT}/scripts/guard_hook.py\" stop",
             "timeout": 120,
             "description": "Mark the finished turn as the on-demand audit target, and — when any agent switch is on — ask the main agent to route the turn and dispatch the agents worth running on it."
           }
@@ -100,7 +100,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/guard_hook.py\" session-start",
+            "command": "uv run --script \"${CLAUDE_PLUGIN_ROOT}/scripts/guard_hook.py\" session-start",
             "timeout": 5,
             "description": "Sweep guard state and turn records past the retention window, export GUARD_REFS_DIR, and state the refs rule as session context."
           }

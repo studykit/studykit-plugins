@@ -22,6 +22,30 @@ When developing or changing skills, hooks, plugins, or agents, always check the 
 
 **All documentation must be written in English.** When creating or editing markdown files, README files, CLAUDE.md files, or any other documentation, always use English.
 
+## Shipped Definitions Must Be Repo-Portable
+
+Everything this repository publishes gets installed into **someone else's repository**.
+That applies to every plugin here, not one of them: `plugins/*/agents/*.md`,
+`plugins/*/skills/*/SKILL.md`, and any instruction text a plugin injects at runtime
+(hook context, dispatch playbooks, command bodies).
+
+So a shipped definition must not name anything that exists only here — `dev/design.md`,
+`wiki/ref/...`, `guide/...`, this repo's env vars, or the plugin's own command surface as
+though the target project had it — and must not carry a measurement taken against this
+repo. Teach the agent **how to find** the equivalent wherever it lands instead: "look for a
+README or CONTRIBUTING section on testing, a `docs/` or `dev/` document, a Makefile target,
+a CI workflow, a test directory".
+
+The failure is silent, which is why this is a rule rather than a preference. A hardcoded
+path does not raise an error in a stranger's checkout; the agent reads the absence as "this
+project has no such thing" and its verdict changes without anyone noticing.
+
+Rationale, measurements and this-repo specifics belong in the plugin's `dev/` notes or its
+`AGENTS.md` — the files that stay behind. A frontmatter comment citing `wiki/ref/...` for a
+design decision is fine: it addresses contributors, not the agent. When editing a shipped
+definition, ask whether the sentence would still be true in a repository you have never
+seen.
+
 ## Agent Instruction Files
 
 Do **not** write detailed implementation content into any `AGENTS.md` file: no long procedures, step-by-step walkthroughs, code-level specifics, or internal mechanics. Keep that detail in the deeper docs it belongs to (deeper docs, `dev/` design notes, source) and link to it from `AGENTS.md` instead of inlining it.

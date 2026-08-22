@@ -1,4 +1,7 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.11"
+# ///
 """Codex hook adapter for guard.
 
 This module owns Codex payload parsing and output.  It intentionally builds a
@@ -15,10 +18,37 @@ import sys
 from pathlib import Path
 from typing import Any
 
+# Before importing anything from guard_core: `config` reads GUARD_HOST once, at import, and
+# every path below it is chosen from that answer.
 os.environ.setdefault("GUARD_HOST", "codex")
-_SCRIPTS = Path(__file__).resolve().parents[2] / "scripts"
-sys.path.insert(0, str(_SCRIPTS))
-import guard_hook as core  # noqa: E402
+
+
+def _guard_core_dir() -> Path:
+    """The directory holding the ``guard_core`` package, found by looking rather than counting.
+
+    A fixed ``parents[2]`` is a bet on this file's depth in the plugin tree, and the bet on
+    the other side of this import is what broke when the implementation moved into a package.
+    """
+    here = Path(__file__).resolve()
+    for parent in here.parents[:5]:
+        if (parent / "scripts" / "guard_core" / "__init__.py").is_file():
+            return parent / "scripts"
+    return here.parents[2] / "scripts"
+
+
+sys.path.insert(0, str(_guard_core_dir()))
+# Imported by module rather than through one façade, so these lines say which layers the
+# adapter leans on and a layering violation is visible here. It also means a name that moves
+# or goes away breaks at import instead of at the call: the façade version of this file spent
+# releases calling two turn-record helpers that no longer existed, and every hook here fails
+# open, so it failed silently.
+from guard_core import agents as core_agents  # noqa: E402
+from guard_core import cmd_edit as core_edit  # noqa: E402
+from guard_core import cmd_session as core_session  # noqa: E402
+from guard_core import config as core_config  # noqa: E402
+from guard_core import payload as core_payload  # noqa: E402
+from guard_core import paths as core_paths  # noqa: E402
+from guard_core import state as core_state  # noqa: E402
 
 def _payload() -> dict[str, Any]:
     try:
@@ -45,16 +75,22 @@ def _project_dir(payload: dict[str, Any]) -> Path | None:
 
 def _session_id(payload: dict[str, Any]) -> str:
     value = payload.get("session_id")
-    return value if isinstance(value, str) and core._SESSION_ID_RE.match(value) and ".." not in value else ""
+    return value if isinstance(value, str) and core_payload._SESSION_ID_RE.match(value) and ".." not in value else ""
 
 
 def _turn_id(payload: dict[str, Any]) -> str:
     value = payload.get("turn_id")
-    return value if isinstance(value, str) and core._SESSION_ID_RE.match(value) and ".." not in value else ""
+    return value if isinstance(value, str) and core_payload._SESSION_ID_RE.match(value) and ".." not in value else ""
 
 
+# Codex's turn record is JSON — `{user, tools, assistant}` — and the adapter owns both the
+# format and these three accessors. Claude's side is a markdown file the main agent writes
+# and the agents correct in place; there is nothing shared to factor out but the state root,
+# and the two formats answer to different readers. Living in core once cost exactly this:
+# the Claude side moved to markdown, its JSON helpers went away, and the adapter kept
+# calling names that no longer existed — silently, because every hook here fails open.
 def _turn_path(project_dir: Path, session_id: str, turn_id: str) -> Path:
-    return core._turn_slice_file(project_dir, session_id, turn_id)
+    return core_paths._state_root(project_dir) / "turns" / session_id / f"{turn_id}.json"
 
 
 def _load_turn(project_dir: Path, session_id: str, turn_id: str) -> dict[str, Any]:
@@ -67,7 +103,15 @@ def _load_turn(project_dir: Path, session_id: str, turn_id: str) -> dict[str, An
 
 
 def _save_turn(project_dir: Path, session_id: str, turn_id: str, turn: dict[str, Any]) -> None:
-    core._write_turn_slice(project_dir, session_id, turn_id, turn)
+    """Write the turn record, atomically. Silent on failure — the caller fails open."""
+    path = _turn_path(project_dir, session_id, turn_id)
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_suffix(".json.tmp")
+        tmp.write_text(json.dumps(turn, ensure_ascii=False), encoding="utf-8")
+        tmp.replace(path)
+    except OSError:
+        core_paths._trace(project_dir, session_id, "codex", "turn_write_failed", turn_id=turn_id)
 
 
 def _emit(value: dict[str, Any]) -> None:
@@ -78,7 +122,7 @@ def _handle_session_start(project_dir: Path) -> None:
     # The shared maintenance logic writes no Codex-specific state beyond the
     # host-selected paths and emits useful policy context on stdout.
     os.environ["GUARD_PROJECT_DIR"] = str(project_dir)
-    core.cmd_session_start()
+    core_session.cmd_session_start()
 
 
 # Caps on what one tool call contributes to Codex's turn record. Codex keeps a record of
@@ -91,8 +135,8 @@ TOOL_RESULT_MAX_CHARS = 2000
 def _handle_prompt(project_dir: Path, payload: dict[str, Any], session_id: str, turn_id: str) -> None:
     prompt = payload.get("prompt")
     prompt = prompt if isinstance(prompt, str) else ""
-    config = core._load_config(project_dir)
-    state = core._read_state(project_dir, session_id, config)
+    config = core_config._load_config(project_dir)
+    state = core_state._read_state(project_dir, session_id, config)
     _save_turn(project_dir, session_id, turn_id, {"user": prompt, "tools": [], "assistant": ""})
 
     if prompt.strip().lower().startswith("/guard:claims-auditor"):
@@ -125,11 +169,11 @@ def _handle_post_tool(project_dir: Path, payload: dict[str, Any], session_id: st
     # this one adapter. Claude's other `post-edit` job — recording the files the turn
     # edited — is deliberately not mirrored: it exists only to point `comment-corrector`
     # and `agents-md-auditor` at them, and Codex has neither agent yet.
-    config = core._load_config(project_dir)
-    if core._targets_refs_dir(project_dir, tool_input, config):
-        target = core._tool_target_path(project_dir, tool_input)
-        if target is not None and target.name not in core._REFS_INDEX_SKIP:
-            reason = core.refs_index_gap(project_dir, target, config)
+    config = core_config._load_config(project_dir)
+    if core_edit._targets_refs_dir(project_dir, tool_input, config):
+        target = core_edit._tool_target_path(project_dir, tool_input)
+        if target is not None and target.name not in core_edit._REFS_INDEX_SKIP:
+            reason = core_edit.refs_index_gap(project_dir, target, config)
             if reason is not None:
                 _emit({"decision": "block", "reason": reason})
 
@@ -145,9 +189,9 @@ def _handle_post_tool(project_dir: Path, payload: dict[str, Any], session_id: st
 # would report `profile: MISSING` on every turn.
 #
 # `refs-finder` is absent for a plainer reason and never reaches this table anyway: it runs
-# before an answer rather than auditing one, so `core._eligible_agents` drops it and Stop
+# before an answer rather than auditing one, so `core_agents._eligible_agents` drops it and Stop
 # never sees it. Its own announcement is suppressed on Codex at the source
-# (`core.cmd_session_start`, gated on `_HOST_IS_CODEX`) — Codex ships one named agent
+# (`core_session.cmd_session_start`, gated on `_HOST_IS_CODEX`) — Codex ships one named agent
 # installed by `$guard:setup`, and there is no refs-finder among them to dispatch. Giving
 # Codex the agent set is what unblocks this, same as above.
 _SCOPE = {"claims-auditor": "the response's claims",
@@ -165,8 +209,8 @@ def _handle_stop(project_dir: Path, payload: dict[str, Any], session_id: str, tu
         return
     turn["assistant"] = response
     _save_turn(project_dir, session_id, turn_id, turn)
-    config = core._load_config(project_dir)
-    state = core._read_state(project_dir, session_id, config)
+    config = core_config._load_config(project_dir)
+    state = core_state._read_state(project_dir, session_id, config)
     # Recorded whether or not a switch is on: it is what `$guard:claims-auditor` is
     # pointed at, and switching the automatic recommendation off is not meant to take
     # away the user's own command.
@@ -175,10 +219,10 @@ def _handle_stop(project_dir: Path, payload: dict[str, Any], session_id: str, tu
     # there is no continuation to piggyback on — so the once-guard cannot lean on
     # `stop_hook_active` and keys on the turn id instead.
     if state.get("last_audited_prompt_id") == turn_id:
-        core._write_state(project_dir, session_id, state)
+        core_state._write_state(project_dir, session_id, state)
         return
     # Neither reuse nor routing exists here. `reuse` is a named instance addressed with
-    # `SendMessage`, and this adapter has neither — `core._eligible_agents` only asks
+    # `SendMessage`, and this adapter has neither — `core_agents._eligible_agents` only asks
     # whether a mode is `off`, so the value costs nothing and means nothing on Codex.
     #
     # No router here either. Claude's Stop asks its main agent to dispatch `guard:router`, a
@@ -191,16 +235,16 @@ def _handle_stop(project_dir: Path, payload: dict[str, Any], session_id: str, tu
     # `_SCOPE` filters before the once-guard is spent, not after: a turn whose only
     # recommendation is one Codex cannot act on must stay eligible for the next event
     # rather than be marked audited on the strength of a message never sent.
-    keys = [k for k in core._eligible_agents(state, []) if k in _SCOPE]
+    keys = [k for k in core_agents._eligible_agents(state, []) if k in _SCOPE]
     if not keys:
-        core._write_state(project_dir, session_id, state)
+        core_state._write_state(project_dir, session_id, state)
         return
     state["last_audited_prompt_id"] = turn_id
-    core._write_state(project_dir, session_id, state)
+    core_state._write_state(project_dir, session_id, state)
 
     # Codex has ONE named agent (`guard_claims_auditor`, installed by `$guard:setup`),
     # so the per-agent fan-out Claude gets is expressed here as a scope sentence handed
-    # to that single agent. The eligibility rules are shared (`core._eligible_agents`);
+    # to that single agent. The eligibility rules are shared (`core_agents._eligible_agents`);
     # what Claude adds on top is the router.
     scope = ", ".join(_SCOPE[k] for k in keys)
     _emit({"decision": "block", "reason": (

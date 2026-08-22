@@ -19,11 +19,17 @@ Run the installer next to this skill with an absolute path, passing the project
 root:
 
 ```sh
-python3 <absolute-path-to-this-skill>/scripts/install_agent.py --project <git-root>
+uv run --script <absolute-path-to-this-skill>/scripts/install_agent.py --project <git-root>
 ```
 
 If the destination already exists, leave it unchanged and report that fact.
 Replace it only when the user explicitly requests replacement, using `--force`.
 Tell the user to start a new Codex session after installation so the named agent
-is discovered. Dispatch this named agent in a fresh context, not with the
+is discovered.
+
+Also tell them that guard's hooks are separate from this, and that installing and
+enabling the plugin does not switch them on: Codex skips plugin-bundled hooks until
+the user reviews and trusts the hook definition, and it does so silently. If guard
+appears to do nothing under Codex while `codex plugin list` reports it installed and
+enabled, untrusted hooks are the first thing to check — this skill cannot affect them. Dispatch this named agent in a fresh context, not with the
 parent's full conversation history.

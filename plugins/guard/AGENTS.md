@@ -1,8 +1,24 @@
 # guard — contributor notes
 
-`guard` supports Claude Code and Codex. Shared state/configuration helpers live in
-`scripts/guard_hook.py`; runtime payload parsing and hook output stay in host adapters.
-Requires Python 3.11+ (`enum.StrEnum`).
+`guard` supports Claude Code and Codex. `scripts/guard_hook.py` is the entry point and only
+that — the subcommand table and `main()`; the implementation is the `scripts/guard_core/`
+package, one module per layer, described in `dev/design.md`. Runtime payload parsing and hook
+output stay in host adapters.
+
+guard has no Python dependencies but it does need **uv**. Both hook manifests and both
+scripts' shebangs go through `uv run --script`, as `guide/adapter-guide.md` requires, and the
+PEP 723 block pins `requires-python = ">=3.11"` (`enum.StrEnum`). That pin is the point, not
+paperwork: `#!/usr/bin/env python3` takes whatever is first on the PATH of the process the
+host launched the hook from, which on macOS is /usr/bin/python3 (3.9) in any context whose
+PATH comes from a login rather than an interactive shell — a tmux pane, for one. Every hook
+then died with an ImportError traceback in the user's session, and having printed nothing it
+left the model free to report success it had not achieved. Measured, in a real session, and
+fixed by letting uv choose the interpreter.
+
+Two invariants the module split exists to hold, both of which broke once: `guard_core.config`
+is the ONLY reader of `GUARD_HOST` and reads it once at import, and nothing resolves a plugin
+path by counting `__file__` parents — the split moved code a level deeper and silently
+rewrote every playbook path guard printed. `dev/design.md` has the layering and the reasons.
 
 **guard makes no model call.** When a turn finishes it asks the main agent, through
 `additionalContext`, to dispatch one subagent — `guard:router` — that reads the turn and

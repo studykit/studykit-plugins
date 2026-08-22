@@ -2,9 +2,61 @@
 
 Deep reference for `guard` contributors. Not auto-loaded; open it when working on the
 area it covers. `../AGENTS.md` is the always-loaded map and points here. The source
-(`scripts/guard_hook.py`) is the truth for control flow — this file records *why* the
-design is shaped this way and the runtime facts verified against the real CLI, not a
-line-by-line walkthrough.
+(`scripts/guard_hook.py` and the `scripts/guard_core/` package it dispatches into) is the
+truth for control flow — this file records *why* the design is shaped this way and the
+runtime facts verified against the real CLI, not a line-by-line walkthrough.
+
+## Module layout (`scripts/`)
+
+`guard_hook.py` is the entry point and nothing else: the subcommand table and `main()`. It
+keeps that path because the path is a published interface — `hooks/hooks.json`, every
+command and agent definition that shells out to the CLI, the dispatch playbook, and the
+Codex adapter all name it. Everything else is `guard_core/`, and each subcommand's own
+docstring lives in the module that implements it rather than in a catalogue at the top of
+one file, which is where such a catalogue drifts.
+
+Imports run one way only. A cycle is a design error, not a technical one:
+
+```
+config -> paths -> turnrec / payload / emit -> transcript
+                -> agents -> state -> dispatch -> cmd_* -> guard_hook
+```
+
+| Module | Holds |
+| --- | --- |
+| `config` | the host split, `AgentMode`, the config schema, guard.local.json I/O |
+| `paths` | the two project-root resolvers, the state tree's paths, the debug trace |
+| `turnrec` | the answer file and the request file beside it |
+| `payload` | the hook payload on stdin, and the session id in it |
+| `emit` | the two hook-output shapes guard writes to stdout |
+| `transcript` | reading the host's transcript, and the `transcript` CLI over it |
+| `agents` | the roster, and mechanical eligibility |
+| `state` | `state/<sid>.json` |
+| `dispatch` | the text handed to the main agent |
+| `cmd_turn` | `user-prompt`, `verify` |
+| `cmd_edit` | `post-edit` |
+| `cmd_stop` | `stop` |
+| `cmd_session` | `session-start` |
+| `cmd_settings` | `settings`, `refs-dir` |
+| `cmd_status` | `toggle`, `status` |
+
+Two rules this layout exists to hold, both of which broke once already:
+
+- **`config` is the only reader of `GUARD_HOST`**, once, at import. The Codex adapter sets
+  that variable before importing anything here, so a second reader is a second answer to
+  "which host am I". `grep -rn GUARD_HOST scripts/guard_core/` must show one line.
+- **Nothing resolves a plugin path by counting `__file__` parents.** `dispatch._plugin_root`
+  walks up looking for a directory that *has* the playbook. A fixed `parent.parent` is a bet
+  on a file's depth in the tree, and the split moved this code one level deeper, which
+  silently turned every playbook path guard printed into `scripts/hooks/context/…`.
+
+The Codex adapter imports the `guard_core` modules it needs by name rather than through a
+single façade, so the layers it leans on are visible in its import block and a name that
+moves breaks at import instead of at the call. That is not hypothetical: the façade version
+called two turn-record helpers that had been renamed out from under it, and because every
+hook there fails open it failed silently for several releases. The adapter also owns the
+JSON turn-record format itself — Claude's answer file is markdown the main agent writes, so
+there is nothing shared to factor out beyond the state root.
 
 ## Hook wiring (`hooks/hooks.json`)
 
@@ -1027,18 +1079,198 @@ python3 -c "import json,pathlib;p=pathlib.Path('$CLAUDE_PROJECT_DIR/.claude/guar
 
 # The mutating CLI verbs refuse without the marker; reads still work.
 (unset GUARD_SETTINGS_SKILL; "$H" settings set claims-auditor off; "$H" settings unset refs_dir; "$H" settings show)
+
+# A HOOK must obey CLAUDE_PROJECT_DIR even when a stale GUARD_PROJECT_DIR is in the
+# environment. This is the nested-session case and it is not exotic: guard exports
+# GUARD_PROJECT_DIR into its own session's Bash, so any `claude` started from there — a
+# nested run, or `cd ../other-repo && claude` — inherits the first project's path.
+mkdir -p /tmp/guard-test/other/.claude
+cp "$CLAUDE_PROJECT_DIR/.claude/guard.local.json" /tmp/guard-test/other/.claude/   # else it is silent
+echo '{"session_id":"sx","prompt_id":"px","prompt":"q"}' \
+  | CLAUDE_PROJECT_DIR=/tmp/guard-test/other GUARD_PROJECT_DIR=/tmp/guard-test/proj "$H" user-prompt
+#   -> names a file under /tmp/guard-test/other. If it says /tmp/guard-test/proj, the
+#      precedence in `_project_dir` has been flipped back and one project is writing its
+#      turn records into another.
 ```
 
-Directly unit-testable without any subprocess: `_write_turn_response` (both headings
-present, response exact, parent dir created, and a read-only dir returning None rather
-than raising), `_turn_identity(path, prompt_id)` on a
+## `deferrals-auditor` and the by-running blind spot
+
+The agent definitions ship into other people's repositories, so nothing in them may name a
+path from this one. That constraint is why the by-running rule reads the way it does — it
+tells the agent how to *find* a project's testing documentation (README/CONTRIBUTING, a
+`docs/` or `dev/` file, a Makefile target, a CI workflow, a test directory, a compose file)
+rather than naming a file. An earlier revision named `dev/design.md` and guard's own
+`/guard:*` surface directly; that is a bug in a plugin, not a shortcut, and it was removed.
+
+The history is worth keeping here because it is the reason the rule is phrased as pressure
+rather than as a category:
+
+- The original definition actively forbade the check — a comment saying verdicts are
+  "settled by READING the repository, not by running it", and `runtime data not yet
+  available` sitting in the legitimate list. The auditor was not failing to reason; it was
+  following the spec, and it quoted the spec back as its reason.
+- Adding a third category (`Resolvable by running`) flipped one dispatch from `pass` to
+  `violations`, but that single flip is weak evidence: a later re-run of the same
+  variant at the same model gave a different verdict, so run-to-run variance is on the
+  order of the effect being measured. Any claim of the form "variant X at model Y is
+  better" needs repetitions, recorded models (`--output-format json` reports
+  `modelUsage`), and a fixture without ambiguous cases.
+- **Model is not the lever.** Measured against a fixture deferring "실제 Codex 세션에서 훅이
+  뜨는지" in this repository — `codex` installed, the recipe two sections below this one —
+  four dispatches passed it: Sonnet and Opus, before and after the rule was hoisted into
+  the agent's opening framing. The `model` parameter on the Agent tool does override the
+  definition's `model:` frontmatter (each run self-reported `Claude Sonnet 5` /
+  `claude-opus-5[1m]`), so this was a real comparison, not a mislabelled one.
+- Both models reduced the question to the easier one — "is the answer stored in this
+  project?" — and answered no. Sonnet: "external to the repo". Opus: "outside the
+  repository". Neither opened the testing docs; tool-call counts were 2 and 3. Moving the
+  rule earlier in the body did not help and the tool-call count went *down*.
+
+**Resolved 2026-08-22, and the earlier heading above is wrong — the lever was the spec and
+the memory, not the model.** Two things had to be fixed together. The definition stopped
+forbidding the check (see the bullet above), and three memory entries had to be deleted: the
+agent had written down "deferrals that need a live runtime are legitimate scope for this
+project" and was citing that entry back as its reason. Two of the three were written *during*
+the verification runs, so the experiment was reinforcing the bug it was measuring. The
+definition now forbids storing a remembered `legitimate` at all, and says why the direction
+is asymmetric.
+
+After both fixes, four dispatches — two fixtures × Sonnet/Opus — all returned `violations`,
+against four `pass` before. So the "one agent cannot hold both questions" hypothesis is
+rejected, and neither of the two candidate fixes (a forced output obligation, a separate
+execution-availability agent) is needed. Opus went further than Sonnet on both fixtures
+rather than merely matching it — it caught a second deferral Sonnet let stand — which is why
+the definition now pins `model: opus`.
+
+**Do not reuse a fixture this file describes.** The first re-run came back `violations` and
+was worthless: the auditor read the bullet above, which quotes the fixture's Korean sentence
+and says the recipe is "two sections below this one". The load-bearing run was a fresh
+fixture (a toggle deferral) that this file does not label as a fixture anywhere — its file
+list confirms it never opened `design.md` at all, and it still reached the answer by reading
+`guard_hook.py`, concluding the CLI runs headless, and reproducing it. Writing an experiment
+up here makes the write-up an answer key for the next round of the same experiment; a new
+fixture is the only way around it.
+
+**Three of the four runs ran guard's own hooks**, in throwaway directories, having been told
+not to. They bounded themselves (scratchpad only, no repository or real-project writes) and
+disclosed it unprompted. The reproduction improved the verdicts — one run matched its
+observations line-by-line against the `_audit_paused` branch in `cmd_stop`. The contract in
+the definition was widened to match, since a rule broken independently at two models for good
+reasons is not a rule.
+
+## Codex: hooks must be trusted, or guard is silent
+
+Installing and enabling guard under Codex is not enough to make it run. Codex skips
+plugin-bundled hooks until the user reviews and trusts the current hook definition
+(`wiki/ref/openai-codex-hooks-2026-08-14.md`), and it says nothing when it skips them — so
+the symptom is a plugin that reports `installed, enabled` and does absolutely nothing.
+
+Measured on 2026-08-22 with `codex-cli 0.147.0`, in an isolated `CODEX_HOME`: after
+`codex plugin marketplace add <repo>` and `codex plugin add guard@studykit-plugins`,
+`codex plugin list` showed `installed, enabled 0.53.0` and neither `codex exec` nor an
+interactive session created `.codex/guard/` at all. The same run with
+`--dangerously-bypass-hook-trust` wrote the session state, the trace and three turn records.
+Nothing was wrong with guard.
+
+Two things follow. When testing the Codex side, pass that flag or trust the hooks first, or
+you are measuring hook trust rather than guard. And when a user reports that guard does
+nothing under Codex, this is the first thing to ask about — ahead of `$guard:setup`, which
+installs only the named agent and cannot affect hooks.
+
+## Testing against the real CLI
+
+`--plugin-dir <path>` loads the plugin for one session, so guard can be exercised by a real
+`claude` without installing it. Two things make the results readable: `--debug-file <path>`
+records every hook firing and the exact `additionalContext` the host received, and
+`GUARD_TRACE=1` gives guard's own view in `trace.log`. Assert on the trace and the state
+tree, not on what the model said about them — a hook that silently did nothing leaves the
+model free to claim it worked, which is exactly what happened once here.
+
+```bash
+cd /tmp/guard-cli-test/proj    # a git repo with .claude/guard.local.json
+env -u GUARD_PROJECT_DIR -u GUARD_REFS_DIR GUARD_TRACE=1 claude -p "Reply with OK." \
+  --plugin-dir /path/to/plugins/guard --model haiku --effort low \
+  --no-session-persistence --max-turns 4 --debug-file /tmp/d.log
+```
+
+`env -u GUARD_PROJECT_DIR` is not optional when the test is launched from inside another
+guard session's Bash — without it the child's hooks write into the PARENT's project. That is
+the bug the case above pins; the flag keeps the test honest even after the fix.
+
+The interactive-only paths — the `UserPromptExpansion` hooks behind `/guard:toggle` and
+`/guard:<agent>` — need a terminal, which `tmux` supplies:
+
+```bash
+tmux -f /dev/null new-session -d -s gt -x 200 -y 50 -c /tmp/guard-cli-test/proj
+tmux send-keys -t gt 'claude --plugin-dir /path/to/plugins/guard --model haiku' Enter
+tmux pipe-pane -o -t gt 'cat >> /tmp/pane.log'   # capture-pane can come back empty here
+tmux send-keys -t gt '/guard:toggle off'; sleep 2; tmux send-keys -t gt Enter
+```
+
+Three traps worth knowing. Piping claude's stdout (`| tee`) takes away its TTY and it drops
+straight to non-interactive mode, so the session exits immediately — use `pipe-pane` instead,
+and note that `capture-pane` can come back empty against claude's TUI. A first-run directory
+shows a trust dialog that eats the first Enter, so the prompt sent before it is lost. And a
+tmux pane starts from the login PATH, which on macOS puts `/usr/bin/python3` (3.9) first —
+harmless now that uv chooses the interpreter, but it is the environment that surfaced the bug
+in the next section, so it is the one to test in.
+
+**Pass `--permission-mode bypassPermissions`, not `auto`.** Measured 2026-08-22 against
+claude 2.1.239, in a fresh directory driven from tmux. Under `auto` the very first
+state-changing Bash call stops on `Do you want to proceed?` and the run stalls until
+something answers it — the mode narrows prompts, it does not remove them. Under
+`bypassPermissions` the same prompt count was zero and the pane header reads
+`bypass permissions on`. The trust dialog is a separate gate and neither mode skips it: it is
+suppressed only in non-interactive mode (`-p`, or a non-TTY stdout), which is exactly the
+mode the interactive-only hooks cannot be tested in. So an interactive recipe still sends one
+extra Enter, or runs in a directory already trusted.
+
+### Why uv, and what it fixed
+
+Both hook manifests and both scripts' shebangs run through `uv run --script`, and each script
+carries a PEP 723 block pinning `requires-python = ">=3.11"`. `guide/adapter-guide.md` asks
+for the uv invocation; the pin is what makes it load-bearing.
+
+The bug it closes was measured on 2026-08-22, in a real session. With the old
+`#!/usr/bin/env python3`, the interpreter is whatever comes first on the PATH of the process
+the host launched the hook from. A tmux pane starts from the login PATH, which on macOS puts
+`/usr/bin/python3` (3.9.6) first, and every hook died with `ImportError: cannot import name
+'StrEnum'` — the session showing `Stop hook error: Failed with non-blocking status code` and
+a traceback. The single-file `guard_hook.py` failed identically before the package split
+(same import, same line), so this was shipped behaviour rather than a consequence of the
+layering.
+
+Two things about that failure were worse than they look. It is **not** fail-open in the sense
+the rest of guard means: a traceback in the transcript on every hook of every turn is the
+loudest possible failure, repeated. And because the hook printed nothing, the model was free
+to narrate success — in the observed run it answered "이 세션에서 비활성화했습니다" to a
+`/guard:toggle off` whose hook had in fact crashed and changed nothing. That is the general
+hazard behind the rule in the CLI-testing section: assert on the trace, not on the answer.
+
+uv resolves an interpreter satisfying the pin, so the same tmux pane — `python3` still 3.9.6,
+`uv` on the PATH at /opt/homebrew/bin — now runs the hooks correctly: `/guard:toggle off`
+records `toggle/set paused: true` plus both control-command skips, `audit_paused` is `True`,
+and the pane shows no hook error. Cost: about 9ms per invocation (10 runs, 0.267s under uv
+vs 0.176s direct), and the 100-case regression suite runs in 1.7s total.
+
+What uv does not fix is an environment with neither a modern `python3` nor `uv`. There the
+failure is `env: uv: No such file or directory`, exit 127 — one line instead of a traceback,
+still broken. uv is a stated install requirement rather than something guard degrades around.
+
+Directly unit-testable without any subprocess, and the split widened this considerably —
+each module below imports without pulling in the hook entry point: `turnrec._write_turn_response`
+(the fallback header present, response exact, parent dir created, an existing non-empty
+file left alone, and a read-only dir returning None rather than raising),
+`transcript._turn_identity(path, prompt_id)` on a
 fixture JSONL (a typed prompt, a `task-notification`, a slash command, a prompt_id absent
 from the file), `_safe_project_subdir(project_dir, value)` on its rejection cases (`"."`,
 `".."`, `".claude/guard"`, `"../elsewhere"`, `"/etc"` — all None; a plain subdirectory
-resolves), `_eligible_agents(state, edited, agent_docs)` on the file-reading prerequisite (each
-bucket gates only its own agent), `_edited_bucket(path)` on a source file, an `AGENTS.md`, a
-`CLAUDE.md`, and a plain `.md` that must land in neither, `_parse_mode` /
-`_agent_mode` on the aliases and on a junk value (which must read as `off`), `_load_config`
-on a mode written into the file (it must survive the type gate — see the Config section),
-and `_router_context` / `_agent_pointer`, which must never name an agent outside the
-eligible list and must name the playbook path exactly once each.
+resolves), `agents._eligible_agents(state, edited, agent_docs)` on the file-reading
+prerequisite (each bucket gates only its own agent), `agents._edited_bucket(path)` on a source
+file, an `AGENTS.md`, a `CLAUDE.md`, and a plain `.md` that must land in neither,
+`config._parse_mode` / `config._agent_mode` on the aliases and on a junk value (which must
+read as `off`), `config._load_config` on a mode written into the file (it must survive the
+type gate — see the Config section), `dispatch._plugin_root` from an install where the
+playbook is present and from one where it is not, and `dispatch._router_context` /
+`dispatch._agent_pointer`, which must never name an agent outside the eligible list and must
+name the playbook path exactly once each.
