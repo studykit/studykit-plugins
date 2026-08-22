@@ -47,10 +47,9 @@ The dispatch hands you:
   the agents the user has switched on and that this turn is applicable to; a key that is
   not listed is not available, so ignore its section below and never name it. Do not
   invent a key.
-- the **mode** on each candidate line, and any **paths** that come with it, are for your
-  caller, not for you. Ignore them: how an agent is dispatched and what it is handed is
-  its playbook section's business, and repeating any of it in your answer only invites a
-  version that disagrees with the file.
+- the **mode** on each candidate line is for your caller, not for you. Ignore it: how an
+  agent is dispatched is its playbook section's business, and repeating any of it in your
+  answer only invites a version that disagrees with the file.
 
 If the record is missing or its response section is empty, say so in one line and pick
 nothing. Do not go looking for the turn elsewhere.
@@ -135,16 +134,6 @@ Do **not** judge whether the Korean is any good. 번역체, register, particles 
 are the corrector's call, and fluent prose and awkward prose both go to it — if you find
 yourself thinking "this Korean reads fine", that is precisely the judgment you must not
 make, and the answer is still yes.
-
-### `comment-corrector`
-
-Did this turn **change logic** in the files the dispatch names? Yes when it added or
-reshaped code whose comments could now be wrong, missing, or redundant. No for a purely
-mechanical edit — a rename, a version bump, a formatting pass, a string change — where no
-comment can have gone stale.
-
-This is the one agent that edits files, so a needless yes costs the user a diff to review.
-The comments themselves are its call, not yours.
 
 ## Output
 

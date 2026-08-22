@@ -287,8 +287,8 @@ Rules:
 | Repo-local skill discovery | Claude-specific locations and plugin install behavior | Codex scans `.agents/skills` from cwd up to repo root; plugins can also bundle skills |
 | Skill arguments | `$ARGUMENTS`, `$ARGUMENTS[N]` with `$N` shorthand such as `$0` and `$1`, and named `$name` arguments are Claude skill-content substitutions | No documented Codex equivalent in current OpenAI skill docs; treat the user prompt as input and pass explicit values to scripts |
 | Skill directory placeholder | `${CLAUDE_SKILL_DIR}` in Claude skill content | No documented `CODEX_SKILL_DIR` placeholder; resolve paths relative to the loaded skill file when needed |
-| Plugin root placeholder in skill content | No documented `${CLAUDE_PLUGIN_ROOT}` skill-content substitution; use `${CLAUDE_SKILL_DIR}` for skill-local files | No documented `CODEX_PLUGIN_ROOT` skill placeholder; Codex plugin manifests use `./`-prefixed paths relative to plugin root |
-| Persistent plugin data | No documented `${CLAUDE_PLUGIN_DATA}` skill-content substitution; use documented plugin subprocess contexts or pass an explicit data path | Do not assume a skill-body placeholder; keep skill state project-local or pass a documented data path explicitly |
+| Plugin root placeholder in skill content | `${CLAUDE_PLUGIN_ROOT}` is substituted in a plugin skill's content and in its `allowed-tools` Bash rules; use it for files shared across the plugin's skills, and `${CLAUDE_SKILL_DIR}` for files bundled with one skill | No documented `CODEX_PLUGIN_ROOT` skill placeholder; Codex plugin manifests use `./`-prefixed paths relative to plugin root |
+| Persistent plugin data | `${CLAUDE_PLUGIN_DATA}` is substituted in a plugin skill's content and `allowed-tools` Bash rules, alongside `${CLAUDE_PLUGIN_ROOT}` | Do not assume a skill-body placeholder; keep skill state project-local or pass a documented data path explicitly |
 | Hook plugin root | `${CLAUDE_PLUGIN_ROOT}` in Claude hook command text and exported hook subprocess environment | `PLUGIN_ROOT` process environment for Studykit Codex hook adapters |
 | Hook plugin data | `${CLAUDE_PLUGIN_DATA}` in Claude hook command text and exported hook subprocess environment | `PLUGIN_DATA` process environment for Codex plugin hook adapters |
 | Tool names | Claude-specific tool names may appear in Claude-only instructions | Codex tool names may differ; avoid tool-name coupling in shared skills |
@@ -341,13 +341,13 @@ Read `references/options.md` when the user asks for advanced options.
 Run `scripts/validate.py` with the target file path.
 ```
 
-Avoid shared skill instructions like:
+Claude-only skill instructions may name a bundled script through either plugin placeholder:
 
 ```md
-Run `${CLAUDE_PLUGIN_ROOT}/skills/example/scripts/validate.py`.
+Run `${CLAUDE_PLUGIN_ROOT}/scripts/validate.py`.
 ```
 
-That path is not a documented skill-content placeholder. Use `${CLAUDE_SKILL_DIR}` for Claude-only skill-local commands, or resolve and pass explicit paths through an adapter.
+Pick by scope, not habit. `${CLAUDE_PLUGIN_ROOT}` is the plugin directory, so it is the one that survives the skill file moving between `skills/<name>/SKILL.md` and `commands/<name>.md`; `${CLAUDE_SKILL_DIR}` is that one skill's own subdirectory, for files bundled with it. Never reach a shared script by climbing out of the skill directory (`${CLAUDE_SKILL_DIR}/../../`) — the depth is wrong the moment the file moves. Neither placeholder exists in Codex skill content, so a cross-runtime skill resolves paths through an adapter instead.
 
 ### Skill Tool Dependencies
 

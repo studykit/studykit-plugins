@@ -12,20 +12,22 @@ Subcommands
                  so the answer exists somewhere editable while the turn is still running.
                  It has to be this hook: by Stop the answer is already printed, and a
                  printed answer cannot be corrected. guard keeps no copy of the prompt.
-                 Silent when every agent is off and for guard's own control commands.
+                 Silent when no agent that reads the turn (see ``_reads_turn``) is on — which
+                 includes "every agent off" but also a project running only
+                 ``comment-corrector`` — and for guard's own control commands.
 - settings       CLI (argv), run by the ``guard:settings`` skill via Bash, in-session.
                  ``show`` prints the current settings; ``set <key> <value>`` changes one
                  of the per-agent settings — each named after the agent it controls
                  (``claims-auditor`` / ``deferrals-auditor`` / ``korean-corrector`` /
                  ``clarity-auditor`` / ``comment-corrector``), valued
-                 ``off``/``fresh``/``reuse`` — or ``router_model`` / ``refs_dir``. The agent
-                 settings also apply to the live session's ``state/<sid>.json`` when a
+                 ``off``/``fresh``/``reuse`` — or ``router_model`` / ``refs_dir``; ``unset
+                 <key>`` removes a key from the file entirely, back to its default. The
+                 agent settings also apply to the live session's ``state/<sid>.json`` when a
                  session id is available (``--session``, which the skill passes as
                  ``${CLAUDE_SESSION_ID}``, else the inherited
                  ``CLAUDE_CODE_SESSION_ID``); the rest are read from the config file at
-                 use. Preserves every other key; ``exempt_skills`` is managed by the
-                 ``exempt`` CLI, not here. Mutating verbs require the settings-skill
-                 marker — see ``_cli_write_allowed``. Not a hook event.
+                 use. Preserves every other key. Mutating verbs require the
+                 settings-skill marker — see ``_cli_write_allowed``. Not a hook event.
 - verify         UserPromptExpansion, one matcher per agent
                  (``^(guard:)?{claims,deferrals,clarity}-auditor$``,
                  ``^(guard:)?korean-corrector$``).
@@ -34,37 +36,51 @@ Subcommands
                  every Stop). A switch that is off is still auditable this way — the
                  switch governs what guard recommends unasked, not what the user may ask
                  for.
-- exempt         CLI (argv), run by the ``guard:settings`` skill via Bash after the user
-                 confirms an interactive selection. ``list``/``set``/``add``/
-                 ``remove``/``clear`` the ``exempt_skills`` config key — that key ONLY,
-                 never the switches/state. Mutating verbs require the settings-skill
-                 marker (``_cli_write_allowed``). Not a hook event.
 - stop           Stop. A turn == the transcript ``prompt_id``. guard reads ONE transcript
                  record, for the turn's kind only (``_turn_identity``) — never its content,
                  which is the main agent's to write. Skips when ``stop_hook_active``, when
                  the prompt_id is absent, when the turn was opened by anything other than a
                  person typing (a background agent's completion, a subagent's
                  ``SendMessage``: guard's own dispatch causes those, so auditing them loops),
-                 and when it was opened by one of guard's control commands or a configured
-                 ``exempt_skills`` entry. Otherwise it records the turn as the pending
+                 when it was opened by one of guard's own control commands, and when it was
+                 opened by a user ``!`` command (no ``UserPromptSubmit`` fired for it, so no
+                 answer file was ever named). Otherwise it records the turn as the pending
                  ``/guard:<agent>`` target and fills in the answer file if the turn left it
                  empty — both regardless of the switches, because the on-demand commands
-                 must work in a project that keeps everything off. Then, when any agent is
-                 not ``off``, it emits ``additionalContext`` asking the main agent to
+                 must work in a project that keeps everything off. Then, when a turn-reading
+                 agent is eligible, it emits ``additionalContext`` asking the main agent to
                  dispatch the router (``ROUTER_AGENT``) over the answer file with the
                  eligible agents and their modes, and to follow the sections its report
-                 names. guard runs no model itself and never blocks here.
+                 names; an eligible ``comment-corrector`` (``reads="files"``) is dispatched
+                 directly over the turn's edited files instead, bypassing the router. guard
+                 runs no model itself and never blocks here.
 - post-edit      PostToolUse (Write/Edit/MultiEdit/NotebookEdit). Records a source
                  file written this turn (the list a ``comment-corrector``
                  recommendation is built from), and requires a file saved inside the
                  refs directory to be listed in that directory's ``AGENTS.md``, blocking
                  until it is. Both are independent of the agent switches.
-- session-start  SessionStart. Sweep state files and turns/ dirs older than retention,
-                 export ``GUARD_REFS_DIR`` (the resolved refs directory) via
+- session-start  SessionStart. Sweep state files and turns/ and extracts/ dirs older than
+                 retention, export ``GUARD_REFS_DIR`` (the resolved refs directory) via
                  ``$CLAUDE_ENV_FILE``, and state as session context: the refs rule always,
                  the dispatch playbook's path when any agent is on, and the standing reuse
                  policy when any agent is in ``reuse``. Each is said ONCE here rather than
                  in every Stop, which is the whole reason this hook prints anything.
+- toggle         UserPromptExpansion (``^(guard:)?toggle$``), for ``/guard:toggle
+                 [on|off]``. Mutes or unmutes the automatic audit for THIS SESSION —
+                 ``audit_paused`` in the session state, never guard.local.json, so it cannot
+                 change what the project does by default. Empty argument flips; ``on`` means
+                 auditing on, which clears the pause. While muted, ``stop`` recommends
+                 nothing and ``user-prompt`` names no answer file, but the pending
+                 ``/guard:<agent>`` target and the answer file are still recorded, so asking
+                 for one audit still works. The hook does the work and prints the resulting
+                 state; the command file only relays it.
+- status         CLI (stdin JSON), for the user's status line. Prints one short field —
+                 ``guard <n>`` armed / ``guard off`` muted / ``guard ·`` nothing switched on
+                 — or NOTHING on any failure, because its stdout goes straight into the
+                 user's status bar. A plugin cannot own the main ``statusLine``, so the user
+                 composes this segment into theirs (``/guard:statusline`` offers to do it).
+                 Reads only the small config and state files, nothing else: it runs on every
+                 assistant message. Not a hook event.
 - transcript     CLI (argv), run by an audit agent via Bash. ``index`` / ``turn`` / ``find``
                  over the session transcript, bounded by ``--since`` / ``--until`` /
                  ``--last``. Writes an extract FILE and prints only its path plus a
@@ -75,15 +91,21 @@ Subcommands
                  output style), not a hook event.
 
 State lives project-local under ``${CLAUDE_PROJECT_DIR}/.claude/guard/``:
-- ``state/<sid>.json``       — {<agent modes>, edited_prompt_id, edited_files, last_audited_prompt_id, pending_verify_prompt_id, transcript_path, updated_at}
+- ``state/<sid>.json``       — {<agent modes>, audit_paused, edited_prompt_id, edited_files, last_audited_prompt_id, pending_verify_prompt_id, transcript_path, updated_at}
 - ``turns/<sid>/<pid>.md``   — the turn's ANSWER. guard names the path at the start of the
                                 turn and the main agent writes the substance there; the
                                 agents audit it and the correctors edit it in place, so the
                                 corrected file is what the user is shown. guard fills it in
                                 only if the turn left it empty (see ``_write_turn_response``).
-- ``extracts/<sid>/…``       — what an agent pulled out of the transcript, written by the
+- ``extracts/<dir>/…``       — what an agent pulled out of the transcript, written by the
                                 ``transcript`` subcommand on request and swept with the
-                                rest of the session's state.
+                                rest of the session's state. ``<dir>`` is the transcript
+                                filename's stem unless the caller passes ``--session``, and
+                                no caller does; Claude Code names that file after the
+                                session, so in practice it reads as a session id without
+                                being one by contract. Nothing reads these back by name —
+                                the subcommand prints the path it wrote — so the sweep keys
+                                on the directory's mtime instead.
 - ``trace.log``              — file-only debug trace (enabled by GUARD_TRACE)
 
 State is retained across the end of a session so a resumed session
@@ -96,12 +118,7 @@ that agent's own name — ``claims-auditor`` / ``deferrals-auditor`` / ``clarity
 ``korean-corrector`` / ``comment-corrector``, each ``"off"`` (the default) / ``"fresh"`` /
 ``"reuse"`` — which
 together are the only control over whether guard says anything unasked and over whether an
-agent is respawned per turn or held open for the session; ``exempt_skills`` (list of strings, default
-``[]``) — skills / slash commands whose turn Stop must not audit, named with their
-plugin namespace (``plugin:skill``, e.g. ``guard:settings``) or bare for un-namespaced
-skills; matched leading-``/``-stripped and case-insensitively (guard's own control
-commands — ``settings``, ``reader-profile`` and the per-agent ones — are always exempt
-regardless of this list),
+agent is respawned per turn or held open for the session,
 and ``refs_dir`` (string, default ``""``) — project-relative directory where guard saves
 local copies of cited docs; empty means the git-tracked default ``wiki/ref/``, so the
 collected references are committed with the repo (point it at a different tracked path,
@@ -126,6 +143,7 @@ import re
 import shlex
 import sys
 import time
+from collections.abc import Iterable
 from datetime import datetime, timezone
 from enum import StrEnum
 from pathlib import Path
@@ -146,8 +164,6 @@ TRACE_TRUTHY = {"1", "true", "yes", "on"}
 # Marker the `guard:settings` skill sets on the config-mutating CLI verbs. See
 # _cli_write_allowed for what this does and does not buy.
 CLI_WRITE_ENV_VAR = "GUARD_SETTINGS_SKILL"
-# List-CLI verbs that write the config; `list` and unknown verbs only report.
-_CLI_MUTATING_VERBS = {"set", "add", "remove", "rm", "clear"}
 ORPHAN_MAX_AGE_SECONDS = 7 * 24 * 60 * 60
 
 class AgentMode(StrEnum):
@@ -213,7 +229,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
     # front of them — switching one on IS switching guard on, and a project that wants
     # the claim check without the deferral check just switches the one it wants.
     #
-    # None of them governs the on-demand `/guard:audit-*` commands: a switch that is off
+    # None of them governs the on-demand `/guard:<agent>` commands: a switch that is off
     # still leaves the user free to ask for that audit now. That is why every switch
     # ships off — guard installed is guard available, not guard running.
     "claims-auditor": AgentMode.OFF,
@@ -232,14 +248,6 @@ DEFAULT_CONFIG: dict[str, Any] = {
     # EDITS them, unattended, in the turn the user is still reading. That is why it is
     # the one switch whose cost is a diff rather than a report.
     "comment-corrector": AgentMode.OFF,
-    # Skills / slash commands Stop must NOT recommend an audit for. A turn opened
-    # by one of these is skill output or a relay, not a body of technical claims to
-    # ground. Values are the name as it appears after the slash, INCLUDING the plugin
-    # namespace (e.g. "guard:settings", "hindsight:review") or the bare name for an
-    # un-namespaced skill ("deep-research"); matched leading-'/'-stripped and
-    # case-insensitively. guard's own control commands are always exempt
-    # regardless of this list.
-    "exempt_skills": [],
     # Where guard saves local copies of cited docs, relative to
     # the project dir. Empty = the default git-tracked `wiki/ref/`, so the collected
     # references are committed with the repo. Point it at a different tracked path
@@ -261,8 +269,7 @@ def _cli_write_allowed() -> bool:
 
     guard never gates Bash, so the model can invoke this script directly — and the
     config-mutating verbs can weaken guard itself: `settings set claims-auditor off`
-    stops the automatic audit, and `exempt add <skill>` drops a skill's turns from
-    it. The `guard:settings` skill is
+    stops the automatic audit. The `guard:settings` skill is
     `disable-model-invocation: true` (user-invoked only) and sets this marker; a bare
     model-issued Bash call does not have it.
 
@@ -465,15 +472,17 @@ _SESSION_ID_RE = re.compile(r"^[A-Za-z0-9._-]+$")
 # built-in `/config` command (which the optional `(guard:)?` would otherwise capture,
 # making guard treat every `/config` as its own control command). `(?=\s|$)` rather than
 # `\b`: the name must END here, not merely hit a word boundary — `\b` would also accept a
-# longer hyphenated name from another plugin (`/settings-export` matching `settings`), and
-# it is what keeps `claims-auditor` from matching a bare `/claims`.
+# longer hyphenated name (`/settings-export` matching `settings`, `/claims-auditor-extra`
+# matching `claims-auditor`), which is how another plugin's command becomes guard's.
 # `comment-corrector` is deliberately ABSENT: that skill's relayed findings are claims about
 # real files and about edits made to them, so its turn stays auditable like any other work.
+# `statusline` is absent for the same reason: it reports what is in the user's settings files
+# and proposes an edit to them, which is checkable work, not a relay of guard's own state.
 # `reader-profile` is here for a different reason from the rest: its turn is an interview
 # about the user, so the "answer" is the user's own words read back to them, and auditing
 # that would have guard grading the user on how they described themselves.
 _CONTROL_CMD_RE = re.compile(
-    r"^/(guard:)?(settings|reader-profile|claims-auditor|deferrals-auditor"
+    r"^/(guard:)?(settings|toggle|reader-profile|claims-auditor|deferrals-auditor"
     r"|clarity-auditor|korean-corrector)(?=\s|$)",
     re.IGNORECASE)
 # In the transcript, a slash command is expanded to
@@ -526,33 +535,14 @@ def _is_control_command_name(name: str) -> bool:
     return bool(name) and bool(_CONTROL_CMD_RE.match("/" + name))
 
 
-def _norm_skill(name: Any) -> str:
-    """Normalize a skill / command name for storage and matching: leading '/' stripped,
-    lowercased, plugin namespace (``plugin:skill``) preserved. '' if not a usable str."""
-    if not isinstance(name, str):
-        return ""
-    return name.strip().lstrip("/").lower()
-
-
-def _exempt_skills(config: dict[str, Any]) -> set[str]:
-    """Normalized set of skill / command names whose turn Stop must not audit
-    (from the ``exempt_skills`` config key). Values keep their plugin namespace
-    (``plugin:skill``); compared leading-'/'-stripped and lowercased, matching
-    ``_turn_command_name``."""
-    raw = config.get("exempt_skills", [])
-    if not isinstance(raw, list):
-        return set()
-    return {n for n in (_norm_skill(c) for c in raw) if n}
-
-
 # Text the host injects into a `user` record that is not the user talking: hook output,
 # slash-command envelopes, `!` command echoes, the compaction caveat. Matched as a prefix
 # on the record's text. Without this filter the record's "user request" is whatever the
 # host happened to prepend, which is both wrong and the kind of wrong an auditor cannot
 # detect — it has no other copy of the request to compare against. The same list drives
 # hindsight's transcript renderer (`plugins/hindsight/skills/review/scripts/render.py`).
-# A user `!` command's records. Not evidence, and the turn that carries one is not audited:
-# the `!` output arrives after the response guard would be judging.
+# The envelope a user `!` command's input arrives in. It is also the record that ANCHORS
+# such a turn, which is what `_turn_identity` keys its Stop skip on.
 _BASH_TAG = "<bash-input>"
 
 _INJECTED_PREFIXES = (
@@ -595,7 +585,7 @@ def _transcript_records(path: Path):
 def _turn_slice(transcript_path: Any, prompt_id: Any) -> dict[str, Any] | None:
     """Everything guard can read about one turn from the transcript. None when it cannot.
 
-    Returns ``{origin_kind, command_name, user, tools, has_user_command}``. A turn is
+    Returns ``{origin_kind, command_name, user, assistant, tools}``. A turn is
     anchored on the FIRST record whose top-level ``promptId`` equals ``prompt_id``, and the
     slice runs to the next record carrying a DIFFERENT non-empty promptId. That positional
     rule is not a convenience: only ``user`` records carry a promptId at all — the assistant
@@ -605,8 +595,8 @@ def _turn_slice(transcript_path: Any, prompt_id: Any) -> dict[str, Any] | None:
 
     Skipped: ``isMeta`` (guard's own injected feedback), ``isSidechain`` (a subagent's
     records, which are not this turn's activity even when they share the file), and user
-    text that is really host-injected envelope (``_INJECTED_PREFIXES``). A user `!` command
-    is not evidence and is not collected; it only sets ``has_user_command``.
+    text that is really host-injected envelope (``_INJECTED_PREFIXES``), which a user `!`
+    command's input and output are: neither is the user asking for anything.
 
     Fail-open throughout: an unreadable transcript, a malformed line, or a prompt_id absent
     from the file yields None or a partial slice, never a raise.
@@ -620,7 +610,6 @@ def _turn_slice(transcript_path: Any, prompt_id: Any) -> dict[str, Any] | None:
     user = ""
     assistant: list[str] = []
     tools: list[dict[str, str]] = []
-    has_user_command = False
     origin_kind = ""
     command_name = ""
     in_turn = False
@@ -644,9 +633,7 @@ def _turn_slice(transcript_path: Any, prompt_id: Any) -> dict[str, Any] | None:
 
         content = _message_of(rec).get("content")
         if isinstance(content, str):
-            if _BASH_TAG in content or "<bash-stdout>" in content or "<bash-stderr>" in content:
-                has_user_command = True
-            elif not user and not content.lstrip().startswith(_INJECTED_PREFIXES):
+            if not user and not content.lstrip().startswith(_INJECTED_PREFIXES):
                 user = content
             continue
         if not isinstance(content, list):
@@ -671,7 +658,6 @@ def _turn_slice(transcript_path: Any, prompt_id: Any) -> dict[str, Any] | None:
                 if isinstance(res, list):
                     res = " ".join(str(x.get("text", "")) for x in res if isinstance(x, dict))
                 out = str(res if res is not None else "")
-                # Attach to the most recent call still lacking output.
                 for t in reversed(tools):
                     if not t["output"]:
                         t["output"] = out
@@ -687,7 +673,6 @@ def _turn_slice(transcript_path: Any, prompt_id: Any) -> dict[str, Any] | None:
         "user": user,
         "assistant": "\n\n".join(assistant),
         "tools": tools,
-        "has_user_command": has_user_command,
     }
 
 
@@ -913,11 +898,12 @@ def cmd_transcript() -> int:
     return 0
 
 
-def _turn_identity(transcript_path: Any, prompt_id: Any) -> dict[str, str] | None:
+def _turn_identity(transcript_path: Any, prompt_id: Any) -> dict[str, Any] | None:
     """What KIND of turn this is, read from the transcript anchor. Never its content.
 
-    Returns ``{origin_kind, command_name}``, or None (fail-open) when the transcript is
-    unreadable or the prompt_id is not in it. Both users of it are skips, not audits:
+    Returns ``{origin_kind, command_name, bash_input}``, or None (fail-open) when the
+    transcript is unreadable or the prompt_id is not in it. Every user of it is a skip,
+    not an audit:
 
     - ``origin_kind`` — a typed prompt is ``"human"``. Anything else that opens a turn is
       machinery reporting in, and each such kind arrives with a fresh promptId and
@@ -927,12 +913,15 @@ def _turn_identity(transcript_path: Any, prompt_id: Any) -> dict[str, str] | Non
       (``isMeta``). Both observed in 2.1.239. Recommending an audit on either is
       self-perpetuating, because guard's own dispatch is what produces them: the audit
       agents are background tasks, and they message the session back.
-    - ``command_name`` — the slash command that opened the turn, so a turn that is
-      guard's own control command or a user-exempted skill can be skipped.
+    - ``command_name`` — the slash command that opened the turn, so a turn opened by
+      one of guard's own control commands can be skipped.
+    - ``bash_input`` — the turn was opened by a user `!` command rather than a prompt.
+      Such a turn carries no ``origin`` at all (verified in 2.1.239, session 6bc60bbf), so
+      the ``origin_kind`` skip above lets it through; see `cmd_stop` for why it must not.
 
     Only the ANCHOR record is examined; records derived from the turn carry
     ``promptId=None`` and nothing about them changes the turn's kind. Kept separate from
-    ``_turn_slice`` because the two skips must be decided before guard does any work, and
+    ``_turn_slice`` because the skips must be decided before guard does any work, and
     reading one record is cheaper than slicing a turn out of a multi-megabyte file.
     """
     if not isinstance(transcript_path, str) or not isinstance(prompt_id, str) or not prompt_id:
@@ -956,9 +945,11 @@ def _turn_identity(transcript_path: Any, prompt_id: Any) -> dict[str, str] | Non
             continue
         origin = rec.get("origin")
         content = _message_of(rec).get("content")
+        text = content if isinstance(content, str) else ""
         return {
             "origin_kind": str(origin.get("kind") or "") if isinstance(origin, dict) else "",
-            "command_name": _turn_command_name(content if isinstance(content, str) else ""),
+            "command_name": _turn_command_name(text),
+            "bash_input": text.lstrip().startswith(_BASH_TAG),
         }
     return None
 
@@ -967,9 +958,9 @@ def _load_config(project_dir: Path) -> dict[str, Any]:
     """Load the JSON config at guard.local.json, if present. Fail-open to defaults.
 
     Only keys present in DEFAULT_CONFIG are honored, and only when the supplied value
-    matches the default's JSON type (str for the agent modes and for ``router_model`` /
-    ``refs_dir``, list for ``exempt_skills``), so a malformed value can never change a
-    setting by accident.
+    matches the default's JSON type (every key is a str: the agent modes,
+    ``router_model``, ``refs_dir``), so a malformed value can never change a setting by
+    accident.
     """
     config = dict(DEFAULT_CONFIG)
     path = project_dir / CONFIG_REL
@@ -995,7 +986,7 @@ def _load_config(project_dir: Path) -> dict[str, Any]:
 
 def _load_raw_config(project_dir: Path) -> dict[str, Any]:
     """Read guard.local.json as a raw dict (unmerged, no defaults applied), or {} if
-    missing/malformed. Used by the exempt CLI so it can edit ``exempt_skills`` in place
+    missing/malformed. Used by the ``settings`` CLI so it can edit one key in place
     while preserving every other key the user has set."""
     path = project_dir / CONFIG_REL
     if not path.is_file():
@@ -1025,7 +1016,7 @@ def _read_state(project_dir: Path, session_id: str, config: dict[str, Any]) -> d
         **{k: str(_agent_mode(config, k)) for k in AUDIT_AGENTS},
         # Per-turn guards keyed by the transcript prompt_id (a turn == one promptId).
         "last_audited_prompt_id": "",
-        # The most recent auditable turn's prompt_id — the target a `/guard:audit-*`
+        # The most recent auditable turn's prompt_id — the target a `/guard:<agent>`
         # command dispatches its agent for. Recorded by every Stop, switches or not.
         "pending_verify_prompt_id": "",
         # The session's transcript, recorded at Stop so the on-demand `/guard:*` path can
@@ -1039,6 +1030,12 @@ def _read_state(project_dir: Path, session_id: str, config: dict[str, Any]) -> d
         # the corrector at files the current turn never touched.
         "edited_prompt_id": "",
         "edited_files": [],
+        # Session-only mute, flipped by `/guard:toggle`. NOT a mode in front of the agent
+        # switches the way the removed `audit_gate` was: it lives only in session state, so
+        # it can never change what the project does by default, and the `status` subcommand
+        # puts it in the user's status line so the muted state is visible rather than
+        # remembered. A hidden mute is the failure that killed the old gate.
+        "audit_paused": False,
         "updated_at": None,
     }
     path = _state_file(project_dir, session_id)
@@ -1051,7 +1048,7 @@ def _read_state(project_dir: Path, session_id: str, config: dict[str, Any]) -> d
     if not isinstance(data, dict):
         return default
     keys = (*AUDIT_AGENTS, "last_audited_prompt_id", "pending_verify_prompt_id",
-            "transcript_path",
+            "transcript_path", "audit_paused",
             "edited_prompt_id", "edited_files", "updated_at")
     default.update({k: data[k] for k in keys if k in data})
     return default
@@ -1176,7 +1173,7 @@ def _instance_name(name: str) -> str:
     return "guard-" + name
 
 
-# Order here is the order the agents appear in a recommendation. The two read-only
+# Order here is the order the agents appear in a recommendation. The three read-only
 # auditors come first: their findings may change what the correctors should be run on.
 AUDIT_AGENTS: dict[str, AuditAgent] = {
     "claims-auditor": AuditAgent(reads="turn", verify_command=True, needs_history=True),
@@ -1242,13 +1239,25 @@ _SOURCE_SUFFIXES = frozenset({
 # template per agent. An agent absent from the roster cannot be picked, which beats
 # describing a disabled agent and appending "but this one is off".
 #
-# The result-handling line for an agent therefore exists in two places: `AuditAgent.tail`
-# here, for the on-demand `/guard:*` path where no router runs, and the same guidance in
-# `agents/router.md` for the routed path. Editing one means editing the other — a real
-# cost, accepted because the alternative is Python parsing its own prose out of a
-# markdown file, or the routed path paying for four blocks to use one.
+# The result-handling line for an agent lives in exactly one place: its section of
+# `hooks/context/dispatch-playbook.md`. Both paths read it from there — the on-demand
+# `/guard:<agent>` path via `_agent_pointer`, the routed path via the router's own
+# report — so there is nothing in Python to keep in sync with the markdown, and no
+# duplicated guidance that could drift between the two.
 # --------------------------------------------------------------------------- #
 ROUTER_AGENT = "guard:router"
+
+
+def _reads_turn(keys: Iterable[str]) -> bool:
+    """Does any of ``keys`` read the turn's answer file?
+
+    The gate on everything the answer file costs. That file exists for the agents whose
+    input it IS (``reads="turn"``); ``comment-corrector`` reads the source files the turn
+    wrote and never opens it. So a configuration with only ``comment-corrector`` on must
+    not pay for it — neither the per-prompt instruction telling the session to write into
+    it, nor the dispatch line naming it.
+    """
+    return any(AUDIT_AGENTS[k].reads == "turn" for k in keys if k in AUDIT_AGENTS)
 
 
 def _eligible_agents(state: dict[str, Any], edited: list[str]) -> list[str]:
@@ -1343,8 +1352,10 @@ def _dispatch_context(project_dir: Path, session_id: str, prompt_id: str, lead: 
                       edited: list[str] | None = None, transcript: str = "") -> str:
     """``additionalContext`` asking the main agent to dispatch these agents directly.
 
-    The no-router path: the user named the audit themselves with a `/guard:audit-*`
-    command, so there is nothing to triage and routing it would only add a hop.
+    The no-router path, reached two ways and for the same reason — there is nothing to
+    triage, so routing would only add a hop. Either the user named the audit themselves
+    with a `/guard:<agent>` command, or `cmd_stop` is dispatching a `reads="files"` agent,
+    whose selection is not a question the router can answer.
     """
     keys = list(keys)
     block = _agent_pointer(project_dir, session_id, prompt_id, keys, edited or [], modes)
@@ -1354,7 +1365,7 @@ def _dispatch_context(project_dir: Path, session_id: str, prompt_id: str, lead: 
 
 
 def _router_context(project_dir: Path, session_id: str, prompt_id: str, lead: str,
-                    eligible: list[str], edited: list[str], modes: dict[str, AgentMode],
+                    eligible: list[str], modes: dict[str, AgentMode],
                     config: dict[str, Any], transcript: str = "") -> str:
     """``additionalContext`` for the Stop path: the playbook pointer, then this turn's data.
 
@@ -1371,9 +1382,9 @@ def _router_context(project_dir: Path, session_id: str, prompt_id: str, lead: st
     the playbook's `Dispatching` section, read once by whoever is sent there.
 
     What is left cannot come from anywhere else: where the playbook is, where the record is,
-    which agents are switched on and in what mode, the files this turn wrote, where a long
-    rewrite may go, and the transcript pointer for the agents whose section asks for it. The
-    field names are terse on purpose — the playbook says what each one is for.
+    which agents are switched on and in what mode, and the transcript pointer for the agents
+    whose section asks for it. The field names are terse on purpose — the playbook says what
+    each one is for.
 
     Deliberately absent: any summary of the turn, from guard or from the main agent. Priming
     an audit with the author's account of the work is how an unexamined claim becomes an
@@ -1386,18 +1397,25 @@ def _router_context(project_dir: Path, session_id: str, prompt_id: str, lead: st
     checks. It is also the cheapest agent here, so continuity buys the least.
     """
     model = _router_model(config)
-    fields = [
-        f"- playbook: {_playbook_path()}",
-        f"- answer file: {_turn_record_file(project_dir, session_id, prompt_id).resolve()}",
-        "- candidates: " + ", ".join(f"`{k}`={modes[k].value}" for k in eligible),
-    ]
-    files_agent = [k for k in eligible if AUDIT_AGENTS[k].reads == "files"]
-    if files_agent:
-        fields.append(f"- files for `{files_agent[0]}`: " + ", ".join(edited))
+    fields = [f"- playbook: {_playbook_path()}"]
+    # Unconditional: every candidate reaching the router is a `reads="turn"` agent, so the
+    # answer file is always the thing being routed on. `comment-corrector` is dispatched
+    # around the router (see `cmd_stop`) and its file list goes with that dispatch, which
+    # is why no candidate line here carries a path.
+    fields.append(
+        f"- answer file: {_turn_record_file(project_dir, session_id, prompt_id).resolve()}")
+    fields.append("- candidates: " + ", ".join(f"`{k}`={modes[k].value}" for k in eligible))
     if transcript and any(AUDIT_AGENTS[k].needs_history for k in eligible):
         fields.append(f"- history: transcript {transcript}, turn {prompt_id}")
     if model:
-        fields.append(f"- router model: {model}")
+        # Phrased as an instruction, unlike every other field, because it is the only one
+        # consumed BEFORE the playbook is opened: the router is dispatched straight off
+        # this block and only its report sends the main agent to a playbook section, so
+        # there is no later text that could say what to do with a bare value. Left as
+        # `- router model: opus` it reads as a fact about the router rather than an
+        # argument to pass, and the dispatch silently falls back to `agents/router.md`.
+        fields.append(
+            f"- dispatch `guard:router` with `model: {model}` — overrides agents/router.md")
     return lead + "\n\n" + "\n".join(fields)
 
 
@@ -1408,6 +1426,25 @@ def _router_context(project_dir: Path, session_id: str, prompt_id: str, lead: st
 _ROUTE_LEAD = (
     "guard: audit the turn you just finished. Dispatch `guard:router` (subagent_type: "
     "\"guard:router\") with the inputs below and follow its report."
+)
+
+
+# The lead for the `comment-corrector` dispatch, which never goes through the router. It
+# says what the turn did rather than what to look for: the agent's criteria are its own,
+# and a lead that previewed them would be the caller telling it what to find.
+_COMMENT_LEAD = (
+    "guard: this turn edited source files. Audit their comments."
+)
+
+
+# Same dispatch, when a router block precedes it. The one thing the main agent could
+# plausibly get wrong here is sequencing — the router block above it ends in "follow its
+# report", which reads as something to finish first — so the concurrency is spelled out.
+# Waiting would cost a round trip for an agent that shares no input with the routed ones.
+_COMMENT_LEAD_WITH_ROUTER = (
+    "guard: this turn also edited source files. Audit their comments. Dispatch this in the "
+    "SAME message as the router above — it reads neither the answer file nor the router's "
+    "report, so it waits for nothing."
 )
 
 
@@ -1440,8 +1477,9 @@ def cmd_user_prompt() -> int:
     correct only works if the answer also exists somewhere editable, and only the main agent
     can put it there while the turn is still running.
 
-    Silent when every agent is off, so an unconfigured guard adds nothing to any prompt. Also
-    silent for guard's own control commands, whose turns are never audited.
+    Silent when no on agent reads the turn (``_reads_turn``) — an unconfigured guard, or one
+    running only ``comment-corrector``, adds nothing to any prompt. Also silent for guard's
+    own control commands, whose turns are never audited.
     """
     project_dir = _project_dir()
     payload = _read_payload()
@@ -1458,9 +1496,15 @@ def cmd_user_prompt() -> int:
 
     config = _load_config(project_dir)
     state = _read_state(project_dir, session_id, config)
+    # Muted by `/guard:toggle`: no audit is coming, so naming a file for the answer would
+    # ask the user to read a file nothing is going to correct.
+    if _audit_paused(state):
+        _trace(project_dir, session_id, "user-prompt", "skip_paused")
+        return 0
     prompt_id = payload.get("prompt_id")
-    if not any(_switch_on(state, k) for k in AUDIT_AGENTS) or not (
-            isinstance(prompt_id, str) and prompt_id):
+    # Gated on the agents that READ the answer file, not on every switch: see `_reads_turn`.
+    on = [k for k in AUDIT_AGENTS if _switch_on(state, k)]
+    if not _reads_turn(on) or not (isinstance(prompt_id, str) and prompt_id):
         _trace(project_dir, session_id, "user-prompt", "seen")
         return 0
 
@@ -1491,11 +1535,12 @@ def _emit_stop_context(msg: str) -> None:
 
 
 def cmd_verify() -> int:
-    """UserPromptExpansion for the per-agent ``/guard:audit-*`` commands.
+    """UserPromptExpansion for the per-agent ``/guard:<agent>`` commands.
 
     The agent comes from argv (``verify claims-auditor`` | ``deferrals-auditor`` |
-    ``korean-corrector``), one per command, so each skill dispatches exactly its own
-    agent and the choice is not a dispatch input the model has to be trusted to honor.
+    ``clarity-auditor`` | ``korean-corrector``), one per command, so each skill dispatches
+    exactly its own agent and the choice is not a dispatch input the model has to be
+    trusted to honor.
 
     Works regardless of the switches: a switch governs what guard recommends UNASKED,
     while running the command is the user asking for this one audit now. Refusing it
@@ -1672,12 +1717,12 @@ def cmd_stop() -> int:
     config = _load_config(project_dir)
     state = _read_state(project_dir, session_id, config)
 
-    # How the turn was opened decides whether guard says anything at all. Two skips, and
+    # How the turn was opened decides whether guard says anything at all. Three skips, and
     # the first is not politeness: guard audits an answer to the USER, so a turn opened by
     # anything other than a person typing is machinery reporting in — a background agent's
     # completion, a subagent's `SendMessage` — and auditing it puts guard in a loop with
     # itself, since guard's own dispatch is what produced it. The turn also gets no record
-    # file and does not become the `/guard:audit-*` target, so the main agent is left
+    # file and does not become the `/guard:<agent>` target, so the main agent is left
     # holding exactly one answer file per question: the user's.
     #
     # Every named non-human kind is skipped rather than a list of the two seen so far, so a
@@ -1691,19 +1736,36 @@ def cmd_stop() -> int:
             _trace(project_dir, session_id, "stop", "skip_nonhuman_turn",
                    prompt_id=prompt_id, origin_kind=origin_kind)
             return 0
-        # A turn opened by guard's own control command (`/guard:settings`,
-        # `/guard:audit-*`) or by a user-configured exempt skill is skill output or a
-        # relay, not the assistant's own prose — there is nothing in it to audit, and
-        # recommending one turns the user's own guard command into an audit of guard.
+        # A turn opened by one of guard's own control commands is guard reporting on
+        # guard: the response is a relay of an audit, not an answer to a question the
+        # user asked. Skipping it BEFORE the record write below is the load-bearing
+        # part — were such a turn to become the pending target, the next
+        # `/guard:<agent>` would audit the previous audit's relay instead of the answer
+        # the user actually wants checked.
         cmd_name = identity["command_name"]
-        if cmd_name and (_is_control_command_name(cmd_name)
-                         or cmd_name in _exempt_skills(config)):
-            _trace(project_dir, session_id, "stop", "skip_exempt_skill",
+        if cmd_name and _is_control_command_name(cmd_name):
+            _trace(project_dir, session_id, "stop", "skip_control_cmd",
                    prompt_id=prompt_id, command=cmd_name)
+            return 0
+        # A turn opened by a user `!` command. `UserPromptSubmit` does not fire for one —
+        # a `!` command is not a prompt — so no answer file was ever named, and guard's
+        # whole premise is audit-then-CORRECT: the answer has to exist somewhere editable
+        # while the turn is still running. What Stop would hand an auditor here is the
+        # fallback copy it just made of an answer already printed, which no correction can
+        # reach. (Verified in 2.1.239, session 6bc60bbf: every turn in the transcript got
+        # the draft path except the `!` one.) This skip was removed in v0.45.0 on a
+        # different rationale — that guard cut the turn slice itself and the `!` output
+        # landed after the response, so evidence trailed the claims. That reason is indeed
+        # gone; this one replaces it, and is about the record, not the evidence.
+        #
+        # Before the record write, like the control-command skip above: a `!` turn must not
+        # displace the user's actual question as the `/guard:<agent>` target.
+        if identity.get("bash_input"):
+            _trace(project_dir, session_id, "stop", "skip_bash_input", prompt_id=prompt_id)
             return 0
 
     # Both of these happen whether or not any switch is on. They are what the on-demand
-    # `/guard:audit-*` commands target, and those are the user asking for an audit now —
+    # `/guard:<agent>` commands target, and those are the user asking for an audit now —
     # refusing them because the automatic recommendation is off would take away the very
     # thing switching everything off is meant to leave in place.
     #
@@ -1715,6 +1777,15 @@ def cmd_stop() -> int:
     if isinstance(payload.get("transcript_path"), str):
         state["transcript_path"] = payload["transcript_path"]
     _write_turn_response(project_dir, session_id, prompt_id, response)
+
+    # Muted by `/guard:toggle`. Checked AFTER the two lines above, on purpose: the pending
+    # target and the response still get recorded, so `/guard:claims-auditor` on the turn the
+    # user just muted still has something to audit. Muting stops the recommendation, not the
+    # user's ability to ask for one.
+    if _audit_paused(state):
+        _write_state(project_dir, session_id, state)
+        _trace(project_dir, session_id, "stop", "skip_paused", prompt_id=prompt_id)
+        return 0
 
     # Once per turn. `stop_hook_active` already covers the normal path, but the
     # recommendation asks the main agent to dispatch background agents, and each of
@@ -1741,9 +1812,33 @@ def cmd_stop() -> int:
     _write_state(project_dir, session_id, state)
 
     transcript = payload.get("transcript_path")
-    context = _router_context(project_dir, session_id, prompt_id, _ROUTE_LEAD,
-                              eligible, edited, modes, config,
-                              transcript if isinstance(transcript, str) else "")
+    transcript = transcript if isinstance(transcript, str) else ""
+    # Split by what each agent reads, because only one of the two groups is a triage
+    # question. Routing asks "is there material here for this agent", and for a
+    # `reads="files"` agent that is a diff-level judgment — logic changed, or just a rename
+    # or a formatting pass — the router cannot make from what it would be given: a file
+    # list is the corrector's input, not a diff, and reading those files shows their
+    # current state, never what this turn changed in them. So routing it can only restate
+    # what `_eligible_agents` already decided, and bill a subagent for it.
+    #
+    # The two dispatches also need no ordering between them. The auditors-before-correctors
+    # rule in the playbook exists so a corrector does not rewrite a sentence an auditor was
+    # about to flag, and it is entirely about the answer file — which `comment-corrector`
+    # never opens. Sharing no input with the routed agents, it goes out in the same message
+    # and runs alongside the router rather than after it.
+    routed = [k for k in eligible if AUDIT_AGENTS[k].reads == "turn"]
+    direct = [k for k in eligible if AUDIT_AGENTS[k].reads == "files"]
+    blocks: list[str] = []
+    if routed:
+        blocks.append(_router_context(project_dir, session_id, prompt_id, _ROUTE_LEAD,
+                                      routed, modes, config, transcript))
+    if direct:
+        lead = _COMMENT_LEAD_WITH_ROUTER if routed else _COMMENT_LEAD
+        blocks.append(_dispatch_context(project_dir, session_id, prompt_id, lead,
+                                        direct, modes, edited, transcript))
+    context = "\n\n".join(blocks)
+    outcome = "routed" if routed and not direct else (
+        "dispatched_direct" if direct and not routed else "routed_and_direct")
     # `additionalContext`, not `decision: "block"`. Per the official hooks docs
     # (https://code.claude.com/docs/en/hooks, "Stop decision control"; excerpt saved at
     # wiki/ref/claude-code-stop-hook-decision-control.md) the two continue the
@@ -1751,7 +1846,7 @@ def cmd_stop() -> int:
     # reported as a hook ERROR while this shows as `Stop hook feedback`. A
     # recommendation is guard working as designed, so it must not look like a failure.
     _emit_stop_context(context)
-    _trace(project_dir, session_id, "stop", "routed", prompt_id=prompt_id,
+    _trace(project_dir, session_id, "stop", outcome, prompt_id=prompt_id,
            eligible=",".join(eligible))
     return 0
 
@@ -1767,7 +1862,6 @@ def cmd_session_start() -> int:
         return 0
     root = _state_root(project_dir)
     cutoff = time.time() - ORPHAN_MAX_AGE_SECONDS
-    # File-per-session dirs.
     for sub in ("state",):
         d = root / sub
         if not d.is_dir():
@@ -1782,22 +1876,45 @@ def cmd_session_start() -> int:
                     entry.unlink()
             except OSError:
                 pass
-    # turns/ holds one dir per session of turn records and rewrites; sweep stale dirs.
-    turns_root = root / "turns"
-    if turns_root.is_dir():
+    # `trace.log` sits at the root, not under `state/`, so the loop above never reached it
+    # and the log grew without bound — the same way `extracts` did, and found the same way.
+    # What the age policy buys here is narrower than it looks: every trace write refreshes
+    # the mtime, so this reaps a log left behind by a project that has stopped tracing, and
+    # never one being actively written. Bounding a live log needs a size check, which this
+    # is not.
+    trace = _trace_file(project_dir)
+    try:
+        if trace.is_file() and trace.stat().st_mtime < cutoff:
+            trace.unlink()
+    except OSError:
+        pass
+    # Dir-per-session trees. Swept on the directory's own mtime, never on its name: an
+    # extract directory is named from `--session` when the caller passes one and from the
+    # transcript's filename when it does not, so nothing here may assume the name is a
+    # session id. `extracts` was missing from this sweep and grew without bound — the
+    # agents that extract history write there on every audit, and guard runs in other
+    # people's repositories, where a directory nothing reaps is a directory nobody asked
+    # for.
+    for sub in ("turns", "extracts"):
+        sub_root = root / sub
+        if not sub_root.is_dir():
+            continue
         try:
-            sess_dirs = list(turns_root.iterdir())
+            sess_dirs = list(sub_root.iterdir())
         except OSError:
-            sess_dirs = []
+            continue
         for d in sess_dirs:
             try:
-                if d.is_dir() and d.stat().st_mtime < cutoff:
-                    for child in d.iterdir():
-                        try:
-                            child.unlink()
-                        except OSError:
-                            pass
-                    d.rmdir()
+                if not (d.is_dir() and d.stat().st_mtime < cutoff):
+                    continue
+                # One level of children only, which is all either tree has. rmdir then
+                # fails on a dir holding anything deeper rather than deleting blind.
+                for child in d.iterdir():
+                    try:
+                        child.unlink()
+                    except OSError:
+                        pass
+                d.rmdir()
             except OSError:
                 pass
     # Persist the resolved refs directory into the session's Bash environment
@@ -1864,80 +1981,6 @@ def cmd_session_start() -> int:
     return 0
 
 
-def cmd_exempt() -> int:
-    """Manage the ``exempt_skills`` list in guard.local.json. Invoked by the
-    ``guard:settings`` skill via Bash, AFTER the user has confirmed a selection
-    interactively (the skill drives the listing + AskUserQuestion; this only records
-    the confirmed result). Argv:
-
-        exempt list                — print the current exempt_skills
-        exempt set   NAME [NAME…]  — replace the list with exactly these
-        exempt add   NAME [NAME…]  — add
-        exempt remove NAME [NAME…] — remove
-        exempt clear               — empty the list
-
-    Edits ONLY the ``exempt_skills`` key — never a switch or session state — so it can
-    change which skills' turns Stop skips but cannot disable guard
-    outright. Project dir from ``CLAUDE_PROJECT_DIR`` (Bash env), else
-    the current working directory. Prints the resulting list for the skill to relay.
-    """
-    argv = sys.argv[2:]
-    op = argv[0].lower() if argv else "list"
-    names = [n for n in (_norm_skill(a) for a in argv[1:]) if n]
-
-    pd_env = os.environ.get("CLAUDE_PROJECT_DIR")
-    project_dir = Path(pd_env) if pd_env else Path.cwd()
-
-    if op in _CLI_MUTATING_VERBS and not _cli_write_allowed():
-        print("guard exempt: refusing to change settings outside /guard:settings. "
-              "Ask the user to run `/guard:settings` — only the user changes guard's "
-              "own configuration.", file=sys.stderr)
-        _trace(project_dir, None, "exempt", "refused_no_skill_marker", op=op)
-        return 0
-
-    raw = _load_raw_config(project_dir)
-    cur_raw = raw.get("exempt_skills")
-    current: list[str] = []
-    if isinstance(cur_raw, list):
-        for c in cur_raw:
-            n = _norm_skill(c)
-            if n and n not in current:
-                current.append(n)
-
-    changed = False
-    if op == "set":
-        new: list[str] = []
-        for n in names:
-            if n not in new:
-                new.append(n)
-        changed = new != current
-        current = new
-    elif op == "add":
-        for n in names:
-            if n not in current:
-                current.append(n)
-                changed = True
-    elif op in ("remove", "rm"):
-        for n in names:
-            if n in current:
-                current.remove(n)
-                changed = True
-    elif op == "clear":
-        changed = bool(current)
-        current = []
-    # "list" / unknown → report only
-
-    if changed:
-        raw["exempt_skills"] = current
-        if not _write_config(project_dir, raw):
-            print("guard exempt: failed to write .claude/guard.local.json", file=sys.stderr)
-            return 0
-
-    print("exempt_skills: " + (", ".join(current) if current else "(none)"))
-    _trace(project_dir, None, "exempt", op, n=len(current), changed=changed)
-    return 0
-
-
 def _parse_settings_argv(argv: list[str]) -> tuple[list[str], str | None]:
     """Split a ``settings`` CLI argv into positionals and the ``--session <id>`` value."""
     positional: list[str] = []
@@ -1989,14 +2032,97 @@ def _config_show_lines(project_dir: Path, session_id: str | None) -> list[str]:
             return f"{key}: {live} (this session; default {default}){suffix}"
         return f"{key}: {default}{suffix}"
 
-    exempt = _exempt_skills(cfg)
     refs_rel = raw.get("refs_dir") if isinstance(raw.get("refs_dir"), str) else ""
+    # The mute is listed first and only when it is on: it overrides every line below it, so a
+    # reader who sees the switches without it would read the wrong answer to "is guard
+    # running". It is session state, so there is no default to show alongside.
+    muted = ["audits: OFF for this session (/guard:toggle on to restore)"] if (
+        state is not None and _audit_paused(state)) else []
     return [
+        *muted,
         *(switch_line(k) for k in AUDIT_AGENTS),
         "router_model: " + (_router_model(cfg) or "(agents/router.md)"),
-        "exempt_skills: " + (", ".join(sorted(exempt)) if exempt else "(none)"),
         "refs_dir: " + (refs_rel if refs_rel else "(default wiki/ref/)"),
     ]
+
+
+def _live_agent_mode(project_dir: Path, session_id: str | None,
+                     cfg: dict[str, Any], key: str) -> AgentMode:
+    """The mode ``key`` is running under right now — session state when there is a
+    session, the config file otherwise. Read BEFORE a write, so the change can be
+    reported."""
+    return _agent_mode(_read_state(project_dir, session_id, cfg) if session_id else cfg, key)
+
+
+def _mode_transition_note(key: str, before: AgentMode, after: AgentMode) -> str:
+    """The note a mode change owes the session, or "" when it owes none.
+
+    A mode change is the one setting change that leaves something behind: an instance the
+    main agent may still be addressing. Nothing in guard can see or stop that instance —
+    this CLI has no channel to it — so the change has to be reported to the session that
+    can, and this text is that report. It reaches the main agent because the skill relays
+    what the CLI printed.
+    """
+    if before is AgentMode.REUSE and after is not AgentMode.REUSE:
+        return (f"guard: {key} is no longer reused. Stop sending to "
+                f"`{_instance_name(key)}` — shut it down if your session offers a way to "
+                f"— and from the next turn dispatch a new instance each time.")
+    if after is AgentMode.REUSE and before is not AgentMode.REUSE:
+        return (f"guard: {key} now runs as one instance for the session, named "
+                f"`{_instance_name(key)}`. Dispatch it under that name once, then "
+                f"SendMessage it on later turns instead of dispatching again.")
+    return ""
+
+
+def _settings_unset(project_dir: Path, session_id: str | None,
+                    positional: list[str]) -> int:
+    """``settings unset <key>`` — delete one key from guard.local.json.
+
+    Deleting an agent switch is a change to what guard does, not just to the file, so it
+    goes through the same two steps a ``set`` does: the session's cached mode is reset to
+    the default and any reuse transition is reported. Deleting a key guard does not
+    honor touches neither.
+    """
+    if not positional:
+        print("guard settings: usage: settings unset <key>", file=sys.stderr)
+        return 0
+    key = positional[0]
+    raw = _load_raw_config(project_dir)
+    # Case-sensitive on purpose: this removes a key by its literal name in the file, and
+    # a lowercased guess would miss the misspelled or foreign-cased key that is exactly
+    # what someone reaches for this verb to clear.
+    if key not in raw:
+        print(f"guard settings: no key {key!r} in .claude/guard.local.json — nothing to "
+              f"remove. Keys present: " + (", ".join(raw) if raw else "(none)"))
+        _trace(project_dir, session_id, "settings", "unset_absent", key=key)
+        return 0
+
+    cfg = _load_config(project_dir)
+    transition = ""
+    if key in AUDIT_AGENTS:
+        before = _live_agent_mode(project_dir, session_id, cfg, key)
+        after = AgentMode(DEFAULT_CONFIG[key])
+        _apply_session_scalar(project_dir, session_id, key, after.value)
+        transition = _mode_transition_note(key, before, after)
+    del raw[key]
+
+    if not _write_config(project_dir, raw):
+        print("guard settings: failed to write .claude/guard.local.json", file=sys.stderr)
+        return 0
+
+    known = key in DEFAULT_CONFIG
+    # `str()` first: an `AgentMode` default would otherwise print as `<AgentMode.OFF: 'off'>`.
+    print(f"guard: removed {key!r} — "
+          + (f"back to the default ({str(DEFAULT_CONFIG[key])!r})." if known
+             else "guard does not honor that key, so nothing changes."))
+    print()
+    for line in _config_show_lines(project_dir, session_id):
+        print(line)
+    if transition:
+        print()
+        print(transition)
+    _trace(project_dir, session_id, "settings", "unset", key=key, known=known)
+    return 0
 
 
 def cmd_settings() -> int:
@@ -2004,6 +2130,7 @@ def cmd_settings() -> int:
 
         settings [show]                      — print the current settings
         settings set <key> <value>           — change one setting
+        settings unset <key>                 — delete one key from the file
 
     Settable keys: the agent switches (the keys of ``AUDIT_AGENTS`` — each is the name
     of the agent it admits), ``router_model`` (the router agent's model, and nothing
@@ -2012,9 +2139,15 @@ def cmd_settings() -> int:
     (``--session <id>``, which the forked skill passes as ``${CLAUDE_SESSION_ID}``, else
     the inherited ``CLAUDE_CODE_SESSION_ID``) so the change takes effect at once and
     persists as the new default; the rest are read from the config file at use.
-    ``exempt_skills`` is managed by the ``exempt`` CLI, not here, and
-    every other key in the file is preserved. Project dir from ``CLAUDE_PROJECT_DIR``
-    (Bash env), else the current directory."""
+    ``set`` preserves every other key in the file. ``unset`` is the one way to remove a
+    key, and it exists because that preservation has no other exit: a key guard stopped
+    honoring (``exempt_skills``, ``audit_gate``) is invisible to ``show`` and survives
+    every ``set`` forever, and the file may only be written through this CLI, so without
+    this verb the only way to clear one is the hand-edit the skill forbids. It deletes
+    any key, live or dead, rather than only the dead ones — guard cannot know which keys
+    a newer version owns, so pruning on its own judgment would silently discard a
+    downgraded user's config. Project dir from ``CLAUDE_PROJECT_DIR`` (Bash env), else
+    the current directory."""
     positional, session_arg = _parse_settings_argv(sys.argv[2:])
     op = positional[0].lower() if positional else "show"
 
@@ -2022,7 +2155,7 @@ def cmd_settings() -> int:
     project_dir = Path(pd_env) if pd_env else Path.cwd()
     session_id = session_arg or (os.environ.get("CLAUDE_CODE_SESSION_ID", "").strip() or None)
 
-    if op != "set":
+    if op not in ("set", "unset"):
         for line in _config_show_lines(project_dir, session_id):
             print(line)
         _trace(project_dir, session_id, "settings", "show")
@@ -2034,6 +2167,9 @@ def cmd_settings() -> int:
               "own configuration.", file=sys.stderr)
         _trace(project_dir, session_id, "settings", "refused_no_skill_marker")
         return 0
+
+    if op == "unset":
+        return _settings_unset(project_dir, session_id, positional[1:])
 
     if len(positional) < 3:
         print("guard settings: usage: settings set <key> <value>", file=sys.stderr)
@@ -2058,22 +2194,10 @@ def cmd_settings() -> int:
         # it — so the change has to be reported to the session that CAN, and this print
         # is that report. It reaches the main agent because the skill relays what the CLI
         # printed.
-        before = _agent_mode(_read_state(project_dir, session_id, cfg) if session_id
-                             else cfg, key)
+        before = _live_agent_mode(project_dir, session_id, cfg, key)
         raw[key] = v.value
         _apply_session_scalar(project_dir, session_id, key, v.value)
-        if before is AgentMode.REUSE and v is not AgentMode.REUSE:
-            transition = (
-                f"guard: {key} is no longer reused. Stop sending to "
-                f"`{_instance_name(key)}` — shut it down if your session offers a way to "
-                f"— and from the next turn dispatch a new instance each time.")
-        elif v is AgentMode.REUSE and before is not AgentMode.REUSE:
-            transition = (
-                f"guard: {key} now runs as one instance for the session, named "
-                f"`{_instance_name(key)}`. Dispatch it under that name once, then "
-                f"SendMessage it on later turns instead of dispatching again.")
-        else:
-            transition = ""
+        transition = _mode_transition_note(key, before, v)
     elif key == "router_model":
         # "" is a legitimate value here, not an error: it hands the choice back to
         # `agents/router.md`, which is how a router model is normally set.
@@ -2083,7 +2207,7 @@ def cmd_settings() -> int:
     else:
         print(f"guard settings: unknown or unsettable key {key!r}. Settable: "
               + ", ".join(AUDIT_AGENTS)
-              + ", router_model, refs_dir (exempt_skills via the exempt CLI).",
+              + ", router_model, refs_dir.",
               file=sys.stderr)
         return 0
 
@@ -2182,6 +2306,137 @@ def refs_index_gap(project_dir: Path, target: Path, config: dict[str, Any]) -> s
     )
 
 
+# Status-line colours. Dim for the state guard chose not to shout about, green for armed,
+# yellow for muted — the one state the user set and can forget. Kept as constants because a
+# status line that emits a stray escape sequence garbles the user's terminal row.
+_ANSI_RESET = "\033[0m"
+_ANSI_ARMED = "\033[32m"
+_ANSI_MUTED = "\033[33m"
+_ANSI_IDLE = "\033[2m"
+
+
+def _audit_paused(state: dict[str, Any]) -> bool:
+    """Is the automatic audit muted for this session? Only ever True from `/guard:toggle`."""
+    return state.get("audit_paused") is True
+
+
+def cmd_toggle() -> int:
+    """UserPromptExpansion for `/guard:toggle [on|off]`. Mute or unmute this session.
+
+    The hook does the work rather than telling the model to: `command_args` carries the
+    argument (hooks docs, excerpt in the refs dir as `claude-code-statusline.md`), so no
+    argument means flip, `on`/`off` set it outright, and the outcome does not depend on a
+    model reading a procedure correctly.
+
+    Session state only. It cannot touch guard.local.json, which is what makes this safe to
+    reach for mid-conversation: whatever the project decided is still what the next session
+    starts with. `on` means auditing on, so it CLEARS the pause — the user's vocabulary is
+    about guard, not about the flag's name.
+    """
+    project_dir = _project_dir()
+    payload = _read_payload()
+    if payload is None or project_dir is None:
+        return 0
+    session_id = _session_id(payload)
+    if session_id is None:
+        _emit_expansion("guard: no usable session id, so there is no session to mute.")
+        return 0
+
+    arg = payload.get("command_args")
+    arg = arg.strip().lower() if isinstance(arg, str) else ""
+    config = _load_config(project_dir)
+    state = _read_state(project_dir, session_id, config)
+
+    if arg in ("", "flip", "toggle"):
+        paused = not _audit_paused(state)
+    elif arg in ("on", "resume", "enable"):
+        paused = False
+    elif arg in ("off", "pause", "disable", "mute"):
+        paused = True
+    else:
+        _emit_expansion(
+            f"guard: `{arg}` is not an argument for /guard:toggle — use `on`, `off`, or "
+            "nothing to flip. Nothing changed; say so in one line."
+        )
+        return 0
+
+    state["audit_paused"] = paused
+    _write_state(project_dir, session_id, state)
+    armed = [k for k in AUDIT_AGENTS if _switch_on(state, k)]
+
+    if paused:
+        msg = ("guard: audits are OFF for this session. Nothing is recommended when a turn "
+               "ends, and answers are no longer written to a file. `/guard:toggle on` "
+               "restores it and the project's own settings are untouched. A `/guard:*` "
+               "command still works if you want one audit now.")
+    elif armed:
+        msg = ("guard: audits are ON for this session again — "
+               + ", ".join(f"`{k}`" for k in armed) + ". Nothing else changed.")
+    else:
+        msg = ("guard: no longer muted, but every agent is `off` for this project, so nothing "
+               "will run. `/guard:settings` is where you switch one on.")
+    _emit_expansion(msg + " Relay this in one line and do nothing else.")
+    _trace(project_dir, session_id, "toggle", "set", arg=arg or "flip", paused=paused)
+    return 0
+
+
+def cmd_status() -> int:
+    """Status-line segment: is guard auditing this session? Reads stdin, prints one field.
+
+    A plugin cannot install the MAIN status line — only `agent` and `subagentStatusLine` are
+    honored in a plugin's settings.json — so this prints a segment the user composes into
+    whatever status line they already run. The excerpt is saved in the refs dir as
+    `claude-code-statusline.md`.
+
+    Two documented constraints shape the body. It runs on every assistant message, debounced
+    at 300ms, and a newer update cancels the one in flight: so it reads only the small
+    config and state JSON files and does nothing else — no git, no transcript, no subprocess.
+    And its stdout goes
+    straight into the user's status bar: so every failure prints NOTHING rather than an
+    error message, because a status line is the one place guard must never shout from.
+    """
+    try:
+        payload = json.loads(sys.stdin.read() or "{}")
+    except (json.JSONDecodeError, ValueError, OSError, UnicodeDecodeError):
+        return 0
+    if not isinstance(payload, dict):
+        return 0
+
+    # The status-line payload names the launch directory, which is where guard's state hangs
+    # off. `CLAUDE_PROJECT_DIR` is the fallback so the same command works when a user wires
+    # it into a script that does not forward the JSON.
+    ws = payload.get("workspace")
+    root = ws.get("project_dir") if isinstance(ws, dict) else None
+    for cand in (root, payload.get("cwd"), os.environ.get("CLAUDE_PROJECT_DIR")):
+        if isinstance(cand, str) and cand.strip():
+            root = cand.strip()
+            break
+    else:
+        return 0
+    session_id = _session_id(payload)
+    if not isinstance(root, str) or session_id is None:
+        return 0
+
+    try:
+        project_dir = Path(root)
+        state = _read_state(project_dir, session_id, _load_config(project_dir))
+    except Exception:
+        return 0
+
+    armed = [k for k in AUDIT_AGENTS if _switch_on(state, k)]
+    if _audit_paused(state):
+        # Muted is the state worth a colour: the user chose it and can forget it.
+        print(f"{_ANSI_MUTED}guard off{_ANSI_RESET}")
+    elif armed:
+        print(f"{_ANSI_ARMED}guard {len(armed)}{_ANSI_RESET}")
+    else:
+        # Nothing switched on for this project: not an error and not something the user did
+        # this session, so it gets a dot rather than a word — "installed, idle" without
+        # asking for attention on every redraw.
+        print(f"{_ANSI_IDLE}guard ·{_ANSI_RESET}")
+    return 0
+
+
 SUBCOMMANDS = {
     "user-prompt": cmd_user_prompt,
     "post-edit": cmd_post_edit,
@@ -2189,9 +2444,10 @@ SUBCOMMANDS = {
     "settings": cmd_settings,
     "stop": cmd_stop,
     "session-start": cmd_session_start,
-    "exempt": cmd_exempt,
     "refs-dir": cmd_refs_dir,
     "transcript": cmd_transcript,
+    "toggle": cmd_toggle,
+    "status": cmd_status,
 }
 
 

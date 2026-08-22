@@ -25,6 +25,8 @@ listed here.
 | `claude-code-output-styles.md` | Output-style frontmatter schema, plugin `output-styles/` discovery, subagent scope | code.claude.com/docs/en/output-styles |
 | `claude-code-pretooluse-permission-decision.md` | PreToolUse `permissionDecision` values | code.claude.com/docs/en/hooks |
 | `claude-code-prompt-hooks.md` | Prompt-type hooks | code.claude.com/docs/en/hooks |
+| `claude-code-skill-substitutions.md` | Which placeholder a plugin skill or flat command file may use to reach a bundled script | code.claude.com/docs/en/skills |
+| `claude-code-statusline.md` | Status line as a user/project setting rather than a plugin capability, its input fields and invocation; also `commands/` vs `skills/` in a plugin and the `command_args` field on `UserPromptExpansion` | code.claude.com/docs/en/statusline + /plugins-reference |
 | `claude-code-stop-hook-decision-control.md` | Stop hook output: `decision: "block"` vs `hookSpecificOutput.additionalContext`, their shared loop protections, and how `additionalContext` reaches the model | code.claude.com/docs/en/hooks |
 | `claude-code-subagent-resume.md` | Naming a subagent at dispatch, resuming one by name with `SendMessage` (full history retained, auto-resume in background), and how long subagent transcripts persist | code.claude.com/docs/en/sub-agents |
 | `claude-code-subagent-frontmatter.md` | Subagent frontmatter fields; `tools` omitted inherits all, no way to express none | code.claude.com/docs/en/sub-agents |

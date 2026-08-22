@@ -1,8 +1,13 @@
 ---
 name: settings
-description: "View and change guard's settings for this project — one setting per audit agent, named after it (claims-auditor, deferrals-auditor, clarity-auditor, korean-corrector, comment-corrector), each off / fresh / reuse, plus router_model, refs_dir, and exempt_skills — recorded in .claude/guard.local.json. Use when the user wants to configure guard: turn the claim, deferral, clarity, Korean-naturalness, or comment check on or off, keep one of them running across turns instead of respawning it, set the router's model or refs_dir, or manage exempt skills. Claude Code only."
+description: "View and change guard's settings for this project — one setting per audit agent, named after it (claims-auditor, deferrals-auditor, clarity-auditor, korean-corrector, comment-corrector), each off / fresh / reuse, plus router_model and refs_dir — recorded in .claude/guard.local.json. Use when the user wants to configure guard: turn the claim, deferral, clarity, Korean-naturalness, or comment check on or off, keep one of them running across turns instead of respawning it, or set the router's model or refs_dir. Claude Code only."
 argument-hint: '[key] [value]'
 disable-model-invocation: true
+# The body names the CLI through `${CLAUDE_PLUGIN_ROOT}`, not `${CLAUDE_SKILL_DIR}/../..`.
+# Both are substituted in a plugin skill's content (wiki/ref/claude-code-skill-substitutions.md),
+# but only the plugin root stays correct wherever this file sits — it moved from
+# `skills/settings/SKILL.md` to `commands/settings.md`, and a relative climb out of the
+# skill directory silently changes depth when it moves again.
 allowed-tools: Bash, AskUserQuestion
 ---
 
@@ -18,7 +23,7 @@ result back.
 
 Fixed values for this run (already substituted — do not re-resolve):
 
-- guard CLI: `"${CLAUDE_SKILL_DIR}/../../scripts/guard_hook.py"`
+- guard CLI: `"${CLAUDE_PLUGIN_ROOT}/scripts/guard_hook.py"`
 - session id: `${CLAUDE_SESSION_ID}` — pass it as `--session ${CLAUDE_SESSION_ID}` so
   the agent switches take effect in the **current** session, not only in sessions
   started later.
@@ -28,14 +33,19 @@ Fixed values for this run (already substituted — do not re-resolve):
 Every command that **changes** a setting must be prefixed with `GUARD_SETTINGS_SKILL=1`.
 guard refuses config-mutating calls without it, so that a settings change is something
 the user asked for through this skill rather than something an agent did on its own.
-Read-only commands (`settings show`, `exempt list`) need no prefix.
+`settings show` is read-only and needs no prefix.
 
 - **Show current settings:**
-  `"${CLAUDE_SKILL_DIR}/../../scripts/guard_hook.py" settings show --session ${CLAUDE_SESSION_ID}`
-- **Change one scalar setting:**
-  `GUARD_SETTINGS_SKILL=1 "${CLAUDE_SKILL_DIR}/../../scripts/guard_hook.py" settings set <key> <value> --session ${CLAUDE_SESSION_ID}`
-- **Manage the exempt list** (`exempt_skills`, a list — not settable via `settings set`):
-  `GUARD_SETTINGS_SKILL=1 "${CLAUDE_SKILL_DIR}/../../scripts/guard_hook.py" exempt list | set <names…> | add <names…> | remove <names…> | clear`
+  `"${CLAUDE_PLUGIN_ROOT}/scripts/guard_hook.py" settings show --session ${CLAUDE_SESSION_ID}`
+- **Change one setting:**
+  `GUARD_SETTINGS_SKILL=1 "${CLAUDE_PLUGIN_ROOT}/scripts/guard_hook.py" settings set <key> <value> --session ${CLAUDE_SESSION_ID}`
+- **Delete a key from the file:**
+  `GUARD_SETTINGS_SKILL=1 "${CLAUDE_PLUGIN_ROOT}/scripts/guard_hook.py" settings unset <key> --session ${CLAUDE_SESSION_ID}`
+
+  Use this for a key guard no longer honors — an old `exempt_skills` or `audit_gate` left
+  in the file is ignored, never shown by `settings show`, and preserved by every `set`, so
+  `unset` is the only way it goes away. It also works on a live key, which puts that
+  setting back to its default. Either way it reports which of the two happened.
 
 ## Settable keys
 
@@ -48,7 +58,6 @@ Read-only commands (`settings show`, `exempt list`) need no prefix.
 | `comment-corrector` | `off` / `fresh` / `reuse` | Admits `guard:comment-corrector`, for the source files the turn actually edited. Note this one **edits those files in place**, so its fixes land without being asked. |
 | `router_model` | a model name, or empty | Model the **router** runs on. Empty (the default) leaves the choice to the router's own definition in the plugin's `agents/`. Every agent the router names uses its own model, so this changes which audits get picked, never how one is done. |
 | `refs_dir` | a project-relative path, or empty | Where guard saves cited-doc copies. Empty = the git-tracked default `wiki/ref/`, committed with the repo; point it at a different tracked path (e.g. `docs/refs`) to override. |
-| `exempt_skills` | skill/command names, namespaced (e.g. `hindsight:review`) | Skills/commands whose finished turn guard never recommends an audit for. Managed with the `exempt` verbs above. |
 
 Each key **is** the name of the agent it controls, so `settings set korean-corrector
 reuse`, the `/guard:korean-corrector` command, and the `guard:korean-corrector` subagent
@@ -78,6 +87,12 @@ this says.
 Changing a setting away from `reuse` means the instance that was running should stand
 down and later turns spawn new ones — the CLI says so when it happens, and I act on it.
 
+**To silence guard for just this session, use `/guard:toggle`, not these settings.** A
+`settings set` writes `guard.local.json` and changes what the project does from now on; the
+toggle is session state only and shows up in the status line if `/guard:statusline` has been
+wired. `settings show` lists the mute first when it is on, because it overrides every switch
+below it.
+
 **Every setting ships off.** All four off is guard silent: when a turn finishes it adds
 nothing to my context and makes no model call. Turning one on is what turns guard on, and
 from then on each finished turn goes to guard's router — one subagent that reads the
@@ -94,22 +109,23 @@ A setting that is off does **not** disable the matching command.
 now, and they work whatever
 the settings say — which is the whole reason it is safe to leave them off.
 
-The agent settings apply to the current session and become the new default; `router_model` /
-`refs_dir` / `exempt_skills` are read from the file when used, so they also take effect
-immediately.
+The agent settings apply to the current session and become the new default; `router_model`
+and `refs_dir` are read from the file when used, so they also take effect immediately.
 
 ## What to do
 
 1. Run `settings show` and show the user the current settings.
-2. **If `$ARGUMENTS` already names a key (and, for a scalar, a value)** — apply it
-   directly with the matching command, skip the menu.
+2. **If `$ARGUMENTS` already names a key and a value** — apply it directly with the
+   matching command, skip the menu.
 3. **Otherwise** call `AskUserQuestion` to ask which setting to change and to what: offer
    that key's valid values as options and note the current value. For an agent key, say
-   what `fresh` and `reuse` mean in one line each rather than only listing them. For `exempt_skills`,
-   ask which namespaced skill/command names to exempt (the user provides them), then
-   record with `exempt set <names…>`.
+   what `fresh` and `reuse` mean in one line each rather than only listing them.
 4. Apply the change with the CLI, then relay the resulting settings the command prints
    back to the user in a short summary. Report exactly what changed.
+
+If `settings show` and the file itself disagree — the file holds a key the listing does not
+mention — that key is one guard no longer honors. Say so and offer `unset`; do not act on it
+unprompted, since the user may be keeping it for another tool.
 
 Never write `.claude/guard.local.json` with Write/Edit — only the CLI above may change
 guard's settings.

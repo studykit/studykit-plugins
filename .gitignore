@@ -213,6 +213,8 @@ session-tree.lock
 .claude/tmp/
 .claude/guard/
 .codex/guard/
+# Subagent `memory: local` scope — declared not-for-version-control by the agents that use it.
+.claude/agent-memory-local/
 .DS_Store
 **/node_modules/
 .obsidian/workspace.json

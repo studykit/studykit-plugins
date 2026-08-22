@@ -10,14 +10,15 @@ line-by-line walkthrough.
 
 | Event | Subcommand | Role |
 | --- | --- | --- |
-| `UserPromptSubmit` | `user-prompt` | Trace only. guard keeps no record of the prompt; the hook stays registered so a "guard said nothing" report can be told apart from a hook that never ran. |
+| `UserPromptSubmit` | `user-prompt` | Name the answer file for this turn — Stop is too late for it, since by then the answer is already printed and a printed answer cannot be corrected. Silent (trace only) when every agent is `off`, when `audit_paused` is set, on a control command, and with no `prompt_id`. guard keeps no copy of the prompt; the hook stays registered even when silent so a "guard said nothing" report can be told apart from a hook that never ran. |
 | `UserPromptExpansion` (one matcher per agent: `claims-auditor`, `deferrals-auditor`, `clarity-auditor`, `korean-corrector`) | `verify <agent>` | On demand, dispatch **that agent** for the last completed turn. The agent name rides in argv, not in a dispatch input the model has to be trusted to honor. |
 | `PostToolUse` (`Write\|Edit\|MultiEdit\|NotebookEdit`) | `post-edit` | Record a source file this turn wrote (the candidate list for a `comment-corrector` recommendation), then block when a file saved in the refs dir is not listed in that dir's `AGENTS.md`. |
-| (called via Bash, not a hook) | `settings` | `guard:settings` skill (in-session) shows/sets guard.local.json settings; the agent modes also apply to the live session's `state/<sid>.json` (session id from `--session`/`CLAUDE_CODE_SESSION_ID`). A mode change away from `reuse` also prints a stand-down note, the only channel guard has to a running instance. Every other key preserved; never the list key (`exempt_skills`). |
-| (called via Bash, not a hook) | `exempt` | `guard:settings` skill records the user's confirmed `exempt_skills` selection (that key only). |
-| `Stop` | `stop` | Write the response section of the turn record and mark the turn as the on-demand target — always. Then, when any agent is not `off`, emit `additionalContext` asking the main agent to dispatch `guard:router` over the record, carrying the eligible agents with their modes and this turn's paths. The router names sections of `hooks/context/dispatch-playbook.md`; the main agent follows those, completing the record's second section only if a named section asks for it. |
+| (called via Bash, not a hook) | `settings` | `guard:settings` skill (in-session) shows/sets/unsets guard.local.json settings; the agent modes also apply to the live session's `state/<sid>.json` (session id from `--session`/`CLAUDE_CODE_SESSION_ID`). A mode change away from `reuse` also prints a stand-down note, the only channel guard has to a running instance. `set` preserves every other key; `unset <key>` is the only way to delete one. |
+| `Stop` | `stop` | Write the response section of the turn record and mark the turn as the on-demand target — always. Then, when any agent is not `off`, emit `additionalContext` asking the main agent to dispatch `guard:router` over the record, carrying the eligible agents with their modes and this turn's paths. The router names sections of `hooks/context/dispatch-playbook.md`; the main agent follows those, completing the record's second section only if a named section asks for it. `comment-corrector` never goes to the router: it is dispatched directly in the same emission, to be sent in the same message — see the invariant below. |
 | `SessionStart` | `session-start` | Sweep state and turn records past retention, export `GUARD_REFS_DIR`, state the refs rule as session context, name the dispatch playbook once when any agent is on, and — when any agent is in `reuse` — state the standing reuse policy once. |
 | (called via Bash, not a hook) | `transcript` | `index` / `turn` / `find` over the session transcript, for the audit agents. Writes an extract file and prints only its path plus a one-line summary; `--since` / `--until` / `--last` bound which turns are scanned. |
+| `UserPromptExpansion` (`^(guard:)?toggle$`) | `toggle` | Mute/unmute the automatic audit for THIS session (`audit_paused`, session state only — never guard.local.json). `command_args` carries `on`/`off`; empty flips. The hook does the work and prints the result. |
+| (called via Bash, not a hook) | `status` | Status-line segment: `guard <n>` / `guard off` / `guard ·`, or nothing on any failure. Reads one state file; runs on every assistant message. |
 | (called via Bash, not a hook) | `refs-dir` | Print the resolved refs directory (auditor fallback; applies `refs_dir` validation). |
 
 ## Storage layout (`${CLAUDE_PROJECT_DIR}/.claude/guard/`)
@@ -33,16 +34,23 @@ written by the main agent.
   it belongs to, not as a bare list: PostToolUse appends and Stop reads back, and without
   the id a previous turn's files would ride into this turn's recommendation.
   `_read_state` honors only known keys, so a hand-edited or stale file degrades to
-  defaults instead of injecting state.
+  defaults instead of injecting state. `audit_paused` is here rather than in the config on
+  purpose — see the session-mute invariant below.
 - `turns/<sid>/<prompt_id>.md` — the answer to the user's question, one file per typed
   prompt. The session writes it during the turn (the path comes from `UserPromptSubmit`);
   guard fills it in at Stop from `last_assistant_message` only when the turn left it empty,
   which is the fallback, not the path. The correctors edit it in place, so it is also the
   file the user is shown at the end.
-- `extracts/<sid>/…` — whatever an agent pulled out of the transcript: `index.md`,
+- `extracts/<dir>/…` — whatever an agent pulled out of the transcript: `index.md`,
   `turn-<id>.md`, `find.md`, or a `--out` path it chose. Written by the `transcript`
   subcommand on request, never on a schedule, and swept with the rest of the session's
-  state.
+  state. `<dir>` is *not* a session id by contract: `transcript` takes the name from
+  `--session` when given and from the transcript filename's stem otherwise, and no caller
+  passes `--session` — the auditors are handed a transcript path and a turn id, nothing
+  more. Claude Code happens to name that file after the session, so the directory reads
+  like a session id; do not build on it. Nothing needs to, because nothing looks these up
+  by name — the subcommand prints the path it wrote, and the SessionStart sweep decides by
+  the directory's mtime.
 - `trace.log` — file-only debug trace (`GUARD_TRACE` truthy).
 
 Not state, but part of the same picture: `hooks/context/dispatch-playbook.md` in the plugin
@@ -51,7 +59,10 @@ it — plus a `router` section. guard's hook output and the router both refer to
 name; nothing copies its text. `_playbook_path()` resolves it from the script's own location
 rather than `CLAUDE_PLUGIN_ROOT`, because the same script is also the Codex adapter's
 library and a plain CLI the settings skill runs over Bash, and only the hook case has that
-variable set.
+variable set. That is not in tension with `commands/settings.md` writing
+`${CLAUDE_PLUGIN_ROOT}/scripts/guard_hook.py`: there it is a text substitution Claude Code
+performs while building the command, so the path arrives already resolved and the launched
+process still sees no such variable in its environment.
 
 State survives session end (a resumed `claude --resume` must keep its flags);
 age-based `SessionStart` sweep is the only reaper. There is no SessionEnd hook.
@@ -100,6 +111,17 @@ payloads, not memory.
   for a typed prompt) and the Stop dispatch name the same path, the correctors edit that
   file, and the playbook's `Presenting the result` opens that file and forbids starting
   another for the audit report.
+- **The answer file is an input, so it is gated on the agents that read it** (`_reads_turn`,
+  over `AUDIT_AGENTS[...].reads == "turn"`) — not on any switch being on. `comment-corrector`
+  reads the source files the turn wrote and never opens the answer file, so a project with
+  only that one on must get neither the `UserPromptSubmit` instruction to write into it nor
+  the `answer file:` line in the dispatch. Both once ignored this and cost the same thing the
+  all-off case is careful to avoid: a per-turn instruction to write a document nothing would
+  read. Keep the two sides gated by the same predicate — they name one path, so they must
+  agree on whether it is wanted, and `- files for` / `- history` are already conditional on
+  the eligible set the same way. On-demand audits are unaffected: Stop writes the response
+  section on every turn, and the record carries a note saying it was filled in from the
+  response because the turn was never told to write it.
 - **`hookSpecificOutput.additionalContext` on Stop continues the conversation.** Claude
   acts on the text in the same turn, exactly as with `decision: "block"`, and under the
   same loop protections — `stop_hook_active` plus an 8-consecutive-continuation cap. The
@@ -218,20 +240,31 @@ payloads, not memory.
   sentence naming what in the response triggered it, quoted where possible, and the main
   agent is told to relay it. A recommendation nobody can second-guess is one that gets
   waved through, which is the failure this whole shape is built to avoid.
-- **Control turns and exempt commands never get a recommendation.** `/guard:settings` and
-  all of `/guard:{claims,deferrals}-auditor` / `/guard:korean-corrector` are skipped on
+- **Control turns never get a recommendation.** `/guard:settings` and all of
+  `/guard:{claims,deferrals,clarity}-auditor` / `/guard:korean-corrector` are skipped on
   BOTH sides: `_CONTROL_CMD_RE` matches the raw prompt at UserPromptSubmit, and `cmd_stop`
   skips them via `command_name` (extracted from the transcript's expanded
   `<command-name>/guard:settings</command-name>`). This second skip is load-bearing — a
   control turn's response is a one-line relay ("guard on") with no evidence, and without
-  it Stop falsely blocked such a turn (session b30dbaec). The same `command_name` path
-  skips any skill / slash command the user lists in `exempt_skills` — named with its
-  plugin namespace (`plugin:skill`), since a user-invoked skill reaches the transcript as
-  a namespaced `<command-name>` just like a command (skill output is not a body of
-  technical claims to ground). `comment-corrector` is deliberately NOT in
+  it Stop falsely blocked such a turn (session b30dbaec). It also has to land BEFORE the
+  record write, so a control turn never becomes `pending_verify_prompt_id`: were it to,
+  the next on-demand `/guard:<agent>` would audit the previous audit's relay instead of
+  the answer the user wants checked. `comment-corrector` is deliberately NOT in
   `_CONTROL_CMD_RE` — that skill relays findings about real files and reports edits made to
   them, so its turn stays auditable — and the regex's `(?=\s|$)` is what keeps
   `claims-auditor` from matching a bare `/claims`.
+  **A user-configurable version of this skip is gone.** `exempt_skills` (a list of
+  skill/command names whose turns Stop dropped, default `[]`) was removed in v0.45.0. It
+  was consulted in `cmd_stop` only, so once the answer file arrived in v0.44.0 a listed
+  skill's turn was still handed a draft path by `cmd_user_prompt` and then silently
+  dropped — the user asked to write into a file nothing would read. Sharing this branch it
+  also inherited the skip of the record write, which is right for a control turn and wrong
+  for a user's skill: `pending_verify_prompt_id` kept pointing at an older turn, so the
+  next on-demand audit quietly audited the wrong answer. Against that, all it bought was
+  one router call on a turn the router would have cleared anyway. If per-skill silence is
+  wanted again, it belongs on the recommendation, not on the record — or in
+  `/guard:toggle`, which already stops the recommendation while keeping the turn
+  auditable.
 - **A saved reference must be indexed.** The `post-edit` hook (PostToolUse) blocks when a
   file written inside the refs dir is not named in that directory's `AGENTS.md`. A
   reference nothing points at is one the next reader never finds, so the index is part of
@@ -264,6 +297,46 @@ payloads, not memory.
   `korean-corrector`: deciding whether a response is Korean enough to audit is a reading
   task, and a ratio has to guess how many English identifiers a Korean answer may carry
   before it stops counting as Korean.
+- **`comment-corrector` is never routed.** The Stop hook splits the eligible set by `reads`:
+  the `reads="turn"` agents go to the router, and `comment-corrector` is dispatched directly
+  in the same emission, to be sent in the same message so the two run concurrently. Two
+  reasons, and the second is why this is a split rather than the narrower "skip the router
+  when it is alone".
+
+  Triage asks whether there is material for an agent, and for this one that is a diff-level
+  question — logic changed, or only a rename or a formatting pass. The router cannot answer
+  it from what it is given: the file list is the corrector's input, not a diff, and reading
+  those files would show their current state, never what this turn changed in them. So the
+  hop can only restate what `_eligible_agents` already decided, and bill a subagent for it.
+
+  Nor does it need to wait. The ordering rule in the playbook's `Dispatching` — auditors
+  before correctors — exists so a corrector does not rewrite a sentence an auditor was about
+  to flag, and it is entirely about the **answer file**. `comment-corrector` never opens that
+  file; it edits comments in source. It shares no input with the routed agents, so there is
+  nothing for it to be ordered against and no round trip to pay.
+
+  Consequences worth keeping straight: `agents/router.md` has no `comment-corrector` section
+  and candidate lines carry no paths, which restores its "record missing → pick nothing" rule
+  to always-correct (the router is now dispatched only when an answer file exists). And a
+  dispatch of `comment-corrector` alone names no answer file at all, which the playbook's
+  `Presenting the result` has to branch on — there is nothing to correct and nothing to open.
+- **The session mute is not `audit_gate` coming back.** `/guard:toggle` adds one boolean in
+  front of the switches, which is the shape removed below, so the difference has to be
+  stated or it reads as a regression. Three things differ and all three are load-bearing.
+  It is **session-only** — `audit_paused` lives in `state/<sid>.json` and the code has no
+  path from it to guard.local.json — so it cannot answer the question "what does this
+  project do by default" differently from the switches. It is **two-valued**, so there is no
+  `ask` to reason about. And it is **visible**: the `status` subcommand puts it in the user's
+  status line, which is what the old gate never had. That last one is the real fix. The old
+  gate's cost was not the extra layer; it was that you could not tell which state you were
+  in without going and reading a file. A mute you can see costs nothing to hold in your
+  head. If the indicator ever becomes impossible to ship, delete the mute rather than let it
+  go invisible.
+
+  What it does NOT suppress is deliberate: `pending_verify_prompt_id` and the answer file are
+  still written while muted, so `/guard:claims-auditor` works on the turn the user just
+  muted. Muting is "stop recommending", not "refuse to audit".
+
 - **The per-agent settings are the only control, and each is named after its agent.**
   There is no gate in front of them. `audit_gate` (`off`/`ask`/`auto`) used to be one, and
   removing it removed a whole class of question — "the switch is on but is the gate open,
@@ -458,10 +531,23 @@ payloads, not memory.
   a `transcript turn` extract rather than from the record. Two rules that used to live here
   are gone and should not come back by habit. The record no longer carries a tool-activity
   section, so nothing asks the turn's own author to assemble the evidence it will be judged
-  on. And a user-run `!` command no longer disqualifies its turn: that skip existed because
-  guard cut the slice itself and the `!` output landed *after* the response an audit would
-  judge, so evidence arrived later than the claims. guard cuts no slice at Stop, so the
-  ordering problem is gone with it — do not re-add the skip without re-establishing it.
+  on. And a user-run `!` command no longer disqualifies its turn *on evidence grounds*:
+  that skip existed because guard cut the slice itself and the `!` output landed *after* the
+  response an audit would judge, so evidence arrived later than the claims. guard cuts no
+  slice at Stop, so that ordering problem is gone.
+- **A `!`-opened turn is skipped anyway, for a different reason: it has no answer file.**
+  `UserPromptSubmit` does not fire for a `!` command — it is not a prompt — so no draft path
+  is ever named, and audit-then-*correct* needs the answer to exist somewhere editable while
+  the turn is still running. What Stop would hand an auditor is the fallback copy it just
+  made of an answer already printed to the user, which no correction can reach. Such a turn
+  also carries no `origin` field at all, so the `origin_kind` skip lets it through and
+  `_turn_identity` reports it separately (`bash_input`, matched on the `<bash-input>` anchor).
+  Verified in 2.1.239, session 6bc60bbf: every turn in that transcript was handed a draft
+  path except the `!` one, and the router was dispatched at a file the user never saw. Like
+  the control-command skip, it lands BEFORE the record write so a `!` turn cannot displace
+  the user's real question as `pending_verify_prompt_id`. Re-establish this reason, not the
+  old one, before removing it again: if `UserPromptSubmit` starts firing for `!` commands,
+  the skip has no basis left.
 - **`_safe_project_subdir` is guard's self-neutering defense** for the one config key that
   names a directory guard treats specially (`refs_dir`): strictly inside the project (the
   root itself fails, because a path is never in its own `.parents` — this is what rejects
@@ -473,12 +559,11 @@ payloads, not memory.
   neither the state root nor under it, so it is a legal value — the rule is containment,
   not reachability, and anything else that starts trusting a configured directory has to
   bring its own check on the actual target rather than assume this one covered it.
-- **The config-mutating CLIs can weaken guard, and Bash is ungated.** `settings set
-  claims-auditor off` and `exempt add <skill>` both reach guard's own configuration, and
-  the model can invoke this script through Bash — nothing stops it. `_cli_write_allowed`
-  requires a marker (`GUARD_SETTINGS_SKILL`) that only the user-invoked `guard:settings`
-  skill sets, on the mutating verbs of both — covering only `exempt` would be theater,
-  since switching an agent off is the easier move.
+- **The config-mutating CLI can weaken guard, and Bash is ungated.** `settings set
+  claims-auditor off` reaches guard's own configuration, and the model can invoke this
+  script through Bash — nothing stops it. `_cli_write_allowed` requires a marker
+  (`GUARD_SETTINGS_SKILL`) that only the user-invoked `guard:settings` sets, on every
+  mutating verb.
   **This is a speed bump, not a boundary**: the variable name is in the source the model
   reads. It buys that the unreflective path ("this audit is in my way, let me turn it
   off") fails closed, that the refusal names the user as the only legitimate widener, and
@@ -493,9 +578,10 @@ default's type are honored; unknown
 keys are ignored and a missing or malformed file falls back to every default.
 `guard.local.json.example` ships at the plugin root.
 
-Keys: one boolean per agent, named after that agent — `claims-auditor`,
-`deferrals-auditor`, `korean-corrector`, `comment-corrector`, **all default `false`** —
-which together are the only control over whether guard says anything unasked. See the
+Keys: one `AgentMode` per agent, named after that agent — `claims-auditor`,
+`deferrals-auditor`, `clarity-auditor`, `korean-corrector`, `comment-corrector`, **all
+default `off`** — which together are the only control over whether guard says anything
+unasked. See the
 invariants above for why the value is a mode rather than a boolean, why reuse is the user's
 call, and why they all ship off. A value that is not a mode word reads as `off` — the safe
 direction, since the alternative is guard acting on a setting the user did not write.
@@ -508,7 +594,10 @@ the session state is ever honored — which is exactly the bug this shape introd
 `router_model` (string, default `""`) — a model override for the router agent alone. Empty
 means guard prints no model line at all and `agents/router.md` decides, which is where a
 subagent's model normally comes from; the key exists for a project that wants the router
-cheaper or sharper than the plugin ships it. It is never validated against a list of names
+cheaper or sharper than the plugin ships it. When set, the line is worded as an instruction
+to pass `model:` on the router dispatch rather than as a bare value, because it is the one
+field the main agent acts on before the playbook is opened — nothing downstream could
+explain it (see `_router_context`). It is never validated against a list of names
 (an alias, a full id, and a provider's own name are all legitimate, and the set moves).
 Every agent the router names brings its own model and effort from its own frontmatter in
 `agents/`, which is also where its criteria live — a second copy in guard's config would
@@ -519,13 +608,6 @@ to the agent rather than pinned to the cheapest thing that runs. A router that m
 the audit silently never happens — the exact failure guard exists to prevent. A router that
 cannot tell a backed claim from one that merely sounds backed names every agent every turn,
 which is the same as naming none, because the user stops reading the recommendation.
-
-`exempt_skills` (list of strings, default `[]`) — skills / slash commands whose turn Stop
-skips, named with their plugin namespace (`plugin:skill`, e.g. `guard:settings`) or bare
-for un-namespaced skills, matched leading-`/`-stripped and case-insensitively (guard's own
-control commands are always exempt regardless). Manage it interactively with the
-`guard:settings` skill (which records the user's chosen names via the `exempt` CLI); no
-need to hand-edit.
 
 `refs_dir` (string, default `""`) — project-relative directory for guard's cited-doc
 copies; empty = the git-tracked default `wiki/ref/` (references committed with the repo), a
@@ -539,6 +621,18 @@ caller resolves it with one `echo`). The output style carries no refs instructio
 user-selected (no `force-for-plugin`), so nothing load-bearing may depend on it being
 active. guard fixes no reference-mark syntax — `claims-auditor` is told to check that a
 mark *resolves*, never to grade its form.
+
+`settings unset <key>` is the only way a key leaves the file, and it exists because `set`'s
+preserve-everything rule has no other exit. A key guard stopped honoring — `exempt_skills`,
+`audit_gate` — is invisible to `show`, ignored by `_load_config`, and carried forward by
+every `set` indefinitely; since the file may only be written through this CLI, without this
+verb the only way to clear one is the hand-edit the settings skill forbids. Two things about
+its shape are deliberate. It deletes **any** key, live or dead, rather than pruning what it
+judges stale: guard cannot know which keys a newer version owns, so a downgraded user's
+config would be silently destroyed. And deleting an agent switch goes through the same two
+steps a `set` does — the session's cached mode is reset to the default and a `reuse`
+transition is reported — because reverting a switch is a change to what guard does, not just
+to the file, and the instance left running still has to be told to stand down.
 
 ## Manual testing
 
@@ -600,6 +694,17 @@ cat "$CLAUDE_PROJECT_DIR/.claude/guard/turns/s1/p1.md"
 "$H" settings set korean-corrector off --session s1
 run p2 "Redis는 Postgres보다 항상 빠릅니다."   # -> claims-auditor is the only candidate
 
+# The answer file is gated on the agents that READ it. With only `comment-corrector` on,
+# `user-prompt` says nothing and the dispatch carries no `answer file:` line — that agent
+# reads source files. On-demand audits still work: the record holds guard's verbatim
+# response section plus a note saying the turn was never told to write into it.
+"$H" settings set claims-auditor off --session s1
+"$H" settings set comment-corrector on --session s1
+echo '{"session_id":"s1","prompt_id":"pc","prompt":"rename a variable"}' | "$H" user-prompt   # -> nothing
+echo "{\"session_id\":\"s1\",\"prompt_id\":\"pc\",\"tool_input\":{\"file_path\":\"$CLAUDE_PROJECT_DIR/src/cache.py\"}}" | "$H" post-edit
+run pc "Renamed it."   # -> playbook, candidates, `files for` — and NO `answer file:` line
+"$H" settings set claims-auditor fresh --session s1     # both on -> the line is back
+
 # comment-corrector needs a source file the turn actually WROTE, and the file must exist.
 echo 'x = 1' > "$CLAUDE_PROJECT_DIR/src/cache.py"
 "$H" settings set comment-corrector on --session s1
@@ -634,10 +739,17 @@ printf '{"promptId":"p5d","message":{"role":"user","content":"q"}}\n' >> "$T"
 echo "{\"session_id\":\"s1\",\"prompt_id\":\"p5d\",\"transcript_path\":\"$T\",\"last_assistant_message\":\"Redis는 항상 빠릅니다.\",\"stop_hook_active\":false}" | "$H" stop
 #   -> a recommendation, NOT empty
 
-# guard's own control turns and exempt skills are skipped by command name.
+# guard's own control turns are skipped by command name, and leave no record behind —
+# `pending_verify_prompt_id` must still name the turn BEFORE this one.
 anchor p6 human '/guard:settings show'
 echo "{\"session_id\":\"s1\",\"prompt_id\":\"p6\",\"transcript_path\":\"$T\",\"last_assistant_message\":\"guard on\",\"stop_hook_active\":false}" | "$H" stop
-#   -> empty; trace: skip_exempt_skill
+#   -> empty; trace: skip_control_cmd; no .claude/guard/turns/s1/p6.md
+
+# A user `!` command opens a turn with no `origin` and no draft path, so it is skipped on the
+# `<bash-input>` anchor — and leaves no record, for the same reason p6 leaves none.
+printf '{"promptId":"p6b","message":{"role":"user","content":"<bash-input>env | grep CLAUDE</bash-input>"}}\n' >> "$T"
+echo "{\"session_id\":\"s1\",\"prompt_id\":\"p6b\",\"transcript_path\":\"$T\",\"last_assistant_message\":\"환경변수 확인만 하신 것으로 보입니다.\",\"stop_hook_active\":false}" | "$H" stop
+#   -> empty; trace: skip_bash_input; no .claude/guard/turns/s1/p6b.md
 
 # Reuse mode changes the dispatch line, not the inputs, and the CLI must report the
 # transition in both directions — that print is guard's only channel to a live instance.
@@ -668,8 +780,19 @@ echo '{"session_id":"s1"}' | "$H" verify comment-corrector  # no output: no turn
 #   `audit_gate` was the old off/ask/auto gate in front of the switches and must stay rejected
 "$H" settings set claims-auditor maybe --session s1  # -> error naming off/fresh/reuse
 
+# `unset` is the only way a key leaves the file. It must handle the key that is not there,
+# the key guard does not honor, and the live switch whose instance has to stand down.
+"$H" settings set korean-corrector reuse --session s1
+"$H" settings unset nope --session s1            # -> "nothing to remove", lists keys present
+python3 -c "import json,pathlib;p=pathlib.Path('$CLAUDE_PROJECT_DIR/.claude/guard.local.json');d=json.loads(p.read_text());d['exempt_skills']=[];p.write_text(json.dumps(d))"
+"$H" settings unset exempt_skills --session s1   # -> "guard does not honor that key"
+"$H" settings unset korean-corrector --session s1
+#   -> "back to the default ('off')", then the settings, then the stand-down note for
+#      `guard-korean-corrector`. Reverting a switch is a change to what guard does, so it
+#      owes the same note a `settings set ... off` does.
+
 # The mutating CLI verbs refuse without the marker; reads still work.
-(unset GUARD_SETTINGS_SKILL; "$H" exempt add some-skill; "$H" settings set claims-auditor off; "$H" exempt list)
+(unset GUARD_SETTINGS_SKILL; "$H" settings set claims-auditor off; "$H" settings unset refs_dir; "$H" settings show)
 ```
 
 Directly unit-testable without any subprocess: `_write_turn_response` (both headings

@@ -104,18 +104,40 @@ paths guard had to tell apart from a clean verdict. As a subagent, none of that 
    claims on their own past say-so. The router has no memory, on purpose — its answer must
    come from this turn, not from a habit.
 
-2. **Post-edit** (PostToolUse on the write tools) — records the turn's edited source
+2. **Session mute** (`/guard:toggle`, UserPromptExpansion) — `audit_paused` in the session
+   state, and the shape matters. It is session-only: it cannot write guard.local.json, so
+   reaching for it mid-conversation can never change what the project does tomorrow. It is
+   also *visible* — the `status` subcommand renders it as a status-line segment — and that
+   is what separates it from the `audit_gate` this plugin deliberately removed. The old gate
+   was a persistent three-valued layer in front of the switches whose state you could not
+   see; this is one session boolean you can read off the screen. Do not grow it back into
+   the old thing: no third value, no persistence, and if the indicator ever stops being
+   available, the mute is the feature that should go rather than become invisible.
+
+   Two consequences to keep. While muted, `stop` says nothing and `user-prompt` names no
+   answer file — a file nothing will correct is a file the user should not be sent to. But
+   the pending on-demand target and the answer file are still recorded, because muting the
+   recommendation is not the same as refusing an audit the user asks for.
+
+   guard cannot install the status line it wants: a plugin's `settings.json` honors only
+   `agent` and `subagentStatusLine` (`wiki/ref/claude-code-statusline.md`). So `status`
+   prints a segment for the user to compose into their own, `/guard:statusline` offers to
+   wire it, and the segment prints **nothing** on any failure — a status line is the one
+   place guard must never report an error.
+
+3. **Post-edit** (PostToolUse on the write tools) — records the turn's edited source
    files for a later `comment-corrector` recommendation, and blocks until a file saved
    in the refs directory is listed in that directory's `AGENTS.md`. Both independent of
    the agent settings.
 
 guard reads the transcript for two unrelated purposes, and keeping them apart matters. At
-Stop it reads a single record to learn how the turn was *opened* (`_turn_identity`), and both
-users of that are skips: only a turn a person typed is audited, because guard audits an
+Stop it reads a single record to learn how the turn was *opened* (`_turn_identity`), and every
+user of that is a skip: only a turn a person typed is audited, because guard audits an
 answer to the *user*, and every other origin is machinery guard's own dispatch set in motion
 — a background agent's completion, a subagent's `SendMessage` back — so auditing it loops
-guard against itself; separately, a turn opened by a control command or an exempt skill has
-nothing to audit. The loop is not hypothetical: shipping the `task-notification` skip alone
+guard against itself; separately, a turn opened by one of guard's own control commands has
+nothing to audit, and a turn opened by a user `!` command has nothing *correctable* — no
+prompt means no `UserPromptSubmit`, so no answer file was ever named. The loop is not hypothetical: shipping the `task-notification` skip alone
 left `peer` open, and one audit whose auditor messaged the session back cost the user two
 extra rounds and, because the relay turn was handed an answer file of its own, ended with
 the audit memo opened in place of the answer. Hence two rules. The skip covers every named
@@ -123,7 +145,10 @@ non-human kind rather than the kinds seen so far, and an absent kind still audit
 noisy is recoverable, guard silently dormant is not. And one user question gets exactly one
 answer file, which is the file the correctors edit and the one the main agent opens; the
 `UserPromptSubmit` draft path and the Stop dispatch name the same file, and nothing else in
-the audit is allowed to become a document. Separately, the `transcript` subcommand
+the audit is allowed to become a document. Both sides of that path are gated on the agents
+that actually read it, never on any switch being on — `comment-corrector` reads the source
+files the turn wrote, so a project running only that one is never told to write an answer
+file nobody opens. Separately, the `transcript` subcommand
 slices turns out of the file on an agent's request — never on a schedule, and always into a
 file rather than onto stdout.
 
@@ -133,6 +158,16 @@ router that can only forward to that same agent decides nothing, so Codex recomm
 whole eligible set, unrouted, and is correspondingly noisier. Projects must run
 `$guard:setup` once to install it. State is host-specific under `.claude/guard/` or
 `.codex/guard/`.
+
+guard's user entry points sit in two directories and the split is by runtime, not by kind.
+`commands/<name>.md` and `skills/<name>/SKILL.md` produce the same `/guard:<name>` in Claude
+Code, but the Codex manifest registers only `./skills/`, so a Claude-only entry point in
+`commands/` is one Codex no longer offers and then refuses. Whichever directory it sits in,
+it reaches the CLI through `${CLAUDE_PLUGIN_ROOT}/scripts/guard_hook.py` — substituted in a
+plugin skill's content and its `allowed-tools` rules alike
+(`wiki/ref/claude-code-skill-substitutions.md`). Never by climbing out with
+`${CLAUDE_SKILL_DIR}/../..`: that depth is wrong the moment the file moves, and it has
+moved.
 
 The source is the truth for control flow, and its comments carry the *why* next to the
 code. When editing, record what must not regress — don't restate function bodies here.

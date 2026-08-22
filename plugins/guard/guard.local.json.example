@@ -5,9 +5,5 @@
   "korean-corrector": "off",
   "comment-corrector": "off",
   "router_model": "",
-  "exempt_skills": [
-    "deep-research",
-    "hindsight:review"
-  ],
   "refs_dir": ""
 }

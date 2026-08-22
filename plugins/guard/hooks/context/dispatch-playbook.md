@@ -166,7 +166,7 @@ user — and do not re-edit its work.
 
 ## Presenting the result
 
-The correctors have already edited the answer file. What is left is yours:
+The correctors have already edited what they were given. What is left is yours:
 
 1. **Apply the auditors' findings to the file.** An unsupported claim, a deferral the repo
    could have answered — fix it where it is written, in the file, with `Edit`. A finding you
@@ -178,8 +178,14 @@ The correctors have already edited the answer file. What is left is yours:
    the end, after every correction has landed — opening it mid-audit shows the user text
    that is still being fixed.
 
-The path in steps 2 and 3 is the **answer file the dispatch named**, every time. It is the
-one holding the answer to the user's question, corrections and all. Do not open a file you
-wrote during the audit, and do not start a new one for this report: an audit summary is
-worth a line in the reply, not a document, and opening it hands the user a memo about the
-answer instead of the answer.
+The path in steps 2 and 3 is the **answer file the dispatch named**. It is the one holding
+the answer to the user's question, corrections and all. Do not open a file you wrote during
+the audit, and do not start a new one for this report: an audit summary is worth a line in
+the reply, not a document, and opening it hands the user a memo about the answer instead of
+the answer.
+
+**When the dispatch named no answer file**, steps 1 and 3 do not apply — there is nothing to
+correct and nothing to open. That is `comment-corrector` dispatched on its own: it works on
+the source files the turn wrote, and a turn with no turn-reading agent eligible never wrote
+an answer file in the first place. Reply per step 2, naming the source files whose comments
+changed; the user reads those in the diff, not in an opened document.
