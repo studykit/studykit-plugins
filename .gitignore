@@ -209,12 +209,25 @@ __marimo__/
 !**/*.local.*.example
 session-tree.lock
 
-.claude/sessions/
-.claude/tmp/
-.claude/guard/
-.codex/guard/
-# Subagent `memory: local` scope — declared not-for-version-control by the agents that use it.
-.claude/agent-memory-local/
+# Agent runtime state. Matched at ANY depth, not just the repo root: a pattern with a
+# slash in it is anchored to this file's directory, so `.claude/guard/` alone left a state
+# tree written under a subdirectory (e.g. `plugins/<name>/.claude/guard/`) committable. That
+# is a tooling bug where it happens, but the ignore rule must not be the thing that lets a
+# session extract reach a commit.
+**/.claude/sessions/
+**/.claude/tmp/
+**/.claude/guard/
+**/.codex/guard/
+# Subagent `memory: local` scope. The agents that use it declare it not-for-version-control,
+# and that is right for the repositories guard is INSTALLED into — creating files in someone
+# else's commits is a side effect nobody asked for. This repository is where those agents are
+# developed, so what they have learned here is worth keeping and reviewing; the root store is
+# tracked deliberately.
+# Still ignored at every other depth: a store under a subdirectory (e.g.
+# `plugins/<name>/.claude/agent-memory-local/`) is state written with a misresolved project
+# root, and that must not become committable just because the root one is wanted.
+**/.claude/agent-memory-local/
+!/.claude/agent-memory-local/
 .DS_Store
 **/node_modules/
 .obsidian/workspace.json

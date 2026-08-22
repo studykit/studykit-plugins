@@ -21,14 +21,15 @@ listed here.
 | File | Subject | Source |
 | --- | --- | --- |
 | `claude-code-headless-child-flags.md` | Flags for a lightweight `claude -p` child: `--safe-mode` disables hooks while keeping auth, why `--bare` is rejected, and a probe table showing that omitting `--allowedTools` does NOT withhold tools | `claude --help` + probes (2.1.238) |
-| `claude-code-hooks-session-env.md` | SessionStart env persistence (`$CLAUDE_ENV_FILE`) and hook output fields | code.claude.com/docs/en/hooks |
+| `claude-code-hooks-session-env.md` | SessionStart env persistence (`$CLAUDE_ENV_FILE`), hook output fields, the matcher `source` values (`startup`/`resume`/`clear`/`compact`/`fork`), and which events show plain stdout to the model | code.claude.com/docs/en/hooks |
 | `claude-code-output-styles.md` | Output-style frontmatter schema, plugin `output-styles/` discovery, subagent scope | code.claude.com/docs/en/output-styles |
 | `claude-code-pretooluse-permission-decision.md` | PreToolUse `permissionDecision` values | code.claude.com/docs/en/hooks |
 | `claude-code-prompt-hooks.md` | Prompt-type hooks | code.claude.com/docs/en/hooks |
+| `claude-code-skill-fork-context.md` | Skill frontmatter `context: fork` / `agent` / `background`: running a skill's body in an isolated subagent that does NOT inherit conversation history, why the agent supplies the system prompt and the skill body the task, the background default and what overrides it | code.claude.com/docs/en/skills |
 | `claude-code-skill-substitutions.md` | Which placeholder a plugin skill or flat command file may use to reach a bundled script | code.claude.com/docs/en/skills |
 | `claude-code-statusline.md` | Status line as a user/project setting rather than a plugin capability, its input fields and invocation; also `commands/` vs `skills/` in a plugin and the `command_args` field on `UserPromptExpansion` | code.claude.com/docs/en/statusline + /plugins-reference |
 | `claude-code-stop-hook-decision-control.md` | Stop hook output: `decision: "block"` vs `hookSpecificOutput.additionalContext`, their shared loop protections, and how `additionalContext` reaches the model | code.claude.com/docs/en/hooks |
-| `claude-code-subagent-resume.md` | Naming a subagent at dispatch, resuming one by name with `SendMessage` (full history retained, auto-resume in background), and how long subagent transcripts persist | code.claude.com/docs/en/sub-agents |
+| `claude-code-subagent-resume.md` | Naming a subagent at dispatch, resuming one by name with `SendMessage` (full history retained, auto-resume in background), how long subagent transcripts persist, the interactive panel that lets the **user** open a background agent's transcript and message it directly, what decides foreground vs background, and fork vs plain subagent | code.claude.com/docs/en/sub-agents |
 | `claude-code-subagent-frontmatter.md` | Subagent frontmatter fields; `tools` omitted inherits all, no way to express none | code.claude.com/docs/en/sub-agents |
 | `claude-code-subagent-memory.md` | The `memory` frontmatter field: `user`/`project`/`local` scopes and their directories, MEMORY.md auto-injection limits, and the fact that it silently enables Write/Edit | code.claude.com/docs/en/sub-agents |
 | `jira-wiki-markup-notation.md` | Jira wiki markup notation (headings, effects, lists, links, tables, code) | Jira `WikiRendererHelpAction.jspa` |

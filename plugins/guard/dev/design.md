@@ -10,12 +10,12 @@ line-by-line walkthrough.
 
 | Event | Subcommand | Role |
 | --- | --- | --- |
-| `UserPromptSubmit` | `user-prompt` | Name the answer file for this turn — Stop is too late for it, since by then the answer is already printed and a printed answer cannot be corrected. Silent (trace only) when every agent is `off`, when `audit_paused` is set, on a control command, and with no `prompt_id`. guard keeps no copy of the prompt; the hook stays registered even when silent so a "guard said nothing" report can be told apart from a hook that never ran. |
+| `UserPromptSubmit` | `user-prompt` | Name the answer file for this turn — Stop is too late for it, since by then the answer is already printed and a printed answer cannot be corrected. Silent (trace only) when every agent is `off`, when `audit_paused` is set, on a control command, and with no `prompt_id`. Also saves the prompt verbatim to `<prompt_id>.request.md` for the router, which is the only copy guard keeps and the only reader it has. The hook stays registered even when silent so a "guard said nothing" report can be told apart from a hook that never ran. |
 | `UserPromptExpansion` (one matcher per agent: `claims-auditor`, `deferrals-auditor`, `clarity-auditor`, `korean-corrector`) | `verify <agent>` | On demand, dispatch **that agent** for the last completed turn. The agent name rides in argv, not in a dispatch input the model has to be trusted to honor. |
 | `PostToolUse` (`Write\|Edit\|MultiEdit\|NotebookEdit`) | `post-edit` | Record a source file this turn wrote (the candidate list for a `comment-corrector` recommendation), then block when a file saved in the refs dir is not listed in that dir's `AGENTS.md`. |
-| (called via Bash, not a hook) | `settings` | `guard:settings` skill (in-session) shows/sets/unsets guard.local.json settings; the agent modes also apply to the live session's `state/<sid>.json` (session id from `--session`/`CLAUDE_CODE_SESSION_ID`). A mode change away from `reuse` also prints a stand-down note, the only channel guard has to a running instance. `set` preserves every other key; `unset <key>` is the only way to delete one. |
+| (called via Bash, not a hook) | `settings` | `guard:settings` (a `context: fork` skill, so it runs in a forked `general-purpose` agent rather than in the main session) shows/sets/unsets guard.local.json settings; the agent modes also apply to the live session's `state/<sid>.json` (session id from `--session`/`CLAUDE_CODE_SESSION_ID`). A mode change away from `reuse` also prints a stand-down note, the only channel guard has to a running instance. `set` preserves every other key; `unset <key>` is the only way to delete one. |
 | `Stop` | `stop` | Write the response section of the turn record and mark the turn as the on-demand target — always. Then, when any agent is not `off`, emit `additionalContext` asking the main agent to dispatch `guard:router` over the record, carrying the eligible agents with their modes and this turn's paths. The router names sections of `hooks/context/dispatch-playbook.md`; the main agent follows those, completing the record's second section only if a named section asks for it. `comment-corrector` never goes to the router: it is dispatched directly in the same emission, to be sent in the same message — see the invariant below. |
-| `SessionStart` | `session-start` | Sweep state and turn records past retention, export `GUARD_REFS_DIR`, state the refs rule as session context, name the dispatch playbook once when any agent is on, and — when any agent is in `reuse` — state the standing reuse policy once. |
+| `SessionStart` | `session-start` | Sweep state and turn records past retention, export `GUARD_REFS_DIR`, state the refs rule as session context, name the dispatch playbook once when any *turn-end* agent is on, state the standing `refs-finder` policy once when that agent is on (Claude only), and — when any agent is in `reuse` — state the standing reuse policy once. |
 | (called via Bash, not a hook) | `transcript` | `index` / `turn` / `find` over the session transcript, for the audit agents. Writes an extract file and prints only its path plus a one-line summary; `--since` / `--until` / `--last` bound which turns are scanned. |
 | `UserPromptExpansion` (`^(guard:)?toggle$`) | `toggle` | Mute/unmute the automatic audit for THIS session (`audit_paused`, session state only — never guard.local.json). `command_args` carries `on`/`off`; empty flips. The hook does the work and prints the result. |
 | (called via Bash, not a hook) | `status` | Status-line segment: `guard <n>` / `guard off` / `guard ·`, or nothing on any failure. Reads one state file; runs on every assistant message. |
@@ -41,6 +41,10 @@ written by the main agent.
   guard fills it in at Stop from `last_assistant_message` only when the turn left it empty,
   which is the fallback, not the path. The correctors edit it in place, so it is also the
   file the user is shown at the end.
+- `turns/<sid>/<prompt_id>.request.md` — the user's request for that turn, verbatim, written
+  by guard at `UserPromptSubmit`. Handed to the ROUTER and to nothing else; never audited,
+  corrected, or included in an audit agent's dispatch. Swept with the answer beside it, since
+  it lands in the same per-session directory.
 - `extracts/<dir>/…` — whatever an agent pulled out of the transcript: `index.md`,
   `turn-<id>.md`, `find.md`, or a `--out` path it chose. Written by the `transcript`
   subcommand on request, never on a schedule, and swept with the rest of the session's
@@ -78,6 +82,18 @@ payloads, not memory.
   fetched 2026-07-09 — docs-verified only, not yet observed on a live session; if
   `GUARD_REFS_DIR` fails to appear, re-check this first.
 
+- **A `SessionStart` entry with no matcher fires on every source**, and the sources are
+  `startup`, `resume`, `clear`, `compact` and `fork`. `compact` is the load-bearing one:
+  guard's SessionStart hook registers no matcher, so a context compaction that drops its
+  injected lines immediately gets them restated. That is the whole reason the `refs-finder`
+  standing policy can be stated once per session instead of on every `UserPromptSubmit`. The
+  same section confirms that plain stdout becomes model-visible context for exactly three
+  events — `UserPromptSubmit`, `UserPromptExpansion`, `SessionStart` — which is how those
+  lines reach the model at all. Source: official hooks docs
+  (https://code.claude.com/docs/en/hooks), excerpt saved at
+  `wiki/ref/claude-code-hooks-session-env.md`, fetched 2026-08-22 — docs-verified, not
+  observed on a live compaction. If the policy line stops surviving a compact, re-check this
+  first and fall back to a per-turn line rather than letting the agent go silent.
 - **`prompt_id` is common to every hook** (PostToolUse and Stop included) and equals
   the transcript record's `promptId` — this is what lets a per-turn marker written by one
   event match the same turn at another. Observed on real payloads (seen on Claude Code 2.1.197;
@@ -183,9 +199,52 @@ payloads, not memory.
   line is stated in `agents/router.md` per candidate, and it is the thing most easily lost
   in an edit: a router that starts judging quality stops naming the agent that would have
   judged it properly.
-- **Nobody gathers the session's history; agents extract it.** guard's record holds the
-  response and nothing else. Everything around it — the request, this turn's tool activity,
-  what an earlier turn established — is already in the transcript, and the agents that may
+- **The router routes on the answer AND the request; materiality needs both.** Triage used
+  to see the answer only, stated as a prohibition — "never because of what the user asked"
+  — and that was wrong, because the one judgment left to the router is materiality and
+  materiality is relative to the request. The same explanatory paragraph is the substance
+  the user came for when they asked how something works, and padding when they asked for a
+  one-line setting change; from the answer alone the two are the same text. What that cost
+  was measured on: a plain-language "refs-finder는 켜줘" (so `_CONTROL_CMD_RE` did not skip
+  it — see the control-turn bullet), whose answer file carried the CLI's own output plus a
+  volunteered section explaining the switch. The router named `claims-auditor` and
+  `clarity-auditor`, correctly by its own cues, and both returned pass.
+
+  So `cmd_user_prompt` saves the prompt verbatim to `turns/<sid>/<pid>.request.md` and
+  `_router_context` hands the path to the router. Four constraints, each load-bearing:
+
+  - *a sibling file, not a section of the answer* — inside the answer file the user's own
+    sentences become text `korean-corrector` rewrites, in a file the user is then shown, and
+    text the auditors weigh as part of the answer;
+  - *the router only* — no audit agent is given it. An auditor that knew what was asked
+    would start excusing an unsupported claim because nobody asked for it;
+  - *it can only subtract* — the request may make the router name FEWER agents than the
+    answer alone would, never more, and "the user did not ask for this" discounts a passage
+    as padding without ever excusing a skip. This is what keeps the old prohibition's
+    guarantee: the expensive failure is still omission, and doubt still resolves to naming;
+  - *guard keeps no other copy* — this restores a prompt store removed in v0.42.0, but for
+    one reader and one question. Do not let it grow back into a general turn record.
+
+  Best-effort and silent on failure: the field is conditional on the file existing, and a
+  turn whose prompt guard never saw (a resumed session, a `!` command) routes on the answer
+  as before. The hook is what decides that, never the router — absence learned from a failed
+  `Read` cannot be told apart from a path built wrong, and that failure is silent.
+
+  The two paths share a long prefix, so `_router_context` spells it once as `turn dir:` and
+  names each file as `{turn dir}/<name>` (851 → 730 characters on a routed turn). The
+  substitution is shown in the value rather than explained, and the same shape is emitted
+  whether or not the request file exists: one input shape for the router beats saving four
+  characters on the turns that have no request. What was rejected is the version that goes
+  further — passing only the `prompt_id` and having the router derive both paths. The
+  mechanism does not exist (env vars reach Bash only, `wiki/ref/claude-code-hooks-session-env.md`;
+  `${CLAUDE_SESSION_ID}` is documented for skill and command content, not for `agents/*.md`,
+  `wiki/ref/claude-code-skill-substitutions.md`), it would need `Bash` on a `Read`-only
+  agent, and it would put guard's storage layout in router prose as a second copy — which,
+  once drifted, reads nothing and clears every turn.
+- **Nobody gathers the session's history; agents extract it.** guard's turn store holds the
+  response, plus one sibling file holding the request for the router alone (next bullet).
+  Everything else around it — this turn's tool activity, what an earlier turn established —
+  is already in the transcript, and the agents that may
   need it (`AuditAgent.needs_history`: the two auditors) are handed a transcript path, the
   turn id, and the `transcript` subcommand. Three shapes were tried and each failed
   differently, so do not go back to them:
@@ -265,6 +324,52 @@ payloads, not memory.
   wanted again, it belongs on the recommendation, not on the record — or in
   `/guard:toggle`, which already stops the recommendation while keeping the turn
   auditable.
+- **A CLI verb finds the project root by walking to the git root; a hook never guesses.**
+  `CLAUDE_PROJECT_DIR` is given to hook processes and substituted into skill/command content.
+  It is **not** in the Bash tool's environment — reaching that takes an explicit
+  `CLAUDE_ENV_FILE` export and nothing here does one
+  (`wiki/ref/claude-code-hooks-session-env.md`, `wiki/ref/claude-code-skill-substitutions.md`).
+  So the three Bash-invoked verbs — `transcript` (an audit agent), `settings` (the settings
+  skill), `refs-dir` (the auditor fallback and the output style) — never see it, and what
+  stands in for it decides whether they are correct at all.
+
+  It was `Path.cwd()`, and that failed silently in both directions. An agent that had
+  `cd`-ed into a subdirectory to read code wrote its extract to
+  `<subdir>/.claude/guard/extracts/`, and `settings show` from the same place reported a
+  project with every switch off — a second, empty state tree beside the real one. Observed as
+  `plugins/guard/.claude/guard/extracts/…` in this repository. Worse, the root `.gitignore`
+  did not cover it: a pattern containing a slash is anchored to the file's own directory, so
+  `.claude/guard/` matched the root and nothing else, and `git add -A` would have committed a
+  session extract into the plugin directory — the exact outcome `memory: local` is chosen to
+  avoid. Both halves are fixed: `_cli_project_dir` walks up to the git root, and the ignore
+  patterns are `**/`-prefixed so a stray tree anywhere is still ignored.
+
+  `refs-dir` was on `_project_dir` and therefore printed NOTHING to every caller it has ever
+  had. That is not a fail-open — the verb *is* the answer it was asked for.
+
+  The primary fix is that guard now **tells** the Bash environment the root instead of
+  letting it be inferred: SessionStart appends `export GUARD_PROJECT_DIR=…` to
+  `$CLAUDE_ENV_FILE`, the one channel whose variables reach every later Bash command. So on
+  Claude Code the CLI verbs read the root the host decided on, and they resolve correctly
+  even from outside the checkout. The git-root walk stays as the fallback and still has to be
+  right: the export is best-effort, `CLAUDE_ENV_FILE` is Claude Code only, and it is not
+  documented to reach a SUBAGENT's Bash — which is exactly where `transcript` runs from.
+
+  Both exports go through `_export_to_bash_env`, which appends a line only when it is not
+  already there. SessionStart registers no matcher, so it fires on `startup`, `resume`,
+  `clear`, `compact` and `fork` alike; before this was shared, `GUARD_REFS_DIR` was appended
+  again on every compaction for the life of the session. Only `GUARD_`-prefixed names are
+  ever exported — the host owns `CLAUDE_PROJECT_DIR`, and other tooling reads its presence as
+  "running inside a hook".
+
+  Keep the two resolvers apart. A hook is given the root, so an absent value means a broken
+  installation and `_project_dir` returns None rather than writing state under whatever
+  directory the host launched in. A CLI verb must answer, so `_cli_project_dir` never returns
+  None. `.git` is tested with `exists()`, not `is_dir()`, because a worktree or submodule has
+  it as a file — and stopping at a worktree's own root is right, since a worktree is its own
+  checkout with its own state. A project that is not a git repository still falls back to the
+  cwd; there is nothing better to offer, and `status` is unaffected either way because its
+  root arrives in the status-line payload.
 - **A saved reference must be indexed.** The `post-edit` hook (PostToolUse) blocks when a
   file written inside the refs dir is not named in that directory's `AGENTS.md`. A
   reference nothing points at is one the next reader never finds, so the index is part of
@@ -297,6 +402,16 @@ payloads, not memory.
   `korean-corrector`: deciding whether a response is Korean enough to audit is a reading
   task, and a ratio has to guess how many English identifiers a Korean answer may carry
   before it stops counting as Korean.
+- **`reads="prompt"` is outside the turn-end machinery entirely.** `refs-finder` works on
+  the question before an answer exists, so `_eligible_agents` drops it and the router never
+  sees it. The exclusion is there and nowhere further downstream on purpose: `cmd_stop`
+  filters `routed`/`direct` on the other two values and would drop it anyway, but `eligible`
+  is also what decides whether Stop emits at all — leaving it in makes a turn look routable
+  on the strength of an agent that already ran, and the Codex adapter, which shares that
+  function, would fold it into its own recommendation. Two more places test `reads` for the
+  same reason: `_reads_turn` (so `refs-finder` alone never asks the session to write an
+  answer file nothing reads) and the SessionStart "audits are on" line (so a project running
+  only `refs-finder` is not told it has an audit).
 - **`comment-corrector` is never routed.** The Stop hook splits the eligible set by `reads`:
   the `reads="turn"` agents go to the router, and `comment-corrector` is dispatched directly
   in the same emission, to be sent in the same message so the two run concurrently. Two
@@ -399,8 +514,15 @@ payloads, not memory.
   ("this project rarely writes Korean") is indistinguishable from a judgment about this
   turn, and routing is the step nothing else checks.
 - **The router is never reused.** Its question is about one turn; an instance carrying the
-  last five can answer it from the wrong one, silently, at the step nothing else checks. It
-  is also the cheapest agent in the set, so continuity buys the least there.
+  last five can answer it from the wrong one, silently, at the step nothing else checks.
+- **The router is not the place to save on model.** `agents/router.md` defaults to `opus`.
+  Every other agent in the set is paid for by a decision this one makes, so a cheap router
+  that misreads a turn saves nothing: it either omits the agent that would have caught the
+  defect, or spends a whole subagent for each agent it named on material that was not
+  there. The second compounds — it is what teaches the user to wave the recommendation
+  through unread, after which the omissions stop being caught either. The triage itself is
+  a short read of two files, so the model is the cheap part of it. `router_model` still
+  overrides per project, in the direction a project chooses.
 - **Reuse needs `SendMessage` in the agent's `tools:`, and the router must not have it.**
   `tools` is an allowlist when present (`wiki/ref/claude-code-subagent-frontmatter.md`), so
   the audit agents list `SendMessage` and the router does not. This also fixes an older
@@ -563,7 +685,16 @@ payloads, not memory.
   claims-auditor off` reaches guard's own configuration, and the model can invoke this
   script through Bash — nothing stops it. `_cli_write_allowed` requires a marker
   (`GUARD_SETTINGS_SKILL`) that only the user-invoked `guard:settings` sets, on every
-  mutating verb.
+  mutating verb. Since that skill became a `context: fork` one the marker is set by the
+  forked agent rather than by the main one, which changes nothing here — it was always a
+  model setting it, and the guarantee was always "the chain began at the user's entry
+  point", never "no agent did this". A custom `tools: Bash` agent would have made
+  hand-editing the config impossible rather than forbidden; it was built, then dropped as
+  one more definition to keep in step with a file that already says all of this. The skill
+  sets `disallowed-tools: Write Edit NotebookEdit` in its place, but whether that reaches
+  inside a fork is undocumented, so the standing prohibition in the skill body remains the
+  thing actually holding. (`allowed-tools` is not an option: per the docs it pre-approves
+  and "does not restrict which tools are available".)
   **This is a speed bump, not a boundary**: the variable name is in the source the model
   reads. It buys that the unreflective path ("this audit is in my way, let me turn it
   off") fails closed, that the refusal names the user as the only legitimate widener, and
@@ -579,9 +710,11 @@ keys are ignored and a missing or malformed file falls back to every default.
 `guard.local.json.example` ships at the plugin root.
 
 Keys: one `AgentMode` per agent, named after that agent — `claims-auditor`,
-`deferrals-auditor`, `clarity-auditor`, `korean-corrector`, `comment-corrector`, **all
-default `off`** — which together are the only control over whether guard says anything
-unasked. See the
+`deferrals-auditor`, `clarity-auditor`, `korean-corrector`, `comment-corrector`,
+`refs-finder`, **all default `off`** — which together are the only control over whether
+guard says anything unasked. `refs-finder` is the only one of them that governs something
+said *before* an answer rather than after; the key behaves identically, which is the point
+of putting it in the same registry. See the
 invariants above for why the value is a mode rather than a boolean, why reuse is the user's
 call, and why they all ship off. A value that is not a mode word reads as `off` — the safe
 direction, since the alternative is guard acting on a setting the user did not write.
@@ -694,6 +827,34 @@ cat "$CLAUDE_PROJECT_DIR/.claude/guard/turns/s1/p1.md"
 "$H" settings set korean-corrector off --session s1
 run p2 "Redis는 Postgres보다 항상 빠릅니다."   # -> claims-auditor is the only candidate
 
+# The CLI verbs must not depend on the cwd. `CLAUDE_PROJECT_DIR` is absent in Bash, so this
+# is the normal case, not an edge one: all three must agree from anywhere in the checkout.
+for d in . plugins/guard wiki/ref; do (cd "$CLAUDE_PROJECT_DIR/$d" 2>/dev/null && \
+  "$H" settings show --session s1 | head -2 && "$H" refs-dir); done
+#   -> identical settings and the same absolute refs dir from every cwd. Before the fix the
+#      subdirectory runs reported an all-off project and refs-dir printed nothing at all.
+
+# The export, and its append-once rule. Run session-start three times (startup + two
+# compactions) against one env file: TWO lines, not six.
+EF=$(mktemp); CLAUDE_ENV_FILE="$EF"
+for i in 1 2 3; do echo '{"session_id":"s1"}' | CLAUDE_ENV_FILE="$EF" "$H" session-start >/dev/null; done
+cat "$EF"    # -> export GUARD_PROJECT_DIR=... and export GUARD_REFS_DIR=..., once each
+( . "$EF"; cd / && "$H" refs-dir )   # -> the project's refs dir, from outside the checkout
+find "$CLAUDE_PROJECT_DIR" -type d -name guard -path '*/.claude/*' -not -path "$CLAUDE_PROJECT_DIR/.claude/*"
+#   -> empty. Anything here is a state tree written outside the project root.
+
+# The request file: written verbatim by `user-prompt`, and the ONLY thing the dispatch adds
+# for it is a `request file:` line — for the router, never for an audit agent's dispatch.
+# Without a `user-prompt` for the turn there is no such file and no such line, which is the
+# resumed-session / `!`-command case.
+echo '{"session_id":"s1","prompt_id":"pq","prompt":"refs-finder는 켜줘"}' | "$H" user-prompt
+cat "$CLAUDE_PROJECT_DIR/.claude/guard/turns/s1/pq.request.md"   # -> header, then the prompt verbatim
+run pq "Turned it on."      # -> `turn dir:` once, then `{turn dir}/pq.md` and `{turn dir}/pq.request.md`
+run pnone "Turned it on."   # -> same shape MINUS `request file:` (no user-prompt ran)
+echo '{"session_id":"s1"}' | "$H" verify claims-auditor
+#   -> no `request file:` line, ever, and a PLAIN absolute answer path: an audit agent gets
+#      one file, so there is no shared prefix to factor out and no placeholder to resolve.
+
 # The answer file is gated on the agents that READ it. With only `comment-corrector` on,
 # `user-prompt` says nothing and the dispatch carries no `answer file:` line — that agent
 # reads source files. On-demand audits still work: the record holds guard's verbatim
@@ -765,6 +926,23 @@ echo '{"session_id":"s1"}' | "$H" session-start
 #   -> a stand-down note: stop sending to it, spawn new ones from the next turn
 "$H" settings set korean-corrector fresh --session s1
 #   -> no note: nothing changed, so there is nothing to retire
+
+# `refs-finder` is announced at SessionStart and never routed. Its three failure modes are
+# all "leaked into the turn-end path", so check each end explicitly.
+for k in claims-auditor deferrals-auditor clarity-auditor korean-corrector comment-corrector; do
+  "$H" settings set $k off --session s1
+done
+"$H" settings set refs-finder fresh --session s1
+echo '{"session_id":"s1"}' | "$H" session-start
+#   -> the refs rule, then the refs-finder policy line naming the playbook.
+#      NOT the "audits are on" line: nothing here audits anything.
+GUARD_HOST=codex "$H" session-start < /dev/null
+#   -> the refs rule only. Codex has no refs-finder agent to dispatch.
+echo "{\"session_id\":\"s1\",\"prompt_id\":\"pr1\",\"transcript_path\":\"$T\",\"last_assistant_message\":\"done.\",\"stop_hook_active\":false}" | "$H" stop
+#   -> empty; trace: none_eligible. A prompt-time agent must never make a turn look routable.
+echo '{"session_id":"s1","prompt_id":"pr1"}' | "$H" user-prompt
+#   -> empty: no agent READS the answer file, so none is named (`_reads_turn`)
+echo '{"session_id":"s1"}' | "$H" verify refs-finder   # no output: verify_command=False
 
 # On-demand dispatch must work with every agent OFF — the invariant most easily broken by
 # a change to the recommendation path. No router is involved: the user already chose.

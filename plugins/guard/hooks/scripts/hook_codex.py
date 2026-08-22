@@ -143,6 +143,13 @@ def _handle_post_tool(project_dir: Path, payload: dict[str, Any], session_id: st
 # is why this adapter keeps its own turn record), and agent memory, to hold the reader
 # profile it calibrates against. Without either it would have nothing to audit against and
 # would report `profile: MISSING` on every turn.
+#
+# `refs-finder` is absent for a plainer reason and never reaches this table anyway: it runs
+# before an answer rather than auditing one, so `core._eligible_agents` drops it and Stop
+# never sees it. Its own announcement is suppressed on Codex at the source
+# (`core.cmd_session_start`, gated on `_HOST_IS_CODEX`) — Codex ships one named agent
+# installed by `$guard:setup`, and there is no refs-finder among them to dispatch. Giving
+# Codex the agent set is what unblocks this, same as above.
 _SCOPE = {"claims-auditor": "the response's claims",
           "deferrals-auditor": "deferrals the repository could resolve",
           "korean-corrector": "whether the Korean reads as translated English"}

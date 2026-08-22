@@ -60,3 +60,76 @@ Stored at `~/.claude/projects/{project}/{sessionId}/subagents/`, named
 Reuse is per-session, not per-project: the transcript lives under the session id, so a
 new session starts every agent fresh whatever the setting says. Custom subagents (which
 all of guard's are) return an agent ID and are resumable; the one-shot built-ins are not.
+
+## The user talking to a running subagent (interactive UI)
+
+Retrieved 2026-08-22 from the same page. This is the capability that makes a forked,
+user-addressable agent viable where an in-session skill used to be the only sensible shape.
+
+> ## Monitoring Running Subagents (Interactive UI)
+>
+> When subagents run in background, they appear in a panel below the prompt:
+>
+> | Key | Action |
+> |-----|--------|
+> | `↑` / `↓` | Move between subagent rows |
+> | `Enter` | Open transcript, send follow-up messages |
+> | `x` | Stop running subagent or dismiss completed one |
+> | `Esc` | Return to prompt |
+>
+> Running subagents also appear in `/tasks` command.
+
+So the reach is **not** Claude-only: `SendMessage` is how *Claude* resumes an agent, and
+this panel is how the *user* does it. The user can open a background agent's transcript and
+send it follow-up messages directly, without going through the main session.
+
+## Foreground vs background, and what decides it
+
+> **Foreground:** Blocks main conversation, permission prompts go directly to you
+>
+> **Background** (default in interactive sessions):
+> - Runs concurrently while you work
+> - Permission prompts surface in main session
+> - Smaller built-in tool set available
+> - Results arrive as completion notification
+
+> Claude Code picks based on:
+> 1. If in-process agent team teammate spawned it → foreground
+> 2. If `CLAUDE_CODE_DISABLE_BACKGROUND_TASKS=1` → foreground
+> 3. If fork mode on → background
+> 4. If fork mode off → background by default (Claude asks for foreground if needed)
+
+> **Set `background: true` in frontmatter** to keep subagent in background even when Claude
+> wants foreground result.
+
+Bearing: the panel only lists **background** agents, so an agent meant to be conversed with
+must not be dispatched foreground. `background: true` in its frontmatter is what pins that
+rather than leaving it to the caller.
+
+## Fork vs a plain subagent
+
+> ### Fork the conversation
+> Start a fork with `/subtask` (v2.1.212+):
+> ```
+> /subtask draft unit tests for the parser changes so far
+> ```
+> A fork inherits your entire conversation instead of starting fresh—useful when a side
+> task needs significant context. Results come back clean to main conversation.
+
+> **Forks** get everything the main session has.
+
+And what a non-fork subagent starts with:
+
+> Each non-fork subagent starts fresh with:
+> - ✓ System prompt from definition
+> - ✓ Task delegation message
+> - ✓ CLAUDE.md files (except Explore/Plan)
+> - ✓ Git status snapshot (except Explore/Plan)
+> - ✓ Preloaded skills (from `skills` field)
+> - ✗ Conversation history
+> - ✗ Main conversation's output style
+> - ✗ Main conversation's auto memory
+
+Bearing: "addressable by the user" and "inherits the conversation" are separate axes. A
+plain background subagent is addressable without inheriting anything, which is what a task
+that needs no conversation history wants.

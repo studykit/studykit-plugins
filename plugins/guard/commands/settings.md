@@ -1,51 +1,79 @@
 ---
 name: settings
-description: "View and change guard's settings for this project — one setting per audit agent, named after it (claims-auditor, deferrals-auditor, clarity-auditor, korean-corrector, comment-corrector), each off / fresh / reuse, plus router_model and refs_dir — recorded in .claude/guard.local.json. Use when the user wants to configure guard: turn the claim, deferral, clarity, Korean-naturalness, or comment check on or off, keep one of them running across turns instead of respawning it, or set the router's model or refs_dir. Claude Code only."
+description: "View and change guard's settings for this project — one setting per agent, named after it (claims-auditor, deferrals-auditor, clarity-auditor, korean-corrector, comment-corrector, refs-finder), each off / fresh / reuse, plus router_model and refs_dir — recorded in .claude/guard.local.json. Use when the user wants to configure guard: turn the claim, deferral, clarity, Korean-naturalness, or comment check on or off, have saved reference docs looked up before an answer, keep one of them running across turns instead of respawning it, or set the router's model or refs_dir. Claude Code only."
 argument-hint: '[key] [value]'
 disable-model-invocation: true
-# The body names the CLI through `${CLAUDE_PLUGIN_ROOT}`, not `${CLAUDE_SKILL_DIR}/../..`.
-# Both are substituted in a plugin skill's content (wiki/ref/claude-code-skill-substitutions.md),
-# but only the plugin root stays correct wherever this file sits — it moved from
+# Runs in a forked subagent, not in the main session. Changing a setting is a few CLI calls
+# and a short exchange, but a session late in its life carries a great deal of context and
+# re-pays for all of it on every turn that exchange takes. `context: fork` does NOT inherit
+# the conversation (that is `/subtask`), so everything below and everything the run produces
+# stay out of the main context — see wiki/ref/claude-code-skill-fork-context.md. That is
+# also why this file is long and unapologetic about it: with the fork it is paid for once,
+# by the agent that actually needs it, and never by the conversation the user came for.
+context: fork
+agent: general-purpose
+# The default, stated because it is load-bearing rather than incidental: only BACKGROUND
+# agents appear in the interactive panel, and that panel is how the user opens the
+# transcript and keeps adjusting settings by talking to the agent directly
+# (wiki/ref/claude-code-subagent-resume.md).
+background: true
+# Best-effort only. `allowed-tools` would be the wrong field — it pre-approves, and per the
+# docs "does not restrict which tools are available". `disallowed-tools` does remove tools
+# from the pool, but whether that removal reaches inside a forked subagent is undocumented,
+# so the standing prohibition in the body is what actually holds. Keep both: if the field
+# does propagate, hand-editing the config becomes impossible rather than merely forbidden.
+disallowed-tools: Write Edit NotebookEdit
+# The CLI is named through `${CLAUDE_PLUGIN_ROOT}`, not `${CLAUDE_SKILL_DIR}/../..`. Both
+# are substituted in a plugin skill's content (wiki/ref/claude-code-skill-substitutions.md),
+# and that substitution carries into the fork, since the substituted content IS the prompt.
+# Only the plugin root stays correct wherever this file sits — it moved from
 # `skills/settings/SKILL.md` to `commands/settings.md`, and a relative climb out of the
 # skill directory silently changes depth when it moves again.
-allowed-tools: Bash, AskUserQuestion
 ---
 
-You configure **guard** for this project. Every setting lives in
-`.claude/guard.local.json` and you change it **only** through guard's CLI — never by
-editing that file with Write/Edit. The CLI is the one supported writer: it validates
-each value and mirrors the change into the live session, which a hand-edit does not.
+Show and change **guard's** settings for this project.
 
-This skill runs **in the current session**, not in a forked context: it is a handful of
-Bash calls and a short summary, and paying for a separate context to make them cost more
-than it saved — the fork had to be told the session id and the CLI path, then relay its
-result back.
+You are running in your own context because the main session's is expensive: it may be
+carrying a large conversation and re-pays for all of it on every turn. None of that happens
+here. You also run in the background, so **the user can open your transcript and talk to you
+directly** — that is the normal way this goes, not an exception. Expect follow-ups and stay
+useful across them: they may set one thing, see the result, and change their mind.
 
-Fixed values for this run (already substituted — do not re-resolve):
+Fixed values for this run — already substituted, do not re-resolve and do not go looking
+for either. If one of them is missing or still looks like a `${...}` placeholder, say so and
+stop rather than guessing:
 
 - guard CLI: `"${CLAUDE_PLUGIN_ROOT}/scripts/guard_hook.py"`
-- session id: `${CLAUDE_SESSION_ID}` — pass it as `--session ${CLAUDE_SESSION_ID}` so
-  the agent switches take effect in the **current** session, not only in sessions
-  started later.
+- session id: `${CLAUDE_SESSION_ID}`
 
-## Commands
+What the user asked for, verbatim and possibly empty: `$ARGUMENTS`
 
-Every command that **changes** a setting must be prefixed with `GUARD_SETTINGS_SKILL=1`.
-guard refuses config-mutating calls without it, so that a settings change is something
-the user asked for through this skill rather than something an agent did on its own.
-`settings show` is read-only and needs no prefix.
+## The CLI
 
-- **Show current settings:**
-  `"${CLAUDE_PLUGIN_ROOT}/scripts/guard_hook.py" settings show --session ${CLAUDE_SESSION_ID}`
-- **Change one setting:**
-  `GUARD_SETTINGS_SKILL=1 "${CLAUDE_PLUGIN_ROOT}/scripts/guard_hook.py" settings set <key> <value> --session ${CLAUDE_SESSION_ID}`
-- **Delete a key from the file:**
-  `GUARD_SETTINGS_SKILL=1 "${CLAUDE_PLUGIN_ROOT}/scripts/guard_hook.py" settings unset <key> --session ${CLAUDE_SESSION_ID}`
+Every call that **changes** a setting must be prefixed with `GUARD_SETTINGS_SKILL=1`. guard
+refuses config-mutating calls without it, so a settings change traces back to the user
+invoking `/guard:settings` rather than to an agent deciding on its own. `settings show` is
+read-only and needs no prefix.
 
-  Use this for a key guard no longer honors — an old `exempt_skills` or `audit_gate` left
-  in the file is ignored, never shown by `settings show`, and preserved by every `set`, so
-  `unset` is the only way it goes away. It also works on a live key, which puts that
-  setting back to its default. Either way it reports which of the two happened.
+```
+"${CLAUDE_PLUGIN_ROOT}/scripts/guard_hook.py" settings show --session ${CLAUDE_SESSION_ID}
+GUARD_SETTINGS_SKILL=1 "${CLAUDE_PLUGIN_ROOT}/scripts/guard_hook.py" settings set <key> <value> --session ${CLAUDE_SESSION_ID}
+GUARD_SETTINGS_SKILL=1 "${CLAUDE_PLUGIN_ROOT}/scripts/guard_hook.py" settings unset <key> --session ${CLAUDE_SESSION_ID}
+```
+
+Always pass `--session`. Without it a change lands in the config file but not in the live
+session, and the user watches the setting they just made appear to do nothing.
+
+`unset` is for a key guard no longer honors — an old `exempt_skills` or `audit_gate` sitting
+in the file is ignored, never listed by `show`, and preserved by every `set`, so `unset` is
+the only way it leaves. It also works on a live key, which puts that setting back to its
+default. Either way the command reports which of the two happened.
+
+**Never open or write `.claude/guard.local.json` yourself** — not with Write, not with Edit,
+not with a shell redirect or `sed` through Bash, and never as text for the user to paste.
+The CLI validates each value and mirrors the change into the live session; a hand-edit does
+neither, and guard treats the CLI as the file's only supported writer. If a change cannot be
+made through the CLI, report that instead of working around it.
 
 ## Settable keys
 
@@ -53,79 +81,81 @@ the user asked for through this skill rather than something an agent did on its 
 | --- | --- | --- |
 | `claims-auditor` | `off` / `fresh` / `reuse` | Admits `guard:claims-auditor` — it flags statements asserted without adequate evidence. |
 | `deferrals-auditor` | `off` / `fresh` / `reuse` | Admits `guard:deferrals-auditor` — it flags work punted as "TBD" / "확인 필요" that the repo could have answered. |
-| `clarity-auditor` | `off` / `fresh` / `reuse` | Admits `guard:clarity-auditor` — it flags terms used but never explained, mechanisms given with no concrete example, and explanation pitched wrong for you. It calibrates against a reader profile; without one it says so and checks less, so run `/guard:reader-profile` before relying on it. |
+| `clarity-auditor` | `off` / `fresh` / `reuse` | Admits `guard:clarity-auditor` — it flags terms used but never explained, mechanisms given with no concrete example, and explanation pitched wrong for this reader. It calibrates against a reader profile; without one it says so and checks less, so `/guard:reader-profile` comes first if the user means to rely on it. |
 | `korean-corrector` | `off` / `fresh` / `reuse` | Admits `guard:korean-corrector` — it flags 번역체 phrasing and a register that is not 존댓말, and hands back the corrected text. Identifiers, paths, commands, and established loanwords (커밋, 리팩토링) are left alone. |
-| `comment-corrector` | `off` / `fresh` / `reuse` | Admits `guard:comment-corrector`, for the source files the turn actually edited. Note this one **edits those files in place**, so its fixes land without being asked. |
-| `router_model` | a model name, or empty | Model the **router** runs on. Empty (the default) leaves the choice to the router's own definition in the plugin's `agents/`. Every agent the router names uses its own model, so this changes which audits get picked, never how one is done. |
-| `refs_dir` | a project-relative path, or empty | Where guard saves cited-doc copies. Empty = the git-tracked default `wiki/ref/`, committed with the repo; point it at a different tracked path (e.g. `docs/refs`) to override. |
+| `comment-corrector` | `off` / `fresh` / `reuse` | Admits `guard:comment-corrector`, for the source files the turn actually edited. This one **edits those files in place**, so its fixes land without being asked — say so when the user turns it on. |
+| `refs-finder` | `off` / `fresh` / `reuse` | Admits `guard:refs-finder` — the one agent that runs **before** an answer rather than auditing one after. When a question could rest on documentation this project has saved a copy of, it names the copies that bear on it. Never routed, edits nothing. |
+| `router_model` | a model name, or empty | Model the **router** runs on. Empty (the default) leaves the choice to the router's own definition in the plugin's `agents/`. Every agent the router names brings its own model, so this changes which audits get picked, never how one is done. |
+| `refs_dir` | a project-relative path, or empty | Where guard saves cited-doc copies. Empty = the git-tracked default `wiki/ref/`, committed with the repo; a different tracked path (e.g. `docs/refs`) overrides it. |
 
-Each key **is** the name of the agent it controls, so `settings set korean-corrector
-reuse`, the `/guard:korean-corrector` command, and the `guard:korean-corrector` subagent
-are all the same string.
+**Every setting ships off**, and with all of them off guard is silent: a finished turn adds
+nothing to the main session's context and makes no model call. Turning one on only makes
+that agent *available* — the router still has to find something in the turn before it names
+it, which is why turning `korean-corrector` on costs nothing on an English turn.
+`refs-finder` is outside that: it runs before an answer exists, so it is never routed and is
+announced once at session start instead.
+
+A setting that is off does **not** disable the matching command. `/guard:claims-auditor`,
+`/guard:deferrals-auditor`, `/guard:clarity-auditor` and `/guard:korean-corrector` are the
+user asking for that one audit now, and they work whatever the settings say — which is the
+whole reason it is safe to leave them off. Say this to a user who hesitates to switch
+something off.
 
 ### `fresh` vs `reuse`
 
-`fresh` (what `on` means) spawns a new instance every time the agent is needed. `reuse`
-keeps **one** instance for the session, named `guard-<agent>`: I dispatch it under that
-name the first time and message it by name after that, so it keeps everything it has
-already read and judged, and it can talk to me and to the other reused agents.
+`fresh` (what "on" means) spawns a new instance every time the agent is needed. `reuse`
+keeps **one** instance for the session, named `guard-<agent>`: the main session dispatches
+it under that name once and messages it by name afterwards, so it keeps everything it has
+already read and judged.
 
 Neither is simply better:
 
-- `reuse` buys continuity. The instance already knows this repository and this session's
-  conventions, it stops re-deriving the same thing every turn, and I can go back to it —
-  "you cleared this claim two turns ago; does the change I just made break it?"
-- `fresh` buys independence. A verdict a reused instance got wrong is in its own history
-  as settled, and every later turn inherits that error, where a new instance would have
-  looked again.
+- `reuse` buys continuity — the instance already knows this repository and this session's
+  conventions and stops re-deriving them every turn.
+- `fresh` buys independence — a verdict a reused instance got wrong sits in its own history
+  as settled, and every later turn inherits that error where a new instance would look
+  again.
 
-Continuity is worth most where the judgment is about text and conventions — the two
-correctors. Independence is worth most where it is about whether something is true — the
-two auditors. Reuse lasts one session: a new session starts every agent fresh whatever
-this says.
+Continuity is worth most where the judgment is about text and conventions: the correctors.
+Independence is worth most where it is about whether something is true: the auditors. Reuse
+lasts one session — a new session starts every agent fresh whatever this says.
 
-Changing a setting away from `reuse` means the instance that was running should stand
-down and later turns spawn new ones — the CLI says so when it happens, and I act on it.
-
-**To silence guard for just this session, use `/guard:toggle`, not these settings.** A
-`settings set` writes `guard.local.json` and changes what the project does from now on; the
-toggle is session state only and shows up in the status line if `/guard:statusline` has been
-wired. `settings show` lists the mute first when it is on, because it overrides every switch
-below it.
-
-**Every setting ships off.** All four off is guard silent: when a turn finishes it adds
-nothing to my context and makes no model call. Turning one on is what turns guard on, and
-from then on each finished turn goes to guard's router — one subagent that reads the
-response and names which of the switched-on agents would actually find something in it,
-with a reason for each. I dispatch what it names, in parallel, and report back. A setting
-only makes an agent *available* to the router; the router still has to find something in
-the turn before it names it, which is why turning `korean-corrector` on costs nothing on
-an English turn. The router itself is always a fresh instance — its question is about one
-turn, and an instance carrying five of them can answer from the wrong one.
-
-A setting that is off does **not** disable the matching command.
-`/guard:claims-auditor`, `/guard:deferrals-auditor`, `/guard:clarity-auditor`,
-`/guard:korean-corrector` and `/guard:comment-corrector` are you asking for that one audit
-now, and they work whatever
-the settings say — which is the whole reason it is safe to leave them off.
-
-The agent settings apply to the current session and become the new default; `router_model`
-and `refs_dir` are read from the file when used, so they also take effect immediately.
+A mode moved **away** from `reuse` makes the CLI print a stand-down note. Pass it through
+verbatim: it is guard's only channel for telling the main session to stop addressing an
+instance guard itself cannot see.
 
 ## What to do
 
-1. Run `settings show` and show the user the current settings.
-2. **If `$ARGUMENTS` already names a key and a value** — apply it directly with the
-   matching command, skip the menu.
-3. **Otherwise** call `AskUserQuestion` to ask which setting to change and to what: offer
-   that key's valid values as options and note the current value. For an agent key, say
-   what `fresh` and `reuse` mean in one line each rather than only listing them.
-4. Apply the change with the CLI, then relay the resulting settings the command prints
-   back to the user in a short summary. Report exactly what changed.
+1. **Run `settings show`** and report the current settings. Do this first, every time,
+   including on a follow-up — something may have changed since you last looked.
+2. **If `$ARGUMENTS` names a key and a value**, apply it and report what changed. They told
+   you; do not ask first.
+3. **Otherwise ask**, in your transcript, as plain prose the user can reply to. Name the
+   keys worth changing, their current values, and what the alternatives would do. For an
+   agent key give one line on `fresh` and one on `reuse` rather than only listing them.
+4. **Report what changed** and show the settings the command printed, including any
+   stand-down note, verbatim.
 
-If `settings show` and the file itself disagree — the file holds a key the listing does not
-mention — that key is one guard no longer honors. Say so and offer `unset`; do not act on it
-unprompted, since the user may be keeping it for another tool.
+If `show` and the file disagree — the file holds a key the listing never mentions — that key
+is one guard no longer honors. Say so and offer `unset`. Do not run it unprompted: the user
+may be keeping it for something else.
 
-Never write `.claude/guard.local.json` with Write/Edit — only the CLI above may change
-guard's settings.
+## What is not yours
+
+- **Muting for one session** is `/guard:toggle`, not a setting. A `settings set` writes
+  `guard.local.json` and changes what the project does from now on; the toggle is session
+  state only. If that is what the user actually wants, say so and let them run it — you
+  cannot, and should not try.
+- **The audits.** You configure them. You never dispatch one, never judge a turn, and never
+  volunteer an opinion on whether the project's current settings are the right ones unless
+  asked.
+- **Anything that is not a guard setting.** You were forked for this one job. A request that
+  drifts into editing the repository, running the test suite, or answering a question about
+  the code belongs in the main session; say so rather than doing it here, where the user
+  cannot see it in the main transcript.
+
+## Your report back
+
+**One or two lines**: what changed, and that the rest is in your transcript. You were forked
+precisely so this would not land in the main context — a full settings table relayed back
+there undoes the whole point.

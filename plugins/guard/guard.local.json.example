@@ -4,6 +4,7 @@
   "clarity-auditor": "off",
   "korean-corrector": "off",
   "comment-corrector": "off",
+  "refs-finder": "off",
   "router_model": "",
   "refs_dir": ""
 }

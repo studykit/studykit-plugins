@@ -1,10 +1,11 @@
 # guard dispatch playbook
 
-How to run each of guard's audit agents and what to do with what it reports. You are sent
-here by section name — guard's router names the sections for the agents it picked, and a
-`/guard:*` command names one section directly. There is no section for the router itself:
-routing is its own job, described in its definition, and its report tells you what to do
-next.
+How to run each of guard's agents and what to do with what it reports. You are sent here by
+section name — guard's router names the sections for the agents it picked, a `/guard:*`
+command names one section directly, and guard's session-opening context names
+`refs-finder`, which runs before an answer exists and so is never routed. There is no
+section for the router itself: routing is its own job, described in its definition, and its
+report tells you what to do next.
 
 **Read only the sections you were named, and do exactly what they say.** Everything each
 agent needs that is specific to this turn — the answer file, the source files, the
@@ -98,6 +99,39 @@ When you report back, relay the router's reason for each pick alongside what tha
 found. **A clean result is one line** — every agent passing is the common case, and a
 paragraph celebrating it trains the user to skip the report that matters. A pick that
 plainly misread the turn is worth saying so about rather than working around.
+
+## `refs-finder`
+
+Names the reference documents already saved in this project that bear on the user's
+question, so you read the saved copy instead of answering from memory or fetching the page
+again.
+
+This one is not part of the turn-end fan-out and three of the rules above do not reach it.
+It runs **before you answer**, so dispatch it **alone and in the foreground** — you need
+its result this turn, and there is nothing else in flight to batch it with. The
+auditors-before-correctors ordering is about the answer file, which does not exist yet. And
+you are sent here by guard's session-opening context rather than by the router, once, for
+whichever questions call for it — not by a per-turn instruction, so deciding that a
+question could rest on saved documentation is yours.
+
+Inputs: **the user's question, verbatim** — their wording, not your restatement of it and
+not keywords you distilled from it. guard keeps no copy of the prompt, so you are the only
+source it has, and a question you have already condensed into search terms has had exactly
+the context stripped out that tells a reference apart from a lookalike. Nothing else: it
+resolves the refs directory itself.
+
+What it returns is a list of paths with one line each, or `none`. Then:
+
+- **On a result** — read the files it named, yourself. It deliberately quotes nothing, so
+  its report is a set of pointers and not evidence. When your answer rests on one, cite
+  both the source URL recorded inside the reference and its local path, per the refs rule
+  guard states at session start.
+- **On `none`** — proceed and say nothing about it. This is the common case, and a line
+  reporting that a lookup found nothing is noise in an answer the user asked for something
+  else in.
+
+Either way, do not paste its report into your reply and do not tell the user a lookup
+happened. It changes nothing on disk.
 
 ## `claims-auditor`
 

@@ -10,6 +10,11 @@ names which of guard's audit agents would actually find something in it, with a 
 for each; the main agent then dispatches those, concurrently. guard audits nothing itself,
 and every audit criterion lives in an agent definition under `agents/`.
 
+guard recommends at **two** events, not one. The turn-end path above is the bulk of it;
+`refs-finder` (item 2) runs at the other end, before an answer exists, and is announced once
+at SessionStart instead of being routed. Anything below that says "the turn" or "the
+response" is about the turn-end path.
+
 Where each piece of text lives is decided by how often it is paid for, and that split must
 hold: `additionalContext` reaches the main agent on **every** routed turn, so it is one
 imperative plus a list of fields (paths, which agents are on, each one's mode).
@@ -70,7 +75,15 @@ paths guard had to tell apart from a clean verdict. As a subagent, none of that 
      request, the tool activity, and earlier evidence the claims rest on. That second half
      is asked for as inclusion, never selection, because the author curating its own
      evidence is the failure that shape invites.
-   - Nobody gathers the session's history. The record holds the response and nothing else;
+   - Nobody gathers the session's history. The record holds the response, and beside it
+     guard saves the user's request verbatim for the ROUTER alone — materiality is relative
+     to what was asked, and it is the one judgment that cannot be made from the answer by
+     itself. Kept as a sibling file, not a section, so the correctors never edit the user's
+     own words; no audit agent is given it, and the router may only ever use it to name
+     FEWER agents, never as the reason to name one. Both are named relative to a `turn dir`
+     the dispatch spells once — the router is never told how to BUILD a guard path, because
+     that prose would be a second copy of the storage layout and a drifted copy clears every
+     turn silently. Beyond those two,
      the agents that may need more (`needs_history`: the three auditors) get a transcript
      path, the turn id, and the `transcript` subcommand, and extract what they want into
      their own file. The main agent gathering it would put the largest cost of an audit in
@@ -104,7 +117,46 @@ paths guard had to tell apart from a clean verdict. As a subagent, none of that 
    claims on their own past say-so. The router has no memory, on purpose — its answer must
    come from this turn, not from a habit.
 
-2. **Session mute** (`/guard:toggle`, UserPromptExpansion) — `audit_paused` in the session
+2. **Reference lookup** (`refs-finder`, SessionStart) — the one agent that runs *before* an
+   answer rather than auditing one after, and the exception every rule above is phrased
+   around. This project's evidence contract makes a doc-based claim save a local copy of
+   what it cites; enforcement is at write time, so nothing made those copies get *read*, and
+   a question already answered on disk got answered from memory or a re-fetch instead. Given
+   the question, the agent names the saved references bearing on it — paths and one line
+   each, never an excerpt — and the main agent reads them itself.
+
+   It joins `AUDIT_AGENTS` under a third `reads` value, `prompt`, which is what earns the
+   whole thing: one string is again the setting, the state key, the playbook section and the
+   `subagent_type`, and validation, `settings show`, the status count and the `off`/`fresh`/
+   `reuse` modes all come free. What `reads="prompt"` then costs is one exclusion, in
+   `_eligible_agents` — the router triages a finished turn and this agent has no material in
+   one. Exclude it there and nowhere else: `eligible` is also what decides whether Stop
+   emits anything at all, and Codex's adapter shares that function.
+
+   Four things must not regress:
+
+   - **Stated once, at SessionStart, not per prompt.** A `UserPromptSubmit` line would bill
+     every turn in the session for an agent that is off by default and wanted only on the
+     questions touching saved docs. Once is enough because SessionStart registers no matcher
+     and so fires on every source — `compact` among them — which restates the line as soon
+     as a compaction drops it (`wiki/ref/claude-code-hooks-session-env.md`). If that ever
+     stops being true, the fix is a per-turn line, not a silent agent.
+   - **The question goes over verbatim.** guard's saved copy of the request is written at
+     `UserPromptSubmit` and addressed to the router; this agent runs before that turn has an
+     answer and is never handed it, so the main agent is its only source — and a question
+     already condensed into search terms has lost what separates a reference from a
+     lookalike.
+   - **No `WebFetch`, and no memory.** Sparing a fetch is the job, so an agent that can
+     fetch will answer from the network the moment the refs come up empty and bury the
+     `none` that is the signal a reference still needs saving. And the refs index is the
+     curated, version-controlled map of what is saved — a remembered copy could only drift
+     from it, which for a lookup is the whole failure. Omitting `memory` also leaves Write
+     and Edit off, so this agent is read-only as a fact rather than as a promise.
+   - **Suppressed on Codex, at the source.** `cmd_session_start` is core and the Codex
+     adapter calls it directly; Codex ships one named agent and no refs-finder, so without
+     the `_HOST_IS_CODEX` gate it is told to dispatch something that does not exist.
+
+3. **Session mute** (`/guard:toggle`, UserPromptExpansion) — `audit_paused` in the session
    state, and the shape matters. It is session-only: it cannot write guard.local.json, so
    reaching for it mid-conversation can never change what the project does tomorrow. It is
    also *visible* — the `status` subcommand renders it as a status-line segment — and that
@@ -125,10 +177,26 @@ paths guard had to tell apart from a clean verdict. As a subagent, none of that 
    wire it, and the segment prints **nothing** on any failure — a status line is the one
    place guard must never report an error.
 
-3. **Post-edit** (PostToolUse on the write tools) — records the turn's edited source
+4. **Post-edit** (PostToolUse on the write tools) — records the turn's edited source
    files for a later `comment-corrector` recommendation, and blocks until a file saved
    in the refs directory is listed in that directory's `AGENTS.md`. Both independent of
    the agent settings.
+
+guard resolves the project root two ways, and merging them breaks one of the two. A **hook**
+is handed `CLAUDE_PROJECT_DIR` and so never guesses: absent means a broken install, and
+`_project_dir` returns None rather than writing state under whatever directory the host
+launched in. A **CLI verb** invoked over Bash — `transcript`, `settings`, `refs-dir` — never
+receives it (that variable reaches Bash only through an explicit `CLAUDE_ENV_FILE` export,
+`wiki/ref/claude-code-hooks-session-env.md`). So SessionStart writes that export itself,
+under guard's own name — `GUARD_PROJECT_DIR` — and `_cli_project_dir` reads it, falling back
+to a walk up to the git root. Never export `CLAUDE_PROJECT_DIR`: the host owns that name and
+other tooling reads its presence as "running inside a hook". The exports are append-once,
+because SessionStart also fires on every compaction. The cwd is not an acceptable stand-in: an agent that had `cd`-ed into a
+subdirectory wrote its extract to a second state tree there, which the root-anchored
+`.gitignore` did not cover, and `settings show` from the same place reported a project with
+every switch off. Both failures are silent, which is why the ignore patterns are also
+`**/`-prefixed — the rule must not be the last thing standing between a session extract and
+a commit.
 
 guard reads the transcript for two unrelated purposes, and keeping them apart matters. At
 Stop it reads a single record to learn how the turn was *opened* (`_turn_identity`), and every
@@ -168,6 +236,37 @@ plugin skill's content and its `allowed-tools` rules alike
 (`wiki/ref/claude-code-skill-substitutions.md`). Never by climbing out with
 `${CLAUDE_SKILL_DIR}/../..`: that depth is wrong the moment the file moves, and it has
 moved.
+
+`/guard:settings` is the one entry point that does **not** run in the main session. It
+carries `context: fork` with `agent: general-purpose`, and the reason is cost: a session
+late in its life re-pays for its whole context on every turn, so a settings exchange held
+there is charged against the conversation the user actually came for. A forked skill does
+not inherit that conversation — `context: fork` is not `/subtask`
+(`wiki/ref/claude-code-skill-fork-context.md`) — so the body and the exchange both stay out.
+Three things follow.
+
+**The body is long on purpose, and that is not the usual smell.** With the fork it is paid
+for once, by the agent that needs it, and never by the conversation the user came for — so
+the question for anything in it is "does this run use it", not "is the file short". The
+`context: fork` warning is the real constraint: a forked skill needs an actionable task, so
+reference material must sit inside instructions rather than replace them.
+
+It stays **background**, which is the default and must remain so. Only background agents
+appear in the interactive panel, and that panel is how the user opens the transcript and
+keeps adjusting settings by talking to the agent (`wiki/ref/claude-code-subagent-resume.md`).
+Foreground would take the tokens out of the main context and hand back nothing the user
+could continue.
+
+**Nothing enforces the CLI-only rule; the body asks for it.** A custom `tools: Bash` agent
+would have made hand-editing `guard.local.json` impossible rather than forbidden, and that
+was tried and dropped — one more agent definition to keep in step with a file that is
+already the single home for this. `allowed-tools` is not the substitute: per the docs it
+pre-approves and "does not restrict which tools are available". `disallowed-tools` does
+remove tools, and the skill sets it, but whether that reaches inside a fork is undocumented
+— so treat it as belt-and-braces and keep the standing prohibition in the body as the thing
+actually holding. This is the same class of guarantee as `GUARD_SETTINGS_SKILL=1`, which a
+model also sets: both prove the chain began at the user's entry point, never that no agent
+could have gone around them.
 
 The source is the truth for control flow, and its comments carry the *why* next to the
 code. When editing, record what must not regress — don't restate function bodies here.

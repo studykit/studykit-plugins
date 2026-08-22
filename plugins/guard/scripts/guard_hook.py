@@ -59,12 +59,14 @@ Subcommands
                  recommendation is built from), and requires a file saved inside the
                  refs directory to be listed in that directory's ``AGENTS.md``, blocking
                  until it is. Both are independent of the agent switches.
-- session-start  SessionStart. Sweep state files and turns/ and extracts/ dirs older than
-                 retention, export ``GUARD_REFS_DIR`` (the resolved refs directory) via
-                 ``$CLAUDE_ENV_FILE``, and state as session context: the refs rule always,
-                 the dispatch playbook's path when any agent is on, and the standing reuse
-                 policy when any agent is in ``reuse``. Each is said ONCE here rather than
-                 in every Stop, which is the whole reason this hook prints anything.
+- session-start  SessionStart. Sweep state files, ``trace.log``, and turns/ and extracts/
+                 dirs older than retention, export ``GUARD_PROJECT_DIR`` and
+                 ``GUARD_REFS_DIR`` via ``$CLAUDE_ENV_FILE`` (append-once, since this event
+                 also fires on every compaction), and state as session context: the refs rule always,
+                 the dispatch playbook's path when any turn-end agent is on, the ``refs-finder``
+                 announcement when that switch is on (not on Codex), and the standing
+                 reuse policy when any agent is in ``reuse``. Each is said ONCE here rather
+                 than in every Stop, which is the whole reason this hook prints anything.
 - toggle         UserPromptExpansion (``^(guard:)?toggle$``), for ``/guard:toggle
                  [on|off]``. Mutes or unmutes the automatic audit for THIS SESSION —
                  ``audit_paused`` in the session state, never guard.local.json, so it cannot
@@ -90,6 +92,13 @@ Subcommands
                  ``refs_dir`` validation. Called via Bash (claims auditor fallback / the
                  output style), not a hook event.
 
+The three CLI verbs (``transcript``, ``settings``, ``refs-dir``) resolve the project root
+with ``_cli_project_dir``: ``GUARD_PROJECT_DIR``, which SessionStart exports into the Bash
+environment via ``$CLAUDE_ENV_FILE``, else the git root above the cwd. ``CLAUDE_PROJECT_DIR``
+itself is never in that environment. The hook events use ``_project_dir``, which is the env
+var alone and fails open. Do not merge the two: a hook guessing a root writes state somewhere
+nobody looks, and a CLI verb refusing to guess answers nothing at all.
+
 State lives project-local under ``${CLAUDE_PROJECT_DIR}/.claude/guard/``:
 - ``state/<sid>.json``       — {<agent modes>, audit_paused, edited_prompt_id, edited_files, last_audited_prompt_id, pending_verify_prompt_id, transcript_path, updated_at}
 - ``turns/<sid>/<pid>.md``   — the turn's ANSWER. guard names the path at the start of the
@@ -97,6 +106,12 @@ State lives project-local under ``${CLAUDE_PROJECT_DIR}/.claude/guard/``:
                                 agents audit it and the correctors edit it in place, so the
                                 corrected file is what the user is shown. guard fills it in
                                 only if the turn left it empty (see ``_write_turn_response``).
+- ``turns/<sid>/<pid>.request.md`` — the user's REQUEST for that turn, verbatim, written by
+                                guard at UserPromptSubmit. It goes to the ROUTER and to
+                                nothing else: never audited, never corrected, never handed to
+                                an audit agent. It is there so triage can tell the part of an
+                                answer the user asked for from the part nobody asked for (see
+                                ``_write_turn_request``).
 - ``extracts/<dir>/…``       — what an agent pulled out of the transcript, written by the
                                 ``transcript`` subcommand on request and swept with the
                                 rest of the session's state. ``<dir>`` is the transcript
@@ -152,7 +167,10 @@ from typing import Any, NamedTuple
 
 # Codex adapters set GUARD_HOST before importing this module. Keep the historical
 # Claude paths intact while preventing one host from interpreting the other's state.
-if os.environ.get("GUARD_HOST") == "codex":
+# Read once into a constant: the Codex adapter imports this module, so anything below
+# asking "which host" must get the same answer the paths were chosen from.
+_HOST_IS_CODEX = os.environ.get("GUARD_HOST") == "codex"
+if _HOST_IS_CODEX:
     STATE_DIR_REL = ".codex/guard"
     CONFIG_REL = ".codex/guard.local.json"
 else:
@@ -248,6 +266,10 @@ DEFAULT_CONFIG: dict[str, Any] = {
     # EDITS them, unattended, in the turn the user is still reading. That is why it is
     # the one switch whose cost is a diff rather than a report.
     "comment-corrector": AgentMode.OFF,
+    # Which of the docs saved under `refs_dir` bear on the question the user just asked.
+    # The only switch here that governs something said BEFORE an answer rather than an
+    # audit of one after, so it is announced once at SessionStart and never routed.
+    "refs-finder": AgentMode.OFF,
     # Where guard saves local copies of cited docs, relative to
     # the project dir. Empty = the default git-tracked `wiki/ref/`, so the collected
     # references are committed with the repo. Point it at a different tracked path
@@ -285,8 +307,57 @@ def _cli_write_allowed() -> bool:
 
 
 def _project_dir() -> Path | None:
+    """Project root for a HOOK. None when the host did not say, which fails open.
+
+    A hook process is given `CLAUDE_PROJECT_DIR` (guard's Codex adapter sets
+    `GUARD_PROJECT_DIR` the same way), so an absent value means something is wrong with the
+    installation rather than that guard should guess — and guessing here would write state
+    under whatever directory the host happened to launch in. CLI verbs are the opposite case
+    and use `_cli_project_dir`.
+    """
     value = os.environ.get("GUARD_PROJECT_DIR") or os.environ.get("CLAUDE_PROJECT_DIR")
     return Path(value) if value else None
+
+
+def _cli_project_dir() -> Path:
+    """Project root for a verb invoked over Bash. Never None — a CLI verb must answer.
+
+    `CLAUDE_PROJECT_DIR` is NOT in the Bash tool's environment. It is given to hook
+    processes and substituted into skill/command content; reaching the Bash environment takes
+    an explicit `CLAUDE_ENV_FILE` export (`wiki/ref/claude-code-hooks-session-env.md`,
+    `wiki/ref/claude-code-skill-substitutions.md`). SessionStart writes one —
+    `GUARD_PROJECT_DIR`, via `_export_to_bash_env` — so on Claude Code the env branch below
+    is the normal path, and everything after it is the fallback.
+
+    That fallback still has to be right. The export is best-effort, `CLAUDE_ENV_FILE` is
+    Claude Code only, and it is not documented to reach a SUBAGENT's Bash — which is exactly
+    where `transcript` runs from.
+
+    It used to be `Path.cwd()`, which is wrong in a way that stays silent. The caller is an
+    agent or a skill, and an agent that had `cd`-ed into a subdirectory to read code wrote
+    its extract to `<subdir>/.claude/guard/extracts/` and `settings show` reported a project
+    with every switch off — a second, empty state tree beside the real one, in a directory
+    the root `.gitignore` does not cover, so `git add -A` would have committed session
+    extracts into the repo. That is the precise outcome guard chooses `memory: local` to
+    avoid.
+
+    Hence the git root, found by walking up from the cwd: guard's state is per-checkout, its
+    ignore rules are written from the repo root, and every caller runs somewhere inside the
+    checkout it is working on. `.git` is tested with `exists()` rather than `is_dir()`
+    because in a worktree or submodule it is a file — and stopping at the worktree's own root
+    is right, since a worktree is its own checkout with its own state.
+
+    The cwd remains the last resort, for a project that is not a git repository at all.
+    There is nothing better to offer there, and it is the behavior that was always in place.
+    """
+    env = os.environ.get("GUARD_PROJECT_DIR") or os.environ.get("CLAUDE_PROJECT_DIR")
+    if env:
+        return Path(env)
+    start = Path.cwd().resolve()
+    for candidate in (start, *start.parents):
+        if (candidate / ".git").exists():
+            return candidate
+    return start
 
 
 def _state_root(project_dir: Path) -> Path:
@@ -306,15 +377,18 @@ def _turn_record_file(project_dir: Path, session_id: str, prompt_id: str) -> Pat
     it out that many times, in a message the main agent composes itself, which is exactly
     where a turn quietly becomes a paraphrase of the turn. One file, read by everyone.
 
-The file is the ANSWER, not a record of it. guard names the path at the start of the
+    The file is the ANSWER, not a record of it. guard names the path at the start of the
     turn, the main agent writes the substance there, the agents audit and correct it in
     place, and the corrected file is what the user is shown — so the same text never has to
     be printed twice, once flawed and once fixed. guard writes it only as a fallback, when
-    the turn ended with nothing there. What surrounds the response (the request, the turn's tool activity,
-    what an earlier turn established) lives in the transcript, and an agent that needs any
-    of it runs `transcript turn|find|index` and gets its own extract file. That keeps the
-    author of the turn out of the record of the turn, which is the property the whole
-    design rests on.
+    the turn ended with nothing there. What surrounds the response — this turn's tool
+    activity, what an earlier turn established — lives in the transcript, and an agent that
+    needs any of it runs `transcript turn|find|index` and gets its own extract file. That
+    keeps the author of the turn out of the record of the turn, which is the property the
+    whole design rests on. The one exception is the user's request, which guard copies into
+    a sibling file for the router alone (`_turn_request_file`): the router has `Read` and no
+    way to extract, and materiality is the one judgment that cannot be made from the answer
+    by itself.
     """
     return _state_root(project_dir) / "turns" / session_id / f"{prompt_id}.md"
 
@@ -356,6 +430,55 @@ def _write_turn_response(project_dir: Path, session_id: str, prompt_id: str,
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(f"{TURN_FALLBACK_HEADER}\n\n{response.rstrip()}\n",
                         encoding="utf-8")
+    except OSError:
+        return None
+    return path
+
+
+def _turn_request_file(project_dir: Path, session_id: str, prompt_id: str) -> Path:
+    """The file holding the user's request for this turn. For the ROUTER only.
+
+    A sibling of the answer file rather than a section inside it, and that separation is the
+    point. Put in the answer file, the user's own sentences become text the correctors edit —
+    `korean-corrector` would rewrite the user's Korean, in a file the user is then shown —
+    and text the auditors weigh as part of the answer. Kept apart, the request can be handed
+    to the one agent whose judgment needs it and withheld from every agent that would act on
+    it. It also lands in the same per-session directory, so the SessionStart sweep reaps it
+    with the answer it belongs to and there is no second tree to keep bounded.
+    """
+    return _state_root(project_dir) / "turns" / session_id / f"{prompt_id}.request.md"
+
+
+# Header on the request file. guard writes this file itself, so unlike the answer file it
+# always carries a header — and the header has work to do: the router is told the file is
+# the user's words and not the answer, at the top of the file it is reading, where a
+# dispatch line naming the path cannot say it.
+TURN_REQUEST_HEADER = (
+    "<!-- guard: the user's request for this turn, verbatim, as guard received it at "
+    "UserPromptSubmit. NOT part of the answer: nothing audits it, nothing corrects it, and "
+    "no audit agent is given it. It exists so the router can tell what the user asked for "
+    "from what the answer volunteered. -->"
+)
+
+
+def _write_turn_request(project_dir: Path, session_id: str, prompt_id: str,
+                        prompt: str) -> Path | None:
+    """Save the user's request verbatim for the router. Returns the path, or None.
+
+    Verbatim is the requirement, not a nicety: the router's job is to judge what the user
+    asked for, and a condensed or paraphrased request is one guard's own summarizer has
+    already decided the answer to. This is the only place guard keeps a copy of a prompt, and
+    it is kept for one reader.
+
+    Best-effort and silent on failure, like `_write_turn_response`: the router falls back to
+    judging materiality from the answer alone, which is what it did before this file existed.
+    A guard that skipped an audit because it could not write a scratch file would be failing
+    closed on its own plumbing.
+    """
+    path = _turn_request_file(project_dir, session_id, prompt_id)
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(f"{TURN_REQUEST_HEADER}\n\n{prompt.strip()}\n", encoding="utf-8")
     except OSError:
         return None
     return path
@@ -826,8 +949,7 @@ def cmd_transcript() -> int:
               file=sys.stderr)
         return 0
 
-    pd_env = os.environ.get("CLAUDE_PROJECT_DIR")
-    project_dir = Path(pd_env) if pd_env else Path.cwd()
+    project_dir = _cli_project_dir()
     session_id = opts.get("session", "") or path.stem
     out = Path(opts["out"]) if opts.get("out") else None
     rows = _turn_index(path)
@@ -1123,11 +1245,22 @@ class AuditAgent(NamedTuple):
     they are the same string.
 
     ``reads`` is what the agent is pointed at — ``"turn"`` for the turn record guard
-    wrote, ``"files"`` for the source files the turn edited. It selects the paths the
-    dispatch carries and gates eligibility, since a ``"files"`` agent with no edited file
-    has no input at all. ``verify_command`` marks the agents that also have their own
-    ``/guard:*`` command over the last completed turn; it is what stops ``cmd_verify``
-    from dispatching an agent no command can reach.
+    wrote, ``"files"`` for the source files the turn edited, ``"prompt"`` for the user's
+    question. It selects the paths the dispatch carries and gates eligibility, since a
+    ``"files"`` agent with no edited file has no input at all.
+
+    ``"prompt"`` is the odd one and marks an agent that runs at the *other end* of a turn.
+    Everything else here audits a finished response, so guard names it at Stop and hands it
+    a path guard itself wrote. A ``"prompt"`` agent works on the question instead, before
+    an answer exists — so there is no path to hand over (guard deliberately keeps no copy
+    of the prompt; the main session is its only source), nothing at Stop to route it into,
+    and its standing policy is stated once at SessionStart rather than per turn. Which is
+    why ``_eligible_agents`` excludes it: the router triages finished turns, and a
+    prompt-time agent has no material in one.
+
+    ``verify_command`` marks the agents that also have their own ``/guard:*`` command over
+    the last completed turn; it is what stops ``cmd_verify`` from dispatching an agent no
+    command can reach.
 
     ``needs_history`` is whether this agent may need to look past the response — at the
     request, at what the turn ran, at what an earlier turn established. Those agents are
@@ -1175,12 +1308,15 @@ def _instance_name(name: str) -> str:
 
 # Order here is the order the agents appear in a recommendation. The three read-only
 # auditors come first: their findings may change what the correctors should be run on.
+# `refs-finder` sits last because it never appears in that recommendation at all — it runs
+# before the answer, not after it — so its position is free.
 AUDIT_AGENTS: dict[str, AuditAgent] = {
     "claims-auditor": AuditAgent(reads="turn", verify_command=True, needs_history=True),
     "deferrals-auditor": AuditAgent(reads="turn", verify_command=True, needs_history=True),
     "clarity-auditor": AuditAgent(reads="turn", verify_command=True, needs_history=True),
     "korean-corrector": AuditAgent(reads="turn", verify_command=True, needs_history=False),
     "comment-corrector": AuditAgent(reads="files", verify_command=False, needs_history=False),
+    "refs-finder": AuditAgent(reads="prompt", verify_command=False, needs_history=False),
 }
 
 
@@ -1270,6 +1406,12 @@ def _eligible_agents(state: dict[str, Any], edited: list[str]) -> list[str]:
     - for a ``reads="files"`` agent, at least one source file this turn wrote, because
       that list is the agent's whole input and the router cannot invent one.
 
+    A ``reads="prompt"`` agent is excluded outright: it works on the question, so a
+    finished turn holds nothing for it. Excluded HERE rather than where the dispatch is
+    built, because ``eligible`` is also what decides whether ``cmd_stop`` emits anything at
+    all — leaving it in would make a turn look routable on the strength of an agent that
+    already ran, and Codex's adapter, which shares this function, would recommend it.
+
     Notably absent: any language test for ``korean-corrector``. Deciding whether a
     response is Korean enough to audit is a reading task, and the router does it better
     than a Hangul ratio that has to guess how many English identifiers a Korean answer
@@ -1278,6 +1420,8 @@ def _eligible_agents(state: dict[str, Any], edited: list[str]) -> list[str]:
     out: list[str] = []
     for key, spec in AUDIT_AGENTS.items():
         if not _switch_on(state, key):
+            continue
+        if spec.reads == "prompt":
             continue
         if spec.reads == "files" and not edited:
             continue
@@ -1394,16 +1538,45 @@ def _router_context(project_dir: Path, session_id: str, prompt_id: str, lead: st
     The ROUTER is always a fresh instance, whatever the agents are set to. Its question is
     about this turn, and an instance carrying the last five turns is one that can answer it
     from the wrong one — the failure would be silent, and routing is the step nothing else
-    checks. It is also the cheapest agent here, so continuity buys the least.
+    checks. Cheapness is not what it is tuned for: a router that misreads the turn either
+    ships the defect or spends a subagent for every agent it named for nothing, and both cost
+    more than the routing call itself ever will. Hence the model in `agents/router.md` is a
+    capable one rather than the cheapest that could hold the method.
     """
     model = _router_model(config)
     fields = [f"- playbook: {_playbook_path()}"]
+    # The two turn files share a long absolute prefix, so it is spelled ONCE and each file
+    # is named relative to it as `{turn dir}/<name>`. The placeholder is written into the
+    # value rather than explained anywhere: a dispatch that shows the substitution needs no
+    # prose about it, and the layout itself stays in `_turn_record_file` /
+    # `_turn_request_file` — a router told how to BUILD these paths would be a second copy
+    # of that layout, in prose, and a drifted copy reads nothing and clears every turn.
+    #
+    # Emitted in the same shape whether or not the request file exists. The dir form is a
+    # few characters longer than one plain absolute path, and paying those is worth more
+    # than giving the router two input shapes to tell apart.
+    answer = _turn_record_file(project_dir, session_id, prompt_id).resolve()
+    fields.append(f"- turn dir: {answer.parent}")
     # Unconditional: every candidate reaching the router is a `reads="turn"` agent, so the
     # answer file is always the thing being routed on. `comment-corrector` is dispatched
     # around the router (see `cmd_stop`) and its file list goes with that dispatch, which
     # is why no candidate line here carries a path.
-    fields.append(
-        f"- answer file: {_turn_record_file(project_dir, session_id, prompt_id).resolve()}")
+    fields.append(f"- answer file: {{turn dir}}/{answer.name}")
+    # The user's own words, for the ROUTER and no other agent. Its one judgment is
+    # materiality, and materiality is relative to what was asked: the same explanatory
+    # paragraph is the answer's substance when the user asked how something works, and
+    # padding when they asked for a one-line setting change. Routing on the answer alone
+    # cannot separate those, and it fails in the expensive direction — a turn that merely
+    # READS like an explanation draws agents that find nothing, which is what teaches the
+    # user to wave the recommendation through. What the request may and may not do with a
+    # pick is stated in `agents/router.md`, read once by the router, not here, where it
+    # would be paid on every routed turn. Conditional on the file existing because
+    # `cmd_user_prompt` is what writes it: a turn it never saw still routes on the answer.
+    # The hook decides that, not the router — absence learned from a failed Read cannot be
+    # told apart from a path the router built wrong, and that failure is silent.
+    request = _turn_request_file(project_dir, session_id, prompt_id).resolve()
+    if request.is_file():
+        fields.append(f"- request file: {{turn dir}}/{request.name}")
     fields.append("- candidates: " + ", ".join(f"`{k}`={modes[k].value}" for k in eligible))
     if transcript and any(AUDIT_AGENTS[k].needs_history for k in eligible):
         fields.append(f"- history: transcript {transcript}, turn {prompt_id}")
@@ -1468,14 +1641,19 @@ _DRAFT_LEAD = (
 
 
 def cmd_user_prompt() -> int:
-    """UserPromptSubmit. Names the file the turn's answer is written to.
+    """UserPromptSubmit. Names the file the turn's answer is written to, and saves the request.
 
-    guard keeps no copy of the user's prompt — it used to, as half of a turn store nothing
-    reads any more. What this hook does now is hand over the draft path, and it has to be
-    this hook because a Stop hook is too late for it: by the time Stop runs, the answer has
-    already been printed to the user, and a printed answer cannot be corrected. Audit-then-
-    correct only works if the answer also exists somewhere editable, and only the main agent
-    can put it there while the turn is still running.
+    It has to be this hook, for both jobs. The draft path, because a Stop hook is too late:
+    by the time Stop runs the answer has already been printed to the user, and a printed
+    answer cannot be corrected — audit-then-correct only works if the answer also exists
+    somewhere editable, and only the main agent can put it there while the turn is running.
+    The request, because this is the only event that carries it; guard's turn store holds the
+    answer and nothing else, and the router cannot go to the transcript for it.
+
+    guard keeps no general copy of the user's prompt — it used to, as half of a turn store
+    nothing reads any more. What `_write_turn_request` restores is narrower than what was
+    removed: one reader, the router, and one question, how much of the answer the user
+    actually asked for.
 
     Silent when no on agent reads the turn (``_reads_turn``) — an unconfigured guard, or one
     running only ``comment-corrector``, adds nothing to any prompt. Also silent for guard's
@@ -1508,6 +1686,10 @@ def cmd_user_prompt() -> int:
         _trace(project_dir, session_id, "user-prompt", "seen")
         return 0
 
+    # Before the lead, so a write that fails cannot be mistaken for the turn being
+    # unroutable: the lead goes out either way and the router adapts to the file's absence.
+    if prompt.strip():
+        _write_turn_request(project_dir, session_id, prompt_id, prompt)
     path = _turn_record_file(project_dir, session_id, prompt_id).resolve()
     print(_DRAFT_LEAD.format(path=path))
     _trace(project_dir, session_id, "user-prompt", "draft_path", prompt_id=prompt_id)
@@ -1851,6 +2033,42 @@ def cmd_stop() -> int:
     return 0
 
 
+def _export_to_bash_env(name: str, value: str) -> bool:
+    """Persist one ``export`` into the session's Bash environment. True if written.
+
+    SessionStart is handed ``CLAUDE_ENV_FILE``, a path whose ``export`` lines reach every
+    later Bash command Claude Code runs (`wiki/ref/claude-code-hooks-session-env.md`). It is
+    the only channel by which a Bash-invoked verb learns something the HOST decided rather
+    than inferring it, and guard uses it for two values: the project root and the resolved
+    refs directory.
+
+    ``GUARD_``-prefixed names only, never ``CLAUDE_PROJECT_DIR``: the host owns that name,
+    other tooling reads its presence as "running inside a hook", and guard exporting it into
+    every shell in the session would be guard answering for the host.
+
+    Appended only when the identical line is not already present. SessionStart registers no
+    matcher, so it fires on `startup`, `resume`, `clear`, `compact` and `fork` alike, and a
+    blind append added the same export once per compaction for the life of the session —
+    which is what `GUARD_REFS_DIR` did before this became shared.
+
+    Best-effort, silent on failure: everything that reads these has a fallback, and the
+    session's context lines go out either way.
+    """
+    env_file = os.environ.get("CLAUDE_ENV_FILE", "").strip()
+    if not env_file:
+        return False
+    line = f"export {name}={shlex.quote(value)}"
+    try:
+        path = Path(env_file)
+        if path.is_file() and line in path.read_text(encoding="utf-8").splitlines():
+            return False
+        with path.open("a", encoding="utf-8") as fh:
+            fh.write(line + "\n")
+    except OSError:
+        return False
+    return True
+
+
 def cmd_session_start() -> int:
     # Sweep both state and logs on the same age policy. State is intentionally NOT
     # cleared at SessionEnd: a session can be resumed later (`claude --resume`), and
@@ -1860,6 +2078,9 @@ def cmd_session_start() -> int:
     project_dir = _project_dir()
     if project_dir is None:
         return 0
+    # Before the sweep: the sweep can fail on a filesystem error, and this export is what
+    # keeps the CLI verbs off their inferred fallback for the rest of the session.
+    exported = _export_to_bash_env("GUARD_PROJECT_DIR", str(project_dir))
     root = _state_root(project_dir)
     cutoff = time.time() - ORPHAN_MAX_AGE_SECONDS
     for sub in ("state",):
@@ -1917,21 +2138,11 @@ def cmd_session_start() -> int:
                 d.rmdir()
             except OSError:
                 pass
-    # Persist the resolved refs directory into the session's Bash environment
-    # (GUARD_REFS_DIR) so a Bash caller resolves it with one `echo`
-    # instead of re-deriving the `refs_dir` validation from the raw config. Docs:
-    # a SessionStart hook may append `export` lines to $CLAUDE_ENV_FILE and the
-    # variables reach all subsequent Bash commands
-    # (https://code.claude.com/docs/en/hooks, "CLAUDE_ENV_FILE").
+    # The resolved refs directory, so a Bash caller gets it with one `echo` instead of
+    # re-deriving the `refs_dir` validation from the raw config.
     session_cfg = _load_config(project_dir)
     refs = _refs_dir(project_dir, session_cfg)
-    env_file = os.environ.get("CLAUDE_ENV_FILE")
-    if env_file:
-        try:
-            with open(env_file, "a", encoding="utf-8") as fh:
-                fh.write(f"export GUARD_REFS_DIR={shlex.quote(str(refs))}\n")
-        except OSError:
-            pass
+    _export_to_bash_env("GUARD_REFS_DIR", str(refs))
 
     # The injected contract states the general rule — a doc-based claim cites the source
     # URL and a local saved copy — but not where this project keeps that copy, which
@@ -1950,12 +2161,42 @@ def cmd_session_start() -> int:
     # on. The Stop hook repeats the path on each routed turn — one line, and it must,
     # because context compaction can drop this one — but stating it here is what lets that
     # line stay a path instead of an explanation of what the file is for.
-    if any(_switch_on(session_cfg, k) for k in AUDIT_AGENTS):
+    #
+    # `reads="prompt"` is excluded from the test: that agent runs before the answer, so a
+    # project running only it has no audit at all and this sentence would be false.
+    if any(_switch_on(session_cfg, k) for k, spec in AUDIT_AGENTS.items()
+           if spec.reads != "prompt"):
         print(
             "guard: audits are on for this project. When a turn finishes, guard names the "
             f"agents to consider and points at {_playbook_path()}, which says how to "
             "dispatch each one and what to do with what it reports. Read only the sections "
             "you are named; do not read the file until then."
+        )
+
+    # `refs-finder` is the one agent guard announces here instead of naming it per turn,
+    # and this is the whole announcement. It runs BEFORE an answer exists, so there is no
+    # Stop recommendation to ride on; the alternative was a line on every UserPromptSubmit,
+    # billing every turn in the session for an agent that is off by default and wanted only
+    # on the questions that touch saved docs. Once is enough because SessionStart registers
+    # no matcher and so fires on every source — `startup`, `resume`, `clear`, `compact`,
+    # `fork` — which means a compaction that drops this line immediately restates it
+    # (https://code.claude.com/docs/en/hooks, excerpt at
+    # wiki/ref/claude-code-hooks-session-env.md).
+    #
+    # Not on Codex: it ships one named agent installed by `$guard:setup` and no
+    # refs-finder, and this module is its adapter's library — so without the host test it
+    # would be told to dispatch an agent that does not exist there.
+    #
+    # The refs directory is deliberately not repeated: the line printed just above names
+    # it, and the agent resolves it itself with the `refs-dir` subcommand anyway.
+    if _switch_on(session_cfg, "refs-finder") and not _HOST_IS_CODEX:
+        print(
+            "guard: this project saves copies of the documentation it cites. Before "
+            "answering a question that could rest on one — how a tool, API, format or "
+            f"protocol behaves — dispatch {_agent_id('refs-finder')} with the user's "
+            "question verbatim and wait for it; it names the saved references that bear "
+            "on the question, or reports none. See the `refs-finder` section of "
+            f"{_playbook_path()} the first time you dispatch it."
         )
 
     # The standing reuse policy is stated ONCE, here, rather than in every Stop
@@ -1972,12 +2213,12 @@ def cmd_session_start() -> int:
     if reused:
         named = ", ".join(f"{_agent_id(k)} as `{_instance_name(k)}`" for k in reused)
         print(
-            "guard: these audit agents run as ONE instance for this whole session, not a "
+            "guard: these guard agents run as ONE instance for this whole session, not a "
             f"fresh one per turn — {named}. Keep those instances; they can message each "
             "other and you by name. Every other guard agent, the router included, is "
             "fresh each time. The playbook says how to reach a reused instance."
         )
-    _trace(project_dir, None, "session-start", "swept")
+    _trace(project_dir, None, "session-start", "swept", exported_project_dir=exported)
     return 0
 
 
@@ -2146,13 +2387,13 @@ def cmd_settings() -> int:
     this verb the only way to clear one is the hand-edit the skill forbids. It deletes
     any key, live or dead, rather than only the dead ones — guard cannot know which keys
     a newer version owns, so pruning on its own judgment would silently discard a
-    downgraded user's config. Project dir from ``CLAUDE_PROJECT_DIR`` (Bash env), else
-    the current directory."""
+    downgraded user's config. Project dir from ``_cli_project_dir`` — the git root, not the
+    cwd, or a `set` run from a subdirectory would write a second config file the session
+    never reads."""
     positional, session_arg = _parse_settings_argv(sys.argv[2:])
     op = positional[0].lower() if positional else "show"
 
-    pd_env = os.environ.get("CLAUDE_PROJECT_DIR")
-    project_dir = Path(pd_env) if pd_env else Path.cwd()
+    project_dir = _cli_project_dir()
     session_id = session_arg or (os.environ.get("CLAUDE_CODE_SESSION_ID", "").strip() or None)
 
     if op not in ("set", "unset"):
@@ -2230,10 +2471,12 @@ def cmd_refs_dir() -> int:
     The single query point for "where do cited-doc copies go": the claims auditor falls
     back to it when its dispatch omits `refs_dir`, and anything with the script
     path can use it instead of re-implementing _refs_dir's fallback rules.
+
+    A CLI verb, so `_cli_project_dir`. On `_project_dir` it printed NOTHING to every caller
+    it has — the Bash environment has no `CLAUDE_PROJECT_DIR` to find — which is not a
+    fail-open, since the whole verb is the answer it was asked for.
     """
-    project_dir = _project_dir()
-    if project_dir is None:
-        return 0
+    project_dir = _cli_project_dir()
     print(_refs_dir(project_dir, _load_config(project_dir)))
     return 0
 
