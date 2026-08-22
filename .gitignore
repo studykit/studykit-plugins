@@ -218,14 +218,17 @@ session-tree.lock
 **/.claude/tmp/
 **/.claude/guard/
 **/.codex/guard/
-# Subagent `memory: local` scope. The agents that use it declare it not-for-version-control,
-# and that is right for the repositories guard is INSTALLED into — creating files in someone
-# else's commits is a side effect nobody asked for. This repository is where those agents are
-# developed, so what they have learned here is worth keeping and reviewing; the root store is
-# tracked deliberately.
-# Still ignored at every other depth: a store under a subdirectory (e.g.
-# `plugins/<name>/.claude/agent-memory-local/`) is state written with a misresolved project
-# root, and that must not become committable just because the root one is wanted.
+# Subagent memory stores, both scopes. The root store is tracked deliberately and that is
+# now the point of it: guard's reporting agents use `memory: project`, so what one of them
+# writes down arrives in a pull request and a wrong entry is caught by the same review that
+# catches wrong code. An untracked store would have to be believed instead.
+# Ignored at every other depth, which is the part that must not be lost: a store under a
+# subdirectory (e.g. `plugins/<name>/.claude/agent-memory/`) is state written with a
+# misresolved project root, and it must not become committable just because the root one is
+# wanted. `agent-memory-local` keeps the same shape — an agent shipping to someone else's
+# repository may still choose that scope, and this repository is where it is developed.
+**/.claude/agent-memory/
+!/.claude/agent-memory/
 **/.claude/agent-memory-local/
 !/.claude/agent-memory-local/
 .DS_Store

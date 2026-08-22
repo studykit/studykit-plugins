@@ -25,7 +25,10 @@ tools: WebSearch, WebFetch, Read, Write, Edit, Grep, Glob, Bash
 # conventions look like — and a stale one costs a wasted fetch, visibly, rather than a
 # suppressed finding. It is also the one agent for which the field grants nothing new: Write
 # and Edit are already in its tool list, because writing the reference IS the job.
-memory: local
+# `project` rather than `local`: what accumulates here is about the sources, not about one
+# checkout, and putting it in the project's diff means a stale convention gets corrected by
+# review instead of quietly costing fetches.
+memory: project
 # `opus`, and this was measured rather than assumed. Both models were given the same question
 # about a long documentation page. Both produced a correct saved excerpt. Only one noticed
 # that `WebFetch` had returned a summarizer's paraphrase with the answer replaced by an

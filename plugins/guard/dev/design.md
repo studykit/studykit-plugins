@@ -217,9 +217,11 @@ payloads, not memory.
   memory*, so `autoMemoryEnabled: false` or `CLAUDE_CODE_DISABLE_AUTO_MEMORY` turns it off
   entirely with no signal to the agent. Docs: https://code.claude.com/docs/en/sub-agents
   ("Persistent Memory for Subagents"), excerpt at
-  `wiki/ref/claude-code-subagent-memory.md`, fetched 2026-08-22. Unverified: whether
-  `<agent>` is the bare or the namespaced name for a plugin subagent — guard is written not
-  to care, since it never touches those directories.
+  `wiki/ref/claude-code-subagent-memory.md`, fetched 2026-08-22. Measured 2026-08-23: the
+  grant is NOT scoped to the memory directory — an agent declaring only `Read` reported Write
+  and Edit present and wrote to an absolute path outside both the project and its memory
+  directory. The directory for a plugin subagent is the hyphenated, plugin-prefixed name
+  (`.claude/agent-memory/guard-claims-auditor/`), also observed rather than assumed.
 - **The settings skill needs the live session id, and gets it by substitution.**
   `${CLAUDE_SESSION_ID}` is a skill-content substitution expanded before the skill runs (per
   the skills docs, https://code.claude.com/docs/en/skills, "string substitution"), so the
@@ -568,11 +570,12 @@ payloads, not memory.
   once at SessionStart instead, so the per-turn text carries only the mechanic.
 - **Memory is what the agent knows about the project; reuse is what the instance saw this
   session.** Both exist, they are different axes, and neither substitutes for the other.
-  The audit agents carry `memory: local` — conventions, where the answers live, a
-  correction the user rejected. The docs recommend `project`, and for an agent a team wrote
-  for itself that is right; guard is installed from a marketplace and runs in repositories
-  it does not own, where `project` would create files that land in someone else's commits
-  and pull requests without their asking. `local` is the reversible default: a team that
+  The reporting agents carry `memory: project`, and the scope is chosen for the review, not
+  for the sharing — see "A stored verdict is invisible when it is wrong" below. The earlier
+  reasoning, kept because it is still the right instinct for a different kind of agent: a
+  marketplace plugin runs in repositories it does not own, where `project` creates files
+  that land in someone else's commits without their asking. `local` is the reversible
+  default for that case: a team that
   wants the knowledge shared changes one word in the agent. Note that neither scope is
   gitignored for free — in this very repo `.claude/agent-memory-local/` is not matched by
   any ignore rule, so "not meant for version control" is an intent the project still has to
@@ -1236,6 +1239,60 @@ with both heading-marked and unmarked project content, and at least one file who
 unattributed — that last case is what separated the models. The fetcher arm needs a long page
 with a section a summarizer will drop, and it must be sandboxed to a scratch refs directory:
 the agent writes, and an arm pointed at the real one leaves two competing references behind.
+
+## A stored verdict is invisible when it is wrong
+
+The failure, first, because the design only makes sense against it. `deferrals-auditor` wrote
+into its own memory that deferrals needing a live runtime are legitimate, then cited that
+entry back as its reason for passing exactly the deferral it exists to catch. Deleting the
+entry did not hold — the next run wrote a fresh one. With a store available, the cheapest
+move on any later turn is to match a stored pattern instead of re-deriving the judgement, and
+a *wrong* stored verdict cannot be found by looking, because it suppresses the finding that
+would have exposed it. Prose forbidding it was tried at two models and broken by both.
+
+Three facts constrain the fix, all measured (2026-08-23, claude 2.1.239):
+
+- **`memory:` grants Write and Edit, unscoped.** An ad-hoc agent declaring `tools: ["Read"]`
+  with `memory: local` reported Write and Edit present and wrote successfully to an absolute
+  path outside both the project and its memory directory. The docs' "so the subagent can
+  manage its memory files" is the grant's purpose, not a restriction. The symmetric run
+  without the field had `Read` alone and no Write tool to call.
+- **A subagent's own `hooks:` frontmatter cannot enforce it.** The field exists, and the host
+  ignores it for plugin subagents (as it does `permissionMode` and `mcpServers`).
+- **A plugin's own hooks do reach subagents.** Tool events fire inside them and the payload
+  carries `agent_type`; a plugin subagent reports the plugin-scoped name, observed as
+  `guard:korean-corrector` in the `pre-write` trace. Excerpt:
+  `wiki/ref/claude-code-hooks-in-subagents.md`.
+
+So the boundary is enforced from guard's own manifest, not from each definition — which also
+means an agent cannot widen its own limit by editing its own file. `PreToolUse` on the write
+tools runs `pre-write`, which denies a write from a report-only agent to anything outside a
+memory directory. Two deliberate choices in it. The rule is a **location**, not a per-agent
+path: naming each agent's own directory would depend on how the host derives that name, and
+one auditor writing into another's memory is a curation problem rather than the repository
+damage this is for. And it traces every write it sees, not only the denials, because
+"the hook never fired" and "no agent ever tried" are otherwise the same empty log.
+
+The enforced set is the agents that report and never edit: `claims-auditor`,
+`deferrals-auditor`, `clarity-auditor`, `agents-md-auditor`, `refs-auditor`. The other three
+write as part of the job — `korean-corrector` edits the answer file, `comment-corrector` the
+source files it was handed, `docs-fetcher` the reference it saved — and restricting those
+would mean encoding "the files given to it this turn", which a PreToolUse hook cannot know.
+
+The hook is only half of it, and the half it does not cover is the original failure. It stops
+a stray write; it cannot stop a wrong verdict written *inside* the memory directory. That is
+what the scope change is for: `project` puts the store in `.claude/agent-memory/`, which is
+tracked, so an entry arrives in a pull request and is read by someone. Review is the check on
+content; the hook is the check on location. `deferrals-auditor` additionally carries the
+asymmetric rule in prose — never store a remembered `legitimate` — because that specific
+direction is the one that reproduces itself.
+
+**Codex is not wired.** Codex lists `PreToolUse` among its events and its decision can deny
+before a tool runs (`guide/adapter-guide.md`), but what is documented there about `agent_type`
+is the `SubagentStart` payload, not `PreToolUse`. Registering the hook on a payload that may
+not identify the agent would cost a process per edit to accomplish nothing, so
+`hooks.codex.json` is unchanged. What has to be established first: whether a Codex
+`PreToolUse` payload carries `agent_type`, and what a plugin subagent reports in it.
 
 ## Codex: hooks must be trusted, or guard is silent
 

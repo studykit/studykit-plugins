@@ -126,7 +126,7 @@ AUDIT_AGENTS: dict[str, AuditAgent] = {
 # Source files whose comments `comment-corrector` can judge. Deliberately not "every
 # file the turn touched": the agent judges comments against the code under them, and a
 # markdown or JSON edit gives it nothing to judge. Extension-based rather than
-# content-sniffing because this runs on every edit and must stay a dict lookup.
+# content-sniffing because this runs on every edit and must stay a set lookup.
 _SOURCE_SUFFIXES = frozenset({
     ".py", ".pyi", ".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".go", ".rs",
     ".java", ".kt", ".kts", ".c", ".h", ".cc", ".cpp", ".hpp", ".cs", ".rb", ".php",
