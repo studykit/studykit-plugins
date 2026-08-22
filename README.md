@@ -9,7 +9,6 @@ A curated plugin repository that is compatible with both **Claude Code** and **O
 - `plugins/<plugin-name>/.codex-plugin/plugin.json`: Codex plugin manifest
 - `.claude-plugin/marketplace.json`: Claude marketplace catalog
 - `.agents/plugins/marketplace.json`: Codex marketplace catalog
-- `global/`: Claude global rules, skills, hooks, and MCP configuration
 
 ## Codex compatibility
 

@@ -18,10 +18,6 @@ Start with `guide/AGENTS.md` when adding or changing plugin manifests, hooks, sk
 
 When developing or changing skills, hooks, plugins, or agents, always check the current official Claude Code and Codex documentation before relying on runtime behavior, manifest schemas, metadata fields, placeholders, environment variables, hook payloads, tool names, or marketplace behavior. Do not rely on memory or repository examples alone when an official behavior may have changed.
 
-## Global Directory
-
-The `global/` directory manages rules, subagents, skills, hooks, and MCP configurations intended for installation to `~/.claude/`. These are user-level components that apply globally across all projects, not specific to any single plugin.
-
 ## Language Requirements
 
 **All documentation must be written in English.** When creating or editing markdown files, README files, CLAUDE.md files, or any other documentation, always use English.
