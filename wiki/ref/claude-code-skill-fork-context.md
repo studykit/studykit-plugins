@@ -14,9 +14,10 @@ The frontmatter that moves a skill's whole body out of the main session. Note th
 | Field | Documented behavior |
 | --- | --- |
 | `context` | "Set to `fork` to run in a forked subagent context." |
-| `agent` | "Which subagent type to use when `context: fork` is set." |
+| `agent` | "Which subagent type to use when `context: fork` is set." Built-ins are `Explore`, `Plan`, `general-purpose`, plus any custom subagent in `.claude/agents/`; **"If omitted, uses `general-purpose`."** So spelling `agent: general-purpose` out states the default rather than changing anything. |
 | `background` | "Only applies with `context: fork`. Set to `false` to wait for the forked subagent's result in the turn that invoked the skill, instead of running it in the background. Default: `true`. Requires Claude Code v2.1.218 or later." |
 | `model` | "With `context: fork`, the value sets the forked subagent's model instead." |
+| `effort` | "Effort level when this skill is active. Overrides the session effort level. Default: inherits from session. Options: `low`, `medium`, `high`, `xhigh`, `max`; available levels depend on the model." Note what is *not* said: `model` carries an explicit "with `context: fork`, the value sets the forked subagent's model instead" and `effort` has no counterpart sentence, so whether it reaches the fork or only the invoking turn is undocumented. Set it if you want it, but do not depend on it. |
 
 ## What it does
 
@@ -67,6 +68,25 @@ Claude Code waits for the result anyway in these cases:
 > that fork the conversation doesn't cover it. If your skill's steps depend on a tool
 > outside that set, set `background: false` to keep the full tool set.
 
+Two filters, from https://code.claude.com/docs/en/sub-agents.md (retrieved 2026-08-22).
+The first drops `Agent`, `AskUserQuestion`, `EndConversation`, `EnterPlanMode`,
+`ExitPlanMode`, `ScheduleWakeup`, `TaskOutput`, `WaitForMcpServers` and `Workflow` from
+**every** subagent, foreground or background. The second leaves a background subagent with
+`Read`, `Grep`, `Glob`, `Bash`, `PowerShell`, `Edit`, `Write`, `NotebookEdit`, `WebFetch`,
+`WebSearch`, `TodoWrite`, `Skill`, `ToolSearch`, `EnterWorktree`, `ExitWorktree`, `Monitor`,
+`TaskStop`, `SendMessage` and `Artifact`. Forks of the conversation skip both filters — but
+that is the `/subtask` kind of fork, not a `context: fork` skill, as the quote above says.
+
+Two consequences for a `context: fork` skill that changes files:
+
+- **It can still edit.** `Edit`, `Write` and `Bash` survive the background filter, so a
+  skill whose job is to write a file works backgrounded.
+- **It cannot ask a bounded question.** `AskUserQuestion` is gone from the first filter, so
+  a skill that needs the user's agreement before writing has to get it in prose, in its own
+  transcript — which the user reaches through the panel `background: true` puts it in
+  (`claude-code-subagent-resume.md`). A skill that must ask in the main conversation needs
+  to stay unforked.
+
 > A forked skill that runs in the background applies its edits outside your session's
 > checkpoints, so `/rewind` doesn't undo them; use git to revert them.
 
@@ -109,7 +129,13 @@ one frontmatter line, and the background default is what puts the agent in the i
 panel so the user can keep adjusting settings by talking to it
 (`claude-code-subagent-resume.md`).
 
-Pairing it with a custom `agent:` rather than `general-purpose` is what keeps the tool
-restriction: guard's settings file may only be written through its CLI, and an agent whose
-`tools` is `Bash` alone cannot open the file at all — an enforced list rather than a
-prohibition in prose.
+A custom `agent:` would be the way to make the tool restriction enforced rather than
+merely stated: guard's settings file may only be written through its CLI, and an agent whose
+`tools` is `Bash` alone cannot open the file at all. guard does not do this — it runs on the
+default `general-purpose` and leans on `disallowed-tools` plus a prohibition in the body,
+because that field's reach into a fork is undocumented. Worth revisiting if the prose ever
+fails to hold.
+
+`/guard:statusline` is forked for the same cost reason, and pays a price `/guard:settings`
+does not: it asks the user before writing their settings file, `AskUserQuestion` is stripped
+from every subagent, so that exchange moved into the background transcript.

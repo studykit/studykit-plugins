@@ -2,6 +2,18 @@
 name: statusline
 description: 'Add guard''s audit indicator to the status line, or show how. Wires `guard_hook.py status` into the user''s existing status line so whether audits are on for this session is visible without asking. Use when the user wants the guard segment shown, or when it stopped appearing. Claude Code only.'
 argument-hint: ''
+# Forked for the same reason as `/guard:settings`: wiring one segment is a short exchange,
+# but the main session may be carrying a large conversation and re-pays for all of it on
+# every turn the exchange takes. `context: fork` does not inherit that conversation, so the
+# body and the whole run stay out of it (wiki/ref/claude-code-skill-fork-context.md).
+context: fork
+model: sonnet
+# The documented default, spelled out because this command asks before it writes and the
+# background panel is where that asking now happens: `AskUserQuestion` is stripped from
+# EVERY subagent, so the agreement below can only be reached in this agent's own transcript,
+# which `background: true` is what makes openable. `Edit` and `Write` survive the background
+# filter, so the write itself still works.
+background: true
 disable-model-invocation: true
 ---
 
@@ -11,6 +23,11 @@ adds a **segment** to whatever status line the user already runs.
 
 **This writes the user's own settings file.** Show the exact change and get explicit
 agreement before touching it. A direct "add it" counts.
+
+You are running in your own background context, so that exchange happens **here**, in this
+transcript, which the user opens from the interactive panel — not in the conversation they
+invoked you from. Ask in prose and wait; there is no question tool to reach for. If nobody
+answers, leave the settings file alone and say what you would have changed.
 
 ## 1. Find the pieces
 

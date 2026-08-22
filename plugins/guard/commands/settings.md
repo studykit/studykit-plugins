@@ -11,7 +11,13 @@ disable-model-invocation: true
 # also why this file is long and unapologetic about it: with the fork it is paid for once,
 # by the agent that actually needs it, and never by the conversation the user came for.
 context: fork
-agent: general-purpose
+# No `agent:` — omitting it is documented to use `general-purpose`, which is what this ran
+# under when the field was spelled out. `model` is documented to set the FORKED subagent's
+# model when `context: fork` is set; `effort` carries no such sentence, so it may reach only
+# the invoking turn. It is set as an intent, not relied on
+# (wiki/ref/claude-code-skill-fork-context.md).
+model: sonnet
+effort: medium
 # The default, stated because it is load-bearing rather than incidental: only BACKGROUND
 # agents appear in the interactive panel, and that panel is how the user opens the
 # transcript and keeps adjusting settings by talking to the agent directly
