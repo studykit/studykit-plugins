@@ -1,8 +1,14 @@
 """The per-session state file, ``state/<sid>.json``.
 
 Holds the agent modes as of this session, ``audit_paused``, the files this turn edited
-(``edited_prompt_id`` / ``edited_files`` / ``edited_agent_docs``), ``last_audited_prompt_id``,
-``pending_verify_prompt_id``, ``transcript_path`` and ``updated_at``.
+(``edited_prompt_id`` / ``edited_files`` / ``edited_agent_docs`` / ``edited_refs``),
+``last_audited_prompt_id``, ``pending_verify_prompt_id``, ``transcript_path`` and
+``updated_at``.
+
+Both the ``default`` dict and the ``keys`` tuple in ``_read_state`` are the schema, and a new
+key must be added to BOTH. A key missing from ``keys`` is written by whoever set it and then
+dropped on the very next read, which looks exactly like the writer never ran — that is how
+``edited_refs`` behaved for its first hour of existence.
 """
 
 from __future__ import annotations
@@ -33,13 +39,15 @@ def _read_state(project_dir: Path, session_id: str, config: dict[str, Any]) -> d
         # Files written during one turn, accumulated by PostToolUse and read back at Stop
         # to decide whether a file-reading agent has anything to look at. Stored WITH the
         # prompt_id they belong to: a bare list would outlive its turn and point an agent
-        # at files the current turn never touched. Two lists, one marker — the split is by
+        # at files the current turn never touched. Three lists, one marker — the split is by
         # which agent can judge the file (source code for `comment-corrector`, instruction
-        # files for `agents-md-auditor`), while "which turn was this" is the same question
-        # for both and a second marker could only drift from the first.
+        # files for `agents-md-auditor`, saved references for `refs-auditor`), while "which
+        # turn was this" is the same question for all of them and a second marker could only
+        # drift from the first.
         "edited_prompt_id": "",
         "edited_files": [],
         "edited_agent_docs": [],
+        "edited_refs": [],
         # Session-only mute, flipped by `/guard:toggle`. NOT a mode in front of the agent
         # switches the way the removed `audit_gate` was: it lives only in session state, so
         # it can never change what the project does by default, and the `status` subcommand
@@ -58,8 +66,8 @@ def _read_state(project_dir: Path, session_id: str, config: dict[str, Any]) -> d
     if not isinstance(data, dict):
         return default
     keys = (*AUDIT_AGENTS, "last_audited_prompt_id", "pending_verify_prompt_id",
-            "transcript_path", "audit_paused",
-            "edited_prompt_id", "edited_files", "edited_agent_docs", "updated_at")
+            "transcript_path", "audit_paused", "edited_prompt_id", "edited_files",
+            "edited_agent_docs", "edited_refs", "updated_at")
     default.update({k: data[k] for k in keys if k in data})
     return default
 

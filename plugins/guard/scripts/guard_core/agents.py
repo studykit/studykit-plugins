@@ -29,27 +29,29 @@ class AuditAgent(NamedTuple):
 
     ``reads`` is what the agent is pointed at — ``"turn"`` for the turn record guard
     wrote, ``"files"`` for the source files the turn edited, ``"agent-docs"`` for the
-    ``AGENTS.md`` / ``CLAUDE.md`` files it edited, ``"prompt"`` for the user's question.
-    It selects the paths the dispatch carries and gates eligibility, since a file-reading
-    agent with no matching edit has no input at all.
+    ``AGENTS.md`` / ``CLAUDE.md`` files it edited, ``"refs"`` for the saved reference files
+    it wrote under the refs directory. It selects the paths the dispatch carries and gates
+    eligibility, since a file-reading agent with no matching edit has no input at all.
 
-    ``"files"`` and ``"agent-docs"`` are separate values rather than one "the turn's
-    edits", because the two agents behind them judge different things and a shared list
-    would hand each one files it has nothing to say about. ``comment-corrector`` judges a
-    comment against the code under it and a markdown file gives it none; the agent-doc
-    auditor judges instruction files against what an instruction file is for and a ``.py``
-    is not one. Same reason ``_SOURCE_SUFFIXES`` and ``_AGENT_DOC_NAMES`` are disjoint:
-    nothing may land in both lists, or one turn's edit would be audited twice under two
-    criteria, one of which does not apply to it.
+    It governs the turn-end path and nothing else. ``docs-fetcher`` is also dispatched
+    BEFORE an answer exists, off the standing policy ``cmd_session_start`` prints, and that
+    entry point is not expressed here — there is no per-turn eligibility to compute for it
+    and no path for guard to hand over, since guard keeps no copy of the prompt. A fourth
+    ``reads`` value for "the question" existed for the agent that only did the lookup; when
+    that agent merged into the fetcher it became a value with one member whose sole effect
+    was an exclusion from a set it was never a candidate for, so it is gone.
 
-    ``"prompt"`` is the odd one and marks an agent that runs at the *other end* of a turn.
-    Everything else here audits a finished response, so guard names it at Stop and hands it
-    a path guard itself wrote. A ``"prompt"`` agent works on the question instead, before
-    an answer exists — so there is no path to hand over (guard deliberately keeps no copy
-    of the prompt; the main session is its only source), nothing at Stop to route it into,
-    and its standing policy is stated once at SessionStart rather than per turn. Which is
-    why ``_eligible_agents`` excludes it: the router triages finished turns, and a
-    prompt-time agent has no material in one.
+    The three file values are separate rather than one "the turn's edits", because the
+    agents behind them judge different things and a shared list would hand each one files it
+    has nothing to say about. ``comment-corrector`` judges a comment against the code under
+    it and a markdown file gives it none; the agent-doc auditor judges instruction files
+    against what an instruction file is for and a ``.py`` is not one; the refs auditor judges
+    a file against what a saved external excerpt may contain, which is a rule no source file
+    is under. Hence the buckets must stay DISJOINT (``_edited_bucket``): a name landing in
+    two would be audited twice under criteria only one of which applies to it. The one real
+    collision is why ``_edited_bucket`` tests location first — the refs directory's own
+    ``AGENTS.md`` is its index, and by name alone it would go to the agent-doc auditor and be
+    faulted for not being a map of the project.
 
     ``verify_command`` marks the agents that also have their own ``/guard:*`` command over
     the last completed turn; it is what stops ``cmd_verify`` from dispatching an agent no
@@ -101,17 +103,23 @@ def _instance_name(name: str) -> str:
 
 # Order here is the order the agents appear in a recommendation. The three read-only
 # auditors come first: their findings may change what the correctors should be run on.
-# `refs-finder` sits last because it never appears in that recommendation at all — it runs
-# before the answer, not after it — so its position is free.
 AUDIT_AGENTS: dict[str, AuditAgent] = {
     "claims-auditor": AuditAgent(reads="turn", verify_command=True, needs_history=True),
     "deferrals-auditor": AuditAgent(reads="turn", verify_command=True, needs_history=True),
     "clarity-auditor": AuditAgent(reads="turn", verify_command=True, needs_history=True),
+    # Routed like the auditors above and for the same reason — whether the answer rests on
+    # an external document is a reading of the answer — but it is the one routed agent that
+    # is not auditing anything. It goes and gets what the answer should have cited.
+    "docs-fetcher": AuditAgent(reads="turn", verify_command=False, needs_history=False),
     "korean-corrector": AuditAgent(reads="turn", verify_command=True, needs_history=False),
     "comment-corrector": AuditAgent(reads="files", verify_command=False, needs_history=False),
     "agents-md-auditor": AuditAgent(reads="agent-docs", verify_command=False,
                                     needs_history=False),
-    "refs-finder": AuditAgent(reads="prompt", verify_command=False, needs_history=False),
+    # Deliberately AFTER `docs-fetcher` in this order, though the two never appear in the
+    # same block: the fetcher is routed and the auditor is dispatched directly. The order
+    # still says which way the pair runs — something saves a reference, then something else
+    # checks what it saved — and a reader of this table should not have to infer that.
+    "refs-auditor": AuditAgent(reads="refs", verify_command=False, needs_history=False),
 }
 
 
@@ -138,11 +146,23 @@ _SOURCE_SUFFIXES = frozenset({
 _AGENT_DOC_NAMES = frozenset({"agents.md", "claude.md"})
 
 
-# Which state list a PostToolUse target belongs in, if any. The two tests are disjoint by
-# construction (`_SOURCE_SUFFIXES` holds no `.md`), so the order here does not decide
-# anything — but a name landing in both would be audited twice under criteria only one of
-# which applies to it, which is why any future entry must keep them disjoint.
-def _edited_bucket(target: Path) -> str | None:
+# Which state list a PostToolUse target belongs in, if any.
+#
+# ORDER IS LOAD-BEARING here, unlike the two name-based tests below it, which are disjoint by
+# construction (`_SOURCE_SUFFIXES` holds no `.md`). The refs test is by LOCATION and it comes
+# first, because the refs directory's own index is named `AGENTS.md` and its shim `CLAUDE.md`:
+# by name alone both go to the agent-doc auditor, which would fault the index of a reference
+# library for not being a map of the project's deeper docs — a finding that is wrong about a
+# file that is doing its job. Inside the refs directory, every markdown file is the refs
+# auditor's, index included: a row describing local reasoning is the same violation as a
+# section of it.
+#
+# `refs_dir` is passed in rather than resolved here so this stays a pure function of its
+# arguments; the caller already has the project dir and the config it takes to resolve it.
+def _edited_bucket(target: Path, refs_dir: Path | None = None) -> str | None:
+    if refs_dir is not None and target.suffix.lower() == ".md" and (
+            target.parent == refs_dir or refs_dir in target.parents):
+        return "edited_refs"
     if target.suffix.lower() in _SOURCE_SUFFIXES:
         return "edited_files"
     if target.name.lower() in _AGENT_DOC_NAMES:
@@ -216,7 +236,8 @@ def _reads_turn(keys: Iterable[str]) -> bool:
 
 
 def _eligible_agents(state: dict[str, Any], edited: list[str],
-                     agent_docs: list[str] | None = None) -> list[str]:
+                     agent_docs: list[str] | None = None,
+                     refs: list[str] | None = None) -> list[str]:
     """The agents the router may choose from, in ``AUDIT_AGENTS`` order.
 
     Two mechanical gates, and only mechanical ones — everything that needs judgment is
@@ -226,27 +247,20 @@ def _eligible_agents(state: dict[str, Any], edited: list[str],
     - for a file-reading agent, at least one file of its own kind this turn wrote,
       because that list is the agent's whole input and nobody downstream can invent one.
 
-    ``agent_docs`` defaults to none rather than being required, for the Codex adapter:
-    it shares this function but mirrors no edited-file recording of its own, so every
-    file-reading agent is ineligible there and passing empty lists is the honest answer.
-
-    A ``reads="prompt"`` agent is excluded outright: it works on the question, so a
-    finished turn holds nothing for it. Excluded HERE rather than where the dispatch is
-    built, because ``eligible`` is also what decides whether ``cmd_stop`` emits anything at
-    all — leaving it in would make a turn look routable on the strength of an agent that
-    already ran, and Codex's adapter, which shares this function, would recommend it.
+    ``agent_docs`` and ``refs`` default to none rather than being required, for the Codex
+    adapter: it shares this function but mirrors no edited-file recording of its own, so
+    every file-reading agent is ineligible there and passing empty lists is the honest
+    answer.
 
     Notably absent: any language test for ``korean-corrector``. Deciding whether a
     response is Korean enough to audit is a reading task, and the router does it better
     than a Hangul ratio that has to guess how many English identifiers a Korean answer
     may carry before it stops being Korean.
     """
-    inputs = {"files": edited, "agent-docs": agent_docs or []}
+    inputs = {"files": edited, "agent-docs": agent_docs or [], "refs": refs or []}
     out: list[str] = []
     for key, spec in AUDIT_AGENTS.items():
         if not _switch_on(state, key):
-            continue
-        if spec.reads == "prompt":
             continue
         if spec.reads in inputs and not inputs[spec.reads]:
             continue

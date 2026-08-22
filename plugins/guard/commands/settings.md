@@ -1,6 +1,6 @@
 ---
 name: settings
-description: "View and change guard's settings for this project — one setting per agent, named after it (claims-auditor, deferrals-auditor, clarity-auditor, korean-corrector, comment-corrector, refs-finder), each off / fresh / reuse, plus router_model and refs_dir — recorded in .claude/guard.local.json. Use when the user wants to configure guard: turn the claim, deferral, clarity, Korean-naturalness, or comment check on or off, have saved reference docs looked up before an answer, keep one of them running across turns instead of respawning it, or set the router's model or refs_dir. Claude Code only."
+description: "View and change guard's settings for this project — one setting per agent, each off / fresh / reuse, plus router_model and refs_dir — recorded in .claude/guard.local.json. Use when the user wants to configure guard: turn an audit on or off, delegate documentation lookups, keep an agent running across turns instead of respawning it, or set the router's model or refs_dir. Claude Code only."
 argument-hint: '[key] [value]'
 disable-model-invocation: true
 # Runs in a forked subagent, not in the main session. Changing a setting is a few CLI calls
@@ -90,16 +90,20 @@ made through the CLI, report that instead of working around it.
 | `clarity-auditor` | `off` / `fresh` / `reuse` | Admits `guard:clarity-auditor` — it flags terms used but never explained, mechanisms given with no concrete example, and explanation pitched wrong for this reader. It calibrates against a reader profile; without one it says so and checks less, so `/guard:reader-profile` comes first if the user means to rely on it. |
 | `korean-corrector` | `off` / `fresh` / `reuse` | Admits `guard:korean-corrector` — it flags 번역체 phrasing and a register that is not 존댓말, and hands back the corrected text. Identifiers, paths, commands, and established loanwords (커밋, 리팩토링) are left alone. |
 | `comment-corrector` | `off` / `fresh` / `reuse` | Admits `guard:comment-corrector`, for the source files the turn actually edited. This one **edits those files in place**, so its fixes land without being asked — say so when the user turns it on. |
-| `refs-finder` | `off` / `fresh` / `reuse` | Admits `guard:refs-finder` — the one agent that runs **before** an answer rather than auditing one after. When a question could rest on documentation this project has saved a copy of, it names the copies that bear on it. Never routed, edits nothing. |
+| `agents-md-auditor` | `off` / `fresh` / `reuse` | Admits `guard:agents-md-auditor`, for the `AGENTS.md` / `CLAUDE.md` files the turn actually edited, judged as instruction files. Reports only — but its findings often mean moving content into a doc that does not exist yet, which is the user's decision, not the agent's. |
+| `docs-fetcher` | `off` / `fresh` / `reuse` | Admits `guard:docs-fetcher` — the only agent on the **network**, and the only one reached from both ends of a turn. With it on, the session stops running WebFetch/WebSearch itself and dispatches this instead: it reports the local path of documentation already saved here, or fetches the primary source and saves it, and says which it did. **It writes to the repository** — new files under `refs_dir` and rows in that directory's index — so say that when the user turns it on. |
+| `refs-auditor` | `off` / `fresh` / `reuse` | Admits `guard:refs-auditor`, for the files under `refs_dir` the turn actually wrote. It checks that a reference is a reference: a trustworthy source named, content attributed rather than recalled, and nothing in it about **this** repository — the last being the rule that actually gets broken. Reports only. |
 | `router_model` | a model name, or empty | Model the **router** runs on. Empty (the default) leaves the choice to the router's own definition in the plugin's `agents/`. Every agent the router names brings its own model, so this changes which audits get picked, never how one is done. |
 | `refs_dir` | a project-relative path, or empty | Where guard saves cited-doc copies. Empty = the git-tracked default `wiki/ref/`, committed with the repo; a different tracked path (e.g. `docs/refs`) overrides it. |
 
 **Every setting ships off**, and with all of them off guard is silent: a finished turn adds
 nothing to the main session's context and makes no model call. Turning one on only makes
 that agent *available* — the router still has to find something in the turn before it names
-it, which is why turning `korean-corrector` on costs nothing on an English turn.
-`refs-finder` is outside that: it runs before an answer exists, so it is never routed and is
-announced once at session start instead.
+it, which is why turning `korean-corrector` on costs nothing on an English turn. The three
+file-reading agents (`comment-corrector`, `agents-md-auditor`, `refs-auditor`) skip the router
+entirely and need a file of their own kind that the turn wrote, so they cost nothing on the
+many turns that write none. `docs-fetcher` is the one that also runs *before* an answer, off a
+policy stated once at session start.
 
 A setting that is off does **not** disable the matching command. `/guard:claims-auditor`,
 `/guard:deferrals-auditor`, `/guard:clarity-auditor` and `/guard:korean-corrector` are the

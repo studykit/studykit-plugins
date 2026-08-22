@@ -21,6 +21,7 @@ listed here.
 | File | Subject | Source |
 | --- | --- | --- |
 | `claude-code-headless-child-flags.md` | Flags for a lightweight `claude -p` child: `--safe-mode` disables hooks while keeping auth, why `--bare` is rejected, and a probe table showing that omitting `--allowedTools` does NOT withhold tools | `claude --help` + probes (2.1.238) |
+| `claude-code-hooks-in-subagents.md` | That `PreToolUse`/`PostToolUse` fire the same hooks for a subagent's tool calls as for the main conversation, the `agent_id`/`agent_type` fields that tell them apart, and that a plugin subagent reports the plugin-scoped name (so a matcher must be anchored) | code.claude.com/docs/en/hooks |
 | `claude-code-hooks-session-env.md` | SessionStart env persistence (`$CLAUDE_ENV_FILE`), hook output fields, the matcher `source` values (`startup`/`resume`/`clear`/`compact`/`fork`), and which events show plain stdout to the model | code.claude.com/docs/en/hooks |
 | `claude-code-output-styles.md` | Output-style frontmatter schema, plugin `output-styles/` discovery, subagent scope | code.claude.com/docs/en/output-styles |
 | `claude-code-pretooluse-permission-decision.md` | PreToolUse `permissionDecision` values | code.claude.com/docs/en/hooks |

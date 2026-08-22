@@ -3,7 +3,7 @@
 How to run each of guard's agents and what to do with what it reports. You are sent here by
 section name — guard's router names the sections for the agents it picked, a `/guard:*`
 command names one section directly, and guard's session-opening context names
-`refs-finder`, which runs before an answer exists and so is never routed. There is no
+`docs-fetcher`, which can also run before an answer exists. There is no
 section for the router itself: routing is its own job, described in its definition, and its
 report tells you what to do next.
 
@@ -100,39 +100,6 @@ found. **A clean result is one line** — every agent passing is the common case
 paragraph celebrating it trains the user to skip the report that matters. A pick that
 plainly misread the turn is worth saying so about rather than working around.
 
-## `refs-finder`
-
-Names the reference documents already saved in this project that bear on the user's
-question, so you read the saved copy instead of answering from memory or fetching the page
-again.
-
-This one is not part of the turn-end fan-out and three of the rules above do not reach it.
-It runs **before you answer**, so dispatch it **alone and in the foreground** — you need
-its result this turn, and there is nothing else in flight to batch it with. The
-auditors-before-correctors ordering is about the answer file, which does not exist yet. And
-you are sent here by guard's session-opening context rather than by the router, once, for
-whichever questions call for it — not by a per-turn instruction, so deciding that a
-question could rest on saved documentation is yours.
-
-Inputs: **the user's question, verbatim** — their wording, not your restatement of it and
-not keywords you distilled from it. guard keeps no copy of the prompt, so you are the only
-source it has, and a question you have already condensed into search terms has had exactly
-the context stripped out that tells a reference apart from a lookalike. Nothing else: it
-resolves the refs directory itself.
-
-What it returns is a list of paths with one line each, or `none`. Then:
-
-- **On a result** — read the files it named, yourself. It deliberately quotes nothing, so
-  its report is a set of pointers and not evidence. When your answer rests on one, cite
-  both the source URL recorded inside the reference and its local path, per the refs rule
-  guard states at session start.
-- **On `none`** — proceed and say nothing about it. This is the common case, and a line
-  reporting that a lookup found nothing is noise in an answer the user asked for something
-  else in.
-
-Either way, do not paste its report into your reply and do not tell the user a lookup
-happened. It changes nothing on disk.
-
 ## `claims-auditor`
 
 Audits the turn for claims asserted without adequate evidence.
@@ -141,8 +108,8 @@ Inputs: the answer file, plus the transcript path, this turn's id and the extrac
 command — it may need history, since a claim is often grounded by a command run several
 turns ago and an auditor that cannot reach it reports a backed claim as unbacked.
 
-It changes nothing you need to review — it may update its own project memory, and
-nothing else. If it reports violations, address them; otherwise continue.
+It changes nothing you need to review — it writes nothing at all. If it reports
+violations, address them; otherwise continue.
 
 ## `deferrals-auditor`
 
@@ -152,8 +119,8 @@ Inputs: the answer file, plus the transcript path, this turn's id and the extrac
 command — it may need history, since the user's request is what separates a deferral the
 assistant owed from a decision it correctly handed back.
 
-It changes nothing you need to review — it may update its own project memory, and
-nothing else. If it reports violations, address them; otherwise continue.
+It changes nothing you need to review — it writes nothing at all. If it reports
+violations, address them; otherwise continue.
 
 ## `clarity-auditor`
 
@@ -198,6 +165,89 @@ It **edits the comments in place**, so its changes are already in the files when
 reports. Relay what it changed AND what it left unfixed — an unfixed finding needs the
 user — and do not re-edit its work.
 
+## `docs-fetcher`
+
+Finds the documentation bearing on a question — in this project's refs directory first, on the
+network when nothing there covers it — and reports the local path, saying which of the two it
+was. It is the only agent here that is not auditing anything, the only one on the network, and
+the only one you reach from **both ends of a turn**.
+
+**Before you answer** is the normal path, and it is the one guard's session-opening context
+sends you here for. You need documentation, the session is not allowed to fetch it, so you
+dispatch this and wait. Dispatch it **alone and in the foreground**: you need its result this
+turn, and there is nothing else in flight to batch it with. Nothing about the turn-end fan-out
+applies — no answer file exists yet, so the auditors-before-correctors ordering is about a file
+that has not been written.
+
+Inputs, on this path: **the user's question, verbatim** — their wording, not your restatement
+and not keywords you distilled from it. guard keeps no copy of the prompt, so you are the only
+source it has, and a question already condensed into search terms has lost exactly the context
+that separates a reference from a lookalike. Nothing else: it resolves the refs directory
+itself.
+
+**At the end of a turn** the router may name it instead, and that is a repair: a finished
+answer rested on how something external behaves and no local copy was ever saved. Inputs
+there: the answer file, and no history — what the answer rests on is in the answer.
+
+Its report gives one line per file, each saying **already saved** or **fetched and saved**, or
+`none`. That distinction is the answer, not a detail:
+
+- **Already saved** — read the file yourself. It deliberately quotes nothing from a file that
+  was already on disk, so its report is a pointer and not evidence. Nothing changed on disk;
+  say nothing to the user about the lookup.
+- **Fetched and saved** — read it, and know that **the repository changed**: a new file under
+  the refs directory and a row in that directory's index. This is the one thing on the
+  pre-answer path that leaves a diff, so name the file in your reply.
+- **`none`** — nothing saved covers the question and nothing primary could be found. Proceed
+  and say nothing about it; a line reporting that a lookup found nothing is noise in an answer
+  the user asked for something else in. What you must not do is quietly substitute your own
+  recollection for the document and cite it as though it were checked.
+
+When your answer rests on one of the files it named, cite **both** the source URL recorded
+inside that file and its local path, per the refs rule guard states at session start.
+
+Two more things to do with the report:
+
+1. **Dispatch `refs-auditor` on exactly the paths it reports as fetched and saved** — one
+   message, the paths unchanged, and not for the already-saved ones. Nothing else will: on the
+   pre-answer path no turn-end recommendation has run yet, on the turn-end path it has already
+   gone out, and either way the agent that just wrote the file is the one party who must not
+   grade it. Skip this and the rule the auditor exists to enforce goes unchecked precisely on
+   the files most likely to break it.
+2. **Act on what it says was for you rather than for the file.** The fetcher is required to
+   keep project-specific conclusions out of a reference and put them in the report instead.
+   That line is a real finding about this repository — a design note or a comment next to the
+   code is usually where it belongs, and that is your call. Do not put it back into the
+   reference.
+
+Do not paste its report into your reply, and do not tell the user a lookup happened when
+nothing was written.
+
+## `refs-auditor`
+
+Audits the saved reference files it is given against what a reference may contain: a
+trustworthy source named, the content attributed to it rather than recalled, and — the rule
+this exists for — nothing in them about this repository.
+
+Inputs: the absolute file paths you were given, and only those — pass them through
+unchanged. It reads neither the turn record nor the transcript, and it has no network by
+design; its evidence is the files and the repository around them.
+
+It **changes nothing**, and carries no tool that could. Its findings split cleanly and you
+should treat the halves differently:
+
+- **A heading, a source line, an index row** — fix it. Renaming a section that labels
+  general observations as this project's notes, adding a missing `Retrieved:` date, adding
+  the index row: these move nothing and lose nothing.
+- **A passage that is project content** — do not delete it. The fix is to move it where it
+  belongs, and the auditor names where; if that document does not exist yet, creating it is
+  a change the user has not asked for. Name the finding, name the destination, and leave it.
+- **An unattributed assertion** — do not repair it from memory, which is the failure being
+  reported. Either quote what the source actually says, which means fetching it, or mark it
+  as the derivation it is. Both are decisions, not fixes; say so.
+
+A clean audit is one line.
+
 ## `agents-md-auditor`
 
 Audits the `AGENTS.md` / `CLAUDE.md` files it is given as agent instruction files: whether
@@ -211,8 +261,8 @@ unchanged. Adding a file means auditing something this turn never touched. It re
 the turn record nor the transcript; it reads the repository itself, which is where its
 evidence comes from.
 
-It **changes nothing** — it may update its own project memory, and nothing else. Its
-findings are the kind you must not apply on autopilot: deleting a section usually means
+It **changes nothing** — it writes nothing at all. Its findings are the kind you must not
+apply on autopilot: deleting a section usually means
 moving its content into a deeper doc that does not exist yet, and creating that document is
 a change the user has not asked for. So relay what it found and what it proposes, and make
 the deletions and pointer fixes you can make without inventing a new document. Where a
@@ -240,7 +290,7 @@ the answer.
 
 **When the dispatch named no answer file**, steps 1 and 3 do not apply — there is nothing to
 correct and nothing to open. That is the file-reading agents dispatched on their own:
-`comment-corrector` and `agents-md-auditor` work on the files the turn wrote, and a turn
-with no turn-reading agent eligible never wrote an answer file in the first place. Reply
-per step 2, naming the files that changed and the findings you did not apply; the user
+`comment-corrector`, `agents-md-auditor` and `refs-auditor` work on the files the turn wrote,
+and a turn with no turn-reading agent eligible never wrote an answer file in the first place.
+Reply per step 2, naming the files that changed and the findings you did not apply; the user
 reads those in the diff, not in an opened document.

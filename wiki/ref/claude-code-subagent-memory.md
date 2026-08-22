@@ -62,9 +62,32 @@ memory: user
 Three consequences, in decreasing order of how easy they are to get wrong.
 
 **Item 3 overrides the `tools:` allowlist.** `memory` silently enables Write and Edit.
-guard's two auditors are declared read-only ("never writes anything"), so enabling memory
-on them widens what they can do, and the boundary has to be stated in prose instead: they
-may write inside their own memory directory and nowhere else.
+Declaring memory on an agent declared read-only widens what it can actually do, and the
+boundary can only be stated in prose — the runtime does not scope the write.
+
+Measured 2026-08-23, claude 2.1.239. An ad-hoc agent declared `tools: ["Read"]` with
+`memory: local` reported Write and Edit present in its tool set, and a single Write call
+to an absolute path **outside the project and outside its memory directory** returned
+`File created successfully at: ...`; the file existed afterwards with the written content.
+So the docs' "so the subagent can manage its memory files" states the *purpose* of the
+grant, not a restriction on it. Anything that must not be writable has to be kept out of
+reach some other way — which is why guard's reporting agents carry no `memory:` at all.
+
+**`local` vs `project` is location and version-control intent, nothing more.** Re-checked
+against the live page 2026-08-23: the only stated difference is the directory and whether the
+knowledge is "shareable via version control" (`project`) or "shouldn't be checked into
+version control" (`local`). Neither scope changes what the memory tools may touch, and
+neither is a permission boundary. The page's wording for the three "when memory is enabled"
+bullets was rephrased since the 2026-08-22 fetch above (numbered list → bullets); the
+substance is unchanged.
+
+**The docs recommend the pattern that failed here.** Under tips: "Include memory
+instructions directly in the subagent's markdown file so it proactively maintains its own
+knowledge base." That is precisely what guard's auditors had, and it is what produced a
+stored verdict the agent then cited back instead of re-deriving it. The advice is sound for
+an agent accumulating codebase knowledge; it is wrong for one whose output is a verdict,
+because a stored verdict suppresses the finding that would reveal it as wrong. guard follows
+the tip for neither, having removed `memory:` from its reporting agents.
 
 **Neither scope is gitignored for free.** `project` writes `.claude/agent-memory/<agent>/`
 and `local` writes `.claude/agent-memory-local/<agent>/`; the "shouldn't be checked into

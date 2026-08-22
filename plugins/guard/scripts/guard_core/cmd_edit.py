@@ -1,10 +1,16 @@
 """``post-edit`` (PostToolUse on the write tools).
 
-Two independent jobs, both independent of the agent switches. It records a source file or an
-agent instruction file written this turn — the lists the ``comment-corrector`` and
-``agents-md-auditor`` recommendations are built from, kept in two buckets that must stay
-disjoint (``agents._edited_bucket``). And it requires a file saved inside the refs directory
-to be listed in that directory's ``AGENTS.md``, blocking until it is.
+Two independent jobs, both independent of the agent switches. It records a source file, an
+agent instruction file, or a saved reference written this turn — the lists the
+``comment-corrector``, ``agents-md-auditor`` and ``refs-auditor`` recommendations are built
+from, kept in three buckets that must stay disjoint (``agents._edited_bucket``). And it
+requires a file saved inside the refs directory to be listed in that directory's
+``AGENTS.md``, blocking until it is.
+
+Both jobs see a subagent's writes as well as the main agent's, since tool events fire the
+same hooks inside a subagent (https://code.claude.com/docs/en/hooks). That is not incidental
+here: ``docs-fetcher`` is what saves references, so without it the refs bucket would only
+ever catch a hand-written file and the index check would never reach the agent it is for.
 """
 
 from __future__ import annotations
@@ -36,14 +42,19 @@ def _record_edited_source(project_dir: Path, payload: dict, tool_input: Any,
                           config: dict[str, Any]) -> None:
     """Note a file this turn wrote, for a later file-reading agent's recommendation.
 
-    Two lists, chosen by `_edited_bucket`: source files for `comment-corrector`, agent
-    instruction files for `agents-md-auditor`. Anything else is not recorded — an agent
-    handed a file its criteria say nothing about spends its context proving that.
+    Three lists, chosen by `_edited_bucket`: source files for `comment-corrector`, agent
+    instruction files for `agents-md-auditor`, saved references for `refs-auditor`. Anything
+    else is not recorded — an agent handed a file its criteria say nothing about spends its
+    context proving that.
+
+    This fires for a SUBAGENT's write as well as the main agent's: tool events run the same
+    configured hooks inside a subagent and the payload carries `agent_id` / `agent_type`
+    (https://code.claude.com/docs/en/hooks). That is what makes the refs bucket work at all —
+    the file lands there because `docs-fetcher` saved it, not because the main agent did.
 
     Only inside the project: an audit of a file outside the working tree is not this
     turn's work to fix. Files under guard's own state are excluded too — a turn slice is
-    a record, not code, and guard's own `AGENTS.md` under the refs dir is an index the
-    `post-edit` refs check already governs.
+    a record, not code.
 
     Silent and best-effort. A miss here costs one skipped recommendation; a raise here
     would surface as a hook failure on an ordinary edit, which is far worse.
@@ -55,27 +66,31 @@ def _record_edited_source(project_dir: Path, payload: dict, tool_input: Any,
     target = _tool_target_path(project_dir, tool_input)
     if target is None:
         return
-    bucket = _edited_bucket(target)
-    if bucket is None:
-        return
     try:
         project = project_dir.resolve()
         state_root = _state_root(project_dir).resolve()
+        refs = _refs_dir(project_dir, config).resolve()
     except OSError:
+        return
+    bucket = _edited_bucket(target, refs)
+    if bucket is None:
         return
     if project not in target.parents or state_root in target.parents:
         return
 
     state = _read_state(project_dir, session_id, config)
-    # A new turn resets BOTH lists off the one marker; without this, files from the
+    # A new turn resets ALL THREE lists off the one marker; without this, files from the
     # previous turn would ride along into this turn's recommendation. Resetting only the
-    # bucket being written would leave the other holding the previous turn's files under
+    # bucket being written would leave the others holding the previous turn's files under
     # this turn's id, which is the same bug with an extra step.
     if state.get("edited_prompt_id") != prompt_id:
         state["edited_prompt_id"] = prompt_id
         state["edited_files"] = []
         state["edited_agent_docs"] = []
-    files = state[bucket]
+        state["edited_refs"] = []
+    # `.get`, not `[]`: a state file written before a bucket existed reaches here with the
+    # turn marker already matching, so the reset above does not run and the key is absent.
+    files = state.get(bucket)
     if not isinstance(files, list):
         files = []
     path = str(target)

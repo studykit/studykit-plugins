@@ -78,7 +78,7 @@
             "type": "command",
             "command": "uv run --script \"${CLAUDE_PLUGIN_ROOT}/scripts/guard_hook.py\" post-edit",
             "timeout": 10,
-            "description": "Record a source file or an agent instruction file written this turn (for a comment-corrector or agents-md-auditor recommendation), and require a file saved inside the refs dir to be listed in the refs index (AGENTS.md)."
+            "description": "Record a source file, an agent instruction file, or a saved reference written this turn (for a comment-corrector, agents-md-auditor or refs-auditor recommendation) — a subagent's writes included — and require a file saved inside the refs dir to be listed in the refs index (AGENTS.md)."
           }
         ]
       }
@@ -102,7 +102,7 @@
             "type": "command",
             "command": "uv run --script \"${CLAUDE_PLUGIN_ROOT}/scripts/guard_hook.py\" session-start",
             "timeout": 5,
-            "description": "Sweep guard state and turn records past the retention window, export GUARD_REFS_DIR, and state the refs rule as session context."
+            "description": "Sweep guard state and turn records past the retention window, export GUARD_REFS_DIR, state the refs rule as session context, and — when docs-fetcher is on — send the session's documentation lookups to that agent instead of its own WebFetch."
           }
         ]
       }

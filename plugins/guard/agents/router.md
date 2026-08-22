@@ -153,6 +153,32 @@ whether an example was missing, whether it was pitched right for this reader. Th
 reader's profile and the session's history, which this agent has and you do not. A clear
 explanation and a baffling one both go to it. You are answering "is this an explanation".
 
+### `docs-fetcher`
+
+The odd one here: picking it does not start an audit, it sends an agent to the network to
+get a document and save it. So the question is not "is something wrong" but **does this
+answer rest on how something outside this repository behaves?**
+
+Yes when the response states the behavior of an external tool, API, library, format,
+protocol or specification — what a field does, what a flag means, what a payload contains,
+what the platform guarantees. That is the class of claim this project requires a saved local
+copy for, which is why the fetch is worth a subagent.
+
+No when everything the answer asserts is about **this repository**: its own code, its own
+files, what a command in it printed, what the diff changed. No external document covers any
+of that, and a fetcher sent after it comes back with nothing. Also no for an
+acknowledgement, a preference, a plan, or a question back to the user.
+
+Do **not** decide whether a copy is already saved. You cannot — you were handed two files
+and have no way to look, and guessing has one expensive failure and one cheap one: guessing
+"already saved" skips a fetch the project's contract requires, while guessing "not saved"
+costs an agent that reads the index, finds the file, and reports it in one line. So when the
+answer rests on external behavior, name it and let the fetcher check.
+
+One thing does belong to you: whether the answer rests on that behavior **materially**. A
+tool name mentioned in passing, or a path that happens to include a vendor's name, is not a
+claim about how anything behaves.
+
 ### `korean-corrector`
 
 Is the response **Korean prose**? Yes when it is substantially written in Korean and is

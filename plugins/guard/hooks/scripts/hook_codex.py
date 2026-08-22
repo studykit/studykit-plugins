@@ -167,8 +167,9 @@ def _handle_post_tool(project_dir: Path, payload: dict[str, Any], session_id: st
     # A reference saved into the refs dir must be listed in the index; same rule as
     # Claude's `post-edit` hook, applied here because Codex routes every event through
     # this one adapter. Claude's other `post-edit` job — recording the files the turn
-    # edited — is deliberately not mirrored: it exists only to point `comment-corrector`
-    # and `agents-md-auditor` at them, and Codex has neither agent yet.
+    # edited — is deliberately not mirrored: it exists only to point `comment-corrector`,
+    # `agents-md-auditor` and `refs-auditor` at them, and Codex has none of those agents yet.
+    # So the index rule below is enforced on Codex while the audit of what was saved is not.
     config = core_config._load_config(project_dir)
     if core_edit._targets_refs_dir(project_dir, tool_input, config):
         target = core_edit._tool_target_path(project_dir, tool_input)
@@ -188,12 +189,15 @@ def _handle_post_tool(project_dir: Path, payload: dict[str, Any], session_id: st
 # profile it calibrates against. Without either it would have nothing to audit against and
 # would report `profile: MISSING` on every turn.
 #
-# `refs-finder` is absent for a plainer reason and never reaches this table anyway: it runs
-# before an answer rather than auditing one, so `core_agents._eligible_agents` drops it and Stop
-# never sees it. Its own announcement is suppressed on Codex at the source
-# (`core_session.cmd_session_start`, gated on `_HOST_IS_CODEX`) — Codex ships one named agent
-# installed by `$guard:setup`, and there is no refs-finder among them to dispatch. Giving
-# Codex the agent set is what unblocks this, same as above.
+# `docs-fetcher` and `refs-auditor` are absent, and unlike `clarity-auditor` the fetcher WOULD
+# reach this table if it were listed — it is a routed `reads="turn"` agent, so
+# `core_agents._eligible_agents` offers it. Leaving them out is a decision, not a mechanism.
+# The fetcher's standing policy is suppressed at the source
+# (`core_session.cmd_session_start`, gated on `_HOST_IS_CODEX`) for the usual reason: Codex
+# ships one named agent from `$guard:setup` and there is no fetcher among them, so the line
+# would forbid WebFetch and name no replacement. The auditor is a file-reading agent and this
+# adapter mirrors no edited-file recording (see `_handle_post_tool`), so it has no input here
+# either way. Giving Codex the agent set is what unblocks both, same as above.
 _SCOPE = {"claims-auditor": "the response's claims",
           "deferrals-auditor": "deferrals the repository could resolve",
           "korean-corrector": "whether the Korean reads as translated English"}

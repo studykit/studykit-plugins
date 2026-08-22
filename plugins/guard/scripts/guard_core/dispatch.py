@@ -30,6 +30,7 @@ from .agents import AUDIT_AGENTS
 _FILE_INPUT_LABELS = {
     "files": "- files to audit (comments only, in place):",
     "agent-docs": "- agent instruction files to audit:",
+    "refs": "- saved reference files to audit:",
 }
 
 

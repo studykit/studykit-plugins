@@ -67,7 +67,7 @@ there is nothing shared to factor out beyond the state root.
 | `PostToolUse` (`Write\|Edit\|MultiEdit\|NotebookEdit`) | `post-edit` | Record a source file this turn wrote (the candidate list for a `comment-corrector` recommendation), then block when a file saved in the refs dir is not listed in that dir's `AGENTS.md`. |
 | (called via Bash, not a hook) | `settings` | `guard:settings` (a `context: fork` skill, so it runs in a forked `general-purpose` agent rather than in the main session) shows/sets/unsets guard.local.json settings; the agent modes also apply to the live session's `state/<sid>.json` (session id from `--session`/`CLAUDE_CODE_SESSION_ID`). A mode change away from `reuse` also prints a stand-down note, the only channel guard has to a running instance. `set` preserves every other key; `unset <key>` is the only way to delete one. |
 | `Stop` | `stop` | Write the response section of the turn record and mark the turn as the on-demand target — always. Then, when any agent is not `off`, emit `additionalContext` asking the main agent to dispatch `guard:router` over the record, carrying the eligible agents with their modes and this turn's paths. The router names sections of `hooks/context/dispatch-playbook.md`; the main agent follows those, completing the record's second section only if a named section asks for it. `comment-corrector` never goes to the router: it is dispatched directly in the same emission, to be sent in the same message — see the invariant below. |
-| `SessionStart` | `session-start` | Sweep state and turn records past retention, export `GUARD_REFS_DIR`, state the refs rule as session context, name the dispatch playbook once when any *turn-end* agent is on, state the standing `refs-finder` policy once when that agent is on (Claude only), and — when any agent is in `reuse` — state the standing reuse policy once. |
+| `SessionStart` | `session-start` | Sweep state and turn records past retention, export `GUARD_REFS_DIR`, state the refs rule as session context, name the dispatch playbook once when any agent is on, state the fetch policy once when `docs-fetcher` is on (Claude only) — the one line guard emits that forbids a tool — and — when any agent is in `reuse` — state the standing reuse policy once. |
 | (called via Bash, not a hook) | `transcript` | `index` / `turn` / `find` over the session transcript, for the audit agents. Writes an extract file and prints only its path plus a one-line summary; `--since` / `--until` / `--last` bound which turns are scanned. |
 | `UserPromptExpansion` (`^(guard:)?toggle$`) | `toggle` | Mute/unmute the automatic audit for THIS session (`audit_paused`, session state only — never guard.local.json). `command_args` carries `on`/`off`; empty flips. The hook does the work and prints the result. |
 | (called via Bash, not a hook) | `status` | Status-line segment: `guard <n>` / `guard off` / `guard ·`, or nothing on any failure. Reads one state file; runs on every assistant message. |
@@ -82,15 +82,21 @@ written by the main agent.
 - `state/<sid>.json` — the session's live agent modes (one key per agent, named after it,
   valued `off`/`fresh`/`reuse`), the per-turn markers keyed on `prompt_id` that keep each once-only action once-only
   (`last_audited_prompt_id`, `pending_verify_prompt_id`), and the turn's edited files
-  (`edited_prompt_id` + `edited_files` + `edited_agent_docs`). The edited lists are stored
-  WITH the prompt_id they belong to, not as bare lists: PostToolUse appends and Stop reads
-  back, and without the id a previous turn's files would ride into this turn's
-  recommendation. Two lists, one marker — the split is by which agent can judge the file
+  (`edited_prompt_id` + `edited_files` + `edited_agent_docs` + `edited_refs`). The edited
+  lists are stored WITH the prompt_id they belong to, not as bare lists: PostToolUse appends
+  and Stop reads back, and without the id a previous turn's files would ride into this turn's
+  recommendation. Three lists, one marker — the split is by which agent can judge the file
   (`_edited_bucket`: source code for `comment-corrector`, `AGENTS.md`/`CLAUDE.md` for
-  `agents-md-auditor`), while "which turn was this" is the same question for both, and a
-  new turn resets BOTH lists or the untouched one holds stale files under a fresh id.
+  `agents-md-auditor`, anything under the refs directory for `refs-auditor`), while "which
+  turn was this" is the same question for all three, and a new turn resets ALL of them or an
+  untouched one holds stale files under a fresh id. The refs test is by LOCATION and runs
+  first, which is what keeps the buckets disjoint: the refs directory's own `AGENTS.md` index
+  and `CLAUDE.md` shim would otherwise be matched by name and sent to `agents-md-auditor`.
   `_read_state` honors only known keys, so a hand-edited or stale file degrades to
-  defaults instead of injecting state. `audit_paused` is here rather than in the config on
+  defaults instead of injecting state — which cuts both ways, and a NEW key must be added to
+  both the `default` dict and the `keys` tuple. `edited_refs` was added to `default` alone at
+  first: every write landed and the next read dropped it, which is indistinguishable from
+  PostToolUse never having run. `audit_paused` is here rather than in the config on
   purpose — see the session-mute invariant below.
 - `turns/<sid>/<prompt_id>.md` — the answer to the user's question, one file per typed
   prompt. The session writes it during the turn (the path comes from `UserPromptSubmit`);
@@ -141,7 +147,7 @@ payloads, not memory.
 - **A `SessionStart` entry with no matcher fires on every source**, and the sources are
   `startup`, `resume`, `clear`, `compact` and `fork`. `compact` is the load-bearing one:
   guard's SessionStart hook registers no matcher, so a context compaction that drops its
-  injected lines immediately gets them restated. That is the whole reason the `refs-finder`
+  injected lines immediately gets them restated. That is the whole reason the `docs-fetcher`
   standing policy can be stated once per session instead of on every `UserPromptSubmit`. The
   same section confirms that plain stdout becomes model-visible context for exactly three
   events — `UserPromptSubmit`, `UserPromptExpansion`, `SessionStart` — which is how those
@@ -261,7 +267,7 @@ payloads, not memory.
   materiality is relative to the request. The same explanatory paragraph is the substance
   the user came for when they asked how something works, and padding when they asked for a
   one-line setting change; from the answer alone the two are the same text. What that cost
-  was measured on: a plain-language "refs-finder는 켜줘" (so `_CONTROL_CMD_RE` did not skip
+  was measured on: a plain-language "docs-fetcher는 켜줘" (so `_CONTROL_CMD_RE` did not skip
   it — see the control-turn bullet), whose answer file carried the CLI's own output plus a
   volunteered section explaining the switch. The router named `claims-auditor` and
   `clarity-auditor`, correctly by its own cues, and both returned pass.
@@ -458,20 +464,25 @@ payloads, not memory.
   `korean-corrector`: deciding whether a response is Korean enough to audit is a reading
   task, and a ratio has to guess how many English identifiers a Korean answer may carry
   before it stops counting as Korean.
-- **`reads="prompt"` is outside the turn-end machinery entirely.** `refs-finder` works on
-  the question before an answer exists, so `_eligible_agents` drops it and the router never
-  sees it. The exclusion is there and nowhere further downstream on purpose: `cmd_stop`
-  filters `routed`/`direct` on the other two values and would drop it anyway, but `eligible`
-  is also what decides whether Stop emits at all — leaving it in makes a turn look routable
-  on the strength of an agent that already ran, and the Codex adapter, which shares that
-  function, would fold it into its own recommendation. Two more places test `reads` for the
-  same reason: `_reads_turn` (so `refs-finder` alone never asks the session to write an
-  answer file nothing reads) and the SessionStart "audits are on" line (so a project running
-  only `refs-finder` is not told it has an audit).
+- **`reads` governs the turn-end path and nothing else.** `docs-fetcher` is dispatched from
+  two places and only one of them is expressed in `reads`. At the end of a turn it is a
+  `reads="turn"` agent like the auditors, routed on the answer. Before an answer exists it is
+  dispatched off the standing policy `cmd_session_start` prints, and there is nothing for
+  `reads` to say about that: no per-turn eligibility to compute, and no path for guard to hand
+  over, since guard keeps no copy of the prompt.
+
+  A fourth value, `reads="prompt"`, used to exist for the read-only lookup agent, and it is
+  gone. When that agent merged into the fetcher the value had one member whose only effect was
+  an exclusion from a candidate set it was never in, plus two more `reads` tests written
+  around it (`_reads_turn`, and the SessionStart "audits are on" line, both of which had to
+  avoid claiming an audit for a project running only the lookup). Deleting the value deleted
+  all three. If a prompt-time-only agent is ever added back, note that the exclusion has to go
+  in `_eligible_agents` and nowhere further downstream: `eligible` is also what decides
+  whether Stop emits at all, and the Codex adapter shares that function.
 - **The file-reading agents are never routed.** The Stop hook splits the eligible set by
   `reads`: the `reads="turn"` agents go to the router, and `comment-corrector`
-  (`reads="files"`) and `agents-md-auditor` (`reads="agent-docs"`) are dispatched directly
-  in the same emission, to be sent in the same message so they run concurrently. Two
+  (`reads="files"`), `agents-md-auditor` (`reads="agent-docs"`) and `refs-auditor`
+  (`reads="refs"`) are dispatched directly in the same emission, to be sent in the same message so they run concurrently. Two
   reasons, and the second is why this is a split rather than the narrower "skip the router
   when it is alone".
 
@@ -481,8 +492,8 @@ payloads, not memory.
   those files would show their current state, never what this turn changed in them. So the
   hop can only restate what `_eligible_agents` already decided, and bill a subagent for it.
 
-  They need no ordering among themselves either: `_edited_bucket` keeps the two lists
-  disjoint, so the one that edits cannot touch what the one that only reports is reading.
+  They need no ordering among themselves either: `_edited_bucket` keeps the three lists
+  disjoint, so the one that edits cannot touch what the ones that only report are reading.
 
   Nor does it need to wait. The ordering rule in the playbook's `Dispatching` — auditors
   before correctors — exists so a corrector does not rewrite a sentence an auditor was about
@@ -686,11 +697,12 @@ payloads, not memory.
 - **`color` warns about the user's own files; it is not an identity.** The docs offer eight
   colors and nothing that says what they mean, so guard assigns them by what an agent can
   damage, not by which agent it is. **`yellow` means this agent edits files you wrote** and
-  is worn by `comment-corrector` alone, because a corrector rewriting comments in the source
-  the turn just produced is the only thing here that lands unattended in a diff the user has
-  to review. **`red`** is the turn-audit path — the auditors, `korean-corrector`, and the
-  router — where the worst case is a wrong finding in a file guard itself created.
-  **`cyan`** is read-only and outside the audit entirely: `refs-finder`, `simple-explainer`.
+  is worn by `comment-corrector` and `docs-fetcher` — the two that land unattended in a diff
+  the user has to review, one rewriting comments in the source the turn just produced, the
+  other adding files under the refs directory and rows to its index. **`red`** is the audit
+  path — the auditors, `korean-corrector`, `agents-md-auditor`, `refs-auditor`, and the
+  router — where the worst case is a wrong finding rather than a wrong edit. **`cyan`** is
+  read-only and outside the audit entirely: `simple-explainer`.
 
   Two things follow, and the first is the one that looks like a mistake. `korean-corrector`
   edits in place and is `red`, not `yellow`, and that is deliberate: it edits the *answer
@@ -790,10 +802,10 @@ keys are ignored and a missing or malformed file falls back to every default.
 
 Keys: one `AgentMode` per agent, named after that agent — `claims-auditor`,
 `deferrals-auditor`, `clarity-auditor`, `korean-corrector`, `comment-corrector`,
-`agents-md-auditor`, `refs-finder`, **all default `off`** — which together are the only control over whether
-guard says anything unasked. `refs-finder` is the only one of them that governs something
-said *before* an answer rather than after; the key behaves identically, which is the point
-of putting it in the same registry. See the
+`agents-md-auditor`, `docs-fetcher`, `refs-auditor`, **all default `off`** — which together
+are the only control over whether guard says anything unasked. `docs-fetcher` is the only one
+that also governs something said *before* an answer; the key behaves identically, which is the
+point of putting it in the same registry. See the
 invariants above for why the value is a mode rather than a boolean, why reuse is the user's
 call, and why they all ship off. A value that is not a mode word reads as `off` — the safe
 direction, since the alternative is guard acting on a setting the user did not write.
@@ -933,7 +945,7 @@ find "$CLAUDE_PROJECT_DIR" -type d -name guard -path '*/.claude/*' -not -path "$
 # for it is a `request file:` line — for the router, never for an audit agent's dispatch.
 # Without a `user-prompt` for the turn there is no such file and no such line, which is the
 # resumed-session / `!`-command case.
-echo '{"session_id":"s1","prompt_id":"pq","prompt":"refs-finder는 켜줘"}' | "$H" user-prompt
+echo '{"session_id":"s1","prompt_id":"pq","prompt":"docs-fetcher는 켜줘"}' | "$H" user-prompt
 cat "$CLAUDE_PROJECT_DIR/.claude/guard/turns/s1/pq.request.md"   # -> header, then the prompt verbatim
 run pq "Turned it on."      # -> `turn dir:` once, then `{turn dir}/pq.md` and `{turn dir}/pq.request.md`
 run pnone "Turned it on."   # -> same shape MINUS `request file:` (no user-prompt ran)
@@ -967,11 +979,23 @@ run p4 "Refactored the cache."          # -> claims-auditor only: p4 wrote nothi
 # check here, and the first is the one a per-bucket reset would break.
 "$H" settings set agents-md-auditor fresh --session s1
 printf '# x\n' > "$CLAUDE_PROJECT_DIR/AGENTS.md"
-buckets(){ python3 -c "import json;d=json.load(open('$CLAUDE_PROJECT_DIR/.claude/guard/state/s1.json'));print(d['edited_files'],d['edited_agent_docs'])"; }
+buckets(){ python3 -c "import json;d=json.load(open('$CLAUDE_PROJECT_DIR/.claude/guard/state/s1.json'));print(d['edited_files'],d['edited_agent_docs'],d['edited_refs'])"; }
 edit(){ echo "{\"session_id\":\"s1\",\"prompt_id\":\"$1\",\"tool_input\":{\"file_path\":\"$CLAUDE_PROJECT_DIR/$2\"}}" | "$H" post-edit; }
 
 edit pa src/cache.py; edit pa notes.md; edit pa AGENTS.md; buckets
-#   -> [cache.py] [AGENTS.md]: notes.md is in neither
+#   -> [cache.py] [AGENTS.md] []: notes.md is in no bucket
+
+# The one collision the ORDER of the bucket tests exists to settle. Both of these are inside
+# the refs dir, and one is named AGENTS.md — it must NOT reach agents-md-auditor.
+"$H" settings set refs-auditor fresh --session s1
+mkdir -p "$CLAUDE_PROJECT_DIR/wiki/ref"
+printf '# refs\n\n| File | Subject | Source |\n| --- | --- | --- |\n| v.md | x | y |\n' \
+  > "$CLAUDE_PROJECT_DIR/wiki/ref/AGENTS.md"
+printf '# v\n' > "$CLAUDE_PROJECT_DIR/wiki/ref/v.md"
+edit pr wiki/ref/v.md; edit pr wiki/ref/AGENTS.md; edit pr AGENTS.md; buckets
+#   -> [] [AGENTS.md] [wiki/ref/v.md, wiki/ref/AGENTS.md]
+#      The project AGENTS.md is an agent doc; the refs index is a ref.
+run pr "Saved a reference."  # -> refs-auditor with only the two refs paths
 run pa "Did both."      # -> ONE direct block, comment-corrector then agents-md-auditor,
                         #    each with only its own paths, and no `answer file:` line
 
@@ -1035,22 +1059,22 @@ echo '{"session_id":"s1"}' | "$H" session-start
 "$H" settings set korean-corrector fresh --session s1
 #   -> no note: nothing changed, so there is nothing to retire
 
-# `refs-finder` is announced at SessionStart and never routed. Its three failure modes are
+# `docs-fetcher`'s pre-answer policy is announced at SessionStart. Its three failure modes are
 # all "leaked into the turn-end path", so check each end explicitly.
 for k in claims-auditor deferrals-auditor clarity-auditor korean-corrector comment-corrector; do
   "$H" settings set $k off --session s1
 done
-"$H" settings set refs-finder fresh --session s1
+"$H" settings set docs-fetcher fresh --session s1
 echo '{"session_id":"s1"}' | "$H" session-start
-#   -> the refs rule, then the refs-finder policy line naming the playbook.
+#   -> the refs rule, then the fetch policy line naming the playbook.
 #      NOT the "audits are on" line: nothing here audits anything.
 GUARD_HOST=codex "$H" session-start < /dev/null
-#   -> the refs rule only. Codex has no refs-finder agent to dispatch.
+#   -> the refs rule only. Codex has no fetcher agent to dispatch.
 echo "{\"session_id\":\"s1\",\"prompt_id\":\"pr1\",\"transcript_path\":\"$T\",\"last_assistant_message\":\"done.\",\"stop_hook_active\":false}" | "$H" stop
 #   -> empty; trace: none_eligible. A prompt-time agent must never make a turn look routable.
 echo '{"session_id":"s1","prompt_id":"pr1"}' | "$H" user-prompt
 #   -> empty: no agent READS the answer file, so none is named (`_reads_turn`)
-echo '{"session_id":"s1"}' | "$H" verify refs-finder   # no output: verify_command=False
+echo '{"session_id":"s1"}' | "$H" verify docs-fetcher  # no output: verify_command=False
 
 # On-demand dispatch must work with every agent OFF — the invariant most easily broken by
 # a change to the recommendation path. No router is involved: the user already chose.
@@ -1157,6 +1181,61 @@ disclosed it unprompted. The reproduction improved the verdicts — one run matc
 observations line-by-line against the `_audit_paused` branch in `cmd_stop`. The contract in
 the definition was widened to match, since a rule broken independently at two models for good
 reasons is not a rule.
+
+## Picking a model for an agent: the one comparison that was actually run
+
+Every agent's `model:` is a claim that this job needs that tier, and most of guard's are
+argued from the failure mode alone. Two are not: `docs-fetcher` and `refs-auditor` were run
+head-to-head on `sonnet` and `opus` before the field was set. This records what the runs
+showed, so the next person can disagree with evidence rather than taste. Both agents' bodies
+were handed to a `general-purpose` subagent as the prompt, identical between arms, with only
+the model differing.
+
+**`refs-auditor` — eight saved references, five carrying project content.** Ground truth was
+established by hand first: two files had the content behind a `## Bearing on <project>`
+heading, three had it with no heading at all, one had a project-named heading over content
+that was actually general, and two were clean.
+
+Both models found all five, and both independently reported the sixth as *arguable* with the
+right reasoning — the heading is the violation, the prose under it is not. On the axis the
+agent exists for, they tie, and the cheaper model would be defensible.
+
+The tie broke elsewhere. One of the two "clean" files states its whole substance — a four-row
+value table plus a behavior sentence — in the documentation's voice with nothing quoted.
+`opus` flagged it and named the single table row a re-fetch would be needed to confirm.
+`sonnet` reported the file clean. In the other direction `sonnet` had two catches `opus`
+missed: a quoted passage about `StrEnum` being used to support an unquoted claim about the
+`str, Enum` mixin, and a source that is a tutorial site rather than a primary one. So this is
+a preference and not a rout — but the file `sonnet` passed is the failure that matters, since
+an unattributed table is precisely what gets cited later as documentation. `opus` also spent
+fewer tokens on that run, finished sooner, and was better calibrated about what NOT to report
+(it noticed a `Fetched:`/`Retrieved:` inconsistency across four files and explicitly declined
+to score it as a finding).
+
+**`docs-fetcher` — one question about a long documentation page**, both arms sandboxed to
+their own refs directory so neither could touch the repository. Both produced a correct saved
+excerpt with the right quotes, and both answered the question in the report.
+
+The difference was in how they got there, and it is decisive for this agent. `WebFetch`
+answers a prompt *against* a page rather than returning it, and on this page it returned a
+paraphrase in which the section being asked about had been replaced by an unfollowed
+cross-reference. `opus` noticed, refetched the raw `.md` with `curl`, and quoted from that.
+`sonnet`'s report gives no sign it noticed. `opus` additionally recorded three things the page
+does **not** say as absences inside the file, and explained why it saved nothing from a second
+page it had cross-checked (it would have split the subject).
+
+A paraphrase saved as documentation is worse than no file at all, because everything
+downstream treats it as evidence — so the hazard `opus` caught is this agent's whole reason to
+be careful. That finding also went into the agent definition itself, as a step: when the
+passage does not come back quoted, get the source with `curl` and quote from that. A cheaper
+model following that instruction may well close the gap; nobody has re-run it since the
+instruction was added.
+
+**What to re-run before changing either field.** The refs-auditor arm needs a ground-truth set
+with both heading-marked and unmarked project content, and at least one file whose substance is
+unattributed — that last case is what separated the models. The fetcher arm needs a long page
+with a section a summarizer will drop, and it must be sandboxed to a scratch refs directory:
+the agent writes, and an arm pointed at the real one leaves two competing references behind.
 
 ## Codex: hooks must be trusted, or guard is silent
 
@@ -1265,9 +1344,12 @@ file left alone, and a read-only dir returning None rather than raising),
 fixture JSONL (a typed prompt, a `task-notification`, a slash command, a prompt_id absent
 from the file), `_safe_project_subdir(project_dir, value)` on its rejection cases (`"."`,
 `".."`, `".claude/guard"`, `"../elsewhere"`, `"/etc"` — all None; a plain subdirectory
-resolves), `agents._eligible_agents(state, edited, agent_docs)` on the file-reading
-prerequisite (each bucket gates only its own agent), `agents._edited_bucket(path)` on a source
-file, an `AGENTS.md`, a `CLAUDE.md`, and a plain `.md` that must land in neither,
+resolves), `agents._eligible_agents(state, edited, agent_docs, refs)` on the file-reading
+prerequisite (each bucket gates only its own agent), `agents._edited_bucket(path, refs_dir)`
+on a source file, an `AGENTS.md`, a `CLAUDE.md`, a plain `.md` that must land in no bucket,
+a file inside the refs dir, and the refs dir's OWN `AGENTS.md`, which must land in
+`edited_refs` and never in `edited_agent_docs`, `state._read_state` on a file holding every
+bucket key (each must survive the round trip),
 `config._parse_mode` / `config._agent_mode` on the aliases and on a junk value (which must
 read as `off`), `config._load_config` on a mode written into the file (it must survive the
 type gate — see the Config section), `dispatch._plugin_root` from an install where the

@@ -3,10 +3,11 @@
 Sweeps state files, ``trace.log``, and turns/ and extracts/ dirs older than retention;
 exports ``GUARD_PROJECT_DIR`` and ``GUARD_REFS_DIR`` via ``$CLAUDE_ENV_FILE`` (append-once,
 since this event also fires on every compaction); and states as session context the refs rule
-always, the dispatch playbook's path when any turn-end agent is on, the ``refs-finder``
-announcement when that switch is on (not on Codex), and the standing reuse policy when any
-agent is in ``reuse``. Each is said ONCE here rather than in every Stop, which is the whole
-reason this hook prints anything.
+always, the dispatch playbook's path when any agent is on, the fetch policy that sends the
+session's documentation lookups to ``docs-fetcher`` instead of to its own WebFetch when that
+switch is on (not on Codex), and the standing reuse policy when any agent is in ``reuse``.
+Each is said ONCE here rather than in every Stop, which is the whole reason this hook prints
+anything.
 """
 
 from __future__ import annotations
@@ -153,11 +154,7 @@ def cmd_session_start() -> int:
     # on. The Stop hook repeats the path on each routed turn — one line, and it must,
     # because context compaction can drop this one — but stating it here is what lets that
     # line stay a path instead of an explanation of what the file is for.
-    #
-    # `reads="prompt"` is excluded from the test: that agent runs before the answer, so a
-    # project running only it has no audit at all and this sentence would be false.
-    if any(_switch_on(session_cfg, k) for k, spec in AUDIT_AGENTS.items()
-           if spec.reads != "prompt"):
+    if any(_switch_on(session_cfg, k) for k in AUDIT_AGENTS):
         print(
             "guard: audits are on for this project. When a turn finishes, guard names the "
             f"agents to consider and points at {_playbook_path()}, which says how to "
@@ -165,29 +162,51 @@ def cmd_session_start() -> int:
             "you are named; do not read the file until then."
         )
 
-    # `refs-finder` is the one agent guard announces here instead of naming it per turn,
-    # and this is the whole announcement. It runs BEFORE an answer exists, so there is no
-    # Stop recommendation to ride on; the alternative was a line on every UserPromptSubmit,
-    # billing every turn in the session for an agent that is off by default and wanted only
-    # on the questions that touch saved docs. Once is enough because SessionStart registers
-    # no matcher and so fires on every source — `startup`, `resume`, `clear`, `compact`,
-    # `fork` — which means a compaction that drops this line immediately restates it
+    # The fetch policy: the one thing guard says that tells the session NOT to do something,
+    # and the reason `docs-fetcher` is announced here rather than named per turn.
+    #
+    # Everything else guard says is about checking work already done. This redirects a tool
+    # call before it happens, so it has to arrive before the session reaches for the tool —
+    # which means SessionStart. A `UserPromptSubmit` line would bill every turn in the
+    # session for an agent that is off by default and wanted only on the questions that touch
+    # documentation. Once is enough because SessionStart registers no matcher and so fires on
+    # every source — `startup`, `resume`, `clear`, `compact`, `fork` — which means a
+    # compaction that drops this line immediately restates it
     # (https://code.claude.com/docs/en/hooks, excerpt at
-    # wiki/ref/claude-code-hooks-session-env.md).
+    # wiki/ref/claude-code-hooks-session-env.md). If that ever stops being true, the fix is a
+    # per-turn line, not a silent agent.
     #
-    # Not on Codex: it ships one named agent installed by `$guard:setup` and no
-    # refs-finder, and this module is its adapter's library — so without the host test it
-    # would be told to dispatch an agent that does not exist there.
+    # Why redirect the fetch at all, when the main agent could do it perfectly well: a page
+    # pulled into the main context is paid for on every turn after, a page read in passing is
+    # a page nobody saves, and a session that skimmed a page cannot separate what the page
+    # said from what it expected the page to say. The agent's definition argues all three.
     #
-    # The refs directory is deliberately not repeated: the line printed just above names
-    # it, and the agent resolves it itself with the `refs-dir` subcommand anyway.
-    if _switch_on(session_cfg, "refs-finder") and not _HOST_IS_CODEX:
+    # The agent LOOKS LOCALLY FIRST and most dispatches end there, which is why one line can
+    # replace what used to be two agents — a read-only lookup that reported `none`, and a
+    # fetcher the session then had to remember to dispatch. That handoff was where a session
+    # gave up and answered from memory. What the merge has to preserve is the distinction the
+    # lookup existed to make, and it is preserved in the REPORT: the agent says whether a path
+    # was already saved or newly fetched, so the caller still knows which it got.
+    #
+    # There is a second entry point, at the far end of the turn: the router may pick
+    # `docs-fetcher` when a finished answer rested on a document nobody saved. That one is a
+    # repair; this is the normal path.
+    #
+    # The refs directory is deliberately not repeated here: the line printed above names it,
+    # and the agent resolves it itself with the `refs-dir` subcommand anyway.
+    #
+    # Not on Codex: it ships one named agent installed by `$guard:setup` and no fetcher among
+    # them, and this module is its adapter's library — so without the host test the line would
+    # forbid a tool and name no replacement.
+    if _switch_on(session_cfg, "docs-fetcher") and not _HOST_IS_CODEX:
         print(
-            "guard: this project saves copies of the documentation it cites. Before "
-            "answering a question that could rest on one — how a tool, API, format or "
-            f"protocol behaves — dispatch {_agent_id('refs-finder')} with the user's "
-            "question verbatim and wait for it; it names the saved references that bear "
-            "on the question, or reports none. See the `refs-finder` section of "
+            "guard: do not run WebFetch or WebSearch yourself, and do not answer from memory "
+            "a question about how an external tool, API, format or protocol behaves. This "
+            f"project saves copies of the documentation it cites: dispatch "
+            f"{_agent_id('docs-fetcher')} with the user's question verbatim and wait for it. "
+            "It reports the local path of what is already saved, fetches and saves the "
+            "primary source when nothing is, and says which of the two it did — or reports "
+            "none. Read the files it names yourself. See the `docs-fetcher` section of "
             f"{_playbook_path()} the first time you dispatch it."
         )
 

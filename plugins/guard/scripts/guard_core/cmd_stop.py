@@ -14,9 +14,9 @@ commands must work in a project that keeps everything off. Then, when a turn-rea
 eligible, it emits ``additionalContext`` asking the main agent to dispatch the router
 (``agents.ROUTER_AGENT``) over the answer file with the eligible agents and their modes, and
 to follow the sections its report names; the eligible file-reading agents —
-``comment-corrector`` (``reads="files"``) and ``agents-md-auditor`` (``reads="agent-docs"``)
-— are dispatched directly over the turn's edited files instead, bypassing the router. guard
-runs no model itself and never blocks here.
+``comment-corrector`` (``reads="files"``), ``agents-md-auditor`` (``reads="agent-docs"``) and
+``refs-auditor`` (``reads="refs"``) — are dispatched directly over the turn's edited files
+instead, bypassing the router. guard runs no model itself and never blocks here.
 """
 
 from __future__ import annotations
@@ -144,7 +144,8 @@ def cmd_stop() -> int:
 
     edited = _edited_files(state, prompt_id, "edited_files")
     agent_docs = _edited_files(state, prompt_id, "edited_agent_docs")
-    eligible = _eligible_agents(state, edited, agent_docs)
+    refs = _edited_files(state, prompt_id, "edited_refs")
+    eligible = _eligible_agents(state, edited, agent_docs, refs)
     modes = {k: _agent_mode(state, k) for k in eligible}
     if not eligible:
         _write_state(project_dir, session_id, state)
@@ -175,7 +176,8 @@ def cmd_stop() -> int:
     # either: their file lists are disjoint by construction (`_edited_bucket`), so the one
     # that edits cannot touch what the one that only reports is reading.
     routed = [k for k in eligible if AUDIT_AGENTS[k].reads == "turn"]
-    direct = [k for k in eligible if AUDIT_AGENTS[k].reads in ("files", "agent-docs")]
+    direct = [k for k in eligible
+              if AUDIT_AGENTS[k].reads in ("files", "agent-docs", "refs")]
     blocks: list[str] = []
     if routed:
         blocks.append(_router_context(project_dir, session_id, prompt_id, _ROUTE_LEAD,
@@ -184,7 +186,7 @@ def cmd_stop() -> int:
         lead = _DIRECT_LEAD_WITH_ROUTER if routed else _DIRECT_LEAD
         blocks.append(_dispatch_context(
             project_dir, session_id, prompt_id, lead, direct, modes,
-            {"files": edited, "agent-docs": agent_docs}, transcript))
+            {"files": edited, "agent-docs": agent_docs, "refs": refs}, transcript))
     context = "\n\n".join(blocks)
     outcome = "routed" if routed and not direct else (
         "dispatched_direct" if direct and not routed else "routed_and_direct")
