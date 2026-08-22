@@ -35,8 +35,8 @@ paths guard had to tell apart from a clean verdict. As a subagent, none of that 
 
 1. **Audit recommendation** (Stop) — every turn is marked as the on-demand target, so the
    user-invoked `/guard:claims-auditor`, `/guard:deferrals-auditor`,
-   `/guard:clarity-auditor`, `/guard:korean-corrector` and `/guard:comment-corrector` work
-   whatever the settings
+   `/guard:clarity-auditor`, `/guard:korean-corrector`, `/guard:comment-corrector` and
+   `/guard:agents-md-auditor` work whatever the settings
    say. The per-agent settings then decide what reaches the main agent unasked. Each
    is named after the agent it controls, so one string is the setting, the state key, the
    command, and the `subagent_type`. Every switch ships `off`: guard installed is guard
@@ -55,8 +55,9 @@ paths guard had to tell apart from a clean verdict. As a subagent, none of that 
    about one turn and an instance carrying five can answer from the wrong one.
 
    The router chooses from the ELIGIBLE set, and eligibility is mechanical only: the
-   mode being anything but `off`, plus — for a `reads="files"` agent — at least one source file the turn
-   actually wrote. Everything requiring judgment is the router's.
+   mode being anything but `off`, plus — for a file-reading agent — at least one file of
+   its own kind that the turn actually wrote. Everything requiring judgment is the
+   router's.
 
    Four things must not regress:
 
@@ -101,6 +102,17 @@ paths guard had to tell apart from a clean verdict. As a subagent, none of that 
    expert passes everything; both are worse than a named gap, and the profile is established
    by `/guard:reader-profile` asking the user rather than by inferring anything from the
    repository — a repository says what the code is, never what its author knows.
+
+   `agents-md-auditor` is the second agent that never goes through the router, for the
+   same reason `comment-corrector` does not, and one of its own. Its input is a file list,
+   not the answer, so triage could only restate what eligibility already decided. And its
+   findings are the one kind the main agent must not apply on autopilot: deleting a section
+   from an `AGENTS.md` usually means moving its content into a deeper doc that does not
+   exist yet, and creating that document is a change nobody asked for. So the playbook
+   splits its report in two — the deletions and pointer fixes that need no new file, and
+   the findings that need the user's decision — and the agent itself is forbidden from
+   writing the documents it recommends. An auditor that "fixed" a bloated instruction file
+   by inventing three new ones would have destroyed content under the name of an audit.
 
    guard's other audit agents carry `memory: local`, so what they learn about a project stays in
    that checkout and out of version control. The docs recommend `project` and that is right
@@ -177,10 +189,24 @@ paths guard had to tell apart from a clean verdict. As a subagent, none of that 
    wire it, and the segment prints **nothing** on any failure — a status line is the one
    place guard must never report an error.
 
-4. **Post-edit** (PostToolUse on the write tools) — records the turn's edited source
-   files for a later `comment-corrector` recommendation, and blocks until a file saved
-   in the refs directory is listed in that directory's `AGENTS.md`. Both independent of
-   the agent settings.
+4. **Post-edit** (PostToolUse on the write tools) — records the files the turn edited for
+   a later file-reading agent's recommendation, and blocks until a file saved in the refs
+   directory is listed in that directory's `AGENTS.md`. Both independent of the agent
+   settings.
+
+   Two lists, not one, and they must stay disjoint (`_edited_bucket`): source files for
+   `comment-corrector`, `AGENTS.md`/`CLAUDE.md` for `agents-md-auditor`. A shared list
+   would hand each agent files its criteria say nothing about — a comment judged against
+   markdown, an instruction file judged against a `.py` — and a name landing in both would
+   be audited twice under criteria only one of which applies. One turn marker governs both,
+   because "which turn was this" is the same question for each and a second marker could
+   only drift from the first.
+
+   `agents-md-auditor` matches on the **filename**, not the suffix. What makes one of these
+   auditable is that a coding agent loads it as standing instruction, which is a property of
+   the name the host looks for; every other markdown file in a repository is prose nobody is
+   instructed by, and auditing one against what an instruction file may contain would flag
+   an ordinary document for having content.
 
 guard resolves the project root two ways, and merging them breaks one of the two. A **hook**
 is handed `CLAUDE_PROJECT_DIR` and so never guesses: absent means a broken install, and
@@ -214,8 +240,8 @@ noisy is recoverable, guard silently dormant is not. And one user question gets 
 answer file, which is the file the correctors edit and the one the main agent opens; the
 `UserPromptSubmit` draft path and the Stop dispatch name the same file, and nothing else in
 the audit is allowed to become a document. Both sides of that path are gated on the agents
-that actually read it, never on any switch being on — `comment-corrector` reads the source
-files the turn wrote, so a project running only that one is never told to write an answer
+that actually read it, never on any switch being on — the file-reading agents read the
+files the turn wrote, so a project running only those is never told to write an answer
 file nobody opens. Separately, the `transcript` subcommand
 slices turns out of the file on an agent's request — never on a schedule, and always into a
 file rather than onto stdout.

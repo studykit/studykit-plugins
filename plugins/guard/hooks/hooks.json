@@ -78,7 +78,7 @@
             "type": "command",
             "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/guard_hook.py\" post-edit",
             "timeout": 10,
-            "description": "Record a source file written this turn (for a comment-corrector recommendation), and require a file saved inside the refs dir to be listed in the refs index (AGENTS.md)."
+            "description": "Record a source file or an agent instruction file written this turn (for a comment-corrector or agents-md-auditor recommendation), and require a file saved inside the refs dir to be listed in the refs index (AGENTS.md)."
           }
         ]
       }

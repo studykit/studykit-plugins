@@ -122,9 +122,9 @@ def _handle_post_tool(project_dir: Path, payload: dict[str, Any], session_id: st
 
     # A reference saved into the refs dir must be listed in the index; same rule as
     # Claude's `post-edit` hook, applied here because Codex routes every event through
-    # this one adapter. Claude's other `post-edit` job — recording the turn's edited
-    # source files — is deliberately not mirrored: it exists only to point
-    # `comment-corrector` at them, and Codex has no agent for that yet.
+    # this one adapter. Claude's other `post-edit` job — recording the files the turn
+    # edited — is deliberately not mirrored: it exists only to point `comment-corrector`
+    # and `agents-md-auditor` at them, and Codex has neither agent yet.
     config = core._load_config(project_dir)
     if core._targets_refs_dir(project_dir, tool_input, config):
         target = core._tool_target_path(project_dir, tool_input)

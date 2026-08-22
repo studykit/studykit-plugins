@@ -1,7 +1,7 @@
 ---
 name: deferrals-auditor
 description: |
-  Audits one finished turn for work punted as TBD / 확인 필요 that the repository could have answered. Reports them; edits nothing.
+  Audits one finished turn for work punted as TBD that the repository could have answered. Reports; edits nothing.
 # `Bash` is for guard's `transcript` extractor and nothing else — the user's request lives
 # in the transcript, and whether the repository could have answered a deferral is still
 # settled by READING the repository, not by running it. `SendMessage` is the fallback when

@@ -1,7 +1,7 @@
 ---
 name: claims-auditor
 description: |
-  Audits one finished turn for claims asserted without adequate evidence, checking each against the repository. Reports them; edits nothing.
+  Audits one finished turn for claims asserted without adequate evidence. Reports; edits nothing.
 # `SendMessage` is how "ask the main session where to look" below actually happens.
 # It is not a way to obtain evidence: an answer from the turn's author is a claim, so
 # use it to be pointed at a file, then read the file yourself. In reuse mode it also

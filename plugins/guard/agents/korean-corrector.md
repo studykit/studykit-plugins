@@ -1,7 +1,7 @@
 ---
 name: korean-corrector
 description: |
-  Corrects the Korean prose of one answer file in place — 복합문, 번역체, AI 문체, register — counting findings before it edits, and reporting each fix.
+  Corrects the Korean prose of one answer file in place, and reports each fix.
 # `Read` and `Edit` for the answer file — its input is the answer the user is about to be
 # shown, so a correction belongs in that file and not in a second one the reader would
 # have to be talked into opening. It judges prose, so it needs no search or shell access.

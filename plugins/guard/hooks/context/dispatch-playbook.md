@@ -198,6 +198,26 @@ It **edits the comments in place**, so its changes are already in the files when
 reports. Relay what it changed AND what it left unfixed — an unfixed finding needs the
 user — and do not re-edit its work.
 
+## `agents-md-auditor`
+
+Audits the `AGENTS.md` / `CLAUDE.md` files it is given as agent instruction files: whether
+`CLAUDE.md` is a thin `@AGENTS.md` import, whether the content is a map pointing at deeper
+docs or a payload that grows with the project, whether it carries implementation detail,
+spec-class material, or things any model already knows, whether its pointers still resolve,
+and what hazard the repository has that it never mentions.
+
+Inputs: the absolute file paths you were given, and only those — pass them through
+unchanged. Adding a file means auditing something this turn never touched. It reads neither
+the turn record nor the transcript; it reads the repository itself, which is where its
+evidence comes from.
+
+It **changes nothing** — it may update its own project memory, and nothing else. Its
+findings are the kind you must not apply on autopilot: deleting a section usually means
+moving its content into a deeper doc that does not exist yet, and creating that document is
+a change the user has not asked for. So relay what it found and what it proposes, and make
+the deletions and pointer fixes you can make without inventing a new document. Where a
+finding needs a file created, say so and leave it to the user.
+
 ## Presenting the result
 
 The correctors have already edited what they were given. What is left is yours:
@@ -219,7 +239,8 @@ the reply, not a document, and opening it hands the user a memo about the answer
 the answer.
 
 **When the dispatch named no answer file**, steps 1 and 3 do not apply — there is nothing to
-correct and nothing to open. That is `comment-corrector` dispatched on its own: it works on
-the source files the turn wrote, and a turn with no turn-reading agent eligible never wrote
-an answer file in the first place. Reply per step 2, naming the source files whose comments
-changed; the user reads those in the diff, not in an opened document.
+correct and nothing to open. That is the file-reading agents dispatched on their own:
+`comment-corrector` and `agents-md-auditor` work on the files the turn wrote, and a turn
+with no turn-reading agent eligible never wrote an answer file in the first place. Reply
+per step 2, naming the files that changed and the findings you did not apply; the user
+reads those in the diff, not in an opened document.

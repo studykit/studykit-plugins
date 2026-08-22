@@ -1,7 +1,7 @@
 ---
 name: simple-explainer
 description: |
-  Explains a topic, file, or a previous answer in plain language, in a clean context. Investigates the repository read-only and returns an explanation a reader understands on first pass — short words, one idea per sentence, the point up front. Dispatched by guard's /guard:simply-explain skill. Never edits files.
+  Explains a topic, file, or a previous answer in plain language, in a clean context. Never edits.
 tools: Read, Grep, Glob, Bash
 model: sonnet
 effort: medium

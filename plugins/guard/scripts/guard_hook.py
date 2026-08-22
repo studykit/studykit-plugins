@@ -19,7 +19,8 @@ Subcommands
                  ``show`` prints the current settings; ``set <key> <value>`` changes one
                  of the per-agent settings — each named after the agent it controls
                  (``claims-auditor`` / ``deferrals-auditor`` / ``korean-corrector`` /
-                 ``clarity-auditor`` / ``comment-corrector``), valued
+                 ``clarity-auditor`` / ``comment-corrector`` / ``agents-md-auditor``),
+                 valued
                  ``off``/``fresh``/``reuse`` — or ``router_model`` / ``refs_dir``; ``unset
                  <key>`` removes a key from the file entirely, back to its default. The
                  agent settings also apply to the live session's ``state/<sid>.json`` when a
@@ -51,12 +52,14 @@ Subcommands
                  agent is eligible, it emits ``additionalContext`` asking the main agent to
                  dispatch the router (``ROUTER_AGENT``) over the answer file with the
                  eligible agents and their modes, and to follow the sections its report
-                 names; an eligible ``comment-corrector`` (``reads="files"``) is dispatched
-                 directly over the turn's edited files instead, bypassing the router. guard
-                 runs no model itself and never blocks here.
-- post-edit      PostToolUse (Write/Edit/MultiEdit/NotebookEdit). Records a source
-                 file written this turn (the list a ``comment-corrector``
-                 recommendation is built from), and requires a file saved inside the
+                 names; the eligible file-reading agents — ``comment-corrector``
+                 (``reads="files"``) and ``agents-md-auditor`` (``reads="agent-docs"``) —
+                 are dispatched directly over the turn's edited files instead, bypassing
+                 the router. guard runs no model itself and never blocks here.
+- post-edit      PostToolUse (Write/Edit/MultiEdit/NotebookEdit). Records a source file
+                 or an agent instruction file written this turn (the lists the
+                 ``comment-corrector`` and ``agents-md-auditor`` recommendations are built
+                 from), and requires a file saved inside the
                  refs directory to be listed in that directory's ``AGENTS.md``, blocking
                  until it is. Both are independent of the agent switches.
 - session-start  SessionStart. Sweep state files, ``trace.log``, and turns/ and extracts/
@@ -100,7 +103,7 @@ var alone and fails open. Do not merge the two: a hook guessing a root writes st
 nobody looks, and a CLI verb refusing to guess answers nothing at all.
 
 State lives project-local under ``${CLAUDE_PROJECT_DIR}/.claude/guard/``:
-- ``state/<sid>.json``       — {<agent modes>, audit_paused, edited_prompt_id, edited_files, last_audited_prompt_id, pending_verify_prompt_id, transcript_path, updated_at}
+- ``state/<sid>.json``       — {<agent modes>, audit_paused, edited_prompt_id, edited_files, edited_agent_docs, last_audited_prompt_id, pending_verify_prompt_id, transcript_path, updated_at}
 - ``turns/<sid>/<pid>.md``   — the turn's ANSWER. guard names the path at the start of the
                                 turn and the main agent writes the substance there; the
                                 agents audit it and the correctors edit it in place, so the
@@ -266,6 +269,12 @@ DEFAULT_CONFIG: dict[str, Any] = {
     # EDITS them, unattended, in the turn the user is still reading. That is why it is
     # the one switch whose cost is a diff rather than a report.
     "comment-corrector": AgentMode.OFF,
+    # The `AGENTS.md` / `CLAUDE.md` files THIS TURN edited, judged as instruction files:
+    # a map pointing at the deeper docs, plus what a model gets wrong here — never the
+    # implementation detail, the spec, or the thing every model already knows. Reports
+    # only. Turning it on costs nothing on the many turns that touch no such file, since
+    # eligibility needs one this turn actually wrote.
+    "agents-md-auditor": AgentMode.OFF,
     # Which of the docs saved under `refs_dir` bear on the question the user just asked.
     # The only switch here that governs something said BEFORE an answer rather than an
     # audit of one after, so it is announced once at SessionStart and never routed.
@@ -1146,12 +1155,16 @@ def _read_state(project_dir: Path, session_id: str, config: dict[str, Any]) -> d
         # path is a session-long fact, so remembering it is cheaper than making the agent
         # go looking for a file it has no reliable way to name.
         "transcript_path": "",
-        # Source files written during one turn, accumulated by PostToolUse and read back
-        # at Stop to decide whether `comment-corrector` has anything to look at. Stored
-        # WITH the prompt_id it belongs to: a bare list would outlive its turn and point
-        # the corrector at files the current turn never touched.
+        # Files written during one turn, accumulated by PostToolUse and read back at Stop
+        # to decide whether a file-reading agent has anything to look at. Stored WITH the
+        # prompt_id they belong to: a bare list would outlive its turn and point an agent
+        # at files the current turn never touched. Two lists, one marker — the split is by
+        # which agent can judge the file (source code for `comment-corrector`, instruction
+        # files for `agents-md-auditor`), while "which turn was this" is the same question
+        # for both and a second marker could only drift from the first.
         "edited_prompt_id": "",
         "edited_files": [],
+        "edited_agent_docs": [],
         # Session-only mute, flipped by `/guard:toggle`. NOT a mode in front of the agent
         # switches the way the removed `audit_gate` was: it lives only in session state, so
         # it can never change what the project does by default, and the `status` subcommand
@@ -1171,7 +1184,7 @@ def _read_state(project_dir: Path, session_id: str, config: dict[str, Any]) -> d
         return default
     keys = (*AUDIT_AGENTS, "last_audited_prompt_id", "pending_verify_prompt_id",
             "transcript_path", "audit_paused",
-            "edited_prompt_id", "edited_files", "updated_at")
+            "edited_prompt_id", "edited_files", "edited_agent_docs", "updated_at")
     default.update({k: data[k] for k in keys if k in data})
     return default
 
@@ -1245,9 +1258,19 @@ class AuditAgent(NamedTuple):
     they are the same string.
 
     ``reads`` is what the agent is pointed at — ``"turn"`` for the turn record guard
-    wrote, ``"files"`` for the source files the turn edited, ``"prompt"`` for the user's
-    question. It selects the paths the dispatch carries and gates eligibility, since a
-    ``"files"`` agent with no edited file has no input at all.
+    wrote, ``"files"`` for the source files the turn edited, ``"agent-docs"`` for the
+    ``AGENTS.md`` / ``CLAUDE.md`` files it edited, ``"prompt"`` for the user's question.
+    It selects the paths the dispatch carries and gates eligibility, since a file-reading
+    agent with no matching edit has no input at all.
+
+    ``"files"`` and ``"agent-docs"`` are separate values rather than one "the turn's
+    edits", because the two agents behind them judge different things and a shared list
+    would hand each one files it has nothing to say about. ``comment-corrector`` judges a
+    comment against the code under it and a markdown file gives it none; the agent-doc
+    auditor judges instruction files against what an instruction file is for and a ``.py``
+    is not one. Same reason ``_SOURCE_SUFFIXES`` and ``_AGENT_DOC_NAMES`` are disjoint:
+    nothing may land in both lists, or one turn's edit would be audited twice under two
+    criteria, one of which does not apply to it.
 
     ``"prompt"`` is the odd one and marks an agent that runs at the *other end* of a turn.
     Everything else here audits a finished response, so guard names it at Stop and hands it
@@ -1316,6 +1339,8 @@ AUDIT_AGENTS: dict[str, AuditAgent] = {
     "clarity-auditor": AuditAgent(reads="turn", verify_command=True, needs_history=True),
     "korean-corrector": AuditAgent(reads="turn", verify_command=True, needs_history=False),
     "comment-corrector": AuditAgent(reads="files", verify_command=False, needs_history=False),
+    "agents-md-auditor": AuditAgent(reads="agent-docs", verify_command=False,
+                                    needs_history=False),
     "refs-finder": AuditAgent(reads="prompt", verify_command=False, needs_history=False),
 }
 
@@ -1330,6 +1355,16 @@ _SOURCE_SUFFIXES = frozenset({
     ".swift", ".scala", ".sh", ".bash", ".zsh", ".lua", ".sql", ".m", ".mm", ".dart",
     ".ex", ".exs", ".vue", ".svelte", ".zig",
 })
+
+# Filenames `agents-md-auditor` can judge. Matched on the name, not the suffix: what makes
+# one of these auditable is that a coding agent loads it as standing instruction, and that
+# is a property of the name the host looks for, not of it being markdown. Every other
+# markdown file in a repository is prose nobody is instructed by, and auditing one against
+# what an instruction file may contain would flag an ordinary document for having content.
+#
+# Lowercased before the lookup, since a repository may spell either one in any case and the
+# host resolves them case-insensitively on macOS and Windows regardless.
+_AGENT_DOC_NAMES = frozenset({"agents.md", "claude.md"})
 
 # --------------------------------------------------------------------------- #
 # the router
@@ -1396,15 +1431,20 @@ def _reads_turn(keys: Iterable[str]) -> bool:
     return any(AUDIT_AGENTS[k].reads == "turn" for k in keys if k in AUDIT_AGENTS)
 
 
-def _eligible_agents(state: dict[str, Any], edited: list[str]) -> list[str]:
+def _eligible_agents(state: dict[str, Any], edited: list[str],
+                     agent_docs: list[str] | None = None) -> list[str]:
     """The agents the router may choose from, in ``AUDIT_AGENTS`` order.
 
     Two mechanical gates, and only mechanical ones — everything that needs judgment is
     the router's call:
 
     - the switch, which is the user saying they are willing to have this agent run;
-    - for a ``reads="files"`` agent, at least one source file this turn wrote, because
-      that list is the agent's whole input and the router cannot invent one.
+    - for a file-reading agent, at least one file of its own kind this turn wrote,
+      because that list is the agent's whole input and nobody downstream can invent one.
+
+    ``agent_docs`` defaults to none rather than being required, for the Codex adapter:
+    it shares this function but mirrors no edited-file recording of its own, so every
+    file-reading agent is ineligible there and passing empty lists is the honest answer.
 
     A ``reads="prompt"`` agent is excluded outright: it works on the question, so a
     finished turn holds nothing for it. Excluded HERE rather than where the dispatch is
@@ -1417,13 +1457,14 @@ def _eligible_agents(state: dict[str, Any], edited: list[str]) -> list[str]:
     than a Hangul ratio that has to guess how many English identifiers a Korean answer
     may carry before it stops being Korean.
     """
+    inputs = {"files": edited, "agent-docs": agent_docs or []}
     out: list[str] = []
     for key, spec in AUDIT_AGENTS.items():
         if not _switch_on(state, key):
             continue
         if spec.reads == "prompt":
             continue
-        if spec.reads == "files" and not edited:
+        if spec.reads in inputs and not inputs[spec.reads]:
             continue
         out.append(key)
     return out
@@ -1432,23 +1473,36 @@ def _eligible_agents(state: dict[str, Any], edited: list[str]) -> list[str]:
 # --------------------------------------------------------------------------- #
 # dispatch text
 # --------------------------------------------------------------------------- #
+# The input line each file-reading agent's path list is introduced by. Worded as what the
+# agent is being handed, not as what to look for: the criteria are the agent's own and live
+# in its definition, so a lead that previewed them would be the caller telling it what to
+# find. The `in place` on the corrector is the exception and is not a criterion — it warns
+# the main agent that those files come back changed.
+_FILE_INPUT_LABELS = {
+    "files": "- files to audit (comments only, in place):",
+    "agent-docs": "- agent instruction files to audit:",
+}
+
+
 def _agent_inputs(project_dir: Path, session_id: str, prompt_id: str, key: str,
-                  edited: list[str]) -> list[str]:
+                  files: dict[str, list[str]]) -> list[str]:
     """The dispatch inputs for one agent: ONLY what the main agent cannot supply itself.
 
     For a turn-reading agent that is the answer file — the same path for every agent in one
     dispatch, so they all read and correct the one document the user will be shown.
 
-    For ``comment-corrector`` it is instead the source files this turn edited, recorded by
-    PostToolUse: a main agent asked to recall which files it wrote will approximate, and
-    this is the one agent pointed at the repository rather than at the answer.
+    For a file-reading agent it is instead the paths this turn edited that its own criteria
+    apply to, recorded by PostToolUse and looked up here by the agent's ``reads`` value: a
+    main agent asked to recall which files it wrote will approximate, and these are the
+    agents pointed at the repository rather than at the answer.
 
     ``session_id`` / ``prompt_id`` are here to BUILD that path, never to be handed over: an
     agent working on one turn has no use for guard's identifiers, and an extra pointer is
     one more thing it can wander into instead of doing its job.
     """
-    if AUDIT_AGENTS[key].reads == "files":
-        return ["- files to audit (comments only, in place):"] + [f"    {p}" for p in edited]
+    reads = AUDIT_AGENTS[key].reads
+    if reads in _FILE_INPUT_LABELS:
+        return [_FILE_INPUT_LABELS[reads]] + [f"    {p}" for p in files.get(reads, ())]
     return ["- answer file: "
             f"{_turn_record_file(project_dir, session_id, prompt_id).resolve()}"]
 
@@ -1465,7 +1519,7 @@ def _playbook_path() -> Path:
 
 
 def _agent_pointer(project_dir: Path, session_id: str, prompt_id: str, keys: list[str],
-                   edited: list[str], modes: dict[str, AgentMode]) -> str:
+                   files: dict[str, list[str]], modes: dict[str, AgentMode]) -> str:
     """Name the playbook sections for these agents and hand over their per-turn inputs.
 
     This is the whole dispatch instruction, and what is NOT in it is the point: how to
@@ -1487,22 +1541,23 @@ def _agent_pointer(project_dir: Path, session_id: str, prompt_id: str, keys: lis
     for key in keys:
         lines.append(f"- `{key}`={modes[key].value}")
         lines.extend("  " + line for line in _agent_inputs(
-            project_dir, session_id, prompt_id, key, edited))
+            project_dir, session_id, prompt_id, key, files))
     return "\n".join(lines)
 
 
 def _dispatch_context(project_dir: Path, session_id: str, prompt_id: str, lead: str,
                       keys: list[str], modes: dict[str, AgentMode],
-                      edited: list[str] | None = None, transcript: str = "") -> str:
+                      files: dict[str, list[str]] | None = None,
+                      transcript: str = "") -> str:
     """``additionalContext`` asking the main agent to dispatch these agents directly.
 
     The no-router path, reached two ways and for the same reason — there is nothing to
     triage, so routing would only add a hop. Either the user named the audit themselves
-    with a `/guard:<agent>` command, or `cmd_stop` is dispatching a `reads="files"` agent,
+    with a `/guard:<agent>` command, or `cmd_stop` is dispatching a file-reading agent,
     whose selection is not a question the router can answer.
     """
     keys = list(keys)
-    block = _agent_pointer(project_dir, session_id, prompt_id, keys, edited or [], modes)
+    block = _agent_pointer(project_dir, session_id, prompt_id, keys, files or {}, modes)
     if transcript and any(AUDIT_AGENTS[k].needs_history for k in keys):
         block += f"\n- history: transcript {transcript}, turn {prompt_id}"
     return "\n\n".join([lead, block])
@@ -1558,9 +1613,9 @@ def _router_context(project_dir: Path, session_id: str, prompt_id: str, lead: st
     answer = _turn_record_file(project_dir, session_id, prompt_id).resolve()
     fields.append(f"- turn dir: {answer.parent}")
     # Unconditional: every candidate reaching the router is a `reads="turn"` agent, so the
-    # answer file is always the thing being routed on. `comment-corrector` is dispatched
-    # around the router (see `cmd_stop`) and its file list goes with that dispatch, which
-    # is why no candidate line here carries a path.
+    # answer file is always the thing being routed on. The file-reading agents are
+    # dispatched around the router (see `cmd_stop`) and their path lists go with that
+    # dispatch, which is why no candidate line here carries a path.
     fields.append(f"- answer file: {{turn dir}}/{answer.name}")
     # The user's own words, for the ROUTER and no other agent. Its one judgment is
     # materiality, and materiality is relative to what was asked: the same explanatory
@@ -1602,22 +1657,24 @@ _ROUTE_LEAD = (
 )
 
 
-# The lead for the `comment-corrector` dispatch, which never goes through the router. It
-# says what the turn did rather than what to look for: the agent's criteria are its own,
-# and a lead that previewed them would be the caller telling it what to find.
-_COMMENT_LEAD = (
-    "guard: this turn edited source files. Audit their comments."
+# The lead for the file-reading agents, which never go through the router. It says what the
+# turn did rather than what to look for: each agent's criteria are its own, and a lead that
+# previewed them would be the caller telling it what to find. One lead covers however many
+# of them are eligible, because the per-agent input lines below it already say which files
+# each one gets — a lead per agent would be the same sentence twice.
+_DIRECT_LEAD = (
+    "guard: this turn edited files in the repository. Audit them."
 )
 
 
 # Same dispatch, when a router block precedes it. The one thing the main agent could
 # plausibly get wrong here is sequencing — the router block above it ends in "follow its
 # report", which reads as something to finish first — so the concurrency is spelled out.
-# Waiting would cost a round trip for an agent that shares no input with the routed ones.
-_COMMENT_LEAD_WITH_ROUTER = (
-    "guard: this turn also edited source files. Audit their comments. Dispatch this in the "
-    "SAME message as the router above — it reads neither the answer file nor the router's "
-    "report, so it waits for nothing."
+# Waiting would cost a round trip for agents that share no input with the routed ones.
+_DIRECT_LEAD_WITH_ROUTER = (
+    "guard: this turn also edited files in the repository. Audit them. Dispatch these in "
+    "the SAME message as the router above — they read neither the answer file nor the "
+    "router's report, so they wait for nothing."
 )
 
 
@@ -1767,23 +1824,39 @@ def cmd_verify() -> int:
     return 0
 
 
-# Cap on the source files one turn may hand `comment-corrector`. Past this the list
-# stops being an audit target and becomes a sweep of the whole change: the agent must
-# read every file in full to judge a comment against the code under it, and the skill
-# that dispatches it by hand asks the user to narrow at roughly this size for the same
-# reason. Recording stops at the cap rather than dropping the oldest entries — the
-# earliest edits of a turn are as worth auditing as the last, and a stable prefix keeps
-# the recommendation reproducible.
+# Cap on the files one turn may hand a file-reading agent. Past this the list stops
+# being an audit target and becomes a sweep of the whole change: the agent must read
+# every file in full to judge it — a comment against the code under it, an instruction
+# file against what it points at — and the skills that dispatch these by hand ask the
+# user to narrow at roughly this size for the same reason. Recording stops at the cap
+# rather than dropping the oldest entries — the earliest edits of a turn are as worth
+# auditing as the last, and a stable prefix keeps the recommendation reproducible.
 EDITED_FILES_MAX = 20
+
+# Which state list a PostToolUse target belongs in, if any. The two tests are disjoint by
+# construction (`_SOURCE_SUFFIXES` holds no `.md`), so the order here does not decide
+# anything — but a name landing in both would be audited twice under criteria only one of
+# which applies to it, which is why any future entry must keep them disjoint.
+def _edited_bucket(target: Path) -> str | None:
+    if target.suffix.lower() in _SOURCE_SUFFIXES:
+        return "edited_files"
+    if target.name.lower() in _AGENT_DOC_NAMES:
+        return "edited_agent_docs"
+    return None
 
 
 def _record_edited_source(project_dir: Path, payload: dict, tool_input: Any,
                           config: dict[str, Any]) -> None:
-    """Note a source file this turn wrote, for a later `comment-corrector` recommendation.
+    """Note a file this turn wrote, for a later file-reading agent's recommendation.
 
-    Only source files (`_SOURCE_SUFFIXES`) and only inside the project: a comment audit
-    of a file outside the working tree is not this turn's work to fix. Files under
-    guard's own state are excluded too — a turn slice is a record, not code.
+    Two lists, chosen by `_edited_bucket`: source files for `comment-corrector`, agent
+    instruction files for `agents-md-auditor`. Anything else is not recorded — an agent
+    handed a file its criteria say nothing about spends its context proving that.
+
+    Only inside the project: an audit of a file outside the working tree is not this
+    turn's work to fix. Files under guard's own state are excluded too — a turn slice is
+    a record, not code, and guard's own `AGENTS.md` under the refs dir is an index the
+    `post-edit` refs check already governs.
 
     Silent and best-effort. A miss here costs one skipped recommendation; a raise here
     would surface as a hook failure on an ordinary edit, which is far worse.
@@ -1793,7 +1866,10 @@ def _record_edited_source(project_dir: Path, payload: dict, tool_input: Any,
     if not isinstance(prompt_id, str) or not prompt_id or session_id is None:
         return
     target = _tool_target_path(project_dir, tool_input)
-    if target is None or target.suffix.lower() not in _SOURCE_SUFFIXES:
+    if target is None:
+        return
+    bucket = _edited_bucket(target)
+    if bucket is None:
         return
     try:
         project = project_dir.resolve()
@@ -1804,34 +1880,37 @@ def _record_edited_source(project_dir: Path, payload: dict, tool_input: Any,
         return
 
     state = _read_state(project_dir, session_id, config)
-    # A new turn resets the list; without this, files from the previous turn would ride
-    # along into this turn's recommendation.
+    # A new turn resets BOTH lists off the one marker; without this, files from the
+    # previous turn would ride along into this turn's recommendation. Resetting only the
+    # bucket being written would leave the other holding the previous turn's files under
+    # this turn's id, which is the same bug with an extra step.
     if state.get("edited_prompt_id") != prompt_id:
         state["edited_prompt_id"] = prompt_id
         state["edited_files"] = []
-    files = state["edited_files"]
+        state["edited_agent_docs"] = []
+    files = state[bucket]
     if not isinstance(files, list):
         files = []
     path = str(target)
     if path in files or len(files) >= EDITED_FILES_MAX:
         return
     files.append(path)
-    state["edited_files"] = files
+    state[bucket] = files
     _write_state(project_dir, session_id, state)
     _trace(project_dir, session_id, "post-edit", "edited_recorded",
-           prompt_id=prompt_id, file=target.name, count=len(files))
+           prompt_id=prompt_id, bucket=bucket, file=target.name, count=len(files))
 
 
-def _edited_source_files(state: dict[str, Any], prompt_id: str) -> list[str]:
-    """The source files THIS turn wrote, as recorded by PostToolUse.
+def _edited_files(state: dict[str, Any], prompt_id: str, bucket: str) -> list[str]:
+    """The files of one bucket THIS turn wrote, as recorded by PostToolUse.
 
     Empty unless the recorded list belongs to this prompt_id and the files still exist:
     a turn that edited a file and then deleted or moved it leaves nothing to audit, and
-    handing the corrector a missing path would spend an agent on a read failure.
+    handing an agent a missing path would spend it on a read failure.
     """
     if state.get("edited_prompt_id") != prompt_id:
         return []
-    files = state.get("edited_files")
+    files = state.get(bucket)
     if not isinstance(files, list):
         return []
     return [f for f in files if isinstance(f, str) and f and Path(f).is_file()]
@@ -1979,8 +2058,9 @@ def cmd_stop() -> int:
                prompt_id=prompt_id)
         return 0
 
-    edited = _edited_source_files(state, prompt_id)
-    eligible = _eligible_agents(state, edited)
+    edited = _edited_files(state, prompt_id, "edited_files")
+    agent_docs = _edited_files(state, prompt_id, "edited_agent_docs")
+    eligible = _eligible_agents(state, edited, agent_docs)
     modes = {k: _agent_mode(state, k) for k in eligible}
     if not eligible:
         _write_state(project_dir, session_id, state)
@@ -1997,27 +2077,30 @@ def cmd_stop() -> int:
     transcript = transcript if isinstance(transcript, str) else ""
     # Split by what each agent reads, because only one of the two groups is a triage
     # question. Routing asks "is there material here for this agent", and for a
-    # `reads="files"` agent that is a diff-level judgment — logic changed, or just a rename
+    # file-reading agent that is a diff-level judgment — logic changed, or just a rename
     # or a formatting pass — the router cannot make from what it would be given: a file
-    # list is the corrector's input, not a diff, and reading those files shows their
-    # current state, never what this turn changed in them. So routing it can only restate
-    # what `_eligible_agents` already decided, and bill a subagent for it.
+    # list is the agent's input, not a diff, and reading those files shows their current
+    # state, never what this turn changed in them. So routing them can only restate what
+    # `_eligible_agents` already decided, and bill a subagent for it.
     #
     # The two dispatches also need no ordering between them. The auditors-before-correctors
     # rule in the playbook exists so a corrector does not rewrite a sentence an auditor was
-    # about to flag, and it is entirely about the answer file — which `comment-corrector`
-    # never opens. Sharing no input with the routed agents, it goes out in the same message
-    # and runs alongside the router rather than after it.
+    # about to flag, and it is entirely about the answer file — which no file-reading agent
+    # opens. Sharing no input with the routed agents, they go out in the same message and
+    # run alongside the router rather than after it. They need no ordering among themselves
+    # either: their file lists are disjoint by construction (`_edited_bucket`), so the one
+    # that edits cannot touch what the one that only reports is reading.
     routed = [k for k in eligible if AUDIT_AGENTS[k].reads == "turn"]
-    direct = [k for k in eligible if AUDIT_AGENTS[k].reads == "files"]
+    direct = [k for k in eligible if AUDIT_AGENTS[k].reads in ("files", "agent-docs")]
     blocks: list[str] = []
     if routed:
         blocks.append(_router_context(project_dir, session_id, prompt_id, _ROUTE_LEAD,
                                       routed, modes, config, transcript))
     if direct:
-        lead = _COMMENT_LEAD_WITH_ROUTER if routed else _COMMENT_LEAD
-        blocks.append(_dispatch_context(project_dir, session_id, prompt_id, lead,
-                                        direct, modes, edited, transcript))
+        lead = _DIRECT_LEAD_WITH_ROUTER if routed else _DIRECT_LEAD
+        blocks.append(_dispatch_context(
+            project_dir, session_id, prompt_id, lead, direct, modes,
+            {"files": edited, "agent-docs": agent_docs}, transcript))
     context = "\n\n".join(blocks)
     outcome = "routed" if routed and not direct else (
         "dispatched_direct" if direct and not routed else "routed_and_direct")

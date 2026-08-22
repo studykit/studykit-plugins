@@ -1,7 +1,7 @@
 ---
 name: router
 description: |
-  Triages one finished turn and names which of guard's audit agents would find something in it, with a reason for each. Names them; dispatches nothing.
+  Triages one finished turn and names which of guard's audit agents would find something in it. Names them; dispatches nothing.
 # `Read` for the two files it is pointed at — the answer and the request — and nothing
 # else. It routes from what it is given, so it needs no search, shell, or web access:
 # whatever needs the repository is the job of the agent it names, which has it. No `Agent`:

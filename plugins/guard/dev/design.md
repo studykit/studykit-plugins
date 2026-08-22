@@ -29,10 +29,14 @@ written by the main agent.
 
 - `state/<sid>.json` — the session's live agent modes (one key per agent, named after it,
   valued `off`/`fresh`/`reuse`), the per-turn markers keyed on `prompt_id` that keep each once-only action once-only
-  (`last_audited_prompt_id`, `pending_verify_prompt_id`), and the turn's edited source
-  files (`edited_prompt_id` + `edited_files`). The edited list is stored WITH the prompt_id
-  it belongs to, not as a bare list: PostToolUse appends and Stop reads back, and without
-  the id a previous turn's files would ride into this turn's recommendation.
+  (`last_audited_prompt_id`, `pending_verify_prompt_id`), and the turn's edited files
+  (`edited_prompt_id` + `edited_files` + `edited_agent_docs`). The edited lists are stored
+  WITH the prompt_id they belong to, not as bare lists: PostToolUse appends and Stop reads
+  back, and without the id a previous turn's files would ride into this turn's
+  recommendation. Two lists, one marker — the split is by which agent can judge the file
+  (`_edited_bucket`: source code for `comment-corrector`, `AGENTS.md`/`CLAUDE.md` for
+  `agents-md-auditor`), while "which turn was this" is the same question for both, and a
+  new turn resets BOTH lists or the untouched one holds stale files under a fresh id.
   `_read_state` honors only known keys, so a hand-edited or stale file degrades to
   defaults instead of injecting state. `audit_paused` is here rather than in the config on
   purpose — see the session-mute invariant below.
@@ -395,10 +399,10 @@ payloads, not memory.
   official docs a subagent runs its own system prompt, which is why
   `agents/simple-explainer.md` carries its own copy of the explain-clearly rules rather
   than inheriting them.
-- **Eligibility is mechanical; selection is the router's.** The four agent modes and one
-  prerequisite (a `reads="files"` agent needs a source file the turn actually wrote, since
-  that list is its whole input and the router cannot invent one) decide what the router may
-  choose from. Nothing else. In particular there is no Hangul-ratio test for
+- **Eligibility is mechanical; selection is the router's.** The agent modes and one
+  prerequisite (a file-reading agent needs a file of its own kind that the turn actually
+  wrote, since that list is its whole input and the router cannot invent one) decide what
+  the router may choose from. Nothing else. In particular there is no Hangul-ratio test for
   `korean-corrector`: deciding whether a response is Korean enough to audit is a reading
   task, and a ratio has to guess how many English identifiers a Korean answer may carry
   before it stops counting as Korean.
@@ -412,17 +416,21 @@ payloads, not memory.
   same reason: `_reads_turn` (so `refs-finder` alone never asks the session to write an
   answer file nothing reads) and the SessionStart "audits are on" line (so a project running
   only `refs-finder` is not told it has an audit).
-- **`comment-corrector` is never routed.** The Stop hook splits the eligible set by `reads`:
-  the `reads="turn"` agents go to the router, and `comment-corrector` is dispatched directly
-  in the same emission, to be sent in the same message so the two run concurrently. Two
+- **The file-reading agents are never routed.** The Stop hook splits the eligible set by
+  `reads`: the `reads="turn"` agents go to the router, and `comment-corrector`
+  (`reads="files"`) and `agents-md-auditor` (`reads="agent-docs"`) are dispatched directly
+  in the same emission, to be sent in the same message so they run concurrently. Two
   reasons, and the second is why this is a split rather than the narrower "skip the router
   when it is alone".
 
-  Triage asks whether there is material for an agent, and for this one that is a diff-level
+  Triage asks whether there is material for an agent, and for these that is a diff-level
   question — logic changed, or only a rename or a formatting pass. The router cannot answer
-  it from what it is given: the file list is the corrector's input, not a diff, and reading
+  it from what it is given: the file list is the agent's input, not a diff, and reading
   those files would show their current state, never what this turn changed in them. So the
   hop can only restate what `_eligible_agents` already decided, and bill a subagent for it.
+
+  They need no ordering among themselves either: `_edited_bucket` keeps the two lists
+  disjoint, so the one that edits cannot touch what the one that only reports is reading.
 
   Nor does it need to wait. The ordering rule in the playbook's `Dispatching` — auditors
   before correctors — exists so a corrector does not rewrite a sentence an auditor was about
@@ -623,6 +631,25 @@ payloads, not memory.
   the relay of its path existed for that reason alone. An answer the user has not read yet
   can simply be fixed, one `Edit` per finding, which also makes the diff the findings. Do
   not reintroduce a rewrite file.
+- **`color` warns about the user's own files; it is not an identity.** The docs offer eight
+  colors and nothing that says what they mean, so guard assigns them by what an agent can
+  damage, not by which agent it is. **`yellow` means this agent edits files you wrote** and
+  is worn by `comment-corrector` alone, because a corrector rewriting comments in the source
+  the turn just produced is the only thing here that lands unattended in a diff the user has
+  to review. **`red`** is the turn-audit path — the auditors, `korean-corrector`, and the
+  router — where the worst case is a wrong finding in a file guard itself created.
+  **`cyan`** is read-only and outside the audit entirely: `refs-finder`, `simple-explainer`.
+
+  Two things follow, and the first is the one that looks like a mistake. `korean-corrector`
+  edits in place and is `red`, not `yellow`, and that is deliberate: it edits the *answer
+  file*, which exists to be corrected and which no one has read yet. Colouring it with the
+  agent that rewrites your source would spend the warning on the one edit that needs none.
+  And a new agent picks its colour from this rule rather than from wanting a fresh one —
+  distinct-colour-per-agent was considered and is wrong here, because it makes the palette
+  carry no information at exactly the moment there are enough agents for it to matter.
+
+  This rule lives here because nothing enforces it. It is one word in a frontmatter file,
+  invisible until the wrong agent is already running under a reassuring colour.
 - **Recommend once per turn, and spend the marker before emitting.** Two independent
   guards: `stop_hook_active` covers the ordinary continuation, and
   `last_audited_prompt_id` covers what it cannot — the recommendation asks the main agent
@@ -711,7 +738,7 @@ keys are ignored and a missing or malformed file falls back to every default.
 
 Keys: one `AgentMode` per agent, named after that agent — `claims-auditor`,
 `deferrals-auditor`, `clarity-auditor`, `korean-corrector`, `comment-corrector`,
-`refs-finder`, **all default `off`** — which together are the only control over whether
+`agents-md-auditor`, `refs-finder`, **all default `off`** — which together are the only control over whether
 guard says anything unasked. `refs-finder` is the only one of them that governs something
 said *before* an answer rather than after; the key behaves identically, which is the point
 of putting it in the same registry. See the
@@ -781,6 +808,13 @@ the same turn-record path for every agent, and nothing offered that is set to `o
 
 ```bash
 export CLAUDE_PROJECT_DIR=/tmp/guard-test/proj
+# Override these two as well, and do not skip it. A shell inside a project that already runs
+# guard has them exported by that project's SessionStart, and `settings` resolves its project
+# from `GUARD_PROJECT_DIR` (never from `CLAUDE_PROJECT_DIR`, which no Bash command receives).
+# Leave them and the recipe's `settings set` lines silently rewrite the REAL project's
+# `guard.local.json` — every switch in it — while the assertions below still read as passing.
+export GUARD_PROJECT_DIR=/tmp/guard-test/proj
+export GUARD_REFS_DIR=/tmp/guard-test/proj/refs
 export CLAUDE_PLUGIN_ROOT=/path/to/plugins/guard
 export GUARD_TRACE=1
 H="$CLAUDE_PLUGIN_ROOT/scripts/guard_hook.py"
@@ -875,6 +909,28 @@ done
 python3 -c "import json;print(json.load(open('$CLAUDE_PROJECT_DIR/.claude/guard/state/s1.json'))['edited_files'])"  # cache.py only
 run p3 "Refactored the cache."          # -> comment-corrector offered, "this turn wrote: cache.py"
 run p4 "Refactored the cache."          # -> claims-auditor only: p4 wrote nothing
+
+# The two edited lists must stay disjoint and must not cross-trigger. `notes.md` above lands
+# in NEITHER; `AGENTS.md` and `CLAUDE.md` land in the agent-doc list only. Three things to
+# check here, and the first is the one a per-bucket reset would break.
+"$H" settings set agents-md-auditor fresh --session s1
+printf '# x\n' > "$CLAUDE_PROJECT_DIR/AGENTS.md"
+buckets(){ python3 -c "import json;d=json.load(open('$CLAUDE_PROJECT_DIR/.claude/guard/state/s1.json'));print(d['edited_files'],d['edited_agent_docs'])"; }
+edit(){ echo "{\"session_id\":\"s1\",\"prompt_id\":\"$1\",\"tool_input\":{\"file_path\":\"$CLAUDE_PROJECT_DIR/$2\"}}" | "$H" post-edit; }
+
+edit pa src/cache.py; edit pa notes.md; edit pa AGENTS.md; buckets
+#   -> [cache.py] [AGENTS.md]: notes.md is in neither
+run pa "Did both."      # -> ONE direct block, comment-corrector then agents-md-auditor,
+                        #    each with only its own paths, and no `answer file:` line
+
+edit pb AGENTS.md; buckets
+#   -> [] [AGENTS.md]: a new turn resets BOTH lists, so cache.py does not ride along
+run pb "Docs only."     # -> agents-md-auditor alone
+
+# Off is off, even with a file waiting for it.
+"$H" settings set agents-md-auditor off --session s1
+edit pc AGENTS.md
+run pc "Docs only."     # -> empty: comment-corrector has no source file, the other is off
 
 # Recommend-once: a second Stop on the same prompt_id is silent even with
 # stop_hook_active false.
@@ -979,7 +1035,9 @@ than raising), `_turn_identity(path, prompt_id)` on a
 fixture JSONL (a typed prompt, a `task-notification`, a slash command, a prompt_id absent
 from the file), `_safe_project_subdir(project_dir, value)` on its rejection cases (`"."`,
 `".."`, `".claude/guard"`, `"../elsewhere"`, `"/etc"` — all None; a plain subdirectory
-resolves), `_eligible_agents(state, edited)` on the `reads="files"` prerequisite, `_parse_mode` /
+resolves), `_eligible_agents(state, edited, agent_docs)` on the file-reading prerequisite (each
+bucket gates only its own agent), `_edited_bucket(path)` on a source file, an `AGENTS.md`, a
+`CLAUDE.md`, and a plain `.md` that must land in neither, `_parse_mode` /
 `_agent_mode` on the aliases and on a junk value (which must read as `off`), `_load_config`
 on a mode written into the file (it must survive the type gate — see the Config section),
 and `_router_context` / `_agent_pointer`, which must never name an agent outside the

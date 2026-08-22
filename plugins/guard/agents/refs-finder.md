@@ -1,7 +1,7 @@
 ---
 name: refs-finder
 description: |
-  Given a question, names the saved reference documents in this project's refs directory that bear on it, one line of why each. Names them; reads nothing out loud, answers nothing, writes nothing.
+  Given a question, names the saved reference documents in this project that bear on it. Names them; nothing else.
 # `Read` and `Grep`/`Glob` for the refs directory. `Bash` is for ONE command — guard's
 # `refs-dir` subcommand, which resolves where that directory is; the refs are markdown
 # and nothing here is settled by running anything.

@@ -1,7 +1,7 @@
 ---
 name: comment-corrector
 description: |
-  Audits the comments in the source files a turn wrote and fixes them in place: false claims corrected, restatements deleted, missing rationale written. Comments only, never code.
+  Fixes the comments in the source files it is given, in place. Comments only, never code.
 # `Edit` to fix comments in place, `Write` only to emit a long report as a file (it can
 # create files, which `Edit` cannot) — never to rewrite a file it was asked to audit.
 tools: Read, Grep, Glob, Bash, Edit, Write, SendMessage

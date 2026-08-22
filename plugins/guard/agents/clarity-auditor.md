@@ -1,7 +1,7 @@
 ---
 name: clarity-auditor
 description: |
-  Audits one finished turn for whether its intended reader can actually follow it — terms used but never explained, mechanisms asserted with no concrete example, and explanation pitched wrong for what the reader already knows. Reports them; edits nothing.
+  Audits one finished turn for whether its intended reader can follow it. Reports; edits nothing.
 # `Bash` is for guard's `transcript` extractor: whether a term was already explained is a
 # question about earlier turns, and the extractor is the only way to answer it. `Grep`/`Glob`
 # and `Read` are for the repository, which settles whether a name the answer used is a real
