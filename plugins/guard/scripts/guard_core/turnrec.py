@@ -66,8 +66,8 @@ def _write_turn_response(project_dir: Path, session_id: str, prompt_id: str,
     and replace the working document with a snapshot of an earlier state.
 
     So this is the fallback for a turn that ignored the ask, and it matters that there is
-    one: the on-demand `/guard:*` commands audit the last completed turn whatever the
-    settings say, and with no file at all they would have nothing to point an agent at.
+    one: the agents are pointed at this file by path, and with no file at all the dispatch
+    would name something that is not there.
 
     Best-effort, and a failure is silent: the recommendation goes out anyway and the main
     agent is asked to create the file. A guard that refused to recommend because it could

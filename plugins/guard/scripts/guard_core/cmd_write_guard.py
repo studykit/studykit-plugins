@@ -39,7 +39,8 @@ from .payload import _read_payload
 
 
 # Agents that report and never edit. Kept as an explicit set rather than derived from
-# `AUDIT_AGENTS`, because what separates these from the rest is not how they are routed but
+# `AUDIT_AGENTS` — which would also miss `ext-docs-auditor`, an agent with no registry entry —
+# because what separates these from the rest is not how they are routed but
 # whether writing is part of the job: `korean-corrector` edits the answer file in place,
 # `comment-corrector` edits the source files it was given, and `ext-docs-fetcher` saves the
 # reference it fetched. Restricting those three would mean encoding "the files handed to it
@@ -68,12 +69,18 @@ def _agent_name(payload: dict) -> str | None:
     `agent_type` is absent in the main conversation and carries the plugin-scoped name
     (`guard:claims-auditor`) inside a plugin subagent, so the namespace is stripped here
     rather than being matched against.
+
+    Recognised against `AUDIT_AGENTS` **and** `REPORT_ONLY_AGENTS`, not `AUDIT_AGENTS` alone.
+    `ext-docs-auditor` ships as an agent with no switch and no routing, so it has no registry
+    entry — and a gate that only knew the registry would quietly stop enforcing
+    "reports; edits nothing" for exactly the agent whose findings are fixed by moving prose
+    between files.
     """
     agent_type = payload.get("agent_type")
     if not isinstance(agent_type, str) or not agent_type.startswith(AGENT_NAMESPACE):
         return None
     name = agent_type[len(AGENT_NAMESPACE):]
-    return name if name in AUDIT_AGENTS else None
+    return name if name in AUDIT_AGENTS or name in REPORT_ONLY_AGENTS else None
 
 
 def _target_paths(payload: dict) -> list[str]:

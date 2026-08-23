@@ -2,8 +2,7 @@
 
 ``settings`` is run by the ``guard:settings`` skill via Bash, in-session. ``show`` prints the
 current settings; ``set <key> <value>`` changes one of the per-agent settings — each named
-after the agent it controls, valued ``off``/``fresh``/``reuse`` — or ``router_model`` /
-``refs_dir``; ``unset <key>`` removes a key from the file entirely, back to its default. The
+after the agent it controls, valued ``off``/``fresh``/``reuse`` — or ``refs_dir``; ``unset <key>`` removes a key from the file entirely, back to its default. The
 agent settings also apply to the live session's ``state/<sid>.json`` when a session id is
 available (``--session``, which the skill passes as ``${CLAUDE_SESSION_ID}``, else the
 inherited ``CLAUDE_CODE_SESSION_ID``); the rest are read from the config file at use. Every
@@ -24,7 +23,7 @@ from typing import Any
 
 from .config import (
     AgentMode, DEFAULT_CONFIG, _agent_mode, _cli_write_allowed, _load_config,
-    _load_raw_config, _parse_mode, _router_model, _write_config
+    _load_raw_config, _parse_mode, _write_config
 )
 from .paths import _cli_project_dir, _refs_dir, _trace
 from .agents import AUDIT_AGENTS, _instance_name
@@ -94,7 +93,6 @@ def _config_show_lines(project_dir: Path, session_id: str | None) -> list[str]:
     return [
         *muted,
         *(switch_line(k) for k in AUDIT_AGENTS),
-        "router_model: " + (_router_model(cfg) or "(agents/router.md)"),
         "refs_dir: " + (refs_rel if refs_rel else "(default wiki/ref/)"),
     ]
 
@@ -186,8 +184,7 @@ def cmd_settings() -> int:
         settings unset <key>                 — delete one key from the file
 
     Settable keys: the agent switches (the keys of ``AUDIT_AGENTS`` — each is the name
-    of the agent it admits), ``router_model`` (the router agent's model, and nothing
-    else's), and ``refs_dir``. The switches
+    of the agent it admits) and ``refs_dir``. The switches
     also apply to the live session's ``state/<sid>.json`` when a session id is available
     (``--session <id>``, which the forked skill passes as ``${CLAUDE_SESSION_ID}``, else
     the inherited ``CLAUDE_CODE_SESSION_ID``) so the change takes effect at once and
@@ -251,16 +248,12 @@ def cmd_settings() -> int:
         raw[key] = v.value
         _apply_session_scalar(project_dir, session_id, key, v.value)
         transition = _mode_transition_note(key, before, v)
-    elif key == "router_model":
-        # "" is a legitimate value here, not an error: it hands the choice back to
-        # `agents/router.md`, which is how a router model is normally set.
-        raw["router_model"] = value.strip()
     elif key == "refs_dir":
         raw["refs_dir"] = value  # "" resets to the default; _refs_dir validates at use
     else:
         print(f"guard settings: unknown or unsettable key {key!r}. Settable: "
               + ", ".join(AUDIT_AGENTS)
-              + ", router_model, refs_dir.",
+              + ", refs_dir.",
               file=sys.stderr)
         return 0
 

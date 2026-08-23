@@ -28,13 +28,16 @@ def _read_state(project_dir: Path, session_id: str, config: dict[str, Any]) -> d
         **{k: str(_agent_mode(config, k)) for k in AUDIT_AGENTS},
         # Per-turn guards keyed by the transcript prompt_id (a turn == one promptId).
         "last_audited_prompt_id": "",
-        # The most recent auditable turn's prompt_id — the target a `/guard:<agent>`
-        # command dispatches its agent for. Recorded by every Stop, switches or not.
+        # The most recent auditable turn's prompt_id, recorded by every Stop, switches or
+        # not. Only the CODEX adapter reads it, for its `/guard:claims-auditor` prompt-prefix
+        # path; Claude's per-agent commands were removed. Kept written on both hosts because
+        # `cmd_stop` is shared core and because a marker maintained only from the day a host
+        # gains an on-demand path back is a marker that is wrong on that day.
         "pending_verify_prompt_id": "",
-        # The session's transcript, recorded at Stop so the on-demand `/guard:*` path can
-        # hand it to an agent that needs history. That payload does not carry it, and the
-        # path is a session-long fact, so remembering it is cheaper than making the agent
-        # go looking for a file it has no reliable way to name.
+        # The session's transcript, recorded at Stop. The Stop payload carries it and the
+        # `UserPromptSubmit` one does not, and it is a session-long fact, so remembering it
+        # here is cheaper than making an agent go looking for a file it has no reliable way
+        # to name.
         "transcript_path": "",
         # Files written during one turn, accumulated by PostToolUse and read back at Stop
         # to decide whether a file-reading agent has anything to look at. Stored WITH the

@@ -11,7 +11,7 @@ tools: Read, Grep, Glob, Bash, SendMessage
 # chosen for the reviewability rather than the sharing: what this agent writes lands in the
 # project's diff, so a wrong entry is caught by the same review that catches wrong code.
 # The field silently grants Write and Edit, and the host does not scope that grant — measured,
-# see `wiki/ref/claude-code-subagent-memory.md`. Prose telling the agent to stay inside its
+# not a promise the field makes. Prose telling the agent to stay inside its
 # memory directory was tried and broken. So the boundary is enforced outside this file, by
 # guard's own `PreToolUse` hook: a write from this agent to anywhere but an agent-memory
 # directory is denied. (A subagent's own `hooks:` frontmatter would be the natural home for

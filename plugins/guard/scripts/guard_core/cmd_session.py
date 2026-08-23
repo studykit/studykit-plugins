@@ -3,11 +3,14 @@
 Sweeps state files, ``trace.log``, and turns/ and extracts/ dirs older than retention;
 exports ``GUARD_PROJECT_DIR`` and ``GUARD_REFS_DIR`` via ``$CLAUDE_ENV_FILE`` (append-once,
 since this event also fires on every compaction); and states as session context the refs rule
-always, the dispatch playbook's path when any agent is on, the fetch policy that sends the
-session's documentation lookups to ``ext-docs-fetcher`` instead of to its own WebFetch when that
-switch is on (not on Codex), and the standing reuse policy when any agent is in ``reuse``.
-Each is said ONCE here rather than in every Stop, which is the whole reason this hook prints
-anything.
+always, the dispatch playbook's path when any agent is on, and the standing reuse policy when
+any agent is in ``reuse``. Each is said ONCE here rather than in every Stop, which is the
+whole reason this hook prints anything.
+
+There is deliberately no line naming ``ext-docs-fetcher``. That agent has no switch to
+announce and nothing here forbids the session's own fetching; it is selected the way any agent
+is, from its description, and the refs rule below is what tells the session that a cited page
+has to end up saved.
 """
 
 from __future__ import annotations
@@ -192,8 +195,7 @@ def cmd_session_start() -> int:
                 "guard: agents are configured for this project, but audits are OFF for this "
                 "session — guard starts muted, so nothing is recommended when a turn ends "
                 "and no answer file is named. `/guard:toggle on` arms it for this session "
-                "only; a `/guard:<agent>` command still runs one audit without arming "
-                "anything. Do not mention this unless the user asks."
+                "only. Do not mention this unless the user asks."
             )
         else:
             print(
@@ -202,59 +204,6 @@ def cmd_session_start() -> int:
                 "dispatch each one and what to do with what it reports. Read only the sections "
                 "you are named; do not read the file until then."
             )
-
-    # The fetch policy, and the reason `ext-docs-fetcher` is announced here rather than named
-    # per turn. Everything else guard says is about checking work already done; this is about
-    # a call the session is about to make, so it has to arrive before the session reaches for
-    # the tool — which means SessionStart. A `UserPromptSubmit` line would bill every turn in
-    # the session for an agent that is off by default and wanted only on the questions that
-    # touch documentation. Once is enough because SessionStart registers no matcher and so
-    # fires on every source — `startup`, `resume`, `clear`, `compact`, `fork` — which means a
-    # compaction that drops this line immediately restates it
-    # (https://code.claude.com/docs/en/hooks, excerpt at
-    # wiki/ref/claude-code-hooks-session-env.md).
-    #
-    # What this line does NOT have to do any more is forbid the fetch. `pre-fetch` denies
-    # WebFetch and WebSearch in the main conversation while this switch is on, so the
-    # prohibition is a rule the host applies and this text only says so, which is why the
-    # sentence reads as a fact rather than an instruction. The half that stays an instruction
-    # is the one no hook can reach: answering an external-behavior question from memory makes
-    # no tool call, so nothing fires and nothing can be denied. That is the line's real job
-    # now, and it is why shortening it to a pointer would lose something.
-    #
-    # Why redirect the fetch at all, when the main agent could do it perfectly well: a page
-    # pulled into the main context is paid for on every turn after, a page read in passing is
-    # a page nobody saves, and a session that skimmed a page cannot separate what the page
-    # said from what it expected the page to say. The agent's definition argues all three.
-    #
-    # The agent LOOKS LOCALLY FIRST and most dispatches end there, which is why one line can
-    # replace what used to be two agents — a read-only lookup that reported `none`, and a
-    # fetcher the session then had to remember to dispatch. That handoff was where a session
-    # gave up and answered from memory. What the merge has to preserve is the distinction the
-    # lookup existed to make, and it is preserved in the REPORT: the agent says whether a path
-    # was already saved or newly fetched, so the caller still knows which it got.
-    #
-    # There is a second entry point, at the far end of the turn: the router may pick
-    # `ext-docs-fetcher` when a finished answer rested on a document nobody saved. That one is a
-    # repair; this is the normal path.
-    #
-    # The refs directory is deliberately not repeated here: the line printed above names it,
-    # and the agent resolves it itself with the `refs-dir` subcommand anyway.
-    #
-    # Not on Codex: it ships one named agent installed by `$guard:setup` and no fetcher among
-    # them, and this module is its adapter's library — so without the host test the line would
-    # forbid a tool and name no replacement.
-    if _switch_on(session_cfg, "ext-docs-fetcher") and not _HOST_IS_CODEX:
-        print(
-            "guard: do not answer from memory a question about how an external tool, API, "
-            "format or protocol behaves. This project saves copies of the documentation it "
-            f"cites: dispatch {_agent_id('ext-docs-fetcher')} with the user's question verbatim "
-            "and wait for it. It reports the local path of what is already saved, fetches and "
-            "saves the primary source when nothing is, and says which of the two it did — or "
-            "reports none. Read the files it names yourself. Your own WebFetch and WebSearch "
-            "are blocked while this is on, so there is no faster route. See the "
-            f"`ext-docs-fetcher` section of {_playbook_path()} the first time you dispatch it."
-        )
 
     # The standing reuse policy is stated ONCE, here, rather than in every Stop
     # recommendation. Reuse is a session-long fact — the instance lives under the session

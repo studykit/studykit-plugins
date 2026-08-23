@@ -168,7 +168,7 @@ def _handle_post_tool(project_dir: Path, payload: dict[str, Any], session_id: st
     # Claude's `post-edit` hook, applied here because Codex routes every event through
     # this one adapter. Claude's other `post-edit` job — recording the files the turn
     # edited — is deliberately not mirrored: it exists only to point `comment-corrector`,
-    # `agents-md-auditor` and `ext-docs-auditor` at them, and Codex has none of those agents yet.
+    # `agents-md-auditor` at them, and Codex has none of those agents yet.
     # So the index rule below is enforced on Codex while the audit of what was saved is not.
     config = core_config._load_config(project_dir)
     if core_edit._targets_refs_dir(project_dir, tool_input, config):
@@ -189,15 +189,12 @@ def _handle_post_tool(project_dir: Path, payload: dict[str, Any], session_id: st
 # profile it calibrates against. Without either it would have nothing to audit against and
 # would report `profile: MISSING` on every turn.
 #
-# `ext-docs-fetcher` and `ext-docs-auditor` are absent, and unlike `clarity-auditor` the fetcher WOULD
-# reach this table if it were listed — it is a routed `reads="turn"` agent, so
-# `core_agents._eligible_agents` offers it. Leaving them out is a decision, not a mechanism.
-# The fetcher's standing policy is suppressed at the source
-# (`core_session.cmd_session_start`, gated on `_HOST_IS_CODEX`) for the usual reason: Codex
-# ships one named agent from `$guard:setup` and there is no fetcher among them, so the line
-# would forbid WebFetch and name no replacement. The auditor is a file-reading agent and this
-# adapter mirrors no edited-file recording (see `_handle_post_tool`), so it has no input here
-# either way. Giving Codex the agent set is what unblocks both, same as above.
+# `ext-docs-fetcher` and `ext-docs-auditor` are absent, and neither could reach this table:
+# they have no `AUDIT_AGENTS` entry, so `core_agents._eligible_agents` never offers them. On
+# Claude the fetcher is selected from its description and the auditor is named by the Stop hook
+# off the turn's refs edits; Codex ships one named agent from `$guard:setup` and this adapter
+# mirrors no edited-file recording (see `_handle_post_tool`), so neither route exists here.
+# Giving Codex the agent set is what unblocks both, same as above.
 _SCOPE = {"claims-auditor": "the response's claims",
           "deferrals-auditor": "deferrals the repository could resolve",
           "korean-corrector": "whether the Korean reads as translated English"}

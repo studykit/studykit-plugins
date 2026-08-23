@@ -14,14 +14,11 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from .config import AgentMode, _router_model
+from .config import AgentMode
 from .turnrec import _turn_record_file, _turn_request_file
 from .agents import AUDIT_AGENTS
 
 
-# --------------------------------------------------------------------------- #
-# dispatch text
-# --------------------------------------------------------------------------- #
 # The input line each file-reading agent's path list is introduced by. Worded as what the
 # agent is being handed, not as what to look for: the criteria are the agent's own and live
 # in its definition, so a lead that previewed them would be the caller telling it what to
@@ -30,7 +27,6 @@ from .agents import AUDIT_AGENTS
 _FILE_INPUT_LABELS = {
     "files": "- files to audit (comments only, in place):",
     "agent-docs": "- agent instruction files to audit:",
-    "refs": "- saved reference files to audit:",
 }
 
 
@@ -119,10 +115,10 @@ def _dispatch_context(project_dir: Path, session_id: str, prompt_id: str, lead: 
                       transcript: str = "") -> str:
     """``additionalContext`` asking the main agent to dispatch these agents directly.
 
-    The no-router path, reached two ways and for the same reason — there is nothing to
-    triage, so routing would only add a hop. Either the user named the audit themselves
-    with a `/guard:<agent>` command, or `cmd_stop` is dispatching a file-reading agent,
-    whose selection is not a question the router can answer.
+    The no-router path: `cmd_stop` dispatching a file-reading agent, whose selection is not
+    a question the router can answer — there is nothing to triage, so routing would only add
+    a hop. It used to have a second caller, the per-agent `/guard:<agent>` command, which is
+    gone; the signature is unchanged because the remaining caller needs all of it.
     """
     keys = list(keys)
     block = _agent_pointer(project_dir, session_id, prompt_id, keys, files or {}, modes)
@@ -133,7 +129,7 @@ def _dispatch_context(project_dir: Path, session_id: str, prompt_id: str, lead: 
 
 def _router_context(project_dir: Path, session_id: str, prompt_id: str, lead: str,
                     eligible: list[str], modes: dict[str, AgentMode],
-                    config: dict[str, Any], transcript: str = "") -> str:
+                    transcript: str = "") -> str:
     """``additionalContext`` for the Stop path: the playbook pointer, then this turn's data.
 
     Every line here is paid in the main agent's context at the end of EVERY routed turn,
@@ -163,10 +159,11 @@ def _router_context(project_dir: Path, session_id: str, prompt_id: str, lead: st
     from the wrong one — the failure would be silent, and routing is the step nothing else
     checks. Cheapness is not what it is tuned for: a router that misreads the turn either
     ships the defect or spends a subagent for every agent it named for nothing, and both cost
-    more than the routing call itself ever will. Hence the model in `agents/router.md` is a
-    capable one rather than the cheapest that could hold the method.
+    more than the routing call itself ever will. Hence `agents/router.md` pins `opus`, and
+    there is no per-project override: the one setting that could make routing cheaper is the
+    one setting whose failure is invisible, since a router that stops naming an agent looks
+    exactly like a turn with nothing in it.
     """
-    model = _router_model(config)
     fields = [f"- playbook: {_playbook_path()}"]
     # The two turn files share a long absolute prefix, so it is spelled ONCE and each file
     # is named relative to it as `{turn dir}/<name>`. The placeholder is written into the
@@ -203,15 +200,6 @@ def _router_context(project_dir: Path, session_id: str, prompt_id: str, lead: st
     fields.append("- candidates: " + ", ".join(f"`{k}`={modes[k].value}" for k in eligible))
     if transcript and any(AUDIT_AGENTS[k].needs_history for k in eligible):
         fields.append(f"- history: transcript {transcript}, turn {prompt_id}")
-    if model:
-        # Phrased as an instruction, unlike every other field, because it is the only one
-        # consumed BEFORE the playbook is opened: the router is dispatched straight off
-        # this block and only its report sends the main agent to a playbook section, so
-        # there is no later text that could say what to do with a bare value. Left as
-        # `- router model: opus` it reads as a fact about the router rather than an
-        # argument to pass, and the dispatch silently falls back to `agents/router.md`.
-        fields.append(
-            f"- dispatch `guard:router` with `model: {model}` — overrides agents/router.md")
     return lead + "\n\n" + "\n".join(fields)
 
 
@@ -246,9 +234,31 @@ _DIRECT_LEAD_WITH_ROUTER = (
 )
 
 
-# --------------------------------------------------------------------------- #
-# subcommands
-# --------------------------------------------------------------------------- #
+# `ext-docs-auditor`, which has no switch and is not routed. It is named here rather than
+# through `AUDIT_AGENTS` because the condition for it is not a judgment and not a setting: the
+# turn either wrote a file under the refs directory or it did not, and `edited_refs` already
+# answers that. Routing it could only restate what the file list says, and a switch in front
+# of it would be a way to save a saved reference from ever being checked.
+#
+# The section is named the same way the other file-reading agents' sections are, so what to
+# do with its report stays in the playbook and is read only when a turn actually wrote one of
+# these files. Worded as what the turn did, not as what to look for — the criteria are the
+# agent's own.
+_REFS_LEAD = (
+    "guard: this turn wrote saved reference files. Dispatch `guard:ext-docs-auditor` "
+    "(subagent_type: \"guard:ext-docs-auditor\") over them and follow the "
+    "`ext-docs-auditor` section of {playbook}."
+)
+
+
+def _refs_context(refs: list[str]) -> str:
+    """``additionalContext`` naming ``ext-docs-auditor`` for the refs files this turn wrote."""
+    lines = [_REFS_LEAD.format(playbook=_playbook_path()),
+             "- saved reference files to audit:"]
+    lines.extend(f"    {p}" for p in refs)
+    return "\n".join(lines)
+
+
 # What the main agent is told at the START of a turn, when guard has anything switched on.
 # It fires on EVERY prompt, including the many that are never audited, so it is one sentence
 # and a path.

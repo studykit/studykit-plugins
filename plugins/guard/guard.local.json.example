@@ -5,7 +5,5 @@
   "korean-corrector": "off",
   "comment-corrector": "off",
   "agents-md-auditor": "off",
-  "refs-finder": "off",
-  "router_model": "",
   "refs_dir": ""
 }

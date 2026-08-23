@@ -5,9 +5,9 @@ audit for THIS SESSION — ``audit_paused`` in the session state, never guard.lo
 cannot change what the project does by default. A session STARTS muted
 (``state._read_state``), which makes ``on`` the common direction: it clears the pause and is
 the only thing that ever does. An empty argument flips. While muted, ``stop`` recommends
-nothing and ``user-prompt`` names no answer file, but the pending ``/guard:<agent>`` target
-and the answer file are still recorded, so asking for one audit still works. The hook does
-the work and prints the resulting state; the command file only relays it.
+nothing and ``user-prompt`` names no answer file, but the pending target and the answer file
+are still recorded — the Codex adapter reads that marker. The hook does the work and prints
+the resulting state; the command file only relays it.
 
 ``status`` (CLI, stdin JSON) is the other half, and starting muted is what makes it
 load-bearing rather than a convenience: the mute is a feature only because it is visible, and
@@ -107,15 +107,18 @@ def cmd_toggle() -> int:
     if paused:
         msg = ("guard: audits are OFF for this session. Nothing is recommended when a turn "
                "ends, and answers are no longer written to a file. `/guard:toggle on` arms "
-               "it again and the project's own settings are untouched. A `/guard:*` "
-               "command still works if you want one audit now.")
+               "it again and the project's own settings are untouched.")
     elif armed:
         msg = ("guard: audits are ON for this session — "
                + ", ".join(f"`{k}`" for k in armed) + ". They stay on until this session "
                "ends; the next one starts muted again. Nothing else changed.")
     else:
-        msg = ("guard: no longer muted, but every agent is `off` for this project, so nothing "
-               "will run. `/guard:settings` is where you switch one on.")
+        # Not "nothing will run": `ext-docs-auditor` has no switch, so a turn that writes a
+        # saved reference is still named at Stop with every agent off. Overstating the silence
+        # here is how a user reads that dispatch as guard ignoring their settings.
+        msg = ("guard: no longer muted, but every agent switch is `off` for this project, so "
+               "no audit of the turn itself will run — only a saved reference the turn writes "
+               "is still checked. `/guard:settings` is where you switch one on.")
     _emit_expansion(msg + " Relay this in one line and do nothing else.")
     _trace(project_dir, session_id, "toggle", "set", arg=arg or "flip", paused=paused)
     return 0

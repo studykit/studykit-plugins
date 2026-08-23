@@ -1,31 +1,23 @@
-"""``user-prompt`` and ``verify`` — the two hooks that run before an answer exists.
+"""``user-prompt`` (UserPromptSubmit) — the one hook that runs before an answer exists.
 
-``user-prompt`` (UserPromptSubmit) names the file this turn's answer is to be written to, so
+It names the file this turn's answer is to be written to, so
 the answer exists somewhere editable while the turn is still running. It has to be this hook:
 by Stop the answer is already printed, and a printed answer cannot be corrected. Silent when
 no agent that reads the turn (``agents._reads_turn``) is on — which includes "every agent off"
 but also a project running only ``comment-corrector`` — and for guard's own control commands.
 It also saves the user's request verbatim, for the router alone.
-
-``verify`` (UserPromptExpansion, one matcher per agent) emits the dispatch instruction for
-that ONE agent over the last completed turn (``pending_verify_prompt_id``, recorded by every
-Stop). A switch that is off is still auditable this way — the switch governs what guard
-recommends unasked, not what the user may ask for.
 """
 
 from __future__ import annotations
 
-import sys
-
-from .config import _agent_mode, _load_config, _switch_on
+from .config import _load_config, _switch_on
 from .paths import _project_dir, _trace
 from .turnrec import _turn_record_file, _write_turn_request
 from .payload import _read_payload, _session_id
-from .emit import _emit_expansion
 from .transcript import _CONTROL_CMD_RE
 from .agents import AUDIT_AGENTS, _reads_turn
 from .state import _audit_paused, _read_state
-from .dispatch import _DRAFT_LEAD, _dispatch_context
+from .dispatch import _DRAFT_LEAD
 
 
 def cmd_user_prompt() -> int:
@@ -83,53 +75,3 @@ def cmd_user_prompt() -> int:
     _trace(project_dir, session_id, "user-prompt", "draft_path", prompt_id=prompt_id)
     return 0
 
-
-def cmd_verify() -> int:
-    """UserPromptExpansion for the per-agent ``/guard:<agent>`` commands.
-
-    The agent comes from argv (``verify claims-auditor`` | ``deferrals-auditor`` |
-    ``clarity-auditor`` | ``korean-corrector``), one per command, so each skill dispatches
-    exactly its own agent and the choice is not a dispatch input the model has to be
-    trusted to honor.
-
-    Works regardless of the switches: a switch governs what guard recommends UNASKED,
-    while running the command is the user asking for this one audit now. Refusing it
-    would leave the user no way to check the very agent they keep switched off, which is
-    the main reason to keep it off in the first place.
-
-    ``pending_verify_prompt_id`` names the turn, and the record for it already holds that
-    turn's response — every Stop writes that section, whatever the switches say, which is
-    what makes this command work in a project that keeps every switch off. The main agent
-    still appends the request, the tool activity, and the earlier evidence, exactly as on
-    a routed turn.
-    """
-    key = sys.argv[2].strip().lower() if len(sys.argv) > 2 else ""
-    spec = AUDIT_AGENTS.get(key)
-    if spec is None or not spec.verify_command:
-        return 0
-    project_dir = _project_dir()
-    payload = _read_payload()
-    if payload is None or project_dir is None:
-        return 0
-    session_id = _session_id(payload)
-    if session_id is None:
-        return 0
-
-    config = _load_config(project_dir)
-    state = _read_state(project_dir, session_id, config)
-
-    pid = state.get("pending_verify_prompt_id") or ""
-    if not pid:
-        _emit_expansion("guard: no completed turn is available to audit yet. "
-                        f"Ask something first, then run `/guard:{key}`.")
-        _trace(project_dir, session_id, "verify", "no_pending", agent=key)
-        return 0
-
-    context = _dispatch_context(
-        project_dir, session_id, pid,
-        "guard: audit the last completed turn, on request.", [key],
-        {key: _agent_mode(state, key)},
-        transcript=str(state.get("transcript_path") or ""))
-    _emit_expansion(context)
-    _trace(project_dir, session_id, "verify", "dispatch", agent=key, prompt_id=pid)
-    return 0

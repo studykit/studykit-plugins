@@ -1,6 +1,6 @@
 ---
 name: settings
-description: "View and change guard's settings for this project — one setting per agent, each off / fresh / reuse, plus router_model and refs_dir — recorded in .claude/guard.local.json. Use when the user wants to configure guard: turn an audit on or off, delegate documentation lookups, keep an agent running across turns instead of respawning it, or set the router's model or refs_dir. Claude Code only."
+description: "View and change guard's settings for this project — one setting per agent, each off / fresh / reuse, plus refs_dir — recorded in .claude/guard.local.json. Use when the user wants to configure guard: turn an audit on or off, keep an agent running across turns instead of respawning it, or point guard at a different refs directory. Claude Code only."
 argument-hint: '[key] [value]'
 disable-model-invocation: true
 # Runs in a forked subagent, not in the main session. Changing a setting is a few CLI calls
@@ -91,25 +91,27 @@ made through the CLI, report that instead of working around it.
 | `korean-corrector` | `off` / `fresh` / `reuse` | Admits `guard:korean-corrector` — it flags 번역체 phrasing and a register that is not 존댓말, and hands back the corrected text. Identifiers, paths, commands, and established loanwords (커밋, 리팩토링) are left alone. |
 | `comment-corrector` | `off` / `fresh` / `reuse` | Admits `guard:comment-corrector`, for the source files the turn actually edited. This one **edits those files in place**, so its fixes land without being asked — say so when the user turns it on. |
 | `agents-md-auditor` | `off` / `fresh` / `reuse` | Admits `guard:agents-md-auditor`, for the `AGENTS.md` / `CLAUDE.md` files the turn actually edited, judged as instruction files. Reports only — but its findings often mean moving content into a doc that does not exist yet, which is the user's decision, not the agent's. |
-| `ext-docs-fetcher` | `off` / `fresh` / `reuse` | Admits `guard:ext-docs-fetcher` — the only agent on the **network**, and the only one reached from both ends of a turn. With it on, the session stops running WebFetch/WebSearch itself and dispatches this instead: it reports the local path of documentation already saved here, or fetches the primary source and saves it, and says which it did. **It writes to the repository** — new files under `refs_dir` and rows in that directory's index — so say that when the user turns it on. |
-| `ext-docs-auditor` | `off` / `fresh` / `reuse` | Admits `guard:ext-docs-auditor`, for the files under `refs_dir` the turn actually wrote. It checks that a reference is a reference: a trustworthy source named, content attributed rather than recalled, and nothing in it about **this** repository — the last being the rule that actually gets broken. Reports only. |
-| `router_model` | a model name, or empty | Model the **router** runs on. Empty (the default) leaves the choice to the router's own definition in the plugin's `agents/`. Every agent the router names brings its own model, so this changes which audits get picked, never how one is done. |
 | `refs_dir` | a project-relative path, or empty | Where guard saves cited-doc copies. Empty = the git-tracked default `wiki/ref/`, committed with the repo; a different tracked path (e.g. `docs/refs`) overrides it. |
 
 **Every setting ships off**, and with all of them off guard is silent: a finished turn adds
 nothing to the main session's context and makes no model call. Turning one on only makes
 that agent *available* — the router still has to find something in the turn before it names
-it, which is why turning `korean-corrector` on costs nothing on an English turn. The three
-file-reading agents (`comment-corrector`, `agents-md-auditor`, `ext-docs-auditor`) skip the router
-entirely and need a file of their own kind that the turn wrote, so they cost nothing on the
-many turns that write none. `ext-docs-fetcher` is the one that also runs *before* an answer, off a
-policy stated once at session start.
+it, which is why turning `korean-corrector` on costs nothing on an English turn. The two
+file-reading agents (`comment-corrector`, `agents-md-auditor`) skip the router entirely and
+need a file of their own kind that the turn wrote, so they cost nothing on the many turns that
+write none.
 
-A setting that is off does **not** disable the matching command. `/guard:claims-auditor`,
-`/guard:deferrals-auditor`, `/guard:clarity-auditor` and `/guard:korean-corrector` are the
-user asking for that one audit now, and they work whatever the settings say — which is the
-whole reason it is safe to leave them off. Say this to a user who hesitates to switch
-something off.
+**Two agents have no setting here and cannot be given one.** `guard:ext-docs-fetcher` is
+selected from its own description, the way any agent is — there is nothing said unasked for a
+switch to govern. `guard:ext-docs-auditor` is named by the Stop hook whenever the turn wrote a
+file under `refs_dir`, whoever wrote it, and deliberately so: the party most likely to break
+the rule it enforces is the party that just saved the file. If a user asks to turn either one
+off, say that plainly rather than writing a key the CLI will refuse.
+
+There is no per-agent command to run one of these audits on demand — the switches are the
+only way an audit runs. So a user switching everything off is switching guard off for this
+project, not merely quieting it; say that plainly rather than reassuring them they can still
+ask for one turn to be checked.
 
 ### `fresh` vs `reuse`
 

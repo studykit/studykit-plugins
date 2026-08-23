@@ -3,14 +3,13 @@
 Configuration is optional: a JSON object at ``${CLAUDE_PROJECT_DIR}/.claude/guard.local.json``
 (``.codex/`` on Codex). One ``AgentMode`` per agent, keyed by that agent's own name —
 ``claims-auditor`` / ``deferrals-auditor`` / ``clarity-auditor`` / ``korean-corrector`` /
-``comment-corrector`` / ``agents-md-auditor`` / ``ext-docs-fetcher`` / ``ext-docs-auditor``, each
+``comment-corrector`` / ``agents-md-auditor``, each
 ``"off"`` (the default) / ``"fresh"`` / ``"reuse"`` — which together are the only control
 over whether guard says anything unasked and over whether an agent is respawned per turn or
 held open for the session. Plus ``refs_dir`` (project-relative directory for saved copies of cited docs; empty
 means the git-tracked default ``wiki/ref/``, and an unsafe value falls back to it — see
-``paths._refs_dir``) and ``router_model`` (a model override for the router alone; empty
-leaves the choice to ``agents/router.md``, and every agent the router recommends brings its
-own model from its own definition).
+``paths._refs_dir``). There is no model key: every agent, the router included, brings its own
+model from its own definition under ``agents/``.
 
 Unknown keys are ignored; a missing or malformed file falls back to all defaults. The
 ``guard:settings`` skill changes these through the ``settings`` CLI, which writes this file
@@ -102,17 +101,12 @@ _MODE_ALIASES = {
 
 
 DEFAULT_CONFIG: dict[str, Any] = {
-    # Model for the router agent, overriding whatever `agents/router.md` declares.
-    # Empty (the default) means guard says nothing about the model and the agent's own
-    # frontmatter governs — the normal way a subagent's model is chosen, and the one
-    # that keeps working when a host has no way to override it at dispatch. This exists
-    # for the project that wants the router cheaper or sharper than the plugin ships it:
-    # a router that misses means the audit silently never happens, which is the exact
-    # failure guard exists to prevent, and the other direction costs just as much — a
-    # model that cannot tell a backed claim from one that merely sounds backed names
-    # every agent every turn, which is the same as naming none, because the user stops
-    # reading the recommendation.
-    "router_model": "",
+    # There is deliberately no key for the router's model. `agents/router.md` pins `opus` and
+    # that is the whole decision: every other agent in the set is paid for by one the router
+    # makes, so the direction a project would tune this in — cheaper — is the direction whose
+    # failure is invisible. A router that stops naming an agent looks exactly like a turn with
+    # nothing in it, and the audit that never happened is the failure guard exists to prevent.
+    #
     # One key per agent, named after the agent it controls — the key IS the agent's name,
     # so `settings set korean-corrector reuse` and `guard:korean-corrector` are the same
     # string and there is no second vocabulary to learn or to keep in sync. The value is
@@ -125,9 +119,10 @@ DEFAULT_CONFIG: dict[str, Any] = {
     # front of them — switching one on IS switching guard on, and a project that wants
     # the claim check without the deferral check just switches the one it wants.
     #
-    # None of them governs the on-demand `/guard:<agent>` commands: a switch that is off
-    # still leaves the user free to ask for that audit now. That is why every switch
-    # ships off — guard installed is guard available, not guard running.
+    # Every switch ships off: guard installed is guard available, not guard running. Note
+    # what changed under that — there is no longer a per-agent command to run one of these
+    # audits on demand, so `off` now means the audit cannot happen at all rather than
+    # merely that it is not offered. See `AGENTS.md`.
     "claims-auditor": AgentMode.OFF,
     "deferrals-auditor": AgentMode.OFF,
     # Can the intended reader follow the answer? The only agent whose verdict depends on
@@ -150,22 +145,11 @@ DEFAULT_CONFIG: dict[str, Any] = {
     # only. Turning it on costs nothing on the many turns that touch no such file, since
     # eligibility needs one this turn actually wrote.
     "agents-md-auditor": AgentMode.OFF,
-    # Finds the documentation a question or an answer rests on — in `refs_dir` first, on the
-    # network when nothing there covers it — and reports the local path either way. The only
-    # switch here that puts an agent on the NETWORK, and the only one whose purpose is partly
-    # to stop the main session doing something rather than to check what it did: with this on,
-    # the session delegates its fetching, which is announced once at SessionStart. It is also
-    # the only agent reached from BOTH ends of a turn — that announcement before an answer
-    # exists, and the router afterwards when a finished answer rested on a document nobody
-    # saved. And the only routed agent that writes to the repository, so its cost is a diff:
-    # new files under `refs_dir` and rows in that directory's index.
-    "ext-docs-fetcher": AgentMode.OFF,
-    # The files under `refs_dir` THIS TURN wrote, judged as saved references: a trustworthy
-    # source named, the content attributed to it rather than recalled, and — the rule that
-    # actually gets broken — nothing in them about this repository. Reports only. Pairs with
-    # `ext-docs-fetcher`, which is what usually writes those files, but is independent of it:
-    # a hand-edited reference is audited the same way.
-    "ext-docs-auditor": AgentMode.OFF,
+    # No key for `ext-docs-fetcher`, deliberately. It is not one of guard's recommended
+    # agents any more: nothing routes it and no hook forces the session into it, so there is
+    # no "says something unasked" for a switch to govern. The main agent picks it the way it
+    # picks any agent — from its description — and an off-by-default switch in front of that
+    # would only be a way to make a listed agent silently unusable.
     # Where guard saves local copies of cited docs, relative to
     # the project dir. Empty = the default git-tracked `wiki/ref/`, so the collected
     # references are committed with the repo. Point it at a different tracked path
@@ -176,9 +160,6 @@ DEFAULT_CONFIG: dict[str, Any] = {
 }
 
 
-# --------------------------------------------------------------------------- #
-# environment / paths
-# --------------------------------------------------------------------------- #
 def _trace_enabled() -> bool:
     return os.environ.get(TRACE_ENV_VAR, "").strip().lower() in TRACE_TRUTHY
 
@@ -207,9 +188,8 @@ def _load_config(project_dir: Path) -> dict[str, Any]:
     """Load the JSON config at guard.local.json, if present. Fail-open to defaults.
 
     Only keys present in DEFAULT_CONFIG are honored, and only when the supplied value
-    matches the default's JSON type (every key is a str: the agent modes,
-    ``router_model``, ``refs_dir``), so a malformed value can never change a setting by
-    accident.
+    matches the default's JSON type (every key is a str: the agent modes and ``refs_dir``),
+    so a malformed value can never change a setting by accident.
     """
     config = dict(DEFAULT_CONFIG)
     path = project_dir / CONFIG_REL
@@ -293,12 +273,3 @@ def _switch_on(cfg: dict[str, Any], key: str) -> bool:
     return _agent_mode(cfg, key) is not AgentMode.OFF
 
 
-def _router_model(cfg: dict[str, Any]) -> str:
-    """The model override for the router agent, or "" to leave the choice to the agent.
-
-    Never validated against a list of names — an alias, a full id, or a provider's own
-    name are all legitimate and the set moves. An empty value is not a fallback to some
-    default here: it means guard prints no model line at all, so `agents/router.md`
-    decides, which is where a subagent's model normally comes from.
-    """
-    return str(cfg.get("router_model", "")).strip()
