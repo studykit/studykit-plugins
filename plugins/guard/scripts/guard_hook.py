@@ -32,6 +32,7 @@ Subcommands
 - pre-write      PreToolUse on the write tools — ``guard_core.cmd_write_guard``
 - pre-fetch      PreToolUse on the network tools — ``guard_core.cmd_fetch_guard``
 - stop           Stop — ``guard_core.cmd_stop``
+- dispatch       CLI (argv), run by the ``guard:audit`` skill — ``guard_core.cmd_dispatch``
 - session-start  SessionStart — ``guard_core.cmd_session``
 - toggle         UserPromptExpansion for ``/guard:toggle`` — ``guard_core.cmd_status``
 - status         CLI (stdin JSON), the status-line segment — ``guard_core.cmd_status``
@@ -51,6 +52,7 @@ from guard_core.transcript import cmd_transcript
 from guard_core.cmd_turn import cmd_user_prompt, cmd_verify
 from guard_core.cmd_edit import cmd_post_edit
 from guard_core.cmd_stop import cmd_stop
+from guard_core.cmd_dispatch import cmd_dispatch
 from guard_core.cmd_session import cmd_session_start
 from guard_core.cmd_settings import cmd_refs_dir, cmd_settings
 from guard_core.cmd_status import cmd_status, cmd_toggle
@@ -66,6 +68,7 @@ SUBCOMMANDS = {
     "verify": cmd_verify,
     "settings": cmd_settings,
     "stop": cmd_stop,
+    "dispatch": cmd_dispatch,
     "session-start": cmd_session_start,
     "refs-dir": cmd_refs_dir,
     "transcript": cmd_transcript,

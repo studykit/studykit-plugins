@@ -32,12 +32,13 @@ config -> paths -> turnrec / payload / emit -> transcript
 | `transcript` | reading the host's transcript, and the `transcript` CLI over it |
 | `agents` | the roster, and mechanical eligibility |
 | `state` | `state/<sid>.json` |
-| `dispatch` | the text handed to the main agent |
+| `dispatch` | the text handed to whoever runs the audit, and the one line that starts it |
 | `cmd_turn` | `user-prompt`, `verify` |
 | `cmd_edit` | `post-edit` |
 | `cmd_write_guard` | `pre-write` |
 | `cmd_fetch_guard` | `pre-fetch` |
 | `cmd_stop` | `stop` |
+| `cmd_dispatch` | `dispatch` |
 | `cmd_session` | `session-start` |
 | `cmd_settings` | `settings`, `refs-dir` |
 | `cmd_status` | `toggle`, `status` |
@@ -70,7 +71,7 @@ there is nothing shared to factor out beyond the state root.
 | `PreToolUse` (`WebFetch\|WebSearch`) | `pre-fetch` | Deny the **main conversation**'s network reads while `ext-docs-fetcher` is on, naming that agent in the reason. Fails open inside every subagent (`agent_type` present), on Codex, and when the live switch is off — the session state's mode, not the config file's, so `/guard:settings` off mid-session stops the denials. |
 | `PostToolUse` (`Write\|Edit\|MultiEdit\|NotebookEdit`) | `post-edit` | Record a source file this turn wrote (the candidate list for a `comment-corrector` recommendation), then block when a file saved in the refs dir is not listed in that dir's `AGENTS.md`. |
 | (called via Bash, not a hook) | `settings` | `guard:settings` (a `context: fork` skill, so it runs in a forked `general-purpose` agent rather than in the main session) shows/sets/unsets guard.local.json settings; the agent modes also apply to the live session's `state/<sid>.json` (session id from `--session`/`CLAUDE_CODE_SESSION_ID`). A mode change away from `reuse` also prints a stand-down note, the only channel guard has to a running instance. `set` preserves every other key; `unset <key>` is the only way to delete one. |
-| `Stop` | `stop` | Write the response section of the turn record and mark the turn as the on-demand target — always. Then, when any agent is not `off`, emit `additionalContext` asking the main agent to dispatch `guard:router` over the record, carrying the eligible agents with their modes and this turn's paths. The router names sections of `hooks/context/dispatch-playbook.md`; the main agent follows those, completing the record's second section only if a named section asks for it. `comment-corrector` never goes to the router: it is dispatched directly in the same emission, to be sent in the same message — see the invariant below. |
+| `Stop` | `stop` | Write the response section of the turn record and mark the turn as the on-demand target — always. Then, when any agent is not `off`, emit `additionalContext` of ONE line: invoke the `guard:audit` skill with this turn's id. Nothing else — the dispatch (which agents, in which mode, over which paths) is built by the `dispatch` CLI verb inside that skill, so it is paid for in the fork's context rather than in the context the user is talking to. The hook still computes eligibility, because whether to say anything at all is a fact about the turn that just ended. |
 | `SessionStart` | `session-start` | Sweep state and turn records past retention, export `GUARD_REFS_DIR`, state the refs rule as session context, say once — when any agent is on — either that the session opened muted (the usual case; `/guard:toggle on` arms it) or that audits are on and where the dispatch playbook is, state the fetch policy once when `ext-docs-fetcher` is on (Claude only) — the redirect and the do-not-answer-from-memory half; the prohibition itself is `pre-fetch`'s job — and — when any agent is in `reuse` — state the standing reuse policy once. |
 | (called via Bash, not a hook) | `transcript` | `index` / `turn` / `find` over the session transcript, for the audit agents. Writes an extract file and prints only its path plus a one-line summary; `--since` / `--until` / `--last` bound which turns are scanned. |
 | `UserPromptExpansion` (`^(guard:)?toggle$`) | `toggle` | Arm/mute the automatic audit for THIS session (`audit_paused`, session state only — never guard.local.json). A session starts muted, so `on` is the arming direction and the common one. `command_args` carries `on`/`off`; empty flips. The hook does the work and prints the result. |
@@ -226,6 +227,26 @@ payloads, not memory.
   `wiki/ref/claude-code-stop-hook-decision-control.md`, fetched 2026-08-21. This is why
   guard's recommendation is `additionalContext` and its refs-index gap is still a block:
   one is guidance from a working hook, the other is unfinished work.
+- **The forked audit skill's three load-bearing facts are probed, not inferred.** Each one
+  would fail silently if wrong, and none is stated outright in the docs, so
+  `wiki/ref/claude-code-skill-injection-and-fork-probe.md` holds the probe (`claude` 2.1.241,
+  throwaway plugin, evidence written to a file by the injected script rather than reported by
+  a model):
+  1. An argument placeholder inside a `` !`command` `` is substituted **before** that command
+     runs, so `dispatch --turn $turn` reaches the CLI with the real id. Had it not been, the
+     Bash shell would have expanded `$turn` to the empty string and guard would have audited
+     the pending turn instead of the named one — an audit of the wrong turn, silently.
+  2. A `context: fork` skill keeps `Agent` and can dispatch a **plugin-scoped** agent
+     (`tp2:mini` → its token). This is the whole design: every agent guard dispatches is
+     plugin-scoped.
+  3. `background: false` is required for (2). `Agent` is not in the tool set a background
+     subagent gets, so the default `background: true` would leave the fork unable to dispatch
+     anything, with nothing to report and no error to notice.
+
+  What the probe also settled, and what it means for the goal: the injected command raises no
+  tool call of its own, and the main agent's context receives only the fork's final message —
+  but the fork's own tool calls do reach the parent as events. So this shape buys a much
+  smaller main context, not a silent screen.
 - **`memory: <scope>` gives a subagent a persistent store, and silently gives it Write and
   Edit.** Scopes and directories: `user` → `~/.claude/agent-memory/<agent>/`, `project` →
   `.claude/agent-memory/<agent>/`, `local` → `.claude/agent-memory-local/<agent>/`; the
@@ -253,9 +274,10 @@ payloads, not memory.
   not write — leaves state untouched and says nothing: guard must never harass the user
   because its own machinery broke.
 - **guard routes; the agents audit; guard runs no model.** No judgment about the *content*
-  of a turn happens in the hook. Stop asks the main agent to dispatch one subagent — the
-  router — which reads the turn and names which eligible agents would find something in it;
-  the main agent dispatches those. Three shapes were tried before this one. Auditing inside
+  of a turn happens in the hook. Stop asks the main agent for one thing — invoke the
+  `guard:audit` skill — and that skill, in a forked context, dispatches one subagent (the
+  router), which reads the turn and names which eligible agents would find something in it;
+  the skill dispatches those and reports the findings back. Three shapes were tried before this one. Auditing inside
   the hook (the old `headless`) meant every criterion existed twice, once as a judge prompt
   and once as an agent definition, and they drifted. Picking agents by lexical pattern meant
   guard could detect `TBD` but not "asserted without evidence", which is the axis that
@@ -498,10 +520,10 @@ payloads, not memory.
   all three. If a prompt-time-only agent is ever added back, note that the exclusion has to go
   in `_eligible_agents` and nowhere further downstream: `eligible` is also what decides
   whether Stop emits at all, and the Codex adapter shares that function.
-- **The file-reading agents are never routed.** The Stop hook splits the eligible set by
-  `reads`: the `reads="turn"` agents go to the router, and `comment-corrector`
+- **The file-reading agents are never routed.** `dispatch.turn_dispatch_text` splits the
+  eligible set by `reads`: the `reads="turn"` agents go to the router, and `comment-corrector`
   (`reads="files"`), `agents-md-auditor` (`reads="agent-docs"`) and `ext-docs-auditor`
-  (`reads="refs"`) are dispatched directly in the same emission, to be sent in the same message so they run concurrently. Two
+  (`reads="refs"`) are dispatched directly in the same text, to be sent in the same message so they run concurrently. Two
   reasons, and the second is why this is a split rather than the narrower "skip the router
   when it is alone".
 
@@ -937,6 +959,11 @@ anchor(){ printf '{"promptId":"%s","origin":{"kind":"%s"},"message":{"role":"use
   "$1" "${2:-human}" "${3:-q}" >> "$T"; }
 run(){ anchor "$1"; echo "{\"session_id\":\"s1\",\"prompt_id\":\"$1\",\"transcript_path\":\"$T\",\"last_assistant_message\":\"$2\",\"stop_hook_active\":false}" \
   | "$H" stop | python3 -c 'import json,sys;d=sys.stdin.read();print(json.loads(d)["hookSpecificOutput"]["additionalContext"] if d.strip() else "(EMPTY)")'; }
+# The other half of the turn-end path. `run` now prints only the one-line trigger, so every
+# assertion about the DISPATCH — the roster, the modes, the paths — goes through this, the
+# way the forked `guard:audit` skill reaches it. The session id comes from the environment
+# variable the runtime sets for Bash, so set it here rather than passing `--session`.
+dsp(){ CLAUDE_CODE_SESSION_ID=s1 "$H" dispatch --turn "$1"; }
 
 "$H" settings show --session s1        # read verbs need no marker
 export GUARD_SETTINGS_SKILL=1         # mutating verbs do — see _cli_write_allowed
@@ -968,10 +995,22 @@ cat "$CLAUDE_PROJECT_DIR/.claude/guard/turns/s1/p0.md"
 "$H" settings set claims-auditor fresh --session s1     # "on" is an accepted alias
 "$H" settings set korean-corrector fresh --session s1
 run p1 "Redis는 Postgres보다 항상 빠릅니다."
+#   -> ONE line: invoke the `guard:audit` skill with `p1` as its argument. No paths, no
+#      roster, no modes — that is the point of this half. Anything else here has leaked back
+#      into the context the user is talking to.
+dsp p1
 #   -> one imperative plus fields: the playbook path, the answer file, exactly two
 #      candidates with their modes, and the transcript + turn id. Nothing here describes
 #      what an agent does, how to dispatch it, or what to do with its report — those are
 #      the playbook's, and the router's answer is what names the sections.
+
+# The three refusals, and all of them must exit 0 and print a sentence: an injected command
+# that exits non-zero aborts the whole skill invocation, and the model then never sees the
+# skill body at all — guard going silently dormant.
+dsp ../../../etc/passwd; echo "exit=$?"   # -> "no usable turn id", exit=0
+dsp deadbeef-0000-0000-0000-000000000000; echo "exit=$?"  # -> "no turn record", exit=0
+CLAUDE_CODE_SESSION_ID= "$H" dispatch --turn p1; echo "exit=$?"  # -> "session id is not in
+#      this environment", exit=0. Never a traceback, never an empty stdout.
 cat "$CLAUDE_PROJECT_DIR/.claude/guard/turns/s1/p1.md"
 #   -> the second section reads "Not collected" and carries the ask for earlier evidence
 #      plus the ban on the main agent's own case for the claim. Nothing collected it.
@@ -979,7 +1018,7 @@ cat "$CLAUDE_PROJECT_DIR/.claude/guard/turns/s1/p1.md"
 # The roster must never offer a switched-off agent. The playbook is the second bound: a key
 # the router invents has no section to follow.
 "$H" settings set korean-corrector off --session s1
-run p2 "Redis는 Postgres보다 항상 빠릅니다."   # -> claims-auditor is the only candidate
+run p2 "Redis는 Postgres보다 항상 빠릅니다." >/dev/null; dsp p2   # -> claims-auditor alone
 
 # The CLI verbs must not depend on the cwd. `CLAUDE_PROJECT_DIR` is absent in Bash, so this
 # is the normal case, not an edge one: all three must agree from anywhere in the checkout.
@@ -1003,8 +1042,8 @@ find "$CLAUDE_PROJECT_DIR" -type d -name guard -path '*/.claude/*' -not -path "$
 # resumed-session / `!`-command case.
 echo '{"session_id":"s1","prompt_id":"pq","prompt":"ext-docs-fetcher는 켜줘"}' | "$H" user-prompt
 cat "$CLAUDE_PROJECT_DIR/.claude/guard/turns/s1/pq.request.md"   # -> header, then the prompt verbatim
-run pq "Turned it on."      # -> `turn dir:` once, then `{turn dir}/pq.md` and `{turn dir}/pq.request.md`
-run pnone "Turned it on."   # -> same shape MINUS `request file:` (no user-prompt ran)
+run pq "Turned it on." >/dev/null; dsp pq   # -> `turn dir:` once, then `{turn dir}/pq.md` and `{turn dir}/pq.request.md`
+run pnone "Turned it on." >/dev/null; dsp pnone   # -> same shape MINUS `request file:` (no user-prompt ran)
 echo '{"session_id":"s1"}' | "$H" verify claims-auditor
 #   -> no `request file:` line, ever, and a PLAIN absolute answer path: an audit agent gets
 #      one file, so there is no shared prefix to factor out and no placeholder to resolve.
@@ -1017,7 +1056,7 @@ echo '{"session_id":"s1"}' | "$H" verify claims-auditor
 "$H" settings set comment-corrector on --session s1
 echo '{"session_id":"s1","prompt_id":"pc","prompt":"rename a variable"}' | "$H" user-prompt   # -> nothing
 echo "{\"session_id\":\"s1\",\"prompt_id\":\"pc\",\"tool_input\":{\"file_path\":\"$CLAUDE_PROJECT_DIR/src/cache.py\"}}" | "$H" post-edit
-run pc "Renamed it."   # -> playbook, candidates, `files for` — and NO `answer file:` line
+run pc "Renamed it." >/dev/null; dsp pc   # -> playbook, candidates, `files for` — and NO `answer file:` line
 "$H" settings set claims-auditor fresh --session s1     # both on -> the line is back
 
 # comment-corrector needs a source file the turn actually WROTE, and the file must exist.
@@ -1027,8 +1066,8 @@ for f in src/cache.py notes.md; do
   echo "{\"session_id\":\"s1\",\"prompt_id\":\"p3\",\"tool_input\":{\"file_path\":\"$CLAUDE_PROJECT_DIR/$f\"}}" | "$H" post-edit
 done
 python3 -c "import json;print(json.load(open('$CLAUDE_PROJECT_DIR/.claude/guard/state/s1.json'))['edited_files'])"  # cache.py only
-run p3 "Refactored the cache."          # -> comment-corrector offered, "this turn wrote: cache.py"
-run p4 "Refactored the cache."          # -> claims-auditor only: p4 wrote nothing
+run p3 "Refactored the cache." >/dev/null; dsp p3   # -> comment-corrector offered, with cache.py
+run p4 "Refactored the cache." >/dev/null; dsp p4   # -> claims-auditor only: p4 wrote nothing
 
 # The two edited lists must stay disjoint and must not cross-trigger. `notes.md` above lands
 # in NEITHER; `AGENTS.md` and `CLAUDE.md` land in the agent-doc list only. Three things to
@@ -1051,13 +1090,13 @@ printf '# v\n' > "$CLAUDE_PROJECT_DIR/wiki/ref/v.md"
 edit pr wiki/ref/v.md; edit pr wiki/ref/AGENTS.md; edit pr AGENTS.md; buckets
 #   -> [] [AGENTS.md] [wiki/ref/v.md, wiki/ref/AGENTS.md]
 #      The project AGENTS.md is an agent doc; the refs index is a ref.
-run pr "Saved a reference."  # -> ext-docs-auditor with only the two refs paths
-run pa "Did both."      # -> ONE direct block, comment-corrector then agents-md-auditor,
+run pr "Saved a reference." >/dev/null; dsp pr  # -> ext-docs-auditor with only the two refs paths
+run pa "Did both." >/dev/null; dsp pa   # -> ONE direct block, comment-corrector then agents-md-auditor,
                         #    each with only its own paths, and no `answer file:` line
 
 edit pb AGENTS.md; buckets
 #   -> [] [AGENTS.md]: a new turn resets BOTH lists, so cache.py does not ride along
-run pb "Docs only."     # -> agents-md-auditor alone
+run pb "Docs only." >/dev/null; dsp pb   # -> agents-md-auditor alone
 
 # Off is off, even with a file waiting for it.
 "$H" settings set agents-md-auditor off --session s1
@@ -1104,7 +1143,7 @@ echo "{\"session_id\":\"s1\",\"prompt_id\":\"p6b\",\"transcript_path\":\"$T\",\"
 # transition in both directions — that print is guard's only channel to a live instance.
 "$H" settings set korean-corrector reuse --session s1
 #   -> settings, then a note naming `guard-korean-corrector` and how to address it
-run p9 "Redis는 Postgres보다 항상 빠릅니다."
+run p9 "Redis는 Postgres보다 항상 빠릅니다." >/dev/null; dsp p9
 #   -> korean-corrector's block says: SendMessage `guard-korean-corrector` if it exists,
 #      else dispatch with name: "guard-korean-corrector". RESUME BEFORE DISPATCH — the
 #      other order spawns a second instance under a taken name.

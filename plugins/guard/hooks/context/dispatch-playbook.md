@@ -7,6 +7,14 @@ command names one section directly, and guard's session-opening context names
 section for the router itself: routing is its own job, described in its definition, and its
 report tells you what to do next.
 
+**Two kinds of reader, and one difference between them.** Usually you are the session that
+wrote the answer: a `/guard:*` command sent you here, or guard's session-opening context did.
+On the turn-end path you are instead the forked audit skill, which runs the audit in a context
+of its own and did **not** write the answer — so wherever a section below says to fix,
+translate, open or reply, that is the invoking session's work, and yours is to report the
+findings to it. Everything about dispatching agents and reading what they report is the same
+for both.
+
 **Read only the sections you were named, and do exactly what they say.** Everything each
 agent needs that is specific to this turn — the answer file, the source files, the
 transcript pointer — comes with the dispatch that sent you here, never from this file.
@@ -294,6 +302,9 @@ the deletions and pointer fixes you can make without inventing a new document. W
 finding needs a file created, say so and leave it to the user.
 
 ## Presenting the result
+
+**Skip this section if you are the forked audit skill** — you return findings, and the session
+that invoked you does everything below. Read it only to know what it needs from you.
 
 The file-reading correctors have already edited what they were given. What is left is yours,
 in this order:

@@ -68,10 +68,27 @@ Claude Code waits for the result anyway in these cases:
 > that fork the conversation doesn't cover it. If your skill's steps depend on a tool
 > outside that set, set `background: false` to keep the full tool set.
 
-Two filters, from https://code.claude.com/docs/en/sub-agents.md (retrieved 2026-08-22).
-The first drops `Agent`, `AskUserQuestion`, `EndConversation`, `EnterPlanMode`,
+Two filters, from https://code.claude.com/docs/en/sub-agents.md (first-filter rows
+re-read 2026-08-23). The first drops `AskUserQuestion`, `EndConversation`, `EnterPlanMode`,
 `ExitPlanMode`, `ScheduleWakeup`, `TaskOutput`, `WaitForMcpServers` and `Workflow` from
-**every** subagent, foreground or background. The second leaves a background subagent with
+**every** subagent, foreground or background — and `Agent` **only at the depth limit**, not
+unconditionally. The 2026-08-22 note here said `Agent` was dropped from every subagent; that
+was wrong, and it is the row that decides whether a forked skill may dispatch agents of its
+own, so the page's own words:
+
+> `Agent`, when the subagent is at the [depth limit](#let-subagents-spawn-their-own-subagents);
+> in a [fork](#fork-the-current-conversation) the tool stays listed but returns an error
+> instead of spawning
+
+> By default, a subagent can spawn subagents of its own, up to three layers below the main
+> conversation. At the depth limit, Claude Code withholds the `Agent` tool from every subagent
+> except a fork, so a subagent at the limit does its delegated work itself and returns one
+> summary. A fork at the limit keeps `Agent` in its inherited tool list, but the tool returns
+> an error instead of spawning.
+
+So a `context: fork` skill invoked from the main conversation sits one layer down and keeps
+`Agent` — **as long as it does not run backgrounded.** `Agent` is absent from the
+background list below, so the second filter is what takes it away. The second leaves a background subagent with
 `Read`, `Grep`, `Glob`, `Bash`, `PowerShell`, `Edit`, `Write`, `NotebookEdit`, `WebFetch`,
 `WebSearch`, `TodoWrite`, `Skill`, `ToolSearch`, `EnterWorktree`, `ExitWorktree`, `Monitor`,
 `TaskStop`, `SendMessage` and `Artifact`. Forks of the conversation skip both filters — but

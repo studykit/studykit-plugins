@@ -10,28 +10,28 @@ answer file was ever named).
 
 Otherwise it records the turn as the pending ``/guard:<agent>`` target and fills in the answer
 file if the turn left it empty — both regardless of the switches, because the on-demand
-commands must work in a project that keeps everything off. Then, when a turn-reading agent is
-eligible, it emits ``additionalContext`` asking the main agent to dispatch the router
-(``agents.ROUTER_AGENT``) over the answer file with the eligible agents and their modes, and
-to follow the sections its report names; the eligible file-reading agents —
-``comment-corrector`` (``reads="files"``), ``agents-md-auditor`` (``reads="agent-docs"``) and
-``ext-docs-auditor`` (``reads="refs"``) — are dispatched directly over the turn's edited files
-instead, bypassing the router. guard runs no model itself and never blocks here.
+commands must work in a project that keeps everything off. Then, when any agent is eligible,
+it emits ``additionalContext`` of ONE line: invoke the ``guard:audit`` skill with this turn's
+id. The dispatch itself — which agents, in which mode, over which paths — is built by the
+``dispatch`` CLI verb inside that skill (``dispatch.turn_dispatch_text``), so the text a
+routed turn costs in the context the user is talking to is one sentence instead of the whole
+roster. This hook decides only WHETHER there is anything to audit; it still computes that
+here, because eligibility is a fact about the turn that just ended and the skill's own
+recomputation would be a second answer to the same question.
+
+guard runs no model itself and never blocks here.
 """
 
 from __future__ import annotations
 
-from .config import _agent_mode, _load_config
+from .config import _load_config
 from .paths import _project_dir, _trace
 from .turnrec import _write_turn_response
 from .payload import _read_payload, _session_id
 from .emit import _emit_stop_context
 from .transcript import _is_control_command_name, _turn_identity
-from .agents import AUDIT_AGENTS, _eligible_agents
-from .state import _audit_paused, _edited_files, _read_state, _write_state
-from .dispatch import (
-    _DIRECT_LEAD, _DIRECT_LEAD_WITH_ROUTER, _ROUTE_LEAD, _dispatch_context, _router_context
-)
+from .state import _audit_paused, _read_state, _write_state
+from .dispatch import _skill_trigger, turn_dispatch_text
 
 
 def cmd_stop() -> int:
@@ -142,11 +142,16 @@ def cmd_stop() -> int:
                prompt_id=prompt_id)
         return 0
 
-    edited = _edited_files(state, prompt_id, "edited_files")
-    agent_docs = _edited_files(state, prompt_id, "edited_agent_docs")
-    refs = _edited_files(state, prompt_id, "edited_refs")
-    eligible = _eligible_agents(state, edited, agent_docs, refs)
-    modes = {k: _agent_mode(state, k) for k in eligible}
+    # Eligibility is decided HERE and the dispatch text is thrown away. The skill rebuilds
+    # it from the same state a moment later, which sounds like waste and is the cheaper half
+    # of the trade: this hook must know whether to say anything at all, and that question is
+    # `_eligible_agents` either way. What it must NOT do is print the answer — every line it
+    # prints is paid for in the main agent's context on every audited turn, and the roster,
+    # the paths and the modes are exactly the lines only the audit needs.
+    transcript = payload.get("transcript_path")
+    transcript = transcript if isinstance(transcript, str) else ""
+    _, outcome, eligible = turn_dispatch_text(project_dir, session_id, prompt_id, state,
+                                              config, transcript)
     if not eligible:
         _write_state(project_dir, session_id, state)
         _trace(project_dir, session_id, "stop", "none_eligible", prompt_id=prompt_id)
@@ -158,45 +163,13 @@ def cmd_stop() -> int:
     state["last_audited_prompt_id"] = prompt_id
     _write_state(project_dir, session_id, state)
 
-    transcript = payload.get("transcript_path")
-    transcript = transcript if isinstance(transcript, str) else ""
-    # Split by what each agent reads, because only one of the two groups is a triage
-    # question. Routing asks "is there material here for this agent", and for a
-    # file-reading agent that is a diff-level judgment — logic changed, or just a rename
-    # or a formatting pass — the router cannot make from what it would be given: a file
-    # list is the agent's input, not a diff, and reading those files shows their current
-    # state, never what this turn changed in them. So routing them can only restate what
-    # `_eligible_agents` already decided, and bill a subagent for it.
-    #
-    # The two dispatches also need no ordering between them. The auditors-before-correctors
-    # rule in the playbook exists so a corrector does not rewrite a sentence an auditor was
-    # about to flag, and it is entirely about the answer file — which no file-reading agent
-    # opens. Sharing no input with the routed agents, they go out in the same message and
-    # run alongside the router rather than after it. They need no ordering among themselves
-    # either: their file lists are disjoint by construction (`_edited_bucket`), so the one
-    # that edits cannot touch what the one that only reports is reading.
-    routed = [k for k in eligible if AUDIT_AGENTS[k].reads == "turn"]
-    direct = [k for k in eligible
-              if AUDIT_AGENTS[k].reads in ("files", "agent-docs", "refs")]
-    blocks: list[str] = []
-    if routed:
-        blocks.append(_router_context(project_dir, session_id, prompt_id, _ROUTE_LEAD,
-                                      routed, modes, config, transcript))
-    if direct:
-        lead = _DIRECT_LEAD_WITH_ROUTER if routed else _DIRECT_LEAD
-        blocks.append(_dispatch_context(
-            project_dir, session_id, prompt_id, lead, direct, modes,
-            {"files": edited, "agent-docs": agent_docs, "refs": refs}, transcript))
-    context = "\n\n".join(blocks)
-    outcome = "routed" if routed and not direct else (
-        "dispatched_direct" if direct and not routed else "routed_and_direct")
     # `additionalContext`, not `decision: "block"`. Per the official hooks docs
     # (https://code.claude.com/docs/en/hooks, "Stop decision control"; excerpt saved at
     # wiki/ref/claude-code-stop-hook-decision-control.md) the two continue the
     # conversation identically and share the same loop protections, but block is
     # reported as a hook ERROR while this shows as `Stop hook feedback`. A
     # recommendation is guard working as designed, so it must not look like a failure.
-    _emit_stop_context(context)
+    _emit_stop_context(_skill_trigger(prompt_id))
     _trace(project_dir, session_id, "stop", outcome, prompt_id=prompt_id,
            eligible=",".join(eligible))
     return 0
