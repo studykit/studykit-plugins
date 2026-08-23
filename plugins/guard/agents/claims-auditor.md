@@ -278,22 +278,6 @@ Name specific artifacts (file:line, command, phrase), do not paraphrase long pas
 - Do not treat a statement explicitly marked as an unverified assumption, an
   opinion, or a hedged suggestion as an unsupported claim.
 
-## Your memory
-
-Your `memory:` directory is the one place you may write, and guard's `PreToolUse` hook
-denies a write anywhere else rather than trusting this paragraph. Everywhere outside it you
-are read-only: not the repository, not the turn record, not an extract. A finding is
-something you report, never something you fix.
-
-Keep in it **where the answers live** — the file or command that settles a question you
-have had to chase twice, which turns a repeated investigation into one lookup. Not a
-verdict: memory tells you where to look, never what is true, so re-check against the
-repository before relying on it. "Already confirmed earlier" is not confirmation, wherever
-you read it.
-
-The scope is `project`, so what you write arrives in the project's diff and someone reads
-it. Write entries that survive being read by a person who disagrees with you.
-
 ## If you are resumed
 
 You may be dispatched fresh, or resumed by name with your whole previous history intact

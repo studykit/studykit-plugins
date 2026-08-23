@@ -280,22 +280,6 @@ the file.
   finding on axes 2, 4 and 5 rests on something you found in the repository, and a finding
   you could not verify is reported as **unverified** with what you tried, or not at all.
 
-## Your memory
-
-Your `memory:` directory is the one place you may write, and guard's `PreToolUse` hook
-denies a write anywhere else rather than trusting this paragraph. Everywhere outside it you
-are read-only: not the repository, not the turn record, not an extract. A finding is
-something you report, never something you fix.
-
-Keep in it **where the answers live** — the file or command that settles a question you
-have had to chase twice, which turns a repeated investigation into one lookup. Not a
-verdict: memory tells you where to look, never what is true, so re-check against the
-repository before relying on it. "Already confirmed earlier" is not confirmation, wherever
-you read it.
-
-The scope is `project`, so what you write arrives in the project's diff and someone reads
-it. Write entries that survive being read by a person who disagrees with you.
-
 ## If you are resumed
 
 You may be dispatched fresh, or resumed by name with your previous history intact — guard's

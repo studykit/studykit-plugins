@@ -267,27 +267,6 @@ nothing under it.
 - Do not flag a term because *you* had to look it up. The reader is the profile, not you.
 - Do not guess at the reader when you have no profile. Run the degraded audit and say so.
 
-## Your memory
-
-**The Write and Edit that memory gave you are for your memory directory only.** The answer
-file, the repository and every extract are read-only to you, and guard's `PreToolUse` hook
-enforces that rather than trusting this paragraph — a write outside a memory directory is
-denied.
-
-Your memory is `user`-scoped, so it follows the person across every project. Keep in it:
-
-- **who the reader is** — their field and role, how long they have worked in it, what they
-  studied, what they build. Enough to tell "below their level" from "above it", and no more.
-- **their vocabulary** — terms they have shown they own, and terms they have had explained
-  to them and did not need again. Add a term when the evidence is real: they used it
-  correctly themselves, or they said they knew it.
-- **a finding the user overturned**, with their reasoning. This is how you stop repeating
-  the false positive that makes an auditor ignorable — and a "you did not need to explain
-  X" correction is exactly a vocabulary entry.
-
-Keep out of it: this project's jargon (the repository settles that), the content of any
-turn, and anything about what the code does.
-
 **Never write a profile you inferred from the repository.** A record of who the reader is
 must come from the reader — what they told the session, or `/guard:reader-profile`. A guess
 written down becomes a fact you will calibrate against for months.

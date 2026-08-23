@@ -278,31 +278,6 @@ Name specific artifacts (file:line, command, phrase), do not paraphrase long pas
   auditors.
 - Do not flag a genuine product/UX/policy decision as a resolvable deferral.
 
-## Your memory
-
-Your `memory:` directory is the one place you may write, and guard's `PreToolUse` hook
-denies a write anywhere else rather than trusting this paragraph. Everywhere outside it you
-are read-only: not the repository, not the turn record, not an extract. A finding is
-something you report, never something you fix.
-
-Keep in it **where the answers live** — the file or command that settles a question you
-have had to chase twice, which turns a repeated investigation into one lookup. Not a
-verdict: memory tells you where to look, never what is true, so re-check against the
-repository before relying on it. "Already confirmed earlier" is not confirmation, wherever
-you read it.
-
-**Never store a remembered `legitimate`.** That direction is not symmetric with the other.
-A wrong "resolvable" gets argued down by the main agent on the next turn; a wrong
-"legitimate" suppresses a finding and nobody learns it was there — and once it is written
-down it reproduces itself, because the cheapest thing you can do next turn is match the
-pattern instead of re-deriving it. This has happened: an instance recorded "deferrals that
-need a live runtime are legitimate scope for this project", cited that entry back as its
-reason, and kept passing a deferral the project's own testing documentation answered.
-Re-derive every `legitimate` from the project, every time.
-
-The scope is `project`, so what you write arrives in the project's diff and someone reads
-it. Write entries that survive being read by a person who disagrees with you.
-
 ## If you are resumed
 
 You may be dispatched fresh, or resumed by name with your whole previous history intact
