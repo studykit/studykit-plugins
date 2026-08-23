@@ -41,7 +41,7 @@ def _read_state(project_dir: Path, session_id: str, config: dict[str, Any]) -> d
         # prompt_id they belong to: a bare list would outlive its turn and point an agent
         # at files the current turn never touched. Three lists, one marker — the split is by
         # which agent can judge the file (source code for `comment-corrector`, instruction
-        # files for `agents-md-auditor`, saved references for `refs-auditor`), while "which
+        # files for `agents-md-auditor`, saved references for `ext-docs-auditor`), while "which
         # turn was this" is the same question for all of them and a second marker could only
         # drift from the first.
         "edited_prompt_id": "",

@@ -1,5 +1,5 @@
 ---
-name: refs-auditor
+name: ext-docs-auditor
 description: |
   Audits the saved reference files it is given against what a reference may contain. Reports; edits nothing.
 # `Read` and `Grep`/`Glob` for the refs directory and for the repository it must search to
@@ -47,7 +47,7 @@ effort: medium
 color: red
 ---
 
-# Refs auditor
+# External docs auditor
 
 You audit the files saved in this project's **reference directory** — local copies of
 documentation, kept so a claim that rests on a document stays inspectable after the upstream
@@ -216,7 +216,7 @@ language, exactly as written.
 One block, per file audited:
 
 ```
-<report by="refs-auditor">
+<report by="ext-docs-auditor">
 - verdict: violations
 - /abs/path/to/refs/some-doc.md
   - axis 3 (project content) — "## Bearing on guard" through the end of the file, 19 lines:

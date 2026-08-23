@@ -1,6 +1,6 @@
 ---
-name: refs-auditor
-description: "Audit this project's saved reference files against what a reference may contain: a trustworthy source named, the content attributed rather than recalled, and nothing in them about this repository. guard dispatches the refs-auditor subagent, which judges the files in a fresh context and reports. It edits nothing. Claude Code only."
+name: ext-docs-auditor
+description: "Audit this project's saved reference files against what a reference may contain: a trustworthy source named, the content attributed rather than recalled, and nothing in them about this repository. guard dispatches the ext-docs-auditor subagent, which judges the files in a fresh context and reports. It edits nothing. Claude Code only."
 argument-hint: '[file | directory] …'
 disable-model-invocation: true
 allowed-tools: Agent, Bash, Glob, Read
@@ -8,7 +8,7 @@ allowed-tools: Agent, Bash, Glob, Read
 
 # Reference audit
 
-The work goes to the `guard:refs-auditor` subagent in a **fresh context**, and the separation
+The work goes to the `guard:ext-docs-auditor` subagent in a **fresh context**, and the separation
 is not a formality. The person who saved a reference is the one person who cannot see what
 went wrong with it: they know which sentences they added and which they copied, so the file
 reads as a faithful excerpt to them and as a mix of excerpt and local reasoning to everyone
@@ -35,7 +35,7 @@ the auditor is reading more than it can hold and the report stops being specific
 
 ## Dispatch the auditor
 
-Dispatch `guard:refs-auditor` with the Agent tool. Give it:
+Dispatch `guard:ext-docs-auditor` with the Agent tool. Give it:
 
 - the explicit list of files to audit;
 - any instruction the user attached to the invocation ("only the project-content check",

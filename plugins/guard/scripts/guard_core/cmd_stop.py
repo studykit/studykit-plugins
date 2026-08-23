@@ -15,7 +15,7 @@ eligible, it emits ``additionalContext`` asking the main agent to dispatch the r
 (``agents.ROUTER_AGENT``) over the answer file with the eligible agents and their modes, and
 to follow the sections its report names; the eligible file-reading agents —
 ``comment-corrector`` (``reads="files"``), ``agents-md-auditor`` (``reads="agent-docs"``) and
-``refs-auditor`` (``reads="refs"``) — are dispatched directly over the turn's edited files
+``ext-docs-auditor`` (``reads="refs"``) — are dispatched directly over the turn's edited files
 instead, bypassing the router. guard runs no model itself and never blocks here.
 """
 

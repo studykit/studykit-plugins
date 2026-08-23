@@ -78,7 +78,18 @@
             "type": "command",
             "command": "uv run --script \"${CLAUDE_PLUGIN_ROOT}/scripts/guard_hook.py\" pre-write",
             "timeout": 10,
-            "description": "Deny a write from one of guard's report-only agents (claims-auditor, deferrals-auditor, clarity-auditor, agents-md-auditor, refs-auditor) when the target is outside an agent-memory directory. Declaring `memory:` silently grants those agents Write and Edit, and the host does not scope the grant, so \"reports; edits nothing\" is enforced here rather than promised in each definition."
+            "description": "Deny a write from one of guard's report-only agents (claims-auditor, deferrals-auditor, clarity-auditor, agents-md-auditor, ext-docs-auditor) when the target is outside an agent-memory directory. Declaring `memory:` silently grants those agents Write and Edit, and the host does not scope the grant, so \"reports; edits nothing\" is enforced here rather than promised in each definition."
+          }
+        ]
+      },
+      {
+        "matcher": "WebFetch|WebSearch",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "uv run --script \"${CLAUDE_PLUGIN_ROOT}/scripts/guard_hook.py\" pre-fetch",
+            "timeout": 10,
+            "description": "When ext-docs-fetcher is on, deny WebFetch/WebSearch from the main conversation and name that agent in the reason. This project saves copies of the documentation it cites, and a standing instruction to delegate the fetch is skippable without a trace; a denied tool call is not. Fails open inside any subagent — a subagent cannot dispatch another agent, so denying its fetch would leave it no way forward."
           }
         ]
       }
@@ -91,7 +102,7 @@
             "type": "command",
             "command": "uv run --script \"${CLAUDE_PLUGIN_ROOT}/scripts/guard_hook.py\" post-edit",
             "timeout": 10,
-            "description": "Record a source file, an agent instruction file, or a saved reference written this turn (for a comment-corrector, agents-md-auditor or refs-auditor recommendation) — a subagent's writes included — and require a file saved inside the refs dir to be listed in the refs index (AGENTS.md)."
+            "description": "Record a source file, an agent instruction file, or a saved reference written this turn (for a comment-corrector, agents-md-auditor or ext-docs-auditor recommendation) — a subagent's writes included — and require a file saved inside the refs dir to be listed in the refs index (AGENTS.md)."
           }
         ]
       }
@@ -115,7 +126,7 @@
             "type": "command",
             "command": "uv run --script \"${CLAUDE_PLUGIN_ROOT}/scripts/guard_hook.py\" session-start",
             "timeout": 5,
-            "description": "Sweep guard state and turn records past the retention window, export GUARD_REFS_DIR, state the refs rule as session context, and — when docs-fetcher is on — send the session's documentation lookups to that agent instead of its own WebFetch."
+            "description": "Sweep guard state and turn records past the retention window, export GUARD_REFS_DIR, state the refs rule as session context, and — when ext-docs-fetcher is on — send the session's documentation lookups to that agent instead of its own WebFetch."
           }
         ]
       }

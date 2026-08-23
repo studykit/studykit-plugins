@@ -3,7 +3,7 @@
 How to run each of guard's agents and what to do with what it reports. You are sent here by
 section name — guard's router names the sections for the agents it picked, a `/guard:*`
 command names one section directly, and guard's session-opening context names
-`docs-fetcher`, which can also run before an answer exists. There is no
+`ext-docs-fetcher`, which can also run before an answer exists. There is no
 section for the router itself: routing is its own job, described in its definition, and its
 report tells you what to do next.
 
@@ -14,13 +14,24 @@ transcript pointer — comes with the dispatch that sent you here, never from th
 You never gather the session's history — the agents that need it read the transcript for
 themselves. See "The answer file, and the session's history".
 
-**Two audiences, two languages.** The answer file and your reply to the user are in the
-user's language, because a person reads them. Everything in between — what you write in a
-dispatch, what the agents report back, what you say to an agent — is English, because only
-agents read it. So a Korean answer is audited by agents reporting in English, and the
-corrections still land in the file as Korean. Do not translate the answer file, and do not
-relay an agent's English report to the user untranslated: say in the user's language what
-changed.
+**English until the audits are done; the user's language last.** The answer file is written
+in **English**, and so is everything around it — what you write in a dispatch, what the
+agents report back, what you say to an agent. The audits run against that English file.
+
+Only after they have run and their findings are applied do you produce the version the user
+reads, in their language, as a **separate file**: the answer file's path with `.md` replaced
+by `.<lang>.md` (`.ko.md` for Korean). That translation is the last step of the turn, and
+`Presenting the result` says how. Your reply to the user is in their language too.
+
+Why this order rather than the obvious one: the auditors are measurably weaker on non-English
+prose. The same answer, translated, drew findings that its original passed clean — twice, from
+two different agents. Auditing the English and translating after is how the user's language
+stops costing them the audit. The translation is then checked in its own right by
+`korean-corrector`, which is why that agent alone runs after the others rather than beside
+them.
+
+Never relay an agent's English report to the user untranslated: say in the user's language
+what changed.
 
 This file exists so that text is stored once and read only when a turn actually gets
 routed. Guard's hook output is paid for in your context on every turn, so it carries only
@@ -76,6 +87,12 @@ those are the user's own entry point.
 Send every agent you were named in **ONE message** so they run concurrently. Keep the
 order the sections were given in: the read-only auditors report before a corrector edits
 anything, so a corrector never rewrites a sentence an auditor was about to flag.
+
+**`korean-corrector` is the one exception and must not go in that message.** Its input does
+not exist yet — it audits the translation, and the translation is made after the other agents
+have reported and their findings are applied. Dispatch it on its own, at the step
+`Presenting the result` names. Sending it with the others points it at an English file, which
+it correctly declines to audit, and the turn ships an unchecked translation.
 
 Each dispatch carries **only its own inputs** — the ones handed to you with the section
 name. An agent learns what to audit from being that agent, not from a scope argument, so
@@ -143,14 +160,22 @@ Say it once; repeating it every turn is how a useful notice becomes noise.
 
 ## `korean-corrector`
 
-Audits the turn for Korean prose that reads as translated English rather than written.
+Audits Korean prose that reads as translated English rather than written. On this turn that
+prose is the **translation**, not the answer file — the answer file is English and this agent
+would rightly report nothing about it.
 
-Inputs: the answer file. No history — Korean prose is judged as prose, so do not pass it
-the transcript.
+So this section runs **out of order**, after the other agents have reported, after you have
+applied their findings, and after you have written the translation. `Presenting the result`
+is where it belongs in the sequence; the router names it here only to tell you it is switched
+on and in which mode.
 
-It **edits the answer file in place**, so its corrections are already applied when it
-reports. Relay any phrase it listed as unfixed; that one is yours to resolve. On a pass it
-changes nothing.
+Inputs: the **translation file** (the answer file's path with `.md` replaced by `.ko.md`), and
+nothing else. No history — Korean prose is judged as prose, so do not pass it the transcript.
+Do not pass it the answer file; that is the English original and not what the user reads.
+
+It **edits the translation in place**, so its corrections are already applied when it reports.
+Relay any phrase it listed as unfixed; that one is yours to resolve. On a pass it changes
+nothing.
 
 ## `comment-corrector`
 
@@ -165,7 +190,7 @@ It **edits the comments in place**, so its changes are already in the files when
 reports. Relay what it changed AND what it left unfixed — an unfixed finding needs the
 user — and do not re-edit its work.
 
-## `docs-fetcher`
+## `ext-docs-fetcher`
 
 Finds the documentation bearing on a question — in this project's refs directory first, on the
 network when nothing there covers it — and reports the local path, saying which of the two it
@@ -208,7 +233,7 @@ inside that file and its local path, per the refs rule guard states at session s
 
 Two more things to do with the report:
 
-1. **Dispatch `refs-auditor` on exactly the paths it reports as fetched and saved** — one
+1. **Dispatch `ext-docs-auditor` on exactly the paths it reports as fetched and saved** — one
    message, the paths unchanged, and not for the already-saved ones. Nothing else will: on the
    pre-answer path no turn-end recommendation has run yet, on the turn-end path it has already
    gone out, and either way the agent that just wrote the file is the one party who must not
@@ -223,7 +248,7 @@ Two more things to do with the report:
 Do not paste its report into your reply, and do not tell the user a lookup happened when
 nothing was written.
 
-## `refs-auditor`
+## `ext-docs-auditor`
 
 Audits the saved reference files it is given against what a reference may contain: a
 trustworthy source named, the content attributed to it rather than recalled, and — the rule
@@ -270,27 +295,59 @@ finding needs a file created, say so and leave it to the user.
 
 ## Presenting the result
 
-The correctors have already edited what they were given. What is left is yours:
+The file-reading correctors have already edited what they were given. What is left is yours,
+in this order:
 
-1. **Apply the auditors' findings to the file.** An unsupported claim, a deferral the repo
-   could have answered — fix it where it is written, in the file, with `Edit`. A finding you
-   are leaving unfixed stays unfixed on purpose and is named in your reply.
-2. **Reply short.** What changed and why, in a line or two per finding, then the path. A
+1. **Apply the auditors' findings to the answer file.** An unsupported claim, a deferral the
+   repo could have answered — fix it where it is written, in the English answer file, with
+   `Edit`. A finding you are leaving unfixed stays unfixed on purpose and is named in your
+   reply.
+2. **Translate.** If you are answering the user in a language other than English, write the
+   translation to a **new file**: the answer file's path with `.md` replaced by `.<lang>.md`
+   (`.ko.md` for Korean). Translate the corrected text — everything, at full length, not a
+   summary. The English file stays as it is; it is what a later `/guard:<agent>` re-audits,
+   and overwriting it would leave that path with the weaker version. Skip this step entirely
+   when you are answering in English; there is nothing to translate and no second file.
+3. **Check the translation.** If `korean-corrector` was among the agents you were named,
+   dispatch it now — alone, on the translation file, per its section. It edits in place.
+   Relay what it left unfixed.
+4. **Reply short.** What changed and why, in a line or two per finding, then the path. A
    clean audit is one line. Do not restate the answer and do not paste the file.
-3. **Open the file** so the user reads the corrected version without hunting for it:
+5. **Open the file, but only if an agent has read it** (see below):
    `open <path>` on macOS, `xdg-open <path>` on Linux, `start <path>` on Windows. Once, at
    the end, after every correction has landed — opening it mid-audit shows the user text
    that is still being fixed.
 
-The path in steps 2 and 3 is the **answer file the dispatch named**. It is the one holding
-the answer to the user's question, corrections and all. Do not open a file you wrote during
-the audit, and do not start a new one for this report: an audit summary is worth a line in
-the reply, not a document, and opening it hands the user a memo about the answer instead of
-the answer.
+The path in step 4 is the one the **user** reads: the translation when you made one, the
+answer file when you did not. Name it in the reply either way.
 
-**When the dispatch named no answer file**, steps 1 and 3 do not apply — there is nothing to
-correct and nothing to open. That is the file-reading agents dispatched on their own:
-`comment-corrector`, `agents-md-auditor` and `refs-auditor` work on the files the turn wrote,
+**Open only a file that was actually audited.** Opening is not "here is where it is" — the
+user has the path from your reply. It is you putting a document in front of them, and doing
+that with text nothing checked presents an unchecked draft as a finished one. So:
+
+- You wrote a translation and `korean-corrector` ran on it → open the translation.
+- You wrote a translation and `korean-corrector` did **not** run → open nothing, and name the
+  path. Say the translation is unchecked only when the reader would otherwise assume it was:
+  after an audit that did run and that you are reporting. On a turn where the router cleared
+  everything you are already saying nothing about auditing — do not start now.
+- You are answering in English, so there is no translation, and at least one agent audited the
+  answer file → open the answer file. Here it is both the audited document and the one the
+  user reads, so nothing is being substituted.
+- No agent read anything this turn → open nothing.
+
+The one substitution to avoid: when the user reads another language and the translation went
+unchecked, do not open the English file in its place. It was checked, but it is not what this
+user reads, so handing it over answers a different question than they asked. That is about
+standing in for a translation — it says nothing against opening the answer file for a reader
+whose language it already is.
+
+And do not open a file you wrote during the audit, or start a new one for this report: an
+audit summary is worth a line in the reply, not a document, and opening it hands the user a
+memo about the answer instead of the answer.
+
+**When the dispatch named no answer file**, steps 1 through 3 and step 5 do not apply — there
+is nothing to correct, nothing to translate and nothing to open. That is the file-reading agents dispatched on their own:
+`comment-corrector`, `agents-md-auditor` and `ext-docs-auditor` work on the files the turn wrote,
 and a turn with no turn-reading agent eligible never wrote an answer file in the first place.
-Reply per step 2, naming the files that changed and the findings you did not apply; the user
+Reply per step 4, naming the files that changed and the findings you did not apply; the user
 reads those in the diff, not in an opened document.

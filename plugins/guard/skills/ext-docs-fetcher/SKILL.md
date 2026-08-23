@@ -1,6 +1,6 @@
 ---
-name: docs-fetcher
-description: "Get the documentation a question rests on: what this project has already saved, or the primary source fetched and saved if it has not. guard dispatches the docs-fetcher subagent, which searches, quotes, writes the reference file and indexes it, and reports the local path saying which it did. Claude Code only."
+name: ext-docs-fetcher
+description: "Get the documentation a question rests on: what this project has already saved, or the primary source fetched and saved if it has not. guard dispatches the ext-docs-fetcher subagent, which searches, quotes, writes the reference file and indexes it, and reports the local path saying which it did. Claude Code only."
 argument-hint: '<question>'
 disable-model-invocation: true
 allowed-tools: Agent, Bash, Read
@@ -8,7 +8,7 @@ allowed-tools: Agent, Bash, Read
 
 # Fetch documentation
 
-The work goes to the `guard:docs-fetcher` subagent. It is the only agent with network access,
+The work goes to the `guard:ext-docs-fetcher` subagent. It is the only agent with network access,
 and the reason it exists is that a page pulled into this session is paid for on every turn
 after, while a page read in passing is a page nobody saves.
 
@@ -35,7 +35,7 @@ Its report gives one line per file, each saying **already saved** or **fetched a
   Nothing changed on disk.
 - **Fetched and saved** — read it, and say plainly that the repository changed: a new file
   under the refs directory and a row in that directory's index. Name the file. Then
-  **dispatch `guard:refs-auditor` on exactly those paths**, unchanged. The agent that wrote a
+  **dispatch `guard:ext-docs-auditor` on exactly those paths**, unchanged. The agent that wrote a
   reference is the one party that must not grade it, and on this path no turn-end audit has
   run. Relay what it finds.
 - **`none`** — say that nothing saved covers the question and no primary source was findable.

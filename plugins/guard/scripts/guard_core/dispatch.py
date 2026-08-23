@@ -260,6 +260,8 @@ _DIRECT_LEAD_WITH_ROUTER = (
 # that CAN be corrected — a reply that has already been printed cannot be, and the earlier
 # shape left the user reading the flawed text with a list of fixes underneath it.
 _DRAFT_LEAD = (
-    "guard: put your answer's substance in {path}; keep the reply short and name that path. "
-    "guard audits that file when the turn ends."
+    "guard: put your answer's substance in {path}, written in ENGLISH; keep the reply short "
+    "and name that path. guard audits that file when the turn ends. When you will answer the "
+    "user in another language, the version they read is translated from this file after the "
+    "audits have run — the playbook says how."
 )

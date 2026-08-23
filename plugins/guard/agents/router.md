@@ -63,6 +63,11 @@ The dispatch hands you:
   never excuses skipping an agent whose material is there anyway, because an unsupported
   claim is unsupported whatever prompted it. If you cannot tell whether a passage was asked
   for, treat it as asked for.
+
+  **One agent is outside both limits: `korean-corrector`.** Its subject is the translation
+  the caller writes after you, so the answer file cannot evidence it and the request is the
+  only thing that can — there, and only there, the request may put an agent on the list. Its
+  own section below says how.
 - **playbook** — the path to guard's dispatch playbook. You do not need to read it to
   triage, and reading a candidate's section will not help you decide; what you need it for
   is your answer, which names this path and the sections in it. Read a section only if you
@@ -153,7 +158,7 @@ whether an example was missing, whether it was pitched right for this reader. Th
 reader's profile and the session's history, which this agent has and you do not. A clear
 explanation and a baffling one both go to it. You are answering "is this an explanation".
 
-### `docs-fetcher`
+### `ext-docs-fetcher`
 
 The odd one here: picking it does not start an audit, it sends an agent to the network to
 get a document and save it. So the question is not "is something wrong" but **does this
@@ -181,16 +186,25 @@ claim about how anything behaves.
 
 ### `korean-corrector`
 
-Is the response **Korean prose**? Yes when it is substantially written in Korean and is
-prose — sentences addressed to the reader. One or two Korean words inside an English
-answer is not; neither is an acknowledgement ("네, 수정했습니다."), a bare list of file
-names, or a question back to the user with nothing else in it. Two ordinary sentences of
-Korean explanation are enough: this is the low bar, not a high one.
+**Do not judge this one from the answer file.** The answer file is English by design, and
+this agent does not audit it — it audits the Korean translation the caller writes afterwards,
+which does not exist yet when you are reading. Judging "is this Korean" against the file in
+front of you answers no every time.
 
-Do **not** judge whether the Korean is any good. 번역체, register, particles and phrasing
-are the corrector's call, and fluent prose and awkward prose both go to it — if you find
-yourself thinking "this Korean reads fine", that is precisely the judgment you must not
-make, and the answer is still yes.
+The question is instead: **will this turn be delivered to the user in Korean prose?** The
+request file settles it. Yes when the user wrote to you in Korean and the answer is prose —
+substance addressed to a reader. This is the one place the request may put an agent ON the
+list rather than only take one off, because it is the only evidence available for the
+question being asked.
+
+No when the exchange is in another language. No when the answer is not prose whatever the
+language — an acknowledgement, a bare list of file names, a question back to the user with
+nothing else in it. Two ordinary sentences of explanation are enough: this is the low bar,
+not a high one. When there is no request file, fall back to the answer: an answer that is
+substantive prose will be translated, so name the agent.
+
+Do **not** judge whether any Korean is any good. 번역체, register, particles and phrasing are
+the corrector's call — and on this path the prose you would be judging has not been written.
 
 ## Output
 

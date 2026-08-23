@@ -168,7 +168,7 @@ def _handle_post_tool(project_dir: Path, payload: dict[str, Any], session_id: st
     # Claude's `post-edit` hook, applied here because Codex routes every event through
     # this one adapter. Claude's other `post-edit` job — recording the files the turn
     # edited — is deliberately not mirrored: it exists only to point `comment-corrector`,
-    # `agents-md-auditor` and `refs-auditor` at them, and Codex has none of those agents yet.
+    # `agents-md-auditor` and `ext-docs-auditor` at them, and Codex has none of those agents yet.
     # So the index rule below is enforced on Codex while the audit of what was saved is not.
     config = core_config._load_config(project_dir)
     if core_edit._targets_refs_dir(project_dir, tool_input, config):
@@ -189,7 +189,7 @@ def _handle_post_tool(project_dir: Path, payload: dict[str, Any], session_id: st
 # profile it calibrates against. Without either it would have nothing to audit against and
 # would report `profile: MISSING` on every turn.
 #
-# `docs-fetcher` and `refs-auditor` are absent, and unlike `clarity-auditor` the fetcher WOULD
+# `ext-docs-fetcher` and `ext-docs-auditor` are absent, and unlike `clarity-auditor` the fetcher WOULD
 # reach this table if it were listed — it is a routed `reads="turn"` agent, so
 # `core_agents._eligible_agents` offers it. Leaving them out is a decision, not a mechanism.
 # The fetcher's standing policy is suppressed at the source

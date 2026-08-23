@@ -30,6 +30,7 @@ Subcommands
 - verify         UserPromptExpansion, one matcher per agent — ``guard_core.cmd_turn``
 - post-edit      PostToolUse on the write tools — ``guard_core.cmd_edit``
 - pre-write      PreToolUse on the write tools — ``guard_core.cmd_write_guard``
+- pre-fetch      PreToolUse on the network tools — ``guard_core.cmd_fetch_guard``
 - stop           Stop — ``guard_core.cmd_stop``
 - session-start  SessionStart — ``guard_core.cmd_session``
 - toggle         UserPromptExpansion for ``/guard:toggle`` — ``guard_core.cmd_status``
@@ -54,12 +55,14 @@ from guard_core.cmd_session import cmd_session_start
 from guard_core.cmd_settings import cmd_refs_dir, cmd_settings
 from guard_core.cmd_status import cmd_status, cmd_toggle
 from guard_core.cmd_write_guard import cmd_pre_write
+from guard_core.cmd_fetch_guard import cmd_pre_fetch
 
 
 SUBCOMMANDS = {
     "user-prompt": cmd_user_prompt,
     "post-edit": cmd_post_edit,
     "pre-write": cmd_pre_write,
+    "pre-fetch": cmd_pre_fetch,
     "verify": cmd_verify,
     "settings": cmd_settings,
     "stop": cmd_stop,

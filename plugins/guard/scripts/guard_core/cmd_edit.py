@@ -2,14 +2,14 @@
 
 Two independent jobs, both independent of the agent switches. It records a source file, an
 agent instruction file, or a saved reference written this turn — the lists the
-``comment-corrector``, ``agents-md-auditor`` and ``refs-auditor`` recommendations are built
+``comment-corrector``, ``agents-md-auditor`` and ``ext-docs-auditor`` recommendations are built
 from, kept in three buckets that must stay disjoint (``agents._edited_bucket``). And it
 requires a file saved inside the refs directory to be listed in that directory's
 ``AGENTS.md``, blocking until it is.
 
 Both jobs see a subagent's writes as well as the main agent's, since tool events fire the
 same hooks inside a subagent (https://code.claude.com/docs/en/hooks). That is not incidental
-here: ``docs-fetcher`` is what saves references, so without it the refs bucket would only
+here: ``ext-docs-fetcher`` is what saves references, so without it the refs bucket would only
 ever catch a hand-written file and the index check would never reach the agent it is for.
 """
 
@@ -43,14 +43,14 @@ def _record_edited_source(project_dir: Path, payload: dict, tool_input: Any,
     """Note a file this turn wrote, for a later file-reading agent's recommendation.
 
     Three lists, chosen by `_edited_bucket`: source files for `comment-corrector`, agent
-    instruction files for `agents-md-auditor`, saved references for `refs-auditor`. Anything
+    instruction files for `agents-md-auditor`, saved references for `ext-docs-auditor`. Anything
     else is not recorded — an agent handed a file its criteria say nothing about spends its
     context proving that.
 
     This fires for a SUBAGENT's write as well as the main agent's: tool events run the same
     configured hooks inside a subagent and the payload carries `agent_id` / `agent_type`
     (https://code.claude.com/docs/en/hooks). That is what makes the refs bucket work at all —
-    the file lands there because `docs-fetcher` saved it, not because the main agent did.
+    the file lands there because `ext-docs-fetcher` saved it, not because the main agent did.
 
     Only inside the project: an audit of a file outside the working tree is not this
     turn's work to fix. Files under guard's own state are excluded too — a turn slice is

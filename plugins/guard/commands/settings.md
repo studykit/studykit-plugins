@@ -91,8 +91,8 @@ made through the CLI, report that instead of working around it.
 | `korean-corrector` | `off` / `fresh` / `reuse` | Admits `guard:korean-corrector` — it flags 번역체 phrasing and a register that is not 존댓말, and hands back the corrected text. Identifiers, paths, commands, and established loanwords (커밋, 리팩토링) are left alone. |
 | `comment-corrector` | `off` / `fresh` / `reuse` | Admits `guard:comment-corrector`, for the source files the turn actually edited. This one **edits those files in place**, so its fixes land without being asked — say so when the user turns it on. |
 | `agents-md-auditor` | `off` / `fresh` / `reuse` | Admits `guard:agents-md-auditor`, for the `AGENTS.md` / `CLAUDE.md` files the turn actually edited, judged as instruction files. Reports only — but its findings often mean moving content into a doc that does not exist yet, which is the user's decision, not the agent's. |
-| `docs-fetcher` | `off` / `fresh` / `reuse` | Admits `guard:docs-fetcher` — the only agent on the **network**, and the only one reached from both ends of a turn. With it on, the session stops running WebFetch/WebSearch itself and dispatches this instead: it reports the local path of documentation already saved here, or fetches the primary source and saves it, and says which it did. **It writes to the repository** — new files under `refs_dir` and rows in that directory's index — so say that when the user turns it on. |
-| `refs-auditor` | `off` / `fresh` / `reuse` | Admits `guard:refs-auditor`, for the files under `refs_dir` the turn actually wrote. It checks that a reference is a reference: a trustworthy source named, content attributed rather than recalled, and nothing in it about **this** repository — the last being the rule that actually gets broken. Reports only. |
+| `ext-docs-fetcher` | `off` / `fresh` / `reuse` | Admits `guard:ext-docs-fetcher` — the only agent on the **network**, and the only one reached from both ends of a turn. With it on, the session stops running WebFetch/WebSearch itself and dispatches this instead: it reports the local path of documentation already saved here, or fetches the primary source and saves it, and says which it did. **It writes to the repository** — new files under `refs_dir` and rows in that directory's index — so say that when the user turns it on. |
+| `ext-docs-auditor` | `off` / `fresh` / `reuse` | Admits `guard:ext-docs-auditor`, for the files under `refs_dir` the turn actually wrote. It checks that a reference is a reference: a trustworthy source named, content attributed rather than recalled, and nothing in it about **this** repository — the last being the rule that actually gets broken. Reports only. |
 | `router_model` | a model name, or empty | Model the **router** runs on. Empty (the default) leaves the choice to the router's own definition in the plugin's `agents/`. Every agent the router names brings its own model, so this changes which audits get picked, never how one is done. |
 | `refs_dir` | a project-relative path, or empty | Where guard saves cited-doc copies. Empty = the git-tracked default `wiki/ref/`, committed with the repo; a different tracked path (e.g. `docs/refs`) overrides it. |
 
@@ -100,9 +100,9 @@ made through the CLI, report that instead of working around it.
 nothing to the main session's context and makes no model call. Turning one on only makes
 that agent *available* — the router still has to find something in the turn before it names
 it, which is why turning `korean-corrector` on costs nothing on an English turn. The three
-file-reading agents (`comment-corrector`, `agents-md-auditor`, `refs-auditor`) skip the router
+file-reading agents (`comment-corrector`, `agents-md-auditor`, `ext-docs-auditor`) skip the router
 entirely and need a file of their own kind that the turn wrote, so they cost nothing on the
-many turns that write none. `docs-fetcher` is the one that also runs *before* an answer, off a
+many turns that write none. `ext-docs-fetcher` is the one that also runs *before* an answer, off a
 policy stated once at session start.
 
 A setting that is off does **not** disable the matching command. `/guard:claims-auditor`,

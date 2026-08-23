@@ -41,7 +41,7 @@ from .payload import _read_payload
 # Agents that report and never edit. Kept as an explicit set rather than derived from
 # `AUDIT_AGENTS`, because what separates these from the rest is not how they are routed but
 # whether writing is part of the job: `korean-corrector` edits the answer file in place,
-# `comment-corrector` edits the source files it was given, and `docs-fetcher` saves the
+# `comment-corrector` edits the source files it was given, and `ext-docs-fetcher` saves the
 # reference it fetched. Restricting those three would mean encoding "the files handed to it
 # this turn", which a PreToolUse hook has no way to know.
 REPORT_ONLY_AGENTS = frozenset({
@@ -49,7 +49,7 @@ REPORT_ONLY_AGENTS = frozenset({
     "deferrals-auditor",
     "clarity-auditor",
     "agents-md-auditor",
-    "refs-auditor",
+    "ext-docs-auditor",
 })
 
 # Both memory scopes, because the scope is a project's choice and the rule is about location.

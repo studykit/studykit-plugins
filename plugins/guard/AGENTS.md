@@ -27,7 +27,7 @@ for each; the main agent then dispatches those, concurrently. guard audits nothi
 and every audit criterion lives in an agent definition under `agents/`.
 
 guard recommends at **two** events, not one. The turn-end path above is the bulk of it;
-`docs-fetcher` (item 2) is also reachable at the other end, before an answer exists, off a
+`ext-docs-fetcher` (item 2) is also reachable at the other end, before an answer exists, off a
 policy announced once at SessionStart. Anything below that says "the turn" or "the response"
 is about the turn-end path.
 
@@ -52,7 +52,7 @@ paths guard had to tell apart from a clean verdict. As a subagent, none of that 
 1. **Audit recommendation** (Stop) — every turn is marked as the on-demand target, so the
    user-invoked `/guard:claims-auditor`, `/guard:deferrals-auditor`,
    `/guard:clarity-auditor`, `/guard:korean-corrector`, `/guard:comment-corrector`,
-   `/guard:agents-md-auditor`, `/guard:docs-fetcher` and `/guard:refs-auditor` work whatever
+   `/guard:agents-md-auditor`, `/guard:ext-docs-fetcher` and `/guard:ext-docs-auditor` work whatever
    the settings say. The per-agent settings then decide what reaches the main agent unasked. Each
    is named after the agent it controls, so one string is the setting, the state key, the
    command, and the `subagent_type`. Every switch ships `off`: guard installed is guard
@@ -120,7 +120,7 @@ paths guard had to tell apart from a clean verdict. As a subagent, none of that 
    repository — a repository says what the code is, never what its author knows.
 
    Three agents never go through the router — `comment-corrector`, `agents-md-auditor` and
-   `refs-auditor`. Their input is a file list, not the answer, so triage could only restate
+   `ext-docs-auditor`. Their input is a file list, not the answer, so triage could only restate
    what eligibility already decided: a file list is not a diff, and reading those files shows
    their current state, never what this turn changed in them. Two of them carry a second
    reason of their own.
@@ -134,7 +134,7 @@ paths guard had to tell apart from a clean verdict. As a subagent, none of that 
    writing the documents it recommends. An auditor that "fixed" a bloated instruction file
    by inventing three new ones would have destroyed content under the name of an audit.
 
-   `refs-auditor` is the second, and it is the same hazard in a different directory. A saved
+   `ext-docs-auditor` is the second, and it is the same hazard in a different directory. A saved
    reference exists to be a faithful copy of something external, so the finding it is built
    for — a passage that is really about this repository — is fixed by MOVING that passage,
    not deleting it, and the destination is usually a design note that does not exist yet. It
@@ -142,29 +142,40 @@ paths guard had to tell apart from a clean verdict. As a subagent, none of that 
    the excerpt was honest when it was taken, and an auditor that could fetch would do the
    fetcher's job instead of its own, leaving nothing to check the fetcher.
 
-   **No other audit agent has `memory:` at all**, and the field was removed rather than
-   restricted. It used to be `local` on all of them, with each body bounding the Write and
-   Edit the field silently grants. That did not hold. `deferrals-auditor` stored the
-   conclusion that live-runtime deferrals are legitimate and cited its own note back as the
-   reason for passing exactly the deferral it exists to catch; deleting the notes was not
-   enough, because the next run wrote a fresh one. With a store available the cheapest move
-   is always to match a stored pattern instead of re-deriving the judgement, and a wrong
-   stored verdict is invisible by construction — it suppresses the finding that would have
-   exposed it. Prose telling the agent to store pointers and not verdicts was tried at two
-   models and did not survive contact.
-   So the capability is gone, which also removes Write and Edit from the reporting agents
-   and makes "it edits nothing" a fact about the tool list rather than a promise in prose.
-   What a run learns now goes in its report, and the user decides whether it is worth
-   keeping. `reuse` is unaffected and is a different axis: within-session, uncurated, and
-   forgotten when the session ends. The router never had memory either — its answer must
-   come from this turn, not from a habit.
+   **The auditors that keep a store carry `memory: project`, and what bounds their writing is
+   a hook rather than the absence of the field.** Removing `memory:` was the previous answer
+   and it is worth knowing why it is not the current one. The field silently grants Write and
+   Edit and the host does not scope that grant, so an agent whose description ends "Reports;
+   edits nothing" cannot make that true by declaring a tool list; the only boundary left was
+   prose in each body, and prose lost. `deferrals-auditor` stored the conclusion that
+   live-runtime deferrals are legitimate and cited its own note back as the reason for passing
+   exactly the deferral it exists to catch. Deleting the note did not hold, because the next
+   run wrote a fresh one: with a store available the cheapest move is always to match a stored
+   pattern instead of re-deriving the judgement, and a wrong stored verdict is invisible by
+   construction — it suppresses the finding that would have exposed it.
 
-   `clarity-auditor` is the exception, and the reason is that its store is not its own
-   work: the reader profile is written by the user through `/guard:reader-profile`, and the
-   agent only reads it. A user-authored setting is not a self-reinforcing verdict, so it
-   stays `user`.
+   Taking the store away stopped that but cost the thing a store is for, so the enforcement
+   moved out of the definitions instead. `pre-write` (`PreToolUse`) denies a report-only
+   agent's write to anything outside an agent-memory directory, which makes "reports; edits
+   nothing" a fact about what the runtime permits rather than a sentence each body repeats —
+   and an agent cannot widen it by editing its own file. The scope is `project` rather than
+   `local` for the **review**, not for the sharing: an entry that lands in the project's diff
+   is caught by whoever reads the diff, which is the only thing that has ever caught a wrong
+   one.
 
-2. **Documentation** (`docs-fetcher`) — the one agent reachable from **both** ends of a turn,
+   What did not change is what belongs in a store: where the answers live, never what is
+   true. A remembered verdict is re-derived rather than cited, and "already confirmed
+   earlier" is not confirmation wherever it is read. `reuse` is a different axis and is
+   unaffected — within-session, uncurated, forgotten when the session ends. The router has no
+   memory at all: its answer must come from this turn, not from a habit.
+
+   `clarity-auditor` is `user` rather than `project`, alone in that, because what it stores is
+   not its own work — the reader profile is written by the user through
+   `/guard:reader-profile` and the agent only reads it, and a person does not change when they
+   switch repositories. `ext-docs-auditor` has no `memory:` at all, and neither corrector does;
+   each frontmatter carries its own reason.
+
+2. **Documentation** (`ext-docs-fetcher`) — the one agent reachable from **both** ends of a turn,
    and the exception most rules above are phrased around. This project's evidence contract
    makes a doc-based claim save a local copy of what it cites; enforcement was at write time
    only, so nothing made those copies get *read*, and a question already answered on disk got
@@ -181,12 +192,24 @@ paths guard had to tell apart from a clean verdict. As a subagent, none of that 
 
    Three things must not regress:
 
-   - **The fetch policy is stated once, at SessionStart, and it is the only thing guard says
-     that forbids a tool.** A `UserPromptSubmit` line would bill every turn in the session for
-     an agent that is off by default. Once is enough because SessionStart registers no matcher
-     and so fires on every source — `compact` among them — which restates the line as soon as
-     a compaction drops it (`wiki/ref/claude-code-hooks-session-env.md`). If that stops being
-     true, the fix is a per-turn line, not a silent agent.
+   - **The prohibition is a hook; the redirect is a sentence. Both, not either.** `pre-fetch`
+     denies `WebFetch`/`WebSearch` in the main conversation while this switch is on, because a
+     standing instruction to delegate is skippable and leaves no trace when it is skipped. But
+     a deny reason is delivered as the tool's error result and weighed as tool output, not as
+     an instruction the session must obey (probe:
+     `wiki/ref/claude-code-pretooluse-deny-reason-visibility.md`), so the hook alone enforces
+     "do not fetch" and only suggests "dispatch this instead". The SessionStart line carries
+     the redirect, and carries alone the half no hook can reach: answering from memory makes no
+     tool call, so nothing fires and nothing can be denied. Deleting either one leaves a gap.
+     Once is enough for the line because SessionStart registers no matcher and so fires on
+     every source — `compact` among them — which restates it as soon as a compaction drops it
+     (`wiki/ref/claude-code-hooks-session-env.md`).
+   - **`pre-fetch` fails open inside every subagent.** The test is the presence of
+     `agent_type`, not a match against the fetcher's name. A subagent cannot dispatch another
+     agent — the host filters `Agent` out of every subagent's tool list — so denying its fetch
+     would take the tool away and leave the replacement unreachable. That covers
+     `ext-docs-fetcher` itself, whose whole job is to fetch, without naming it in a second
+     place that could drift.
    - **The question goes over verbatim.** guard's saved copy of the request is written at
      `UserPromptSubmit` and addressed to the router; on the pre-answer path this agent is
      never handed it, so the main agent is its only source — and a question already condensed
@@ -196,11 +219,11 @@ paths guard had to tell apart from a clean verdict. As a subagent, none of that 
      `_HOST_IS_CODEX` gate the line forbids WebFetch and names no replacement.
 
    It is also the only *routed* agent that writes to the repository, which is why its playbook
-   section ends by dispatching `refs-auditor` on exactly what it saved. Nothing else would: on
+   section ends by dispatching `ext-docs-auditor` on exactly what it saved. Nothing else would: on
    the pre-answer path no turn-end recommendation has run, on the turn-end path it has already
    gone out, and either way the agent that wrote the file must not grade it.
 
-   **`docs-fetcher` and `refs-auditor` carry `opus` rather than the cheapest model that fits,
+   **`ext-docs-fetcher` and `ext-docs-auditor` carry `opus` rather than the cheapest model that fits,
    and both were measured rather than assumed.** The comparison and what broke each tie are in
    `dev/design.md`; each agent's frontmatter carries the short version. Re-run it before
    changing either.
@@ -233,7 +256,7 @@ paths guard had to tell apart from a clean verdict. As a subagent, none of that 
 
    Three lists, not one, and they must stay disjoint (`_edited_bucket`): source files for
    `comment-corrector`, `AGENTS.md`/`CLAUDE.md` for `agents-md-auditor`, anything under the
-   refs directory for `refs-auditor`. A shared list would hand each agent files its criteria
+   refs directory for `ext-docs-auditor`. A shared list would hand each agent files its criteria
    say nothing about — a comment judged against markdown, an instruction file judged against
    a `.py` — and a name landing in two would be audited twice under criteria only one of
    which applies. One turn marker governs all three, because "which turn was this" is the
@@ -248,7 +271,7 @@ paths guard had to tell apart from a clean verdict. As a subagent, none of that 
    Both jobs see a **subagent's** writes, not only the main agent's: tool events fire the same
    hooks inside a subagent and the payload carries `agent_id` / `agent_type`
    (`https://code.claude.com/docs/en/hooks`). The refs bucket depends on that entirely — the
-   file lands there because `docs-fetcher` saved it, not because the main agent did.
+   file lands there because `ext-docs-fetcher` saved it, not because the main agent did.
 
    `state._read_state` has a `default` dict AND a `keys` whitelist, and a new state key must
    be added to **both**. A key missing from `keys` is written and then dropped on the next

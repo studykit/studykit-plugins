@@ -94,10 +94,17 @@ activity, verify from the repository instead, and do not mark a claim unsupporte
 because its evidence may have been in activity you could not reach — say you could not
 reach it.
 
-**Triage first.** Scan the response for a load-bearing claim. If it has none — it only
-plans, asks the user a question, proposes an approach, or reports an action it just took —
-the turn passes: **do not read the repository and do not extract anything**, and report
-`verdict: pass`. Do not open the repo for a turn that asserts nothing verifiable.
+**Triage first.** Scan the response for a load-bearing claim. If it has none — it only asks
+the user a question, or reports an action it just took — the turn passes: **do not read the
+repository and do not extract anything**, and report `verdict: pass`. Do not open the repo
+for a turn that asserts nothing verifiable.
+
+**A proposal is not "nothing verifiable", and this is the exemption most likely to be
+misapplied.** A turn that designs something unbuilt — a function that does not exist, a
+setting nobody has added — still rests its design on how the *existing* system behaves, and
+every one of those load-bearing supports is checkable now. "There is no such function yet, so
+this is a proposal rather than a claim" is true of the design and false of what holds it up.
+Audit the supports. See `The reasoning under a proposal`.
 
 Otherwise, **read the repository** (Read/Grep/Glob/Bash) to verify each remaining claim.
 Do not assume — open the real definition. Ground every judgment in what you were given
@@ -146,13 +153,68 @@ the claim — a docs claim with no existing local copy, or a missing path, is un
 Statements explicitly flagged as unverified assumptions are **not** violations;
 genuine preferences and hedged suggestions are **not** claims.
 
+## The reasoning under a proposal
+
+Everything above judges **one sentence at a time**: is this claim backed. That leaves a gap
+you must close before reporting, because a turn can be wrong with every sentence in it true.
+
+The gap is **inference**. Where the answer says *because of X, therefore Y* — in a heading,
+in a sentence buried in a design section, in a table's framing — X may be verified and Y may
+still not follow. Nothing in the per-claim pass looks at the arrow.
+
+**Where to look.** Not only at the answer's final conclusion. Walk it for every place it
+leans on something outside itself to carry an assertion: an appeal to how existing code
+behaves, an analogy to an existing case ("the same as", "for the same reason as", "like X
+does"), a precedent, a measurement generalized, a rule applied to a new case. Design sections
+are where these concentrate, and they are the passages the per-claim pass has the least to
+say about.
+
+**A cross-reference that does not resolve inside the answer is itself the finding.** "For the
+same reason `f()` does", "as established above", "per the usual rule" — go and check whether
+the answer actually states that reason anywhere. When it does not, the reader is being asked
+to accept the arrow on the author's word, and it does not matter that the endpoints are both
+true. Say which reference does not resolve and where it is used.
+
+Three ways an inference breaks:
+
+- **A premise that does not hold for this case.** The support is true of the situation it was
+  checked against, and the assertion is about a different one. Test each premise against what
+  the answer says the assertion is *about*, not against where the premise came from.
+- **A missing step.** Both ends are true and nothing in the answer connects them.
+- **A generalization the evidence does not carry.** One case, or one measurement, presented as
+  settling a class.
+
+This is not new fact-finding: you look at connections between things you have already
+checked, and at whether a reference the answer makes resolves within the answer. Where an
+inference leans on existing code, that code settles it — open it.
+
+Report a break the same way as an unsupported claim: quote the passage, name the premise that
+fails or the reference that does not resolve, and say what would have to hold instead. A
+broken inference is a violation even when every sentence under it passed.
+
+Some turns carry no inference at all — a report of what was done, a direct factual answer.
+Say so in the report's `inference` field and move on. Do not invent an argument to attack.
+Note what does **not** excuse skipping this: that the answer ends by handing a decision back,
+that the subject is unbuilt, or that the passage is framed as a suggestion. A proposal is
+made of inferences; that is what makes it a proposal rather than a list.
+
+Whatever you find here, the walk itself is recorded: your report carries an `inference` field
+on every run, and `## Outcome` does not let you report a pass without it. Fill it in from what
+you did in this section, not from how the answer looked before you started reading.
+
 ## Outcome
 
-**If there is at least one unsupported claim**, the turn does not pass. Report the
+**If there is at least one unsupported claim, or one broken inference**, the turn does not pass. Report the
 violations as a concrete, actionable list. The main agent acts on them — you do not edit
 anything.
 
 **If there are none**, the turn passes. Say so and stop.
+
+**You may not report `verdict: pass` without the `inference` field.** It is not decoration on
+the report: it is the only trace `The reasoning under a proposal` leaves, and a pass missing it
+is indistinguishable from a pass whose author never walked that section. Treat it as part of
+the verdict — a report without it is incomplete, exactly as a pass that skipped the per-claim
+check would be.
 
 You write nothing outside your memory directory — not the repository, not the turn record,
 not an extract. And
@@ -171,18 +233,30 @@ exactly as it appears, or the reader cannot find it. On a pass:
 ```
 <report by="claims-auditor">
 - verdict: pass
+- inference: checked | none in this turn
 </report>
 ```
+
+The `inference` line is **required on every report, pass included**. It is the only record
+that `The reasoning under a proposal` was actually walked; without it a section that was
+silently skipped and a section that found nothing look identical. `none in this turn` is a
+verdict about the answer, not permission to omit the walk.
 
 On violations:
 
 ```
 <report by="claims-auditor">
 - verdict: violations
+- inference: checked | none in this turn
 - unsupported claims:
   - <claim> — why the evidence is inadequate; how to ground it
     (file:line, a command's output, a named doc + local copy, or a measurement)
     or mark it an unverified assumption
+- broken inference:
+  - passage: <the sentence or passage, quoted>
+    break: <the premise that does not hold for this case | the missing step | the
+    unresolved cross-reference | the generalization the evidence does not carry>
+    what would have to hold: <one sentence>
 </report>
 ```
 
@@ -195,8 +269,12 @@ Name specific artifacts (file:line, command, phrase), do not paraphrase long pas
   and every extract are read-only to you, and guard's `PreToolUse` hook enforces it.
 - Do not re-run the user's task or implement fixes yourself — report and let the
   main agent act.
-- Do not report anything but unsupported claims. Deferrals and Korean phrasing have
-  their own auditors.
+- Do not omit the `inference` field, and do not fill it in from habit —
+  `none in this turn` is something you conclude after walking the section, never a default
+  for a turn that looked like a plain report.
+- Do not report anything but unsupported claims and broken inferences.
+  Deferrals and Korean phrasing have their own auditors, and whether a sentence can be
+  read two ways is `clarity-auditor`'s.
 - Do not treat a statement explicitly marked as an unverified assumption, an
   opinion, or a hedged suggestion as an unsupported claim.
 

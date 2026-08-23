@@ -150,6 +150,17 @@ docs steer new plugins to `skills/`.
 
 ## `UserPromptExpansion` receives the command's arguments
 
+From the hook-lifecycle table (retrieved 2026-08-23, same page):
+
+> When a **user-typed** command expands into a prompt, before it reaches Claude. Can block
+> the expansion
+
+The emphasis is added; the word "user-typed" is the page's own. It is the whole answer to
+"does this fire when the MODEL invokes a skill" — a model invocation goes through the
+`Skill` tool rather than through prompt expansion, so nothing expands and this event never
+fires. The docs do not say that in so many words, so treat the inference as an inference:
+what is quoted is the trigger, and a Skill-tool invocation is not it.
+
 > Matches on `command_name`. Leave the matcher empty to fire on every prompt-type command.
 
 > In addition to the [common input fields](#common-input-fields), UserPromptExpansion hooks

@@ -3,7 +3,7 @@
 Configuration is optional: a JSON object at ``${CLAUDE_PROJECT_DIR}/.claude/guard.local.json``
 (``.codex/`` on Codex). One ``AgentMode`` per agent, keyed by that agent's own name —
 ``claims-auditor`` / ``deferrals-auditor`` / ``clarity-auditor`` / ``korean-corrector`` /
-``comment-corrector`` / ``agents-md-auditor`` / ``docs-fetcher`` / ``refs-auditor``, each
+``comment-corrector`` / ``agents-md-auditor`` / ``ext-docs-fetcher`` / ``ext-docs-auditor``, each
 ``"off"`` (the default) / ``"fresh"`` / ``"reuse"`` — which together are the only control
 over whether guard says anything unasked and over whether an agent is respawned per turn or
 held open for the session. Plus ``refs_dir`` (project-relative directory for saved copies of cited docs; empty
@@ -159,13 +159,13 @@ DEFAULT_CONFIG: dict[str, Any] = {
     # exists, and the router afterwards when a finished answer rested on a document nobody
     # saved. And the only routed agent that writes to the repository, so its cost is a diff:
     # new files under `refs_dir` and rows in that directory's index.
-    "docs-fetcher": AgentMode.OFF,
+    "ext-docs-fetcher": AgentMode.OFF,
     # The files under `refs_dir` THIS TURN wrote, judged as saved references: a trustworthy
     # source named, the content attributed to it rather than recalled, and — the rule that
     # actually gets broken — nothing in them about this repository. Reports only. Pairs with
-    # `docs-fetcher`, which is what usually writes those files, but is independent of it:
+    # `ext-docs-fetcher`, which is what usually writes those files, but is independent of it:
     # a hand-edited reference is audited the same way.
-    "refs-auditor": AgentMode.OFF,
+    "ext-docs-auditor": AgentMode.OFF,
     # Where guard saves local copies of cited docs, relative to
     # the project dir. Empty = the default git-tracked `wiki/ref/`, so the collected
     # references are committed with the repo. Point it at a different tracked path

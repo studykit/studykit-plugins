@@ -33,7 +33,7 @@ class AuditAgent(NamedTuple):
     it wrote under the refs directory. It selects the paths the dispatch carries and gates
     eligibility, since a file-reading agent with no matching edit has no input at all.
 
-    It governs the turn-end path and nothing else. ``docs-fetcher`` is also dispatched
+    It governs the turn-end path and nothing else. ``ext-docs-fetcher`` is also dispatched
     BEFORE an answer exists, off the standing policy ``cmd_session_start`` prints, and that
     entry point is not expressed here — there is no per-turn eligibility to compute for it
     and no path for guard to hand over, since guard keeps no copy of the prompt. A fourth
@@ -110,16 +110,16 @@ AUDIT_AGENTS: dict[str, AuditAgent] = {
     # Routed like the auditors above and for the same reason — whether the answer rests on
     # an external document is a reading of the answer — but it is the one routed agent that
     # is not auditing anything. It goes and gets what the answer should have cited.
-    "docs-fetcher": AuditAgent(reads="turn", verify_command=False, needs_history=False),
+    "ext-docs-fetcher": AuditAgent(reads="turn", verify_command=False, needs_history=False),
     "korean-corrector": AuditAgent(reads="turn", verify_command=True, needs_history=False),
     "comment-corrector": AuditAgent(reads="files", verify_command=False, needs_history=False),
     "agents-md-auditor": AuditAgent(reads="agent-docs", verify_command=False,
                                     needs_history=False),
-    # Deliberately AFTER `docs-fetcher` in this order, though the two never appear in the
+    # Deliberately AFTER `ext-docs-fetcher` in this order, though the two never appear in the
     # same block: the fetcher is routed and the auditor is dispatched directly. The order
     # still says which way the pair runs — something saves a reference, then something else
     # checks what it saved — and a reader of this table should not have to infer that.
-    "refs-auditor": AuditAgent(reads="refs", verify_command=False, needs_history=False),
+    "ext-docs-auditor": AuditAgent(reads="refs", verify_command=False, needs_history=False),
 }
 
 
