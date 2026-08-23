@@ -14,10 +14,9 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from .config import AgentMode, _agent_mode, _router_model
+from .config import AgentMode, _router_model
 from .turnrec import _turn_record_file, _turn_request_file
-from .agents import AUDIT_AGENTS, _eligible_agents
-from .state import _edited_files
+from .agents import AUDIT_AGENTS
 
 
 # --------------------------------------------------------------------------- #
@@ -245,90 +244,6 @@ _DIRECT_LEAD_WITH_ROUTER = (
     "the SAME message as the router above — they read neither the answer file nor the "
     "router's report, so they wait for nothing."
 )
-
-
-# The skill the Stop hook hands a finished turn to on Claude Code, and the one line that
-# does the handing. Everything the audit needs is behind that skill: the trigger names the
-# turn and nothing else, so what a routed turn costs in the context the user is talking to is
-# one sentence rather than the whole dispatch.
-#
-# It names a SKILL, which the rest of guard is forbidden from doing — and the distinction is
-# the frontmatter, not the etiquette. `skills/<agent>/SKILL.md` are the user's own entry
-# points (`disable-model-invocation: true`), so a hook reaching through one would be guard
-# pretending to be the user. This one is the inverse: `user-invocable: false`, invisible in
-# the `/` menu, invocable only by the model. A hook may name that.
-#
-# The turn id travels as the skill's ARGUMENT rather than being looked up on the other side.
-# The hook is the one thing that knows which turn just ended; the pending marker in the state
-# file is a good enough answer for a user typing `/guard:<agent>` a moment later, but it is an
-# inference, and an audit pointed at the wrong turn is a failure nothing downstream can see.
-# Probed before being relied on: an argument placeholder inside the skill's injected command
-# is substituted before that command runs (`wiki/ref/claude-code-skill-injection-and-fork-probe.md`).
-AUDIT_SKILL = "guard:audit"
-
-
-_SKILL_TRIGGER = (
-    "guard: audit the turn you just finished. Invoke the `" + AUDIT_SKILL + "` skill with "
-    "the Skill tool, passing `{prompt_id}` as its argument, and relay what it reports. It "
-    "runs the audit in its own context and carries every input it needs; you dispatch "
-    "nothing yourself."
-)
-
-
-def _skill_trigger(prompt_id: str) -> str:
-    return _SKILL_TRIGGER.format(prompt_id=prompt_id)
-
-
-def turn_dispatch_text(project_dir: Path, session_id: str, prompt_id: str,
-                       state: dict[str, Any], config: dict[str, Any],
-                       transcript: str = "") -> tuple[str, str, list[str]]:
-    """The dispatch text for one finished turn: the routed block, the direct one, or both.
-
-    Returns ``(text, outcome, eligible)``; ``eligible`` empty means guard has nothing to say
-    about this turn and the two callers both fall silent.
-
-    Two callers, and neither may keep its own copy. The ``dispatch`` CLI verb builds this for
-    the forked audit skill, which is the live path on Claude Code; ``cmd_stop`` no longer
-    prints it, but the function stays the single place a turn's dispatch is composed, because
-    a second copy drifts on the first day only one of them is edited.
-
-    The split by what each agent READS is the only judgment here, and it is mechanical.
-    Routing asks "is there material here for this agent", and for a file-reading agent that
-    is a diff-level question the router cannot answer from what it would be given: a file
-    list is the agent's input, not a diff, and reading those files shows their current state,
-    never what this turn changed in them. So routing them could only restate what
-    ``_eligible_agents`` already decided, and bill a subagent for it.
-
-    The two blocks also need no ordering between them. The auditors-before-correctors rule in
-    the playbook exists so a corrector does not rewrite a sentence an auditor was about to
-    flag, and it is entirely about the answer file — which no file-reading agent opens.
-    Sharing no input with the routed agents, they go out in the same message and run
-    alongside the router rather than after it. They need no ordering among themselves either:
-    their file lists are disjoint by construction (``_edited_bucket``), so the one that edits
-    cannot touch what the one that only reports is reading.
-    """
-    edited = _edited_files(state, prompt_id, "edited_files")
-    agent_docs = _edited_files(state, prompt_id, "edited_agent_docs")
-    refs = _edited_files(state, prompt_id, "edited_refs")
-    eligible = _eligible_agents(state, edited, agent_docs, refs)
-    if not eligible:
-        return "", "none_eligible", []
-    modes = {k: _agent_mode(state, k) for k in eligible}
-    routed = [k for k in eligible if AUDIT_AGENTS[k].reads == "turn"]
-    direct = [k for k in eligible
-              if AUDIT_AGENTS[k].reads in ("files", "agent-docs", "refs")]
-    blocks: list[str] = []
-    if routed:
-        blocks.append(_router_context(project_dir, session_id, prompt_id, _ROUTE_LEAD,
-                                      routed, modes, config, transcript))
-    if direct:
-        lead = _DIRECT_LEAD_WITH_ROUTER if routed else _DIRECT_LEAD
-        blocks.append(_dispatch_context(
-            project_dir, session_id, prompt_id, lead, direct, modes,
-            {"files": edited, "agent-docs": agent_docs, "refs": refs}, transcript))
-    outcome = "routed" if routed and not direct else (
-        "dispatched_direct" if direct and not routed else "routed_and_direct")
-    return "\n\n".join(blocks), outcome, eligible
 
 
 # --------------------------------------------------------------------------- #

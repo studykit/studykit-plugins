@@ -20,20 +20,11 @@ is the ONLY reader of `GUARD_HOST` and reads it once at import, and nothing reso
 path by counting `__file__` parents — the split moved code a level deeper and silently
 rewrote every playbook path guard printed. `dev/design.md` has the layering and the reasons.
 
-**guard makes no model call.** When a turn finishes it asks the main agent for one thing:
-invoke the `guard:audit` skill with the finished turn's id. That skill runs in a forked
-context (`context: fork`, `background: false`), asks the `dispatch` CLI verb what this turn's
-audit is, dispatches one subagent — `guard:router` — that reads the turn and names which of
-guard's audit agents would actually find something in it with a reason for each, dispatches
-those concurrently, and reports the findings back. The invoking session applies them: it wrote
-the answer, and it is the one that knows what language the user reads. guard audits nothing
-itself, and every audit criterion lives in an agent definition under `agents/`.
-
-`background: false` is not a preference — `Agent` is absent from the tool set a BACKGROUND
-subagent gets, so a backgrounded fork could dispatch nothing at all. That, the fact that a
-fork can dispatch a plugin-scoped agent, and the fact that the skill's `$turn` argument is
-substituted before its injected command runs are probed rather than assumed:
-`wiki/ref/claude-code-skill-injection-and-fork-probe.md`.
+**guard makes no model call.** When a turn finishes it asks the main agent, through
+`additionalContext`, to dispatch one subagent — `guard:router` — that reads the turn and
+names which of guard's audit agents would actually find something in it, with a reason
+for each; the main agent then dispatches those, concurrently. guard audits nothing itself,
+and every audit criterion lives in an agent definition under `agents/`.
 
 guard recommends at **two** events, not one. The turn-end path above is the bulk of it;
 `ext-docs-fetcher` (item 2) is also reachable at the other end, before an answer exists, off a
@@ -41,10 +32,8 @@ policy announced once at SessionStart. Anything below that says "the turn" or "t
 is about the turn-end path.
 
 Where each piece of text lives is decided by how often it is paid for, and that split must
-hold. `additionalContext` reaches the main agent on **every** routed turn, so it is one
-sentence: which skill to invoke, for which turn. The list of fields it used to carry — the
-paths, which agents are on, each one's mode — moved behind that skill into the `dispatch`
-verb, and is paid for only in the context that actually runs the audit.
+hold: `additionalContext` reaches the main agent on **every** routed turn, so it is one
+imperative plus a list of fields (paths, which agents are on, each one's mode).
 `agents/router.md` is read once per routed turn by the router alone, so it carries the
 triage method, the cue per candidate, and the shape of the report.
 `hooks/context/dispatch-playbook.md` is read only by whoever is sent to a section, so it
@@ -91,12 +80,9 @@ paths guard had to tell apart from a clean verdict. As a subagent, none of that 
    - The recommendation is `additionalContext`, never `decision: "block"`. The docs give
      both the same continuation and loop protections, but block reads as a hook error and
      a recommendation is guard working (`wiki/ref/claude-code-stop-hook-decision-control.md`).
-   - It names one **model-only skill**, and otherwise only **agents**. The distinction is
-     frontmatter, not etiquette: `skills/<agent>/SKILL.md` are `disable-model-invocation:
-     true` because they are the user's entry point, and a hook reaching through one would be
-     guard pretending to be the user. `skills/audit/SKILL.md` is the inverse —
-     `user-invocable: false`, absent from the `/` menu, invocable only by the model — so a
-     hook may name that one, and nothing else about the rule changes.
+   - It names **agents**, never guard's own skills. Those are
+     `disable-model-invocation: true` because they are the user's entry point, so a hook
+     must not reach through them.
    - The roster offers only the eligible set, and the playbook is the second bound: a key
      the router invents has no section to follow, so a switched-off agent stays unreachable
      even if the router names it anyway.

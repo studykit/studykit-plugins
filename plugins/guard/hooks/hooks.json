@@ -114,7 +114,7 @@
             "type": "command",
             "command": "uv run --script \"${CLAUDE_PLUGIN_ROOT}/scripts/guard_hook.py\" stop",
             "timeout": 120,
-            "description": "Mark the finished turn as the on-demand audit target, and — when any agent switch is on — ask the main agent to invoke the `guard:audit` skill for that turn. One line: the dispatch itself is built by the `dispatch` CLI verb inside that skill's forked context, so the roster and the paths are not paid for in the context the user is talking to."
+            "description": "Mark the finished turn as the on-demand audit target, and — when any agent switch is on — ask the main agent to route the turn and dispatch the agents worth running on it."
           }
         ]
       }
