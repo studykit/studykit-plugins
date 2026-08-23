@@ -22,8 +22,36 @@ from .config import (
     AgentMode, ORPHAN_MAX_AGE_SECONDS, _HOST_IS_CODEX, _agent_mode, _load_config, _switch_on
 )
 from .paths import _project_dir, _refs_dir, _state_root, _trace, _trace_file
+from .payload import _read_payload, _session_id
+from .state import _audit_paused, _read_state
 from .agents import AUDIT_AGENTS, _agent_id, _instance_name
 from .dispatch import _playbook_path
+
+
+def _session_muted(project_dir: Path, config: dict) -> bool:
+    """Is the session this SessionStart opens muted? Claude only.
+
+    A session starts muted (`state._read_state`), so at `startup` this is True and the line
+    below has to say so instead of announcing audits nothing will run. It is not always
+    True: SessionStart registers no matcher, so it also fires on `resume`, `clear`,
+    `compact` and `fork`, where the session may already have been unmuted by
+    `/guard:toggle` and the state file says so.
+
+    Reading stdin here is safe only because the Claude entry point has not: `guard_hook.py`
+    dispatches this verb without touching the payload. The Codex adapter HAS already
+    consumed stdin by the time it calls this module, which is a second reason for the host
+    test — the first being that Codex has no `/guard:toggle` and its own Stop path never
+    reads `audit_paused`, so a Codex session is never muted.
+    """
+    if _HOST_IS_CODEX:
+        return False
+    payload = _read_payload()
+    sid = _session_id(payload) if payload else None
+    if sid is None:
+        # No session to look up means no state to have been unmuted — the same answer a
+        # fresh session gets, and the honest one when guard cannot tell.
+        return True
+    return _audit_paused(_read_state(project_dir, sid, config))
 
 
 def _export_to_bash_env(name: str, value: str) -> bool:
@@ -155,12 +183,25 @@ def cmd_session_start() -> int:
     # because context compaction can drop this one — but stating it here is what lets that
     # line stay a path instead of an explanation of what the file is for.
     if any(_switch_on(session_cfg, k) for k in AUDIT_AGENTS):
-        print(
-            "guard: audits are on for this project. When a turn finishes, guard names the "
-            f"agents to consider and points at {_playbook_path()}, which says how to "
-            "dispatch each one and what to do with what it reports. Read only the sections "
-            "you are named; do not read the file until then."
-        )
+        # Which of the two lines goes out is the mute, not the switches. Saying "audits are
+        # on" to a session that starts muted would be false in the one place a false line is
+        # most expensive: nothing later in the session contradicts it, so the model spends
+        # the session expecting a recommendation that never comes.
+        if _session_muted(project_dir, session_cfg):
+            print(
+                "guard: agents are configured for this project, but audits are OFF for this "
+                "session — guard starts muted, so nothing is recommended when a turn ends "
+                "and no answer file is named. `/guard:toggle on` arms it for this session "
+                "only; a `/guard:<agent>` command still runs one audit without arming "
+                "anything. Do not mention this unless the user asks."
+            )
+        else:
+            print(
+                "guard: audits are on for this session. When a turn finishes, guard names the "
+                f"agents to consider and points at {_playbook_path()}, which says how to "
+                "dispatch each one and what to do with what it reports. Read only the sections "
+                "you are named; do not read the file until then."
+            )
 
     # The fetch policy, and the reason `ext-docs-fetcher` is announced here rather than named
     # per turn. Everything else guard says is about checking work already done; this is about

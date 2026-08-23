@@ -1,15 +1,17 @@
 """``toggle`` and ``status`` — the session mute, and the indicator that makes it visible.
 
-``toggle`` (UserPromptExpansion, for ``/guard:toggle [on|off]``) mutes or unmutes the
-automatic audit for THIS SESSION — ``audit_paused`` in the session state, never
-guard.local.json, so it cannot change what the project does by default. An empty argument
-flips; ``on`` means auditing on, which clears the pause. While muted, ``stop`` recommends
+``toggle`` (UserPromptExpansion, for ``/guard:toggle [on|off]``) arms or mutes the automatic
+audit for THIS SESSION — ``audit_paused`` in the session state, never guard.local.json, so it
+cannot change what the project does by default. A session STARTS muted
+(``state._read_state``), which makes ``on`` the common direction: it clears the pause and is
+the only thing that ever does. An empty argument flips. While muted, ``stop`` recommends
 nothing and ``user-prompt`` names no answer file, but the pending ``/guard:<agent>`` target
 and the answer file are still recorded, so asking for one audit still works. The hook does
 the work and prints the resulting state; the command file only relays it.
 
-``status`` (CLI, stdin JSON) is the other half: the mute is a feature only because it is
-visible. It prints one short field — ``guard <n>`` armed / ``guard off`` muted / ``guard ·``
+``status`` (CLI, stdin JSON) is the other half, and starting muted is what makes it
+load-bearing rather than a convenience: the mute is a feature only because it is visible, and
+now it is the state every session opens in. It prints one short field — ``guard <n>`` armed / ``guard off`` muted / ``guard ·``
 nothing switched on — or NOTHING on any failure, because its stdout goes straight into the
 user's status bar. A plugin cannot own the main ``statusLine``, so the user composes this
 segment into theirs (``/guard:statusline`` offers to do it). It reads only the small config
@@ -56,9 +58,10 @@ def cmd_toggle() -> int:
     model reading a procedure correctly.
 
     Session state only. It cannot touch guard.local.json, which is what makes this safe to
-    reach for mid-conversation: whatever the project decided is still what the next session
-    starts with. `on` means auditing on, so it CLEARS the pause — the user's vocabulary is
-    about guard, not about the flag's name.
+    reach for mid-conversation: it cannot change what any other session does. And since every
+    session starts muted, an `off` here is not undone by the next session either — there is
+    nothing this can leave behind. `on` means auditing on, so it CLEARS the pause — the
+    user's vocabulary is about guard, not about the flag's name.
     """
     project_dir = _project_dir()
     payload = _read_payload()
@@ -103,12 +106,13 @@ def cmd_toggle() -> int:
 
     if paused:
         msg = ("guard: audits are OFF for this session. Nothing is recommended when a turn "
-               "ends, and answers are no longer written to a file. `/guard:toggle on` "
-               "restores it and the project's own settings are untouched. A `/guard:*` "
+               "ends, and answers are no longer written to a file. `/guard:toggle on` arms "
+               "it again and the project's own settings are untouched. A `/guard:*` "
                "command still works if you want one audit now.")
     elif armed:
-        msg = ("guard: audits are ON for this session again — "
-               + ", ".join(f"`{k}`" for k in armed) + ". Nothing else changed.")
+        msg = ("guard: audits are ON for this session — "
+               + ", ".join(f"`{k}`" for k in armed) + ". They stay on until this session "
+               "ends; the next one starts muted again. Nothing else changed.")
     else:
         msg = ("guard: no longer muted, but every agent is `off` for this project, so nothing "
                "will run. `/guard:settings` is where you switch one on.")

@@ -26,7 +26,7 @@ from .config import (
     AgentMode, DEFAULT_CONFIG, _agent_mode, _cli_write_allowed, _load_config,
     _load_raw_config, _parse_mode, _router_model, _write_config
 )
-from .paths import _cli_project_dir, _refs_dir, _state_file, _trace
+from .paths import _cli_project_dir, _refs_dir, _trace
 from .agents import AUDIT_AGENTS, _instance_name
 from .state import _audit_paused, _read_state, _write_state
 
@@ -70,9 +70,12 @@ def _config_show_lines(project_dir: Path, session_id: str | None) -> list[str]:
     it differs from the default (the session may have been changed after)."""
     raw = _load_raw_config(project_dir)
     cfg = _load_config(project_dir)
-    state = None
-    if session_id and _state_file(project_dir, session_id).is_file():
-        state = _read_state(project_dir, session_id, cfg)
+    # Read the state whenever there is a session, file or not. The defaults ARE the session's
+    # state until something writes one, and the mute is the key where that distinction shows:
+    # a session starts muted, so gating this on the file existing hid the muted line on
+    # exactly the sessions that had never been armed. The switch lines are unaffected — their
+    # defaults come from the same config `cfg` does, so they still report no difference.
+    state = _read_state(project_dir, session_id, cfg) if session_id else None
 
     def switch_line(key: str) -> str:
         default = _agent_mode(cfg, key)
@@ -86,7 +89,7 @@ def _config_show_lines(project_dir: Path, session_id: str | None) -> list[str]:
     # The mute is listed first and only when it is on: it overrides every line below it, so a
     # reader who sees the switches without it would read the wrong answer to "is guard
     # running". It is session state, so there is no default to show alongside.
-    muted = ["audits: OFF for this session (/guard:toggle on to restore)"] if (
+    muted = ["audits: OFF for this session (/guard:toggle on to arm it)"] if (
         state is not None and _audit_paused(state)) else []
     return [
         *muted,

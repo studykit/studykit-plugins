@@ -71,9 +71,9 @@ there is nothing shared to factor out beyond the state root.
 | `PostToolUse` (`Write\|Edit\|MultiEdit\|NotebookEdit`) | `post-edit` | Record a source file this turn wrote (the candidate list for a `comment-corrector` recommendation), then block when a file saved in the refs dir is not listed in that dir's `AGENTS.md`. |
 | (called via Bash, not a hook) | `settings` | `guard:settings` (a `context: fork` skill, so it runs in a forked `general-purpose` agent rather than in the main session) shows/sets/unsets guard.local.json settings; the agent modes also apply to the live session's `state/<sid>.json` (session id from `--session`/`CLAUDE_CODE_SESSION_ID`). A mode change away from `reuse` also prints a stand-down note, the only channel guard has to a running instance. `set` preserves every other key; `unset <key>` is the only way to delete one. |
 | `Stop` | `stop` | Write the response section of the turn record and mark the turn as the on-demand target — always. Then, when any agent is not `off`, emit `additionalContext` asking the main agent to dispatch `guard:router` over the record, carrying the eligible agents with their modes and this turn's paths. The router names sections of `hooks/context/dispatch-playbook.md`; the main agent follows those, completing the record's second section only if a named section asks for it. `comment-corrector` never goes to the router: it is dispatched directly in the same emission, to be sent in the same message — see the invariant below. |
-| `SessionStart` | `session-start` | Sweep state and turn records past retention, export `GUARD_REFS_DIR`, state the refs rule as session context, name the dispatch playbook once when any agent is on, state the fetch policy once when `ext-docs-fetcher` is on (Claude only) — the redirect and the do-not-answer-from-memory half; the prohibition itself is `pre-fetch`'s job — and — when any agent is in `reuse` — state the standing reuse policy once. |
+| `SessionStart` | `session-start` | Sweep state and turn records past retention, export `GUARD_REFS_DIR`, state the refs rule as session context, say once — when any agent is on — either that the session opened muted (the usual case; `/guard:toggle on` arms it) or that audits are on and where the dispatch playbook is, state the fetch policy once when `ext-docs-fetcher` is on (Claude only) — the redirect and the do-not-answer-from-memory half; the prohibition itself is `pre-fetch`'s job — and — when any agent is in `reuse` — state the standing reuse policy once. |
 | (called via Bash, not a hook) | `transcript` | `index` / `turn` / `find` over the session transcript, for the audit agents. Writes an extract file and prints only its path plus a one-line summary; `--since` / `--until` / `--last` bound which turns are scanned. |
-| `UserPromptExpansion` (`^(guard:)?toggle$`) | `toggle` | Mute/unmute the automatic audit for THIS session (`audit_paused`, session state only — never guard.local.json). `command_args` carries `on`/`off`; empty flips. The hook does the work and prints the result. |
+| `UserPromptExpansion` (`^(guard:)?toggle$`) | `toggle` | Arm/mute the automatic audit for THIS session (`audit_paused`, session state only — never guard.local.json). A session starts muted, so `on` is the arming direction and the common one. `command_args` carries `on`/`off`; empty flips. The hook does the work and prints the result. |
 | (called via Bash, not a hook) | `status` | Status-line segment: `guard <n>` / `guard off` / `guard ·`, or nothing on any failure. Reads one state file; runs on every assistant message. |
 | (called via Bash, not a hook) | `refs-dir` | Print the resolved refs directory (auditor fallback; applies `refs_dir` validation). |
 
@@ -101,7 +101,8 @@ written by the main agent.
   both the `default` dict and the `keys` tuple. `edited_refs` was added to `default` alone at
   first: every write landed and the next read dropped it, which is indistinguishable from
   PostToolUse never having run. `audit_paused` is here rather than in the config on
-  purpose — see the session-mute invariant below.
+  purpose, and so is its **`True` default** — a session starts muted — see the session-mute
+  invariant below.
 - `turns/<sid>/<prompt_id>.md` — the answer to the user's question, one file per typed
   prompt. The session writes it during the turn (the path comes from `UserPromptSubmit`);
   guard fills it in at Stop from `last_assistant_message` only when the turn left it empty,
@@ -524,18 +525,36 @@ payloads, not memory.
   to always-correct (the router is now dispatched only when an answer file exists). And a
   dispatch of `comment-corrector` alone names no answer file at all, which the playbook's
   `Presenting the result` has to branch on — there is nothing to correct and nothing to open.
-- **The session mute is not `audit_gate` coming back.** `/guard:toggle` adds one boolean in
-  front of the switches, which is the shape removed below, so the difference has to be
-  stated or it reads as a regression. Three things differ and all three are load-bearing.
-  It is **session-only** — `audit_paused` lives in `state/<sid>.json` and the code has no
-  path from it to guard.local.json — so it cannot answer the question "what does this
-  project do by default" differently from the switches. It is **two-valued**, so there is no
-  `ask` to reason about. And it is **visible**: the `status` subcommand puts it in the user's
-  status line, which is what the old gate never had. That last one is the real fix. The old
-  gate's cost was not the extra layer; it was that you could not tell which state you were
-  in without going and reading a file. A mute you can see costs nothing to hold in your
-  head. If the indicator ever becomes impossible to ship, delete the mute rather than let it
-  go invisible.
+- **The session mute is not `audit_gate` coming back, and a session starts muted.**
+  `/guard:toggle` adds one boolean in front of the switches, which is the shape removed
+  below, so the difference has to be stated or it reads as a regression — and the default
+  being `True` (`state._read_state`) makes stating it more urgent, not less, because that
+  boolean now decides the *usual* case rather than an exception. Three things differ and all
+  three are load-bearing. It is **session-only** — `audit_paused` lives in `state/<sid>.json`,
+  the code has no path from it to guard.local.json, and no config key can set it — so it
+  cannot answer "what does this project do by default" differently in one repository than in
+  another; the switches say what the project *can* run, and the mute says whether this
+  session runs it. It is **two-valued**, so there is no `ask` to reason about. And it is
+  **visible**: the `status` subcommand puts it in the user's status line and SessionStart
+  says which of the two states the session opened in, which is what the old gate never had.
+  That last one is the real fix, and the muted default is why it is now the load-bearing one:
+  the old gate's cost was not the extra layer, it was that you could not tell which state you
+  were in without going and reading a file, and a default of "off" is exactly the state a
+  user forgets they are in. A mute you can see costs nothing to hold in your head. If the
+  indicator ever becomes impossible to ship, delete the mute — which now means shipping armed
+  again — rather than let it go invisible.
+
+  Why muted rather than armed: a switch left `off` costs nothing, but an audit the user did
+  not ask for spends a router call plus every agent it names on a turn that may not have
+  wanted checking, and it spends them before the user can object. Arming is one command and
+  lasts the session; the reverse default charges for the sessions that never wanted it. This
+  is a change to the *initial value only* — do not turn it into a config key, which is the
+  persistence the invariant above forbids.
+
+  Codex does not participate: `/guard:toggle` is UserPromptExpansion, which Codex has no
+  equivalent for, and `hook_codex.py` never reads `audit_paused`. So a Codex session is never
+  muted, and `_session_muted` tests `_HOST_IS_CODEX` first — which also keeps it from reading
+  a stdin the Codex adapter has already consumed.
 
   What it does NOT suppress is deliberate: `pending_verify_prompt_id` and the answer file are
   still written while muted, so `/guard:claims-auditor` works on the turn the user just
@@ -853,6 +872,11 @@ the audit silently never happens — the exact failure guard exists to prevent. 
 cannot tell a backed claim from one that merely sounds backed names every agent every turn,
 which is the same as naming none, because the user stops reading the recommendation.
 
+There is deliberately **no key for the mute.** `audit_paused` is session state with a `True`
+default, so a session starts muted and only `/guard:toggle on` arms it; a config key here
+would be the persistence the session-mute invariant forbids, and would let a project ship
+itself pre-armed with nothing on screen saying so.
+
 `refs_dir` (string, default `""`) — project-relative directory for guard's cited-doc
 copies; empty = the git-tracked default `wiki/ref/` (references committed with the repo), a
 different tracked path (e.g. `"docs/refs"`) overrides it; commits stay in the user's normal
@@ -917,8 +941,20 @@ run(){ anchor "$1"; echo "{\"session_id\":\"s1\",\"prompt_id\":\"$1\",\"transcri
 "$H" settings show --session s1        # read verbs need no marker
 export GUARD_SETTINGS_SKILL=1         # mutating verbs do — see _cli_write_allowed
 
+# ARM THE SESSION, and do not skip this either. A session starts muted, so without it every
+# `run` below is silent for the WRONG reason and each assertion that expects a recommendation
+# passes as (EMPTY) while testing nothing. This is the one line that stands between this
+# recipe and a whole file of silent no-ops. `toggle` is a UserPromptExpansion hook, so it
+# takes its argument in the payload, not in argv.
+echo '{"session_id":"s1","command_args":"on"}' | "$H" toggle > /dev/null
+python3 -c "import json;print(json.load(open('$CLAUDE_PROJECT_DIR/.claude/guard/state/s1.json'))['audit_paused'])"
+#   -> False. Every case below assumes it.
+
 # All switches off (the shipped default): NOTHING is emitted, but the pending target must
 # still be recorded or every /guard:* audit command breaks in the state guard installs in.
+# Check the TRACE, not just the emptiness: an armed session with no switches records
+# `none_eligible`, and a session that was never armed records the mute instead — the two are
+# indistinguishable from stdout alone, which is how a mute reason can masquerade as this case.
 run p0 "Redis is always faster."        # -> (EMPTY); trace: none_eligible
 python3 -c "import json;print(json.load(open('$CLAUDE_PROJECT_DIR/.claude/guard/state/s1.json'))['pending_verify_prompt_id'])"
 

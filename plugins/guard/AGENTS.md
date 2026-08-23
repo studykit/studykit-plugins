@@ -229,14 +229,24 @@ paths guard had to tell apart from a clean verdict. As a subagent, none of that 
    changing either.
 
 3. **Session mute** (`/guard:toggle`, UserPromptExpansion) — `audit_paused` in the session
-   state, and the shape matters. It is session-only: it cannot write guard.local.json, so
-   reaching for it mid-conversation can never change what the project does tomorrow. It is
-   also *visible* — the `status` subcommand renders it as a status-line segment — and that
-   is what separates it from the `audit_gate` this plugin deliberately removed. The old gate
-   was a persistent three-valued layer in front of the switches whose state you could not
-   see; this is one session boolean you can read off the screen. Do not grow it back into
-   the old thing: no third value, no persistence, and if the indicator ever stops being
-   available, the mute is the feature that should go rather than become invisible.
+   state, and the shape matters. **A session starts muted**, so the switches say what this
+   project *can* run and the mute says whether this session runs it; `/guard:toggle on` is
+   what arms a session and nothing else does. That default lives in the state schema, never
+   in guard.local.json: it is session-only, it cannot write the config, and no config can
+   write it — so reaching for it mid-conversation can never change what the project does
+   tomorrow, and no project can quietly ship itself pre-armed. It is also *visible* — the
+   `status` subcommand renders it as a status-line segment, and SessionStart says which of
+   the two states the session opened in — and that is what separates it from the
+   `audit_gate` this plugin deliberately removed. The old gate was a persistent three-valued
+   layer in front of the switches whose state you could not see; this is one session boolean
+   you can read off the screen. Starting muted raises the price of that going invisible, not
+   lowers it. Do not grow it back into the old thing: no third value, no persistence, and if
+   the indicator ever stops being available, the mute is the feature that should go rather
+   than become invisible.
+
+   Codex is not muted and has no route to be: `/guard:toggle` is UserPromptExpansion, which
+   Codex does not have, and its adapter's Stop path never reads `audit_paused`. The
+   host test in `_session_muted` is what keeps the SessionStart line honest on both.
 
    Two consequences to keep. While muted, `stop` says nothing and `user-prompt` names no
    answer file — a file nothing will correct is a file the user should not be sent to. But

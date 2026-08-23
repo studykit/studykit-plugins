@@ -152,10 +152,13 @@ may be keeping it for something else.
 
 ## What is not yours
 
-- **Muting for one session** is `/guard:toggle`, not a setting. A `settings set` writes
+- **Arming or muting one session** is `/guard:toggle`, not a setting. A `settings set` writes
   `guard.local.json` and changes what the project does from now on; the toggle is session
-  state only. If that is what the user actually wants, say so and let them run it — you
-  cannot, and should not try.
+  state only. This matters more than it reads: every session starts MUTED, so switching an
+  agent on here says what the project may run, not that this session will run it — if `show`
+  reports `audits: OFF for this session`, a `set` does not change that and saying otherwise
+  would be wrong. Tell the user `/guard:toggle on` is what arms the session they are in; you
+  cannot run it, and should not try.
 - **The audits.** You configure them. You never dispatch one, never judge a turn, and never
   volunteer an opinion on whether the project's current settings are the right ones unless
   asked.

@@ -48,12 +48,18 @@ def _read_state(project_dir: Path, session_id: str, config: dict[str, Any]) -> d
         "edited_files": [],
         "edited_agent_docs": [],
         "edited_refs": [],
-        # Session-only mute, flipped by `/guard:toggle`. NOT a mode in front of the agent
-        # switches the way the removed `audit_gate` was: it lives only in session state, so
-        # it can never change what the project does by default, and the `status` subcommand
-        # puts it in the user's status line so the muted state is visible rather than
-        # remembered. A hidden mute is the failure that killed the old gate.
-        "audit_paused": False,
+        # Session-only mute, flipped by `/guard:toggle`, and MUTED IS WHERE A SESSION
+        # STARTS: a session audits only after the user asks it to, for as long as that
+        # session lasts. The default lives here, in the state schema, rather than in
+        # guard.local.json on purpose — there is still no path from the config to this
+        # key, so the mute cannot answer "what does this project do by default"
+        # differently in one repository than in another, and no setting can hide it.
+        # NOT a mode in front of the agent switches the way the removed `audit_gate` was:
+        # it is two-valued, it is session-scoped, and the `status` subcommand puts it in
+        # the user's status line so the muted state is visible rather than remembered. A
+        # hidden mute is the failure that killed the old gate, and starting muted raises
+        # the price of hiding it — which is why `session-start` says so out loud.
+        "audit_paused": True,
         "updated_at": None,
     }
     path = _state_file(project_dir, session_id)
@@ -100,5 +106,9 @@ def _edited_files(state: dict[str, Any], prompt_id: str, bucket: str) -> list[st
 
 
 def _audit_paused(state: dict[str, Any]) -> bool:
-    """Is the automatic audit muted for this session? Only ever True from `/guard:toggle`."""
+    """Is the automatic audit muted for this session? True until `/guard:toggle on`.
+
+    A session starts muted (see the schema above), so this is the state a session is in
+    before anyone touches it, not only the state `/guard:toggle off` puts it in.
+    """
     return state.get("audit_paused") is True
