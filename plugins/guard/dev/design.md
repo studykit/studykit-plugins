@@ -336,8 +336,48 @@ payloads, not memory.
   `wiki/ref/claude-code-skill-substitutions.md`), it would need `Bash` on a `Read`-only
   agent, and it would put guard's storage layout in router prose as a second copy — which,
   once drifted, reads nothing and clears every turn.
+
+- **Materiality is measured on the turn, not on the answer file — v0.65.2.** The request
+  bullet above fixed *what* the router compares against; this fixes *what it is reading*. The
+  answer file is where a turn's substance is written down, so it is written even when the
+  substance is one sentence, and it arrives with headings and paragraphs because that is the
+  format. The router then finds material in text that exists only because the file had to be
+  filled. Measured on `gurad 훅 테스트` — five words, a smoke test of the hook wiring, whose
+  answer file ran to ~250 words of sections restating what the two hooks had printed. The
+  router named `claims-auditor` and `korean-corrector`; both ran, both passed clean, 50s and
+  49s of subagent time for a turn whose finding was "the hooks work". Correct by its own
+  cues, which is what made it a rule problem rather than a routing mistake — replayed against
+  the old definition the same turn also drew `clarity-auditor`, so two agents was the lucky
+  end of the range, not the typical one. Three cues were missing, and
+  all three had to go together — fixing one alone still leaves the turn drawing an agent:
+
+  - *self-observation is not a claim.* The `claims-auditor` cue excluded a bare report of what
+    the assistant just *did* (`수정했습니다`) but not what it just *observed* — which hooks
+    fired, what a command printed, what state the session is in. These have nowhere to be
+    wrong: evidence and assertion arrived in the same context window, and no file or
+    transcript could disagree. Paraphrase is what smuggles them past the old "plainly a
+    quotation of tool output" escape, since the paraphrase is formally a statement about the
+    output rather than the output. The test now stated is whether the claim has somewhere to
+    be wrong: "the Stop hook fired on this turn" narrates the session, "the Stop hook fires on
+    every turn" is checkable.
+  - *the `korean-corrector` exemption covers the language, not materiality.* Its subject does
+    not exist when the router reads, so the request had to be allowed to put it ON the list —
+    but that was written as being outside *both* request limits, which read as an exemption
+    from the materiality bar too. It is not: the language question is unanswerable from the
+    English answer file, the substance question is answerable there like any other agent's. A
+    Korean request makes the agent possible, not worth running.
+  - *the empty-answer list read as exhaustive.* Four shapes were listed and a hook smoke test
+    is none of them literally. Now marked as examples, with the check-that-something-works
+    shape named — it is the shape a plugin's own users hit first, since testing the plugin is
+    the first thing they do with it.
+
+  The router cannot fix the inflation itself — the answer file must be written, and a
+  one-sentence file is indistinguishable from a turn that skipped the convention. So the rule
+  is stated at the router instead: judge what the turn established, and treat the file's
+  length as format.
 - **Nobody gathers the session's history; agents extract it.** guard's turn store holds the
-  response, plus one sibling file holding the request for the router alone (next bullet).
+  response, plus one sibling file holding the request for the router alone (see the router
+  bullets above).
   Everything else around it — this turn's tool activity, what an earlier turn established —
   is already in the transcript, and the agents that may
   need it (`AuditAgent.needs_history`: the two auditors) are handed a transcript path, the

@@ -63,10 +63,12 @@ The dispatch hands you:
   claim is unsupported whatever prompted it. If you cannot tell whether a passage was asked
   for, treat it as asked for.
 
-  **One agent is outside both limits: `korean-corrector`.** Its subject is the translation
+  **One agent escapes the first limit: `korean-corrector`.** Its subject is the translation
   the caller writes after you, so the answer file cannot evidence it and the request is the
-  only thing that can — there, and only there, the request may put an agent on the list. Its
-  own section below says how.
+  only thing that can — there, and only there, the request may put an agent on the list. The
+  second limit still binds it, and so does materiality: what the request settles is the
+  *language*, never whether the turn has enough substance to be worth the agent. Its own
+  section below says how.
 - **playbook** — the path to guard's dispatch playbook. You do not need to read it to
   triage, and reading a candidate's section will not help you decide; what you need it for
   is your answer, which names this path and the sections in it. Read a section only if you
@@ -107,8 +109,17 @@ you genuinely cannot tell, **name** the agent — but do not name one merely bec
 available.
 
 An **empty answer** is a normal, frequent, correct result. Return it when the turn has
-nothing for any candidate: an acknowledgement, a relay, a question back to the user, a
-turn whose whole content is output you can see was quoted from the tool activity.
+nothing for any candidate. Some shapes that come up often — the list is examples, not the
+set, so a turn that resembles none of them can still be empty: an acknowledgement, a relay,
+a question back to the user, a turn whose whole content is output you can see was quoted
+from the tool activity, a check that something works whose finding is that it does.
+
+**Judge the turn, not the file's length.** The answer file is the only place this turn's
+substance is written down, so a turn with one sentence of substance still arrives as a file
+with headings and paragraphs — that shape is the format, not evidence of material. Ask what
+the turn established, and if the honest summary of it is a sentence, an answer file of five
+hundred words does not make it more. This is the single most common way a trivial turn draws
+a full slate of agents that all return clean.
 
 ## The candidates
 
@@ -126,6 +137,18 @@ No when there is nothing of that kind to audit: an acknowledgement or a bare rep
 what the assistant just did ("수정했습니다", "added the function") that asserts nothing
 beyond the act itself, a question back to the user, an instruction, a pure preference, or
 content that is plainly a quotation of tool output rather than a statement about it.
+
+No, also, when the response only **reports what just happened in this session** — which
+hooks fired, what a command printed, what the assistant was instructed to do, what state the
+session is in. A reader cannot check these against anything outside the turn, because the
+evidence and the assertion arrived together; there is no repository, no file and no
+transcript that could disagree. Paraphrasing rather than quoting does not change that: the
+same sentence in the assistant's own words is still a report of what the session just
+observed, and it is the paraphrase that most often smuggles this past the rule above.
+
+The distinction is whether the claim has somewhere to be wrong. "The `Stop` hook fired and
+asked for an audit" is this turn narrating itself. "The `Stop` hook fires on every turn" is a
+claim about how the tool behaves — checkable, and therefore material.
 
 Do **not** decide whether the evidence behind a claim is adequate — that is the auditor's
 whole job and it reads the turn itself, so a response that cites nothing and one that
@@ -175,6 +198,15 @@ language — an acknowledgement, a bare list of file names, a question back to t
 nothing else in it. Two ordinary sentences of explanation are enough: this is the low bar,
 not a high one. When there is no request file, fall back to the answer: an answer that is
 substantive prose will be translated, so name the agent.
+
+**The exemption is about the language, not about materiality.** Only the language question
+is unanswerable from the answer file; whether the turn has substance worth translating is
+answerable, and you answer it the same way you do for every other agent. So apply the
+materiality bar here too: read the answer file for what the turn actually established, and
+if that is a sentence — an acknowledgement, a state change and its confirmation, a check that
+something works — the translation will be a sentence too, and there is nothing for a
+corrector to work on. A Korean request is what makes this agent *possible*; it is not on its
+own what makes it *worth running*.
 
 Do **not** judge whether any Korean is any good. 번역체, register, particles and phrasing are
 the corrector's call — and on this path the prose you would be judging has not been written.
