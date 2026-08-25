@@ -16,9 +16,13 @@ tools: WebSearch, WebFetch, Read, Write, Edit, Grep, Glob, Bash
 # summarizes, this project's naming conventions), so a stale entry costs a visible wasted
 # fetch rather than a suppressed finding.
 memory: project
-# `opus`, measured rather than assumed — `dev/design.md` has the comparison. Re-run it before
-# changing this.
-model: opus
+# `sonnet` (set 2026-08-25). The head-to-head in `dev/design.md` had picked `opus` on one
+# finding: `sonnet` saved a `WebFetch` paraphrase without noticing the page's real section had
+# been replaced by a cross-reference. The `curl`-the-raw-source step in the body below was
+# added in response to exactly that, and the comparison has not been re-run since — so the
+# measurement predates its own fix. Re-run it (recipe in `dev/design.md`) before treating
+# either tier as settled.
+model: sonnet
 effort: medium
 color: yellow
 ---

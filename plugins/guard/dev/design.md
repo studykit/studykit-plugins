@@ -1383,6 +1383,12 @@ passage does not come back quoted, get the source with `curl` and quote from tha
 model following that instruction may well close the gap; nobody has re-run it since the
 instruction was added.
 
+**The field is `sonnet` as of 2026-08-25**, set by the maintainer. That is the arm this
+comparison ruled against, on the paraphrase finding — but on the run that produced the
+finding the `curl` step did not yet exist, so what is recorded above is no longer a
+measurement of what ships. Re-running it is how this gets settled; until then the risk is
+the one named above, that a paraphrase saved as documentation reads downstream as evidence.
+
 **What to re-run before changing either field.** The ext-docs-auditor arm needs a ground-truth set
 with both heading-marked and unmarked project content, and at least one file whose substance is
 unattributed — that last case is what separated the models. The fetcher arm needs a long page
