@@ -487,9 +487,8 @@ payloads, not memory.
   implemented in the style file, because it is inactive for most users. Anything that
   must always hold goes in the SessionStart context (`guard_hook.py`)
   or an agent definition. Note the style also does not reach subagents at all: per the
-  official docs a subagent runs its own system prompt, which is why
-  `agents/simple-explainer.md` carries its own copy of the explain-clearly rules rather
-  than inheriting them.
+  official docs a subagent runs its own system prompt, so an agent that needs the style's
+  rules carries its own copy rather than inheriting them.
 - **Eligibility is mechanical; selection is the router's.** The agent modes and one
   prerequisite (a file-reading agent needs a file of its own kind that the turn actually
   wrote, since that list is its whole input and the router cannot invent one) decide what
@@ -805,8 +804,9 @@ payloads, not memory.
   the user has to review, one rewriting comments in the source the turn just produced, the
   other adding files under the refs directory and rows to its index. **`red`** is the audit
   path — the auditors, `korean-corrector`, `agents-md-auditor`, `ext-docs-auditor`, and the
-  router — where the worst case is a wrong finding rather than a wrong edit. **`cyan`** is
-  read-only and outside the audit entirely: `simple-explainer`.
+  router — where the worst case is a wrong finding rather than a wrong edit. A third colour,
+  `cyan`, was for an agent read-only and outside the audit entirely; no shipped agent is one
+  now.
 
   Two things follow, and the first is the one that looks like a mistake. `korean-corrector`
   edits in place and is `red`, not `yellow`, and that is deliberate: it edits the *answer
