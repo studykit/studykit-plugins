@@ -34,6 +34,7 @@ Subcommands
 - status         CLI (stdin JSON), the status-line segment — ``guard_core.cmd_status``
 - settings       CLI (argv), run by the ``guard:settings`` skill — ``guard_core.cmd_settings``
 - refs-dir       CLI, prints the resolved refs directory — ``guard_core.cmd_settings``
+- candidates     CLI (argv), run by the router — ``guard_core.cmd_candidates``
 - transcript     CLI (argv), run by an audit agent — ``guard_core.transcript``
 
 Requires Python 3.11+ (``enum.StrEnum``).
@@ -49,6 +50,7 @@ from guard_core.cmd_turn import cmd_user_prompt
 from guard_core.cmd_edit import cmd_post_edit
 from guard_core.cmd_stop import cmd_stop
 from guard_core.cmd_session import cmd_session_start
+from guard_core.cmd_candidates import cmd_candidates
 from guard_core.cmd_settings import cmd_refs_dir, cmd_settings
 from guard_core.cmd_status import cmd_status, cmd_toggle
 
@@ -60,6 +62,7 @@ SUBCOMMANDS = {
     "stop": cmd_stop,
     "session-start": cmd_session_start,
     "refs-dir": cmd_refs_dir,
+    "candidates": cmd_candidates,
     "transcript": cmd_transcript,
     "toggle": cmd_toggle,
     "status": cmd_status,

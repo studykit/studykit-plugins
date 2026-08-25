@@ -18,7 +18,8 @@ Imports run one way only, and a cycle here is a design error rather than a techn
 - ``agents``     the roster guard can recommend, and mechanical eligibility
 - ``state``      the per-session state file
 - ``dispatch``   the text handed to the main agent
-- ``cmd_*``      one module per hook event, plus the CLI verbs
+- ``cmd_*``      one module per hook event, plus the CLI verbs (``cmd_candidates``
+                 is the router's roster lookup, not an event)
 
 ``config`` is the only module that may read ``GUARD_HOST``, and it reads it once at import.
 The Codex adapter sets that variable before importing anything here, so a second reader

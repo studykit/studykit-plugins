@@ -65,8 +65,9 @@ there is nothing shared to factor out beyond the state root.
 | `UserPromptSubmit` | `user-prompt` | Name the answer file for this turn — Stop is too late for it, since by then the answer is already printed and a printed answer cannot be corrected. Silent (trace only) when every agent is `off`, when `audit_paused` is set, on a control command, and with no `prompt_id`. Also saves the prompt verbatim to `<prompt_id>.request.md` for the router, which is the only copy guard keeps and the only reader it has. The hook stays registered even when silent so a "guard said nothing" report can be told apart from a hook that never ran. |
 | `PostToolUse` (`Write\|Edit\|MultiEdit\|NotebookEdit`) | `post-edit` | Record a source file, an agent instruction file, or a saved reference this turn wrote (the candidate lists for `comment-corrector`, `agents-md-auditor` and `ext-docs-auditor`), then block when a file saved in the refs dir is not listed in that dir's `AGENTS.md`. |
 | (called via Bash, not a hook) | `settings` | `guard:settings` (a `context: fork` skill, so it runs in a forked `general-purpose` agent rather than in the main session) shows/sets/unsets guard.local.json settings; the agent modes also apply to the live session's `state/<sid>.json` (session id from `--session`/`CLAUDE_CODE_SESSION_ID`). A mode change away from `reuse` also prints a stand-down note, the only channel guard has to a running instance. `set` preserves every other key; `unset <key>` is the only way to delete one. |
-| `Stop` | `stop` | Write the response section of the turn record and mark the turn as the on-demand target — always (only Codex reads that marker now; see below). Then, when any agent is not `off`, emit `additionalContext` asking the main agent to dispatch `guard:router` over the record, carrying the eligible agents with their modes and this turn's paths. The router names sections of `hooks/context/dispatch-playbook.md`; the main agent follows those, completing the record's second section only if a named section asks for it. `comment-corrector` never goes to the router: it is dispatched directly in the same emission, to be sent in the same message — see the invariant below. A third block names `ext-docs-auditor` over the refs files the turn wrote; it has no switch, so it can be the only block a turn produces. |
+| `Stop` | `stop` | Write the response section of the turn record and mark the turn as the on-demand target — always (only Codex reads that marker now; see below). Then, when any agent is not `off`, emit `additionalContext` asking the main agent to dispatch `guard:router` over the record, carrying this turn's paths and the `candidates` command the router runs to get the roster itself. The router names sections of `hooks/context/dispatch-playbook.md`; the main agent follows those, completing the record's second section only if a named section asks for it. `comment-corrector` never goes to the router: it is dispatched directly in the same emission, to be sent in the same message — see the invariant below. A third block names `ext-docs-auditor` over the refs files the turn wrote; it has no switch, so it can be the only block a turn produces. |
 | `SessionStart` | `session-start` | Sweep state and turn records past retention, export `GUARD_REFS_DIR`, state the refs rule as session context, say once — when any agent is on — either that the session opened muted (the usual case; `/guard:toggle on` arms it) or that audits are on and where the dispatch playbook is, and — when any agent is in `reuse` — state the standing reuse policy once. |
+| (called via Bash, not a hook) | `candidates` | The router's own roster: prints the turn-reading agents switched on for this session, one `key=mode` per line, in `AUDIT_AGENTS` order. Session id from `CLAUDE_CODE_SESSION_ID`, which a subagent's Bash carries as its parent's. Read-only, and the only command the router runs. |
 | (called via Bash, not a hook) | `transcript` | `index` / `turn` / `find` over the session transcript, for the audit agents. Writes an extract file and prints only its path plus a one-line summary; `--since` / `--until` / `--last` bound which turns are scanned. |
 | `UserPromptExpansion` (`^(guard:)?toggle$`) | `toggle` | Arm/mute the automatic audit for THIS session (`audit_paused`, session state only — never guard.local.json). A session starts muted, so `on` is the arming direction and the common one. `command_args` carries `on`/`off`; empty flips. The hook does the work and then **blocks the expansion**, so its message reaches the user directly and no model is invoked — the command file exists only to make the matcher reachable, and its body never runs. |
 | (called via Bash, not a hook) | `status` | Status-line segment: `guard <n>` / `guard off` / `guard · on` / `guard ·`, or nothing on any failure. Reads one state file; runs on every assistant message. |
@@ -406,8 +407,8 @@ payloads, not memory.
   check; it never treats unverifiable as verified.
 - **Text is stored where it is read, not where it is emitted.** Three homes, split by how
   often each is paid for. `additionalContext` is paid in the main agent's context on *every*
-  routed turn, so it is one imperative plus a list of fields — the paths, which agents are
-  on, each one's mode — and nothing that reads the same twice. `agents/router.md` is paid
+  routed turn, so it is one imperative plus a list of fields — this turn's paths, and the
+  command that yields the roster — and nothing that reads the same twice. `agents/router.md` is paid
   once per routed turn, in the router's own context, so it holds the triage method, the cue
   per candidate, and the shape of the report. `hooks/context/dispatch-playbook.md` is paid
   only by whoever is sent to a section, so it holds how to dispatch an agent and what to do
@@ -850,6 +851,40 @@ payloads, not memory.
   broader than the body under it. Whether that helps is unproven — it is stated because the
   failure it targets is real and was observed, not because a trial demonstrated the fix.
 
+- **The router fetches its own roster — v0.65.4.** The Stop hook printed a
+  `candidates:` line naming the eligible agents and their modes. It was read by the router
+  and by nobody else, yet it landed in the MAIN agent's context on every routed turn: the
+  main agent dispatches the router and then follows whatever sections the report names, so
+  the roster it held in between informed no decision of its own.
+
+  Two costs, and the second is the reason this changed rather than being left as waste. The
+  list is paid for on every routed turn by a reader that never acts on it. And it is an
+  invitation to act: a main agent holding the eligible set can dispatch from it directly and
+  skip the router, which is the one shortcut that removes triage from the loop without
+  looking like a failure — the agents still run, they just all run.
+
+  So the hook now prints the `candidates` verb and the router runs it. That is possible
+  because a subagent's Bash carries the PARENT session's `CLAUDE_CODE_SESSION_ID` (verified
+  in 2.1.239: a subagent echoed the main session's id, not one of its own), so the verb needs
+  no argument and the dispatch grew no field for guard's own bookkeeping — the roster line got
+  shorter, not longer. The verb calls the same `_eligible_agents` the hook would have, so the
+  two cannot disagree about which switches are on, and filters to `reads="turn"` because the
+  file-reading agents are dispatched around the router and naming one would offer the router
+  a key its caller opens no section for.
+
+  The cost is `Bash` on an agent that had `Read` only, which was a real property worth
+  keeping: a pure triage step cannot wander into the repository. `agents/router.md` now says
+  `Bash` is for this one command and that the answer and request files are the only files it
+  reads. That is an instruction, not an enforcement — the honest trade is a weaker sandbox on
+  the router in exchange for the roster never reaching the agent that could misuse it, and
+  the misuse the roster enables is the one nothing downstream detects.
+
+  Two failure shapes had to stay distinguishable, since both would otherwise reach the router
+  as silence: no session id (an installation problem, or the `--continue`/bare-`--resume`
+  carve-out where the env var holds the startup id) and an empty roster. Both print on stderr,
+  and the router is told to report either in one line and pick nothing rather than fall back
+  to the candidate sections in its own definition as though they were the roster.
+
 - **`clarity-auditor` audits against a reader, and says so when it has none.** Its three
   axes are not symmetric in what they need. "Is there a concrete example" is answerable from
   the answer alone. "Is this term unexplained" needs the session — a term defined two turns
@@ -1136,18 +1171,26 @@ cat "$CLAUDE_PROJECT_DIR/.claude/guard/turns/s1/p0.md"
 "$H" settings set claims-auditor fresh --session s1     # "on" is an accepted alias
 "$H" settings set korean-corrector fresh --session s1
 run p1 "Redis는 Postgres보다 항상 빠릅니다."
-#   -> one imperative plus fields: the playbook path, the answer file, exactly two
-#      candidates with their modes, and the transcript + turn id. Nothing here describes
-#      what an agent does, how to dispatch it, or what to do with its report — those are
-#      the playbook's, and the router's answer is what names the sections.
+#   -> one imperative plus fields: the playbook path, the turn dir, the answer and request
+#      files, the `candidates` COMMAND (never the roster itself — the router runs it), and
+#      the transcript + turn id. Nothing here describes what an agent does, how to dispatch
+#      it, or what to do with its report — those are the playbook's, and the router's answer
+#      is what names the sections.
 cat "$CLAUDE_PROJECT_DIR/.claude/guard/turns/s1/p1.md"
 #   -> the second section reads "Not collected" and carries the ask for earlier evidence
 #      plus the ban on the main agent's own case for the claim. Nothing collected it.
 
 # The roster must never offer a switched-off agent. The playbook is the second bound: a key
-# the router invents has no section to follow.
+# the router invents has no section to follow. The roster is not in the Stop output any more,
+# so this is checked where the router now reads it — and note the FILTER: the verb prints only
+# the turn-reading agents, so a `comment-corrector` that is on must NOT appear here.
 "$H" settings set korean-corrector off --session s1
-run p2 "Redis는 Postgres보다 항상 빠릅니다."   # -> claims-auditor is the only candidate
+run p2 "Redis는 Postgres보다 항상 빠릅니다."   # -> the `candidates:` line, unchanged by the switch
+CLAUDE_CODE_SESSION_ID=s1 "$H" candidates     # -> claims-auditor=fresh, and nothing else
+# The two failure shapes must not both be silence: one is an installation problem, the other
+# a real (if unexpected) answer, and the router is told to report each in one line.
+CLAUDE_CODE_SESSION_ID= "$H" candidates       # -> stderr: no CLAUDE_CODE_SESSION_ID; exit 0
+CLAUDE_CODE_SESSION_ID=nosuch "$H" candidates # -> stderr: nothing switched on; exit 0
 
 # The CLI verbs must not depend on the cwd. `CLAUDE_PROJECT_DIR` is absent in Bash, so this
 # is the normal case, not an edge one: all three must agree from anywhere in the checkout.
@@ -1185,7 +1228,8 @@ run pnone "Turned it on."   # -> same shape MINUS `request file:` (no user-promp
 "$H" settings set comment-corrector on --session s1
 echo '{"session_id":"s1","prompt_id":"pc","prompt":"rename a variable"}' | "$H" user-prompt   # -> nothing
 echo "{\"session_id\":\"s1\",\"prompt_id\":\"pc\",\"tool_input\":{\"file_path\":\"$CLAUDE_PROJECT_DIR/src/cache.py\"}}" | "$H" post-edit
-run pc "Renamed it."   # -> playbook, candidates, `files for` — and NO `answer file:` line
+run pc "Renamed it."   # -> the direct block only: playbook and `files to audit` — and NO
+                       #    router block at all, so no `answer file:` and no `candidates:`
 "$H" settings set claims-auditor fresh --session s1     # both on -> the line is back
 
 # comment-corrector needs a source file the turn actually WROTE, and the file must exist.

@@ -12,8 +12,9 @@ Otherwise it records the turn as the pending on-demand target and fills in the a
 file if the turn left it empty — both regardless of the switches, because an on-demand audit
 must work in a project that keeps everything off. Then, when a turn-reading agent is
 eligible, it emits ``additionalContext`` asking the main agent to dispatch the router
-(``agents.ROUTER_AGENT``) over the answer file with the eligible agents and their modes, and
-to follow the sections its report names; the eligible file-reading agents —
+(``agents.ROUTER_AGENT``) over the answer file and to follow the sections its report names —
+the router reads its own eligible-agent roster from the ``candidates`` CLI rather than being
+handed it here, so the roster never passes through the main agent's context; the eligible file-reading agents —
 ``comment-corrector`` (``reads="files"``) and ``agents-md-auditor``
 (``reads="agent-docs"``) — are dispatched directly over the turn's edited files
 instead, bypassing the router. A third block names ``ext-docs-auditor`` when the turn wrote
@@ -189,7 +190,7 @@ def cmd_stop() -> int:
     blocks: list[str] = []
     if routed:
         blocks.append(_router_context(project_dir, session_id, prompt_id, _ROUTE_LEAD,
-                                      routed, modes, transcript))
+                                      routed, transcript))
     if direct:
         lead = _DIRECT_LEAD_WITH_ROUTER if routed else _DIRECT_LEAD
         blocks.append(_dispatch_context(

@@ -82,6 +82,18 @@ def _playbook_path() -> Path:
     return _plugin_root() / PLAYBOOK_REL
 
 
+# The CLI the router runs to get its own roster. Built from the same `_plugin_root` the
+# playbook path is, so a moved install cannot leave one of the two pointing at nothing, and
+# spelled with the `uv run --script` prefix the hook commands use — the script's shebang
+# carries it too, but a caller that invoked the file directly would depend on its exec bit
+# surviving whatever installed it.
+CLI_REL = "scripts/guard_hook.py"
+
+
+def _candidates_cmd() -> str:
+    return f'uv run --script "{_plugin_root() / CLI_REL}" candidates'
+
+
 def _agent_pointer(project_dir: Path, session_id: str, prompt_id: str, keys: list[str],
                    files: dict[str, list[str]], modes: dict[str, AgentMode]) -> str:
     """Name the playbook sections for these agents and hand over their per-turn inputs.
@@ -128,8 +140,7 @@ def _dispatch_context(project_dir: Path, session_id: str, prompt_id: str, lead: 
 
 
 def _router_context(project_dir: Path, session_id: str, prompt_id: str, lead: str,
-                    eligible: list[str], modes: dict[str, AgentMode],
-                    transcript: str = "") -> str:
+                    eligible: list[str], transcript: str = "") -> str:
     """``additionalContext`` for the Stop path: the playbook pointer, then this turn's data.
 
     Every line here is paid in the main agent's context at the end of EVERY routed turn,
@@ -197,7 +208,18 @@ def _router_context(project_dir: Path, session_id: str, prompt_id: str, lead: st
     request = _turn_request_file(project_dir, session_id, prompt_id).resolve()
     if request.is_file():
         fields.append(f"- request file: {{turn dir}}/{request.name}")
-    fields.append("- candidates: " + ", ".join(f"`{k}`={modes[k].value}" for k in eligible))
+    # The roster is a COMMAND, not a list. It is read by the router and by nothing else —
+    # the main agent dispatches the router and then follows whatever sections the report
+    # names, so a roster printed here is text it pays for on every routed turn and never
+    # acts on. Worse, it is text that invites acting on: a main agent holding the list of
+    # eligible agents can skip the router and dispatch from it directly, which is the one
+    # shortcut that silently removes triage from the loop.
+    #
+    # So the verb goes in the dispatch and the answer stays out of it. The router runs it,
+    # gets the switches first-hand from the same `_eligible_agents` this hook would have
+    # called, and needs no identifier to do so — `cmd_candidates` reads
+    # `CLAUDE_CODE_SESSION_ID`, which a subagent's Bash carries as the PARENT session's id.
+    fields.append(f"- candidates: run `{_candidates_cmd()}`")
     if transcript and any(AUDIT_AGENTS[k].needs_history for k in eligible):
         fields.append(f"- history: transcript {transcript}, turn {prompt_id}")
     return lead + "\n\n" + "\n".join(fields)
