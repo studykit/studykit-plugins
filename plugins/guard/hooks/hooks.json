@@ -26,19 +26,6 @@
         ]
       }
     ],
-    "PreToolUse": [
-      {
-        "matcher": "Write|Edit|MultiEdit|NotebookEdit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "uv run --script \"${CLAUDE_PLUGIN_ROOT}/scripts/guard_hook.py\" pre-write",
-            "timeout": 10,
-            "description": "Deny a write from one of guard's report-only agents (claims-auditor, deferrals-auditor, clarity-auditor, agents-md-auditor, ext-docs-auditor) when the target is outside an agent-memory directory. Declaring `memory:` silently grants those agents Write and Edit, and the host does not scope the grant, so \"reports; edits nothing\" is enforced here rather than promised in each definition."
-          }
-        ]
-      }
-    ],
     "PostToolUse": [
       {
         "matcher": "Write|Edit|MultiEdit|NotebookEdit",

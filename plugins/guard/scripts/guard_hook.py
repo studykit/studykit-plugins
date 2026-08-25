@@ -28,7 +28,6 @@ Subcommands
 -----------
 - user-prompt    UserPromptSubmit  — ``guard_core.cmd_turn``
 - post-edit      PostToolUse on the write tools — ``guard_core.cmd_edit``
-- pre-write      PreToolUse on the write tools — ``guard_core.cmd_write_guard``
 - stop           Stop — ``guard_core.cmd_stop``
 - session-start  SessionStart — ``guard_core.cmd_session``
 - toggle         UserPromptExpansion for ``/guard:toggle`` — ``guard_core.cmd_status``
@@ -52,13 +51,11 @@ from guard_core.cmd_stop import cmd_stop
 from guard_core.cmd_session import cmd_session_start
 from guard_core.cmd_settings import cmd_refs_dir, cmd_settings
 from guard_core.cmd_status import cmd_status, cmd_toggle
-from guard_core.cmd_write_guard import cmd_pre_write
 
 
 SUBCOMMANDS = {
     "user-prompt": cmd_user_prompt,
     "post-edit": cmd_post_edit,
-    "pre-write": cmd_pre_write,
     "settings": cmd_settings,
     "stop": cmd_stop,
     "session-start": cmd_session_start,

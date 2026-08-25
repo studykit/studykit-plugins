@@ -225,7 +225,8 @@ The remaining entries were checked and are accurate — pointer-style, each carr
 
 ## Root cause worth fixing
 
-guard's `pre-write` hook already denies a reporting agent's write outside an agent-memory
-directory. Narrowing that to the **project-root** agent-memory directory would make a
-cwd-drifted store fail loudly instead of appearing silently — the hook doing for creation what
-`.gitignore` already does for commits.
+This was going to be narrowed from guard's `pre-write` hook — which denied a reporting
+agent's write outside an agent-memory directory — to the **project-root** agent-memory
+directory, making a cwd-drifted store fail loudly instead of appearing silently. That hook
+was removed on 2026-08-25 (see `dev/design.md`), so the route is gone with it and a
+cwd-drifted store now has nothing catching it at creation time.

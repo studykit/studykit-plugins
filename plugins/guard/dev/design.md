@@ -35,7 +35,6 @@ config -> paths -> turnrec / payload / emit -> transcript
 | `dispatch` | the text handed to the main agent |
 | `cmd_turn` | `user-prompt` |
 | `cmd_edit` | `post-edit` |
-| `cmd_write_guard` | `pre-write` |
 | `cmd_stop` | `stop` |
 | `cmd_session` | `session-start` |
 | `cmd_settings` | `settings`, `refs-dir` |
@@ -64,7 +63,6 @@ there is nothing shared to factor out beyond the state root.
 | Event | Subcommand | Role |
 | --- | --- | --- |
 | `UserPromptSubmit` | `user-prompt` | Name the answer file for this turn — Stop is too late for it, since by then the answer is already printed and a printed answer cannot be corrected. Silent (trace only) when every agent is `off`, when `audit_paused` is set, on a control command, and with no `prompt_id`. Also saves the prompt verbatim to `<prompt_id>.request.md` for the router, which is the only copy guard keeps and the only reader it has. The hook stays registered even when silent so a "guard said nothing" report can be told apart from a hook that never ran. |
-| `PreToolUse` (`Write\|Edit\|MultiEdit\|NotebookEdit`) | `pre-write` | Deny a write from a report-only agent when the target is outside an agent-memory directory. `memory:` silently grants Write/Edit and the host does not scope the grant, so "reports; edits nothing" is enforced here instead of promised per definition. |
 | `PostToolUse` (`Write\|Edit\|MultiEdit\|NotebookEdit`) | `post-edit` | Record a source file, an agent instruction file, or a saved reference this turn wrote (the candidate lists for `comment-corrector`, `agents-md-auditor` and `ext-docs-auditor`), then block when a file saved in the refs dir is not listed in that dir's `AGENTS.md`. |
 | (called via Bash, not a hook) | `settings` | `guard:settings` (a `context: fork` skill, so it runs in a forked `general-purpose` agent rather than in the main session) shows/sets/unsets guard.local.json settings; the agent modes also apply to the live session's `state/<sid>.json` (session id from `--session`/`CLAUDE_CODE_SESSION_ID`). A mode change away from `reuse` also prints a stand-down note, the only channel guard has to a running instance. `set` preserves every other key; `unset <key>` is the only way to delete one. |
 | `Stop` | `stop` | Write the response section of the turn record and mark the turn as the on-demand target — always (only Codex reads that marker now; see below). Then, when any agent is not `off`, emit `additionalContext` asking the main agent to dispatch `guard:router` over the record, carrying the eligible agents with their modes and this turn's paths. The router names sections of `hooks/context/dispatch-playbook.md`; the main agent follows those, completing the record's second section only if a named section asks for it. `comment-corrector` never goes to the router: it is dispatched directly in the same emission, to be sent in the same message — see the invariant below. A third block names `ext-docs-auditor` over the refs files the turn wrote; it has no switch, so it can be the only block a turn produces. |
@@ -511,9 +509,7 @@ payloads, not memory.
   Three things follow, and each of them broke or would have broken by assuming the registry is
   the roster. `edited_refs` is a `_edited_bucket` value with no `AUDIT_AGENTS` entry behind it,
   so nothing computes eligibility for it and `cmd_stop` reads the list directly.
-  `_agent_name` in `cmd_write_guard` matches against `AUDIT_AGENTS` **or**
-  `REPORT_ONLY_AGENTS`, because a registry-only gate would silently stop enforcing "reports;
-  edits nothing" for `ext-docs-auditor`. And `settings set` refuses both names, which is
+  And `settings set` refuses both names, which is
   correct and has to be *said* — `commands/settings.md` tells the skill to explain the refusal
   rather than let it read as a bug.
 - **The two ext-docs agents are a pair: one writes references, the other checks them.** That
@@ -675,9 +671,9 @@ payloads, not memory.
   gitignored for free — in this very repo `.claude/agent-memory-local/` is not matched by
   any ignore rule, so "not meant for version control" is an intent the project still has to
   enforce. Three rules hold this together and each one is a failure mode if dropped: the
-  Write/Edit that `memory` enables is bounded to a memory directory BY THE `pre-write` HOOK,
-  not by prose in each body, because the frontmatter cannot express it and prose was tried and
-  broken; a remembered claim is re-checked before it is relied on, since memory records where
+  Write/Edit that `memory` enables is bounded only by each agent's own body — guard ships
+  nothing that refuses such a write (see "A stored verdict is invisible when it is wrong"
+  below); a remembered claim is re-checked before it is relied on, since memory records where
   to look and never what is true; and nothing in guard reads or writes those directories, so a
   user with auto memory disabled loses accumulated knowledge and nothing else.
 - **The router has no memory, for the same reason it is never reused.** A remembered habit
@@ -1414,33 +1410,27 @@ Three facts constrain the fix, all measured (2026-08-23, claude 2.1.239):
   ignores it for plugin subagents (as it does `permissionMode` and `mcpServers`).
 - **A plugin's own hooks do reach subagents.** Tool events fire inside them and the payload
   carries `agent_type`; a plugin subagent reports the plugin-scoped name, observed as
-  `guard:korean-corrector` in the `pre-write` trace. Excerpt:
+  `guard:korean-corrector` when guard still ran a `PreToolUse` hook. Excerpt:
   `wiki/ref/claude-code-hooks-in-subagents.md`.
 
-So the boundary is enforced from guard's own manifest, not from each definition — which also
-means an agent cannot widen its own limit by editing its own file. `PreToolUse` on the write
-tools runs `pre-write`, which denies a write from a report-only agent to anything outside a
-memory directory. Two deliberate choices in it. The rule is a **location**, not a per-agent
-path: naming each agent's own directory would depend on how the host derives that name, and
-one auditor writing into another's memory is a curation problem rather than the repository
-damage this is for. And it traces every write it sees, not only the denials, because
-"the hook never fired" and "no agent ever tried" are otherwise the same empty log.
+**A `pre-write` hook, denying a report-only agent's write outside a memory directory, was
+built on these facts and then removed at the maintainer's direction (2026-08-25).** It is
+recorded here because the facts above still hold and would otherwise invite rebuilding it.
+`PreToolUse` on the write tools checked the payload's `agent_type` against a report-only set
+and denied any target outside `agent-memory`/`agent-memory-local`; the rule was a location
+rather than a per-agent path, since deriving each agent's own directory depends on how the
+host names it. What remains is that `memory:` grants unscoped Write and Edit, and nothing in
+guard refuses such a write: "reports; edits nothing" is a promise in each agent's body.
 
-The enforced set is the agents that report and never edit: `claims-auditor`,
-`deferrals-auditor`, `clarity-auditor`, `agents-md-auditor`, `ext-docs-auditor`. The other three
-write as part of the job — `korean-corrector` edits the answer file, `comment-corrector` the
-source files it was handed, `ext-docs-fetcher` the reference it saved — and restricting those
-would mean encoding "the files given to it this turn", which a PreToolUse hook cannot know.
+Note what the hook never covered, because it bears on the failure that opened this section.
+It stopped a stray write; it could not stop a wrong verdict written *inside* the memory
+directory, which is what actually happened. That part of the remedy is unaffected by the
+removal: `project` puts the store in `.claude/agent-memory/`, which is tracked, so an entry
+arrives in a pull request and is read by someone. Review was always the check on content.
+`deferrals-auditor` additionally carries the asymmetric rule in prose — never store a
+remembered `legitimate` — because that specific direction is the one that reproduces itself.
 
-The hook is only half of it, and the half it does not cover is the original failure. It stops
-a stray write; it cannot stop a wrong verdict written *inside* the memory directory. That is
-what the scope change is for: `project` puts the store in `.claude/agent-memory/`, which is
-tracked, so an entry arrives in a pull request and is read by someone. Review is the check on
-content; the hook is the check on location. `deferrals-auditor` additionally carries the
-asymmetric rule in prose — never store a remembered `legitimate` — because that specific
-direction is the one that reproduces itself.
-
-**Codex cannot express this rule, and that is now checked rather than suspected.** Codex
+**Codex could not have expressed the rule either, which was checked rather than suspected.** Codex
 lists `PreToolUse` and its decision can deny before a tool runs, but the event's payload is
 `turn_id`, `tool_name`, `tool_use_id`, `tool_input` over the common fields — and carries
 **no `agent_id` and no `agent_type`**; those two are documented for `SubagentStart` and

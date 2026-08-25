@@ -19,9 +19,8 @@ tools: Read, Grep, Glob, Bash, SendMessage
 # exception that stays out of memory: a term defined in the repository is settled by reading
 # the repository.
 # Note the field silently enables Write and Edit and the host does not scope that grant
-# (measured). Prose in the body was tried as the boundary and
-# broke, so guard's own `pre-write` hook enforces it: a write from this agent to anywhere but
-# an agent-memory directory is denied.
+# (measured), so "reports; edits nothing" rests on the body below rather than on anything
+# that could refuse the write.
 memory: user
 model: sonnet
 effort: medium
