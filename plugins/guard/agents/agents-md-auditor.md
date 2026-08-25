@@ -18,11 +18,10 @@ tools: Read, Grep, Glob, Bash
 # chosen for the reviewability rather than the sharing: what this agent writes lands in the
 # project's diff, so a wrong entry is caught by the same review that catches wrong code.
 # The field silently grants Write and Edit, and the host does not scope that grant — measured,
-# not a promise the field makes. So "reports; edits nothing" rests on the body below: prose
-# was tried as the boundary and broken once, a `PreToolUse` hook that refused such writes was
-# then built and later removed on purpose, and a subagent's own `hooks:` frontmatter cannot
-# carry it either (the host ignores that field for plugin subagents). `dev/design.md` has the
-# measurements and the removal.
+# not a promise the field makes. Nothing refuses such a write — a subagent's own `hooks:`
+# frontmatter cannot carry the boundary either (the host ignores that field for plugin
+# subagents) — so "reports; edits nothing" rests on the body below. `dev/design.md` has the
+# measurements.
 memory: project
 model: opus
 color: red

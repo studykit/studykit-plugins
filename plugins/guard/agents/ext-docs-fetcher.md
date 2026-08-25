@@ -9,7 +9,7 @@ description: |
 # save the file and its index row, and `Read`/`Grep`/`Glob` do the local search that comes
 # first. No `Agent` and no `SendMessage`: it cannot delegate the reading, and it cannot ask
 # the caller to narrow a vague question — hence the instruction to report what it took the
-# question to mean. Rationale for all of this is in `AGENTS.md` and `dev/design.md`.
+# question to mean.
 tools: WebSearch, WebFetch, Read, Write, Edit, Grep, Glob, Bash
 # `project`, and the exception to the no-stores rule is that nothing here is a VERDICT: what
 # accumulates is operational (which vendors serve raw markdown, which pages WebFetch
