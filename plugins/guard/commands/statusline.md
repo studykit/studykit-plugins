@@ -43,7 +43,7 @@ Check the segment works before proposing anything:
 printf '{"session_id":"probe","workspace":{"project_dir":"<project root>"}}' | "<guard>/scripts/guard_hook.py" status
 ```
 
-Expect one short field (`guard 3`, `guard off`, or `guard ·`) or nothing. If it prints
+Expect one short field (`guard 3`, `guard off`, `guard · on`, or `guard ·`) or nothing. If it prints
 nothing for a project with agents switched on, stop and say so rather than wiring up a
 segment that will stay blank.
 
@@ -83,8 +83,10 @@ as it was.
 
 Tell the user two things and stop:
 
-- The segment reads three states: `guard N` (N agents armed), `guard off` (muted for this
-  session with `/guard:toggle`), `guard ·` (installed, nothing switched on for this project).
+- The segment reads four states: `guard N` (N agents armed), `guard off` (agents configured
+  but muted for this session with `/guard:toggle`), and — when nothing is switched on for this
+  project — `guard · on` armed and `guard ·` muted. The mute changes the segment in every
+  case, so `/guard:toggle` is always visible.
 - If it ever goes blank, the plugin path moved — a plugin update can relocate the install
   directory — and re-running this command fixes it. Blank is deliberate: the segment prints
   nothing rather than an error, because a status line is the wrong place to report a failure.

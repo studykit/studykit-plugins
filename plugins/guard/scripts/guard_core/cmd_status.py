@@ -13,11 +13,14 @@ exists to make the matcher reachable at all, and its body never runs.
 
 ``status`` (CLI, stdin JSON) is the other half, and starting muted is what makes it
 load-bearing rather than a convenience: the mute is a feature only because it is visible, and
-now it is the state every session opens in. It prints one short field — ``guard <n>`` armed / ``guard off`` muted / ``guard ·``
+now it is the state every session opens in. It prints one short field — ``guard <n>`` armed /
+``guard off`` muted / ``guard · on`` and ``guard ·`` for the two states of a project with
 nothing switched on — or NOTHING on any failure, because its stdout goes straight into the
-user's status bar. A plugin cannot own the main ``statusLine``, so the user composes this
-segment into theirs (``/guard:statusline`` offers to do it). It reads only the small config
-and state files, nothing else: it runs on every assistant message. Not a hook event.
+user's status bar. The mute decides the word in EVERY branch, including the last pair: a
+toggle that leaves the segment unchanged cannot be told from a toggle that did not fire.
+A plugin cannot own the main ``statusLine``, so the user composes this segment into theirs
+(``/guard:statusline`` offers to do it). It reads only the small config and state files,
+nothing else: it runs on every assistant message. Not a hook event.
 """
 
 from __future__ import annotations
@@ -76,8 +79,7 @@ def cmd_toggle() -> int:
     # session id, unrecognised argument) say so out loud for the same reason.
     if project_dir is None:
         _emit_expansion(
-            "guard: no project directory resolved, so there is no session state to write. "
-            "Nothing changed — the session is still in whatever state it was in."
+            "guard: no project directory resolved — nothing changed."
         )
         return 0
     session_id = _session_id(payload)
@@ -98,8 +100,8 @@ def cmd_toggle() -> int:
         paused = True
     else:
         _emit_expansion(
-            f"guard: `{arg}` is not an argument for /guard:toggle — use `on`, `off`, or "
-            "nothing to flip. Nothing changed."
+            f"guard: `{arg}` is not an argument — use `on`, `off`, or nothing to flip. "
+            "Nothing changed."
         )
         return 0
 
@@ -107,21 +109,20 @@ def cmd_toggle() -> int:
     _write_state(project_dir, session_id, state)
     armed = [k for k in AUDIT_AGENTS if _switch_on(state, k)]
 
+    # One line each, and every branch opens with ON or OFF. The old wording buried the new
+    # state mid-sentence ("no longer muted, but ..."), which reads as a toggle that did not
+    # fire — the flip is the one thing the user is checking for here.
     if paused:
-        msg = ("guard: audits are OFF for this session. Nothing is recommended when a turn "
-               "ends, and answers are no longer written to a file. `/guard:toggle on` arms "
-               "it again and the project's own settings are untouched.")
+        msg = "guard: audits OFF for this session. `/guard:toggle on` to arm."
     elif armed:
-        msg = ("guard: audits are ON for this session — "
-               + ", ".join(f"`{k}`" for k in armed) + ". They stay on until this session "
-               "ends; the next one starts muted again. Nothing else changed.")
+        msg = ("guard: audits ON for this session — "
+               + ", ".join(f"`{k}`" for k in armed) + ".")
     else:
         # Not "nothing will run": `ext-docs-auditor` has no switch, so a turn that writes a
         # saved reference is still named at Stop with every agent off. Overstating the silence
         # here is how a user reads that dispatch as guard ignoring their settings.
-        msg = ("guard: no longer muted, but every agent switch is `off` for this project, so "
-               "no audit of the turn itself will run — only a saved reference the turn writes "
-               "is still checked. `/guard:settings` is where you switch one on.")
+        msg = ("guard: audits ON for this session, but no agent is switched on — only saved "
+               "references are checked. `/guard:settings` to switch one on.")
     _emit_expansion(msg)
     _trace(project_dir, session_id, "toggle", "set", arg=arg or "flip", paused=paused)
     return 0
@@ -171,14 +172,22 @@ def cmd_status() -> int:
         return 0
 
     armed = [k for k in AUDIT_AGENTS if _switch_on(state, k)]
-    if _audit_paused(state):
-        # Muted is the state worth a colour: the user chose it and can forget it.
+    # The mute is a feature only because it is visible, so it decides the WORD in every
+    # branch — including the one where no agent is switched on. Ordering `armed` ahead of
+    # the mute, or letting the empty-roster case print the same dot either way, makes
+    # `/guard:toggle` a command with no observable effect on a project that has switched
+    # nothing on: the state flips and the segment does not move. That is indistinguishable
+    # from a broken toggle, which is how it was read.
+    if not armed:
+        # Nothing switched on for this project. Still not an error and still not worth
+        # shouting about, so it keeps the dim dot — but the dot follows the mute, so the
+        # toggle remains legible here too.
+        word = "guard ·" if _audit_paused(state) else "guard · on"
+        print(f"{_ANSI_IDLE}{word}{_ANSI_RESET}")
+    elif _audit_paused(state):
+        # Muted with agents configured is the state worth a colour: the user chose it and
+        # can forget it, and unlike the branch above there is something being held back.
         print(f"{_ANSI_MUTED}guard off{_ANSI_RESET}")
-    elif armed:
-        print(f"{_ANSI_ARMED}guard {len(armed)}{_ANSI_RESET}")
     else:
-        # Nothing switched on for this project: not an error and not something the user did
-        # this session, so it gets a dot rather than a word — "installed, idle" without
-        # asking for attention on every redraw.
-        print(f"{_ANSI_IDLE}guard ·{_ANSI_RESET}")
+        print(f"{_ANSI_ARMED}guard {len(armed)}{_ANSI_RESET}")
     return 0
