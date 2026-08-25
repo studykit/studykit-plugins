@@ -811,6 +811,45 @@ payloads, not memory.
   be called an auditor. The consequence: `comment-corrector on` means unattended edits to
   the files the turn just wrote, which is why its dispatch text tells the main agent to
   relay what was left unfixed.
+- **Only executable code settles a claim about behavior — v0.65.3.** Reported from use: in a
+  real session the auditor caught six errors in a turn and passed two claims sourced to
+  javadoc, which the user caught instead ("javadoc 믿으면 안되는데"). The rule is stated as a
+  property of the evidence rather than of the author, and aimed at the auditor in the second
+  person: prose about code describes intent at the moment it was written, the code moves and
+  the prose does not follow, so behavior is verified against the statements that execute and
+  prose is a pointer to where to look. Two carve-outs keep it from swallowing the cases where
+  prose is the subject — a claim *about* the prose is checked against the file, and saved
+  references still settle how something outside this repository behaves.
+
+  **What this change does NOT do, measured.** Six A/B trials against the definition it
+  replaced produced **no verdict change** — not one claim flipped between supported and
+  unsupported. Fixtures: a javadoc that lies outright; the truth two call-hops away in another
+  file; prose evidence never announced as such; the real session's shape reproduced (a *true*
+  conclusion resting on javadoc); the same with the citation pointing at the executing line so
+  no range-mismatch tell existed; and a fresh domain the rule does not name, run with each
+  definition in its own subagent that was never told an A/B was underway. The last two exist
+  because earlier trials were compromised — the rule's examples had quoted the fixture almost
+  verbatim, handing the auditor an answer key, and a single agent ran both arms knowing what
+  was being compared. Both flaws were removed and the result held.
+
+  The prior text already carried "inferring what a function does from ... a comment ... or a
+  docstring without reading the body" and "a cited `file:line` that does not actually
+  establish the claim counts as unsupported", and on every fixture those two were enough. So
+  do not restate this section as a detection improvement; the honest claim is narrower. What
+  it adds, and what the trials did show, is that the stale comment gets reported **as its own
+  finding** rather than only as the reason a claim failed — the answer that inherited a wrong
+  comment is a different problem from one that invented the behavior, the correction belongs
+  partly in the comment, and without that line the next reader walks into the same trap.
+
+  The reported miss is therefore probably not a missing rule. In that session the auditor
+  applied the surrounding rules correctly and still let the javadoc claims through, and what
+  distinguished them is that their conclusions were *true* — checking the conclusion found
+  nothing to disagree with. Hence the two-step test (does the cited location execute; do
+  those statements establish the claim **as written**), which routes around conclusion-checking
+  entirely, and the named shapes it catches: a guarantee credited to the wrong unit, and prose
+  broader than the body under it. Whether that helps is unproven — it is stated because the
+  failure it targets is real and was observed, not because a trial demonstrated the fix.
+
 - **`clarity-auditor` audits against a reader, and says so when it has none.** Its three
   axes are not symmetric in what they need. "Is there a concrete example" is answerable from
   the answer alone. "Is this term unexplained" needs the session — a term defined two turns

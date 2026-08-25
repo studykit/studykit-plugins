@@ -144,6 +144,60 @@ actual behavior:
 - building a conclusion on an earlier unverified assumption.
 
 A cited `file:line` that does not actually establish the claim counts as unsupported.
+
+**Prose about code is not evidence of what the code does — only the code is.** A comment,
+a docstring, a Javadoc block, a type name, a commit message, a changelog entry, a README
+or a design doc all describe intent at the moment someone wrote them; the code moves and
+they do not follow. So when a claim is about **behavior**, verify it against the
+statements that execute — the body, the branches, the call it actually makes — and treat
+the surrounding prose as a pointer to where to look, never as the answer. This binds you
+as much as the answer you are auditing: reading `/** Returns null if absent. */` and
+marking the claim supported is the same error as the response making it, and you are the
+step that was supposed to catch it.
+
+Mark such a claim unsupported when the code was never opened. When you open it and the
+prose contradicts what the code does, the claim is unsupported **and** the contradiction
+is worth a line in your report — the answer may have inherited a stale comment rather
+than invented the behavior, and that distinction is useful to whoever fixes it.
+
+**A true conclusion does not rescue prose evidence, and this is the case you will actually
+miss.** The dangerous shape is not a comment that lies outright; it is a comment that is
+*roughly* right, so the claim built on it reads as correct and nothing you check disagrees
+with it. Checking the conclusion is therefore not the test — the test is what the cited code
+establishes. Ask it in this order, and stop at the first no:
+
+1. Does the cited location contain executing statements, or only prose?
+2. Do those statements establish the claim **as written** — its scope, its guarantee, its
+   quantifier — or only something weaker that resembles it?
+
+A claim that fails either step is unsupported no matter how true its conclusion turns out to
+be, and you say so plainly: the finding is that the answer does not know what it asserted,
+which stays a defect after someone confirms the conclusion by other means.
+
+Two shapes to watch for, because a right-sounding conclusion is what hides them:
+
+- **The guarantee belongs to something else.** The cited unit is credited with an invariant
+  that something upstream or downstream of it actually holds — a validator credited to the
+  consumer that merely benefits from it, a check credited to the caller when the callee
+  performs it. Advice built on this inherits a promise the cited code never made, and it
+  holds only while the real source keeps holding; after this answer, nobody is watching that
+  source.
+- **The prose is broader than the code.** A comment states a general property and the body
+  implements one narrow case of it. The claim inherits the comment's breadth and is wrong at
+  exactly the edges a reader will reach for — the values, states, or inputs the narrow case
+  never covered.
+
+When the conclusion does hold but for a reason the answer never states, say both: the claim
+is unsupported as argued, and name the code that actually carries it. That is the correction
+the author needs — not a verdict that the sentence happens to be true.
+
+Two limits, so this does not overreach. Prose *is* the evidence when the claim is about
+the prose itself — that a comment says something, that an API documents a contract, that
+a decision was recorded — and there the file is what you check. And a saved reference
+under the refs directory remains evidence for how something **outside this repository**
+behaves, per the documentation rule below; what it cannot settle is what the code in
+front of you does.
+
 When a claim cites **official documentation**, the response must also point to a local
 saved copy under the refs directory (`refs_dir`); confirm that file exists and supports
 the claim — a docs claim with no existing local copy, or a missing path, is unsupported.
