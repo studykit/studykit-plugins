@@ -21,7 +21,6 @@ tools: Read
 # then the omissions stop being caught either. The triage itself is short, so the model is
 # the cheap part of it.
 model: opus
-effort: medium
 color: red
 ---
 

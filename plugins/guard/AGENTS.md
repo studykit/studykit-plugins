@@ -72,11 +72,17 @@ how the code here is organised.
 - The session mute is session-only, two-valued and visible. Do not grow it back into the
   persistent gate that was removed; if the indicator ever becomes unshippable, drop the mute
   rather than let it go invisible.
-- "Reports; edits nothing" is a promise in each agent's body, not something guard enforces.
-  `memory:` grants Write and Edit silently and the host does not scope the grant, so a
-  reporting agent *can* write anywhere; nothing refuses it. A `pre-write` hook did refuse it
-  and was removed deliberately — see `dev/design.md` before adding one back.
 - guard always exits 0 and fails open.
+
+## Deliberately not enforced
+
+`memory:` grants Write and Edit silently and the host does not scope the grant, so an agent
+that reports and never edits *can* write anywhere; nothing refuses it. "Reports; edits
+nothing" is a promise in each agent's body.
+
+A `PreToolUse` hook that refused those writes was built and then removed on request. It is
+not in the list below, because it worked — it was not abandoned for failing. Read
+`dev/design.md` for what the removal gave up before adding one back.
 
 ## Tried, and must not come back
 

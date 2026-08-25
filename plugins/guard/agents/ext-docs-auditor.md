@@ -15,7 +15,6 @@ tools: Read, Grep, Glob, Bash
 # the field also leaves Write and Edit off, which is what makes "edits nothing" a fact about
 # the tool list rather than a promise in prose. See `AGENTS.md`.
 model: opus
-effort: medium
 color: red
 ---
 

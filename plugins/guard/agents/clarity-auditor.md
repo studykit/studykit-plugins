@@ -22,8 +22,7 @@ tools: Read, Grep, Glob, Bash, SendMessage
 # (measured), so "reports; edits nothing" rests on the body below rather than on anything
 # that could refuse the write.
 memory: user
-model: sonnet
-effort: medium
+model: opus
 color: red
 ---
 

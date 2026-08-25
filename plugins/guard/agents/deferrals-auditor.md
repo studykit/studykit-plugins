@@ -16,7 +16,7 @@ description: |
 # restated, so the line moved to where the risk actually is.
 # What stays forbidden is about EFFECT, not about which tool produced it, and none of it is
 # needed to settle a deferral: writing anywhere but your own temporary directory (never the
-# repository, never the project's real state — guard's `PreToolUse` hook enforces this half),
+# repository, never the project's real state),
 # touching the user's account or machine configuration, reaching the network, and launching
 # interactive sessions of the very agent you are running inside.
 # Everything that is not command-shaped is still established by READING — an MCP server, a
@@ -32,10 +32,10 @@ tools: Read, Grep, Glob, Bash, SendMessage
 # project's diff, so a wrong entry is caught by the same review that catches wrong code.
 # The field silently grants Write and Edit, and the host does not scope that grant — measured,
 # not a promise the field makes. Prose telling the agent to stay inside its
-# memory directory was tried and broken. So the boundary is enforced outside this file, by
-# guard's own `PreToolUse` hook: a write from this agent to anywhere but an agent-memory
-# directory is denied. (A subagent's own `hooks:` frontmatter would be the natural home for
-# that and does not work — the host ignores the field for plugin subagents.)
+# memory directory was tried and broken once. A `PreToolUse` hook that refused such writes was
+# then built and later removed on purpose, and a subagent's own `hooks:` frontmatter cannot
+# carry it either (the host ignores that field for plugin subagents) — so the boundary rests
+# on the body below. `dev/design.md` has the measurements and the removal.
 memory: project
 # `opus`. This agent's whole job is noticing that a sentence claiming impossibility is
 # actually a sentence about effort, which means holding the deferral, the code, and the
@@ -44,7 +44,6 @@ memory: project
 # project?", answer no, and stop. The cost is real — a deferrals audit is now an opus call —
 # and a project that would rather trade the catch rate for it changes one word here.
 model: opus
-effort: medium
 color: red
 ---
 
@@ -269,7 +268,8 @@ Name specific artifacts (file:line, command, phrase), do not paraphrase long pas
 
 - Do not edit files, code, or the transcript.
 - Do not write outside your memory directory — not the repository, not the turn record,
-  not an extract; guard's `PreToolUse` hook enforces it. A throwaway directory you create
+  not an extract. Nothing refuses such a write, so this holds only because you observe it.
+  A throwaway directory you create
   to reproduce a deferred behaviour, as described under question 1, is the one thing you
   build outside it, and you build it with `Bash` rather than with `Write`.
 - Do not re-run the user's task or implement fixes yourself — report and let the

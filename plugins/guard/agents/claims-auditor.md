@@ -12,13 +12,12 @@ tools: Read, Grep, Glob, Bash, SendMessage
 # project's diff, so a wrong entry is caught by the same review that catches wrong code.
 # The field silently grants Write and Edit, and the host does not scope that grant — measured,
 # not a promise the field makes. Prose telling the agent to stay inside its
-# memory directory was tried and broken. So the boundary is enforced outside this file, by
-# guard's own `PreToolUse` hook: a write from this agent to anywhere but an agent-memory
-# directory is denied. (A subagent's own `hooks:` frontmatter would be the natural home for
-# that and does not work — the host ignores the field for plugin subagents.)
+# memory directory was tried and broken once. A `PreToolUse` hook that refused such writes was
+# then built and later removed on purpose, and a subagent's own `hooks:` frontmatter cannot
+# carry it either (the host ignores that field for plugin subagents) — so the boundary rests
+# on the body below. `dev/design.md` has the measurements and the removal.
 memory: project
-model: sonnet
-effort: medium
+model: opus
 color: red
 ---
 
@@ -266,7 +265,8 @@ Name specific artifacts (file:line, command, phrase), do not paraphrase long pas
 
 - Do not edit files, code, or the transcript.
 - Do not write anything outside your memory directory. The repository, the turn record
-  and every extract are read-only to you, and guard's `PreToolUse` hook enforces it.
+  and every extract are read-only to you. Nothing refuses such a write, so this holds
+  only because you observe it.
 - Do not re-run the user's task or implement fixes yourself — report and let the
   main agent act.
 - Do not omit the `inference` field, and do not fill it in from habit —

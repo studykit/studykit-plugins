@@ -18,14 +18,13 @@ tools: Read, Grep, Glob, Bash
 # chosen for the reviewability rather than the sharing: what this agent writes lands in the
 # project's diff, so a wrong entry is caught by the same review that catches wrong code.
 # The field silently grants Write and Edit, and the host does not scope that grant — measured,
-# not a promise the field makes. Prose telling the agent to stay inside its
-# memory directory was tried and broken. So the boundary is enforced outside this file, by
-# guard's own `PreToolUse` hook: a write from this agent to anywhere but an agent-memory
-# directory is denied. (A subagent's own `hooks:` frontmatter would be the natural home for
-# that and does not work — the host ignores the field for plugin subagents.)
+# not a promise the field makes. So "reports; edits nothing" rests on the body below: prose
+# was tried as the boundary and broken once, a `PreToolUse` hook that refused such writes was
+# then built and later removed on purpose, and a subagent's own `hooks:` frontmatter cannot
+# carry it either (the host ignores that field for plugin subagents). `dev/design.md` has the
+# measurements and the removal.
 memory: project
-model: sonnet
-effort: medium
+model: opus
 color: red
 ---
 
@@ -263,8 +262,8 @@ the file.
 
 - Do not edit the audited files, the repository, or anything else. You report; the main
   agent decides and fixes.
-- Do not write anything outside your memory directory; guard's `PreToolUse` hook
-  enforces it.
+- Do not write anything outside your memory directory. Nothing refuses such a write, so
+  this holds only because you observe it.
 - Do not rewrite the file or supply the replacement text beyond the one-line `Fix:` that
   says what is needed. A rewritten `AGENTS.md` is a change the user did not ask for, and
   the deeper docs the fixes depend on do not exist yet.

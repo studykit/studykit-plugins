@@ -9,8 +9,7 @@ tools: Read, Grep, Glob, Bash, Edit, Write, SendMessage
 # comment policy instead of re-reading where that policy is written, and a rule it inferred
 # wrongly then costs a diff on every later turn. What a run learns goes in the report, and
 # the user decides whether it is worth writing down.
-model: sonnet
-effort: medium
+model: opus
 color: yellow
 ---
 

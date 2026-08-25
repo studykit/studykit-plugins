@@ -11,7 +11,6 @@ tools: Read, Edit, Write, SendMessage
 # again. Terms to leave alone are visible in the file being corrected; a preference worth
 # keeping goes in the report, where the user can confirm it.
 model: opus
-effort: high
 color: red
 ---
 
