@@ -1,6 +1,6 @@
 {
   "name": "guard",
-  "version": "0.61.0",
+  "version": "0.62.0",
   "description": "When a turn ends, guard asks the session to run its router subagent over the response; the router names which audit agents would actually find something in it — unsupported claims, deferrals the repo could answer, explanation the reader cannot follow, unnatural Korean, comments in the source it edited, AGENTS.md/CLAUDE.md that drifted from a map into a payload, saved reference docs that filled up with local reasoning — each with a reason, and they run in parallel. A documentation agent reports what is already saved or fetches and saves the primary source, and a saved reference the turn wrote is checked by an auditor of its own. One switch per agent, all off until you turn one on, and on Claude Code every session starts muted until `/guard:toggle on` arms it. Claude Code and Codex. Requires Python 3.11+.",
   "author": {
     "name": "studykit"

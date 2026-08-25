@@ -25,6 +25,8 @@ wrote. Anything below that says "the turn" or "the response" is about the routed
 Every switch ships `off`, and a session additionally starts muted. guard installed is guard
 available, not guard running.
 
+`/guard:toggle` makes no model call either — its hook answers the user directly.
+
 ## Hard requirements
 
 guard has no Python dependencies but it does need **uv**. Both hook manifests and both
@@ -61,7 +63,9 @@ how the code here is organised.
 - Only a turn a person typed is audited. A non-human origin guard has never seen must still
   skip, while an *absent* origin must still audit — guard noisy is recoverable, guard silently
   dormant is not.
-- The recommendation is `additionalContext`; the refs-index gap is the one `decision: "block"`.
+- The recommendation is `additionalContext`; the refs-index gap is the one `decision: "block"`
+  that means unfinished work. `/guard:toggle` is also a block, for an unrelated reason — see
+  `dev/design.md` on Stop vs. `UserPromptExpansion` block semantics before changing either.
 - It names **agents**, never guard's own skills — those are the user's entry point, so a hook
   must not reach through them.
 - The three edited-file lists stay disjoint, and the refs test runs first, by location.
@@ -86,8 +90,10 @@ each one cost.
 - A `.ko-fix.md` rewrite file beside the answer.
 - A `UserPromptExpansion` matcher with no command file of that name behind it: the host
   answers `Unknown command` before the hook runs, silently, which is how four of guard's
-  matchers ended up orphaned. There is no per-agent on-demand command on Claude any more;
-  Codex keeps its own path, which is why the turn marker is still written on every Stop.
+  matchers ended up orphaned — `toggle`'s command file does exist, which is why it still
+  fires, and it must stay even though its body never runs. There is no per-agent on-demand
+  command on Claude any more; Codex keeps its own path, which is why the turn marker is
+  still written on every Stop.
 
 ## Codex
 

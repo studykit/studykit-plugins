@@ -6,8 +6,10 @@ cannot change what the project does by default. A session STARTS muted
 (``state._read_state``), which makes ``on`` the common direction: it clears the pause and is
 the only thing that ever does. An empty argument flips. While muted, ``stop`` recommends
 nothing and ``user-prompt`` names no answer file, but the pending target and the answer file
-are still recorded — the Codex adapter reads that marker. The hook does the work and prints
-the resulting state; the command file only relays it.
+are still recorded — the Codex adapter reads that marker. The hook does the work and blocks
+the expansion, so its message reaches the user directly and no model is invoked to relay a
+sentence the hook has already finished (see ``emit._emit_expansion``); the command file
+exists to make the matcher reachable at all, and its body never runs.
 
 ``status`` (CLI, stdin JSON) is the other half, and starting muted is what makes it
 load-bearing rather than a convenience: the mute is a feature only because it is visible, and
@@ -55,7 +57,8 @@ def cmd_toggle() -> int:
     The hook does the work rather than telling the model to: `command_args` carries the
     argument (hooks docs, excerpt in the refs dir as `claude-code-statusline.md`), so no
     argument means flip, `on`/`off` set it outright, and the outcome does not depend on a
-    model reading a procedure correctly.
+    model reading a procedure correctly. Nothing here is addressed to a model — the
+    expansion is blocked, so every string below is read by a person.
 
     Session state only. It cannot touch guard.local.json, which is what makes this safe to
     reach for mid-conversation: it cannot change what any other session does. And since every
@@ -74,7 +77,7 @@ def cmd_toggle() -> int:
     if project_dir is None:
         _emit_expansion(
             "guard: no project directory resolved, so there is no session state to write. "
-            "Nothing changed — say so in one line rather than reporting the mute."
+            "Nothing changed — the session is still in whatever state it was in."
         )
         return 0
     session_id = _session_id(payload)
@@ -96,7 +99,7 @@ def cmd_toggle() -> int:
     else:
         _emit_expansion(
             f"guard: `{arg}` is not an argument for /guard:toggle — use `on`, `off`, or "
-            "nothing to flip. Nothing changed; say so in one line."
+            "nothing to flip. Nothing changed."
         )
         return 0
 
@@ -119,7 +122,7 @@ def cmd_toggle() -> int:
         msg = ("guard: no longer muted, but every agent switch is `off` for this project, so "
                "no audit of the turn itself will run — only a saved reference the turn writes "
                "is still checked. `/guard:settings` is where you switch one on.")
-    _emit_expansion(msg + " Relay this in one line and do nothing else.")
+    _emit_expansion(msg)
     _trace(project_dir, session_id, "toggle", "set", arg=arg or "flip", paused=paused)
     return 0
 

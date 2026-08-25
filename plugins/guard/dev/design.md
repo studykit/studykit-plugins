@@ -70,7 +70,7 @@ there is nothing shared to factor out beyond the state root.
 | `Stop` | `stop` | Write the response section of the turn record and mark the turn as the on-demand target — always (only Codex reads that marker now; see below). Then, when any agent is not `off`, emit `additionalContext` asking the main agent to dispatch `guard:router` over the record, carrying the eligible agents with their modes and this turn's paths. The router names sections of `hooks/context/dispatch-playbook.md`; the main agent follows those, completing the record's second section only if a named section asks for it. `comment-corrector` never goes to the router: it is dispatched directly in the same emission, to be sent in the same message — see the invariant below. A third block names `ext-docs-auditor` over the refs files the turn wrote; it has no switch, so it can be the only block a turn produces. |
 | `SessionStart` | `session-start` | Sweep state and turn records past retention, export `GUARD_REFS_DIR`, state the refs rule as session context, say once — when any agent is on — either that the session opened muted (the usual case; `/guard:toggle on` arms it) or that audits are on and where the dispatch playbook is, and — when any agent is in `reuse` — state the standing reuse policy once. |
 | (called via Bash, not a hook) | `transcript` | `index` / `turn` / `find` over the session transcript, for the audit agents. Writes an extract file and prints only its path plus a one-line summary; `--since` / `--until` / `--last` bound which turns are scanned. |
-| `UserPromptExpansion` (`^(guard:)?toggle$`) | `toggle` | Arm/mute the automatic audit for THIS session (`audit_paused`, session state only — never guard.local.json). A session starts muted, so `on` is the arming direction and the common one. `command_args` carries `on`/`off`; empty flips. The hook does the work and prints the result. |
+| `UserPromptExpansion` (`^(guard:)?toggle$`) | `toggle` | Arm/mute the automatic audit for THIS session (`audit_paused`, session state only — never guard.local.json). A session starts muted, so `on` is the arming direction and the common one. `command_args` carries `on`/`off`; empty flips. The hook does the work and then **blocks the expansion**, so its message reaches the user directly and no model is invoked — the command file exists only to make the matcher reachable, and its body never runs. |
 | (called via Bash, not a hook) | `status` | Status-line segment: `guard <n>` / `guard off` / `guard ·`, or nothing on any failure. Reads one state file; runs on every assistant message. |
 | (called via Bash, not a hook) | `refs-dir` | Print the resolved refs directory (auditor fallback; applies `refs_dir` validation). |
 
@@ -230,6 +230,18 @@ payloads, not memory.
   `wiki/ref/claude-code-stop-hook-decision-control.md`, fetched 2026-08-21. This is why
   guard's recommendation is `additionalContext` and its refs-index gap is still a block:
   one is guidance from a working hook, the other is unfinished work.
+
+  **That reading is about Stop, and does not carry to `UserPromptExpansion`.** On Stop the
+  two forms are presentation — both continue the turn — so the choice is free to express
+  what guard means. On the expansion event they are not interchangeable at all:
+  `additionalContext` is added "alongside the expanded prompt" for Claude to act on, while
+  `decision: "block"` ends the turn and shows `reason` to the user. So `/guard:toggle` is
+  a block for a reason that has nothing to do with unfinished work — it is the only shape
+  that delivers a finished sentence without paying for a model call. Source: official hooks
+  docs (https://code.claude.com/docs/en/hooks.md, "UserPromptExpansion decision control"),
+  excerpt at `wiki/ref/claude-code-userpromptexpansion-hook.md`, fetched 2026-08-25. Note
+  the docs say "the turn ends"; they never describe the model-call lifecycle, so zero
+  inference is an inference, not a quoted guarantee.
 - **`memory: <scope>` gives a subagent a persistent store, and silently gives it Write and
   Edit.** Scopes and directories: `user` → `~/.claude/agent-memory/<agent>/`, `project` →
   `.claude/agent-memory/<agent>/`, `local` → `.claude/agent-memory-local/<agent>/`; the
