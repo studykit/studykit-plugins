@@ -5,6 +5,7 @@ tools: Read, Grep, Glob, Bash
 model: sonnet
 effort: medium
 color: orange
+memory: project
 ---
 
 # Plugin agent-definition auditor
