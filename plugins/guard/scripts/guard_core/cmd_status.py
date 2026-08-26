@@ -96,20 +96,27 @@ def _mute_sentence(state: dict, paused: bool, arm_hint: str) -> str:
     """The one description of a session's mute, for reporting it and for changing it.
 
     Split from ``_apply_toggle`` because the CLI's ``status`` verb reports without writing,
-    and the copy it used to keep drifted from this one — same three sentences, different
-    formatting of the agent list. A reader comparing ``guard on`` with ``guard status`` saw
-    two answers and no way to tell which reflected the state.
+    and the copy it used to keep drifted from this one. A reader comparing ``guard on`` with
+    ``guard status`` saw two answers and no way to tell which reflected the state.
 
     One line each, and every branch opens with ON or OFF. The old wording buried the new
     state mid-sentence ("no longer muted, but ..."), which reads as a toggle that did not
     fire — the flip is the one thing the user is checking for here.
+
+    ON or OFF, and nothing about the roster. Neither the names nor a count belongs here:
+    which agents run is the router's answer, decided per turn against what the turn actually
+    contains, so anything stated at toggle time describes a different question than the one
+    the user will see answered. A roster restated here is also a second copy to drift.
+    ``/guard:settings`` is where the switches live.
+
+    The one exception is having nothing switched on, which is not a roster detail but a
+    different outcome — the turn-reading agents cannot run at all — and saying so is what
+    stops `guard on` from promising an audit that will not come.
     """
-    armed = [k for k in AUDIT_AGENTS if _switch_on(state, k)]
     if paused:
         return f"guard: audits OFF for this session. `{arm_hint}` to arm."
-    if armed:
-        return ("guard: audits ON for this session — "
-                + ", ".join(f"`{k}`" for k in armed) + ".")
+    if any(_switch_on(state, k) for k in AUDIT_AGENTS):
+        return "guard: audits ON for this session."
     # Not "nothing will run": `ext-docs-auditor` has no switch, so a turn that writes a
     # saved reference is still named at Stop with every agent off. Overstating the silence
     # here is how a user reads that dispatch as guard ignoring their settings.

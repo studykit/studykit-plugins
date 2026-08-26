@@ -374,6 +374,16 @@ payloads, not memory.
   inside a session prints the state, which the function form could not have done. It also
   behaves the way a command is expected to, `command -v` included.
 
+  **The toggle says ON or OFF and nothing about the roster.** It listed the switched-on
+  agents at first, then their count; both are gone. Which agents run is the router's answer,
+  decided per turn against what the turn contains, so a roster stated at toggle time
+  describes a different question than the one the user sees answered — and is a second copy
+  of the roster to drift. The one thing kept is "no agent is switched on", which is not a
+  roster detail but a different outcome: the turn-reading agents cannot run at all, and
+  saying so is what stops `guard on` from promising an audit that will not come. The
+  status-line segment still shows a count; it is a different surface, read continuously
+  rather than at the moment of a decision.
+
   Prepending one directory holding one command is not "reordering the user's PATH", which
   is what an earlier draft of this bullet claimed as the reason to avoid it. A user who
   already has a `guard` on their PATH has a genuine collision; `GUARD_TOGGLE_NAME` changes
@@ -1225,7 +1235,9 @@ echo '{"session_id":"s1","command_args":"on"}' | "$H" toggle > /dev/null
 # The last two are the reason this verb exists: it must never be silent, because a person is
 # reading it and silence reads as success. Both must PRINT and exit non-zero.
 CLAUDE_CODE_SESSION_ID=s1 "$H" toggle-cli status   # -> one line; exit 0
-CLAUDE_CODE_SESSION_ID=s1 "$H" toggle-cli on       # -> "audits ON ... `claims-auditor`, ..."
+CLAUDE_CODE_SESSION_ID=s1 "$H" toggle-cli on       # -> "audits ON for this session." and
+                                                   #    NOTHING about which agents — the
+                                                   #    router names those, per turn
 CLAUDE_CODE_SESSION_ID=s1 "$H" toggle-cli status   # -> the SAME sentence as the line above;
                                                    #    a difference here means the report
                                                    #    path and the write path have drifted
