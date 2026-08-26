@@ -1,7 +1,6 @@
 ---
 name: clarity-auditor
-description: |
-  Audits one finished turn for whether its intended reader can follow it. Reports; edits nothing.
+description: Clarity auditor.
 # What each tool is FOR, not a limit on it — the host injects a standing instruction to route
 # work through `Bash` wherever it can do the job, so a comment here narrowing `Bash` to a
 # purpose list would be contradicted on every turn and is not written that way.

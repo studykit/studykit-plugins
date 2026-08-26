@@ -1,7 +1,6 @@
 ---
 name: deferrals-auditor
-description: |
-  Audits one finished turn for work punted as TBD that the repository could have answered, or that it documents a way to test. Reports; edits nothing.
+description: Deferrals auditor.
 # `Bash` carries three things worth naming, and naming them is not narrowing them: guard's
 # `transcript` extractor, checking whether a named command exists on this machine (asked the
 # way this platform asks it), and reproducing a deferred behaviour inside a throwaway

@@ -1,7 +1,6 @@
 ---
 name: agents-md-auditor
-description: |
-  Audits the `AGENTS.md` / `CLAUDE.md` files it is given. Reports; edits nothing.
+description: `AGENTS.md` auditor.
 # `Read` for the files under audit and for whatever they point at — a pointer is only good
 # if the thing on the other end exists and answers the question. `Grep`/`Glob` settle the
 # axis that separates this agent from a style checker: whether a sentence in the file is

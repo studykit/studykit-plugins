@@ -1,7 +1,6 @@
 ---
 name: router
-description: |
-  Triages one finished turn and names which of guard's audit agents would find something in it. Names them; dispatches nothing.
+description: Audit router.
 # `Read` for the two files it is pointed at — the answer and the request — plus `Bash` for
 # two of guard's own commands: `guard-inputs`, which turns the turn id it is given into
 # those paths, and `guard-candidates`, which tells it which agents it may name. Both are

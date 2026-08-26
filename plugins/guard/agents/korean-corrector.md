@@ -1,7 +1,6 @@
 ---
 name: korean-corrector
-description: |
-  Corrects the Korean prose of one answer file in place, and reports each fix.
+description: Korean prose corrector.
 # `Read` and `Edit` for the answer file — its input is the answer the user is about to be
 # shown, so a correction belongs in that file and not in a second one the reader would
 # have to be talked into opening. It judges prose, so it needs no search or shell access.

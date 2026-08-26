@@ -1,7 +1,6 @@
 ---
 name: ext-docs-auditor
-description: |
-  Audits the saved reference files it is given against what a reference may contain. Reports; edits nothing.
+description: Saved-reference auditor.
 # `Read`/`Grep`/`Glob` for the refs directory and the repository it searches to tell an
 # external fact from a local one; `Bash` for `refs-dir` and for `git log` on a file whose
 # history says when a passage arrived.
