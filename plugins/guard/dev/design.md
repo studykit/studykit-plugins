@@ -432,6 +432,29 @@ payloads, not memory.
   router still returned picks — so it reached the command through its own definition rather
   than through anything the caller passed.
 
+- **`guard-inputs` takes the same argument one step further: the routed dispatch is now the
+  turn id and nothing else.** Those four remaining fields were all derivable from that id
+  plus the session — the playbook from the plugin root, the answer and request files from
+  `turnrec`'s layout, the transcript from what `cmd_stop` already records in session state —
+  and the main agent derived none of them. It relayed them, into a dispatch it composes
+  itself, which is the step that can only lose fidelity. `- turn: <id>` replaces the lot.
+
+  Two things this buys beyond the context. The layout goes back to the code that owns it: a
+  dispatch spelling out `{turn dir}/<name>` was a second copy of `turnrec`'s layout written
+  in prose, and a drifted copy of a path reads nothing and clears every turn silently. And
+  the paths are produced by the same functions that create the files, so the agent opening
+  one cannot be handed a path assembled by a party that never opens it.
+
+  The transcript is the one field guard cannot derive, because it is the host's path handed
+  to the Stop hook in its payload — so the verb reads it back from session state, and says
+  on stderr when a session has none. An agent that needs history must be able to tell "no
+  transcript" from "I built the path wrong"; those two look identical if the verb is silent.
+
+  The fallback is the whole old field list, sent when `shell/bin/guard-inputs` is not on
+  disk. It is larger than the `guard-candidates` fallback because there is more to replace,
+  and it keeps the `needs_history` test: whether any agent on THIS dispatch wants history is
+  the one thing the verb cannot know, since it is asked about a turn, not about a roster.
+
   Two things this verb does differently from everything else in guard, both deliberate:
 
   - **It does not fail open.** Every other subcommand swallows its own exceptions, because

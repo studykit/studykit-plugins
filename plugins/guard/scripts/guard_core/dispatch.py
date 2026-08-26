@@ -91,6 +91,9 @@ CLI_REL = "scripts/guard_hook.py"
 
 # The `guard-candidates` wrapper, when SessionStart got it onto PATH.
 SHELL_CANDIDATES_REL = "shell/bin/guard-candidates"
+# The `guard-inputs` wrapper, which derives a turn's paths from its id. Its presence is what
+# lets the dispatch carry the id alone instead of the paths themselves.
+SHELL_INPUTS_REL = "shell/bin/guard-inputs"
 
 
 def _candidates_cmd() -> str:
@@ -192,61 +195,34 @@ def _router_context(project_dir: Path, session_id: str, prompt_id: str, lead: st
     one setting whose failure is invisible, since a router that stops naming an agent looks
     exactly like a turn with nothing in it.
     """
-    fields = [f"- playbook: {_playbook_path()}"]
-    # The two turn files share a long absolute prefix, so it is spelled ONCE and each file
-    # is named relative to it as `{turn dir}/<name>`. The placeholder is written into the
-    # value rather than explained anywhere: a dispatch that shows the substitution needs no
-    # prose about it, and the layout itself stays in `_turn_record_file` /
-    # `_turn_request_file` — a router told how to BUILD these paths would be a second copy
-    # of that layout, in prose, and a drifted copy reads nothing and clears every turn.
+    # ONE field: the turn id. Everything else the agent needs — the playbook, the answer
+    # file, the request file beside it, the transcript and the turn to look up in it — is
+    # derivable from that id plus the session, so `guard-inputs` derives them and the agent
+    # runs it. What this replaces is the main agent relaying four absolute paths it never
+    # opens: text paid for in its context on every routed turn, and a copy step whose only
+    # possible contribution is to get one wrong.
     #
-    # Emitted in the same shape whether or not the request file exists. The dir form is a
-    # few characters longer than one plain absolute path, and paying those is worth more
-    # than giving the router two input shapes to tell apart.
-    answer = _turn_record_file(project_dir, session_id, prompt_id).resolve()
-    fields.append(f"- turn dir: {answer.parent}")
-    # Unconditional: every candidate reaching the router is a `reads="turn"` agent, so the
-    # answer file is always the thing being routed on. The file-reading agents are
-    # dispatched around the router (see `cmd_stop`) and their path lists go with that
-    # dispatch, which is why no candidate line here carries a path.
-    fields.append(f"- answer file: {{turn dir}}/{answer.name}")
-    # The user's own words, for the ROUTER and no other agent. Its one judgment is
-    # materiality, and materiality is relative to what was asked: the same explanatory
-    # paragraph is the answer's substance when the user asked how something works, and
-    # padding when they asked for a one-line setting change. Routing on the answer alone
-    # cannot separate those, and it fails in the expensive direction — a turn that merely
-    # READS like an explanation draws agents that find nothing, which is what teaches the
-    # user to wave the recommendation through. What the request may and may not do with a
-    # pick is stated in `agents/router.md`, read once by the router, not here, where it
-    # would be paid on every routed turn. Conditional on the file existing because
-    # `cmd_user_prompt` is what writes it: a turn it never saw still routes on the answer.
-    # The hook decides that, not the router — absence learned from a failed Read cannot be
-    # told apart from a path the router built wrong, and that failure is silent.
-    request = _turn_request_file(project_dir, session_id, prompt_id).resolve()
-    if request.is_file():
-        fields.append(f"- request file: {{turn dir}}/{request.name}")
-    # The roster is a COMMAND, not a list. It is read by the router and by nothing else —
-    # the main agent dispatches the router and then follows whatever sections the report
-    # names, so a roster printed here is text it pays for on every routed turn and never
-    # acts on. Worse, it is text that invites acting on: a main agent holding the list of
-    # eligible agents can skip the router and dispatch from it directly, which is the one
-    # shortcut that silently removes triage from the loop.
-    #
-    # Nothing about it is said here AT ALL when the wrapper ships, which is the normal case.
-    # Naming the command in the dispatch made the main agent relay an instruction addressed
-    # to someone else — it does not run the command, so every character was read by the
-    # wrong party, and shortening the string only made that cheaper rather than stopping it.
-    # A fixed command needs no relay: `agents/router.md` names `guard-candidates` itself,
-    # read once by its only caller. What stays turn-specific is nothing, so nothing is sent.
-    #
-    # The fallback line is for a tree without the wrapper, where the router's own definition
-    # would name a command that is not there. Then, and only then, the caller supplies the
-    # long form — the router is told to pick nothing when the command fails, so a missing
-    # wrapper would otherwise clear every turn silently.
-    if not (_plugin_root() / SHELL_CANDIDATES_REL).is_file():
-        fields.append(f"- candidates: run `{_candidates_cmd()}`")
-    if transcript and any(AUDIT_AGENTS[k].needs_history for k in eligible):
-        fields.append(f"- history: transcript {transcript}, turn {prompt_id}")
+    # It also puts the layout back with the code that owns it. A dispatch that spelled the
+    # turn directory out was a second copy of `turnrec`'s layout, in prose, and a drifted
+    # copy reads nothing and clears every turn silently.
+    fields = [f"- turn: {prompt_id}"]
+    # The fallback for a tree without the wrapper, where the agent's own definition would
+    # name a command that is not there. Then the caller must supply what it can, in the old
+    # shape, because nothing downstream can derive it.
+    if not (_plugin_root() / SHELL_INPUTS_REL).is_file():
+        answer = _turn_record_file(project_dir, session_id, prompt_id).resolve()
+        fields.append(f"- playbook: {_playbook_path()}")
+        fields.append(f"- turn dir: {answer.parent}")
+        fields.append(f"- answer file: {{turn dir}}/{answer.name}")
+        request = _turn_request_file(project_dir, session_id, prompt_id).resolve()
+        if request.is_file():
+            fields.append(f"- request file: {{turn dir}}/{request.name}")
+        # Inside the fallback too: `guard-inputs` prints the transcript from what `cmd_stop`
+        # recorded in session state, so with the wrapper present this line is the same fact
+        # a second time. The `needs_history` test stays because it is the one thing the
+        # verb cannot know — whether any agent on THIS dispatch will want history at all.
+        if transcript and any(AUDIT_AGENTS[k].needs_history for k in eligible):
+            fields.append(f"- history: transcript {transcript}, turn {prompt_id}")
     return lead + "\n\n" + "\n".join(fields)
 
 

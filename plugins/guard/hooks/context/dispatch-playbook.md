@@ -36,8 +36,10 @@ Never relay an agent's English report to the user untranslated: say in the user'
 what changed.
 
 This file exists so that text is stored once and read only when a turn actually gets
-routed. Guard's hook output is paid for in your context on every turn, so it carries only
-what changes per turn: the paths, which agents are switched on, and what mode each is in.
+routed. Guard's hook output is paid for in your context on every turn, so it carries as
+little as it can: on a routed turn, the turn id alone. The paths that go with it — this
+file, the answer file, the transcript — come from `guard-inputs <turn id>`, run by whoever
+opens them rather than relayed through you. The router's report names them for you.
 
 ## The answer file, and the session's history
 
@@ -56,14 +58,17 @@ properly next time.
 
 The **session's history** — what the user asked, what this turn ran, what an earlier turn
 established — is in the transcript, and an agent that needs it extracts what it needs
-itself. When the dispatch that sent you here included a transcript path and a turn id, pass
-both straight through to any agent whose section says it may need history, along with the
-extractor: `scripts/guard_hook.py` in the plugin directory holding this playbook — this file
+itself. Pass the turn id straight through to any agent whose section says it may need
+history, and let it run `guard-inputs <turn id>` for the transcript path the same way you
+would. **Do not run the extraction yourself and do not summarize the session for the
+agent.** Gathering it here would put the largest cost of an audit in the context the user is
+talking to, before anything is known to need it.
+
+When the dispatch that sent you here named a transcript path and a turn id directly — an
+older caller, or a tree without `guard-inputs` — pass both through instead, along with the
+extractor: `scripts/guard_hook.py` in the plugin directory holding this playbook. This file
 is `hooks/context/dispatch-playbook.md`, so it is `../../scripts/guard_hook.py` from here,
-and you know this file's absolute path because you were given it. **Do not run the extraction
-yourself and do not summarize the session for the agent.** Gathering it here would put the
-largest cost of an audit in the context the user is talking to, before anything is known to
-need it.
+and you know this file's absolute path because you were given it.
 
 **Fallback.** An agent can fail to get an extract — no transcript path was passed, the file
 is gone, the turn id is not in it, a compaction dropped the range. It is then allowed to

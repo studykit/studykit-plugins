@@ -3,7 +3,8 @@ name: router
 description: |
   Triages one finished turn and names which of guard's audit agents would find something in it. Names them; dispatches nothing.
 # `Read` for the two files it is pointed at — the answer and the request — plus `Bash` for
-# exactly one command: guard's `candidates` verb, which tells it which agents it may name.
+# two of guard's own commands: `guard-inputs`, which turns the turn id it is given into
+# those paths, and `guard-candidates`, which tells it which agents it may name.
 # That roster used to arrive in the dispatch, which meant it was also sitting in the MAIN
 # agent's context on every routed turn — paid for by a reader that never acts on it, and an
 # invitation to skip the router and dispatch from the list directly. Fetching it here keeps
@@ -43,12 +44,21 @@ subagent and a key omitted ships the defect.
 
 ## Inputs
 
-The dispatch hands you:
+The dispatch hands you one thing: **the turn id**, as `- turn: <id>`. Run
+`guard-inputs <id>` — it is on your `PATH` — and it prints the rest, one `key: value` per
+line: `playbook`, `answer file`, `request file` when the turn has one, and `transcript` plus
+`turn` when history is available. The paths are absolute; read them as printed.
 
-- **turn dir** — the directory both files below live in. They are named relative to it, as
-  `{turn dir}/<name>`: put this path where the placeholder is to get the absolute path you
-  read. It is spelled once because both files share it and this block is paid for on every
-  routed turn, including the many you then clear.
+Run it first, before you decide anything. If it fails or prints no answer file, say so in
+one line and pick nothing — do not go looking for guard's files yourself, because a path you
+built by guessing at the layout points somewhere that reads as an empty turn.
+
+An older caller may pass the paths directly instead, as `playbook:`, `turn dir:`,
+`answer file:` and `history:` lines, with the two files named relative to the turn directory
+as `{turn dir}/<name>`. When it does, use what it gave you and skip the command.
+
+What each one is:
+
 - **answer file** — the answer this turn is giving, written during the turn by the session
   that gave it. This is your evidence, and the only thing that can put an agent on the list:
   an agent is worth running because of something the *assistant* wrote, never because of
@@ -75,10 +85,10 @@ The dispatch hands you:
   second limit still binds it, and so does materiality: what the request settles is the
   *language*, never whether the turn has enough substance to be worth the agent. Its own
   section below says how.
-- **playbook** — the path to guard's dispatch playbook. You do not need to read it to
-  triage, and reading a candidate's section will not help you decide; what you need it for
-  is your answer, which names this path and the sections in it. Read a section only if you
-  genuinely cannot tell what a key refers to.
+- **playbook** — guard's dispatch playbook. You do not need to read it to triage, and
+  reading a candidate's section will not help you decide; what you need it for is your
+  answer, which names this path and the sections in it. Read a section only if you genuinely
+  cannot tell what a key refers to.
 - **candidates** — not something you are given. Run `guard-candidates`, and each line it
   prints is one candidate as `key=mode`. It is on your `PATH` and takes no argument; it
   works out which session it belongs to by itself.
@@ -247,14 +257,19 @@ the playbook path filled in, because your caller still has to close the turn out
 none — nothing in this turn for any candidate. No corrections; go straight to `Presenting the result` in <playbook path> and say nothing about auditing.
 ```
 
-**When you pick one or more**, name the playbook and the sections, then one line per pick in
-the order `candidates` printed them in:
+**When you pick one or more**, name the playbook, the answer file and the sections, then one
+line per pick in the order `candidates` printed them in:
 
 ```
-Follow <playbook path>, these sections in this order, then `Presenting the result`:
+Follow <playbook path>, these sections in this order, then `Presenting the result`.
+Answer file: <answer file path>
 - `claims-auditor` — asserts "Redis가 Postgres보다 항상 빠릅니다" as settled fact
 - `korean-corrector` — the whole explanation is Korean prose
 ```
+
+Both paths verbatim as `guard-inputs` printed them. Your caller was given the turn id and
+nothing else, so these are how it reaches the file it must correct and translate — a path
+you retype from memory or shorten is one it cannot open.
 
 The order matters and it is the order you were given: the read-only auditors before the
 correctors, so a corrector never rewrites a sentence an auditor was about to flag.

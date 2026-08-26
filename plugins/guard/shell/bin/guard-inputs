@@ -1,0 +1,20 @@
+#!/bin/sh
+# guard-inputs — print the per-turn paths for the turn you were sent to work on.
+#
+#   guard-inputs <turn-id>
+#
+# For an agent guard dispatched, and for nothing else. It exists so the dispatch can carry
+# the turn id alone: the playbook, the answer file, the request file and the transcript are
+# all derivable from it, and having the main agent spell them out made it relay four
+# absolute paths it never opens — text read by the wrong party, and a copy step that can
+# only lose fidelity.
+#
+# Same PATH as `guard` and `guard-candidates`, put there by the SessionStart hook. A
+# subagent's Bash inherits it, and carries the PARENT session's CLAUDE_CODE_SESSION_ID,
+# which is what lets this find the session state the hooks wrote.
+if [ -z "$GUARD_TOGGLE_CLI" ] || [ ! -f "$GUARD_TOGGLE_CLI" ]; then
+  echo "guard-inputs: GUARD_TOGGLE_CLI is unset or missing — this command works inside a Claude Code session." >&2
+  exit 1
+fi
+
+exec uv run --script "$GUARD_TOGGLE_CLI" inputs "$@"
