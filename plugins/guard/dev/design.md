@@ -403,6 +403,35 @@ payloads, not memory.
   location, so a `guard` inherited by a subprocess still reaches the session's own plugin
   copy.
 
+- **`guard-candidates` is on that PATH for the router, and it removes the roster line from
+  the dispatch entirely.** Moving the roster out of the main agent's context is why the
+  `candidates` verb exists at all — the Stop hook printed the command instead of the answer,
+  and the router ran it. But printing the command was still the main agent relaying an
+  instruction addressed to someone else: it never runs it, so every character was read by
+  the wrong party. Shortening the string to a bare name made that cheaper without stopping
+  it. The fix is that a FIXED command needs no relay at all — `agents/router.md` names
+  `guard-candidates` itself, read once by its only caller — so the hook now sends nothing
+  about the roster, and the dispatch carries four fields: playbook, turn dir, answer file,
+  history.
+
+  It needs no new plumbing: `_add_shell_command_to_path` already puts the directory on the
+  session's PATH, and a subagent's Bash inherits it exactly as a subprocess inherits
+  `guard` — the same property that made an executable the right choice over a shell
+  function. It reads `$GUARD_TOGGLE_CLI` for the same reason `guard` does, so the router
+  cannot address a different plugin copy than the hooks did.
+
+  The one case that still sends a line is a tree where `shell/bin/guard-candidates` is not
+  on disk, because there the router's own definition would name a command that is not
+  there. The check is for a partial install, not for PATH. It matters because the router is
+  instructed to pick nothing when this command fails: a missing wrapper with no fallback
+  would clear every turn silently, which is under-auditing that looks exactly like a clean
+  run.
+
+  Measured in a real session with the wrapper present: the Stop hook's dispatch listed
+  `playbook`, `turn dir`, `answer file` and `history` and no `candidates` line, and the
+  router still returned picks — so it reached the command through its own definition rather
+  than through anything the caller passed.
+
   Two things this verb does differently from everything else in guard, both deliberate:
 
   - **It does not fail open.** Every other subcommand swallows its own exceptions, because

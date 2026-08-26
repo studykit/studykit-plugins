@@ -89,8 +89,25 @@ def _playbook_path() -> Path:
 # surviving whatever installed it.
 CLI_REL = "scripts/guard_hook.py"
 
+# The `guard-candidates` wrapper, when SessionStart got it onto PATH.
+SHELL_CANDIDATES_REL = "shell/bin/guard-candidates"
+
 
 def _candidates_cmd() -> str:
+    """The command that produces the router's roster.
+
+    Two callers with opposite needs, which is why this returns a string rather than being
+    inlined. `agents/router.md` names `guard-candidates` itself and needs nothing from here;
+    `_router_context` calls this only for the FALLBACK line it sends when that wrapper is
+    absent, and then the long form is the only thing that can work.
+
+    The short form needs no PATH lookup by this process: `_add_shell_command_to_path` put
+    the directory on the session's PATH at SessionStart, and a subagent's Bash inherits it
+    the way it inherits `guard`. What is checked is only that the file SHIPPED — a partial
+    install, or a tree where it was never added.
+    """
+    if (_plugin_root() / SHELL_CANDIDATES_REL).is_file():
+        return "guard-candidates"
     return f'uv run --script "{_plugin_root() / CLI_REL}" candidates'
 
 
@@ -215,11 +232,19 @@ def _router_context(project_dir: Path, session_id: str, prompt_id: str, lead: st
     # eligible agents can skip the router and dispatch from it directly, which is the one
     # shortcut that silently removes triage from the loop.
     #
-    # So the verb goes in the dispatch and the answer stays out of it. The router runs it,
-    # gets the switches first-hand from the same `_eligible_agents` this hook would have
-    # called, and needs no identifier to do so — `cmd_candidates` reads
-    # `CLAUDE_CODE_SESSION_ID`, which a subagent's Bash carries as the PARENT session's id.
-    fields.append(f"- candidates: run `{_candidates_cmd()}`")
+    # Nothing about it is said here AT ALL when the wrapper ships, which is the normal case.
+    # Naming the command in the dispatch made the main agent relay an instruction addressed
+    # to someone else — it does not run the command, so every character was read by the
+    # wrong party, and shortening the string only made that cheaper rather than stopping it.
+    # A fixed command needs no relay: `agents/router.md` names `guard-candidates` itself,
+    # read once by its only caller. What stays turn-specific is nothing, so nothing is sent.
+    #
+    # The fallback line is for a tree without the wrapper, where the router's own definition
+    # would name a command that is not there. Then, and only then, the caller supplies the
+    # long form — the router is told to pick nothing when the command fails, so a missing
+    # wrapper would otherwise clear every turn silently.
+    if not (_plugin_root() / SHELL_CANDIDATES_REL).is_file():
+        fields.append(f"- candidates: run `{_candidates_cmd()}`")
     if transcript and any(AUDIT_AGENTS[k].needs_history for k in eligible):
         fields.append(f"- history: transcript {transcript}, turn {prompt_id}")
     return lead + "\n\n" + "\n".join(fields)
@@ -291,9 +316,18 @@ def _refs_context(refs: list[str]) -> str:
 # edit to it, with the reply carrying only what changed. The file is also the only version
 # that CAN be corrected — a reply that has already been printed cannot be, and the earlier
 # shape left the user reading the flawed text with a list of fixes underneath it.
+#
+# "Keep the reply short" was the whole instruction once, and short is not the property that
+# matters: a compressed restatement of the answer obeys it and still puts the unaudited text
+# in front of the user, which is the one thing this lead exists to prevent. So the reply is
+# specified by CONTENT — a headline and the path — rather than by length. The two named
+# exclusions are the shapes that were observed slipping through as "short": a bullet summary
+# of the file, and a preview of its opening.
 _DRAFT_LEAD = (
-    "guard: put your answer's substance in {path}, written in ENGLISH; keep the reply short "
-    "and name that path. guard audits that file when the turn ends. When you will answer the "
-    "user in another language, the version they read is translated from this file after the "
-    "audits have run — the playbook says how."
+    "guard: put your answer's substance in {path}, written in ENGLISH. Until the audits have "
+    "run, the user should be reading that file and not a copy of it in the transcript: your "
+    "reply is ONE headline sentence plus that path — no summary of what the file says, no "
+    "excerpt from it, no findings list. guard audits that file when the turn ends. When you "
+    "will answer the user in another language, the version they read is translated from this "
+    "file after the audits have run — the playbook says how."
 )

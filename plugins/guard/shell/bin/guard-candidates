@@ -1,0 +1,23 @@
+#!/bin/sh
+# guard-candidates — print the audit agents the router may name, one `key=mode` per line.
+#
+#   guard-candidates
+#
+# For the ROUTER, and for nothing else. It exists as a command rather than as a line of
+# output because of who was paying for the alternative: the Stop hook used to print the full
+# `uv run --script "<plugin>/scripts/guard_hook.py" candidates` invocation into the main
+# agent's context on every routed turn. Moving the ROSTER out of that context was the point
+# of the `candidates` verb, and spelling the command out there gave half of it back — the
+# main agent never runs it, so every character of that path was read by the wrong party.
+#
+# Same PATH as `guard`, put there by the SessionStart hook, and the router reaches it for
+# the same reason a subprocess reaches `guard`: an executable is inherited where a shell
+# function is not. A subagent's Bash also carries the PARENT session's
+# CLAUDE_CODE_SESSION_ID, which is what lets the verb find the session state the hooks
+# wrote — a router reading an id of its own would find an unconfigured project.
+if [ -z "$GUARD_TOGGLE_CLI" ] || [ ! -f "$GUARD_TOGGLE_CLI" ]; then
+  echo "guard-candidates: GUARD_TOGGLE_CLI is unset or missing — this command works inside a Claude Code session." >&2
+  exit 1
+fi
+
+exec uv run --script "$GUARD_TOGGLE_CLI" candidates "$@"

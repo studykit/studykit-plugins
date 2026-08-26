@@ -79,8 +79,12 @@ The dispatch hands you:
   triage, and reading a candidate's section will not help you decide; what you need it for
   is your answer, which names this path and the sections in it. Read a section only if you
   genuinely cannot tell what a key refers to.
-- **candidates** — a command to RUN, not a list. The dispatch gives you the command line;
-  run it, and each line it prints is one candidate as `key=mode`.
+- **candidates** — not something you are given. Run `guard-candidates`, and each line it
+  prints is one candidate as `key=mode`. It is on your `PATH` and takes no argument; it
+  works out which session it belongs to by itself.
+
+  Your dispatch does not name it, and does not need to. Older callers may still pass a
+  `candidates:` line; when one does, run what it gives you instead of this name.
 
   **You may name only the keys it printed.** They are the agents the user has switched on;
   a key that is not printed is not available, so ignore its section below and never name

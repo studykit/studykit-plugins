@@ -27,6 +27,8 @@ available, not guard running.
 
 `/guard:toggle` makes no model call either — its hook answers the user directly. `guard on` / `guard off` does the same from a shell prompt, without entering the conversation at all: SessionStart puts the command on `PATH` through `$CLAUDE_ENV_FILE`, which is sourced rather than scanned for exports, so there is nothing to install and nothing left behind. It is an executable rather than a shell function so that subprocesses inherit it. `toggle-cli` shares its whole decision path with the hook, and is the one subcommand that must not fail open — a person is reading its output, so silence would read as success.
 
+That same `PATH` carries `guard-candidates`, which is the router's and never the user's — a fixed command the router names itself, so the dispatch says nothing about the roster at all. `dev/design.md` has why that beats printing the command, and what the one remaining fallback line is for.
+
 ## Hard requirements
 
 guard has no Python dependencies but it does need **uv**. Both hook manifests and both

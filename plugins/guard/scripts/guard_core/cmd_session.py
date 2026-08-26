@@ -58,7 +58,12 @@ def _session_muted(project_dir: Path, config: dict) -> bool:
 
 
 def _add_shell_command_to_path() -> bool:
-    """Put guard's ``guard`` command on the session's ``PATH``. True if written.
+    """Put guard's shell commands on the session's ``PATH``. True if written.
+
+    Two of them share the directory and are reached the same way, by parties that never
+    meet: ``guard`` is the user's, typed at a shell prompt, and ``guard-candidates`` is the
+    router's, run from a subagent's Bash. Adding the directory serves both, which is why
+    this is one export rather than two.
 
     ``CLAUDE_ENV_FILE`` is not a list of ``export`` lines — it is a shell script Claude Code
     SOURCES before each Bash command, so it can prepend a directory as readily as it can set

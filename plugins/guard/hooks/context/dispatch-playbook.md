@@ -47,9 +47,12 @@ delivered — it is the deliverable, which is why the agents can still fix it.
 
 Two rules. Do not paste its contents into a reply: printing the text is what this shape
 exists to avoid, and printing it twice (before and after correction) is the waste that
-motivated the whole arrangement. And if you find the file empty or missing, guard filled it
-in from the response after the fact and said so in a comment at the top; treat it as the
-answer anyway, and write it properly next time.
+motivated the whole arrangement. **Summarising it is the same failure in a shorter form** —
+a bulleted digest of the file, or a preview of how it opens, puts the unaudited answer in
+front of the user just as effectively as quoting it, and it passes for brevity while doing
+so. And if you find the file empty or missing, guard filled it in from the response after
+the fact and said so in a comment at the top; treat it as the answer anyway, and write it
+properly next time.
 
 The **session's history** — what the user asked, what this turn ran, what an earlier turn
 established — is in the transcript, and an agent that needs it extracts what it needs
@@ -261,7 +264,10 @@ in this order:
    dispatch it now — alone, on the translation file, per its section. It edits in place.
    Relay what it left unfixed.
 4. **Reply short.** What changed and why, in a line or two per finding, then the path. A
-   clean audit is one line. Do not restate the answer and do not paste the file.
+   clean audit is one line. Do not restate the answer and do not paste the file. This reply
+   reports on the answer; it never stands in for it. The user reads the document — so a
+   reply that would let them skip opening it has replaced the thing it was reporting on,
+   and has done it with text no agent audited.
 5. **Open the file, but only if an agent has read it** (see below):
    `open <path>` on macOS, `xdg-open <path>` on Linux, `start <path>` on Windows. Once, at
    the end, after every correction has landed — opening it mid-audit shows the user text
