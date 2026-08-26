@@ -88,7 +88,7 @@ def _config_show_lines(project_dir: Path, session_id: str | None) -> list[str]:
     # The mute is listed first and only when it is on: it overrides every line below it, so a
     # reader who sees the switches without it would read the wrong answer to "is guard
     # running". It is session state, so there is no default to show alongside.
-    muted = ["audits: OFF for this session (/guard:toggle on to arm it)"] if (
+    muted = ["audits: OFF for this session (`guard on` in a shell to arm it)"] if (
         state is not None and _audit_paused(state)) else []
     return [
         *muted,

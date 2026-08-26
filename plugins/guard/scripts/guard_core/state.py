@@ -51,7 +51,7 @@ def _read_state(project_dir: Path, session_id: str, config: dict[str, Any]) -> d
         "edited_files": [],
         "edited_agent_docs": [],
         "edited_refs": [],
-        # Session-only mute, flipped by `/guard:toggle`, and MUTED IS WHERE A SESSION
+        # Session-only mute, flipped by the `guard` shell command, and MUTED IS WHERE A SESSION
         # STARTS: a session audits only after the user asks it to, for as long as that
         # session lasts. The default lives here, in the state schema, rather than in
         # guard.local.json on purpose — there is still no path from the config to this
@@ -132,9 +132,9 @@ def _plan_audit_paused(state: dict[str, Any]) -> bool:
 
 
 def _audit_paused(state: dict[str, Any]) -> bool:
-    """Is the automatic audit muted for this session? True until `/guard:toggle on`.
+    """Is the automatic audit muted for this session? True until `guard on`.
 
     A session starts muted (see the schema above), so this is the state a session is in
-    before anyone touches it, not only the state `/guard:toggle off` puts it in.
+    before anyone touches it, not only the state `guard off` puts it in.
     """
     return state.get("audit_paused") is True

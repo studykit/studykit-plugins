@@ -42,12 +42,12 @@ def _session_muted(project_dir: Path, config: dict, payload: dict | None) -> boo
     below has to say so instead of announcing audits nothing will run. It is not always
     True: SessionStart registers no matcher, so it also fires on `resume`, `clear`,
     `compact` and `fork`, where the session may already have been unmuted by
-    `/guard:toggle` — or, on `clear`, by the handoff from the session it replaced — and the
+    `guard on` — or, on `clear`, by the handoff from the session it replaced — and the
     state file says so.
 
     The payload is passed in rather than read here: stdin can be read once, and the clear
     handoff needs the same payload's `source`. On Codex it is None (that adapter consumed
-    stdin before calling this module), which costs nothing — Codex has no `/guard:toggle`
+    stdin before calling this module), which costs nothing — Codex has no mute command
     and its Stop path never reads `audit_paused`, so a Codex session is never muted.
     """
     if _HOST_IS_CODEX:
@@ -421,8 +421,8 @@ def cmd_session_start() -> int:
             print(
                 "guard: agents are configured for this project, but audits are OFF for this "
                 "session — guard starts muted, so nothing is recommended when a turn ends "
-                "and no answer file is named. `/guard:toggle on` arms it for this session "
-                "only. Do not mention this unless the user asks."
+                "and no answer file is named. Running `guard on` in a shell arms it for "
+                "this session only. Do not mention this unless the user asks."
             )
         else:
             print(

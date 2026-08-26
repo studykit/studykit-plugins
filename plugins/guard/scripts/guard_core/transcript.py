@@ -44,7 +44,7 @@ from .paths import _cli_project_dir, _state_root, _trace
 # about the user, so the "answer" is the user's own words read back to them, and auditing
 # that would have guard grading the user on how they described themselves.
 _CONTROL_CMD_RE = re.compile(
-    r"^/(guard:)?(settings|toggle|reader-profile|claims-auditor|deferrals-auditor"
+    r"^/(guard:)?(settings|reader-profile|claims-auditor|deferrals-auditor"
     r"|clarity-auditor|korean-corrector)(?=\s|$)",
     re.IGNORECASE)
 

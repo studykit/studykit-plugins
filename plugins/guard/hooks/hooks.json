@@ -13,19 +13,6 @@
         ]
       }
     ],
-    "UserPromptExpansion": [
-      {
-        "matcher": "^(guard:)?toggle$",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "uv run --script \"${CLAUDE_PLUGIN_ROOT}/scripts/guard_hook.py\" toggle",
-            "timeout": 5,
-            "description": "Mute or unmute guard's automatic audit for this session (arg: on|off, empty flips)."
-          }
-        ]
-      }
-    ],
     "PostToolUse": [
       {
         "matcher": "ExitPlanMode",

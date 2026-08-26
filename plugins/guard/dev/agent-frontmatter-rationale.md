@@ -430,3 +430,66 @@ No `memory:` — same reason as the checkers, and stronger here: a stored ruling
 premise is the one most likely to be wrong.
 
 `model: opus`.
+
+## Conversation
+
+### `interviewer`
+
+`tools: Read, Grep, Glob, Bash, WebSearch, WebFetch`
+
+The only agent here the USER talks to directly, in its own transcript, rather than one the main
+session dispatches and reads. `WebSearch`/`WebFetch` for sources outside the repository,
+`Read`/`Grep`/`Glob`/`Bash` for the project.
+
+**`Write` and `Edit` were in that list and were taken away after two measured runs.** The body
+said, in the go-ahead section and again in the prohibitions, that it must never build the thing
+under discussion. On the first run it scaffolded an entire Python project and CI workflow after
+the go-ahead. The prohibition was strengthened at the decision point, and on the second run it
+did the same thing *before any go-ahead at all*, and offered to `gh repo create` and push.
+
+Two honest qualifications on that evidence, both of which the maintainer raised. Both runs used
+`--permission-mode bypassPermissions`; in an ordinary session each of those calls would have
+surfaced as a permission prompt in the user's main conversation, named to this agent, and could
+have been denied — so the runs show what the agent *reaches for*, not what it gets away with.
+And `Bash` stayed, at the maintainer's direction, because research needs it. So the boundary is
+not closed: a shell redirect still writes. What removing `Write`/`Edit` buys is that the
+scaffolding path is no longer the obvious one, and what the permission prompt buys is that the
+attempt is visible. Neither is sufficient alone and the body says so rather than claiming a
+capability the agent can see it has — a body that tells an agent it cannot do what it can is
+worse than a rule, because the agent finds out.
+
+It follows that it does not write the brief either: its last message IS the brief, and the main
+session saves it to `.claude/interviews/<slug>.md`. The `description` carries that instruction,
+because the main agent is the one who has to follow it. `color: red` — this agent reports and
+leaves the user's project alone.
+
+**`background: true` is load-bearing, not a default spelled out.** Only background agents appear
+in the interactive panel, and that panel is the only way the user opens a transcript and talks to
+the agent (`wiki/ref/claude-code-subagent-resume.md`). Dispatched foreground, this agent has no
+user to listen to.
+
+**No `memory:`, and the reason is the opposite of the auditors'.** Their hazard is a stored
+verdict that suppresses a finding. This agent's hazard is a stored *user profile* — "they always
+mean X", "they prefer Y" — which is a conclusion about the person it is supposed to be asking.
+An interviewer that already knows what you want has stopped doing the job. The omission also
+keeps Write and Edit from being granted twice over, though here they are granted outright anyway.
+
+`model: opus`, argued from the failure mode: the input is a short sentence with the context left
+out on purpose, and the failure is supplying that context yourself and answering confidently.
+That is a reading-intent job, which is where the tier is worth paying for.
+
+No `SendMessage`: it has nobody to message. Its report reaches the main session as its final
+message, and the user is reached by talking back in the transcript. No `AskUserQuestion` either,
+and not by choice — the host strips it from every subagent, so the questions have to be prose,
+which the body is written around.
+
+No `maxTurns`. A conversation has no turn budget that could be set correctly in advance.
+
+**No command file, and the `description` carries what one would have.** `@agent-guard:interviewer`
+is documented to guarantee this agent runs, so the launch needs no command. Three instructions do
+have to reach the MAIN agent rather than this one — pass it the subject and no procedure, do not
+wait for it or relay it, and treat the brief's open questions as questions — and all three are in
+text the main agent already reads: the `description` for the first two, the brief's own `Open`
+heading for the third. A command would have been a
+third copy that drifts, and its body speaks for exactly one turn, which is not when either
+instruction is needed.

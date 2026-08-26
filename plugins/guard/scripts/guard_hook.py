@@ -32,8 +32,7 @@ Subcommands
 - stop           Stop — ``guard_core.cmd_stop``
 - session-start  SessionStart — ``guard_core.cmd_session``
 - session-end    SessionEnd on ``clear`` — ``guard_core.cmd_session``
-- toggle         UserPromptExpansion for ``/guard:toggle`` — ``guard_core.cmd_status``
-- toggle-cli     CLI (argv), the same mute from a shell — ``guard_core.cmd_status``
+- toggle-cli     CLI (argv), the session mute — ``guard_core.cmd_status``
 - status         CLI (stdin JSON), the status-line segment — ``guard_core.cmd_status``
 - settings       CLI (argv), run by the ``guard:settings`` skill — ``guard_core.cmd_settings``
 - refs-dir       CLI, prints the resolved refs directory — ``guard_core.cmd_settings``
@@ -64,7 +63,7 @@ from guard_core.cmd_inputs import cmd_inputs
 from guard_core.cmd_plan import cmd_knowledge_dirs
 from guard_core.cmd_plan_gate import cmd_exit_plan, cmd_plan_audited, cmd_plan_toggle_cli
 from guard_core.cmd_settings import cmd_refs_dir, cmd_settings
-from guard_core.cmd_status import cmd_status, cmd_toggle, cmd_toggle_cli
+from guard_core.cmd_status import cmd_status, cmd_toggle_cli
 
 
 SUBCOMMANDS = {
@@ -83,7 +82,6 @@ SUBCOMMANDS = {
     "plan-audited": cmd_plan_audited,
     "plan-toggle-cli": cmd_plan_toggle_cli,
     "transcript": cmd_transcript,
-    "toggle": cmd_toggle,
     "toggle-cli": cmd_toggle_cli,
     "status": cmd_status,
 }

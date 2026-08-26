@@ -128,7 +128,7 @@ def cmd_stop() -> int:
         state["transcript_path"] = payload["transcript_path"]
     _write_turn_response(project_dir, session_id, prompt_id, response)
 
-    # Muted by `/guard:toggle`. Checked AFTER the two lines above, on purpose: the pending
+    # Muted by `guard off`. Checked AFTER the two lines above, on purpose: the pending
     # target and the response still get recorded, so an audit asked for on the turn the user
     # just muted still has something to work on. Muting stops the recommendation, not the
     # user's ability to ask for one.

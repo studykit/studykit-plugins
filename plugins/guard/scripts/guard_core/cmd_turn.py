@@ -54,7 +54,7 @@ def cmd_user_prompt() -> int:
 
     config = _load_config(project_dir)
     state = _read_state(project_dir, session_id, config)
-    # Muted by `/guard:toggle`: no audit is coming, so naming a file for the answer would
+    # Muted by `guard off`: no audit is coming, so naming a file for the answer would
     # ask the user to read a file nothing is going to correct.
     if _audit_paused(state):
         _trace(project_dir, session_id, "user-prompt", "skip_paused")

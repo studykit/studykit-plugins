@@ -1,15 +1,19 @@
-"""``toggle`` and ``status`` — the session mute, and the indicator that makes it visible.
+"""``toggle-cli`` and ``status`` — the session mute, and the indicator that makes it visible.
 
-``toggle`` (UserPromptExpansion, for ``/guard:toggle [on|off]``) arms or mutes the automatic
-audit for THIS SESSION — ``audit_paused`` in the session state, never guard.local.json, so it
-cannot change what the project does by default. A session STARTS muted
-(``state._read_state``), which makes ``on`` the common direction: it clears the pause and is
-the only thing that ever does. An empty argument flips. While muted, ``stop`` recommends
+``toggle-cli`` (CLI, argv) arms or mutes the automatic audit for THIS SESSION —
+``audit_paused`` in the session state, never guard.local.json, so it cannot change what the
+project does by default. A session STARTS muted (``state._read_state``), which makes ``on``
+the common direction: it clears the pause and is the only thing that ever does. An empty
+argument flips, and ``status`` reports without writing. While muted, ``stop`` recommends
 nothing and ``user-prompt`` names no answer file, but the pending target and the answer file
-are still recorded — the Codex adapter reads that marker. The hook does the work and blocks
-the expansion, so its message reaches the user directly and no model is invoked to relay a
-sentence the hook has already finished (see ``emit._emit_expansion``); the command file
-exists to make the matcher reachable at all, and its body never runs.
+are still recorded — the Codex adapter reads that marker.
+
+The shell is the ONLY way in, through the ``guard`` wrapper the SessionStart hook puts on
+``PATH``. There was a ``/guard:toggle`` slash command beside it and it was removed: flipping
+guard is not something to say to the model. The command cost a turn — typing it sent a
+prompt, and the answer came back as a blocked expansion — and it also cost a command file
+and a ``UserPromptExpansion`` matcher that had to stay in step with each other. From a
+terminal the user already has, the same flip touches the conversation not at all.
 
 ``status`` (CLI, stdin JSON) is the other half, and starting muted is what makes it
 load-bearing rather than a convenience: the mute is a feature only because it is visible, and
@@ -22,16 +26,6 @@ toggle that leaves the segment unchanged cannot be told from a toggle that did n
 A plugin cannot own the main ``statusLine``, so the user composes this segment into theirs
 (``/guard:statusline`` offers to do it). It reads only the small config and state files,
 nothing else: it runs on every assistant message. Not a hook event.
-
-``toggle-cli`` (CLI, argv) is the same mute for a shell prompt rather than for the model's
-slash command. It exists because ``/guard:toggle`` costs a turn: typing it into Claude Code
-sends a prompt, and the answer comes back as a blocked expansion. From a terminal the user
-already has, flipping guard should not enter the conversation at all. The two verbs share
-``_parse_toggle_arg``, ``_apply_toggle`` and ``_mute_sentence``, so the accepted words and
-the resulting sentence cannot drift between them; what differs is only where the session id
-comes from (``CLAUDE_CODE_SESSION_ID`` rather than the payload), how the answer leaves
-(stdout rather than a blocked expansion), and which command the sentence names as the way
-to arm guard.
 """
 
 from __future__ import annotations
@@ -43,9 +37,8 @@ import sys
 from pathlib import Path
 
 from .config import _load_config, _switch_on
-from .paths import _cli_project_dir, _project_dir, _trace
-from .payload import _read_payload, _session_id
-from .emit import _emit_expansion
+from .paths import _cli_project_dir, _trace
+from .payload import _session_id
 from .agents import AUDIT_AGENTS
 from .state import _audit_paused, _plan_audit_paused, _read_state, _write_state
 
@@ -93,10 +86,10 @@ def _parse_toggle_arg(arg: str) -> str | None:
     return None
 
 
-def _mute_sentence(state: dict, paused: bool, arm_hint: str) -> str:
+def _mute_sentence(state: dict, paused: bool) -> str:
     """The one description of a session's mute, for reporting it and for changing it.
 
-    Split from ``_apply_toggle`` because the CLI's ``status`` verb reports without writing,
+    Split from ``_apply_toggle`` because the ``status`` verb reports without writing,
     and the copy it used to keep drifted from this one. A reader comparing ``guard on`` with
     ``guard status`` saw two answers and no way to tell which reflected the state.
 
@@ -115,7 +108,7 @@ def _mute_sentence(state: dict, paused: bool, arm_hint: str) -> str:
     stops `guard on` from promising an audit that will not come.
     """
     if paused:
-        return f"guard: audits OFF for this session. `{arm_hint}` to arm."
+        return f"guard: audits OFF for this session. `{_shell_arm_hint()}` to arm."
     if any(_switch_on(state, k) for k in AUDIT_AGENTS):
         return "guard: audits ON for this session."
     # Not "nothing will run": `ext-docs-auditor` has no switch, so a turn that writes a
@@ -125,16 +118,11 @@ def _mute_sentence(state: dict, paused: bool, arm_hint: str) -> str:
             "references are checked. `/guard:settings` to switch one on.")
 
 
-def _apply_toggle(project_dir: Path, session_id: str, action: str, arm_hint: str) -> str:
+def _apply_toggle(project_dir: Path, session_id: str, action: str) -> str:
     """Write the mute for one session and return the sentence describing the result.
 
-    The message is the product, not a side effect: both callers show it verbatim, so the
-    branches below are the only place either one decides what the user is told.
-
-    ``arm_hint`` is how the CALLER's user arms guard — `/guard:toggle on` from the slash
-    command, `guard on` from the shell. It is a parameter because the sentence is shown to
-    someone who just typed one of the two, and naming the other interface is advice they
-    cannot follow where they are standing.
+    The message is the product, not a side effect: the caller shows it verbatim, so the
+    branches below are the only place anything decides what the user is told.
     """
     config = _load_config(project_dir)
     state = _read_state(project_dir, session_id, config)
@@ -142,56 +130,7 @@ def _apply_toggle(project_dir: Path, session_id: str, action: str, arm_hint: str
 
     state["audit_paused"] = paused
     _write_state(project_dir, session_id, state)
-    return _mute_sentence(state, paused, arm_hint)
-
-
-def cmd_toggle() -> int:
-    """UserPromptExpansion for `/guard:toggle [on|off]`. Mute or unmute this session.
-
-    The hook does the work rather than telling the model to: `command_args` carries the
-    argument (hooks docs, excerpt in the refs dir as `claude-code-statusline.md`), so no
-    argument means flip, `on`/`off` set it outright, and the outcome does not depend on a
-    model reading a procedure correctly. Nothing here is addressed to a model — the
-    expansion is blocked, so every string below is read by a person.
-
-    Session state only. It cannot touch guard.local.json, which is what makes this safe to
-    reach for mid-conversation: it cannot change what any other session does. And since every
-    session starts muted, an `off` here is not undone by the next session either — there is
-    nothing this can leave behind. `on` means auditing on, so it CLEARS the pause — the
-    user's vocabulary is about guard, not about the flag's name.
-    """
-    project_dir = _project_dir()
-    payload = _read_payload()
-    if payload is None:
-        return 0
-    # Not silent, unlike every other guard failure. A hook that prints nothing lets the model
-    # report the mute it was asked for and never got — the same shape as the crashed toggle
-    # this project has already seen narrated as success. The two neighbouring branches (no
-    # session id, unrecognised argument) say so out loud for the same reason.
-    if project_dir is None:
-        _emit_expansion(
-            "guard: no project directory resolved — nothing changed."
-        )
-        return 0
-    session_id = _session_id(payload)
-    if session_id is None:
-        _emit_expansion("guard: no usable session id, so there is no session to mute.")
-        return 0
-
-    raw = payload.get("command_args")
-    raw = raw if isinstance(raw, str) else ""
-    action = _parse_toggle_arg(raw)
-    if action is None:
-        _emit_expansion(
-            f"guard: `{raw.strip().lower()}` is not an argument — use `on`, `off`, or "
-            "nothing to flip. Nothing changed."
-        )
-        return 0
-
-    msg = _apply_toggle(project_dir, session_id, action, "/guard:toggle on")
-    _emit_expansion(msg)
-    _trace(project_dir, session_id, "toggle", "set", arg=action)
-    return 0
+    return _mute_sentence(state, paused)
 
 
 def cmd_toggle_cli() -> int:
@@ -202,7 +141,7 @@ def cmd_toggle_cli() -> int:
         guard_hook.py toggle-cli off      — mute it
         guard_hook.py toggle-cli status   — report without changing anything
 
-    Same mute, same session, same words as `/guard:toggle` — see `_apply_toggle`. The
+    The mute, and the only way to reach it — see `_apply_toggle`. The
     session id comes from `CLAUDE_CODE_SESSION_ID`, which Claude Code sets in every Bash
     tool subprocess to the value the hook payload carries
     (`wiki/ref/claude-code-session-id-env.md`). That equality is the whole basis for this
@@ -238,7 +177,7 @@ def cmd_toggle_cli() -> int:
 
     if raw.strip().lower() in ("status", "show"):
         state = _read_state(project_dir, session_id, _load_config(project_dir))
-        print(_mute_sentence(state, _audit_paused(state), _shell_arm_hint()))
+        print(_mute_sentence(state, _audit_paused(state)))
         _trace(project_dir, session_id, "toggle-cli", "show")
         return 0
 
@@ -258,7 +197,7 @@ def cmd_toggle_cli() -> int:
     before = _audit_paused(_read_state(project_dir, session_id, config))
     expected = (not before) if action == "flip" else (action == "off")
 
-    msg = _apply_toggle(project_dir, session_id, action, _shell_arm_hint())
+    msg = _apply_toggle(project_dir, session_id, action)
 
     verify = _read_state(project_dir, session_id, config)
     if _audit_paused(verify) is not expected:
@@ -336,7 +275,7 @@ def cmd_status() -> int:
     # U+2691 have identical coverage in the fonts a terminal falls back to.
     #
     # It carries its OWN colour, closed before the fraction's begins. The two switches are
-    # independent — `/guard:toggle` cannot move the plan gate and `guard-plan` cannot move the
+    # independent — `guard` cannot move the plan gate and `guard-plan` cannot move the
     # turn audit — so one colour spanning both would state a single verdict about two
     # settings: a green fraction beside a dim flag has to be able to say "auditing, gate off",
     # and one span over both cannot. Green armed, dim muted — the same vocabulary the fraction
@@ -352,7 +291,7 @@ def cmd_status() -> int:
     # it says what a bare count never did: how many switches are set at all.
     #
     # The numerator is only ever 0 or the whole denominator, because the mute is what governs
-    # it. That is the fraction working, not a wasted digit: `/guard:toggle` moves the
+    # it. That is the fraction working, not a wasted digit: `guard` moves the
     # numerator and `/guard:settings` moves the denominator, so which command a reader needs
     # is legible from the field.
     #
@@ -360,7 +299,7 @@ def cmd_status() -> int:
     # `0/0`, and only the colour separates them. That is a deliberate trade for one grammar
     # over a special case — but it is also the whole reason the colours below are not
     # decoration. Before touching them, note that a mute nobody can see is the failure that
-    # killed the gate this mute replaced: `/guard:toggle` must remain observable in every
+    # killed the gate this mute replaced: `guard` must remain observable in every
     # state, and here the colour is the only thing carrying it.
     # Each half closes its own colour before the next opens — nesting the flag's spans inside
     # the fraction's left a reset in the middle of an open span, which renders correctly today

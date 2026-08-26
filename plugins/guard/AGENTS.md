@@ -25,7 +25,24 @@ wrote. Anything below that says "the turn" or "the response" is about the routed
 Every switch ships `off`, and a session additionally starts muted. guard installed is guard
 available, not guard running.
 
-`/guard:toggle` makes no model call either — its hook answers the user directly. `guard on` / `guard off` does the same from a shell prompt, without entering the conversation at all: SessionStart puts the command on `PATH` through `$CLAUDE_ENV_FILE`, which is sourced rather than scanned for exports, so there is nothing to install and nothing left behind. It is an executable rather than a shell function so that subprocesses inherit it. `toggle-cli` shares its whole decision path with the hook, and is the one subcommand that must not fail open — a person is reading its output, so silence would read as success.
+`interviewer` is not part of any of that. It is a background agent the **user** talks to directly, in
+its own transcript, and it answers to nobody here: no switch, no hook, no router, and guard never
+dispatches it. It exists because a turn audited is a turn that cost a router call plus whatever
+the router named, and thinking out loud should not cost that — a message sent inside a subagent's
+transcript fires no `UserPromptSubmit`, and the `Stop` it does fire in the main session carries a
+non-human origin, so guard's own skip catches it. **That skip is the only thing keeping it free.**
+Registering a `SubagentStop` hook, or relaxing the origin test, closes this with nothing failing;
+`dev/design.md` has the measurement. `interviewer`'s deliverable is one brief file, written when
+the user closes the interview and never before, and its final message to the main session is
+that path and nothing else — the file is the handoff, so a summary beside it would be a second
+version to disagree with.
+
+It ships **no command**. `@agent-guard:interviewer` is documented to guarantee a given subagent
+runs, lands it in the background panel, and keeps a running one reachable — so a command would
+only be a second, driftable way to say the same thing. What that entry point does not settle is
+the opening prompt, which the main agent still writes; the agent's own body has to carry that.
+
+`guard on` / `guard off` flips the session mute from a shell prompt, without entering the conversation at all — the reason it is not a slash command. SessionStart puts it on `PATH` through `$CLAUDE_ENV_FILE`, which is sourced rather than scanned for exports, so there is nothing to install and nothing left behind. It is an executable rather than a shell function so that subprocesses inherit it. `guard-plan` is its counterpart for the plan gate. `toggle-cli` is the one subcommand that must not fail open — a person is reading its output, so silence would read as success.
 
 That same `PATH` carries `guard-candidates` and `guard-inputs`, which are the dispatched agents' and never the user's. Between them the routed dispatch is down to `- turn: <id>`. `dev/design.md` has why that beats printing the roster and the paths, and what each fallback line is for.
 
@@ -68,8 +85,7 @@ how the code here is organised.
 - The recommendation is `additionalContext`; the refs-index gap is the one `decision: "block"`
   that means unfinished work. The `/`-rooted search refusal is a `PreToolUse` `deny` and is
   the only thing guard forbids outright rather than recommends — it gates a tool ARGUMENT,
-  never a caller's identity, which is what separates it from the removed hook below. `/guard:toggle` is also a block, for an unrelated reason — see
-  `dev/design.md` on Stop vs. `UserPromptExpansion` block semantics before changing either.
+  never a caller's identity, which is what separates it from the removed hook below.
 - It names **agents**, never guard's own skills — those are the user's entry point, so a hook
   must not reach through them.
 - The three edited-file lists stay disjoint, and the refs test runs first, by location.
@@ -109,11 +125,16 @@ each one cost.
 - A `reuse_agents` list separate from the per-agent mode, or an `exempt_skills` list.
 - A `.ko-fix.md` rewrite file beside the answer.
 - A `UserPromptExpansion` matcher with no command file of that name behind it: the host
-  answers `Unknown command` before the hook runs, silently, which is how four of guard's
-  matchers ended up orphaned — `toggle`'s command file does exist, which is why it still
-  fires, and it must stay even though its body never runs. There is no per-agent on-demand
-  command on Claude any more; Codex keeps its own path, which is why the turn marker is
-  still written on every Stop.
+  answers `Unknown command` before the hook runs, silently, which is how every one of guard's
+  matchers ended up orphaned. guard registers none now — the session mute is a shell command
+  (`guard`), not a slash command, so nothing has to keep a matcher and a command file in
+  step. There is no per-agent on-demand command on Claude either; Codex keeps its own path,
+  which is why the turn marker is still written on every Stop.
+- A slash command for the session mute. Flipping guard is not something to say to the model:
+  it cost a turn, and it cost a command file whose body never ran.
+- A command that spawns `interviewer`. It was written and removed the same day: `@`-mention
+  already guarantees the agent runs, so all the command added was a copy of the agent's own
+  description and a standing instruction placed in a file that only speaks for one turn.
 
 ## Codex
 

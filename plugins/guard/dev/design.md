@@ -69,11 +69,10 @@ there is nothing shared to factor out beyond the state root.
 | (called via Bash, not a hook) | `settings` | `guard:settings` (a `context: fork` skill, so it runs in a forked `general-purpose` agent rather than in the main session) shows/sets/unsets guard.local.json settings; the agent modes also apply to the live session's `state/<sid>.json` (session id from `--session`/`CLAUDE_CODE_SESSION_ID`). A mode change away from `reuse` also prints a stand-down note, the only channel guard has to a running instance. `set` preserves every other key; `unset <key>` is the only way to delete one. |
 | `Stop` | `stop` | Write the response section of the turn record and mark the turn as the on-demand target — always (only Codex reads that marker now; see below). Then, when any agent is not `off`, emit `additionalContext` asking the main agent to dispatch `guard:router` over the record, carrying this turn's paths and the `candidates` command the router runs to get the roster itself. The router names sections of `hooks/context/dispatch-playbook.md`; the main agent follows those, completing the record's second section only if a named section asks for it. `comment-corrector` never goes to the router: it is dispatched directly in the same emission, to be sent in the same message — see the invariant below. A third block names `ext-docs-auditor` over the refs files the turn wrote; it has no switch, so it can be the only block a turn produces. |
 | `SessionEnd` (`clear`) | `session-end` | Hand this session's two switches to the session `/clear` is about to open, then let it announce what it adopted. Writes nothing when both are muted. |
-| `SessionStart` | `session-start` | Sweep state and turn records past retention, export `GUARD_REFS_DIR` and `GUARD_TOGGLE_CLI`, state the refs rule as session context, say once — when any agent is on — either that the session opened muted (the usual case; `/guard:toggle on` arms it) or that audits are on and where the dispatch playbook is, and — when any agent is in `reuse` — state the standing reuse policy once. |
+| `SessionStart` | `session-start` | Sweep state and turn records past retention, export `GUARD_REFS_DIR` and `GUARD_TOGGLE_CLI`, state the refs rule as session context, say once — when any agent is on — either that the session opened muted (the usual case; `guard on` arms it) or that audits are on and where the dispatch playbook is, and — when any agent is in `reuse` — state the standing reuse policy once. |
 | (called via Bash, not a hook) | `candidates` | The router's own roster: prints the turn-reading agents switched on for this session, one `key=mode` per line, in `AUDIT_AGENTS` order. Session id from `CLAUDE_CODE_SESSION_ID`, which a subagent's Bash carries as its parent's. Read-only, and the only command the router runs. |
 | (called via Bash, not a hook) | `transcript` | `index` / `turn` / `find` over the session transcript, for the audit agents. Writes an extract file and prints only its path plus a one-line summary; `--since` / `--until` / `--last` bound which turns are scanned. |
-| `UserPromptExpansion` (`^(guard:)?toggle$`) | `toggle` | Arm/mute the automatic audit for THIS session (`audit_paused`, session state only — never guard.local.json). A session starts muted, so `on` is the arming direction and the common one. `command_args` carries `on`/`off`; empty flips. The hook does the work and then **blocks the expansion**, so its message reaches the user directly and no model is invoked — the command file exists only to make the matcher reachable, and its body never runs. |
-| (called via Bash, not a hook) | `toggle-cli` | The same mute as `/guard:toggle`, for a shell prompt: `on` / `off` / `status` / empty flips. Session id from `CLAUDE_CODE_SESSION_ID`; project from `_cli_project_dir`. Shares `_apply_toggle` and `_mute_sentence` with the hook, so the two cannot describe the same state differently. The ONE subcommand that does not fail open — see `_MUST_REPORT` in `guard_hook.py`. |
+| (called via Bash, not a hook) | `toggle-cli` | Arm/mute the automatic audit for THIS session (`audit_paused`, session state only — never guard.local.json), from a shell prompt: `on` / `off` / `status` / empty flips. A session starts muted, so `on` is the arming direction and the common one. Session id from `CLAUDE_CODE_SESSION_ID`; project from `_cli_project_dir`. The ONE subcommand that does not fail open — see `_MUST_REPORT` in `guard_hook.py`. |
 | (called via Bash, not a hook) | `status` | Status-line segment: `guard <will run>/<switched on>` plus the plan gate's flag (`⚑` armed, `⚐` muted), green armed and dim muted on each half; nothing at all on any failure. Reads one state file; runs on every assistant message. |
 | (called via Bash, not a hook) | `refs-dir` | Print the resolved refs directory (auditor fallback; applies `refs_dir` validation). |
 
@@ -234,14 +233,16 @@ payloads, not memory.
   guard's recommendation is `additionalContext` and its refs-index gap is still a block:
   one is guidance from a working hook, the other is unfinished work.
 
-  **That reading is about Stop, and does not carry to `UserPromptExpansion`.** On Stop the
-  two forms are presentation — both continue the turn — so the choice is free to express
-  what guard means. On the expansion event they are not interchangeable at all:
-  `additionalContext` is added "alongside the expanded prompt" for Claude to act on, while
-  `decision: "block"` ends the turn and shows `reason` to the user. So `/guard:toggle` is
-  a block for a reason that has nothing to do with unfinished work — it is the only shape
-  that delivers a finished sentence without paying for a model call. Source: official hooks
-  docs (https://code.claude.com/docs/en/hooks.md, "UserPromptExpansion decision control"),
+  **That reading is about Stop, and did not carry to `UserPromptExpansion`.** guard
+  registers no expansion hook any more, and this is kept because the two events read
+  differently and anyone adding one back will assume they do not. On Stop the two forms are
+  presentation — both continue the turn — so the choice is free to express what guard means.
+  On the expansion event they are not interchangeable at all: `additionalContext` is added
+  "alongside the expanded prompt" for Claude to act on, while `decision: "block"` ends the
+  turn and shows `reason` to the user. `/guard:toggle` was a block for a reason that had
+  nothing to do with unfinished work — it was the only shape that delivered a finished
+  sentence without paying for a model call. Source: official hooks docs
+  (https://code.claude.com/docs/en/hooks.md, "UserPromptExpansion decision control"),
   excerpt at `wiki/ref/claude-code-userpromptexpansion-hook.md`, fetched 2026-08-25. Note
   the docs say "the turn ends"; they never describe the model-call lifecycle, so zero
   inference is an inference, not a quoted guarantee.
@@ -342,12 +343,15 @@ payloads, not memory.
   agent, and it would put guard's storage layout in router prose as a second copy — which,
   once drifted, reads nothing and clears every turn.
 
-- **The shell toggle exists because the slash command costs a turn.** `/guard:toggle` is
-  cheap as hooks go — it blocks the expansion, so no model is invoked to relay its sentence
-  — but reaching it still means typing into the conversation, which is a prompt, a turn
-  boundary, and a Stop hook. Someone who just wants audits off for the next ten minutes
-  pays all of that. `toggle-cli` is the same three lines of state change addressed from a
-  prompt the user already has, and the conversation never learns it happened.
+- **The mute is a shell command, and the slash command that used to sit beside it was
+  removed.** `/guard:toggle` was cheap as hooks go — it blocked the expansion, so no model
+  was invoked to relay its sentence — but reaching it still meant typing into the
+  conversation, which is a prompt, a turn boundary, and a Stop hook. Someone who just wants
+  audits off for the next ten minutes paid all of that. `toggle-cli` is the same three lines
+  of state change addressed from a prompt the user already has, and the conversation never
+  learns it happened. Keeping both meant keeping a command file and a matcher in step for a
+  body that never ran, to offer the more expensive of two identical outcomes, so the second
+  one went.
 
   What makes it possible is `CLAUDE_CODE_SESSION_ID`: Claude Code sets it in every Bash
   subprocess to the value the hook payload carries, so a shell command can address the same
@@ -601,7 +605,7 @@ payloads, not memory.
   next on-demand audit quietly audited the wrong answer. Against that, all it bought was
   one router call on a turn the router would have cleared anyway. If per-skill silence is
   wanted again, it belongs on the recommendation, not on the record — or in
-  `/guard:toggle`, which already stops the recommendation while keeping the turn
+  the session mute, which already stops the recommendation while keeping the turn
   auditable.
 - **A CLI verb finds the project root by walking to the git root; a hook never guesses.**
   `CLAUDE_PROJECT_DIR` is given to hook processes and substituted into skill/command content.
@@ -764,7 +768,7 @@ payloads, not memory.
   **Both session switches live in that one field, and they are spelled differently on
   purpose.** The turn audit is a FRACTION — agents that can run on the next finished turn over
   agents switched on — so `3/3` armed, `0/3` muted, and the two commands that move it move
-  different halves: `/guard:toggle` the numerator, `/guard:settings` the denominator. It was
+  different halves: `guard on|off` the numerator, `/guard:settings` the denominator. It was
   `guard off` until the readings collided: `off` sounds like a statement about guard, while
   the state next to it — also nothing running, for the entirely different reason that no agent
   is switched on — was spelled `guard ·` and contradicted it. The fraction cannot be read
@@ -778,7 +782,7 @@ payloads, not memory.
   — `0/N` against `N/N` — which is what survives a log or a screenshot, and the colour is what
   covers the case the numbers cannot: with nothing switched on, both mute states read `0/0`,
   and green against dim is then the only thing separating them. Tinting that pair identically
-  makes `/guard:toggle` a command with no observable effect, which is the failure that killed
+  makes `guard on|off` a command with no observable effect, which is the failure that killed
   the persistent gate this mute replaced.
 
   The plan gate is a MARK — filled `⚑` armed, outline `⚐` muted — and it is never absent. A
@@ -826,7 +830,7 @@ payloads, not memory.
   dispatch of `comment-corrector` alone names no answer file at all, which the playbook's
   `Presenting the result` has to branch on — there is nothing to correct and nothing to open.
 - **The session mute is not `audit_gate` coming back, and a session starts muted.**
-  `/guard:toggle` adds one boolean in front of the switches, which is the shape removed
+  The mute adds one boolean in front of the switches, which is the shape removed
   below, so the difference has to be stated or it reads as a regression — and the default
   being `True` (`state._read_state`) makes stating it more urgent, not less, because that
   boolean now decides the *usual* case rather than an exception. Three things differ and all
@@ -851,8 +855,8 @@ payloads, not memory.
   is a change to the *initial value only* — do not turn it into a config key, which is the
   persistence the invariant above forbids.
 
-  Codex does not participate: `/guard:toggle` is UserPromptExpansion, which Codex has no
-  equivalent for, and `hook_codex.py` never reads `audit_paused`. So a Codex session is never
+  Codex does not participate: the mute is a shell command against a Claude Code session id,
+  which Codex has no equivalent for, and `hook_codex.py` never reads `audit_paused`. So a Codex session is never
   muted, and `_session_muted` tests `_HOST_IS_CODEX` first — which also keeps it from reading
   a stdin the Codex adapter has already consumed.
 
@@ -1279,7 +1283,7 @@ also where its criteria live; a second copy in guard's config would let the two 
 the same agent.
 
 There is deliberately **no key for the mute.** `audit_paused` is session state with a `True`
-default, so a session starts muted and only `/guard:toggle on` arms it; a config key here
+default, so a session starts muted and only `guard on` arms it; a config key here
 would be the persistence the session-mute invariant forbids, and would let a project ship
 itself pre-armed with nothing on screen saying so.
 
@@ -1350,12 +1354,11 @@ export GUARD_SETTINGS_SKILL=1         # mutating verbs do — see _cli_write_all
 # ARM THE SESSION, and do not skip this either. A session starts muted, so without it every
 # `run` below is silent for the WRONG reason and each assertion that expects a recommendation
 # passes as (EMPTY) while testing nothing. This is the one line that stands between this
-# recipe and a whole file of silent no-ops. `toggle` is a UserPromptExpansion hook, so it
-# takes its argument in the payload, not in argv.
-echo '{"session_id":"s1","command_args":"on"}' | "$H" toggle > /dev/null
+# recipe and a whole file of silent no-ops. `toggle-cli` takes its argument in argv and its
+# session id from the ENVIRONMENT, so both are set per command.
+CLAUDE_CODE_SESSION_ID=s1 "$H" toggle-cli on > /dev/null
 
-# The same mute from a shell — `toggle-cli`, which the `guard` shell function wraps. Session
-# id comes from the ENVIRONMENT here, not from a payload, so it is set per command.
+# `toggle-cli` is what the `guard` shell command wraps, and it is the only way to the mute.
 # The last two are the reason this verb exists: it must never be silent, because a person is
 # reading it and silence reads as success. Both must PRINT and exit non-zero.
 CLAUDE_CODE_SESSION_ID=s1 "$H" toggle-cli status   # -> one line; exit 0
@@ -1584,10 +1587,9 @@ echo '{"session_id":"s1","prompt_id":"pr2"}' | "$H" user-prompt
 # silent, so nothing else would report it.
 python3 -c "
 import json
-m = json.load(open('plugins/guard/hooks/hooks.json'))['hooks']['UserPromptExpansion']
-print([b['matcher'] for b in m])   # -> only the toggle matcher
+h = json.load(open('plugins/guard/hooks/hooks.json'))['hooks']
+print(h.get('UserPromptExpansion'))   # -> None; guard registers no expansion matcher
 "
-ls plugins/guard/commands plugins/guard/skills   # -> a file for every matcher above
 
 # Unknown keys and unknown values are both rejected outright rather than silently accepted.
 "$H" settings set audit_gate off --session s1   # -> error listing the settable keys;
@@ -1620,6 +1622,67 @@ echo '{"session_id":"sx","prompt_id":"px","prompt":"q"}' \
 #      precedence in `_project_dir` has been flipped back and one project is writing its
 #      turn records into another.
 ```
+
+## `interviewer`, and what actually keeps a subagent conversation free
+
+Measured 2026-08-26 against claude 2.1.246, in a throwaway git project driven from a second
+tmux/Herdr pane with `GUARD_TRACE=1`, `--plugin-dir` on the working tree, and
+`claims-auditor`/`deferrals-auditor` set to `fresh`. The pane's environment was checked empty
+of `GUARD_PROJECT_DIR` / `GUARD_REFS_DIR` / `GUARD_TOGGLE_CLI` / `CLAUDE_CODE_SESSION_ID`
+first — a pane inherits the launching shell's environment, and this repository's own sessions
+export three of those.
+
+The session was armed with `guard on`, a background subagent named `chat` was spawned, and its
+transcript was opened from the interactive panel with `↓` then `Enter`. Four messages were sent
+to it that way, one of which asked it for a confident factual claim — material `claims-auditor`
+exists for.
+
+Three results, and the second is the one the design rests on.
+
+**`UserPromptSubmit` does not fire for a message sent into a subagent's transcript.** Zero
+`user-prompt` trace records for all four, and the answer-file count did not move. So `cmd_turn`
+never names a file, which is correct: there is no `Stop` coming to fill one.
+
+**`Stop` DOES fire in the main session when the exchange finishes, and guard's own origin test
+is what skips it.** Every one of the four produced:
+
+```
+stop  skip_nonhuman_turn  origin_kind=task-notification
+```
+
+No router, no auditors, no record. This is worth stating precisely because the obvious
+explanation is wrong: it is **not** that guard registers no `SubagentStop` hook. The hook that
+fires is `Stop`, in the main session, and the only thing standing between it and a full audit
+is `_turn_identity`'s `origin_kind != "human"` skip — written for a different purpose (guard's
+own dispatch causes background completions, and auditing those loops). Two ways that closes
+with nothing failing: registering `SubagentStop`, or the host ceasing to emit `origin` for
+these turns, since an ABSENT kind still audits by design. Anything that makes a conversational
+subagent a supported workflow has to treat that skip as load-bearing.
+
+**`PostToolUse` fires for the subagent's writes, and the edit is then silently dropped.** This
+is a defect, not a property to rely on. Asking `chat` to create a file produced:
+
+```
+post-edit  edited_recorded  prompt_id=b273f957-…  bucket=edited_files  file=probe_edit.py
+```
+
+— recorded under the last MAIN-session `prompt_id`, which was already spent. `cmd_stop` reads
+`_edited_files(state, prompt_id, …)` with the current turn's id, so any later turn gets `[]`
+and `comment-corrector` is never dispatched over that file. Verified directly against the
+state file the run produced: same id returns the file, a fresh id returns nothing.
+
+The mirror case — a subagent editing while a main turn is genuinely in flight, so the live id
+is recorded and a corrector is dispatched at files from a conversation the main session never
+saw — follows from the same code path but was **not** measured.
+
+`interviewer` is written around the first two results and around the third being unfixed: it is
+allowed to write, so its edits are in that gap. Its body confines it to one file and forbids
+touching source, which is a rule in prose, not an enforced boundary.
+
+One more thing the trace showed, unrelated to subagents: `UserPromptSubmit` fires for
+`task-notification` turns too and names an answer file, which `Stop` then skips. The run ended
+with 8 files in `turns/<sid>/` for 2 audited turns. Harmless, but it is why a file count is not
+a turn count.
 
 ## `deferrals-auditor` and the by-running blind spot
 
@@ -1910,14 +1973,14 @@ env -u GUARD_PROJECT_DIR -u GUARD_REFS_DIR GUARD_TRACE=1 claude -p "Reply with O
 guard session's Bash — without it the child's hooks write into the PARENT's project. That is
 the bug the case above pins; the flag keeps the test honest even after the fix.
 
-The interactive-only paths — the `UserPromptExpansion` hooks behind `/guard:toggle` and
-`/guard:<agent>` — need a terminal, which `tmux` supplies:
+An interactive path — one that needs a real session, such as the `guard` command reaching the
+same `state/<sid>.json` the hooks write — needs a terminal, which `tmux` supplies:
 
 ```bash
 tmux -f /dev/null new-session -d -s gt -x 200 -y 50 -c /tmp/guard-cli-test/proj
 tmux send-keys -t gt 'claude --plugin-dir /path/to/plugins/guard --model haiku' Enter
 tmux pipe-pane -o -t gt 'cat >> /tmp/pane.log'   # capture-pane can come back empty here
-tmux send-keys -t gt '/guard:toggle off'; sleep 2; tmux send-keys -t gt Enter
+tmux send-keys -t gt '!guard off'; sleep 2; tmux send-keys -t gt Enter
 ```
 
 Three traps worth knowing. Piping claude's stdout (`| tee`) takes away its TTY and it drops
@@ -1935,7 +1998,7 @@ something answers it — the mode narrows prompts, it does not remove them. Unde
 `bypassPermissions` the same prompt count was zero and the pane header reads
 `bypass permissions on`. The trust dialog is a separate gate and neither mode skips it: it is
 suppressed only in non-interactive mode (`-p`, or a non-TTY stdout), which is exactly the
-mode the interactive-only hooks cannot be tested in. So an interactive recipe still sends one
+mode an interactive-only path cannot be tested in. So an interactive recipe still sends one
 extra Enter, or runs in a directory already trusted.
 
 ### Why uv, and what it fixed
@@ -1957,12 +2020,13 @@ Two things about that failure were worse than they look. It is **not** fail-open
 the rest of guard means: a traceback in the transcript on every hook of every turn is the
 loudest possible failure, repeated. And because the hook printed nothing, the model was free
 to narrate success — in the observed run it answered "이 세션에서 비활성화했습니다" to a
-`/guard:toggle off` whose hook had in fact crashed and changed nothing. That is the general
+`/guard:toggle off` — the slash command, since removed — whose hook had in fact crashed and
+changed nothing. That is the general
 hazard behind the rule in the CLI-testing section: assert on the trace, not on the answer.
 
 uv resolves an interpreter satisfying the pin, so the same tmux pane — `python3` still 3.9.6,
 `uv` on the PATH at /opt/homebrew/bin — now runs the hooks correctly: `/guard:toggle off`
-records `toggle/set paused: true` plus both control-command skips, `audit_paused` is `True`,
+recorded `toggle/set paused: true` plus both control-command skips, `audit_paused` is `True`,
 and the pane shows no hook error. Cost: about 9ms per invocation (10 runs, 0.267s under uv
 vs 0.176s direct), and the 100-case regression suite runs in 1.7s total.
 
