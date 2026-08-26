@@ -206,6 +206,13 @@ def _router_context(project_dir: Path, session_id: str, prompt_id: str, lead: st
     # turn directory out was a second copy of `turnrec`'s layout, in prose, and a drifted
     # copy reads nothing and clears every turn silently.
     fields = [f"- turn: {prompt_id}"]
+    # Two INDEPENDENT fallbacks, one per wrapper, because a tree can be missing either. Each
+    # covers what its own wrapper would have derived, and the roster one is separate from
+    # the paths one — folding them together is how the `candidates` line was silently lost
+    # when this block was rewritten, and a router with no roster command picks nothing,
+    # which is indistinguishable from a turn that had nothing in it.
+    if not (_plugin_root() / SHELL_CANDIDATES_REL).is_file():
+        fields.append(f"- candidates: run `{_candidates_cmd()}`")
     # The fallback for a tree without the wrapper, where the agent's own definition would
     # name a command that is not there. Then the caller must supply what it can, in the old
     # shape, because nothing downstream can derive it.
