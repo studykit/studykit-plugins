@@ -73,7 +73,7 @@ there is nothing shared to factor out beyond the state root.
 | (called via Bash, not a hook) | `transcript` | `index` / `turn` / `find` over the session transcript, for the audit agents. Writes an extract file and prints only its path plus a one-line summary; `--since` / `--until` / `--last` bound which turns are scanned. |
 | `UserPromptExpansion` (`^(guard:)?toggle$`) | `toggle` | Arm/mute the automatic audit for THIS session (`audit_paused`, session state only — never guard.local.json). A session starts muted, so `on` is the arming direction and the common one. `command_args` carries `on`/`off`; empty flips. The hook does the work and then **blocks the expansion**, so its message reaches the user directly and no model is invoked — the command file exists only to make the matcher reachable, and its body never runs. |
 | (called via Bash, not a hook) | `toggle-cli` | The same mute as `/guard:toggle`, for a shell prompt: `on` / `off` / `status` / empty flips. Session id from `CLAUDE_CODE_SESSION_ID`; project from `_cli_project_dir`. Shares `_apply_toggle` and `_mute_sentence` with the hook, so the two cannot describe the same state differently. The ONE subcommand that does not fail open — see `_MUST_REPORT` in `guard_hook.py`. |
-| (called via Bash, not a hook) | `status` | Status-line segment: `guard <n>` / `guard off` / `guard · on` / `guard ·`, or nothing on any failure. Reads one state file; runs on every assistant message. |
+| (called via Bash, not a hook) | `status` | Status-line segment: `guard <will run>/<switched on>` plus the plan gate's flag (`⚑` armed, `⚐` muted), green armed and dim muted on each half; nothing at all on any failure. Reads one state file; runs on every assistant message. |
 | (called via Bash, not a hook) | `refs-dir` | Print the resolved refs directory (auditor fallback; applies `refs_dir` validation). |
 
 ## Storage layout (`${CLAUDE_PROJECT_DIR}/.claude/guard/`)
@@ -734,6 +734,42 @@ payloads, not memory.
   `/guard:statusline` offers to wire it. The segment prints **nothing** on any failure: a
   status line runs on every assistant message and is the one place guard must never report an
   error.
+
+  **Both session switches live in that one field, and they are spelled differently on
+  purpose.** The turn audit is a FRACTION — agents that can run on the next finished turn over
+  agents switched on — so `3/3` armed, `0/3` muted, and the two commands that move it move
+  different halves: `/guard:toggle` the numerator, `/guard:settings` the denominator. It was
+  `guard off` until the readings collided: `off` sounds like a statement about guard, while
+  the state next to it — also nothing running, for the entirely different reason that no agent
+  is switched on — was spelled `guard ·` and contradicted it. The fraction cannot be read
+  that way, and it says what the bare count never did, which is how many switches are set at
+  all. A project with nothing switched on is `0/0`, not a dot: one grammar, no special case.
+
+  **GREEN MEANS ARMED, and it is not decoration.** The fraction is green while the session is
+  auditing and dim while it is muted; the flag below is green while the plan gate is armed and
+  dim while it is not. Two independent switches, one vocabulary, so the field is read by
+  counting the green rather than by decoding two conventions. The numbers say it a second time
+  — `0/N` against `N/N` — which is what survives a log or a screenshot, and the colour is what
+  covers the case the numbers cannot: with nothing switched on, both mute states read `0/0`,
+  and green against dim is then the only thing separating them. Tinting that pair identically
+  makes `/guard:toggle` a command with no observable effect, which is the failure that killed
+  the persistent gate this mute replaced.
+
+  The plan gate is a MARK — filled `⚑` armed, outline `⚐` muted — and it is never absent. A
+  second fraction would imply a second roster and there is none; the gate is one bit. Absence
+  was the first spelling and it was wrong for a reason worth keeping: a missing mark cannot be
+  told from a guard that does not report plan audits at all, so the reader it failed was
+  exactly the one who most needed it — someone who has never run `guard-plan` and would never
+  otherwise learn the switch exists. Two glyphs of the same shape and width also mean the
+  field neither moves nor grows when it flips.
+
+  Both marks are ordinary Unicode rather than Nerd Font glyphs. A private-use codepoint has no
+  fallback, and this segment is composed into status lines whose font guard cannot know;
+  U+2690 and U+2691 have identical coverage in the fonts a terminal falls back to.
+
+  This segment is the only place either switch reports itself unasked. `/guard:settings show`
+  and the SessionStart line still say nothing about plan audits, which is survivable only
+  while this field exists — the same argument as for the mute above.
 - **The file-reading agents are never routed.** The Stop hook splits the eligible set by
   `reads`: the `reads="turn"` agents go to the router, and `comment-corrector`
   (`reads="files"`) and `agents-md-auditor` (`reads="agent-docs"`) are dispatched directly in

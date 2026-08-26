@@ -13,10 +13,11 @@ exists to make the matcher reachable at all, and its body never runs.
 
 ``status`` (CLI, stdin JSON) is the other half, and starting muted is what makes it
 load-bearing rather than a convenience: the mute is a feature only because it is visible, and
-now it is the state every session opens in. It prints one short field — ``guard <n>`` armed /
-``guard off`` muted / ``guard · on`` and ``guard ·`` for the two states of a project with
-nothing switched on — or NOTHING on any failure, because its stdout goes straight into the
-user's status bar. The mute decides the word in EVERY branch, including the last pair: a
+now it is the state every session opens in. It prints one short field — ``guard <will
+run>/<switched on>``, so ``guard 3/3`` armed, ``guard 0/3`` muted, ``guard 0/0`` for a project
+with nothing switched on, each followed by ``· ⚑`` when the plan gate is armed and ``· ⚐``
+when it is not — or NOTHING on any failure, because its stdout goes straight into the user's
+status bar. The mute decides the word in EVERY branch, including the last pair: a
 toggle that leaves the segment unchanged cannot be told from a toggle that did not fire.
 A plugin cannot own the main ``statusLine``, so the user composes this segment into theirs
 (``/guard:statusline`` offers to do it). It reads only the small config and state files,
@@ -46,19 +47,19 @@ from .paths import _cli_project_dir, _project_dir, _trace
 from .payload import _read_payload, _session_id
 from .emit import _emit_expansion
 from .agents import AUDIT_AGENTS
-from .state import _audit_paused, _read_state, _write_state
+from .state import _audit_paused, _plan_audit_paused, _read_state, _write_state
 
 
-# Status-line colours. Dim for the state guard chose not to shout about, green for armed,
-# yellow for muted — the one state the user set and can forget. Kept as constants because a
-# status line that emits a stray escape sequence garbles the user's terminal row.
+# Status-line colours, and one rule behind both halves: GREEN MEANS ARMED. The fraction is
+# green while the session is auditing and dim while it is muted; the flag is green while the
+# plan gate is armed and dim while it is not. Two independent switches, the same vocabulary,
+# so a glance at the field counts the green rather than decoding two conventions. Kept as
+# constants because a status line that emits a stray escape sequence garbles the user's
+# terminal row.
 _ANSI_RESET = "\033[0m"
 
 
 _ANSI_ARMED = "\033[32m"
-
-
-_ANSI_MUTED = "\033[33m"
 
 
 _ANSI_IDLE = "\033[2m"
@@ -278,6 +279,10 @@ def cmd_status() -> int:
     whatever status line they already run. The excerpt is saved in the refs dir as
     `claude-code-statusline.md`.
 
+    Two switches, one field: the fraction is the turn audit, and the trailing flag is the
+    plan gate — filled `⚑` armed, outline `⚐` muted. They are separate settings with separate commands and separate defaults, and
+    this is the only place either one is visible without being asked for.
+
     Two documented constraints shape the body. It runs on every assistant message, debounced
     at 300ms, and a newer update cancels the one in flight: so it reads only the small
     config and state JSON files and does nothing else — no git, no transcript, no subprocess.
@@ -314,22 +319,68 @@ def cmd_status() -> int:
         return 0
 
     armed = [k for k in AUDIT_AGENTS if _switch_on(state, k)]
-    # The mute is a feature only because it is visible, so it decides the WORD in every
-    # branch — including the one where no agent is switched on. Ordering `armed` ahead of
-    # the mute, or letting the empty-roster case print the same dot either way, makes
-    # `/guard:toggle` a command with no observable effect on a project that has switched
-    # nothing on: the state flips and the segment does not move. That is indistinguishable
-    # from a broken toggle, which is how it was read.
-    if not armed:
-        # Nothing switched on for this project. Still not an error and still not worth
-        # shouting about, so it keeps the dim dot — but the dot follows the mute, so the
-        # toggle remains legible here too.
-        word = "guard ·" if _audit_paused(state) else "guard · on"
-        print(f"{_ANSI_IDLE}{word}{_ANSI_RESET}")
-    elif _audit_paused(state):
-        # Muted with agents configured is the state worth a colour: the user chose it and
-        # can forget it, and unlike the branch above there is something being held back.
-        print(f"{_ANSI_MUTED}guard off{_ANSI_RESET}")
+    # The plan gate is a SECOND switch, with its own default and its own command
+    # (`guard-plan`), so it needs its own mark — and a mark rather than a word because this
+    # field shares one terminal row with everything else the user's status line carries.
+    # Presence against absence is enough to read it, but only because the mark is appended in
+    # EVERY branch below: a `guard-plan` flip that left some segment unchanged would be the
+    # unobservable toggle the next comment is about.
+    # Filled flag armed, OUTLINE flag muted — the mark is always there, never absent. An
+    # absent mark cannot be told from a guard that does not report plan audits at all, which
+    # is exactly the reader who most needs to know the gate exists: someone who has never run
+    # `guard-plan` and would otherwise never learn there is a switch. The two glyphs are the
+    # same shape at the same width, so the field neither moves nor grows when it flips.
+    #
+    # Both are ordinary Unicode, deliberately: a private-use Nerd Font glyph has no fallback,
+    # and this segment is composed into status lines whose font guard cannot know. U+2690 and
+    # U+2691 have identical coverage in the fonts a terminal falls back to.
+    #
+    # It carries its OWN colour, closed before the fraction's begins. The two switches are
+    # independent — `/guard:toggle` cannot move the plan gate and `guard-plan` cannot move the
+    # turn audit — so one colour spanning both would state a single verdict about two
+    # settings: a green fraction beside a dim flag has to be able to say "auditing, gate off",
+    # and one span over both cannot. Green armed, dim muted — the same vocabulary the fraction
+    # uses, so the field is read by counting the green.
+    if _plan_audit_paused(state):
+        flag = f"{_ANSI_IDLE} · ⚐{_ANSI_RESET}"
     else:
-        print(f"{_ANSI_ARMED}guard {len(armed)}{_ANSI_RESET}")
+        flag = f"{_ANSI_IDLE} · {_ANSI_RESET}{_ANSI_ARMED}⚑{_ANSI_RESET}"
+    # One shape everywhere: agents that can run on the next finished turn over agents
+    # switched on. `guard off` used to hold the muted case, and it read as a claim about guard
+    # itself — which the neighbouring "nothing switched on" state, also nothing running for an
+    # entirely different reason, then contradicted. The fraction cannot be read that way, and
+    # it says what a bare count never did: how many switches are set at all.
+    #
+    # The numerator is only ever 0 or the whole denominator, because the mute is what governs
+    # it. That is the fraction working, not a wasted digit: `/guard:toggle` moves the
+    # numerator and `/guard:settings` moves the denominator, so which command a reader needs
+    # is legible from the field.
+    #
+    # ONE CORNER LOSES THE TEXTUAL DIFFERENCE: with nothing switched on, both mute states are
+    # `0/0`, and only the colour separates them. That is a deliberate trade for one grammar
+    # over a special case — but it is also the whole reason the colours below are not
+    # decoration. Before touching them, note that a mute nobody can see is the failure that
+    # killed the gate this mute replaced: `/guard:toggle` must remain observable in every
+    # state, and here the colour is the only thing carrying it.
+    # Each half closes its own colour before the next opens — nesting the flag's spans inside
+    # the fraction's left a reset in the middle of an open span, which renders correctly today
+    # and is one edit away from not.
+    #
+    # The numbers AND the colour carry the mute, and the redundancy is the point. `0/N` muted
+    # against `N/N` armed stays legible where colour cannot go — a log, a screenshot, a
+    # terminal configured differently — while the colour is what makes the flip visible at a
+    # glance in the row itself. It also covers the one case the numbers cannot: a project with
+    # nothing switched on reads `0/0` either way, since there is no count for the numerator to
+    # move, and green-versus-dim is then the only thing separating a muted session from an
+    # armed one. Do not tint that pair identically.
+    if _audit_paused(state):
+        turn = f"{_ANSI_IDLE}guard 0/{len(armed)}{_ANSI_RESET}"
+    elif not armed:
+        # Armed, but nothing switched on: green because the session IS auditing, and `0/0`
+        # because no turn-reading agent can run. Not a contradiction — `ext-docs-auditor` has
+        # no switch, so a turn that writes a saved reference is still checked from here.
+        turn = f"{_ANSI_ARMED}guard 0/0{_ANSI_RESET}"
+    else:
+        turn = f"{_ANSI_ARMED}guard {len(armed)}/{len(armed)}{_ANSI_RESET}"
+    print(f"{turn}{flag}")
     return 0
