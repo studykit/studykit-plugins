@@ -61,6 +61,16 @@ CLI_WRITE_ENV_VAR = "GUARD_SETTINGS_SKILL"
 ORPHAN_MAX_AGE_SECONDS = 7 * 24 * 60 * 60
 
 
+# How long a `/clear` handoff record stays usable. The record is not a guess about which
+# session preceded which — `SessionEnd` names the ending session outright, measured 55ms
+# before the replacing `SessionStart` arrives — so this is not a confidence window. It is the
+# expiry on a record that was never consumed: the new session's hook failing to run, or the
+# process dying between the two events, leaves a file behind, and without an expiry that file
+# would arm some unrelated `/clear` hours later. Five minutes is enormous next to 55ms and
+# still far too short to become the persistent gate that was deleted.
+CLEAR_INHERIT_MAX_AGE_SECONDS = 5 * 60
+
+
 class AgentMode(StrEnum):
     """How one audit agent runs. The value of that agent's config key.
 

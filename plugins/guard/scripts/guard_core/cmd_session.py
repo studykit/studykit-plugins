@@ -15,6 +15,7 @@ has to end up saved.
 
 from __future__ import annotations
 
+import json
 import os
 import shlex
 import time
@@ -22,33 +23,35 @@ import time
 from pathlib import Path
 
 from .config import (
-    AgentMode, ORPHAN_MAX_AGE_SECONDS, _HOST_IS_CODEX, _agent_mode, _load_config, _switch_on
+    AgentMode, CLEAR_INHERIT_MAX_AGE_SECONDS, ORPHAN_MAX_AGE_SECONDS, _HOST_IS_CODEX,
+    _agent_mode, _load_config, _switch_on
 )
-from .paths import _project_dir, _refs_dir, _state_root, _trace, _trace_file
+from .paths import (
+    _clear_handoff_file, _project_dir, _refs_dir, _state_root, _trace, _trace_file
+)
 from .payload import _read_payload, _session_id
-from .state import _audit_paused, _read_state
+from .state import _audit_paused, _plan_audit_paused, _read_state, _write_state
 from .agents import AUDIT_AGENTS, _agent_id, _instance_name
 from .dispatch import CLI_REL, _playbook_path, _plugin_root
 
 
-def _session_muted(project_dir: Path, config: dict) -> bool:
+def _session_muted(project_dir: Path, config: dict, payload: dict | None) -> bool:
     """Is the session this SessionStart opens muted? Claude only.
 
     A session starts muted (`state._read_state`), so at `startup` this is True and the line
     below has to say so instead of announcing audits nothing will run. It is not always
     True: SessionStart registers no matcher, so it also fires on `resume`, `clear`,
     `compact` and `fork`, where the session may already have been unmuted by
-    `/guard:toggle` and the state file says so.
+    `/guard:toggle` — or, on `clear`, by the handoff from the session it replaced — and the
+    state file says so.
 
-    Reading stdin here is safe only because the Claude entry point has not: `guard_hook.py`
-    dispatches this verb without touching the payload. The Codex adapter HAS already
-    consumed stdin by the time it calls this module, which is a second reason for the host
-    test — the first being that Codex has no `/guard:toggle` and its own Stop path never
-    reads `audit_paused`, so a Codex session is never muted.
+    The payload is passed in rather than read here: stdin can be read once, and the clear
+    handoff needs the same payload's `source`. On Codex it is None (that adapter consumed
+    stdin before calling this module), which costs nothing — Codex has no `/guard:toggle`
+    and its Stop path never reads `audit_paused`, so a Codex session is never muted.
     """
     if _HOST_IS_CODEX:
         return False
-    payload = _read_payload()
     sid = _session_id(payload) if payload else None
     if sid is None:
         # No session to look up means no state to have been unmuted — the same answer a
@@ -147,6 +150,146 @@ def _append_env_file(text: str, marker: str | None = None) -> bool:
     return True
 
 
+def cmd_session_end() -> int:
+    """SessionEnd, matched on ``clear`` — hand this session's switches to its replacement.
+
+    `/clear` starts a NEW session with a new id, so `state/<sid>.json` no longer applies and
+    both switches would open muted: the user who armed guard a minute ago has to arm it again,
+    with nothing saying why. This is the one boundary where that is worth fixing, because it is
+    the one boundary where a new session is not a new intention — the conversation was cleared,
+    the work was not.
+
+    **Why this event, and not an inference in SessionStart.** `SessionStart` with
+    `source: "clear"` says the session was born from a clear but names no predecessor (measured
+    payload keys: `cwd`, `hook_event_name`, `session_id`, `source`, `transcript_path`). Picking
+    the predecessor by recency instead is wrong the moment two sessions run in one project. So
+    the ENDING session writes the record and names itself; `SessionEnd` carries `reason:
+    "clear"` and the old `session_id`, and fires 55ms before the replacing `SessionStart`
+    (measured 2026-08-26 in a live session; ordering is not documented, which is why it was
+    measured and why this fails silent if it ever reverses).
+
+    Nothing is written unless a switch is actually armed — a muted session has nothing to hand
+    over, and an absent record is the same instruction as a record of two mutes. A stale record
+    from a previous clear is removed in that case rather than left to be read later.
+
+    NOT handed over: `plan_audited_hash`. The plan a cleared session had audited is gone from
+    the conversation that approved it, so the gate should audit again rather than wave through
+    a plan on the strength of a review nobody in this session saw.
+    """
+    if _HOST_IS_CODEX:
+        return 0
+    project_dir = _project_dir()
+    if project_dir is None:
+        return 0
+    payload = _read_payload()
+    if payload is None:
+        return 0
+    # The matcher already filters this, so the test is defence against a future registration
+    # without one: every other reason (`logout`, `prompt_input_exit`, `resume`, `other`) ends
+    # a session that is not being replaced, and inheriting into the next unrelated session is
+    # exactly the persistent gate this must not become.
+    if payload.get("reason") != "clear":
+        return 0
+    sid = _session_id(payload)
+    if sid is None:
+        return 0
+
+    handoff = _clear_handoff_file(project_dir)
+    state = _read_state(project_dir, sid, _load_config(project_dir))
+    audit_paused = _audit_paused(state)
+    plan_paused = _plan_audit_paused(state)
+    if audit_paused and plan_paused:
+        try:
+            handoff.unlink()
+        except OSError:
+            pass
+        _trace(project_dir, sid, "session-end", "clear_nothing_to_carry")
+        return 0
+
+    record = {
+        "from_session": sid,
+        "audit_paused": audit_paused,
+        "plan_audit_paused": plan_paused,
+        "written_at": time.time(),
+    }
+    try:
+        handoff.parent.mkdir(parents=True, exist_ok=True)
+        tmp = handoff.with_suffix(".json.tmp")
+        tmp.write_text(json.dumps(record, ensure_ascii=False), encoding="utf-8")
+        tmp.replace(handoff)
+    except OSError:
+        return 0
+    _trace(project_dir, sid, "session-end", "clear_handoff_written",
+           audit_paused=audit_paused, plan_audit_paused=plan_paused)
+    return 0
+
+
+def _consume_clear_handoff(project_dir: Path, config: dict, payload: dict | None) -> dict | None:
+    """On a `source: "clear"` SessionStart, adopt the ended session's switches. Once.
+
+    Returns what was carried, for the line that says so out loud — an inheritance nobody is
+    told about is the invisible gate, and being told is the whole difference. Returns None when
+    there is nothing to carry, which is the ordinary case.
+
+    The record is deleted whether or not it is used: single use is what stops one clear's
+    choice from reaching a second clear, and the expiry
+    (``CLEAR_INHERIT_MAX_AGE_SECONDS``) covers a record whose reader never ran.
+    """
+    if _HOST_IS_CODEX or payload is None:
+        return None
+    if payload.get("source") != "clear":
+        return None
+    sid = _session_id(payload)
+    if sid is None:
+        return None
+    handoff = _clear_handoff_file(project_dir)
+    try:
+        raw = handoff.read_text(encoding="utf-8")
+    except OSError:
+        return None
+    # Read once, then gone, regardless of what happens below.
+    try:
+        handoff.unlink()
+    except OSError:
+        pass
+    try:
+        record = json.loads(raw)
+    except (json.JSONDecodeError, ValueError):
+        return None
+    if not isinstance(record, dict):
+        return None
+    if record.get("from_session") == sid:
+        # The session cannot inherit from itself; a record naming this id means the id was
+        # reused, and applying it would be a no-op at best.
+        return None
+    written = record.get("written_at")
+    if not isinstance(written, (int, float)):
+        return None
+    if time.time() - written > CLEAR_INHERIT_MAX_AGE_SECONDS:
+        _trace(project_dir, sid, "session-start", "clear_handoff_expired")
+        return None
+    audit_paused = record.get("audit_paused")
+    plan_paused = record.get("plan_audit_paused")
+    if not isinstance(audit_paused, bool) or not isinstance(plan_paused, bool):
+        return None
+    if audit_paused and plan_paused:
+        return None
+
+    state = _read_state(project_dir, sid, config)
+    state["audit_paused"] = audit_paused
+    state["plan_audit_paused"] = plan_paused
+    _write_state(project_dir, sid, state)
+    # Confirm by reading back: `_write_state` swallows OSError by design, and a line saying
+    # the switches were carried over a write that failed is worse than no line at all.
+    check = _read_state(project_dir, sid, config)
+    if _audit_paused(check) != audit_paused or _plan_audit_paused(check) != plan_paused:
+        _trace(project_dir, sid, "session-start", "clear_handoff_write_failed")
+        return None
+    _trace(project_dir, sid, "session-start", "clear_handoff_applied",
+           audit_paused=audit_paused, plan_audit_paused=plan_paused)
+    return {"audit_paused": audit_paused, "plan_audit_paused": plan_paused}
+
+
 def cmd_session_start() -> int:
     # Sweep both state and logs on the same age policy. State is intentionally NOT
     # cleared at SessionEnd: a session can be resumed later (`claude --resume`), and
@@ -156,6 +299,9 @@ def cmd_session_start() -> int:
     project_dir = _project_dir()
     if project_dir is None:
         return 0
+    # Once, here: stdin is readable one time, and two things below need this payload — the
+    # mute line and the `/clear` handoff, which keys off `source`.
+    payload = _read_payload()
     # Before the sweep: the sweep can fail on a filesystem error, and this export is what
     # keeps the CLI verbs off their inferred fallback for the rest of the session.
     exported = _export_to_bash_env("GUARD_PROJECT_DIR", str(project_dir))
@@ -228,11 +374,26 @@ def cmd_session_start() -> int:
     # marketplace installs the plugin under a versioned cache directory. Exporting the
     # resolved path is what makes `guard on` from a prompt possible at all.
     #
-    # The PATH itself is deliberately not touched. Prepending a directory to a user's PATH
-    # from a session hook changes how every command in that shell resolves, for a feature
-    # that needs one variable; the wrapper the user installs reads this instead.
+    # The shell commands go on PATH beside it, appended once per session to the same file.
     _export_to_bash_env("GUARD_TOGGLE_CLI", str(_plugin_root() / CLI_REL))
     _add_shell_command_to_path()
+
+    # A `/clear` is the one boundary where a new session is not a new intention, so the
+    # switches the ended session was carrying are adopted here — before the lines below,
+    # which read the state this may have just written. Said out loud, because an inheritance
+    # nobody is told about is the invisible gate that was deleted.
+    carried = _consume_clear_handoff(project_dir, session_cfg, payload)
+    if carried:
+        parts = []
+        if not carried["audit_paused"]:
+            parts.append("audits are ON")
+        if not carried["plan_audit_paused"]:
+            parts.append("plan audits are ON")
+        print(
+            "guard: carried the previous session's switches across the /clear — "
+            f"{' and '.join(parts)} for this session. `guard off` / `guard-plan off` to "
+            "change either. Do not mention this unless the user asks."
+        )
 
     # The injected contract states the general rule — a doc-based claim cites the source
     # URL and a local saved copy — but not where this project keeps that copy, which
@@ -256,7 +417,7 @@ def cmd_session_start() -> int:
         # on" to a session that starts muted would be false in the one place a false line is
         # most expensive: nothing later in the session contradicts it, so the model spends
         # the session expecting a recommendation that never comes.
-        if _session_muted(project_dir, session_cfg):
+        if _session_muted(project_dir, session_cfg, payload):
             print(
                 "guard: agents are configured for this project, but audits are OFF for this "
                 "session — guard starts muted, so nothing is recommended when a turn ends "

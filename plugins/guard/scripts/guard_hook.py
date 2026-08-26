@@ -31,6 +31,7 @@ Subcommands
 - pre-search     PreToolUse on the search tools — ``guard_core.cmd_search``
 - stop           Stop — ``guard_core.cmd_stop``
 - session-start  SessionStart — ``guard_core.cmd_session``
+- session-end    SessionEnd on ``clear`` — ``guard_core.cmd_session``
 - toggle         UserPromptExpansion for ``/guard:toggle`` — ``guard_core.cmd_status``
 - toggle-cli     CLI (argv), the same mute from a shell — ``guard_core.cmd_status``
 - status         CLI (stdin JSON), the status-line segment — ``guard_core.cmd_status``
@@ -57,7 +58,7 @@ from guard_core.cmd_turn import cmd_user_prompt
 from guard_core.cmd_edit import cmd_post_edit
 from guard_core.cmd_search import cmd_pre_search
 from guard_core.cmd_stop import cmd_stop
-from guard_core.cmd_session import cmd_session_start
+from guard_core.cmd_session import cmd_session_end, cmd_session_start
 from guard_core.cmd_candidates import cmd_candidates
 from guard_core.cmd_inputs import cmd_inputs
 from guard_core.cmd_plan import cmd_knowledge_dirs
@@ -73,6 +74,7 @@ SUBCOMMANDS = {
     "settings": cmd_settings,
     "stop": cmd_stop,
     "session-start": cmd_session_start,
+    "session-end": cmd_session_end,
     "refs-dir": cmd_refs_dir,
     "candidates": cmd_candidates,
     "inputs": cmd_inputs,

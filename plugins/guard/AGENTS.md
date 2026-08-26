@@ -79,6 +79,11 @@ how the code here is organised.
 - The session mute is session-only, two-valued and visible. Do not grow it back into the
   persistent gate that was removed; if the indicator ever becomes unshippable, drop the mute
   rather than let it go invisible.
+- A `/clear` inherits both switches from the session it replaced, and that is the ONLY
+  boundary that inherits anything — `startup` opens muted. The predecessor is named by the
+  `SessionEnd` record rather than inferred from file times, the record is single-use and
+  expiring, and the adoption is announced. Weaken any one of those four and this becomes the
+  persistent gate wearing a different name; `dev/design.md` has the measurements.
 - guard always exits 0 and fails open.
 
 ## Deliberately not enforced

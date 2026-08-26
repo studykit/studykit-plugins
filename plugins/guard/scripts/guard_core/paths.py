@@ -141,6 +141,21 @@ def _safe_project_subdir(project_dir: Path, raw: Any) -> Path | None:
     return candidate
 
 
+def _clear_handoff_file(project_dir: Path) -> Path:
+    """Where a `/clear`ed session leaves its switches for the session replacing it.
+
+    One file per project, not per session: it is written by exactly one event (`SessionEnd`
+    with `reason: "clear"`) and consumed by the next `SessionStart` with `source: "clear"`,
+    which then deletes it. A second concurrent session cannot be mistaken for the predecessor
+    because the record NAMES the session that ended — recency never enters into it.
+
+    It sits beside `state/` rather than inside it so the age sweep, which reaps that directory
+    on a seven-day policy, cannot be confused by a file that is meant to live for milliseconds.
+    Its own expiry is ``CLEAR_INHERIT_MAX_AGE_SECONDS``.
+    """
+    return _state_root(project_dir) / "clear-handoff.json"
+
+
 def _knowledge_dirs(project_dir: Path, config: dict[str, Any] | None = None) -> list[Path]:
     """The directories holding this project's operational knowledge. Empty when unset.
 

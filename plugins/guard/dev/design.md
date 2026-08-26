@@ -68,6 +68,7 @@ there is nothing shared to factor out beyond the state root.
 | `PostToolUse` (`Write\|Edit\|MultiEdit\|NotebookEdit`) | `post-edit` | Record a source file, an agent instruction file, or a saved reference this turn wrote (the candidate lists for `comment-corrector`, `agents-md-auditor` and `ext-docs-auditor`), then block when a file saved in the refs dir is not listed in that dir's `AGENTS.md`. |
 | (called via Bash, not a hook) | `settings` | `guard:settings` (a `context: fork` skill, so it runs in a forked `general-purpose` agent rather than in the main session) shows/sets/unsets guard.local.json settings; the agent modes also apply to the live session's `state/<sid>.json` (session id from `--session`/`CLAUDE_CODE_SESSION_ID`). A mode change away from `reuse` also prints a stand-down note, the only channel guard has to a running instance. `set` preserves every other key; `unset <key>` is the only way to delete one. |
 | `Stop` | `stop` | Write the response section of the turn record and mark the turn as the on-demand target — always (only Codex reads that marker now; see below). Then, when any agent is not `off`, emit `additionalContext` asking the main agent to dispatch `guard:router` over the record, carrying this turn's paths and the `candidates` command the router runs to get the roster itself. The router names sections of `hooks/context/dispatch-playbook.md`; the main agent follows those, completing the record's second section only if a named section asks for it. `comment-corrector` never goes to the router: it is dispatched directly in the same emission, to be sent in the same message — see the invariant below. A third block names `ext-docs-auditor` over the refs files the turn wrote; it has no switch, so it can be the only block a turn produces. |
+| `SessionEnd` (`clear`) | `session-end` | Hand this session's two switches to the session `/clear` is about to open, then let it announce what it adopted. Writes nothing when both are muted. |
 | `SessionStart` | `session-start` | Sweep state and turn records past retention, export `GUARD_REFS_DIR` and `GUARD_TOGGLE_CLI`, state the refs rule as session context, say once — when any agent is on — either that the session opened muted (the usual case; `/guard:toggle on` arms it) or that audits are on and where the dispatch playbook is, and — when any agent is in `reuse` — state the standing reuse policy once. |
 | (called via Bash, not a hook) | `candidates` | The router's own roster: prints the turn-reading agents switched on for this session, one `key=mode` per line, in `AUDIT_AGENTS` order. Session id from `CLAUDE_CODE_SESSION_ID`, which a subagent's Bash carries as its parent's. Read-only, and the only command the router runs. |
 | (called via Bash, not a hook) | `transcript` | `index` / `turn` / `find` over the session transcript, for the audit agents. Writes an extract file and prints only its path plus a one-line summary; `--since` / `--until` / `--last` bound which turns are scanned. |
@@ -728,6 +729,31 @@ payloads, not memory.
   inventing three new ones would have destroyed content under the name of an audit.
   `ext-docs-auditor` is the same hazard in a different directory: the passage it flags is
   fixed by MOVING it, and the destination is usually a design note nobody has written.
+- **A `/clear` carries the session switches over; nothing else does.** `/clear` opens a new
+  session id, so `state/<sid>.json` no longer applies and both switches would open muted —
+  the user who armed guard a minute ago arms it again, with nothing saying why. It is the one
+  boundary worth crossing because it is the one where a new session is not a new intention:
+  the conversation was cleared, the work was not. `startup` still opens muted, which is what
+  keeps this from being the persistent gate that was deleted.
+
+  **The predecessor is named, not inferred.** Three payload facts, measured in a live session
+  on 2026-08-26 because none of them is documented: `SessionStart` with `source: "clear"`
+  carries `cwd`, `hook_event_name`, `session_id`, `source`, `transcript_path` — and nothing
+  naming the session it replaced; `SessionEnd` carries `reason: "clear"` and the ENDING
+  session's id; and the two fire in that order, 55–68ms apart. So the ending session writes
+  the record and names itself. The alternative — picking the most recently touched state file
+  — is wrong the moment two sessions run in one project, which is normal here.
+
+  Three properties keep the record honest, and each one is load-bearing. It is **single use**:
+  read and deleted, so one clear's choice cannot reach a second clear. It **expires**
+  (`CLEAR_INHERIT_MAX_AGE_SECONDS`), which covers the record whose reader never ran — without
+  it, a file left behind by a crash arms an unrelated clear hours later. And it is
+  **announced** in the session context, because an inheritance nobody is told about is exactly
+  the invisible gate, and being told is the whole difference.
+
+  Not carried: `plan_audited_hash`. The plan a cleared session had audited is gone from the
+  conversation that approved it, so the gate audits again rather than waving through a plan on
+  the strength of a review nobody in this session saw.
 - **guard cannot install the status line it wants.** A plugin's `settings.json` honors only
   `agent` and `subagentStatusLine` (`wiki/ref/claude-code-statusline.md`), so the main status
   line stays the user's. `status` prints a segment for them to compose into their own and
