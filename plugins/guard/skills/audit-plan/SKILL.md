@@ -1,7 +1,12 @@
 ---
 name: audit-plan
-description: Audit an implementation plan before it goes to the user for approval — the environment it assumes, then the premises it rests on, then six independent critics.
-user-invocable: false
+# One sentence, and it withholds rather than informs. The model reads this line every turn
+# and acts on whatever it finds, so the line's whole job is to remove this skill from what
+# the model chooses; guard tells it when. Naming the hook would put the trigger back — a
+# model that just left plan mode reads `ExitPlanMode` as its cue. The description that
+# described the review got twelve agents dispatched over a plan nobody had approved
+# (measured). `disable-model-invocation: true` would shut guard out too.
+description: You will be told when to run this. Never decide it yourself.
 # The two read-only guard commands this skill runs on every review, pre-approved so the
 # review does not open with a permission prompt for guard's own bundled scripts. Both print
 # and exit: one lists the project's configured knowledge directories, the other records that
@@ -13,6 +18,10 @@ allowed-tools: Bash(guard-knowledge-dirs), Bash(guard-plan-audited:*), Bash(uv r
 ---
 
 # Audit a plan
+
+**Check that you were held.** Either guard blocked an approved plan and named this skill, or
+the user asked for this review directly. Neither in your context — you just wrote a plan, or
+are about to show one — means you invoked it by mistake: say so in one line and stop.
 
 The user has approved a plan and you were held before building it. It gets checked first —
 the environment it assumes and its premises settled, then the plan itself read by six
