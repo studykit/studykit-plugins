@@ -1,28 +1,7 @@
 ---
 name: router
 description: Audit router.
-# `Read` for the two files it is pointed at — the answer and the request — plus `Bash` for
-# two of guard's own commands: `guard-inputs`, which turns the turn id it is given into
-# those paths, and `guard-candidates`, which tells it which agents it may name. Both are
-# fetched here rather than passed in, so each stays with its only reader.
-#
-# `Bash` is otherwise not for this agent's use. It routes from what it is given, so it needs
-# no search and no web access: whatever needs the repository is the job of the agent it
-# names, which has it. And no `Agent`: a router that could dispatch would be running the
-# very agents it was asked to merely nominate.
 tools: Read, Bash
-# No `memory:`, deliberately. Memory would inject this project's accumulated triage habits
-# into every routing decision, and the one thing routing must not do is decide from a
-# pattern instead of from this turn — a remembered "this project rarely writes Korean" is
-# exactly how a Korean turn goes unrouted, silently, at the step nothing else checks.
-#
-# `opus`, not the cheapest model that fits the method. Every other agent here is paid for
-# by a decision this one makes, so a router that misreads a turn does not save anything: it
-# either omits the agent that would have caught the defect, or spends a full subagent for
-# each agent it named on material that was not there. The second failure is the one that
-# compounds — it is what teaches the user to wave the recommendation through unread, and
-# then the omissions stop being caught either. The triage itself is short, so the model is
-# the cheap part of it.
 model: opus
 color: red
 ---

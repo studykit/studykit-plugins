@@ -28,6 +28,17 @@
     ],
     "PostToolUse": [
       {
+        "matcher": "ExitPlanMode",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "uv run --script \"${CLAUDE_PLUGIN_ROOT}/scripts/guard_hook.py\" exit-plan",
+            "timeout": 10,
+            "description": "When the user APPROVES a plan, hold it before it is built until it has been through the plan audit, and again whenever it is revised afterwards. Choosing \"tell Claude what to change\" runs no tool, so this never fires on feedback. Silent while the session has plan audits muted (`guard-plan off`, the default)."
+          }
+        ]
+      },
+      {
         "matcher": "Write|Edit|MultiEdit|NotebookEdit",
         "hooks": [
           {

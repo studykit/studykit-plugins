@@ -66,11 +66,16 @@ how the code here is organised.
   skip, while an *absent* origin must still audit — guard noisy is recoverable, guard silently
   dormant is not.
 - The recommendation is `additionalContext`; the refs-index gap is the one `decision: "block"`
-  that means unfinished work. `/guard:toggle` is also a block, for an unrelated reason — see
+  that means unfinished work. The `/`-rooted search refusal is a `PreToolUse` `deny` and is
+  the only thing guard forbids outright rather than recommends — it gates a tool ARGUMENT,
+  never a caller's identity, which is what separates it from the removed hook below. `/guard:toggle` is also a block, for an unrelated reason — see
   `dev/design.md` on Stop vs. `UserPromptExpansion` block semantics before changing either.
 - It names **agents**, never guard's own skills — those are the user's entry point, so a hook
   must not reach through them.
 - The three edited-file lists stay disjoint, and the refs test runs first, by location.
+- Two things ignore the agent switches AND the session mute, because both are prohibitions
+  rather than opinions: the refs-index check and the `/`-rooted search refusal. A mute that
+  could lift a prohibition would not be one.
 - The session mute is session-only, two-valued and visible. Do not grow it back into the
   persistent gate that was removed; if the indicator ever becomes unshippable, drop the mute
   rather than let it go invisible.

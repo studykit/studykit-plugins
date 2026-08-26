@@ -44,6 +44,7 @@ sys.path.insert(0, str(_guard_core_dir()))
 # open, so it failed silently.
 from guard_core import agents as core_agents  # noqa: E402
 from guard_core import cmd_edit as core_edit  # noqa: E402
+from guard_core import cmd_search as core_search  # noqa: E402
 from guard_core import cmd_session as core_session  # noqa: E402
 from guard_core import config as core_config  # noqa: E402
 from guard_core import payload as core_payload  # noqa: E402
@@ -266,6 +267,21 @@ def main() -> int:
     event = payload.get("hook_event_name")
     if event == "SessionStart":
         _handle_session_start(project_dir)
+    elif event == "PreToolUse":
+        # Before the turn-id guard below, deliberately. Every other handler here writes or
+        # reads a turn record and is meaningless without one; this rule reads `tool_name`
+        # and `tool_input` only, both of which Codex documents on this event
+        # (`wiki/ref/openai-codex-pretooluse-payload.md`), and a missing turn id must not
+        # quietly disarm a prohibition.
+        #
+        # This is the one guard rule Codex CAN express. The removed `pre-write` hook could
+        # not port because it classified the CALLER and this payload carries no
+        # `agent_type`; this one classifies the tool ARGUMENT, which is present on both
+        # hosts. The deny shape is the same `hookSpecificOutput.permissionDecision` Claude
+        # uses — Codex documents it, alongside a legacy `decision: "block"` it still accepts
+        # (`wiki/ref/openai-codex-pretooluse-deny-output-shape.md`), so `_emit_pre_tool_deny`
+        # is shared rather than reimplemented.
+        core_search.cmd_pre_search_payload(payload, project_dir, session_id)
     elif not session_id or not turn_id:
         return 0
     elif event == "UserPromptSubmit":

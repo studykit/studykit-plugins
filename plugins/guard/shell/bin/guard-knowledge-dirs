@@ -1,0 +1,16 @@
+#!/bin/sh
+# guard-knowledge-dirs — print the project's knowledge directories, one per line.
+#
+#   guard-knowledge-dirs
+#
+# Where this project writes down what its DEPLOYED system looks like — topology,
+# environments, runbooks. Configured order is precedence; only directories that exist are
+# printed. Printing nothing is normal and means the project has configured none.
+#
+# For the `guard:audit-plan` skill, which passes them to `design-environment`.
+if [ -z "$GUARD_TOGGLE_CLI" ] || [ ! -f "$GUARD_TOGGLE_CLI" ]; then
+  echo "guard-knowledge-dirs: GUARD_TOGGLE_CLI is unset or missing — this command works inside a Claude Code session." >&2
+  exit 1
+fi
+
+exec uv run --script "$GUARD_TOGGLE_CLI" knowledge-dirs "$@"

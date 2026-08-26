@@ -63,6 +63,19 @@ def _read_state(project_dir: Path, session_id: str, config: dict[str, Any]) -> d
         # hidden mute is the failure that killed the old gate, and starting muted raises
         # the price of hiding it — which is why `session-start` says so out loud.
         "audit_paused": True,
+        # The plan audit is OFF until asked for, for the same reason the turn audit is: it
+        # spends real time and the user has to want it. It is a SEPARATE key because the two
+        # run at different moments on different material — one on a finished answer, one on
+        # a plan awaiting approval — and a user who wants their turns audited has not
+        # thereby asked for every plan to be.
+        "plan_audit_paused": True,
+        # Which plan this session has already audited, as a hash of the plan text. The
+        # ExitPlanMode hook lets a plan through once its audit is recorded here and blocks
+        # it otherwise; hashing the CONTENT rather than setting a flag is what makes a
+        # revised plan a new plan — edit it after the audit and the hash no longer matches,
+        # so the next ExitPlanMode is blocked again and the audit runs against what the user
+        # will actually see.
+        "plan_audited_hash": None,
         "updated_at": None,
     }
     path = _state_file(project_dir, session_id)
@@ -75,7 +88,8 @@ def _read_state(project_dir: Path, session_id: str, config: dict[str, Any]) -> d
     if not isinstance(data, dict):
         return default
     keys = (*AUDIT_AGENTS, "last_audited_prompt_id", "pending_verify_prompt_id",
-            "transcript_path", "audit_paused", "edited_prompt_id", "edited_files",
+            "transcript_path", "audit_paused", "plan_audit_paused", "plan_audited_hash",
+            "edited_prompt_id", "edited_files",
             "edited_agent_docs", "edited_refs", "updated_at")
     default.update({k: data[k] for k in keys if k in data})
     return default
@@ -106,6 +120,15 @@ def _edited_files(state: dict[str, Any], prompt_id: str, bucket: str) -> list[st
     if not isinstance(files, list):
         return []
     return [f for f in files if isinstance(f, str) and f and Path(f).is_file()]
+
+
+def _plan_audit_paused(state: dict[str, Any]) -> bool:
+    """Whether the plan audit is muted for this session. Default (missing key) is muted.
+
+    Mirrors ``_audit_paused``: absent means OFF, so a state file written by an older version
+    reads as muted rather than silently arming a review the user never asked for.
+    """
+    return state.get("plan_audit_paused") is not False
 
 
 def _audit_paused(state: dict[str, Any]) -> bool:

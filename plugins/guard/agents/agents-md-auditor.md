@@ -1,26 +1,7 @@
 ---
 name: agents-md-auditor
-description: `AGENTS.md` auditor.
-# `Read` for the files under audit and for whatever they point at — a pointer is only good
-# if the thing on the other end exists and answers the question. `Grep`/`Glob` settle the
-# axis that separates this agent from a style checker: whether a sentence in the file is
-# something the code already shows, which can only be answered by going and looking at the
-# code. `git log`/`git ls-files` are worth reaching for — how big the project is and how
-# recently a named path moved is what tells a map that has drifted from one that was never
-# right. That is what the tool is for here, not the boundary of what it may do: the host
-# injects a standing instruction to prefer `Bash` wherever it can do the job, so a comment
-# narrowing it to a purpose list would be contradicted on every turn.
-# No `SendMessage`: the whole input is on disk, so there is nothing to ask the author that
-# reading the repository would not answer better.
+description: "`AGENTS.md` auditor."
 tools: Read, Grep, Glob, Bash
-# `project` — `.claude/agent-memory/<agent>/`, the host's recommended default, and here it is
-# chosen for the reviewability rather than the sharing: what this agent writes lands in the
-# project's diff, so a wrong entry is caught by the same review that catches wrong code.
-# The field silently grants Write and Edit, and the host does not scope that grant — measured,
-# not a promise the field makes. Nothing refuses such a write — a subagent's own `hooks:`
-# frontmatter cannot carry the boundary either (the host ignores that field for plugin
-# subagents) — so "reports; edits nothing" rests on the body below. `dev/design.md` has the
-# measurements.
 memory: project
 model: opus
 color: red

@@ -1,13 +1,7 @@
 ---
 name: comment-corrector
 description: Comment corrector. Comments only, never code.
-# `Edit` to fix comments in place, `Write` only to emit a long report as a file (it can
-# create files, which `Edit` cannot) — never to rewrite a file it was asked to audit.
 tools: Read, Grep, Glob, Bash, Edit, Write, SendMessage
-# No `memory:`. A corrector with a store starts trusting its own paraphrase of a project's
-# comment policy instead of re-reading where that policy is written, and a rule it inferred
-# wrongly then costs a diff on every later turn. What a run learns goes in the report, and
-# the user decides whether it is worth writing down.
 model: opus
 color: yellow
 ---

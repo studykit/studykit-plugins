@@ -1,0 +1,21 @@
+#!/bin/sh
+# guard-plan — arm or mute the PLAN audit for this Claude Code session.
+#
+#   guard-plan on | guard-plan off | guard-plan | guard-plan status
+#
+# Separate from `guard`, which is the turn audit. The two run at different moments on
+# different material — a finished answer versus a plan awaiting approval — and wanting one
+# is not wanting the other.
+#
+# While ON, an APPROVED plan is held before it is built until it has been through the
+# `guard:audit-plan` skill; revise the plan afterwards and it is held again, because the gate
+# matches the plan's text rather than a flag. Answering the approval prompt with "tell Claude
+# what to change" is feedback, not approval, and is never held.
+#
+# Same PATH as `guard`, put there by the SessionStart hook.
+if [ -z "$GUARD_TOGGLE_CLI" ] || [ ! -f "$GUARD_TOGGLE_CLI" ]; then
+  echo "guard-plan: GUARD_TOGGLE_CLI is unset or missing — this command works inside a Claude Code session." >&2
+  exit 1
+fi
+
+exec uv run --script "$GUARD_TOGGLE_CLI" plan-toggle-cli "$@"

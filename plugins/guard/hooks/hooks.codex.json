@@ -25,6 +25,19 @@
         ]
       }
     ],
+    "PreToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "uv run --script \"${PLUGIN_ROOT}/hooks/scripts/hook_codex.py\"",
+            "timeout": 10,
+            "description": "Refuse a search rooted at `/`. MUST stay synchronous: a background hook cannot block a Codex PreToolUse call whatever JSON it returns (wiki/ref/openai-codex-pretooluse-deny-output-shape.md)."
+          }
+        ]
+      }
+    ],
     "PostToolUse": [
       {
         "matcher": "*",

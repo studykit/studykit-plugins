@@ -4,20 +4,8 @@ description: |
   Finds the documentation bearing on a question — this project's refs directory first, the network only when nothing saved covers it — and reports the local path, saying which of the two it was. Answers nothing; you read the files it names.
 
   Use it proactively, before stating how anything outside this repository behaves (an API field, a flag, a payload, a format, a platform version) when you cannot point at a saved file that says so — being fairly sure is what a wrong recollection feels like. Prefer it over your own WebFetch/WebSearch for anything worth citing.
-# `WebSearch` finds the primary source, `WebFetch` reads it, `Bash` covers the four commands
-# the body names (`refs-dir`, `date +%F`, `curl`, the MarkItDown one-liner), `Write`/`Edit`
-# save the file and its index row, and `Read`/`Grep`/`Glob` do the local search that comes
-# first. No `Agent` and no `SendMessage`: it cannot delegate the reading, and it cannot ask
-# the caller to narrow a vague question — hence the instruction to report what it took the
-# question to mean.
 tools: WebSearch, WebFetch, Read, Write, Edit, Grep, Glob, Bash
-# `project`, and the exception to the no-stores rule is that nothing here is a VERDICT: what
-# accumulates is operational (which vendors serve raw markdown, which pages WebFetch
-# summarizes, this project's naming conventions), so a stale entry costs a visible wasted
-# fetch rather than a suppressed finding.
 memory: project
-# The head-to-head in `dev/design.md` § "Picking a model for an agent" argued for `opus`, on
-# a run that predates the `curl` step below — re-run it before treating either tier as settled.
 model: sonnet
 effort: medium
 color: yellow

@@ -48,6 +48,7 @@ listed here.
 | `obsidian-block-links.md` | Obsidian block identifiers and block links | obsidian.md/help/links |
 | `openai-codex-hooks-2026-08-14.md` | Codex plugin hook env vars and payloads | learn.chatgpt.com/docs/hooks |
 | `openai-codex-pretooluse-payload.md` | Codex `PreToolUse` payload fields — carries no `agent_id`/`agent_type` | learn.chatgpt.com/docs/hooks |
+| `openai-codex-pretooluse-deny-output-shape.md` | Codex `PreToolUse` block/deny JSON output shape — `hookSpecificOutput.permissionDecision: "deny"` + `permissionDecisionReason` (current) vs. legacy `decision: "block"` + `reason`, exit code `2`/stderr as a third path, and why `continue: false` and background hooks don't block this event | learn.chatgpt.com/docs/hooks |
 | `openai-codex-skills-2026-08-14.md` | Codex `SKILL.md` requirements | learn.chatgpt.com/docs/build-skills |
 | `openai-codex-subagents-2026-08-14.md` | Codex custom agents (TOML under `.codex/agents/`) | learn.chatgpt.com/docs/agent-configuration/subagents |
 | `python-strenum.md` | `enum.StrEnum` version added and string behavior | docs.python.org/3/library/enum |

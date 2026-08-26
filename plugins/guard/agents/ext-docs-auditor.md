@@ -1,18 +1,7 @@
 ---
 name: ext-docs-auditor
 description: Saved-reference auditor.
-# `Read`/`Grep`/`Glob` for the refs directory and the repository it searches to tell an
-# external fact from a local one; `Bash` for `refs-dir` and for `git log` on a file whose
-# history says when a passage arrived.
-#
-# No `WebFetch`/`WebSearch`: what is auditable is the file's internal honesty, all of which is
-# on disk, and a page that reads differently today says nothing about whether the excerpt was
-# honest when taken.
 tools: Read, Grep, Glob, Bash
-# No `memory:`. It would store VERDICTS, and matching a stored one is cheaper than re-reading
-# the file — a wrong stored verdict then suppresses the finding that would expose it. Omitting
-# the field also leaves Write and Edit off, which is what makes "edits nothing" a fact about
-# the tool list rather than a promise in prose. See `AGENTS.md`.
 model: opus
 color: red
 ---

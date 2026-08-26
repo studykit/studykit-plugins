@@ -28,6 +28,7 @@ Subcommands
 -----------
 - user-prompt    UserPromptSubmit  — ``guard_core.cmd_turn``
 - post-edit      PostToolUse on the write tools — ``guard_core.cmd_edit``
+- pre-search     PreToolUse on the search tools — ``guard_core.cmd_search``
 - stop           Stop — ``guard_core.cmd_stop``
 - session-start  SessionStart — ``guard_core.cmd_session``
 - toggle         UserPromptExpansion for ``/guard:toggle`` — ``guard_core.cmd_status``
@@ -37,6 +38,10 @@ Subcommands
 - refs-dir       CLI, prints the resolved refs directory — ``guard_core.cmd_settings``
 - candidates     CLI (argv), run by the router — ``guard_core.cmd_candidates``
 - inputs         CLI (argv), run by a dispatched agent — ``guard_core.cmd_inputs``
+- knowledge-dirs CLI, prints the configured knowledge dirs — ``guard_core.cmd_plan``
+- exit-plan      PreToolUse/ExitPlanMode, gates an unaudited plan — ``guard_core.cmd_plan_gate``
+- plan-audited   CLI (argv), records the audited plan — ``guard_core.cmd_plan_gate``
+- plan-toggle-cli CLI (argv), the plan-audit session switch — ``guard_core.cmd_plan_gate``
 - transcript     CLI (argv), run by an audit agent — ``guard_core.transcript``
 
 Requires Python 3.11+ (``enum.StrEnum``).
@@ -50,10 +55,13 @@ from guard_core.paths import _project_dir, _trace
 from guard_core.transcript import cmd_transcript
 from guard_core.cmd_turn import cmd_user_prompt
 from guard_core.cmd_edit import cmd_post_edit
+from guard_core.cmd_search import cmd_pre_search
 from guard_core.cmd_stop import cmd_stop
 from guard_core.cmd_session import cmd_session_start
 from guard_core.cmd_candidates import cmd_candidates
 from guard_core.cmd_inputs import cmd_inputs
+from guard_core.cmd_plan import cmd_knowledge_dirs
+from guard_core.cmd_plan_gate import cmd_exit_plan, cmd_plan_audited, cmd_plan_toggle_cli
 from guard_core.cmd_settings import cmd_refs_dir, cmd_settings
 from guard_core.cmd_status import cmd_status, cmd_toggle, cmd_toggle_cli
 
@@ -61,12 +69,17 @@ from guard_core.cmd_status import cmd_status, cmd_toggle, cmd_toggle_cli
 SUBCOMMANDS = {
     "user-prompt": cmd_user_prompt,
     "post-edit": cmd_post_edit,
+    "pre-search": cmd_pre_search,
     "settings": cmd_settings,
     "stop": cmd_stop,
     "session-start": cmd_session_start,
     "refs-dir": cmd_refs_dir,
     "candidates": cmd_candidates,
     "inputs": cmd_inputs,
+    "knowledge-dirs": cmd_knowledge_dirs,
+    "exit-plan": cmd_exit_plan,
+    "plan-audited": cmd_plan_audited,
+    "plan-toggle-cli": cmd_plan_toggle_cli,
     "transcript": cmd_transcript,
     "toggle": cmd_toggle,
     "toggle-cli": cmd_toggle_cli,

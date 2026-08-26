@@ -28,13 +28,14 @@ config -> paths -> turnrec / payload / emit -> transcript
 | `paths` | the two project-root resolvers, the state tree's paths, the debug trace |
 | `turnrec` | the answer file and the request file beside it |
 | `payload` | the hook payload on stdin, and the session id in it |
-| `emit` | the two hook-output shapes guard writes to stdout |
+| `emit` | the three hook-output shapes guard writes to stdout |
 | `transcript` | reading the host's transcript, and the `transcript` CLI over it |
 | `agents` | the roster, and mechanical eligibility |
 | `state` | `state/<sid>.json` |
 | `dispatch` | the text handed to the main agent |
 | `cmd_turn` | `user-prompt` |
 | `cmd_edit` | `post-edit` |
+| `cmd_search` | `pre-search` |
 | `cmd_stop` | `stop` |
 | `cmd_session` | `session-start` |
 | `cmd_settings` | `settings`, `refs-dir` |
@@ -63,6 +64,7 @@ there is nothing shared to factor out beyond the state root.
 | Event | Subcommand | Role |
 | --- | --- | --- |
 | `UserPromptSubmit` | `user-prompt` | Name the answer file for this turn — Stop is too late for it, since by then the answer is already printed and a printed answer cannot be corrected. Silent (trace only) when every agent is `off`, when `audit_paused` is set, on a control command, and with no `prompt_id`. Also saves the prompt verbatim to `<prompt_id>.request.md` for the router, which is the only copy guard keeps and the only reader it has. The hook stays registered even when silent so a "guard said nothing" report can be told apart from a hook that never ran. |
+| `PreToolUse` (`Bash\|Grep\|Glob`) | `pre-search` | Deny a search rooted at the filesystem root: `find /`, `grep -r /`, `rg /` (and `fd`/`ag`/`ack`/`locate`), a `/`-anchored glob like `/*`, or a `Grep`/`Glob` call whose `path` is `/`. Reads the tool ARGUMENT only — never the caller — which is why it survives where the removed `pre-write` hook could not. Ignores the agent switches and the mute. Silent for every other call, and fails open on a command `shlex` cannot parse. |
 | `PostToolUse` (`Write\|Edit\|MultiEdit\|NotebookEdit`) | `post-edit` | Record a source file, an agent instruction file, or a saved reference this turn wrote (the candidate lists for `comment-corrector`, `agents-md-auditor` and `ext-docs-auditor`), then block when a file saved in the refs dir is not listed in that dir's `AGENTS.md`. |
 | (called via Bash, not a hook) | `settings` | `guard:settings` (a `context: fork` skill, so it runs in a forked `general-purpose` agent rather than in the main session) shows/sets/unsets guard.local.json settings; the agent modes also apply to the live session's `state/<sid>.json` (session id from `--session`/`CLAUDE_CODE_SESSION_ID`). A mode change away from `reuse` also prints a stand-down note, the only channel guard has to a running instance. `set` preserves every other key; `unset <key>` is the only way to delete one. |
 | `Stop` | `stop` | Write the response section of the turn record and mark the turn as the on-demand target — always (only Codex reads that marker now; see below). Then, when any agent is not `off`, emit `additionalContext` asking the main agent to dispatch `guard:router` over the record, carrying this turn's paths and the `candidates` command the router runs to get the roster itself. The router names sections of `hooks/context/dispatch-playbook.md`; the main agent follows those, completing the record's second section only if a named section asks for it. `comment-corrector` never goes to the router: it is dispatched directly in the same emission, to be sent in the same message — see the invariant below. A third block names `ext-docs-auditor` over the refs files the turn wrote; it has no switch, so it can be the only block a turn produces. |
@@ -1739,6 +1741,73 @@ Codex subagent's `PreToolUse` reports the subagent's `session_id` or the parent'
 reports the parent's, nothing separates the subagent's writes from the main thread's and the
 approach is dead. `codex-cli` is installed on this machine, so this is a measurement rather
 than a question.
+
+## The `/`-rooted search refusal, and why it is not the hook that was removed
+
+`pre-search` (`PreToolUse` on `Bash|Grep|Glob`) denies a search whose root is `/`. It exists
+because the rule was already written down and unenforced: the user's global instructions say
+never to run `find`, `grep`, `rg` or similar with `/` as the target. An instruction in a
+CLAUDE.md is obeyed by a model that reads it and remembers it at the moment it composes the
+command, which is not the same as always.
+
+**It is not the removed `pre-write` hook wearing a new name, and the difference is the input
+it reads.** `pre-write` classified the CALLER: it asked whether `agent_type` named a
+report-only agent, and denied on identity. That is what made it unportable — Codex's
+`PreToolUse` payload carries no `agent_type` (`wiki/ref/openai-codex-pretooluse-payload.md`)
+— and identity is also what made it contentious enough to remove. `pre-search` classifies the
+ARGUMENT: is this search rooted at `/`. Every host that reports `tool_name` and `tool_input`
+can answer that, and the answer does not depend on who is asking. A rebuild check that stops
+at "guard had a PreToolUse hook and it was removed" reaches the wrong conclusion here.
+
+**Deny, not ask.** A deny reason reaches the model verbatim as the tool's `<error>` result —
+measured, not assumed (`wiki/ref/claude-code-pretooluse-deny-reason-visibility.md`) — so the
+refusal can name the narrower search and be acted on in the same turn. `ask` would put a
+dialog in front of a call that is almost always a slip, handing the decision to the user who
+did not write the command. Confirmed live: the refused `find / -name sample.txt` returned the
+reason word for word, and the session re-ran it bounded without further prompting.
+
+**The reason names the fix, not just the prohibition.** The same measurement says a deny
+reason is weighed as tool output rather than as instruction, which is why the entry under
+"must not come back" forbids a deny reason that redirects to another AGENT — that redirect is
+declinable. Naming a narrower path is different in kind: it is not asking the session to
+dispatch anything, and the session was already trying to search. Without it the predictable
+sequel is the same walk retried one top-level directory at a time.
+
+**What it does not do.** It denies the root of a search, not searches it dislikes. `/etc`,
+`/usr`, `/Users/...` all pass — they are bounded, and deciding which bounded directories a
+project may read is not guard's business. Denied: a bare `/`, the slash runs (`//`), `/.` and
+`/..`, and any glob whose FIRST path segment carries a wildcard (`/*`, `/**`, `/*.py`,
+`/**/*.py`) — all of which descend from the root.
+
+That last clause is wider than it first shipped, and the widening is the useful record here.
+The original test was "strip a trailing glob segment", which caught `/*` and `/**` and missed
+`/**/*.py` — the ordinary way anyone actually writes a root-anchored glob. The audit that
+found it also found the mirror-image bug in `_VALUE_FLAGS`: `-prune` and `-print0` were listed
+among the value-taking flags, and since a match there skips the NEXT token too, `find -print0
+/` and `find . -prune / -name y` both walked the root unrefused. Both holes shared one shape —
+a rule that covered the spelling in the example and not the spelling in use — and neither was
+visible from the passing test matrix, because the matrix had been written from the same
+examples as the code. The cases are in it now.
+
+**Coverage beyond the three names in the rule.** `fd`, `ag`, `ack` and `locate` are matched
+too. A rule that knew only `find`/`grep`/`rg` would be stepped around without anyone
+intending to — whoever types `fd` types it because it is the tool they use. Matching is on
+the basename of the command word, so `/usr/bin/find` and an alias-bypassing `\find` both
+count, and each segment of a compound command (`a && b`, `a | b`) is read separately so a
+root search that is not the first command is still caught. Option-taking flags are skipped
+with their values, which is what keeps `grep -f / pattern src` and `find . -newer / -name x`
+from being misread as root searches.
+
+**It fails open, twice over.** A command `shlex` cannot split (an unbalanced quote) produces
+no verdict rather than a guess, and every other internal failure is silent. guard does not
+block because its own parser broke — a search it cannot read is one it cannot make a claim
+about either.
+
+Verified live against `claude 2.1.246` with `--plugin-dir`, in a throwaway project, from a
+second pane: `find / -name "sample.txt"` was blocked with the reason quoted back verbatim,
+and `find /private/tmp/... -name "sample.txt"` plus `grep -rn hello .` both ran untouched. A
+46-case matrix over the parser (26 deny, 20 allow, including the fail-open case) passes; the
+last eleven cases were added by the audit described above and each one failed before the fix.
 
 ## Codex: hooks must be trusted, or guard is silent
 

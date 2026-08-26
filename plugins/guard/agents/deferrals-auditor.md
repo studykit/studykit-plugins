@@ -1,46 +1,8 @@
 ---
 name: deferrals-auditor
 description: Deferrals auditor.
-# `Bash` carries three things worth naming, and naming them is not narrowing them: guard's
-# `transcript` extractor, checking whether a named command exists on this machine (asked the
-# way this platform asks it), and reproducing a deferred behaviour inside a throwaway
-# directory of your own. Use it for anything else it does well too — the host injects a
-# standing instruction to prefer `Bash` wherever it can do the job, so a comment restricting
-# it to a list would be contradicted on every turn and is deliberately not written that way.
-# The reproduction allowance replaced a flat ban. Instances given the ban crossed it anyway —
-# independently, at more than one model — because a deferral of the form "this needed a live
-# runtime" is settled far more cheaply by spending a minute proving the component runs
-# headless than by arguing from the code. They also bounded themselves sensibly while doing it
-# and said so. A rule that is reliably broken for good reasons is better replaced than
-# restated, so the line moved to where the risk actually is.
-# What stays forbidden is about EFFECT, not about which tool produced it, and none of it is
-# needed to settle a deferral: writing anywhere but your own temporary directory (never the
-# repository, never the project's real state),
-# touching the user's account or machine configuration, reaching the network, and launching
-# interactive sessions of the very agent you are running inside.
-# Everything that is not command-shaped is still established by READING — an MCP server, a
-# subagent, a test runner, a staging endpoint are found in the project's config, its docs,
-# and the turn's own tool activity. And a verdict never requires a reproduction: the code
-# answering the deferral, or the repository documenting how to exercise it, is enough. The
-# execution is a shortcut to certainty, not the standard of proof.
-# `SendMessage` is the fallback when an extract cannot be had, and the way to ask where to
-# look — never for the finding itself.
 tools: Read, Grep, Glob, Bash, SendMessage
-# `project` — `.claude/agent-memory/<agent>/`, the host's recommended default, and here it is
-# chosen for the reviewability rather than the sharing: what this agent writes lands in the
-# project's diff, so a wrong entry is caught by the same review that catches wrong code.
-# The field silently grants Write and Edit, and the host does not scope that grant — measured,
-# not a promise the field makes. Prose telling the agent to stay inside its
-# memory directory was tried and broken. Nothing refuses such a write, and a subagent's own
-# `hooks:` frontmatter cannot carry the boundary either (the host ignores that field for
-# plugin subagents) — so it rests on the body below. `dev/design.md` has the measurements.
 memory: project
-# `opus`. This agent's whole job is noticing that a sentence claiming impossibility is
-# actually a sentence about effort, which means holding the deferral, the code, and the
-# project's testing surface in view at once and disbelieving a plausible excuse. Weaker
-# models pass the excuse through: they reduce the question to "is the answer stored in this
-# project?", answer no, and stop. The cost is real — a deferrals audit is now an opus call —
-# and a project that would rather trade the catch rate for it changes one word here.
 model: opus
 color: red
 ---

@@ -1,0 +1,19 @@
+#!/bin/sh
+# guard-plan-audited — record that the plan at <path> has been audited.
+#
+#   guard-plan-audited <plan-file-path>
+#
+# For the `guard:audit-plan` skill, and for nothing else. It is what lets `ExitPlanMode`
+# through: the gate compares the plan being presented against the text recorded here.
+#
+# Run it LAST, after the review's findings are written back into the plan file. It hashes
+# the file as it stands, so the audited plan and the presented plan are the same document —
+# and a plan edited afterwards is held again rather than riding through on this clearance.
+#
+# Same PATH as `guard`, put there by the SessionStart hook.
+if [ -z "$GUARD_TOGGLE_CLI" ] || [ ! -f "$GUARD_TOGGLE_CLI" ]; then
+  echo "guard-plan-audited: GUARD_TOGGLE_CLI is unset or missing — this command works inside a Claude Code session." >&2
+  exit 1
+fi
+
+exec uv run --script "$GUARD_TOGGLE_CLI" plan-audited "$@"

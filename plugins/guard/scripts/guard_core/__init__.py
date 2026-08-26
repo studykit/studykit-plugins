@@ -13,11 +13,12 @@ Imports run one way only, and a cycle here is a design error rather than a techn
 - ``paths``      project root resolution, the state tree's paths, the debug trace
 - ``turnrec``    the answer file and the request file beside it
 - ``payload``    hook payload on stdin, and the session id in it
-- ``emit``       the two hook-output shapes guard writes to stdout
+- ``emit``       the three hook-output shapes guard writes to stdout
 - ``transcript`` reading the host's transcript, and the ``transcript`` CLI over it
 - ``agents``     the roster guard can recommend, and mechanical eligibility
 - ``state``      the per-session state file
 - ``dispatch``   the text handed to the main agent
+- ``cmd_search`` ``pre-search``: the one hook that denies rather than reports
 - ``cmd_*``      one module per hook event, plus the CLI verbs (``cmd_candidates``
                  is the router's roster lookup, not an event)
 

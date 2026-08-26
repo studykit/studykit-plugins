@@ -1,19 +1,7 @@
 ---
 name: claims-auditor
 description: Unevidenced-claims auditor.
-# `SendMessage` is how "ask the main session where to look" below actually happens.
-# It is not a way to obtain evidence: an answer from the turn's author is a claim, so
-# use it to be pointed at a file, then read the file yourself. In reuse mode it also
-# reaches the other guard agents running in this session.
 tools: Read, Grep, Glob, Bash, SendMessage
-# `project` — `.claude/agent-memory/<agent>/`, the host's recommended default, and here it is
-# chosen for the reviewability rather than the sharing: what this agent writes lands in the
-# project's diff, so a wrong entry is caught by the same review that catches wrong code.
-# The field silently grants Write and Edit, and the host does not scope that grant — measured,
-# not a promise the field makes. Prose telling the agent to stay inside its
-# memory directory was tried and broken. Nothing refuses such a write, and a subagent's own
-# `hooks:` frontmatter cannot carry the boundary either (the host ignores that field for
-# plugin subagents) — so it rests on the body below. `dev/design.md` has the measurements.
 memory: project
 model: opus
 color: red

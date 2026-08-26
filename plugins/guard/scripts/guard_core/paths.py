@@ -141,6 +141,50 @@ def _safe_project_subdir(project_dir: Path, raw: Any) -> Path | None:
     return candidate
 
 
+def _knowledge_dirs(project_dir: Path, config: dict[str, Any] | None = None) -> list[Path]:
+    """The directories holding this project's operational knowledge. Empty when unset.
+
+    Read by `design-environment`, which audits a proposal against the system as actually
+    deployed — topology, environments, runbooks. That material routinely lives OUTSIDE the
+    repository (a personal or team knowledge base), which is why this is not
+    ``_safe_project_subdir``: an absolute path and a ``~`` are the expected shapes here, and
+    confining it to the project would exclude the case the key exists for.
+
+    A LIST, because the knowledge is normally split rather than centralized — one directory
+    per system, per team, or per source, and a design touching two systems needs both. Order
+    is preserved and is the user's statement of precedence: the reading agent starts at the
+    front.
+
+    Nothing writes here and nothing derives a write path from it, so the containment rules
+    that make ``refs_dir`` a self-neutering hazard do not apply. What is checked is only
+    that each value resolves to a real directory; a typo then drops that entry rather than
+    the whole setting, and it drops SILENTLY here — the ``settings`` CLI is where a bad path
+    is reported, because this runs on a dispatch and an agent cannot act on a warning it was
+    not built to read.
+    """
+    raw = (config or {}).get("knowledge_dir", [])
+    # A bare string is accepted as a one-element list: it is what a user who has one
+    # directory will write, and what every earlier version of this key was.
+    if isinstance(raw, str):
+        raw = [raw]
+    if not isinstance(raw, list):
+        return []
+    out: list[Path] = []
+    for entry in raw:
+        if not isinstance(entry, str) or not entry.strip():
+            continue
+        try:
+            candidate = Path(entry.strip()).expanduser()
+            if not candidate.is_absolute():
+                candidate = project_dir / candidate
+            candidate = candidate.resolve()
+        except (OSError, RuntimeError):
+            continue
+        if candidate.is_dir() and candidate not in out:
+            out.append(candidate)
+    return out
+
+
 def _refs_dir(project_dir: Path, config: dict[str, Any] | None = None) -> Path:
     """Directory where guard saves local copies of cited docs.
 

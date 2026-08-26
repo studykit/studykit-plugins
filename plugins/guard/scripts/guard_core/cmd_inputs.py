@@ -27,7 +27,7 @@ import os
 import sys
 
 from .config import _load_config
-from .paths import _cli_project_dir, _trace
+from .paths import _cli_project_dir, _knowledge_dirs, _trace
 from .state import _read_state
 from .turnrec import _turn_record_file, _turn_request_file
 from .dispatch import _playbook_path
@@ -79,6 +79,14 @@ def cmd_inputs() -> int:
         print(f"request file: {request}")
 
     config = _load_config(project_dir)
+    # One line per configured directory, in the order the user wrote them — precedence, and
+    # a single line holding several paths would have to be split on a separator that a real
+    # path may contain. Absent entirely when the project has configured none, which is the
+    # normal case and is why the reader is told to treat absence as "no knowledge base"
+    # rather than as a lookup that failed.
+    for kdir in _knowledge_dirs(project_dir, config):
+        print(f"knowledge dir: {kdir}")
+
     state = _read_state(project_dir, session_id, config)
     transcript = state.get("transcript_path")
     if isinstance(transcript, str) and transcript:

@@ -145,6 +145,21 @@ DEFAULT_CONFIG: dict[str, Any] = {
     # only. Turning it on costs nothing on the many turns that touch no such file, since
     # eligibility needs one this turn actually wrote.
     "agents-md-auditor": AgentMode.OFF,
+    # Where this project writes down what its DEPLOYED system looks like — topology,
+    # environments, runbooks. Read by `design-environment` and by nothing else; guard never
+    # writes here. Empty (the default) means the project has none, which is a normal state:
+    # that agent then falls back to the repository's own deploy surface, to a read-only
+    # probe, and finally to asking the user.
+    #
+    # Unlike `refs_dir` this is NOT confined to the project. The material it points at is
+    # frequently a knowledge base kept outside the repository, and since nothing derives a
+    # write from it, the containment rules that make `refs_dir` a hazard have nothing to
+    # protect here. See `paths._knowledge_dirs`.
+    #
+    # A LIST — this knowledge is normally split across directories rather than centralized,
+    # and order is precedence. A bare string is still accepted (one directory), since that
+    # is what a user with one will write.
+    "knowledge_dir": [],
     # No key for `ext-docs-fetcher`, deliberately. It is not one of guard's recommended
     # agents any more: nothing routes it and no hook forces the session into it, so there is
     # no "says something unasked" for a switch to govern. The main agent picks it the way it
@@ -207,7 +222,15 @@ def _load_config(project_dir: Path) -> dict[str, Any]:
         # widened for those keys or every mode in the file is silently dropped and only
         # the session state is ever honored. The accessor (``_agent_mode``) validates the
         # value; this only checks the shape.
-        want = str if isinstance(default, StrEnum) else type(default)
+        want: type | tuple[type, ...]
+        if isinstance(default, StrEnum):
+            want = str
+        elif isinstance(default, list):
+            # A list default accepts a bare string too — `knowledge_dir` takes one
+            # directory written plainly. The resolver normalizes; this only checks shape.
+            want = (list, str)
+        else:
+            want = type(default)
         if key in data and isinstance(data[key], want):
             config[key] = data[key]
     return config

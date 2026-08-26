@@ -1,14 +1,7 @@
 ---
 name: korean-corrector
 description: Korean prose corrector.
-# `Read` and `Edit` for the answer file — its input is the answer the user is about to be
-# shown, so a correction belongs in that file and not in a second one the reader would
-# have to be talked into opening. It judges prose, so it needs no search or shell access.
 tools: Read, Edit, Write, SendMessage
-# No `memory:`. A store here would accumulate rulings about which phrasings this project
-# keeps, and a wrong one silently stops a whole class of correction from ever being raised
-# again. Terms to leave alone are visible in the file being corrected; a preference worth
-# keeping goes in the report, where the user can confirm it.
 model: opus
 color: red
 ---
