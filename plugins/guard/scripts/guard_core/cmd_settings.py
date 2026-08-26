@@ -2,8 +2,10 @@
 
 ``settings`` is run by the ``guard:settings`` skill via Bash, in-session. ``show`` prints the
 current settings; ``set <key> <value>`` changes one of the per-agent settings — each named
-after the agent it controls, valued ``off``/``fresh``/``reuse`` — or ``refs_dir``; ``unset <key>`` removes a key from the file entirely, back to its default. The
-agent settings also apply to the live session's ``state/<sid>.json`` when a session id is
+after the agent it controls, valued ``off``/``fresh``/``reuse`` — one of the two audit
+switches (``audit-turn`` / ``audit-plan``, ``on``/``off``) or ``refs_dir``; ``unset <key>`` removes a key from the file entirely, back to its default. The
+agent settings and the audit switches also apply to the live session's ``state/<sid>.json``
+when a session id is
 available (``--session``, which the skill passes as ``${CLAUDE_SESSION_ID}``, else the
 inherited ``CLAUDE_CODE_SESSION_ID``); the rest are read from the config file at use. Every
 other key is preserved. Mutating verbs require the settings-skill marker — see
@@ -22,12 +24,29 @@ from pathlib import Path
 from typing import Any
 
 from .config import (
-    AgentMode, DEFAULT_CONFIG, _agent_mode, _cli_write_allowed, _load_config,
-    _load_raw_config, _parse_mode, _write_config
+    AUDIT_PLAN_KEY, AUDIT_SWITCHES, AUDIT_TURN_KEY, AgentMode, DEFAULT_CONFIG, _agent_mode,
+    _audit_on, _cli_write_allowed, _load_config, _load_raw_config, _parse_mode, _parse_switch,
+    _write_config
 )
 from .paths import _cli_project_dir, _refs_dir, _trace
 from .agents import AUDIT_AGENTS, _instance_name
-from .state import _audit_paused, _read_state, _write_state
+from .state import _audit_paused, _plan_audit_paused, _read_state, _write_state
+
+
+# Which session-state key each audit switch seeds, and the shell command that moves it for one
+# session. The state key is the switch INVERTED — the config says armed, the state says paused —
+# and that inversion is why this mapping is written down once rather than open-coded per call
+# site: a `set audit-turn off` that wrote `audit_paused = False` would report the change the
+# user asked for and apply its opposite.
+_SWITCH_STATE_KEY = {AUDIT_TURN_KEY: "audit_paused", AUDIT_PLAN_KEY: "plan_audit_paused"}
+
+
+_SWITCH_COMMAND = {AUDIT_TURN_KEY: "guard", AUDIT_PLAN_KEY: "guard-plan"}
+
+
+# And how each one is read back out of a state dict, since the two accessors are what hold the
+# "missing key means armed" rule.
+_SWITCH_PAUSED = {AUDIT_TURN_KEY: _audit_paused, AUDIT_PLAN_KEY: _plan_audit_paused}
 
 
 def _parse_settings_argv(argv: list[str]) -> tuple[list[str], str | None]:
@@ -54,7 +73,10 @@ def _apply_session_scalar(project_dir: Path, session_id: str | None, key: str, v
     ``state/<sid>.json`` so it takes effect at once, not only for sessions started later.
     These are the only settings cached in session state (seeded from config at session
     start); the rest are read from the config file at use, so writing the file is enough
-    for them. No-op without a session id."""
+    for them. No-op without a session id.
+
+    ``key`` is the STATE key, which for the two audit switches is not the config key and is
+    inverted from it — see ``_SWITCH_STATE_KEY``."""
     if not session_id:
         return
     config = _load_config(project_dir)
@@ -70,10 +92,10 @@ def _config_show_lines(project_dir: Path, session_id: str | None) -> list[str]:
     raw = _load_raw_config(project_dir)
     cfg = _load_config(project_dir)
     # Read the state whenever there is a session, file or not. The defaults ARE the session's
-    # state until something writes one, and the mute is the key where that distinction shows:
-    # a session starts muted, so gating this on the file existing hid the muted line on
-    # exactly the sessions that had never been armed. The switch lines are unaffected — their
-    # defaults come from the same config `cfg` does, so they still report no difference.
+    # state until something writes one, so `_read_state` on a session with no file yet returns
+    # the config-seeded values — which is exactly what the audit lines below want to compare
+    # against. Gating this on the file existing would have made every never-toggled session
+    # report no session value at all.
     state = _read_state(project_dir, session_id, cfg) if session_id else None
 
     def switch_line(key: str) -> str:
@@ -84,14 +106,31 @@ def _config_show_lines(project_dir: Path, session_id: str | None) -> list[str]:
             return f"{key}: {live} (this session; default {default}){suffix}"
         return f"{key}: {default}{suffix}"
 
+    def audit_line(key: str) -> str:
+        """One audit switch: the project's setting, and the live session's value when it
+        differs. Both halves are needed and neither substitutes for the other — the setting is
+        what a `set` here changes, the session value is what the user is actually getting, and
+        the shell toggle can put them out of step for the rest of the session."""
+        default = _audit_on(cfg, key)
+        live = default if state is None else not _SWITCH_PAUSED[key](state)
+        cmd = _SWITCH_COMMAND[key]
+        if live != default:
+            return (f"{key}: {'on' if live else 'off'} (this session; project setting "
+                    f"{'on' if default else 'off'}) — `{cmd} {'off' if live else 'on'}` in a "
+                    f"shell undoes that")
+        if not live:
+            return (f"{key}: off — `{cmd} on` arms this session without changing the "
+                    f"setting")
+        return f"{key}: on"
+
     refs_rel = raw.get("refs_dir") if isinstance(raw.get("refs_dir"), str) else ""
-    # The mute is listed first and only when it is on: it overrides every line below it, so a
-    # reader who sees the switches without it would read the wrong answer to "is guard
-    # running". It is session state, so there is no default to show alongside.
-    muted = ["audits: OFF for this session (`guard on` in a shell to arm it)"] if (
-        state is not None and _audit_paused(state)) else []
+    # The two audit switches are listed FIRST: each overrides every agent line below it, so a
+    # reader who sees the switches without them would read the wrong answer to "is guard
+    # running". Always listed, unlike the old mute line, which appeared only while muted —
+    # armed is now the default, and a state that is never printed is a state the reader has no
+    # way to tell from a guard that does not have it.
     return [
-        *muted,
+        *(audit_line(k) for k in AUDIT_SWITCHES),
         *(switch_line(k) for k in AUDIT_AGENTS),
         "refs_dir: " + (refs_rel if refs_rel else "(default wiki/ref/)"),
     ]
@@ -155,6 +194,11 @@ def _settings_unset(project_dir: Path, session_id: str | None,
         after = AgentMode(DEFAULT_CONFIG[key])
         _apply_session_scalar(project_dir, session_id, key, after.value)
         transition = _mode_transition_note(key, before, after)
+    elif key in AUDIT_SWITCHES:
+        # Same as a `set` to the default: removing the key changes what guard does now, not
+        # only what the next session opens in, so the live session follows it back.
+        on = _parse_switch(str(DEFAULT_CONFIG[key])) is True
+        _apply_session_scalar(project_dir, session_id, _SWITCH_STATE_KEY[key], not on)
     del raw[key]
 
     if not _write_config(project_dir, raw):
@@ -183,8 +227,9 @@ def cmd_settings() -> int:
         settings set <key> <value>           — change one setting
         settings unset <key>                 — delete one key from the file
 
-    Settable keys: the agent switches (the keys of ``AUDIT_AGENTS`` — each is the name
-    of the agent it admits) and ``refs_dir``. The switches
+    Settable keys: the two audit switches (``AUDIT_SWITCHES``), the agent switches (the keys
+    of ``AUDIT_AGENTS`` — each is the name of the agent it admits) and ``refs_dir``. The
+    switches
     also apply to the live session's ``state/<sid>.json`` when a session id is available
     (``--session <id>``, which the forked skill passes as ``${CLAUDE_SESSION_ID}``, else
     the inherited ``CLAUDE_CODE_SESSION_ID``) so the change takes effect at once and
@@ -248,11 +293,22 @@ def cmd_settings() -> int:
         raw[key] = v.value
         _apply_session_scalar(project_dir, session_id, key, v.value)
         transition = _mode_transition_note(key, before, v)
+    elif key in AUDIT_SWITCHES:
+        on = _parse_switch(value)
+        if on is None:
+            print(f"guard settings: {key} must be `on` or `off` (got {value!r})",
+                  file=sys.stderr)
+            return 0
+        raw[key] = "on" if on else "off"
+        # The live session moves with it, inverted into the state's paused key. Without this a
+        # user who just turned auditing off would keep being audited for the rest of the
+        # session, having been shown a line that says it is off.
+        _apply_session_scalar(project_dir, session_id, _SWITCH_STATE_KEY[key], not on)
     elif key == "refs_dir":
         raw["refs_dir"] = value  # "" resets to the default; _refs_dir validates at use
     else:
         print(f"guard settings: unknown or unsettable key {key!r}. Settable: "
-              + ", ".join(AUDIT_AGENTS)
+              + ", ".join((*AUDIT_SWITCHES, *AUDIT_AGENTS))
               + ", refs_dir.",
               file=sys.stderr)
         return 0

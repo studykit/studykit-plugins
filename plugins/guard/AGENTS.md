@@ -22,8 +22,10 @@ path entirely and have no switch: `ext-docs-fetcher`, which the main agent selec
 own description, and `ext-docs-auditor`, which the Stop hook names off the refs files the turn
 wrote. Anything below that says "the turn" or "the response" is about the routed path.
 
-Every switch ships `off`, and a session additionally starts muted. guard installed is guard
-available, not guard running.
+Every agent switch ships `off`: guard installed is guard available, not guard running. The two
+audit switches (`audit-turn`, `audit-plan`) are the exception — absent from the config they read
+as `on`, so a project that switches an agent on gets the audit without a second step. They are
+the value each session OPENS in; `guard` / `guard-plan` then move that session alone.
 
 `interviewer` is not part of any of that. It is a background agent the **user** talks to directly, in
 its own transcript, and it answers to nobody here: no switch, no hook, no router, and guard never
@@ -42,7 +44,7 @@ runs, lands it in the background panel, and keeps a running one reachable — so
 only be a second, driftable way to say the same thing. What that entry point does not settle is
 the opening prompt, which the main agent still writes; the agent's own body has to carry that.
 
-`guard on` / `guard off` flips the session mute from a shell prompt, without entering the conversation at all — the reason it is not a slash command. SessionStart puts it on `PATH` through `$CLAUDE_ENV_FILE`, which is sourced rather than scanned for exports, so there is nothing to install and nothing left behind. It is an executable rather than a shell function so that subprocesses inherit it. `guard-plan` is its counterpart for the plan gate. `toggle-cli` is the one subcommand that must not fail open — a person is reading its output, so silence would read as success.
+`guard on` / `guard off` flips this session's mute from a shell prompt, without entering the conversation at all — the reason it is not a slash command. It leaves `audit-turn` alone, so muting the session you are in never changes what the next one does. SessionStart puts it on `PATH` through `$CLAUDE_ENV_FILE`, which is sourced rather than scanned for exports, so there is nothing to install and nothing left behind. It is an executable rather than a shell function so that subprocesses inherit it. `guard-plan` is its counterpart for the plan gate. `toggle-cli` is the one subcommand that must not fail open — a person is reading its output, so silence would read as success.
 
 That same `PATH` carries `guard-candidates` and `guard-inputs`, which are the dispatched agents' and never the user's. Between them the routed dispatch is down to `- turn: <id>`. `dev/design.md` has why that beats printing the roster and the paths, and what each fallback line is for.
 
@@ -92,11 +94,14 @@ how the code here is organised.
 - Two things ignore the agent switches AND the session mute, because both are prohibitions
   rather than opinions: the refs-index check and the `/`-rooted search refusal. A mute that
   could lift a prohibition would not be one.
-- The session mute is session-only, two-valued and visible. Do not grow it back into the
-  persistent gate that was removed; if the indicator ever becomes unshippable, drop the mute
-  rather than let it go invisible.
+- The session mute is two-valued and visible, and the shell toggle writes session state only —
+  never the config. The persistence lives in `audit-turn` / `audit-plan`, which say what a
+  session opens in and nothing else; do not let the toggle start writing them, and if the
+  indicator ever becomes unshippable, drop the mute rather than let it go invisible.
 - A `/clear` inherits both switches from the session it replaced, and that is the ONLY
-  boundary that inherits anything — `startup` opens muted. The predecessor is named by the
+  boundary that inherits anything — every other start reads the settings. It carries a session
+  that DIFFERS from those settings, in either direction, which is why the comparison is
+  against the config rather than against "armed". The predecessor is named by the
   `SessionEnd` record rather than inferred from file times, the record is single-use and
   expiring, and the adoption is announced. Weaken any one of those four and this becomes the
   persistent gate wearing a different name; `dev/design.md` has the measurements.
@@ -121,7 +126,11 @@ each one cost.
 - Any hook that redirects by naming a replacement in a `PreToolUse` deny reason — a deny
   reason is weighed as tool output, which was measured.
 - Judging inside the hook, or picking agents by lexical pattern.
-- A persistent `audit_gate` in front of the per-agent switches.
+- `audit_gate` (`off`/`ask`/`auto`) in front of the per-agent switches. `audit-turn` is a
+  boolean in that position and is persistent, so the difference is no longer persistence: it is
+  that there is no `ask` to reason about and that both of its states are on screen. Keep those
+  two and this is a switch; lose either and it is the gate again. `dev/design.md` has the
+  argument.
 - A `reuse_agents` list separate from the per-agent mode, or an `exempt_skills` list.
 - A `.ko-fix.md` rewrite file beside the answer.
 - A `UserPromptExpansion` matcher with no command file of that name behind it: the host

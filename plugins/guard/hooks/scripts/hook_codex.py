@@ -217,6 +217,14 @@ def _handle_stop(project_dir: Path, payload: dict[str, Any], session_id: str, tu
     # pointed at, and switching the automatic recommendation off is not meant to take
     # away the user's own command.
     state["pending_verify_prompt_id"] = turn_id
+    # `audit-turn: off` in this project's config, read through the state it seeds. Codex has no
+    # `guard` command, so on this host the switch is only ever the config's value — but it IS a
+    # config key, and a project that writes one and gets audited anyway has been told nothing.
+    # Placed after the line above for the same reason Claude's Stop places it there: the pending
+    # target is still recorded, so `$guard:claims-auditor` still works on the turn.
+    if core_state._audit_paused(state):
+        core_state._write_state(project_dir, session_id, state)
+        return
     # Codex command hooks cannot launch an agent themselves, and unlike Claude's Stop
     # there is no continuation to piggyback on — so the once-guard cannot lean on
     # `stop_hook_active` and keys on the turn id instead.

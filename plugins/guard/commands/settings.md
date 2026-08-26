@@ -1,6 +1,6 @@
 ---
 name: settings
-description: "View and change guard's settings for this project — one setting per agent, each off / fresh / reuse, plus refs_dir — recorded in .claude/guard.local.json. Use when the user wants to configure guard: turn an audit on or off, keep an agent running across turns instead of respawning it, or point guard at a different refs directory. Claude Code only."
+description: "View and change guard's settings for this project — whether new sessions start with turn and plan auditing armed (audit-turn / audit-plan, on unless set), one setting per agent, each off / fresh / reuse, plus refs_dir — recorded in .claude/guard.local.json. Use when the user wants to configure guard: turn an audit on or off by default, admit an agent, keep one running across turns instead of respawning it, or point guard at a different refs directory. Claude Code only."
 argument-hint: '[key] [value]'
 disable-model-invocation: true
 # Runs in a forked subagent, not in the main session. Changing a setting is a few CLI calls
@@ -85,6 +85,8 @@ made through the CLI, report that instead of working around it.
 
 | Key | Values | What it controls |
 | --- | --- | --- |
+| `audit-turn` | `on` (default) / `off` | Whether a session **starts** with turn auditing armed. `off` and guard recommends nothing when a turn ends, whatever the agent keys below say. This is the project's default, not the live session: `guard on` / `guard off` in a shell move the session you are in and leave this alone. |
+| `audit-plan` | `on` (default) / `off` | Whether a session **starts** with the plan gate armed. While armed, an approved plan is held before it is built until it has been through `/guard:audit-plan`, and revising the plan holds it again. Its session-level command is `guard-plan on` / `guard-plan off`. |
 | `claims-auditor` | `off` / `fresh` / `reuse` | Admits `guard:claims-auditor` — it flags statements asserted without adequate evidence. |
 | `deferrals-auditor` | `off` / `fresh` / `reuse` | Admits `guard:deferrals-auditor` — it flags work punted as "TBD" / "확인 필요" that the repo could have answered. |
 | `clarity-auditor` | `off` / `fresh` / `reuse` | Admits `guard:clarity-auditor` — it flags terms used but never explained, mechanisms given with no concrete example, and explanation pitched wrong for this reader. It calibrates against a reader profile; without one it says so and checks less, so `/guard:reader-profile` comes first if the user means to rely on it. |
@@ -93,7 +95,7 @@ made through the CLI, report that instead of working around it.
 | `agents-md-auditor` | `off` / `fresh` / `reuse` | Admits `guard:agents-md-auditor`, for the `AGENTS.md` / `CLAUDE.md` files the turn actually edited, judged as instruction files. Reports only — but its findings often mean moving content into a doc that does not exist yet, which is the user's decision, not the agent's. |
 | `refs_dir` | a project-relative path, or empty | Where guard saves cited-doc copies. Empty = the git-tracked default `wiki/ref/`, committed with the repo; a different tracked path (e.g. `docs/refs`) overrides it. |
 
-**Every setting ships off**, and with all of them off guard is silent: a finished turn adds
+**Every agent setting ships off**, and with all of them off guard is silent: a finished turn adds
 nothing to the main session's context and makes no model call. Turning one on only makes
 that agent *available* — the router still has to find something in the turn before it names
 it, which is why turning `korean-corrector` on costs nothing on an English turn. The two
@@ -154,13 +156,14 @@ may be keeping it for something else.
 
 ## What is not yours
 
-- **Arming or muting one session** is the `guard` shell command, not a setting. A `settings
-  set` writes `guard.local.json` and changes what the project does from now on; the mute is
-  session state only. This matters more than it reads: every session starts MUTED, so
-  switching an agent on here says what the project may run, not that this session will run
-  it — if `show` reports `audits: OFF for this session`, a `set` does not change that and
-  saying otherwise would be wrong. Tell the user to run `guard on` in a shell to arm the
-  session they are in; you cannot do it for them, and should not try.
+- **Muting one session, and only that session,** is the `guard` / `guard-plan` shell command,
+  not a setting. `audit-turn` and `audit-plan` say what a session *starts* as, so a session the
+  user has already flipped no longer matches them — `show` reports that as
+  `audit-turn: off (this session; project setting on)`, and it is the session value, not the
+  setting, that answers "is guard auditing right now". Report both when they differ instead of
+  reading out the setting alone. A `set` here does reach the live session (this is why
+  `--session` matters), so it can also *undo* a `guard off` the user ran a minute ago: if they
+  asked only to change the project default, say that the session moved too.
 - **The audits.** You configure them. You never dispatch one, never judge a turn, and never
   volunteer an opinion on whether the project's current settings are the right ones unless
   asked.

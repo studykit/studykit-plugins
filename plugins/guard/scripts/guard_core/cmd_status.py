@@ -2,8 +2,9 @@
 
 ``toggle-cli`` (CLI, argv) arms or mutes the automatic audit for THIS SESSION —
 ``audit_paused`` in the session state, never guard.local.json, so it cannot change what the
-project does by default. A session STARTS muted (``state._read_state``), which makes ``on``
-the common direction: it clears the pause and is the only thing that ever does. An empty
+project does by default. The state a session opens in is the project's ``audit-turn`` setting,
+armed when the file says nothing (``state._read_state``), which makes ``off`` the common
+direction: one session that does not want auditing, with the setting left alone. An empty
 argument flips, and ``status`` reports without writing. While muted, ``stop`` recommends
 nothing and ``user-prompt`` names no answer file, but the pending target and the answer file
 are still recorded — the Codex adapter reads that marker.
@@ -15,9 +16,10 @@ prompt, and the answer came back as a blocked expansion — and it also cost a c
 and a ``UserPromptExpansion`` matcher that had to stay in step with each other. From a
 terminal the user already has, the same flip touches the conversation not at all.
 
-``status`` (CLI, stdin JSON) is the other half, and starting muted is what makes it
-load-bearing rather than a convenience: the mute is a feature only because it is visible, and
-now it is the state every session opens in. It prints one short field — ``guard <will
+``status`` (CLI, stdin JSON) is the other half, and it is load-bearing rather than a
+convenience: the mute is a feature only because it is visible. SessionStart says which state
+the session opened in and the toggle prints its own result, but both scroll away — this field
+is the only place the answer is still legible at the moment a user wonders. It prints one short field — ``guard <will
 run>/<switched on>``, so ``guard 3/3`` armed, ``guard 0/3`` muted, ``guard 0/0`` for a project
 with nothing switched on, each followed by ``· ⚑`` when the plan gate is armed and ``· ⚐``
 when it is not — or NOTHING on any failure, because its stdout goes straight into the user's
@@ -36,7 +38,7 @@ import sys
 
 from pathlib import Path
 
-from .config import _load_config, _switch_on
+from .config import _load_config, _parse_switch, _switch_on
 from .paths import _cli_project_dir, _trace
 from .payload import _session_id
 from .agents import AUDIT_AGENTS
@@ -72,18 +74,18 @@ def _shell_arm_hint() -> str:
 def _parse_toggle_arg(arg: str) -> str | None:
     """Map a user's word to ``on`` / ``off`` / ``flip``, or None if it is not one.
 
-    One vocabulary for both entry points. The synonyms are here rather than at each call
-    site because a word accepted by the slash command and rejected by the shell one is a
-    difference the user has no way to predict.
+    One vocabulary for every entry point: the on/off words come from ``config``, which is
+    also what the ``audit-turn`` / ``audit-plan`` settings are read with, because a word the
+    config file accepts and this command rejects is a difference the user has no way to
+    predict. ``flip`` is this command's alone — a setting has no "the other one".
     """
     arg = arg.strip().lower()
     if arg in ("", "flip", "toggle"):
         return "flip"
-    if arg in ("on", "resume", "enable", "arm", "unmute"):
-        return "on"
-    if arg in ("off", "pause", "disable", "mute"):
-        return "off"
-    return None
+    parsed = _parse_switch(arg)
+    if parsed is None:
+        return None
+    return "on" if parsed else "off"
 
 
 def _mute_sentence(state: dict, paused: bool) -> str:

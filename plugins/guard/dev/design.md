@@ -68,11 +68,11 @@ there is nothing shared to factor out beyond the state root.
 | `PostToolUse` (`Write\|Edit\|MultiEdit\|NotebookEdit`) | `post-edit` | Record a source file, an agent instruction file, or a saved reference this turn wrote (the candidate lists for `comment-corrector`, `agents-md-auditor` and `ext-docs-auditor`), then block when a file saved in the refs dir is not listed in that dir's `AGENTS.md`. |
 | (called via Bash, not a hook) | `settings` | `guard:settings` (a `context: fork` skill, so it runs in a forked `general-purpose` agent rather than in the main session) shows/sets/unsets guard.local.json settings; the agent modes also apply to the live session's `state/<sid>.json` (session id from `--session`/`CLAUDE_CODE_SESSION_ID`). A mode change away from `reuse` also prints a stand-down note, the only channel guard has to a running instance. `set` preserves every other key; `unset <key>` is the only way to delete one. |
 | `Stop` | `stop` | Write the response section of the turn record and mark the turn as the on-demand target — always (only Codex reads that marker now; see below). Then, when any agent is not `off`, emit `additionalContext` asking the main agent to dispatch `guard:router` over the record, carrying this turn's paths and the `candidates` command the router runs to get the roster itself. The router names sections of `hooks/context/dispatch-playbook.md`; the main agent follows those, completing the record's second section only if a named section asks for it. `comment-corrector` never goes to the router: it is dispatched directly in the same emission, to be sent in the same message — see the invariant below. A third block names `ext-docs-auditor` over the refs files the turn wrote; it has no switch, so it can be the only block a turn produces. |
-| `SessionEnd` (`clear`) | `session-end` | Hand this session's two switches to the session `/clear` is about to open, then let it announce what it adopted. Writes nothing when both are muted. |
-| `SessionStart` | `session-start` | Sweep state and turn records past retention, export `GUARD_REFS_DIR` and `GUARD_TOGGLE_CLI`, state the refs rule as session context, say once — when any agent is on — either that the session opened muted (the usual case; `guard on` arms it) or that audits are on and where the dispatch playbook is, and — when any agent is in `reuse` — state the standing reuse policy once. |
+| `SessionEnd` (`clear`) | `session-end` | Hand this session's two switches to the session `/clear` is about to open, then let it announce what it adopted. Writes nothing when both still match this project's `audit-turn` / `audit-plan` — the replacement reads the same config and lands there on its own. |
+| `SessionStart` | `session-start` | Sweep state and turn records past retention, export `GUARD_REFS_DIR` and `GUARD_TOGGLE_CLI`, state the refs rule as session context, say once — when any agent is on — either that the session opened muted (`guard on` arms it) or that audits are on and where the dispatch playbook is, and — when any agent is in `reuse` — state the standing reuse policy once. |
 | (called via Bash, not a hook) | `candidates` | The router's own roster: prints the turn-reading agents switched on for this session, one `key=mode` per line, in `AUDIT_AGENTS` order. Session id from `CLAUDE_CODE_SESSION_ID`, which a subagent's Bash carries as its parent's. Read-only, and the only command the router runs. |
 | (called via Bash, not a hook) | `transcript` | `index` / `turn` / `find` over the session transcript, for the audit agents. Writes an extract file and prints only its path plus a one-line summary; `--since` / `--until` / `--last` bound which turns are scanned. |
-| (called via Bash, not a hook) | `toggle-cli` | Arm/mute the automatic audit for THIS session (`audit_paused`, session state only — never guard.local.json), from a shell prompt: `on` / `off` / `status` / empty flips. A session starts muted, so `on` is the arming direction and the common one. Session id from `CLAUDE_CODE_SESSION_ID`; project from `_cli_project_dir`. The ONE subcommand that does not fail open — see `_MUST_REPORT` in `guard_hook.py`. |
+| (called via Bash, not a hook) | `toggle-cli` | Arm/mute the automatic audit for THIS session (`audit_paused`, session state only — never guard.local.json), from a shell prompt: `on` / `off` / `status` / empty flips. A session opens in whatever `audit-turn` says, armed unless the config says otherwise, so `off` is the direction that usually needs typing. Session id from `CLAUDE_CODE_SESSION_ID`; project from `_cli_project_dir`. The ONE subcommand that does not fail open — see `_MUST_REPORT` in `guard_hook.py`. |
 | (called via Bash, not a hook) | `status` | Status-line segment: `guard <will run>/<switched on>` plus the plan gate's flag (`⚑` armed, `⚐` muted), green armed and dim muted on each half; nothing at all on any failure. Reads one state file; runs on every assistant message. |
 | (called via Bash, not a hook) | `refs-dir` | Print the resolved refs directory (auditor fallback; applies `refs_dir` validation). |
 
@@ -99,9 +99,10 @@ written by the main agent.
   defaults instead of injecting state — which cuts both ways, and a NEW key must be added to
   both the `default` dict and the `keys` tuple. `edited_refs` was added to `default` alone at
   first: every write landed and the next read dropped it, which is indistinguishable from
-  PostToolUse never having run. `audit_paused` is here rather than in the config on
-  purpose, and so is its **`True` default** — a session starts muted — see the session-mute
-  invariant below.
+  PostToolUse never having run. `audit_paused` and `plan_audit_paused` are **seeded from the
+  config** on every read — `audit-turn` / `audit-plan`, armed when the file says nothing — and
+  are the session's own from then on: the shell toggles write here and never there. See the
+  session-mute invariant below.
 - `turns/<sid>/<prompt_id>.md` — the answer to the user's question, one file per typed
   prompt. The session writes it during the turn (the path comes from `UserPromptSubmit`);
   guard fills it in at Stop from `last_assistant_message` only when the turn left it empty,
@@ -734,11 +735,19 @@ payloads, not memory.
   `ext-docs-auditor` is the same hazard in a different directory: the passage it flags is
   fixed by MOVING it, and the destination is usually a design note nobody has written.
 - **A `/clear` carries the session switches over; nothing else does.** `/clear` opens a new
-  session id, so `state/<sid>.json` no longer applies and both switches would open muted —
-  the user who armed guard a minute ago arms it again, with nothing saying why. It is the one
-  boundary worth crossing because it is the one where a new session is not a new intention:
-  the conversation was cleared, the work was not. `startup` still opens muted, which is what
-  keeps this from being the persistent gate that was deleted.
+  session id, so `state/<sid>.json` no longer applies and both switches would go back to
+  `audit-turn` / `audit-plan` — the user who muted guard a minute ago mutes it again, with
+  nothing saying why. It is the one boundary worth crossing because it is the one where a new
+  session is not a new intention: the conversation was cleared, the work was not. Every other
+  start reads the settings, which is what keeps this from being a second, invisible place the
+  project's default lives.
+
+  What it carries is a session that **differs from the settings**, and that comparison
+  (`_default_paused`) is the whole test — in either direction. It used to be "is anything
+  armed", which was the same question while the switches defaulted to muted and is now the
+  wrong one: with them defaulting to on, the intention most likely to be lost across a `/clear`
+  is a `guard off`, and a check for "armed" would have written no record for exactly that case.
+  The announcement names both switches for the same reason.
 
   **The predecessor is named, not inferred.** Three payload facts, measured in a live session
   on 2026-08-26 because none of them is documented: `SessionStart` with `source: "clear"`
@@ -829,36 +838,45 @@ payloads, not memory.
   to always-correct (the router is now dispatched only when an answer file exists). And a
   dispatch of `comment-corrector` alone names no answer file at all, which the playbook's
   `Presenting the result` has to branch on — there is nothing to correct and nothing to open.
-- **The session mute is not `audit_gate` coming back, and a session starts muted.**
+- **The session mute is not `audit_gate` coming back, and it now has a config key.**
   The mute adds one boolean in front of the switches, which is the shape removed
-  below, so the difference has to be stated or it reads as a regression — and the default
-  being `True` (`state._read_state`) makes stating it more urgent, not less, because that
-  boolean now decides the *usual* case rather than an exception. Three things differ and all
-  three are load-bearing. It is **session-only** — `audit_paused` lives in `state/<sid>.json`,
-  the code has no path from it to guard.local.json, and no config key can set it — so it
-  cannot answer "what does this project do by default" differently in one repository than in
-  another; the switches say what the project *can* run, and the mute says whether this
-  session runs it. It is **two-valued**, so there is no `ask` to reason about. And it is
-  **visible**: the `status` subcommand puts it in the user's status line and SessionStart
-  says which of the two states the session opened in, which is what the old gate never had.
-  That last one is the real fix, and the muted default is why it is now the load-bearing one:
-  the old gate's cost was not the extra layer, it was that you could not tell which state you
-  were in without going and reading a file, and a default of "off" is exactly the state a
-  user forgets they are in. A mute you can see costs nothing to hold in your head. If the
-  indicator ever becomes impossible to ship, delete the mute — which now means shipping armed
-  again — rather than let it go invisible.
+  below, so the difference has to be stated or it reads as a regression — and `audit-turn` /
+  `audit-plan` (`config.DEFAULT_CONFIG`, `on` when absent) make stating it more urgent, because
+  persistence used to be half the answer and is not available any more. Two things differ, and
+  both are load-bearing. It is **two-valued**, so there is no `ask` to reason about — the
+  question the old gate forced on the user ("the switch is on, but is the gate open, and does
+  `ask` mean before or after routing") does not exist for a boolean. And it is **visible**: the
+  `status` subcommand puts it in the user's status line, SessionStart says which of the two
+  states the session opened in, and `settings show` prints both the setting and the live session
+  value when they differ. That is the real fix — the old gate's cost was not the extra layer, it
+  was that you could not tell which state you were in without going and reading a file. If the
+  indicator ever becomes impossible to ship, delete the mute rather than let it go invisible.
 
-  Why muted rather than armed: a switch left `off` costs nothing, but an audit the user did
-  not ask for spends a router call plus every agent it names on a turn that may not have
-  wanted checking, and it spends them before the user can object. Arming is one command and
-  lasts the session; the reverse default charges for the sessions that never wanted it. This
-  is a change to the *initial value only* — do not turn it into a config key, which is the
-  persistence the invariant above forbids.
+  **The split that replaced "session-only".** The setting says what a session *opens* in; the
+  shell toggle moves the session and nothing else. There is still no path from the toggle to
+  guard.local.json, which is what keeps a mute typed at a prompt from silently becoming this
+  project's answer to "audit by default?" — the direction that matters, because that write
+  would be invisible in exactly the way the old gate was. The reverse direction is fine and is
+  the point: a project states its default once, in a file its users can read.
 
-  Codex does not participate: the mute is a shell command against a Claude Code session id,
-  which Codex has no equivalent for, and `hook_codex.py` never reads `audit_paused`. So a Codex session is never
-  muted, and `_session_muted` tests `_HOST_IS_CODEX` first — which also keeps it from reading
-  a stdin the Codex adapter has already consumed.
+  Why the default is `on` — and what it costs. It was `off` (a session started muted, armed by
+  one command) on the argument that an audit the user did not ask for spends a router call plus
+  every agent it names before the user can object. That argument still holds; it lost to a
+  plainer one: a user who configured agents and installed the status line has asked, and making
+  them ask again every session is a per-session tax on the setup they already did. The cost is
+  real and is accepted — a fresh install with an agent switched on now audits without a second
+  step, and `audit-plan` defaulting on means an approved plan is held for review in a project
+  that never ran `guard-plan`. `audit-turn: off` in the config is the one-line answer for a
+  project that does not want it, and unlike the old default it survives the session.
+
+  Codex has the SETTING but not the toggle. The toggle is a shell command against a Claude Code
+  session id, which Codex has no equivalent for, so `_session_muted` tests `_HOST_IS_CODEX`
+  first — which also keeps it from reading a stdin the Codex adapter has already consumed, and
+  means no Codex session announces a mute at start. `audit-turn` is a config key, though, and
+  `hook_codex._handle_stop` honors it through the state it seeds: a project that writes
+  `audit-turn: off` in `.codex/guard.local.json` and gets audited anyway would have been told
+  nothing at all, which is the silent-config failure this repo's cross-runtime rule exists to
+  prevent. On that host the state value is therefore always just the config's.
 
   What it does NOT suppress is deliberate: `pending_verify_prompt_id` and the answer file are
   still written while muted, so an on-demand audit works on the turn the user just
@@ -1282,10 +1300,16 @@ Every agent brings its own model and effort from its own frontmatter in `agents/
 also where its criteria live; a second copy in guard's config would let the two disagree about
 the same agent.
 
-There is deliberately **no key for the mute.** `audit_paused` is session state with a `True`
-default, so a session starts muted and only `guard on` arms it; a config key here
-would be the persistence the session-mute invariant forbids, and would let a project ship
-itself pre-armed with nothing on screen saying so.
+`audit-turn` / `audit-plan` (string, `"on"` by default; `"off"`, or any off-word, or a JSON
+boolean) — the state each session's turn audit and plan gate **open** in. They seed
+`audit_paused` / `plan_audit_paused` in `state/<sid>.json` and nothing else: `guard` and
+`guard-plan` write that state, never this file, so the setting is the project's answer and the
+toggle is one session's. An absent or unreadable value reads as `on`, the opposite fallback
+direction from the agent modes, which fall back to `off` — an unreadable agent mode would run an
+agent nobody named, while an unreadable switch here can only leave guard auditing, and that is
+what an absent key already does. Two keys and not one: the two audits run at different moments
+on different material, and wanting turns checked is not wanting every plan held. Why the default
+is `on`, and what that costs, is the session-mute invariant above.
 
 `refs_dir` (string, default `""`) — project-relative directory for guard's cited-doc
 copies; empty = the git-tracked default `wiki/ref/` (references committed with the repo), a
@@ -1351,14 +1375,16 @@ run(){ anchor "$1"; echo "{\"session_id\":\"s1\",\"prompt_id\":\"$1\",\"transcri
 "$H" settings show --session s1        # read verbs need no marker
 export GUARD_SETTINGS_SKILL=1         # mutating verbs do — see _cli_write_allowed
 
-# ARM THE SESSION, and do not skip this either. A session starts muted, so without it every
-# `run` below is silent for the WRONG reason and each assertion that expects a recommendation
-# passes as (EMPTY) while testing nothing. This is the one line that stands between this
-# recipe and a whole file of silent no-ops. `toggle-cli` takes its argument in argv and its
-# session id from the ENVIRONMENT, so both are set per command.
+# ARM THE SESSION EXPLICITLY, even though `audit-turn` defaults to on and this project has no
+# config file. The default is not the assertion: a project that ships `audit-turn: off`, or a
+# state file left behind by an earlier run, makes every `run` below silent for the WRONG reason
+# and each assertion that expects a recommendation passes as (EMPTY) while testing nothing.
+# `toggle-cli` takes its argument in argv and its session id from the ENVIRONMENT, so both are
+# set per command.
 CLAUDE_CODE_SESSION_ID=s1 "$H" toggle-cli on > /dev/null
 
-# `toggle-cli` is what the `guard` shell command wraps, and it is the only way to the mute.
+# `toggle-cli` is what the `guard` shell command wraps, and the only way to the mute from a
+# shell prompt (`settings set audit-turn` also moves it, but through the config).
 # The last two are the reason this verb exists: it must never be silent, because a person is
 # reading it and silence reads as success. Both must PRINT and exit non-zero.
 CLAUDE_CODE_SESSION_ID=s1 "$H" toggle-cli status   # -> one line; exit 0
@@ -1388,8 +1414,8 @@ python3 -c "import json;print(json.load(open('$CLAUDE_PROJECT_DIR/.claude/guard/
 # still be recorded: Codex's on-demand path reads it, and a marker maintained only from the
 # day a host regains one is a marker that is wrong on that day.
 # Check the TRACE, not just the emptiness: an armed session with no switches records
-# `none_eligible`, and a session that was never armed records the mute instead — the two are
-# indistinguishable from stdout alone, which is how a mute reason can masquerade as this case.
+# `none_eligible`, and a muted one records `skip_paused` instead — the two are indistinguishable
+# from stdout alone, which is how a mute reason can masquerade as this case.
 run p0 "Redis is always faster."        # -> (EMPTY); trace: none_eligible
 python3 -c "import json;print(json.load(open('$CLAUDE_PROJECT_DIR/.claude/guard/state/s1.json'))['pending_verify_prompt_id'])"
 
@@ -1590,6 +1616,25 @@ import json
 h = json.load(open('plugins/guard/hooks/hooks.json'))['hooks']
 print(h.get('UserPromptExpansion'))   # -> None; guard registers no expansion matcher
 "
+
+# The two audit switches. Each one is BOTH a config key and a seed for the live session, and
+# the state key it seeds is inverted from it — so check the state, not only the printed line: a
+# `set audit-turn off` that wrote `audit_paused = False` would print exactly what was asked for
+# and do the opposite.
+"$H" settings set audit-turn off --session s1
+python3 -c "import json;print(json.load(open('$CLAUDE_PROJECT_DIR/.claude/guard/state/s1.json'))['audit_paused'])"
+#   -> True
+run pmute "Redis is always faster."     # -> (EMPTY); trace: skip_paused, NOT none_eligible
+CLAUDE_CODE_SESSION_ID=s1 "$H" toggle-cli on > /dev/null
+"$H" settings show --session s1
+#   -> `audit-turn: on (this session; project setting off)`. Both halves, because the toggle
+#      does not write the file and the file no longer describes the session.
+"$H" settings unset audit-turn --session s1     # -> back to the default ('on'), session too
+python3 -c "import json;print(json.load(open('$CLAUDE_PROJECT_DIR/.claude/guard/state/s1.json'))['audit_paused'])"
+#   -> False
+"$H" settings set audit-plan false --session s1   # a JSON-style word is accepted, like `off`
+"$H" settings set audit-turn sometimes --session s1   # -> error naming on/off; nothing written
+"$H" settings unset audit-plan --session s1
 
 # Unknown keys and unknown values are both rejected outright rather than silently accepted.
 "$H" settings set audit_gate off --session s1   # -> error listing the settable keys;

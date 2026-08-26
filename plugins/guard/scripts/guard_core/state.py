@@ -1,6 +1,7 @@
 """The per-session state file, ``state/<sid>.json``.
 
-Holds the agent modes as of this session, ``audit_paused``, the files this turn edited
+Holds the agent modes as of this session, the two audit mutes (``audit_paused`` /
+``plan_audit_paused``, seeded from the project's ``audit-turn`` / ``audit-plan``), the files this turn edited
 (``edited_prompt_id`` / ``edited_files`` / ``edited_agent_docs`` / ``edited_refs``),
 ``last_audited_prompt_id``, ``pending_verify_prompt_id``, ``transcript_path`` and
 ``updated_at``.
@@ -18,7 +19,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from .config import _agent_mode
+from .config import AUDIT_PLAN_KEY, AUDIT_TURN_KEY, _agent_mode, _audit_on
 from .paths import _now_iso, _state_file
 from .agents import AUDIT_AGENTS
 
@@ -51,24 +52,21 @@ def _read_state(project_dir: Path, session_id: str, config: dict[str, Any]) -> d
         "edited_files": [],
         "edited_agent_docs": [],
         "edited_refs": [],
-        # Session-only mute, flipped by the `guard` shell command, and MUTED IS WHERE A SESSION
-        # STARTS: a session audits only after the user asks it to, for as long as that
-        # session lasts. The default lives here, in the state schema, rather than in
-        # guard.local.json on purpose — there is still no path from the config to this
-        # key, so the mute cannot answer "what does this project do by default"
-        # differently in one repository than in another, and no setting can hide it.
+        # Session-only mute, flipped by the `guard` shell command. The value a session OPENS
+        # in is the project's `audit-turn` setting, armed when the file says nothing; from
+        # then on this key is the session's own, and the toggle never writes back to the
+        # config — so muting the session you are in cannot change what the next one does.
         # NOT a mode in front of the agent switches the way the removed `audit_gate` was:
-        # it is two-valued, it is session-scoped, and the `status` subcommand puts it in
-        # the user's status line so the muted state is visible rather than remembered. A
-        # hidden mute is the failure that killed the old gate, and starting muted raises
-        # the price of hiding it — which is why `session-start` says so out loud.
-        "audit_paused": True,
-        # The plan audit is OFF until asked for, for the same reason the turn audit is: it
-        # spends real time and the user has to want it. It is a SEPARATE key because the two
-        # run at different moments on different material — one on a finished answer, one on
-        # a plan awaiting approval — and a user who wants their turns audited has not
-        # thereby asked for every plan to be.
-        "plan_audit_paused": True,
+        # it is two-valued, and the `status` subcommand puts it in the user's status line so
+        # the muted state is visible rather than remembered. A hidden mute is the failure
+        # that killed the old gate, which is why `session-start` says which state the session
+        # opened in.
+        "audit_paused": not _audit_on(config, AUDIT_TURN_KEY),
+        # The plan audit reads its own config key, and is a SEPARATE key here, because the two
+        # run at different moments on different material — one on a finished answer, one on a
+        # plan awaiting approval — and a user who wants their turns audited has not thereby
+        # asked for every plan to be.
+        "plan_audit_paused": not _audit_on(config, AUDIT_PLAN_KEY),
         # Which plan this session has already audited, as a hash of the plan text. The
         # ExitPlanMode hook lets a plan through once its audit is recorded here and blocks
         # it otherwise; hashing the CONTENT rather than setting a flag is what makes a
@@ -123,18 +121,19 @@ def _edited_files(state: dict[str, Any], prompt_id: str, bucket: str) -> list[st
 
 
 def _plan_audit_paused(state: dict[str, Any]) -> bool:
-    """Whether the plan audit is muted for this session. Default (missing key) is muted.
+    """Whether the plan audit is muted for this session.
 
-    Mirrors ``_audit_paused``: absent means OFF, so a state file written by an older version
-    reads as muted rather than silently arming a review the user never asked for.
+    Mirrors ``_audit_paused``, including the absent case: ``_read_state`` seeds both keys from
+    the config on every read, so a dict reaching here without one did not come from there, and
+    the honest answer for a missing key is the config default — armed.
     """
-    return state.get("plan_audit_paused") is not False
+    return state.get("plan_audit_paused") is True
 
 
 def _audit_paused(state: dict[str, Any]) -> bool:
-    """Is the automatic audit muted for this session? True until `guard on`.
+    """Is the automatic audit muted for this session?
 
-    A session starts muted (see the schema above), so this is the state a session is in
-    before anyone touches it, not only the state `guard off` puts it in.
+    The session's own answer, not the project's: `_read_state` seeds it from `audit-turn` and
+    `guard off` overrides it for the rest of the session.
     """
     return state.get("audit_paused") is True

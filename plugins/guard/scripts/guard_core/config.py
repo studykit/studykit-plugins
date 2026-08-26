@@ -6,7 +6,9 @@ Configuration is optional: a JSON object at ``${CLAUDE_PROJECT_DIR}/.claude/guar
 ``comment-corrector`` / ``agents-md-auditor``, each
 ``"off"`` (the default) / ``"fresh"`` / ``"reuse"`` — which together are the only control
 over whether guard says anything unasked and over whether an agent is respawned per turn or
-held open for the session. Plus ``refs_dir`` (project-relative directory for saved copies of cited docs; empty
+held open for the session. Plus ``audit-turn`` / ``audit-plan`` (``"on"``, the default, or
+``"off"``: the state each session's two audits OPEN in — the shell toggles move the session
+only and never write here) and ``refs_dir`` (project-relative directory for saved copies of cited docs; empty
 means the git-tracked default ``wiki/ref/``, and an unsafe value falls back to it — see
 ``paths._refs_dir``). There is no model key: every agent, the router included, brings its own
 model from its own definition under ``agents/``.
@@ -99,6 +101,27 @@ class AgentMode(StrEnum):
     REUSE = "reuse"
 
 
+# The words that mean armed and muted, for BOTH ways a two-valued switch is written: the
+# `audit-turn` / `audit-plan` values in guard.local.json and the argument to the `guard` /
+# `guard-plan` shell commands. One vocabulary, because a word the config file accepts and the
+# shell command rejects is a difference the user has no way to predict.
+_ON_WORDS = frozenset({"on", "true", "yes", "1", "resume", "enable", "arm", "unmute"})
+
+
+_OFF_WORDS = frozenset({"off", "false", "no", "0", "pause", "disable", "mute"})
+
+
+# The two audit switches, keyed the way the agent switches are: the key is what the user
+# reads, and each names the audit it opens. Values are `_ON_WORDS` / `_OFF_WORDS` words.
+AUDIT_TURN_KEY = "audit-turn"
+
+
+AUDIT_PLAN_KEY = "audit-plan"
+
+
+AUDIT_SWITCHES = (AUDIT_TURN_KEY, AUDIT_PLAN_KEY)
+
+
 # CLI spellings accepted for a mode, beyond the member values themselves. The boolean
 # words are kept because "on"/"off" is what a switch has always been set with here, and
 # "on" has to mean something: it means the mode the agents were designed for.
@@ -133,6 +156,24 @@ DEFAULT_CONFIG: dict[str, Any] = {
     # what changed under that — there is no longer a per-agent command to run one of these
     # audits on demand, so `off` now means the audit cannot happen at all rather than
     # merely that it is not offered. See `AGENTS.md`.
+    # The state each session's two audits OPEN in — the project's answer to "audit by
+    # default?", and ON when the file says nothing, so a project that installs guard and
+    # switches an agent on gets the audit without a second step.
+    #
+    # These are the DEFAULT, not the live value: `guard` / `guard-plan` move `audit_paused` /
+    # `plan_audit_paused` in `state/<sid>.json` for one session and never write here, so a
+    # session muted at a shell prompt stays muted without changing what the next session does.
+    # Two keys rather than one because the two audits run at different moments on different
+    # material — a finished answer against a plan awaiting approval — and wanting one is not
+    # wanting the other.
+    #
+    # A value that is neither an on-word nor an off-word reads as ON (`_audit_on` falls back
+    # to the default), the opposite direction from the agent modes. The two are not
+    # inconsistent: an unreadable agent mode would have guard running an agent the user never
+    # named, while an unreadable switch here can only leave guard auditing — which is what an
+    # absent key already does, and the failure a guard plugin should fail toward.
+    AUDIT_TURN_KEY: "on",
+    AUDIT_PLAN_KEY: "on",
     "claims-auditor": AgentMode.OFF,
     "deferrals-auditor": AgentMode.OFF,
     # Can the intended reader follow the answer? The only agent whose verdict depends on
@@ -233,7 +274,13 @@ def _load_config(project_dir: Path) -> dict[str, Any]:
         # the session state is ever honored. The accessor (``_agent_mode``) validates the
         # value; this only checks the shape.
         want: type | tuple[type, ...]
-        if isinstance(default, StrEnum):
+        if key in AUDIT_SWITCHES:
+            # `"off"` and `false` are the same instruction written two ways, and a two-valued
+            # switch is the one setting a user reasonably writes as a JSON boolean. Rejecting
+            # one of the two spellings would silently ignore an intention that is not
+            # ambiguous; `_audit_on` reads both.
+            want = (str, bool)
+        elif isinstance(default, StrEnum):
             want = str
         elif isinstance(default, list):
             # A list default accepts a bare string too — `knowledge_dir` takes one
@@ -304,5 +351,37 @@ def _agent_mode(cfg: dict[str, Any], key: str) -> AgentMode:
 def _switch_on(cfg: dict[str, Any], key: str) -> bool:
     """Whether this agent may be recommended at all."""
     return _agent_mode(cfg, key) is not AgentMode.OFF
+
+
+def _parse_switch(value: str) -> bool | None:
+    """Parse an on/off word: True armed, False muted, None when it is neither.
+
+    The caller reports the error rather than guessing — this is what the ``settings`` CLI
+    validates a written value with, and guessing there would record a switch the user did not
+    ask for in a file that outlives the session.
+    """
+    v = value.strip().lower()
+    if v in _ON_WORDS:
+        return True
+    if v in _OFF_WORDS:
+        return False
+    return None
+
+
+def _audit_on(cfg: dict[str, Any], key: str) -> bool:
+    """Does this project's config open a session with ``key``'s audit armed?
+
+    A CONFIG reader, never a state reader: the live answer for a session is
+    ``state._audit_paused`` / ``state._plan_audit_paused``, which this seeds and the shell
+    toggle then overrides. Absent, malformed, or written as a JSON boolean all resolve here —
+    and anything unrecognized resolves to the default, which is armed (see ``DEFAULT_CONFIG``).
+    """
+    raw = cfg.get(key, DEFAULT_CONFIG[key])
+    if isinstance(raw, bool):
+        return raw
+    parsed = _parse_switch(str(raw))
+    if parsed is None:
+        return _parse_switch(str(DEFAULT_CONFIG[key])) is True
+    return parsed
 
 

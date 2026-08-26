@@ -27,7 +27,8 @@ edit ride through on the previous plan's clearance.
 ``plan-toggle-cli`` is the session switch, the same shape as ``toggle-cli`` for the turn audit
 (``cmd_status``) and reached from the shell the same way, through ``guard-plan``. It writes
 ``plan_audit_paused`` and nothing else, so muting the plan audit cannot alter the turn audit or
-touch guard.local.json.
+touch guard.local.json — the project's own default for it is the ``audit-plan`` setting, which
+seeds this at session start and which only ``/guard:settings`` writes.
 """
 
 from __future__ import annotations
@@ -170,7 +171,8 @@ def cmd_plan_toggle_cli() -> int:
 
     Session-scoped like the turn audit's mute, and separate from it: the two audits run at
     different moments on different material, so one switch for both would arm a review the
-    user did not ask for. Starts muted (``state._read_state``).
+    user did not ask for. The state a session opens in is the project's ``audit-plan``
+    setting, armed when the config says nothing (``state._read_state``).
     """
     session_id = os.environ.get("CLAUDE_CODE_SESSION_ID", "").strip()
     project_dir = _cli_project_dir()

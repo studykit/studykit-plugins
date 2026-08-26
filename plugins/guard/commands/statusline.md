@@ -112,12 +112,13 @@ Then tell the user three things and stop:
 
 - The fraction is *how many agents can run on the next finished turn* over *how many are
   switched on*: `guard 3/3` with three switched on and the session armed, `guard 0/3` when the
-  session is muted with `guard off`, `guard 0/0` when nothing is switched on at all. So
-  `guard on|off` moves the numerator and `/guard:settings` moves the denominator.
+  session is muted, `guard 0/0` when nothing is switched on at all. So `guard on|off` moves
+  the numerator for this session and `/guard:settings` moves the denominator — and the
+  `audit-turn` setting there is which numerator a new session starts on.
 - The flag is the plan gate, and it is always shown: filled `⚑` means plan audits are armed
   for this session, so an approved plan is held until it has been audited; outline `⚐` means
-  they are off, which is the default. Separate switch, own command — `guard-plan on|off` in a
-  shell.
+  they are off. Separate switch, own command — `guard-plan on|off` in a shell for this
+  session, or the `audit-plan` setting for what every session starts as.
 - Green means armed, dim means muted, on each half independently: a green fraction beside a
   dim flag is a session auditing turns with the plan gate off. Colour is the only difference
   between the two `0/0` states, so a terminal that drops it loses the mute there.
