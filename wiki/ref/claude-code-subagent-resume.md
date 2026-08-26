@@ -83,6 +83,51 @@ So the reach is **not** Claude-only: `SendMessage` is how *Claude* resumes an ag
 this panel is how the *user* does it. The user can open a background agent's transcript and
 send it follow-up messages directly, without going through the main session.
 
+## Invoking one by `@`-mention (the user's own entry point)
+
+Retrieved 2026-08-26 from the same page. This is what makes a user-addressable agent need no
+slash command of its own.
+
+The page contrasts three ways to request a specific subagent:
+
+> * **Natural language**: name the subagent in your prompt; Claude decides whether to delegate
+> * **@-mention**: guarantees the subagent runs for one task
+> * **Session-wide**: the whole session uses that subagent's system prompt, tool restrictions, and model via the `--agent` flag or the `agent` setting
+
+Syntax, including the plugin-scoped form:
+
+> **@-mention the subagent.** Type `@` and pick the subagent from the typeahead, the same way
+> you @-mention files. This ensures that specific subagent runs rather than leaving the choice
+> to Claude
+
+> You can also type the mention manually without using the picker: `@agent-<name>` for local
+> subagents, or `@agent-` followed by the scoped name for plugin subagents, for example
+> `@agent-my-plugin:code-reviewer`. While you type this form the typeahead shows file matches
+> rather than agents. The agent mention still resolves when you submit.
+
+> Subagents provided by an enabled plugin appear in the typeahead under their scoped name, such
+> as `my-plugin:code-reviewer` [...]. Named background subagents currently running in the
+> session also appear in the typeahead, showing their status next to the name.
+
+What it does and does not control:
+
+> Your full message still goes to Claude, which writes the subagent's task prompt based on what
+> you asked. The @-mention controls which subagent Claude invokes, not what prompt it receives.
+
+And how an @-mentioned agent behaves:
+
+> An @-mentioned subagent runs according to the normal foreground/background rules. Where fork
+> mode is on (the default in interactive sessions), the subagent runs in the background.
+
+> @-mentioned subagents appear in the subagent panel below the prompt input, following the same
+> display rules as other subagents.
+
+Bearing: a plugin agent meant for the user to converse with needs no command to launch it.
+`@agent-<plugin>:<name>` guarantees it runs, lands it in the background panel, and — because a
+running named agent stays in the typeahead — is also how the user gets back to the one already
+going. What the mention does NOT fix is the opening prompt, which the main agent still writes;
+that has to be handled by the agent's own body.
+
 ## Foreground vs background, and what decides it
 
 > **Foreground:** Blocks main conversation, permission prompts go directly to you

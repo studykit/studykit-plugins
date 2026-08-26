@@ -64,10 +64,10 @@ mis-dispatch a no-op.
 
 ### What has not been done
 
-**None of it has run.** guard is muted in the originating session (`/guard:toggle`), so no turn
+**None of it has run.** guard is muted in the originating session (`guard off`), so no turn
 has exercised the new flow end to end. First thing to do in the new session:
 
-1. `/guard:toggle on`
+1. `guard on`
 2. Ask something that produces a substantive Korean answer.
 3. Check, in order: the answer file is English; the auditors were dispatched on it;
    `korean-corrector` was **not** in that batch; a `.ko.md` sibling exists; `korean-corrector`
