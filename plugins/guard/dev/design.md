@@ -38,7 +38,7 @@ config -> paths -> turnrec / payload / emit -> transcript
 | `cmd_stop` | `stop` |
 | `cmd_session` | `session-start` |
 | `cmd_settings` | `settings`, `refs-dir` |
-| `cmd_status` | `toggle`, `status` |
+| `cmd_status` | `toggle`, `toggle-cli`, `status` |
 
 Two rules this layout exists to hold, both of which broke once already:
 
@@ -66,10 +66,11 @@ there is nothing shared to factor out beyond the state root.
 | `PostToolUse` (`Write\|Edit\|MultiEdit\|NotebookEdit`) | `post-edit` | Record a source file, an agent instruction file, or a saved reference this turn wrote (the candidate lists for `comment-corrector`, `agents-md-auditor` and `ext-docs-auditor`), then block when a file saved in the refs dir is not listed in that dir's `AGENTS.md`. |
 | (called via Bash, not a hook) | `settings` | `guard:settings` (a `context: fork` skill, so it runs in a forked `general-purpose` agent rather than in the main session) shows/sets/unsets guard.local.json settings; the agent modes also apply to the live session's `state/<sid>.json` (session id from `--session`/`CLAUDE_CODE_SESSION_ID`). A mode change away from `reuse` also prints a stand-down note, the only channel guard has to a running instance. `set` preserves every other key; `unset <key>` is the only way to delete one. |
 | `Stop` | `stop` | Write the response section of the turn record and mark the turn as the on-demand target — always (only Codex reads that marker now; see below). Then, when any agent is not `off`, emit `additionalContext` asking the main agent to dispatch `guard:router` over the record, carrying this turn's paths and the `candidates` command the router runs to get the roster itself. The router names sections of `hooks/context/dispatch-playbook.md`; the main agent follows those, completing the record's second section only if a named section asks for it. `comment-corrector` never goes to the router: it is dispatched directly in the same emission, to be sent in the same message — see the invariant below. A third block names `ext-docs-auditor` over the refs files the turn wrote; it has no switch, so it can be the only block a turn produces. |
-| `SessionStart` | `session-start` | Sweep state and turn records past retention, export `GUARD_REFS_DIR`, state the refs rule as session context, say once — when any agent is on — either that the session opened muted (the usual case; `/guard:toggle on` arms it) or that audits are on and where the dispatch playbook is, and — when any agent is in `reuse` — state the standing reuse policy once. |
+| `SessionStart` | `session-start` | Sweep state and turn records past retention, export `GUARD_REFS_DIR` and `GUARD_TOGGLE_CLI`, state the refs rule as session context, say once — when any agent is on — either that the session opened muted (the usual case; `/guard:toggle on` arms it) or that audits are on and where the dispatch playbook is, and — when any agent is in `reuse` — state the standing reuse policy once. |
 | (called via Bash, not a hook) | `candidates` | The router's own roster: prints the turn-reading agents switched on for this session, one `key=mode` per line, in `AUDIT_AGENTS` order. Session id from `CLAUDE_CODE_SESSION_ID`, which a subagent's Bash carries as its parent's. Read-only, and the only command the router runs. |
 | (called via Bash, not a hook) | `transcript` | `index` / `turn` / `find` over the session transcript, for the audit agents. Writes an extract file and prints only its path plus a one-line summary; `--since` / `--until` / `--last` bound which turns are scanned. |
 | `UserPromptExpansion` (`^(guard:)?toggle$`) | `toggle` | Arm/mute the automatic audit for THIS session (`audit_paused`, session state only — never guard.local.json). A session starts muted, so `on` is the arming direction and the common one. `command_args` carries `on`/`off`; empty flips. The hook does the work and then **blocks the expansion**, so its message reaches the user directly and no model is invoked — the command file exists only to make the matcher reachable, and its body never runs. |
+| (called via Bash, not a hook) | `toggle-cli` | The same mute as `/guard:toggle`, for a shell prompt: `on` / `off` / `status` / empty flips. Session id from `CLAUDE_CODE_SESSION_ID`; project from `_cli_project_dir`. Shares `_apply_toggle` and `_mute_sentence` with the hook, so the two cannot describe the same state differently. The ONE subcommand that does not fail open — see `_MUST_REPORT` in `guard_hook.py`. |
 | (called via Bash, not a hook) | `status` | Status-line segment: `guard <n>` / `guard off` / `guard · on` / `guard ·`, or nothing on any failure. Reads one state file; runs on every assistant message. |
 | (called via Bash, not a hook) | `refs-dir` | Print the resolved refs directory (auditor fallback; applies `refs_dir` validation). |
 
@@ -337,6 +338,75 @@ payloads, not memory.
   `wiki/ref/claude-code-skill-substitutions.md`), it would need `Bash` on a `Read`-only
   agent, and it would put guard's storage layout in router prose as a second copy — which,
   once drifted, reads nothing and clears every turn.
+
+- **The shell toggle exists because the slash command costs a turn.** `/guard:toggle` is
+  cheap as hooks go — it blocks the expansion, so no model is invoked to relay its sentence
+  — but reaching it still means typing into the conversation, which is a prompt, a turn
+  boundary, and a Stop hook. Someone who just wants audits off for the next ten minutes
+  pays all of that. `toggle-cli` is the same three lines of state change addressed from a
+  prompt the user already has, and the conversation never learns it happened.
+
+  What makes it possible is `CLAUDE_CODE_SESSION_ID`: Claude Code sets it in every Bash
+  subprocess to the value the hook payload carries, so a shell command can address the same
+  `state/<sid>.json` the Stop hook will read. `GUARD_TOGGLE_CLI` — exported at SessionStart
+  — carries the other half, the script's own path, which the shell cannot otherwise know:
+  `CLAUDE_PLUGIN_ROOT` is a hook variable, and the marketplace installs the plugin under a
+  versioned cache directory. Because that path is resolved by `_plugin_root()` at session
+  start, it names the plugin copy THIS session loaded — a session started with
+  `--plugin-dir` gets the working tree, and the command cannot address a different version
+  than the hooks do.
+
+  **Nothing is installed.** `CLAUDE_ENV_FILE` is not a list of `export` lines: it is a shell
+  script the host SOURCES before each Bash command, so it can prepend a directory as readily
+  as set a variable. SessionStart adds `shell/bin` to `PATH`, and `guard` is on it from the
+  session's first shell. Verified against a live session — the file is
+  `~/.claude/session-env/<sid>/sessionstart-hook-N.sh`, and in that session `command -v
+  guard` resolved to the plugin's own `shell/bin/guard`. No startup file is edited, so
+  nothing survives the session and there is no uninstall step to forget. An earlier design
+  shipped a `/guard:shell` command that appended a `source` line to `~/.zshrc`; it was
+  removed once the env file was found to do this itself.
+
+  **A real executable, not a shell function.** Both work in the Bash tool's own shell, and
+  the function was built first. The executable wins on inheritance: a function exists only
+  in the shell that sourced it, so anything one level down — a subprocess, a Makefile
+  recipe, a script the agent writes — would not find `guard`, while an executable is
+  inherited like every other command. Confirmed both ways: `sh -c "guard status"` from
+  inside a session prints the state, which the function form could not have done. It also
+  behaves the way a command is expected to, `command -v` included.
+
+  Prepending one directory holding one command is not "reordering the user's PATH", which
+  is what an earlier draft of this bullet claimed as the reason to avoid it. A user who
+  already has a `guard` on their PATH has a genuine collision; `GUARD_TOGGLE_NAME` changes
+  the name guard's messages *suggest*, but not the file, so resolving it is theirs.
+
+  Added for every project, with no condition. Gating it on "guard is configured here" gates
+  on nothing: a project with no `guard.local.json` loads `DEFAULT_CONFIG` and is an ordinary
+  guard project with every switch `off`, so the test would not separate the case it appears
+  to — and would remove the command from the project where a user is most likely to reach
+  for it first. Verified in a project with no `.claude/` at all: `guard on` armed the
+  session and reported that no agent was switched on, which is the honest answer.
+
+  The command lives in `shell/bin/guard` rather than in a Python string, because shell code
+  inside a Python literal cannot be syntax-checked and is exactly the text that rots. It is
+  POSIX `sh`: the shell that sources the env file is the Bash tool's, not the user's login
+  shell. It resolves the CLI from `$GUARD_TOGGLE_CLI` rather than relative to its own
+  location, so a `guard` inherited by a subprocess still reaches the session's own plugin
+  copy.
+
+  Two things this verb does differently from everything else in guard, both deliberate:
+
+  - **It does not fail open.** Every other subcommand swallows its own exceptions, because
+    a broken plugin must not block someone's session. Here a person is standing at a prompt
+    reading the output, and printing nothing while exiting 0 is indistinguishable from
+    success. That is not hypothetical: during development a missing argument raised
+    `TypeError`, `main()` swallowed it, and `guard off` printed nothing and exited 0 —
+    which reads exactly like the mute worked. `_MUST_REPORT` in `guard_hook.py` is the
+    carve-out.
+  - **It verifies the write by reading it back.** `_write_state` swallows `OSError` by
+    design, so a full disk or a read-only checkout would otherwise leave the user with a
+    sentence announcing a flip that never reached the file. The `flip` case has to resolve
+    its target *before* the write; comparing against a state re-read afterwards compares it
+    with itself and passes for any outcome at all.
 
 - **Materiality is measured on the turn, not on the answer file — v0.65.2.** The request
   bullet above fixed *what* the router compares against; this fixes *what it is reading*. The
@@ -1149,6 +1219,29 @@ export GUARD_SETTINGS_SKILL=1         # mutating verbs do — see _cli_write_all
 # recipe and a whole file of silent no-ops. `toggle` is a UserPromptExpansion hook, so it
 # takes its argument in the payload, not in argv.
 echo '{"session_id":"s1","command_args":"on"}' | "$H" toggle > /dev/null
+
+# The same mute from a shell — `toggle-cli`, which the `guard` shell function wraps. Session
+# id comes from the ENVIRONMENT here, not from a payload, so it is set per command.
+# The last two are the reason this verb exists: it must never be silent, because a person is
+# reading it and silence reads as success. Both must PRINT and exit non-zero.
+CLAUDE_CODE_SESSION_ID=s1 "$H" toggle-cli status   # -> one line; exit 0
+CLAUDE_CODE_SESSION_ID=s1 "$H" toggle-cli on       # -> "audits ON ... `claims-auditor`, ..."
+CLAUDE_CODE_SESSION_ID=s1 "$H" toggle-cli status   # -> the SAME sentence as the line above;
+                                                   #    a difference here means the report
+                                                   #    path and the write path have drifted
+CLAUDE_CODE_SESSION_ID=s1 "$H" toggle-cli off      # -> "audits OFF ... `guard on` to arm."
+CLAUDE_CODE_SESSION_ID=s1 GUARD_TOGGLE_NAME=gd "$H" toggle-cli off   # -> "`gd on` to arm."
+CLAUDE_CODE_SESSION_ID= "$H" toggle-cli on; echo "exit=$?"      # -> stderr; exit=1
+CLAUDE_CODE_SESSION_ID=s1 "$H" toggle-cli bogus; echo "exit=$?" # -> stderr; exit=1
+
+# The shell command's own wiring: SessionStart writes a PATH line into $CLAUDE_ENV_FILE.
+# Run it more than once — SessionStart has no matcher, so it fires on compact and fork too,
+# and a blind append would add the same line once per compaction.
+ENVF=$(mktemp); CLAUDE_ENV_FILE=$ENVF
+for i in 1 2 3; do echo '{"session_id":"s1"}' | "$H" session-start > /dev/null; done
+grep -c 'export PATH=' "$ENVF"      # -> 1, not 3
+# And the point of an executable over a function: it survives into a subprocess.
+sh -c ". $ENVF; sh -c 'CLAUDE_CODE_SESSION_ID=s1 guard status'"   # -> one line
 python3 -c "import json;print(json.load(open('$CLAUDE_PROJECT_DIR/.claude/guard/state/s1.json'))['audit_paused'])"
 #   -> False. Every case below assumes it.
 

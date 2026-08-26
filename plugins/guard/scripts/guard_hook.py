@@ -31,6 +31,7 @@ Subcommands
 - stop           Stop — ``guard_core.cmd_stop``
 - session-start  SessionStart — ``guard_core.cmd_session``
 - toggle         UserPromptExpansion for ``/guard:toggle`` — ``guard_core.cmd_status``
+- toggle-cli     CLI (argv), the same mute from a shell — ``guard_core.cmd_status``
 - status         CLI (stdin JSON), the status-line segment — ``guard_core.cmd_status``
 - settings       CLI (argv), run by the ``guard:settings`` skill — ``guard_core.cmd_settings``
 - refs-dir       CLI, prints the resolved refs directory — ``guard_core.cmd_settings``
@@ -52,7 +53,7 @@ from guard_core.cmd_stop import cmd_stop
 from guard_core.cmd_session import cmd_session_start
 from guard_core.cmd_candidates import cmd_candidates
 from guard_core.cmd_settings import cmd_refs_dir, cmd_settings
-from guard_core.cmd_status import cmd_status, cmd_toggle
+from guard_core.cmd_status import cmd_status, cmd_toggle, cmd_toggle_cli
 
 
 SUBCOMMANDS = {
@@ -65,20 +66,35 @@ SUBCOMMANDS = {
     "candidates": cmd_candidates,
     "transcript": cmd_transcript,
     "toggle": cmd_toggle,
+    "toggle-cli": cmd_toggle_cli,
     "status": cmd_status,
 }
+
+
+# The one subcommand that must NOT fail open. Everything else here runs as a hook, where
+# swallowing guard's own crash is the whole policy: a broken plugin must not block someone's
+# session. `toggle-cli` has no session to protect — a person is standing at a prompt reading
+# the output — and silence there is indistinguishable from success. That is not theoretical:
+# a missing argument in this verb's own call raised TypeError, was swallowed here, and
+# printed nothing while exiting 0, which is exactly what the user would have read as "guard
+# is off now".
+_MUST_REPORT = {"toggle-cli"}
 
 
 def main() -> int:
     if len(sys.argv) < 2:
         return 0
-    handler = SUBCOMMANDS.get(sys.argv[1])
+    verb = sys.argv[1]
+    handler = SUBCOMMANDS.get(verb)
     if handler is None:
         return 0
     try:
         return handler()
     except Exception as e:  # never let guard's own failure surface as a hook error
-        _trace(_project_dir(), None, sys.argv[1] if len(sys.argv) > 1 else "?", "exception", error=repr(e))
+        _trace(_project_dir(), None, verb, "exception", error=repr(e))
+        if verb in _MUST_REPORT:
+            print(f"guard: {verb} failed — {e!r}. Nothing changed.", file=sys.stderr)
+            return 1
         return 0
 
 

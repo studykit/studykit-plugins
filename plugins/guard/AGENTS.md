@@ -25,7 +25,7 @@ wrote. Anything below that says "the turn" or "the response" is about the routed
 Every switch ships `off`, and a session additionally starts muted. guard installed is guard
 available, not guard running.
 
-`/guard:toggle` makes no model call either — its hook answers the user directly.
+`/guard:toggle` makes no model call either — its hook answers the user directly. `guard on` / `guard off` does the same from a shell prompt, without entering the conversation at all: SessionStart puts the command on `PATH` through `$CLAUDE_ENV_FILE`, which is sourced rather than scanned for exports, so there is nothing to install and nothing left behind. It is an executable rather than a shell function so that subprocesses inherit it. `toggle-cli` shares its whole decision path with the hook, and is the one subcommand that must not fail open — a person is reading its output, so silence would read as success.
 
 ## Hard requirements
 

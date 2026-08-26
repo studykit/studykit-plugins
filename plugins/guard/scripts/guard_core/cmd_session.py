@@ -28,7 +28,7 @@ from .paths import _project_dir, _refs_dir, _state_root, _trace, _trace_file
 from .payload import _read_payload, _session_id
 from .state import _audit_paused, _read_state
 from .agents import AUDIT_AGENTS, _agent_id, _instance_name
-from .dispatch import _playbook_path
+from .dispatch import CLI_REL, _playbook_path, _plugin_root
 
 
 def _session_muted(project_dir: Path, config: dict) -> bool:
@@ -57,6 +57,43 @@ def _session_muted(project_dir: Path, config: dict) -> bool:
     return _audit_paused(_read_state(project_dir, sid, config))
 
 
+def _add_shell_command_to_path() -> bool:
+    """Put guard's ``guard`` command on the session's ``PATH``. True if written.
+
+    ``CLAUDE_ENV_FILE`` is not a list of ``export`` lines — it is a shell script Claude Code
+    SOURCES before each Bash command, so it can prepend a directory as readily as it can set
+    a variable. That is what makes ``guard on`` work with nothing to install: no startup
+    file is edited, and nothing is left behind when the session ends, because the file
+    belongs to one session.
+
+    A real executable on ``PATH``, not a shell function. A function exists only in the shell
+    that sourced it, so anything one level down — a subprocess, a Makefile recipe, a script
+    the agent writes — would not find ``guard``; an executable is inherited the way every
+    other command is. It also behaves like a command in the ways people expect: ``command -v
+    guard`` locates it, and ``guard`` inside ``$(...)`` works.
+
+    Only guard's own ``bin`` is added, and only ever once (``_append_env_file`` matches on
+    the directory). Prepending is not "reordering the user's PATH": it adds one directory
+    holding one command. A user who already has a ``guard`` can set ``GUARD_TOGGLE_NAME``,
+    which is the name guard's own messages then suggest — though note that variable renames
+    only the SUGGESTION, not this file, so a genuine collision is theirs to resolve.
+
+    Added unconditionally, for every project. Gating it on "guard is configured here" would
+    be gating on nothing: a project with no ``guard.local.json`` loads the defaults and is an
+    ordinary guard project whose switches are all ``off`` — so the condition would not
+    separate the case it appears to, and the command would be missing exactly where a user
+    might reach for it first.
+
+    Best-effort and silent, like the exports: the CLI verb is reachable by path regardless,
+    and a session without it is merely less convenient.
+    """
+    bin_dir = _plugin_root() / "shell" / "bin"
+    if not (bin_dir / "guard").is_file():
+        return False
+    quoted = shlex.quote(str(bin_dir))
+    return _append_env_file(f"export PATH={quoted}:$PATH", marker=f"export PATH={quoted}:")
+
+
 def _export_to_bash_env(name: str, value: str) -> bool:
     """Persist one ``export`` into the session's Bash environment. True if written.
 
@@ -78,16 +115,28 @@ def _export_to_bash_env(name: str, value: str) -> bool:
     Best-effort, silent on failure: everything that reads these has a fallback, and the
     session's context lines go out either way.
     """
+    return _append_env_file(f"export {name}={shlex.quote(value)}")
+
+
+def _append_env_file(text: str, marker: str | None = None) -> bool:
+    """Append to ``$CLAUDE_ENV_FILE`` unless it already carries this. True if written.
+
+    ``marker`` is the line that identifies a multi-line block already being present; for a
+    single line the text is its own marker. SessionStart registers no matcher, so it fires
+    on `startup`, `resume`, `clear`, `compact` and `fork` alike — a blind append added the
+    same content once per compaction for the life of the session, which is what
+    ``GUARD_REFS_DIR`` did before this check existed.
+    """
     env_file = os.environ.get("CLAUDE_ENV_FILE", "").strip()
     if not env_file:
         return False
-    line = f"export {name}={shlex.quote(value)}"
+    needle = marker if marker is not None else text
     try:
         path = Path(env_file)
-        if path.is_file() and line in path.read_text(encoding="utf-8").splitlines():
+        if path.is_file() and needle in path.read_text(encoding="utf-8"):
             return False
         with path.open("a", encoding="utf-8") as fh:
-            fh.write(line + "\n")
+            fh.write(text + "\n")
     except OSError:
         return False
     return True
@@ -167,6 +216,18 @@ def cmd_session_start() -> int:
     session_cfg = _load_config(project_dir)
     refs = _refs_dir(project_dir, session_cfg)
     _export_to_bash_env("GUARD_REFS_DIR", str(refs))
+
+    # The CLI behind the shell toggle. `CLAUDE_PLUGIN_ROOT` is given to hook processes and
+    # substituted into command bodies, but it is NOT in the Bash tool's environment, so a
+    # shell wrapper has no way to find this script — and its path is not guessable: the
+    # marketplace installs the plugin under a versioned cache directory. Exporting the
+    # resolved path is what makes `guard on` from a prompt possible at all.
+    #
+    # The PATH itself is deliberately not touched. Prepending a directory to a user's PATH
+    # from a session hook changes how every command in that shell resolves, for a feature
+    # that needs one variable; the wrapper the user installs reads this instead.
+    _export_to_bash_env("GUARD_TOGGLE_CLI", str(_plugin_root() / CLI_REL))
+    _add_shell_command_to_path()
 
     # The injected contract states the general rule — a doc-based claim cites the source
     # URL and a local saved copy — but not where this project keeps that copy, which

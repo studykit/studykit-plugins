@@ -1,0 +1,20 @@
+#!/bin/sh
+# guard — arm or mute guard's audit for the Claude Code session this shell belongs to.
+#
+#   guard on | guard off | guard | guard status
+#
+# On PATH because guard's SessionStart hook prepends this directory to it, via the shell
+# script at $CLAUDE_ENV_FILE. Nothing is installed and nothing is left behind: that file
+# belongs to one session.
+#
+# $GUARD_TOGGLE_CLI, exported beside it, points at the plugin copy THIS session loaded, so
+# the command can never address a different version than the session's hooks do. It is
+# resolved here rather than relative to this script so that a `guard` inherited by a
+# subprocess still reaches the right plugin.
+if [ -z "$GUARD_TOGGLE_CLI" ] || [ ! -f "$GUARD_TOGGLE_CLI" ]; then
+  echo "guard: GUARD_TOGGLE_CLI is unset or missing — this command works inside a Claude Code session." >&2
+  exit 1
+fi
+
+GUARD_TOGGLE_NAME="${GUARD_TOGGLE_NAME:-guard}" export GUARD_TOGGLE_NAME
+exec uv run --script "$GUARD_TOGGLE_CLI" toggle-cli "$@"
