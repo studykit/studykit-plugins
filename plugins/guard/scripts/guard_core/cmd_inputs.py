@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import os
 import sys
+from pathlib import Path
 
 from .config import _load_config
 from .paths import _cli_project_dir, _knowledge_dirs, _trace
@@ -58,8 +59,17 @@ def cmd_inputs() -> int:
     could not reach rather than stall, and an agent that stalls here stalls the turn.
     """
     argv = sys.argv[2:]
+    # `--file` is the document form: a file that is not a turn — today the interview brief,
+    # which no turn produced and no `Stop` ever saw. The turn id is the only thing this verb
+    # cannot derive, so when there is no turn the caller supplies the one path in its place
+    # and the rest is derived the same way. It lives here rather than in a verb of its own
+    # because it answers the same question — where is the thing I was sent to work on — and a
+    # second verb would be a second place for the layout to be spelled out.
+    if argv and argv[0].strip() == "--file":
+        return _inputs_for_file(argv[1:])
     if not argv or not argv[0].strip():
-        print("guard inputs: no turn id given — `inputs <turn-id>`.", file=sys.stderr)
+        print("guard inputs: no turn id given — `inputs <turn-id>` or "
+              "`inputs --file <path>`.", file=sys.stderr)
         return 0
     prompt_id = argv[0].strip()
 
@@ -96,4 +106,53 @@ def cmd_inputs() -> int:
         print("guard inputs: no transcript recorded for this session — history is "
               "unavailable; judge on what you have.", file=sys.stderr)
     _trace(project_dir, session_id, "inputs", "printed", prompt_id=prompt_id)
+    return 0
+
+
+def _inputs_for_file(argv: list[str]) -> int:
+    """``inputs --file <path>`` — the same keys, for a document with no turn behind it.
+
+    Three fields are absent and each absence is a fact, not a gap:
+
+    - no **request file**, because nobody typed a prompt that produced this document. The
+      materiality call the router makes from a request is simply unavailable here.
+    - no **playbook**. guard's dispatch playbook is written around a turn: it routes findings
+      back into the answer file, then into a translation of it, then into how the turn is
+      presented to the user. None of that exists for a document, and a caller following those
+      steps over a brief would produce a translation nobody asked for. The document router
+      carries its own, much shorter, dispatch instructions instead.
+    - no **transcript** and no **turn**, and this one is easy to get wrong. The brief is
+      written inside a subagent's own conversation, which the MAIN session's transcript does
+      not contain — so handing that path over would offer history that provably cannot hold
+      the document's provenance, and an agent would spend a search on it before finding out.
+      The document is self-contained by construction; it is audited as what it says.
+
+    Unlike the turn form, the path here comes from the caller rather than from guard's own
+    layout, so it is checked: a missing file is reported and nothing is printed, because an
+    agent handed a path that does not open reads it as an empty document and audits nothing.
+
+    Fail-open like every other verb — a bad path is a reason on stderr and exit 0.
+    """
+    project_dir = _cli_project_dir()
+    if not argv or not argv[0].strip():
+        print("guard inputs: no path given — `inputs --file <path>`.", file=sys.stderr)
+        _trace(project_dir, None, "inputs", "file_no_path")
+        return 0
+    target = Path(argv[0].strip()).expanduser()
+    try:
+        target = target.resolve()
+    except OSError:
+        target = target.absolute()
+    if not target.is_file():
+        print(f"guard inputs: no file at {target} — nothing to audit.", file=sys.stderr)
+        _trace(project_dir, None, "inputs", "file_missing")
+        return 0
+
+    # `file:`, not `answer file:`. Only the document router reads this form, and calling a
+    # brief an "answer" would invite it to reason about a turn that does not exist.
+    print(f"file: {target}")
+    config = _load_config(project_dir)
+    for kdir in _knowledge_dirs(project_dir, config):
+        print(f"knowledge dir: {kdir}")
+    _trace(project_dir, None, "inputs", "file_printed", file=target.name)
     return 0

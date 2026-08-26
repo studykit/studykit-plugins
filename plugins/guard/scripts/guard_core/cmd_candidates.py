@@ -31,7 +31,7 @@ import sys
 from .config import _agent_mode, _load_config
 from .paths import _cli_project_dir, _trace
 from .agents import AUDIT_AGENTS, _eligible_agents
-from .state import _read_state
+from .state import _audit_paused, _read_state
 
 
 def cmd_candidates() -> int:
@@ -46,11 +46,12 @@ def cmd_candidates() -> int:
     flag. That ordering therefore lives in one place, the roster, and reaches the router as
     the order of the lines rather than as a rule it has to be told.
 
-    Two failure shapes, and they must not look alike. No session id is an installation
-    problem and says so on stderr; an empty list is a real answer that the router should
-    never see here, since the hook prints this command only when at least one turn-reading
-    agent is eligible — so it, too, is called out rather than left as silence the router
-    would have to interpret.
+    Three shapes that print no keys, and they must not look alike on stderr. No session id
+    is an installation problem. A muted session is the user having switched guard off, which
+    is an answer. An empty list is a real answer too, and one the router should never see on
+    the routed path, since the hook prints this command only when at least one turn-reading
+    agent is eligible — so each is called out rather than left as silence the router would
+    have to interpret.
 
     On the ``--continue`` / bare ``--resume`` carve-out in the reference above, the env var
     may carry the startup id while the hooks carry the resumed one. That surfaces here as an
@@ -68,6 +69,17 @@ def cmd_candidates() -> int:
 
     config = _load_config(project_dir)
     state = _read_state(project_dir, session_id, config)
+    # The mute, honored here as well as in `cmd_stop`. On the routed path this is dead
+    # weight — a muted session returns before the router is ever dispatched, so this verb
+    # is not reached — but the document path (`inputs --file`) has no Stop hook in front of
+    # it, and its router asks this command what is on. Without this, `guard off` would
+    # silence the turn audit and leave the document audit running, which is not what a
+    # switch labelled off means.
+    if _audit_paused(state):
+        print("guard candidates: this session is muted (`guard off`) — nothing is eligible.",
+              file=sys.stderr)
+        _trace(project_dir, session_id, "candidates", "paused")
+        return 0
     # The file lists are deliberately empty. Only the turn-reading agents are routed, and
     # `_eligible_agents` gates a file-reading one on having a file of its own kind — so
     # passing nothing is what makes those ineligible here, which is exactly the filter this

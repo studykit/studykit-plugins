@@ -39,6 +39,14 @@ the user closes the interview and never before, and its final message to the mai
 that path and nothing else — the file is the handoff, so a summary beside it would be a second
 version to disagree with.
 
+That brief is the one document guard's turn audit can never reach: the skip above is what keeps
+the interview free, and the same skip means no `Stop` ever sees the text. So it is audited on a
+path of its own — the `description` tells the MAIN agent to dispatch `file-router` over the
+saved path, and that router triages the document the way `router` triages a turn. Nothing in
+the hooks is involved, which is why the switches and the mute had to move into
+`guard-candidates`: it is the only thing both routers run, and on this path there is no hook in
+front to check them.
+
 It ships **no command**. `@agent-guard:interviewer` is documented to guarantee a given subagent
 runs, lands it in the background panel, and keeps a running one reachable — so a command would
 only be a second, driftable way to say the same thing. What that entry point does not settle is
@@ -46,7 +54,7 @@ the opening prompt, which the main agent still writes; the agent's own body has 
 
 `guard on` / `guard off` flips this session's mute from a shell prompt, without entering the conversation at all — the reason it is not a slash command. It leaves `audit-turn` alone, so muting the session you are in never changes what the next one does. SessionStart puts it on `PATH` through `$CLAUDE_ENV_FILE`, which is sourced rather than scanned for exports, so there is nothing to install and nothing left behind. It is an executable rather than a shell function so that subprocesses inherit it. `guard-plan` is its counterpart for the plan gate. `toggle-cli` is the one subcommand that must not fail open — a person is reading its output, so silence would read as success.
 
-That same `PATH` carries `guard-candidates` and `guard-inputs`, which are the dispatched agents' and never the user's. Between them the routed dispatch is down to `- turn: <id>`. `dev/design.md` has why that beats printing the roster and the paths, and what each fallback line is for.
+That same `PATH` carries `guard-candidates` and `guard-inputs`, which are the dispatched agents' and never the user's. Between them the routed dispatch is down to `- turn: <id>`, and the document dispatch to `- file: <path>`. `dev/design.md` has why that beats printing the roster and the paths, and what each fallback line is for.
 
 ## Hard requirements
 
@@ -91,6 +99,9 @@ how the code here is organised.
 - It names **agents**, never guard's own skills — those are the user's entry point, so a hook
   must not reach through them.
 - The three edited-file lists stay disjoint, and the refs test runs first, by location.
+- `guard-candidates` is where a switch and the mute are enforced for the document path, and
+  `cmd_stop` is where they are enforced for the turn path. Neither is redundant: drop the check
+  in the command and `guard off` silences the turn audit while the brief audit keeps running.
 - Two things ignore the agent switches AND the session mute, because both are prohibitions
   rather than opinions: the refs-index check and the `/`-rooted search refusal. A mute that
   could lift a prohibition would not be one.

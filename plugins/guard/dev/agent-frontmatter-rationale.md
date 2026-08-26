@@ -184,6 +184,44 @@ named on material that was not there. The second failure is the one that compoun
 teaches the user to wave the recommendation through unread, and then the omissions stop being
 caught either. The triage itself is short, so the model is the cheap part of it.
 
+### `file-router`
+
+`tools: Read, Bash`
+
+Same frontmatter as `router`, and for the same reasons; what differs is what it is pointed at.
+`router` triages a TURN and gets there from a turn id. This one triages a DOCUMENT and gets
+there from a path — `guard-inputs --file <path>`, the second form of the same verb.
+
+**Why a second agent rather than a second mode of `router`.** The two share the mechanism and
+disagree on three judgments, each of which would have to become a conditional inside a body that
+is already the longest in this plugin:
+
+- **No request file.** `router`'s materiality call leans on what the user asked for. A document
+  had no user in front of it, so that whole section is inapplicable rather than merely empty.
+- **`korean-corrector` can never be named.** On the turn path the agent corrects a translation
+  the caller writes *after* routing, which is why the request is allowed to put it on the list.
+  A document is already written and is the deliverable; there is no later prose. A shared body
+  would carry a rule whose one job is to be switched off half the time.
+- **A declared-open section has to be read as a claim, not as a clearance.** The interview
+  brief carries `Open` and `Could not determine` headings, and the first draft of this router
+  told it to skip them as the document doing its job. That was backwards, and the maintainer
+  caught it: the heading asserts that somebody decided to leave these open, and the interviewer
+  is perfectly capable of parking a question it never asked under it. An item nobody put to the
+  user sits there indistinguishable from one the user declined, with the heading making it look
+  accounted for — which is `deferrals-auditor`'s subject exactly. So the rule is the opposite of
+  what it started as: that section is the strongest reason to name the agent.
+
+It also carries its own dispatch instructions instead of pointing at the playbook, which is why
+`inputs --file` prints no playbook path: the playbook routes findings into the answer file, then
+a translation, then the presentation of a turn, and a caller following that over a brief would
+produce a Korean translation nobody asked for.
+
+**The mute is honored by `guard-candidates`, not by this agent.** There is no Stop hook in front
+of this path to check it — the main agent dispatches this router off the interviewer's
+`description` — so the switch check had to move into the command both routers already run. On
+the turn path that is dead weight (a muted session returns before the router is dispatched);
+here it is the only thing that makes `guard off` mean off.
+
 ## Correctors
 
 ### `comment-corrector`
@@ -435,13 +473,15 @@ premise is the one most likely to be wrong.
 
 ### `interviewer`
 
-`tools: Read, Grep, Glob, Bash, WebSearch, WebFetch`
+`tools: Read, Grep, Glob, Bash, Write, Edit, WebSearch, WebFetch`
 
 The only agent here the USER talks to directly, in its own transcript, rather than one the main
 session dispatches and reads. `WebSearch`/`WebFetch` for sources outside the repository,
-`Read`/`Grep`/`Glob`/`Bash` for the project.
+`Read`/`Grep`/`Glob`/`Bash` for the project, `Write`/`Edit` for the brief and nothing else.
 
-**`Write` and `Edit` were in that list and were taken away after two measured runs.** The body
+**`Write` and `Edit` were taken away after two measured runs, and put back on 2026-08-26 at the
+maintainer's direction.** The evidence that removed them still stands, so it is recorded here
+rather than deleted — what changed is the conclusion drawn from it, not the measurement. The body
 said, in the go-ahead section and again in the prohibitions, that it must never build the thing
 under discussion. On the first run it scaffolded an entire Python project and CI workflow after
 the go-ahead. The prohibition was strengthened at the decision point, and on the second run it
@@ -451,17 +491,23 @@ Two honest qualifications on that evidence, both of which the maintainer raised.
 `--permission-mode bypassPermissions`; in an ordinary session each of those calls would have
 surfaced as a permission prompt in the user's main conversation, named to this agent, and could
 have been denied — so the runs show what the agent *reaches for*, not what it gets away with.
-And `Bash` stayed, at the maintainer's direction, because research needs it. So the boundary is
-not closed: a shell redirect still writes. What removing `Write`/`Edit` buys is that the
-scaffolding path is no longer the obvious one, and what the permission prompt buys is that the
-attempt is visible. Neither is sufficient alone and the body says so rather than claiming a
-capability the agent can see it has — a body that tells an agent it cannot do what it can is
-worse than a rule, because the agent finds out.
+And `Bash` stayed, at the maintainer's direction, because research needs it — which already left
+the boundary open, since a shell redirect writes. Removing `Write`/`Edit` therefore never closed
+it; it only made the scaffolding path less obvious, at the cost of a second agent standing
+between the brief and the disk.
 
-It follows that it does not write the brief either: its last message IS the brief, and the main
-session saves it to `.claude/interviews/<slug>.md`. The `description` carries that instruction,
-because the main agent is the one who has to follow it. `color: red` — this agent reports and
-leaves the user's project alone.
+**So the boundary is prose plus the permission prompt, and the body is written to be exactly
+that.** It does not tell the agent it lacks a capability it can see it holds — that is worse
+than a rule, because the agent finds out — it names the one file `Write` is for and says the
+attempt at anything else surfaces as a prompt in the user's main conversation, with this agent's
+name on it, asking them to approve a build they came here to avoid. Whether that holds where the
+tool removal did not is the thing to watch on the next run.
+
+The brief follows from the grant: the agent writes it itself, to
+`.claude/interviews/<short-kebab-slug>.md`, and its final message is that path and nothing else.
+The `description` tells the main agent to act on the file rather than on the report, and to name
+no path of its own — the slug rule lives with the agent that applies it. `color: red` — this
+agent reports and leaves the rest of the user's project alone.
 
 **`background: true` is load-bearing, not a default spelled out.** Only background agents appear
 in the interactive panel, and that panel is the only way the user opens a transcript and talks to
@@ -471,8 +517,7 @@ user to listen to.
 **No `memory:`, and the reason is the opposite of the auditors'.** Their hazard is a stored
 verdict that suppresses a finding. This agent's hazard is a stored *user profile* — "they always
 mean X", "they prefer Y" — which is a conclusion about the person it is supposed to be asking.
-An interviewer that already knows what you want has stopped doing the job. The omission also
-keeps Write and Edit from being granted twice over, though here they are granted outright anyway.
+An interviewer that already knows what you want has stopped doing the job.
 
 `model: opus`, argued from the failure mode: the input is a short sentence with the context left
 out on purpose, and the failure is supplying that context yourself and answering confidently.
