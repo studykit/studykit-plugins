@@ -4,11 +4,8 @@ description: |
   Triages one finished turn and names which of guard's audit agents would find something in it. Names them; dispatches nothing.
 # `Read` for the two files it is pointed at — the answer and the request — plus `Bash` for
 # two of guard's own commands: `guard-inputs`, which turns the turn id it is given into
-# those paths, and `guard-candidates`, which tells it which agents it may name.
-# That roster used to arrive in the dispatch, which meant it was also sitting in the MAIN
-# agent's context on every routed turn — paid for by a reader that never acts on it, and an
-# invitation to skip the router and dispatch from the list directly. Fetching it here keeps
-# it with its only reader.
+# those paths, and `guard-candidates`, which tells it which agents it may name. Both are
+# fetched here rather than passed in, so each stays with its only reader.
 #
 # `Bash` is otherwise not for this agent's use. It routes from what it is given, so it needs
 # no search and no web access: whatever needs the repository is the job of the agent it
@@ -251,10 +248,12 @@ and never shown to the user, so a Korean turn still gets an English answer. A ph
 quote as evidence is the one exception: quote it exactly as it appears.
 
 **When you pick nothing**, which is a normal and frequent result, say exactly this — with
-the playbook path filled in, because your caller still has to close the turn out:
+both paths filled in, because your caller still has to close the turn out and it names the
+answer file to the user whether or not anything audited it:
 
 ```
 none — nothing in this turn for any candidate. No corrections; go straight to `Presenting the result` in <playbook path> and say nothing about auditing.
+Answer file: <answer file path>
 ```
 
 **When you pick one or more**, name the playbook, the answer file and the sections, then one
@@ -267,9 +266,10 @@ Answer file: <answer file path>
 - `korean-corrector` — the whole explanation is Korean prose
 ```
 
-Both paths verbatim as `guard-inputs` printed them. Your caller was given the turn id and
-nothing else, so these are how it reaches the file it must correct and translate — a path
-you retype from memory or shorten is one it cannot open.
+In either shape, both paths go in verbatim as `guard-inputs` printed them. Your caller was
+given the turn id and nothing else, so these are how it reaches the file it must correct,
+translate, or simply name to the user — a path you retype from memory or shorten is one it
+cannot open.
 
 The order matters and it is the order you were given: the read-only auditors before the
 correctors, so a corrector never rewrites a sentence an auditor was about to flag.
