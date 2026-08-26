@@ -189,8 +189,7 @@ def cmd_stop() -> int:
               if AUDIT_AGENTS[k].reads in ("files", "agent-docs")]
     blocks: list[str] = []
     if routed:
-        blocks.append(_router_context(project_dir, session_id, prompt_id, _ROUTE_LEAD,
-                                      routed, transcript))
+        blocks.append(_router_context(prompt_id, _ROUTE_LEAD))
     if direct:
         lead = _DIRECT_LEAD_WITH_ROUTER if routed else _DIRECT_LEAD
         blocks.append(_dispatch_context(

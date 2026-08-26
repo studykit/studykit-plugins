@@ -64,12 +64,6 @@ would. **Do not run the extraction yourself and do not summarize the session for
 agent.** Gathering it here would put the largest cost of an audit in the context the user is
 talking to, before anything is known to need it.
 
-When the dispatch that sent you here named a transcript path and a turn id directly — an
-older caller, or a tree without `guard-inputs` — pass both through instead, along with the
-extractor: `scripts/guard_hook.py` in the plugin directory holding this playbook. This file
-is `hooks/context/dispatch-playbook.md`, so it is `../../scripts/guard_hook.py` from here,
-and you know this file's absolute path because you were given it.
-
 **Fallback.** An agent can fail to get an extract — no transcript path was passed, the file
 is gone, the turn id is not in it, a compaction dropped the range. It is then allowed to
 `SendMessage` you and ask, and answering is the right thing to do. Two limits on your

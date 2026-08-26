@@ -50,10 +50,6 @@ Run it first, before you decide anything. If it fails or prints no answer file, 
 one line and pick nothing — do not go looking for guard's files yourself, because a path you
 built by guessing at the layout points somewhere that reads as an empty turn.
 
-An older caller may pass the paths directly instead, as `playbook:`, `turn dir:`,
-`answer file:` and `history:` lines, with the two files named relative to the turn directory
-as `{turn dir}/<name>`. When it does, use what it gave you and skip the command.
-
 What each one is:
 
 - **answer file** — the answer this turn is giving, written during the turn by the session
@@ -90,8 +86,7 @@ What each one is:
   prints is one candidate as `key=mode`. It is on your `PATH` and takes no argument; it
   works out which session it belongs to by itself.
 
-  Your dispatch does not name it, and does not need to. Older callers may still pass a
-  `candidates:` line; when one does, run what it gives you instead of this name.
+  Your dispatch does not name it, and does not need to.
 
   **You may name only the keys it printed.** They are the agents the user has switched on;
   a key that is not printed is not available, so ignore its section below and never name

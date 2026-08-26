@@ -420,12 +420,20 @@ payloads, not memory.
   function. It reads `$GUARD_TOGGLE_CLI` for the same reason `guard` does, so the router
   cannot address a different plugin copy than the hooks did.
 
-  The one case that still sends a line is a tree where `shell/bin/guard-candidates` is not
-  on disk, because there the router's own definition would name a command that is not
-  there. The check is for a partial install, not for PATH. It matters because the router is
-  instructed to pick nothing when this command fails: a missing wrapper with no fallback
-  would clear every turn silently, which is under-auditing that looks exactly like a clean
-  run.
+  **There is no fallback for a missing wrapper, and one was removed rather than kept.** It
+  tested `is_file()` on each wrapper and added the long `uv run --script <cli> <verb>` form
+  when it was absent. Measuring all four present/absent combinations showed it caught
+  nothing that happens: a version mismatch is impossible because `agents/router.md` and
+  `shell/bin/` install as one tree; a lost exec bit or a PATH the wrappers never reached
+  leaves the file in place, so `is_file()` passes and the fallback never fires — and that is
+  every realistic failure; Codex never calls `_router_context` at all. The only state it
+  caught was one produced by deleting the files by hand.
+
+  It was not free, either. The `candidates` half vanished in the v0.68.0 refactor and
+  nothing noticed until these paths were measured directly — a branch that never runs in
+  practice is a branch nothing protects. If a wrapper is ever genuinely unreachable, the fix
+  belongs in the router's report: "the command failed" and "nothing to audit" produce
+  identical output today, and that ambiguity is the real silent failure.
 
   Measured in a real session with the wrapper present: the Stop hook's dispatch listed
   `playbook`, `turn dir`, `answer file` and `history` and no `candidates` line, and the
@@ -450,10 +458,10 @@ payloads, not memory.
   on stderr when a session has none. An agent that needs history must be able to tell "no
   transcript" from "I built the path wrong"; those two look identical if the verb is silent.
 
-  The fallback is the whole old field list, sent when `shell/bin/guard-inputs` is not on
-  disk. It is larger than the `guard-candidates` fallback because there is more to replace,
-  and it keeps the `needs_history` test: whether any agent on THIS dispatch wants history is
-  the one thing the verb cannot know, since it is asked about a turn, not about a roster.
+  This verb had a fallback too — the whole old field list — and it was removed with the
+  other one, for the same reason and in the same commit. `_router_context` is now a lead and
+  one field, with no branch in it: rendering it with the wrappers deleted produces byte-identical
+  output to rendering it with them present, which is the check that the branching is really gone.
 
   Two things this verb does differently from everything else in guard, both deliberate:
 

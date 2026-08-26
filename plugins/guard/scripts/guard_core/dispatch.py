@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any
 
 from .config import AgentMode
-from .turnrec import _turn_record_file, _turn_request_file
+from .turnrec import _turn_record_file
 from .agents import AUDIT_AGENTS
 
 
@@ -82,36 +82,27 @@ def _playbook_path() -> Path:
     return _plugin_root() / PLAYBOOK_REL
 
 
-# The CLI the router runs to get its own roster. Built from the same `_plugin_root` the
-# playbook path is, so a moved install cannot leave one of the two pointing at nothing, and
-# spelled with the `uv run --script` prefix the hook commands use — the script's shebang
-# carries it too, but a caller that invoked the file directly would depend on its exec bit
-# surviving whatever installed it.
+# The CLI behind guard's shell wrappers and the Codex adapter. Built from the same
+# `_plugin_root` the playbook path is, so a moved install cannot leave one of the two
+# pointing at nothing.
 CLI_REL = "scripts/guard_hook.py"
 
-# The `guard-candidates` wrapper, when SessionStart got it onto PATH.
-SHELL_CANDIDATES_REL = "shell/bin/guard-candidates"
-# The `guard-inputs` wrapper, which derives a turn's paths from its id. Its presence is what
-# lets the dispatch carry the id alone instead of the paths themselves.
-SHELL_INPUTS_REL = "shell/bin/guard-inputs"
-
-
-def _candidates_cmd() -> str:
-    """The command that produces the router's roster.
-
-    Two callers with opposite needs, which is why this returns a string rather than being
-    inlined. `agents/router.md` names `guard-candidates` itself and needs nothing from here;
-    `_router_context` calls this only for the FALLBACK line it sends when that wrapper is
-    absent, and then the long form is the only thing that can work.
-
-    The short form needs no PATH lookup by this process: `_add_shell_command_to_path` put
-    the directory on the session's PATH at SessionStart, and a subagent's Bash inherits it
-    the way it inherits `guard`. What is checked is only that the file SHIPPED — a partial
-    install, or a tree where it was never added.
-    """
-    if (_plugin_root() / SHELL_CANDIDATES_REL).is_file():
-        return "guard-candidates"
-    return f'uv run --script "{_plugin_root() / CLI_REL}" candidates'
+# There is deliberately NO fallback for a tree whose `shell/bin/` wrappers are missing. One
+# existed, testing `is_file()` on each wrapper and adding the long `uv run --script <cli>
+# <verb>` form to the dispatch when it was absent. Measuring it found it caught nothing real:
+#
+# - A version mismatch cannot happen. `agents/router.md` and `shell/bin/` install as one
+#   tree, so a version whose router names `guard-candidates` is a version that ships it.
+# - A lost exec bit, or a PATH the wrappers never reached, leaves the FILE in place — so
+#   `is_file()` passes and the fallback never fires, which is every realistic failure.
+# - Codex never calls `_router_context` at all (see `hooks/scripts/hook_codex.py`).
+#
+# So the test and the failure it was meant to cover were about different things, and the
+# only state it caught was one produced by deleting the files by hand. It also had a real
+# cost: the `candidates` half vanished silently in a refactor and nothing noticed until the
+# paths were measured directly. If a wrapper is ever genuinely unreachable, the fix is for
+# the router to distinguish "the command failed" from "nothing to audit" in its report —
+# those two produce identical output today, which is the actual silent failure here.
 
 
 def _agent_pointer(project_dir: Path, session_id: str, prompt_id: str, keys: list[str],
@@ -159,26 +150,23 @@ def _dispatch_context(project_dir: Path, session_id: str, prompt_id: str, lead: 
     return "\n\n".join([lead, block])
 
 
-def _router_context(project_dir: Path, session_id: str, prompt_id: str, lead: str,
-                    eligible: list[str], transcript: str = "") -> str:
-    """``additionalContext`` for the Stop path: the playbook pointer, then this turn's data.
+def _router_context(prompt_id: str, lead: str) -> str:
+    """``additionalContext`` for the Stop path: one imperative and the turn id.
 
     Every line here is paid in the main agent's context at the end of EVERY routed turn,
     including the many the router then clears, so the test each line has to pass is: could
-    the playbook have said this instead? If yes, it is deleted from here and said there,
-    where it is read once by whoever needs it.
+    the playbook have said this instead, or could the party that needs it derive it? If
+    either, it is deleted from here.
 
-    Everything that used to spell out the procedure failed that test and is gone. What is
-    left is one imperative and a list of fields, because the ROUTER now returns the next
-    instruction itself: it names the playbook and the sections to follow, so the main agent
-    never reads a section about routing and the playbook has none. The rest — dispatch in one
-    message, in the order named, a clean result is one line, gather nothing yourself — is in
-    the playbook's `Dispatching` section, read once by whoever is sent there.
+    Everything else failed that test. The procedure went to the playbook, read once by
+    whoever is sent to a section. The roster and the per-turn paths went to `guard-candidates`
+    and `guard-inputs`, run by the agents that use them — the main agent opens none of those
+    files, so relaying their paths only gave it text to carry and a copy step to get wrong.
+    The ROUTER returns the next instruction itself, naming the playbook and the sections, so
+    the main agent never reads a section about routing.
 
-    What is left cannot come from anywhere else: where the playbook is, where the record is,
-    which agents are switched on and in what mode, and the transcript pointer for the agents
-    whose section asks for it. The field names are terse on purpose — the playbook says what
-    each one is for.
+    The turn id is what remains because it is the one thing nothing downstream can work out
+    for itself.
 
     Deliberately absent: any summary of the turn, from guard or from the main agent. Priming
     an audit with the author's account of the work is how an unexamined claim becomes an
@@ -205,32 +193,7 @@ def _router_context(project_dir: Path, session_id: str, prompt_id: str, lead: st
     # It also puts the layout back with the code that owns it. A dispatch that spelled the
     # turn directory out was a second copy of `turnrec`'s layout, in prose, and a drifted
     # copy reads nothing and clears every turn silently.
-    fields = [f"- turn: {prompt_id}"]
-    # Two INDEPENDENT fallbacks, one per wrapper, because a tree can be missing either. Each
-    # covers what its own wrapper would have derived, and the roster one is separate from
-    # the paths one — folding them together is how the `candidates` line was silently lost
-    # when this block was rewritten, and a router with no roster command picks nothing,
-    # which is indistinguishable from a turn that had nothing in it.
-    if not (_plugin_root() / SHELL_CANDIDATES_REL).is_file():
-        fields.append(f"- candidates: run `{_candidates_cmd()}`")
-    # The fallback for a tree without the wrapper, where the agent's own definition would
-    # name a command that is not there. Then the caller must supply what it can, in the old
-    # shape, because nothing downstream can derive it.
-    if not (_plugin_root() / SHELL_INPUTS_REL).is_file():
-        answer = _turn_record_file(project_dir, session_id, prompt_id).resolve()
-        fields.append(f"- playbook: {_playbook_path()}")
-        fields.append(f"- turn dir: {answer.parent}")
-        fields.append(f"- answer file: {{turn dir}}/{answer.name}")
-        request = _turn_request_file(project_dir, session_id, prompt_id).resolve()
-        if request.is_file():
-            fields.append(f"- request file: {{turn dir}}/{request.name}")
-        # Inside the fallback too: `guard-inputs` prints the transcript from what `cmd_stop`
-        # recorded in session state, so with the wrapper present this line is the same fact
-        # a second time. The `needs_history` test stays because it is the one thing the
-        # verb cannot know — whether any agent on THIS dispatch will want history at all.
-        if transcript and any(AUDIT_AGENTS[k].needs_history for k in eligible):
-            fields.append(f"- history: transcript {transcript}, turn {prompt_id}")
-    return lead + "\n\n" + "\n".join(fields)
+    return lead + "\n\n" + f"- turn: {prompt_id}"
 
 
 # The lead for a routed turn. There is no second mode: a switch the user turned on is
