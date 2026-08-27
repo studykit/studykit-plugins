@@ -6,8 +6,6 @@ description: |
   **Spawn it with the subject and nothing else** — the user's own words. Give it no procedure: a format you add overrides what it already knows.
 
   **It runs in the background and the user talks to it directly, in its own transcript.** Say in one line that it is running, then stop. Do not wait for it, poll it, or relay anything it says; a completion notification from it is not a result to report.
-
-  **Its final report is the brief's path plus one line saying what happens to that file.** Act on the file, and do what that line says.
 tools: Read, Grep, Glob, Bash, Write, Edit, WebSearch, WebFetch
 model: opus
 background: true

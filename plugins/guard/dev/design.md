@@ -784,15 +784,17 @@ payloads, not memory.
   have: the user names it themselves, and it ships no command precisely so that the `@`-mention
   is the only way in.
 
-  What a description on this agent DOES have to carry is the caller's instructions, because the
-  main session never reads the agent's body and gets three things wrong without being told:
-  it writes a procedure into the prompt, which overrides what the agent knows; it waits on or
-  relays a background agent talking to someone else; and it treats a completion notification as
-  a result. Those three plus one line of what the agent is are what remains, at 770 bytes.
+  What a description on this agent DOES have to carry is only what the caller needs **before the
+  agent has spoken**, because the main session never reads the agent's body: it writes a
+  procedure into the prompt, which overrides what the agent knows; and it waits on, polls or
+  relays a background agent that is talking to someone else, a completion notification included.
+  Those two plus one line of what the agent is are what remains, at 633 bytes.
 
-  The test that survives this: a description is for whoever must ACT on it. When the model picks
-  the agent, that is selection text; when a person picks it, everything but the dispatch
-  instructions is being paid for on every turn to be read by nobody.
+  A first pass kept a third — what the final report looks like and what to do with it — and that
+  was the same mistake in miniature. The report is a path and one imperative line; a caller
+  holding it needs no preview of its shape. Anything an agent will say for itself is not
+  description material, which sharpens the earlier test: a description is for whoever must act on
+  it, and only for what they must act on before there is a report to read.
 
 - **A document gets translated too — v0.103.0.** `korean-translator` had no `report_entry`, so
   it never appeared in `guard-candidates --doc` and a brief could only ever be delivered in
