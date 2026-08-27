@@ -18,9 +18,15 @@ each. The main agent dispatches those, concurrently. guard audits nothing itself
 audit criterion lives in an agent definition under `agents/`.
 
 Everything guard recommends, it recommends at turn end. Two shipped agents sit outside that
-path entirely and have no switch: `ext-docs-fetcher`, which the main agent selects from its
+path entirely and have no switch: `docs-finder`, which the main agent selects from its
 own description, and `ext-docs-auditor`, which the Stop hook names off the refs files the turn
 wrote. Anything below that says "the turn" or "the response" is about the routed path.
+
+The two names no longer rhyme, and that is the shape rather than drift: the finder searches
+wider than it writes — saved references, the repository's own documentation, any configured
+knowledge directory — while the auditor's subject is still only the refs copies. It reports
+WHERE a document is and never what it says, because a gist in its report is a second version
+of the document for the caller to disagree with.
 
 Two agents on that path are one step rather than an audit: `korean-translator` writes the Korean
 the user reads, from the corrected English answer file, and `korean-corrector` then judges what

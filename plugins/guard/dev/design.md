@@ -155,7 +155,8 @@ payloads, not memory.
   a prohibition and can only ever *suggest* a redirect.
 
   guard had one hook that leaned on this — `pre-fetch`, which denied the main conversation's
-  `WebFetch`/`WebSearch` and named `ext-docs-fetcher` in the reason — and it is gone. The
+  `WebFetch`/`WebSearch` and named the docs agent (then `ext-docs-fetcher`, now
+  `docs-finder`) in the reason — and it is gone. The
   measurement above is why the removal costs less than it looks: the half that a deny actually
   enforced was "do not fetch", and the half that mattered, "use the fetcher instead", was never
   more than a suggestion. That half is now carried where a suggestion belongs, in the agent's
@@ -311,7 +312,8 @@ payloads, not memory.
   materiality is relative to the request. The same explanatory paragraph is the substance
   the user came for when they asked how something works, and padding when they asked for a
   one-line setting change; from the answer alone the two are the same text. What that cost
-  was measured on: a plain-language "ext-docs-fetcher는 켜줘" (so `_CONTROL_CMD_RE` did not skip
+  was measured on: a plain-language "ext-docs-fetcher는 켜줘" (the agent's name at the time;
+  it is `docs-finder` now) (so `_CONTROL_CMD_RE` did not skip
   it — see the control-turn bullet), whose answer file carried the CLI's own output plus a
   volunteered section explaining the switch. The router named `claims-auditor` and
   `clarity-auditor`, correctly by its own cues, and both returned pass.
@@ -1014,7 +1016,7 @@ payloads, not memory.
   task, and a ratio has to guess how many English identifiers a Korean answer may carry
   before it stops counting as Korean.
 - **`AUDIT_AGENTS` is the set guard RECOMMENDS, not the set it ships.** Two shipped agents have
-  no entry in it, and the absence is the design rather than an oversight. `ext-docs-fetcher` is
+  no entry in it, and the absence is the design rather than an oversight. `docs-finder` is
   selected by the main agent from its own description, so there is nothing said unasked for a
   switch to govern and no per-turn eligibility to compute — guard keeps no copy of the prompt
   it would be dispatched on anyway. `ext-docs-auditor` is named by the Stop hook whenever
@@ -1028,15 +1030,34 @@ payloads, not memory.
   And `settings set` refuses both names, which is
   correct and has to be *said* — `commands/settings.md` tells the skill to explain the refusal
   rather than let it read as a bug.
-- **The two ext-docs agents are a pair: one writes references, the other checks them.** That
-  is the point of shipping both, and each half has a constraint that looks like an omission.
+- **`docs-finder` and `ext-docs-auditor` are a pair: one writes references, the other checks
+  them.** That is the point of shipping both, and each half has a constraint that looks like an
+  omission. The names stopped rhyming when the finder's search space outgrew the refs
+  directory; the auditor's subject did not move.
 
-  `ext-docs-fetcher` looks in the refs directory first, fetches only when nothing saved
-  covers the question, and **reports which of the two it did**. That distinction is the whole
-  report, and it is what the agent replaced: a read-only lookup that answered `none` and left
-  the session to remember, unprompted, to dispatch a fetcher next. If the report ever stops
-  making the distinction, restore the distinction — do not split the agent back into a
-  looker-up and a fetcher.
+  `docs-finder` searches in a fixed order — the refs directory, then the repository's own
+  documentation, then any configured knowledge directory — and goes to the network only for an
+  external subject that none of them settles. It **reports which of those it was**, and that
+  distinction is the whole report. It is what the agent replaced: a read-only lookup that
+  answered `none` and left the session to remember, unprompted, to dispatch a fetcher next. If
+  the report ever stops making the distinction, restore the distinction — do not split the
+  agent back into a looker-up and a fetcher.
+
+  Two rules hold that shape and both were asked for explicitly. **The report carries locations
+  and never content** — not a quote, not a gist, on any of the kinds. A sentence about what a
+  document says is a second version of it for the caller to disagree with, and the caller is
+  about to open the file anyway. And **an internal document does not settle an external
+  question**: a repo doc discussing a vendor's API records what somebody here believed, so it
+  is reported, labelled internal, and the source is fetched regardless. Drop that second rule
+  and the refs requirement in `audit-turn-claims` becomes satisfiable by this project quoting
+  itself.
+
+  Why the search space widened at all: the trigger the main agent has to apply is "am I about
+  to state something I did not read this session", and the old boundary — external only — made
+  it apply a second test it has to already be right about to use. Both misreadings of the old
+  name resolved toward not dispatching: `ext-` said "internal is out of scope" and `fetcher`
+  said "not applicable when I am not fetching". Under-invocation was the reported failure; the
+  name is part of the fix.
 
   `ext-docs-auditor` has **no network on purpose**. A saved reference exists to be a faithful
   copy of something external, so what the auditor judges is whether the excerpt is honest
@@ -1532,7 +1553,7 @@ payloads, not memory.
 - **`color` warns about the user's own files; it is not an identity.** The docs offer eight
   colors and nothing that says what they mean, so guard assigns them by what an agent can
   damage, not by which agent it is. **`yellow` means this agent edits files you wrote** and
-  is worn by `comment-corrector` and `ext-docs-fetcher` — the two that land unattended in a diff
+  is worn by `comment-corrector` and `docs-finder` — the two that land unattended in a diff
   the user has to review, one rewriting comments in the source the turn just produced, the
   other adding files under the refs directory and rows to its index. **`red`** is the audit
   path — the auditors, `korean-translator`, `korean-corrector`, `agents-md-auditor`,
@@ -1672,7 +1693,7 @@ keys are ignored and a missing or malformed file falls back to every default.
 Keys: one `AgentMode` per agent, named after that agent — `claims-auditor`,
 `deferrals-auditor`, `clarity-auditor`, `comment-corrector`, `agents-md-auditor`,
 **all default `off`** — which together
-are the only control over whether guard says anything unasked. `ext-docs-fetcher` and
+are the only control over whether guard says anything unasked. `docs-finder` and
 `ext-docs-auditor`, `korean-translator` and `korean-corrector` are shipped agents with no key
 here; the invariants above say why, and
 `settings set` refuses both names rather than writing a key nothing reads. See the
@@ -2183,12 +2204,12 @@ for k in claims-auditor deferrals-auditor clarity-auditor comment-corrector \
          agents-md-auditor; do
   "$H" settings set $k off --session s1
 done
-"$H" settings set ext-docs-fetcher fresh --session s1
+"$H" settings set docs-finder fresh --session s1
 #   -> error listing the settable keys: not a config key, and must stay refused
 "$H" settings set ext-docs-auditor fresh --session s1   # -> same
 "$H" settings list
-#   -> six agent lines and refs_dir. Neither ext-docs agent appears, and there is no
-#      router_model line.
+#   -> six agent lines and refs_dir. Neither `docs-finder` nor `ext-docs-auditor` appears,
+#      and there is no router_model line.
 echo '{"session_id":"s1"}' | "$H" session-start
 #   -> the refs rule only: no agent is on, so no closeout line.
 edit pr2 wiki/ref/v.md
@@ -2387,8 +2408,9 @@ reasons is not a rule.
 ## Picking a model for an agent: the one comparison that was actually run
 
 Every agent's `model:` is a claim that this job needs that tier, and most of guard's are
-argued from the failure mode alone. Two are not: `ext-docs-fetcher` and `ext-docs-auditor` were run
-head-to-head on `sonnet` and `opus` before the field was set. This records what the runs
+argued from the failure mode alone. Two are not: `docs-finder` (then named
+`ext-docs-fetcher`) and `ext-docs-auditor` were run head-to-head on `sonnet` and `opus` before
+the field was set. This records what the runs
 showed, so the next person can disagree with evidence rather than taste. Both agents' bodies
 were handed to a `general-purpose` subagent as the prompt, identical between arms, with only
 the model differing.
@@ -2414,7 +2436,7 @@ fewer tokens on that run, finished sooner, and was better calibrated about what 
 (it noticed a `Fetched:`/`Retrieved:` inconsistency across four files and explicitly declined
 to score it as a finding).
 
-**`ext-docs-fetcher` — one question about a long documentation page**, both arms sandboxed to
+**`docs-finder` — one question about a long documentation page**, both arms sandboxed to
 their own refs directory so neither could touch the repository. Both produced a correct saved
 excerpt with the right quotes, and both answered the question in the report.
 
@@ -2432,6 +2454,10 @@ be careful. That finding also went into the agent definition itself, as a step: 
 passage does not come back quoted, get the source with `curl` and quote from that. A cheaper
 model following that instruction may well close the gap; nobody has re-run it since the
 instruction was added.
+
+That run also predates the scope change that made this `docs-finder`: it was one external page,
+with no repository search and no location-only reporting rule, so it measures the fetch half
+alone.
 
 **The field is `sonnet` as of 2026-08-25**, set by the maintainer. That is the arm this
 comparison ruled against, on the paraphrase finding — but on the run that produced the

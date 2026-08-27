@@ -215,7 +215,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
     # and order is precedence. A bare string is still accepted (one directory), since that
     # is what a user with one will write.
     "knowledge_dir": [],
-    # No key for `ext-docs-fetcher`, deliberately. It is not one of guard's recommended
+    # No key for `docs-finder`, deliberately. It is not one of guard's recommended
     # agents any more: nothing routes it and no hook forces the session into it, so there is
     # no "says something unasked" for a switch to govern. The main agent picks it the way it
     # picks any agent — from its description — and an off-by-default switch in front of that

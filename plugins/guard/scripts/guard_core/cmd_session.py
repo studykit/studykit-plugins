@@ -7,7 +7,7 @@ always, and the turn closeout's path when any agent is on. Each is said ONCE her
 than in every Stop, which is the
 whole reason this hook prints anything.
 
-There is deliberately no line naming ``ext-docs-fetcher``. That agent has no switch to
+There is deliberately no line naming ``docs-finder``. That agent has no switch to
 announce and nothing here forbids the session's own fetching; it is selected the way any agent
 is, from its description, and the refs rule below is what tells the session that a cited page
 has to end up saved.

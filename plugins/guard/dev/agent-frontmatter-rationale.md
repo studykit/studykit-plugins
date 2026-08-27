@@ -51,8 +51,8 @@ restrictions: the host injects a standing instruction to route work through `Bas
 can do the job, so a rule here confining `Bash` to a purpose list would be contradicted on
 every turn. Use it for anything else it does well.
 
-**`model: opus` is argued from the failure mode, except twice.** Only `ext-docs-fetcher` and
-`ext-docs-auditor` were run head-to-head on `sonnet` and `opus` before the field was set;
+**`model: opus` is argued from the failure mode, except twice.** Only `docs-finder` (under its
+former name `ext-docs-fetcher`) and `ext-docs-auditor` were run head-to-head on `sonnet` and `opus` before the field was set;
 design.md § "Picking a model for an agent" records what those runs showed and what to re-run
 before changing either field. Every other `opus` in this directory is a claim about the job,
 not a measurement.
@@ -313,13 +313,19 @@ the file — a wrong stored verdict then suppresses the finding that would expos
 
 `model: opus` — one of the two fields set by measurement; see design.md.
 
-### `ext-docs-fetcher`
+### `docs-finder`
 
 `tools: WebSearch, WebFetch, Read, Write, Edit, Grep, Glob, Bash`
 
-`WebSearch` finds the primary source, `WebFetch` reads it, `Bash` covers the four commands the
-body names (`refs-dir`, `date +%F`, `curl`, the MarkItDown one-liner), `Write`/`Edit` save the file
-and its index row, and `Read`/`Grep`/`Glob` do the local search that comes first.
+`WebSearch` finds the primary source, `WebFetch` reads it, `Bash` covers the five commands the
+body names (`refs-dir`, `knowledge-dirs`, `date +%F`, `curl`, the MarkItDown one-liner),
+`Write`/`Edit` save the file and its index row, and `Read`/`Grep`/`Glob` do the local search that
+comes first.
+
+The read tools now reach the repository as well as the refs directory, and the write tools
+still do not: the body carries "write nothing outside the refs directory", which is a promise
+rather than a grant the host scopes — the same arrangement as every "reports; edits nothing"
+agent here.
 
 No `Agent` and no `SendMessage`: it cannot delegate the reading, and it cannot ask the caller to
 narrow a vague question — hence the instruction in the body to report what it took the question to

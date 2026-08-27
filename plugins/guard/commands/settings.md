@@ -109,7 +109,7 @@ quality that depends on a config key. They cost nothing where they are not neede
 names them only when the turn is being delivered in Korean prose, and they never make a turn
 routed on their own — with every switch below `off`, guard is still silent.
 
-`guard:ext-docs-fetcher` is
+`guard:docs-finder` is
 selected from its own description, the way any agent is — there is nothing said unasked for a
 switch to govern. `guard:ext-docs-auditor` is named by the Stop hook whenever the turn wrote a
 file under `refs_dir`, whoever wrote it, and deliberately so: the party most likely to break

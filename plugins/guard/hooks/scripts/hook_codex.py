@@ -190,7 +190,7 @@ def _handle_post_tool(project_dir: Path, payload: dict[str, Any], session_id: st
 # profile it calibrates against. Without either it would have nothing to audit against and
 # would report `profile: MISSING` on every turn.
 #
-# `ext-docs-fetcher` and `ext-docs-auditor` are absent, and neither could reach this table:
+# `docs-finder` and `ext-docs-auditor` are absent, and neither could reach this table:
 # they have no `AUDIT_AGENTS` entry, so `core_agents._eligible_agents` never offers them. On
 # Claude the fetcher is selected from its description and the auditor is named by the Stop hook
 # off the turn's refs edits; Codex ships one named agent from `$guard:setup` and this adapter
