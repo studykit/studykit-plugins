@@ -20,7 +20,7 @@ because its own machinery broke).
 
 This file stays at ``scripts/guard_hook.py`` because that path is a published interface:
 ``hooks/hooks.json``, the command and agent definitions that shell out to the CLI, the
-dispatch playbook, and the Codex adapter all name it. The implementation is in
+turn closeout, and the Codex adapter all name it. The implementation is in
 ``guard_core``, one module per layer, and each subcommand's own docstring is in the module
 that implements it — see ``guard_core/__init__.py`` for the layering.
 

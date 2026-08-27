@@ -4,7 +4,7 @@ Where each piece of text lives is decided by how often it is paid for, and that 
 hold. What this module builds reaches the main agent on every routed turn, so it is one
 imperative plus a list of fields: paths, which agents are on, each one's mode.
 ``agents/turn-router.md`` is read once per routed turn by the router alone, so it carries the
-triage method and the dispatch per candidate. ``hooks/context/dispatch-playbook.md`` is read
+triage method and the dispatch per candidate. ``hooks/context/turn-closeout.md`` is read
 only by whoever is sent to a section, so it carries how to dispatch an agent and what to do
 with its report. Nobody re-types another home's text.
 """
@@ -53,15 +53,15 @@ def _agent_inputs(project_dir: Path, session_id: str, prompt_id: str, key: str,
             f"{_turn_record_file(project_dir, session_id, prompt_id).resolve()}"]
 
 
-# The playbook the main agent is sent to by section name. Resolved from this file's own
+# The closeout file the main agent is sent to. Resolved from this file's own
 # location rather than from `CLAUDE_PLUGIN_ROOT`: the same code is the Codex adapter's
 # library and a plain CLI the settings skill calls over Bash, and only one of those three
 # has the env var set.
-PLAYBOOK_REL = "hooks/context/dispatch-playbook.md"
-# The plugin root, found by looking for a directory that HAS the playbook rather than by
+CLOSEOUT_REL = "hooks/context/turn-closeout.md"
+# The plugin root, found by looking for a directory that HAS the closeout file rather than by
 # counting parents. A fixed `parent.parent` is a bet on this file's depth, and this module
 # has already moved once — out of `scripts/guard_hook.py` and into `scripts/guard_core/`,
-# which silently turned every playbook path guard printed into `scripts/hooks/context/…`.
+# which silently turned every closeout path guard printed into `scripts/hooks/context/…`.
 # Walking up until the file is there costs a few `is_file()` calls once per process and
 # cannot be wrong about a depth it never assumes.
 _PLUGIN_ROOT_MAX_DEPTH = 5
@@ -70,20 +70,20 @@ _PLUGIN_ROOT_MAX_DEPTH = 5
 def _plugin_root() -> Path:
     here = Path(__file__).resolve()
     for parent in here.parents[:_PLUGIN_ROOT_MAX_DEPTH]:
-        if (parent / PLAYBOOK_REL).is_file():
+        if (parent / CLOSEOUT_REL).is_file():
             return parent
-    # No playbook on disk (a partial install, or a test tree). Fall back to the layout as
+    # No closeout file on disk (a partial install, or a test tree). Fall back to the layout as
     # shipped — `<root>/scripts/guard_core/dispatch.py` — so the path printed is still the
     # one a correct install would have, rather than a path under `scripts/`.
     return here.parent.parent.parent
 
 
-def _playbook_path() -> Path:
-    return _plugin_root() / PLAYBOOK_REL
+def _closeout_path() -> Path:
+    return _plugin_root() / CLOSEOUT_REL
 
 
 # The CLI behind guard's shell wrappers and the Codex adapter. Built from the same
-# `_plugin_root` the playbook path is, so a moved install cannot leave one of the two
+# `_plugin_root` the closeout path is, so a moved install cannot leave one of the two
 # pointing at nothing.
 CLI_REL = "scripts/guard_hook.py"
 
@@ -107,15 +107,15 @@ CLI_REL = "scripts/guard_hook.py"
 
 def _agent_pointer(project_dir: Path, session_id: str, prompt_id: str, keys: list[str],
                    files: dict[str, list[str]], modes: dict[str, AgentMode]) -> str:
-    """Name the playbook sections for these agents and hand over their per-turn inputs.
+    """Name the closeout sections for these agents and hand over their per-turn inputs.
 
     The lead carries the one mechanical fact — these are agents, and the namespace they
-    live in — because no router speaks on this path and the playbook no longer holds
+    live in — because no router speaks on this path and the closeout file no longer holds
     dispatch mechanics for anyone. What its section holds is the part that needs a judgment
     the report cannot make for the caller: an `ext-docs-auditor` finding that must be moved
     rather than deleted, an `agents-md-auditor` one that would mean inventing a document.
     That is the same on every turn, so it is stored once and read only when a turn actually
-    writes one of these files. What guard prints is only what the playbook cannot know —
+    writes one of these files. What guard prints is only what the closeout file cannot know —
     which agents, in which mode, and the paths for this turn.
 
     The alternative, printing each agent's dispatch block here, costs the same text in the
@@ -129,7 +129,7 @@ def _agent_pointer(project_dir: Path, session_id: str, prompt_id: str, keys: lis
     """
     lines = [f"Dispatch each of these with the Agent tool and "
              f'subagent_type: "guard:<name>", in this order, giving it only the inputs '
-             f"named under it. Then follow its section of {_playbook_path()}:"]
+             f"named under it. Then follow its section of {_closeout_path()}:"]
     for key in keys:
         lines.append(f"- `{key}`={modes[key].value}")
         lines.extend("  " + line for line in _agent_inputs(
@@ -160,14 +160,14 @@ def _router_context(prompt_id: str, lead: str) -> str:
 
     Every line here is paid in the main agent's context at the end of EVERY routed turn,
     including the many the router then clears, so the test each line has to pass is: could
-    the playbook have said this instead, or could the party that needs it derive it? If
+    the closeout file have said this instead, or could the party that needs it derive it? If
     either, it is deleted from here.
 
-    Everything else failed that test. The procedure went to the playbook, read once by
+    Everything else failed that test. The procedure went to the closeout file, read once by
     whoever is sent to a section. The roster and the per-turn paths went to `guard-candidates`
     and `guard-inputs`, run by the agents that use them — the main agent opens none of those
     files, so relaying their paths only gave it text to carry and a copy step to get wrong.
-    The ROUTER returns the next instruction itself, naming the playbook and the sections, so
+    The ROUTER returns the next instruction itself, naming the closeout file and the sections, so
     the main agent never reads a section about routing.
 
     The turn id is what remains because it is the one thing nothing downstream can work out
@@ -188,7 +188,7 @@ def _router_context(prompt_id: str, lead: str) -> str:
     one setting whose failure is invisible, since a router that stops naming an agent looks
     exactly like a turn with nothing in it.
     """
-    # ONE field: the turn id. Everything else the agent needs — the playbook, the answer
+    # ONE field: the turn id. Everything else the agent needs — the closeout file, the answer
     # file, the request file beside it, the transcript and the turn to look up in it — is
     # derivable from that id plus the session, so `guard-inputs` derives them and the agent
     # runs it. What this replaces is the main agent relaying four absolute paths it never
@@ -239,19 +239,19 @@ _DIRECT_LEAD_WITH_ROUTER = (
 # of it would be a way to save a saved reference from ever being checked.
 #
 # The section is named the same way the other file-reading agents' sections are, so what to
-# do with its report stays in the playbook and is read only when a turn actually wrote one of
+# do with its report stays in the closeout file and is read only when a turn actually wrote one of
 # these files. Worded as what the turn did, not as what to look for — the criteria are the
 # agent's own.
 _REFS_LEAD = (
     "guard: this turn wrote saved reference files. Dispatch `guard:ext-docs-auditor` "
     "(subagent_type: \"guard:ext-docs-auditor\") over them and follow the "
-    "`ext-docs-auditor` section of {playbook}."
+    "`ext-docs-auditor` section of {closeout}."
 )
 
 
 def _refs_context(refs: list[str]) -> str:
     """``additionalContext`` naming ``ext-docs-auditor`` for the refs files this turn wrote."""
-    lines = [_REFS_LEAD.format(playbook=_playbook_path()),
+    lines = [_REFS_LEAD.format(closeout=_closeout_path()),
              "- saved reference files to audit:"]
     lines.extend(f"    {p}" for p in refs)
     return "\n".join(lines)
@@ -280,5 +280,5 @@ _DRAFT_LEAD = (
     "reply is ONE headline sentence plus that path — no summary of what the file says, no "
     "excerpt from it, no findings list. guard audits that file when the turn ends. When you "
     "will answer the user in another language, the version they read is translated from this "
-    "file after the audits have run — the playbook says how."
+    "file after the audits have run — the closeout file says how."
 )

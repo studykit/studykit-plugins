@@ -27,9 +27,11 @@ the user reads, from the corrected English answer file, and `korean-corrector` t
 it wrote. **Neither has a switch**, because the answer the user reads is not something to opt
 into — a switch there would make the quality of a delivered answer depend on a config key, and
 `off` would put the session back to translating its own text, which is the arrangement that
-produced 직역. What keeps them free for everyone else is the router: it names them only for a
-turn being delivered in Korean prose, and they never make a turn routed on their own — with
-every switch `off`, guard is still silent. `dev/design.md` has why an author cannot translate
+produced 직역. What keeps them free for everyone else is the router: it names
+`korean-translator` only for a turn being delivered in Korean prose, and the pair never makes a
+turn routed on its own — with every switch `off`, guard is still silent. Only the translator is
+routed (`routed=False` on the corrector): the translator's report hands the corrector its file,
+which is the one place the fact it turns on — the translation now exists — is actually known. `dev/design.md` has why an author cannot translate
 their own text, what the translator must not move while doing it, and the eligibility rule that
 keeps a switch-free agent from reinstating the router call.
 
@@ -111,13 +113,13 @@ how the code here is organised.
 - Nothing resolves a plugin path by counting `__file__` parents.
 - Where a piece of text lives is decided by how often it is paid for: hook output is read on
   every routed turn, `agents/turn-router.md` once per routed turn by the router alone,
-  `hooks/context/dispatch-playbook.md` only by whoever is sent to a section. Nobody re-types
-  another home's text, and nothing in the playbook describes routing.
-- **How to dispatch travels with the dispatch; the playbook holds only what happens after.**
+  `hooks/context/turn-closeout.md` only by whoever is sent to a section. Nobody re-types
+  another home's text, and nothing in the closeout file describes routing.
+- **How to dispatch travels with the dispatch; the closeout file holds only what happens after.**
   Each router's report template says how to run what it named, `_agent_pointer`'s lead says it
-  on the no-router path, and an agent's own report says what its findings mean. A playbook
+  on the no-router path, and an agent's own report says what its findings mean. A closeout
   section exists only where the caller faces a judgment no report can make for it. The rule is
-  negative and that is the useful half: a playbook sentence that decides WHETHER an agent runs,
+  negative and that is the useful half: a closeout sentence that decides WHETHER an agent runs,
   or restates how to call one, is a second authority over a decision already made — see
   `dev/design.md` for the turn it cost.
 - guard writes the turn record's **response** section itself, verbatim from the Stop payload —

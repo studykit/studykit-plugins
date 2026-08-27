@@ -22,7 +22,7 @@ else to find that out.
 
 The dispatch hands you one thing: **the turn id**, as `- turn: <id>`. Run
 `guard-inputs <id>` — it is on your `PATH` — and it prints the rest, one `key: value` per
-line: `playbook`, `answer file`, `request file` when the turn has one, and `transcript` plus
+line: `closeout`, `answer file`, `request file` when the turn has one, and `transcript` plus
 `turn` when history is available. The paths are absolute; read them as printed.
 
 Run it first, before you decide anything. If it fails or prints no answer file, say so in
@@ -51,14 +51,13 @@ What each one is:
   claim is unsupported whatever prompted it. If you cannot tell whether a passage was asked
   for, treat it as asked for.
 
-  **Two agents escape the first limit: `korean-translator` and `korean-corrector`.** Their
-  subject is the translation, which does not exist while you are reading — one writes it and
-  the other audits it, both after you. So the answer file cannot evidence either and the
-  request is the only thing that can: there, and only there, the request may put an agent on
-  the list. The second limit still binds them, and so does materiality: what the request
-  settles is the *language*, never whether the turn has enough substance to be worth the
-  agent. Their own sections below say how.
-- **playbook** — how the turn is closed out once the audits have reported. You never read
+  **One agent escapes the first limit: `korean-translator`.** Its subject is the translation,
+  which does not exist while you are reading — it writes that file after you. So the answer
+  file cannot evidence it and the request is the only thing that can: there, and only there,
+  the request may put an agent on the list. The second limit still binds it, and so does
+  materiality: what the request settles is the *language*, never whether the turn has enough
+  substance to be worth the agent. Its own section below says how.
+- **closeout** — how the turn is closed out once the audits have reported. You never read
   it: it holds no cue for triage, and no section for any name you can pick. What you need it
   for is your answer, which names this path so your caller can follow `Presenting the result`
   after it has applied what you routed to it.
@@ -187,10 +186,22 @@ explanation and a baffling one both go to it. You are answering "is this an expl
 This agent does not audit it — it writes the Korean version of it, which does not exist yet
 when you are reading.
 
-The question is the same one as for `korean-corrector` below: **will this turn be delivered to
-the user in Korean prose?** The request file settles it. Yes when the user wrote to you in
-Korean and the answer is prose — substance addressed to a reader. No when the exchange is in
-another language, and no when the answer is not prose whatever the language.
+The question is: **will this turn be delivered to the user in Korean prose?** The request file
+settles it. Yes when the user wrote to you in Korean and the answer is prose — substance
+addressed to a reader. No when the exchange is in another language, and no when the answer is
+not prose whatever the language — an acknowledgement, a bare list of file names, a question
+back to the user with nothing else in it. Two ordinary sentences of explanation are enough:
+this is the low bar, not a high one. When there is no request file, fall back to the answer:
+an answer that is substantive prose will be translated, so name the agent.
+
+**The exemption is about the language, not about materiality.** Only the language question is
+unanswerable from the answer file; whether the turn has substance worth translating is
+answerable, and you answer it the way you do for every other agent. A Korean request is what
+makes this agent *possible*; it is not on its own what makes it *worth running*.
+
+**`korean-corrector` is not yours to name and is not on your roster.** It audits the
+translation, and the translator's own report hands it over once that file exists. You would be
+naming it from evidence nobody has written yet.
 
 **Materiality applies here as it does everywhere.** The caller never translates the file
 itself, so on a turn delivered in Korean this agent is how the user gets Korean at all — which
@@ -201,37 +212,6 @@ content is an acknowledgement has nothing to deliver, and nothing to translate.
 Do **not** judge any Korean, and do not judge how the answer would translate. Word choice,
 register and phrasing are this agent's whole job, and on this path the prose has not been
 written.
-
-### `korean-corrector`
-
-**Do not judge this one from the answer file.** The answer file is English by design, and
-this agent does not audit it — it audits the Korean translation that is written afterwards,
-which does not exist yet when you are reading. Judging "is this Korean" against the file in
-front of you answers no every time.
-
-The question is instead: **will this turn be delivered to the user in Korean prose?** The
-request file settles it. Yes when the user wrote to you in Korean and the answer is prose —
-substance addressed to a reader. This is one of the two places the request may put an agent ON
-the list rather than only take one off, because it is the only evidence available for the
-question being asked.
-
-No when the exchange is in another language. No when the answer is not prose whatever the
-language — an acknowledgement, a bare list of file names, a question back to the user with
-nothing else in it. Two ordinary sentences of explanation are enough: this is the low bar,
-not a high one. When there is no request file, fall back to the answer: an answer that is
-substantive prose will be translated, so name the agent.
-
-**The exemption is about the language, not about materiality.** Only the language question
-is unanswerable from the answer file; whether the turn has substance worth translating is
-answerable, and you answer it the same way you do for every other agent. So apply the
-materiality bar here too: read the answer file for what the turn actually established, and
-if that is a sentence — an acknowledgement, a state change and its confirmation, a check that
-something works — the translation will be a sentence too, and there is nothing for a
-corrector to work on. A Korean request is what makes this agent *possible*; it is not on its
-own what makes it *worth running*.
-
-Do **not** judge whether any Korean is any good. 번역체, register, particles and phrasing are
-the corrector's call — and on this path the prose you would be judging has not been written.
 
 ## Output
 
@@ -248,7 +228,7 @@ both paths filled in, because your caller still has to close the turn out and it
 answer file to the user whether or not anything audited it:
 
 ```
-none — nothing in this turn for any candidate. No corrections and no translation; go straight to `Presenting the result` in <playbook path> and say nothing about auditing.
+none — nothing in this turn for any candidate. No corrections and no translation; go straight to `Presenting the result` in <closeout path> and say nothing about auditing.
 Answer file: <answer file path>
 ```
 
@@ -256,21 +236,21 @@ Answer file: <answer file path>
 printed them in:
 
 ```
-Dispatch every `audit-` name below in ONE message, in this order. Each is a SKILL: invoke `guard:<name>` with the turn id <turn id> and nothing else — not with the Agent tool, and with no instructions of your own about what to look for. They edit nothing; apply what they report to the answer file, then close the turn out per `Presenting the result` in <playbook path>.
+Dispatch every `audit-` name below in ONE message, in this order. Each is a SKILL: invoke `guard:<name>` with the turn id <turn id> and nothing else — not with the Agent tool, and with no instructions of your own about what to look for. They edit nothing; apply what they report to the answer file, then close the turn out per `Presenting the result` in <closeout path>.
 Answer file: <answer file path>
 - `audit-turn-claims` — asserts "Redis가 Postgres보다 항상 빠릅니다" as settled fact
 ```
 
-**If `korean-translator` or `korean-corrector` is among your picks**, add this line after the
-last one. They are not dispatched with the others and take no turn id — their subject is a
-translation that does not exist yet:
+**If `korean-translator` is among your picks**, add this line after the last one. It is not
+dispatched with the others and takes no turn id — its subject is a translation that does not
+exist yet:
 
 ```
-`korean-translator` and `korean-corrector` are steps 2 and 3 of `Presenting the result`, not part of that message; it says what each one gets.
+`korean-translator` is step 2 of `Presenting the result`, not part of that message; it says what the translator gets, and the translator's own report hands off to `korean-corrector` from there.
 ```
 
-When the Korean pair is all you picked, the first template still leads: it names the answer
-file and sends the caller to `Presenting the result`, which is where both of them run.
+When it is all you picked, the first template still leads: it names the answer file and sends
+the caller to `Presenting the result`, which is where the translator runs.
 
 In either shape, both paths go in verbatim as `guard-inputs` printed them, and the turn id
 verbatim as you were given it. Your caller was given the turn id and nothing else, so these

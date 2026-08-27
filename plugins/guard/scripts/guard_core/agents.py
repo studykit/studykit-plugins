@@ -67,6 +67,12 @@ class AuditAgent(NamedTuple):
     on whether an earlier turn already explained it. The correctors do not — Korean prose is
     judged as prose, and comments are judged against the code under them.
 
+    ``routed=False`` marks an audit the turn router must not be offered, because something
+    else already hands it over: ``korean-corrector`` is named by ``korean-translator``'s own
+    report, which is the only party that knows the translation now exists. Routing it as well
+    would make two authorities for one step and give the router a name to judge from evidence
+    that is not written yet.
+
     ``turn_entry`` and ``report_entry`` name what the caller INVOKES to run this audit on
     each dispatch path — the finished turn, and a standalone document such as an interview
     brief. ``turn_entry=None`` (the usual case) means the agent's name IS the key.
@@ -88,7 +94,7 @@ class AuditAgent(NamedTuple):
 
     What the agent DOES is its own definition, and what to do with its report is that
     report. Only where the caller has a judgment the report cannot make for it does a
-    section exist, in ``hooks/context/dispatch-playbook.md``. None of it belongs here:
+    section exist, in ``hooks/context/turn-closeout.md``. None of it belongs here:
     every string guard prints is paid for in the main agent's context on the turn it
     prints it.
     """
@@ -98,6 +104,7 @@ class AuditAgent(NamedTuple):
     fixed_mode: str | None = None
     turn_entry: str | None = None
     report_entry: str | None = None
+    routed: bool = True
 
 
 # No `subagent_type` is built here any more. `cmd_candidates` prints the bare entry name and
@@ -152,7 +159,13 @@ AUDIT_AGENTS: dict[str, AuditAgent] = {
     # Switch-free for the same reason, and it has to be the same reason: these two are one
     # step. A corrector the user can switch off behind a translator they cannot is a Korean
     # deliverable nothing reads — and the pair is what makes the writer/reader split hold.
-    "korean-corrector": AuditAgent(reads="turn", needs_history=False, fixed_mode="fresh"),
+    #
+    # `routed=False` because being one step is enough: the translator's report ends in a `next`
+    # line naming this agent and the file it wrote, so the hand-off happens where the fact it
+    # depends on — the translation exists — is actually known. The router, reading before either
+    # ran, could only have guessed at it from the request.
+    "korean-corrector": AuditAgent(reads="turn", needs_history=False, fixed_mode="fresh",
+                                   routed=False),
     "comment-corrector": AuditAgent(reads="files", needs_history=False),
     "agents-md-auditor": AuditAgent(reads="agent-docs", needs_history=False),
 }
@@ -286,8 +299,8 @@ def _edited_bucket(target: Path, refs_dir: Path | None = None) -> str | None:
 #
 # How to dispatch an agent is said by whoever dispatches it, once per path: the router's own
 # report template on the routed path, `_agent_pointer`'s lead on the direct one. It used to be
-# a playbook section per agent, reached from both — which gave the playbook a place to state,
-# and then to contradict, decisions the router had already made. What is left in the playbook
+# a section per agent in the closeout file, reached from both — which gave that file a place
+# to state, and then to contradict, decisions the router had already made. What is left in it
 # is the part no report can carry: the turn's closeout, and the two file-writing audits whose
 # findings must not be applied on autopilot.
 # --------------------------------------------------------------------------- #
@@ -327,10 +340,11 @@ def _eligible_agents(state: dict[str, Any], edited: list[str],
     already has an answer file. Only those riders are dropped; the rest of the result stands,
     which is what keeps a ``comment-corrector``-only project working.
 
-    Notably absent: any language test for ``korean-corrector``. Deciding whether a
-    response is Korean enough to audit is a reading task, and the router does it better
-    than a Hangul ratio that has to guess how many English identifiers a Korean answer
-    may carry before it stops being Korean.
+    Notably absent: any language test for ``korean-translator``. Deciding whether a turn
+    will be delivered in Korean is a reading task, and the router does it better than a
+    Hangul ratio that has to guess how many English identifiers a Korean answer may carry
+    before it stops being Korean. ``korean-corrector`` needs no test at all — it is not
+    routed, and the translator's report is what reaches it.
     """
     inputs = {"files": edited, "agent-docs": agent_docs or []}
     out: list[str] = []

@@ -223,8 +223,8 @@ is already the longest in this plugin:
   accounted for — which is `deferrals-auditor`'s subject exactly. So the rule is the opposite of
   what it started as: that section is the strongest reason to name the agent.
 
-It also carries its own dispatch instructions instead of pointing at the playbook, which is why
-`inputs --file` prints no playbook path: the playbook routes findings into the answer file, then
+It also carries its own dispatch instructions instead of pointing at the closeout file, which is
+why `inputs --file` prints no closeout path: the closeout routes findings into the answer file, then
 a translation, then the presentation of a turn, and a caller following that over a brief would
 produce a Korean translation nobody asked for.
 

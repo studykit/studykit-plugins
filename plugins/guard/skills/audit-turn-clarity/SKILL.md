@@ -13,7 +13,7 @@ agent: guard:clarity-auditor
 # this one backgrounding too is what keeps the turn one shape. `false` was tried and removed:
 # the reason given for it — a backgrounded fork's narrower tool set — does not bite here, since
 # `clarity-auditor` uses only tools that survive that filter. Ordering is the caller's job
-# either way, and its playbook section says so.
+# either way, and the router's report template says so.
 background: true
 ---
 

@@ -1,6 +1,6 @@
 """``inputs`` — the CLI verb an agent runs to locate the turn it was sent to work on.
 
-Not a hook event. The Stop hook used to print the playbook path, the turn directory, the
+Not a hook event. The Stop hook used to print the closeout path, the turn directory, the
 answer file and the transcript into ``additionalContext``, which put four absolute paths in
 the MAIN AGENT's context on every routed turn so that it could copy them into a dispatch.
 Every one of them is derivable from the turn id, and the main agent derives none of them —
@@ -31,7 +31,7 @@ from .config import _load_config
 from .paths import _cli_project_dir, _knowledge_dirs, _trace
 from .state import _read_state
 from .turnrec import _turn_record_file, _turn_request_file
-from .dispatch import _playbook_path
+from .dispatch import _closeout_path
 
 
 def cmd_inputs() -> int:
@@ -41,7 +41,7 @@ def cmd_inputs() -> int:
 
     The turn id is the only argument because it is the only thing the caller knows that
     this process cannot work out. Everything printed is derived from it plus the session:
-    the answer file and the request file from ``turnrec``'s layout, the playbook from the
+    the answer file and the request file from ``turnrec``'s layout, the closeout file from the
     plugin root, the transcript from what the Stop hook recorded.
 
     Absolute paths, and the turn directory is NOT factored out into a placeholder the way
@@ -82,7 +82,7 @@ def cmd_inputs() -> int:
         return 0
 
     answer = _turn_record_file(project_dir, session_id, prompt_id).resolve()
-    print(f"playbook: {_playbook_path()}")
+    print(f"closeout: {_closeout_path()}")
     print(f"answer file: {answer}")
     request = _turn_request_file(project_dir, session_id, prompt_id).resolve()
     if request.is_file():
@@ -116,7 +116,7 @@ def _inputs_for_file(argv: list[str]) -> int:
 
     - no **request file**, because nobody typed a prompt that produced this document. The
       materiality call the router makes from a request is simply unavailable here.
-    - no **playbook**. guard's dispatch playbook is written around a turn: it routes findings
+    - no **closeout**. guard's turn closeout is written around a turn: it routes findings
       back into the answer file, then into a translation of it, then into how the turn is
       presented to the user. None of that exists for a document, and a caller following those
       steps over a brief would produce a translation nobody asked for. The document router

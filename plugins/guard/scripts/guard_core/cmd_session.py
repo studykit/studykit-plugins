@@ -3,7 +3,7 @@
 Sweeps state files, ``trace.log``, and turns/ and extracts/ dirs older than retention;
 exports ``GUARD_PROJECT_DIR`` and ``GUARD_REFS_DIR`` via ``$CLAUDE_ENV_FILE`` (append-once,
 since this event also fires on every compaction); and states as session context the refs rule
-always, and the dispatch playbook's path when any agent is on. Each is said ONCE here rather
+always, and the turn closeout's path when any agent is on. Each is said ONCE here rather
 than in every Stop, which is the
 whole reason this hook prints anything.
 
@@ -32,7 +32,7 @@ from .paths import (
 from .payload import _read_payload, _session_id
 from .state import _audit_paused, _plan_audit_paused, _read_state, _write_state
 from .agents import SETTABLE_AGENTS
-from .dispatch import CLI_REL, _playbook_path, _plugin_root
+from .dispatch import CLI_REL, _closeout_path, _plugin_root
 
 
 def _session_muted(project_dir: Path, config: dict, payload: dict | None) -> bool:
@@ -431,7 +431,7 @@ def cmd_session_start() -> int:
         "and that local path. The same path is in $GUARD_REFS_DIR for Bash."
     )
 
-    # Name the playbook once, at the session's opening, when guard has anything switched
+    # Name the closeout file once, at the session's opening, when guard has anything switched
     # on. The Stop hook repeats the path on each routed turn — one line, and it must,
     # because context compaction can drop this one — but stating it here is what lets that
     # line stay a path instead of an explanation of what the file is for.
@@ -450,7 +450,7 @@ def cmd_session_start() -> int:
         else:
             print(
                 "guard: audits are on for this session. When a turn finishes, guard names the "
-                f"agents to consider and points at {_playbook_path()}, which says how to "
+                f"agents to consider and points at {_closeout_path()}, which says how to "
                 "dispatch each one and what to do with what it reports. Read only the sections "
                 "you are named; do not read the file until then."
             )

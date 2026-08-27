@@ -23,10 +23,10 @@ The dispatch hands you one thing: **the file**, as `- file: <path>`. Run
 `guard-inputs --file <path>` — it is on your `PATH` — and it prints one `key: value` per
 line: `file` (the same path, resolved) and any `knowledge dir` the project has configured. Use the resolved path in your answer, not the one you were handed.
 
-It prints no playbook, and that is deliberate: guard's dispatch playbook is written around a
+It prints no closeout file, and that is deliberate: guard's turn closeout is written around a
 turn — it routes findings into the answer file, then a translation of it, then how the turn is
 presented to the user. A document has none of that. Your Output section below is the whole of
-the dispatch instructions for this path, so do not send your caller to the playbook.
+the dispatch instructions for this path, so do not send your caller anywhere else.
 
 Run it first, before you decide anything. If it says there is no file at that path, say so in
 one line and pick nothing — do not go looking for the document elsewhere and do not audit the
@@ -42,7 +42,7 @@ offered — an audit with no document-side entry point simply does not appear.
 
 **Every one of them is a SKILL your caller invokes**, not an agent it dispatches; the names all
 begin `audit-`. You do not invoke anything yourself, but your output has to say which it is,
-because there is no playbook on this path to say it for you.
+because there is no closeout file on this path to say it for you.
 
 **You may name only the names it printed.** A name that is not printed is not available, so
 ignore its section below and never name it. If the command prints nothing, or fails, or says

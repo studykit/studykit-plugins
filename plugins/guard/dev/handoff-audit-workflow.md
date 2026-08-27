@@ -41,9 +41,9 @@ version the user reads is translated afterwards into a sibling file (`<turn>.md`
 ### Files changed
 
 - **`scripts/guard_core/dispatch.py`** — `_DRAFT_LEAD` now asks for the answer file in ENGLISH
-  and points at the playbook for the translation step. Deliberately does not name a language:
+  and points at the closeout file for the translation step. Deliberately does not name a language:
   this string ships into other people's repositories.
-- **`hooks/context/dispatch-playbook.md`**
+- **`hooks/context/turn-closeout.md`**
   - The "two audiences, two languages" section is inverted and now carries the reason.
   - `Dispatching` gained a carve-out: `korean-corrector` must **not** go in the one-message
     batch, because its input does not exist yet.

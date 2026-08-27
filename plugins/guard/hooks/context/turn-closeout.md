@@ -26,8 +26,9 @@ against that English file.
 **You do not write the user's language yourself.** Every word of Korean the user reads comes
 from `korean-translator` and is then checked by `korean-corrector`. Neither has a switch, so
 the user cannot turn them off — but that is not the same as running on every turn. Whether
-this turn has substance being delivered to a reader is the router's call, and when it names
-neither of them there is no translation at all: you do not write one in their place. The one
+this turn has substance being delivered to a reader is the router's call, made on
+`korean-translator` alone — the corrector follows from the translator's own report — and when
+it does not name it there is no translation at all: you do not write one in its place. The one
 exception is the short line you type in the terminal beside the path — a pointer, not the
 deliverable — and it stays short for that reason.
 
@@ -205,14 +206,14 @@ in this order:
    every turn you are answering in English, where it never appears. That is the router saying
    this turn has nothing worth translating, and the answer to it is no translation, not a
    translation you write instead.
-3. **Check the translation.** Only when step 2 made one. Dispatch `korean-corrector` now —
-   alone, and on the **translation file** only: no history, since Korean prose is judged as
-   prose, and not the answer file, which is the English original and not what the user reads.
-   It edits in place, so its corrections are already applied when it reports; relay any phrase
-   it listed as unfixed. The translator's own report ends by telling you to dispatch it, and
-   that instruction stands whether or not the router named the agent: the two are one step, so
-   a translation that exists is always checked. With no translation there is nothing for it to
-   read.
+3. **Check the translation.** Only when step 2 made one, and the translator's report is what
+   tells you to: it ends in a `next` line naming `korean-corrector` and the file it wrote. That
+   line is the whole instruction — the router never names this agent, because when it read, the
+   file did not exist. Dispatch it alone and on the **translation file** only: no history, since
+   Korean prose is judged as prose, and not the answer file, which is the English original and
+   not what the user reads. It edits in place, so its corrections are already applied when it
+   reports; relay any phrase it listed as unfixed. A translation that exists is always
+   checked — the two are one step.
 4. **Reply short.** What changed and why, in a line or two per finding, then the path. A
    clean audit is one line. Do not restate the answer and do not paste the file. This reply
    reports on the answer; it never stands in for it. The user reads the document — so a
@@ -231,7 +232,7 @@ user has the path from your reply. It is you putting a document in front of them
 that with text nothing checked presents an unchecked draft as a finished one. So:
 
 - A translation exists and `korean-corrector` ran on it → open the translation. This is the
-  normal case on a turn that got one: step 3 always follows step 2.
+  normal case on a turn that got one: the translator's `next` line always follows.
 - A translation exists and `korean-corrector` did **not** run → open nothing, and name the
   path. `korean-translator` having written it does not substitute: it is the author of that
   file, and nothing has read it. Say the translation is unchecked, and say why the corrector
@@ -254,8 +255,9 @@ audit summary is worth a line in the reply, not a document, and opening it hands
 memo about the answer instead of the answer.
 
 **When the router picked nothing**, steps 1 through 3 and step 5 do not apply either. `none`
-means no agent had material here — the Korean pair included, since the router judges them on
-the same materiality bar as everything else. So there are no findings to apply, no translation
+means no agent had material here — `korean-translator` included, since the router judges it on
+the same materiality bar as everything else, and with no translation the corrector has no
+input either. So there are no findings to apply, no translation
 to make, and nothing audited to open: reply per step 4, in the user's language, naming the
 answer file. Say nothing about auditing; a turn that drew no agent is not news.
 

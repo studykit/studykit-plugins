@@ -10,7 +10,7 @@ runtime facts verified against the real CLI, not a line-by-line walkthrough.
 
 `guard_hook.py` is the entry point and nothing else: the subcommand table and `main()`. It
 keeps that path because the path is a published interface — `hooks/hooks.json`, every
-command and agent definition that shells out to the CLI, the dispatch playbook, and the
+command and agent definition that shells out to the CLI, the turn closeout, and the
 Codex adapter all name it. Everything else is `guard_core/`, and each subcommand's own
 docstring lives in the module that implements it rather than in a catalogue at the top of
 one file, which is where such a catalogue drifts.
@@ -47,9 +47,9 @@ Two rules this layout exists to hold, both of which broke once already:
   that variable before importing anything here, so a second reader is a second answer to
   "which host am I". `grep -rn GUARD_HOST scripts/guard_core/` must show one line.
 - **Nothing resolves a plugin path by counting `__file__` parents.** `dispatch._plugin_root`
-  walks up looking for a directory that *has* the playbook. A fixed `parent.parent` is a bet
+  walks up looking for a directory that *has* the closeout file. A fixed `parent.parent` is a bet
   on a file's depth in the tree, and the split moved this code one level deeper, which
-  silently turned every playbook path guard printed into `scripts/hooks/context/…`.
+  silently turned every closeout path guard printed into `scripts/hooks/context/…`.
 
 The Codex adapter imports the `guard_core` modules it needs by name rather than through a
 single façade, so the layers it leans on are visible in its import block and a name that
@@ -67,9 +67,9 @@ there is nothing shared to factor out beyond the state root.
 | `PreToolUse` (`Bash\|Grep\|Glob`) | `pre-search` | Deny a search rooted at the filesystem root: `find /`, `grep -r /`, `rg /` (and `fd`/`ag`/`ack`/`locate`), a `/`-anchored glob like `/*`, or a `Grep`/`Glob` call whose `path` is `/`. Reads the tool ARGUMENT only — never the caller — which is why it survives where the removed `pre-write` hook could not. Ignores the agent switches and the mute. Silent for every other call, and fails open on a command `shlex` cannot parse. |
 | `PostToolUse` (`Write\|Edit\|MultiEdit\|NotebookEdit`) | `post-edit` | Record a source file, an agent instruction file, or a saved reference this turn wrote (the candidate lists for `comment-corrector`, `agents-md-auditor` and `ext-docs-auditor`), then block when a file saved in the refs dir is not listed in that dir's `AGENTS.md`. |
 | (called via Bash, not a hook) | `settings` | `guard:settings` (a `context: fork` skill, so it runs in a forked `general-purpose` agent rather than in the main session) shows/sets/unsets guard.local.json settings; the agent modes also apply to the live session's `state/<sid>.json` (session id from `--session`/`CLAUDE_CODE_SESSION_ID`). `set` preserves every other key; `unset <key>` is the only way to delete one. |
-| `Stop` | `stop` | Write the response section of the turn record and mark the turn as the on-demand target — always (only Codex reads that marker now; see below). Then, when any agent is not `off`, emit `additionalContext` asking the main agent to dispatch `guard:turn-router` over the record, carrying this turn's paths and the `candidates` command the router runs to get the roster itself. The router names sections of `hooks/context/dispatch-playbook.md`; the main agent follows those, completing the record's second section only if a named section asks for it. `comment-corrector` never goes to the router: it is dispatched directly in the same emission, to be sent in the same message — see the invariant below. A third block names `ext-docs-auditor` over the refs files the turn wrote; it has no switch, so it can be the only block a turn produces. |
+| `Stop` | `stop` | Write the response section of the turn record and mark the turn as the on-demand target — always (only Codex reads that marker now; see below). Then, when any agent is not `off`, emit `additionalContext` asking the main agent to dispatch `guard:turn-router` over the record, carrying this turn's paths and the `candidates` command the router runs to get the roster itself. The router names sections of `hooks/context/turn-closeout.md`; the main agent follows those, completing the record's second section only if a named section asks for it. `comment-corrector` never goes to the router: it is dispatched directly in the same emission, to be sent in the same message — see the invariant below. A third block names `ext-docs-auditor` over the refs files the turn wrote; it has no switch, so it can be the only block a turn produces. |
 | `SessionEnd` (`clear`) | `session-end` | Hand this session's two switches to the session `/clear` is about to open, then let it announce what it adopted. Writes nothing when both still match this project's `audit-turn` / `audit-plan` — the replacement reads the same config and lands there on its own. |
-| `SessionStart` | `session-start` | Sweep state and turn records past retention, export `GUARD_REFS_DIR` and `GUARD_TOGGLE_CLI`, state the refs rule as session context, say once — when any agent is on — either that the session opened muted (`guard on` arms it) or that audits are on and where the dispatch playbook is. |
+| `SessionStart` | `session-start` | Sweep state and turn records past retention, export `GUARD_REFS_DIR` and `GUARD_TOGGLE_CLI`, state the refs rule as session context, say once — when any agent is on — either that the session opened muted (`guard on` arms it) or that audits are on and where the turn closeout is. |
 | (called via Bash, not a hook) | `candidates` | The router's own roster: prints the turn-reading agents switched on for this session, one `agent=mode` per line, in `AUDIT_AGENTS` order. `--doc` answers for the document path instead — the same eligibility, mapped through `report_entry`, so an audit with no document-side entry point drops out. Session id from `CLAUDE_CODE_SESSION_ID`, which a subagent's Bash carries as its parent's. Read-only, and the only command the router runs. |
 | (called via Bash, not a hook) | `transcript` | `index` / `turn` / `find` over the session transcript, for the audit agents. Writes an extract file and prints only its path plus a one-line summary; `--since` / `--until` / `--last` bound which turns are scanned. |
 | (called via Bash, not a hook) | `toggle-cli` | Arm/mute the automatic audit for THIS session (`audit_paused`, session state only — never guard.local.json), from a shell prompt: `on` / `off` / `status` / empty flips. A session opens in whatever `audit-turn` says, armed unless the config says otherwise, so `off` is the direction that usually needs typing. Session id from `CLAUDE_CODE_SESSION_ID`; project from `_cli_project_dir`. The ONE subcommand that does not fail open — see `_MUST_REPORT` in `guard_hook.py`. |
@@ -124,11 +124,11 @@ written by the main agent.
   the directory's mtime.
 - `trace.log` — file-only debug trace (`GUARD_TRACE` truthy).
 
-Not state, but part of the same picture: `hooks/context/dispatch-playbook.md` in the plugin
+Not state, but part of the same picture: `hooks/context/turn-closeout.md` in the plugin
 holds one section per agent — how to dispatch it, what its report means, what to do about
 it — and deliberately no `turn-router` section, for the reason under "Text is stored where it is
 read". guard's hook output and the router both refer to it by section
-name; nothing copies its text. `_playbook_path()` resolves it from the script's own location
+name; nothing copies its text. `_closeout_path()` resolves it from the script's own location
 rather than `CLAUDE_PLUGIN_ROOT`, because the same script is also the Codex adapter's
 library and a plain CLI the settings skill runs over Bash, and only the hook case has that
 variable set. That is not in tension with `commands/settings.md` writing
@@ -172,7 +172,7 @@ payloads, not memory.
   `startup`, `resume`, `clear`, `compact` and `fork`. `compact` is the load-bearing one:
   guard's SessionStart hook registers no matcher, so a context compaction that drops its
   injected lines immediately gets them restated. That is the whole reason the refs rule and
-  the playbook pointer can be stated once per session instead of on every `UserPromptSubmit`. The
+  the closeout file pointer can be stated once per session instead of on every `UserPromptSubmit`. The
   same section confirms that plain stdout becomes model-visible context for exactly three
   events — `UserPromptSubmit`, `UserPromptExpansion`, `SessionStart` — which is how those
   lines reach the model at all. Source: official hooks docs
@@ -211,7 +211,7 @@ payloads, not memory.
   the main agent ended up opening the audit memo instead of the answer. Hence the second
   half of the rule: one user question, one answer file. `UserPromptSubmit` (which fires only
   for a typed prompt) and the Stop dispatch name the same path, the correctors edit that
-  file, and the playbook's `Presenting the result` opens that file and forbids starting
+  file, and the closeout file's `Presenting the result` opens that file and forbids starting
   another for the audit report.
 - **The answer file is an input, so it is gated on the agents that read it** (`_reads_turn`,
   over `AUDIT_AGENTS[...].reads == "turn"`) — not on any switch being on. `comment-corrector`
@@ -423,7 +423,7 @@ payloads, not memory.
   the wrong party. Shortening the string to a bare name made that cheaper without stopping
   it. The fix is that a FIXED command needs no relay at all — `agents/turn-router.md` names
   `guard-candidates` itself, read once by its only caller — so the hook now sends nothing
-  about the roster, and the dispatch carries four fields: playbook, turn dir, answer file,
+  about the roster, and the dispatch carries four fields: closeout, turn dir, answer file,
   history.
 
   It needs no new plumbing: `_add_shell_command_to_path` already puts the directory on the
@@ -448,13 +448,13 @@ payloads, not memory.
   identical output today, and that ambiguity is the real silent failure.
 
   Measured in a real session with the wrapper present: the Stop hook's dispatch listed
-  `playbook`, `turn dir`, `answer file` and `history` and no `candidates` line, and the
+  `closeout`, `turn dir`, `answer file` and `history` and no `candidates` line, and the
   router still returned picks — so it reached the command through its own definition rather
   than through anything the caller passed.
 
 - **`guard-inputs` takes the same argument one step further: the routed dispatch is now the
   turn id and nothing else.** Those four remaining fields were all derivable from that id
-  plus the session — the playbook from the plugin root, the answer and request files from
+  plus the session — the closeout file from the plugin root, the answer and request files from
   `turnrec`'s layout, the transcript from what `cmd_stop` already records in session state —
   and the main agent derived none of them. It relayed them, into a dispatch it composes
   itself, which is the step that can only lose fidelity. `- turn: <id>` replaces the lot.
@@ -531,7 +531,7 @@ payloads, not memory.
 
 - **`none` means nothing runs, the Korean pair included — v0.91.0.** The two bullets above
   gave the router the materiality bar and applied it to `korean-corrector` explicitly. The
-  playbook then overrode the result: `korean-translator`'s section said "if the router did not
+  closeout file then overrode the result: `korean-translator`'s section said "if the router did not
   name it, dispatch it anyway", step 2 of `Presenting the result` repeated it, and step 3
   dispatched the corrector behind it. So a turn the router cleared still spent both agents —
   measured on a turn whose entire content was spawning `interviewer` and saying it was running,
@@ -555,14 +555,14 @@ payloads, not memory.
   router's `none` template says "no corrections and no translation" for the same reason — the
   caller reads that line before it reads any section.
 
-- **How to dispatch travels with the dispatch; the playbook keeps only the closeout — v0.92.0.**
-  The bullet above fixed one contradiction between the playbook and the router. The shape that
+- **How to dispatch travels with the dispatch; the closeout file keeps only the closeout — v0.92.0.**
+  The bullet above fixed one contradiction between the closeout file and the router. The shape that
   produced it was still there: two files each holding a per-agent list, one of them read by the
-  party the other had just instructed. So the playbook's per-agent sections are gone, and the
+  party the other had just instructed. So the closeout file's per-agent sections are gone, and the
   turn router's report template carries the dispatch instruction the way `report-router`'s
   already did — that path has shipped this design all along (`agents/report-router.md`: "Your
   Output section below is the whole of the dispatch instructions for this path, so do not send
-  your caller to the playbook"), which is the counter-evidence to the objection recorded at
+  your caller to the closeout file"), which is the counter-evidence to the objection recorded at
   `_agent_pointer` and the reason it is overturned here rather than argued with.
 
   What made this cheap is the roster the turn router actually sees. `cmd_candidates` filters to
@@ -593,9 +593,29 @@ payloads, not memory.
     three sections were byte-identical apart from their first line, which is what a section with
     no content of its own looks like.
 
-  The rule that replaces them is negative, and that is the useful half: a playbook sentence that
+  The rule that replaces them is negative, and that is the useful half: a closeout sentence that
   decides WHETHER an agent runs, or restates how to call one, is a second authority over a
   decision already made. 376 lines to 267.
+
+- **The file is `hooks/context/turn-closeout.md`, and the router names only
+  `korean-translator` — v0.93.0.** Two follow-ons from the bullet above, both of them the
+  same move finished properly.
+
+  The rename is not cosmetic bookkeeping. A file called "dispatch playbook" that holds no
+  dispatch instruction is an invitation to put one back in it, and the rule it now carries is
+  precisely that nothing of that kind belongs there. `CLOSEOUT_REL` / `_closeout_path()`, and
+  `guard-inputs` prints `closeout:` rather than `playbook:`. The fixtures under `dev/fixtures/`
+  still say `dispatch-playbook.md` on purpose: they are frozen sample answers used as input to
+  the design critics, not live pointers.
+
+  Dropping `korean-corrector` from the router's roster (`routed=False`) removes the last place
+  two parties decided one thing. The corrector's precondition is that the translation exists,
+  and the router reads before it does — so routing it meant inferring from the request what the
+  translator would later make true. `korean-translator`'s report already ended in a `next` line
+  naming the corrector and the file it wrote, marked **never drop**, which is the hand-off
+  happening where the fact is actually known. The router now judges one question about the
+  language instead of the same question twice, and `_eligible_agents` still returns the
+  corrector so `settings set` keeps refusing it and `status` keeps showing it.
 - **Nobody gathers the session's history; agents extract it.** guard's turn store holds the
   response, plus one sibling file holding the request for the router alone (see the router
   bullets above).
@@ -630,14 +650,14 @@ payloads, not memory.
   routed turn, so it is one imperative plus a list of fields — this turn's paths, and the
   command that yields the roster — and nothing that reads the same twice. `agents/turn-router.md` is paid
   once per routed turn, in the router's own context, so it holds the triage method, the cue
-  per candidate, and the shape of the report. `hooks/context/dispatch-playbook.md` is paid
+  per candidate, and the shape of the report. `hooks/context/turn-closeout.md` is paid
   only by whoever is sent to a section, so it holds how to dispatch an agent and what to do
   with its report — needed only for the agents actually picked.
 
-  The test for any line in the hook output is: could the playbook or the router's own
+  The test for any line in the hook output is: could the closeout file or the router's own
   definition have said this instead? If yes it belongs there. That test removed the whole
-  procedure from the hook, and it is why there is **no `turn-router` section in the playbook** —
-  the router's report names the playbook and the sections to follow, so the main agent never
+  procedure from the hook, and it is why there is **no `turn-router` section in the closeout file** —
+  the router's report names the closeout file and the sections to follow, so the main agent never
   reads a section about routing.
 
   Three temptations to refuse. Printing each candidate's dispatch block in the hook pays for
@@ -647,10 +667,12 @@ payloads, not memory.
   it — it names sections, it does not reproduce them. And restating the procedure "so the
   main agent does not have to look it up" is paying every turn to save one Read on the turns
   that route.
-- **What bounds the dispatch is the playbook, not the roster.** A key the router invents
-  has no section, so a switched-off agent stays unreachable even when it is named anyway.
-  The roster is what stops it being reached for in the first place; the missing section is
-  what stops it working.
+- **What bounds the dispatch is the entry point, not the roster alone.** A key the router
+  invents resolves to no skill and no agent, so a switched-off agent stays unreachable even
+  when it is named anyway — the invocation finds nothing rather than erroring. The roster is
+  what stops it being reached for in the first place; the missing entry point is what stops it
+  working. This used to be phrased as "the missing section", back when a name the caller could
+  not find a section for was the thing that failed.
 - **The router's reason is part of the output, not decoration.** Each pick carries one
   sentence naming what in the response triggered it, quoted where possible, and the main
   agent is told to relay it. A recommendation nobody can second-guess is one that gets
@@ -801,7 +823,7 @@ payloads, not memory.
   main agent's.** Two agents produce that kind routinely, and both are barred from writing the
   document they recommend. `agents-md-auditor` says an instruction file carries content that
   belongs in a deeper doc — but creating that doc is a change nobody asked for, so the
-  playbook splits its report into the deletions and pointer fixes that need no new file and
+  closeout file splits its report into the deletions and pointer fixes that need no new file and
   the findings that need a decision. An auditor that "fixed" a bloated instruction file by
   inventing three new ones would have destroyed content under the name of an audit.
   `ext-docs-auditor` is the same hazard in a different directory: the passage it flags is
@@ -899,7 +921,7 @@ payloads, not memory.
   They need no ordering among themselves either: `_edited_bucket` keeps the three lists
   disjoint, so the one that edits cannot touch what the ones that only report are reading.
 
-  Nor does it need to wait. The ordering rule in the playbook's `Dispatching` — auditors
+  Nor does it need to wait. The ordering rule the router's report carries — auditors
   before correctors — exists so a corrector does not rewrite a sentence an auditor was about
   to flag, and it is entirely about the **answer file**. `comment-corrector` never opens that
   file; it edits comments in source. It shares no input with the routed agents, so there is
@@ -908,7 +930,7 @@ payloads, not memory.
   Consequences worth keeping straight: `agents/turn-router.md` has no `comment-corrector` section
   and candidate lines carry no paths, which restores its "record missing → pick nothing" rule
   to always-correct (the router is now dispatched only when an answer file exists). And a
-  dispatch of `comment-corrector` alone names no answer file at all, which the playbook's
+  dispatch of `comment-corrector` alone names no answer file at all, which the closeout file's
   `Presenting the result` has to branch on — there is nothing to correct and nothing to open.
 - **The session mute is not `audit_gate` coming back, and it now has a config key.**
   The mute adds one boolean in front of the switches, which is the shape removed
@@ -1537,7 +1559,7 @@ description is loaded into every session's context whether or not guard ever run
 is paid on every turn of every project that installs the plugin. What it normally buys is the
 model recognising when to invoke the skill — and none of guard's audit skills need that. Every
 one of them is named, verbatim, by whatever summons it: the router prints `audit-turn-claims`
-and the caller invokes that name from its playbook section, and the plan gate prints "Run the
+and the caller invokes that name from its closeout section, and the plan gate prints "Run the
 `guard:audit-plan` skill over the plan" (`cmd_plan_gate.py`). A user typing
 `/guard:audit-plan` is matching the name too, not the description. So the line has exactly one
 job left — keeping the model from choosing the skill for itself — and it does that in four
@@ -1564,7 +1586,7 @@ audit wait by mechanism while the rest wait by rule buys less than it costs in i
 **So the roster field is `turn_entry` / `report_entry`, not `turn_agent` / `report_agent`.** An
 entry is a skill for the three shared audits and the agent's own name for the rest; the
 invariant that survives is that the name the router prints is the name the caller invokes, and
-the playbook section named the same says which tool. `dev/check-entries.py` resolves an entry
+the router's own report template says which tool. `dev/check-entries.py` resolves an entry
 against `agents/<name>.md` **and** `skills/<name>/SKILL.md` for that reason.
 
 The document path keeps one caution the turn path does not need, in the clarity skill: the
@@ -1582,7 +1604,7 @@ the generated files committed because installation copies the repo tree and ther
 step at install time.
 
 The obvious alternative had been a shipped criteria file the agents read at dispatch, resolved
-by a CLI verb the way `dispatch-playbook.md` is. It was rejected for one reason worth keeping
+by a CLI verb the way `turn-closeout.md` is. It was rejected for one reason worth keeping
 on record, because it applies to anything guard might later ask an agent to load: **a
 referenced file is a file an agent can decline to read, and nothing reports the decline.** An
 agent definition is loaded into the agent by the host; a `Read` it was told to perform is a
@@ -1612,7 +1634,7 @@ about nothing else, and `_agent_mode` then falls back to that default — `off`.
 to follow an entry point would silently switch the audit off for every project that had
 configured it. So the key names the audit, `turn_entry` / `report_entry` name the entry points,
 and `agents._path_entry` is the single translation, called only by `cmd_candidates`. Downstream
-of that call the entry name is the only string in play: the router's report, the playbook
+of that call the entry name is the only string in play: the router's report, the closeout file
 section its caller opens, and the `subagent_type` or skill name that caller invokes are all the
 same string.
 
@@ -1735,16 +1757,16 @@ cat "$CLAUDE_PROJECT_DIR/.claude/guard/turns/s1/p0.md"
 "$H" settings set claims-auditor fresh --session s1     # "on" is an accepted alias
 "$H" settings set korean-corrector fresh --session s1
 run p1 "Redis는 Postgres보다 항상 빠릅니다."
-#   -> one imperative plus fields: the playbook path, the turn dir, the answer and request
+#   -> one imperative plus fields: the closeout path, the turn dir, the answer and request
 #      files, the `candidates` COMMAND (never the roster itself — the router runs it), and
 #      the transcript + turn id. Nothing here describes what an agent does, how to dispatch
-#      it, or what to do with its report — those are the playbook's, and the router's answer
+#      it, or what to do with its report — those are the closeout file's, and the router's answer
 #      is what names the sections.
 cat "$CLAUDE_PROJECT_DIR/.claude/guard/turns/s1/p1.md"
 #   -> the second section reads "Not collected" and carries the ask for earlier evidence
 #      plus the ban on the main agent's own case for the claim. Nothing collected it.
 
-# The roster must never offer a switched-off agent. The playbook is the second bound: a key
+# The roster must never offer a switched-off agent. The closeout file is the second bound: a key
 # the router invents has no section to follow. The roster is not in the Stop output any more,
 # so this is checked where the router now reads it — and note the FILTER: the verb prints only
 # the turn-reading agents, so a `comment-corrector` that is on must NOT appear here.
@@ -1810,7 +1832,7 @@ run pnone "Turned it on."   # -> same shape MINUS `request file:` (no user-promp
 "$H" settings set comment-corrector on --session s1
 echo '{"session_id":"s1","prompt_id":"pc","prompt":"rename a variable"}' | "$H" user-prompt   # -> nothing
 echo "{\"session_id\":\"s1\",\"prompt_id\":\"pc\",\"tool_input\":{\"file_path\":\"$CLAUDE_PROJECT_DIR/src/cache.py\"}}" | "$H" post-edit
-run pc "Renamed it."   # -> the direct block only: playbook and `files to audit` — and NO
+run pc "Renamed it."   # -> the direct block only: closeout and `files to audit` — and NO
                        #    router block at all, so no `answer file:` and no `candidates:`
 "$H" settings set claims-auditor fresh --session s1     # both on -> the line is back
 
@@ -1924,7 +1946,7 @@ done
 #   -> six agent lines and refs_dir. Neither ext-docs agent appears, and there is no
 #      router_model line.
 echo '{"session_id":"s1"}' | "$H" session-start
-#   -> the refs rule only: no agent is on, so no playbook line.
+#   -> the refs rule only: no agent is on, so no closeout line.
 edit pr2 wiki/ref/v.md
 echo "{\"session_id\":\"s1\",\"prompt_id\":\"pr2\",\"transcript_path\":\"$T\",\"last_assistant_message\":\"done.\",\"stop_hook_active\":false}" | "$H" stop
 #   -> the refs block ALONE, naming ext-docs-auditor; trace outcome: refs. Every switch is
@@ -2420,6 +2442,6 @@ bucket key (each must survive the round trip),
 `config._parse_mode` / `config._agent_mode` on the aliases and on a junk value (which must
 read as `off`), `config._load_config` on a mode written into the file (it must survive the
 type gate — see the Config section), `dispatch._plugin_root` from an install where the
-playbook is present and from one where it is not, and `dispatch._router_context` /
+closeout file is present and from one where it is not, and `dispatch._router_context` /
 `dispatch._agent_pointer`, which must never name an agent outside the eligible list and must
-name the playbook path exactly once each.
+name the closeout path exactly once each.

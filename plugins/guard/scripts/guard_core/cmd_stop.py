@@ -178,7 +178,7 @@ def cmd_stop() -> int:
     # `_eligible_agents` already decided, and bill a subagent for it.
     #
     # The two dispatches also need no ordering between them. The auditors-before-correctors
-    # rule in the playbook exists so a corrector does not rewrite a sentence an auditor was
+    # rule in the closeout file exists so a corrector does not rewrite a sentence an auditor was
     # about to flag, and it is entirely about the answer file — which no file-reading agent
     # opens. Sharing no input with the routed agents, they go out in the same message and
     # run alongside the router rather than after it. They need no ordering among themselves

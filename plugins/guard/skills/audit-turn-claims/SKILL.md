@@ -3,7 +3,7 @@ name: audit-turn-claims
 # Extremely short, and deliberately. This line is loaded into every session's context whether
 # or not guard runs, so its cost is paid on every turn — while its only job is to keep the
 # model from choosing this skill for itself. It never has to attract an invocation: guard's
-# router names this skill by name and the caller invokes it from its playbook section, so a
+# router names this skill by name and the caller invokes it from the router's report, so a
 # description that described the audit would buy nothing and would get it run over turns
 # nobody routed. `disable-model-invocation: true` is not the answer — it would shut guard out
 # too, and guard is the only thing that should be invoking this.

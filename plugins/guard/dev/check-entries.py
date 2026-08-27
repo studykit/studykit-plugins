@@ -54,7 +54,7 @@ def problems() -> list[str]:
                 continue
             # The frontmatter `name:` and the filename must agree. They diverge silently: the
             # host registers a definition under its frontmatter name, while the roster, the
-            # router's report and the playbook section all use the path.
+            # router's report and the closeout section all use the path.
             body = target.read_text()
             if not (m := re.search(r"^name:\s*(\S+)\s*$", body, re.MULTILINE)):
                 out.append(f"{key}.{field} = {name!r} — {target.name} has no `name:`")

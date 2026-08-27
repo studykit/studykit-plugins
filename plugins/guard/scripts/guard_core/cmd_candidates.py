@@ -91,8 +91,10 @@ def cmd_candidates() -> int:
     # passing nothing is what makes those ineligible here, which is exactly the filter this
     # verb wants. Reading the recorded lists instead would let a file-reading agent through
     # to a router whose caller opens no section for it.
+    # `routed` drops `korean-corrector`: the translator's report hands it over, so offering it
+    # here would ask the router to judge a translation that does not exist while it reads.
     eligible = [k for k in _eligible_agents(state, [], [])
-                if AUDIT_AGENTS[k].reads == "turn"]
+                if AUDIT_AGENTS[k].reads == "turn" and AUDIT_AGENTS[k].routed]
     if not eligible:
         print("guard candidates: no turn-reading agent is switched on for this session.",
               file=sys.stderr)
@@ -101,7 +103,7 @@ def cmd_candidates() -> int:
 
     # Key to entry-point name, once, here — see `_path_entry`. What the line names is what
     # the caller invokes, which is an agent for most rows and a skill for `clarity-auditor`;
-    # which tool to reach for is the playbook section's business, not this verb's. An audit
+    # which tool to reach for is the router's report template's business, not this verb's. An audit
     # with no entry on this path drops out, and on `--doc` that is most of them: the Korean
     # pair writes and checks a translation a document never gets, and this is what replaces
     # the paragraph the document router used to need telling it to refuse those two by name.
