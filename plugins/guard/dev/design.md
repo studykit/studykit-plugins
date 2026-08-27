@@ -699,6 +699,25 @@ payloads, not memory.
   applied" — rather than as a per-turn schedule the router works out. What the router decides
   about the pair is one question, the language; everything after that is sequence the parties
   involved already know.
+
+- **`clarity-auditor` runs after the first wave's findings are applied — v0.98.0.** v0.96.0 said
+  the routed audits were simultaneous because they "edit nothing and share no input". True of the
+  agents and wrong about the turn: the caller edits between them, and what it edits is the answer
+  file all of them read. Applying a claims finding puts evidence into a sentence that did not have
+  it; applying a deferrals finding resolves a punt into new text. Those are the passages most
+  likely to be hard to follow, and they do not exist while the first wave is running — so a
+  `clarity-auditor` beside it judges prose that is about to change and cannot see the prose the
+  correction introduces.
+
+  So the routed audits run in two waves: claims and deferrals together, the caller applies, then
+  clarity on the corrected file. `korean-translator` is the same dependency one step further on,
+  which is what makes the roster order load-bearing again — not as auditors-before-correctors,
+  which really did stop meaning anything, but as the wave order. `cmd_candidates` says so where
+  the order is produced.
+
+  The router emits only the waves it has picks for and keeps the other's label, so a turn that
+  drew clarity alone still says `Wave 2`. The cost is one extra round trip on a turn that draws
+  both waves; what it buys is the clarity audit reading the file the user is actually given.
 - **Nobody gathers the session's history; agents extract it.** guard's turn store holds the
   response, plus one sibling file holding the request for the router alone (see the router
   bullets above).

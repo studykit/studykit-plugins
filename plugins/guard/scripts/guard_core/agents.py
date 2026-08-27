@@ -114,8 +114,13 @@ class AuditAgent(NamedTuple):
 # line of a list whose reader already has it from the lead.
 
 
-# Order here is the order the agents appear in a recommendation. The three read-only
-# auditors come first: their findings may change what the correctors should be run on.
+# Order here is the order the agents appear in a recommendation, and on the routed path it is
+# the order they RUN in — as waves, not as a single list. `claims-auditor` and
+# `deferrals-auditor` go out together; the caller applies what they found; `clarity-auditor`
+# then reads the corrected answer file, because the corrections are new prose and they are the
+# prose most likely to be hard to follow. `korean-translator` is last, translating what all of
+# them settled. No agent here waits on another directly: every dependency runs through an edit
+# the caller makes in between, which is why the router's template has to state it.
 AUDIT_AGENTS: dict[str, AuditAgent] = {
     # Every audit that runs on both dispatch paths splits at the ENTRY, not at the agent: one
     # agent judges, and a `context: fork` skill per path carries the input-gathering. What

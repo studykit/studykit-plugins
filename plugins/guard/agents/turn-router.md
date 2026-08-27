@@ -228,14 +228,28 @@ none — nothing in this turn for any candidate. No corrections and no translati
 Answer file: <answer file path>
 ```
 
-**When you pick one or more**, use this, with one line per pick in the order `candidates`
-printed them in:
+**When you pick one or more**, use this, with one line per pick under its wave:
 
 ```
-Dispatch every `audit-` name below CONCURRENTLY, all of them in ONE message — they edit nothing and share no input, so none of them waits on another and the order they are listed in is only a listing. Each is a SKILL: invoke `guard:<name>` with the turn id <turn id> and nothing else — not with the Agent tool, and with no instructions of your own about what to look for. When they have all reported, apply what they found to the answer file, then close the turn out per `Presenting the result` in <closeout path>.
+Dispatch these in waves, and apply what a wave reports to the answer file before starting the next. Every name is a SKILL: invoke `guard:<name>` with the turn id <turn id> and nothing else — not with the Agent tool, and with no instructions of your own about what to look for. When the last wave's findings are in the file, close the turn out per `Presenting the result` in <closeout path>.
 Answer file: <answer file path>
+Wave 1 — dispatch these together in ONE message; they edit nothing and share no input, so neither waits on the other:
 - `audit-turn-claims` — asserts "Redis가 Postgres보다 항상 빠릅니다" as settled fact
+- `audit-turn-deferrals` — leaves "정확한 수치는 확인 필요" for a number the repo records
+Wave 2 — after wave 1's findings are in the answer file:
+- `audit-turn-clarity` — the whole explanation is new to this reader
 ```
+
+**Drop a wave you have no pick for, and keep the other's label as it is** — the labels name the
+stage, not a position in your list, so a turn that drew only `audit-turn-clarity` still says
+`Wave 2`. With one wave the phrase "in ONE message" still belongs on it if it has two picks.
+
+Why the split, so you do not collapse it back: wave 1's findings are **applied by your caller**,
+and applying them rewrites the answer — an unsupported claim gains its evidence, a deferral gets
+resolved into new text. `audit-turn-clarity` judges whether a reader can follow what the user
+will actually be given, so it has to read the file after those edits. Run beside wave 1 it would
+be judging prose that is about to change, and would miss the passages the corrections
+introduce — which are the densest ones in the file.
 
 **If `korean-translator` is among your picks**, add this after the last one. It is the whole
 instruction for the translation — your caller reads nothing else about it, and the file it
@@ -257,13 +271,12 @@ are how it reaches the file it must correct, translate, or simply name to the us
 you retype from memory or shorten is one it cannot open, and a turn id you alter is a skill
 that resolves someone else's turn.
 
-**Your caller cannot tell from a list of names whether they wait on each other, so the
-templates say it and you reproduce them verbatim.** The `audit-` picks are read-only and touch
-nothing each other reads, so they go out at once; keep them in the order `candidates` printed,
-which is only the order they are listed in. `korean-translator` is always last — it translates
-the answer file after the findings are in it — and whatever follows the translation is in the
-translator's own report, not yours. Do not reword either template into a schedule of your
-own.
+**Your caller cannot tell from a list of names what waits on what, so the templates say it and
+you reproduce them verbatim.** None of these agents waits on another directly; what they wait on
+is an edit your caller makes in between, which is why it has to be told. Keep the order
+`candidates` printed — it is the wave order — and `korean-translator` is always last, after the
+last wave's findings are in the file. Whatever follows the translation is in the translator's
+own report, not yours. Do not reword a template into a schedule of your own.
 
 Each key must be copied exactly as it was given to you — it is what your caller invokes, so a
 key you shorten or invent names nothing and fails silently rather than erroring. Each reason is one short
