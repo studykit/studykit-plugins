@@ -20,7 +20,7 @@ class AuditAgent(NamedTuple):
 
     Keyed in ``AUDIT_AGENTS`` by the name of the AUDIT. That key is the config switch the
     user types and the key in the state file, and for most rows it is also the agent's own
-    name — its playbook section and, namespaced, its ``subagent_type``.
+    name — and, namespaced, its ``subagent_type``.
 
     Some audits are reached through a different ENTRY POINT per dispatch path
     (``turn_entry`` / ``report_entry``), and there the key names the audit while each entry
@@ -77,20 +77,20 @@ class AuditAgent(NamedTuple):
 
     An entry is a SKILL for every audit that runs on both paths and the agent's own name for
     the rest; the three shared audits are each one agent behind two `context: fork` skills.
-    Which tool the caller reaches for is the playbook
-    section's business, not this module's; what this module guarantees is that the name it
-    hands over is the name of a real entry point, checked by ``dev/check-entries.py`` against
-    both ``agents/`` and ``skills/``.
+    Which tool the caller reaches for is said by whoever dispatches — each router's report
+    template, and ``_agent_pointer``'s lead on the direct path — not by this module; what this
+    module guarantees is that the name it hands over is the name of a real entry point,
+    checked by ``dev/check-entries.py`` against both ``agents/`` and ``skills/``.
 
     Entries are spelled out rather than derived as ``"turn-" + key``. A derived name that
     matches no file fails silently — the dispatch simply finds nothing — whereas a literal
     can be checked.
 
-    What the agent DOES, how to dispatch it, and what to do with its report are all in
-    ``hooks/context/dispatch-playbook.md``, under the section named by this key. None of
-    it belongs here: every string guard prints is paid for in the main agent's context on
-    the turn it prints it, and this text is the same on every turn — so it is stored once
-    and read only when a turn is actually routed to that agent.
+    What the agent DOES is its own definition, and what to do with its report is that
+    report. Only where the caller has a judgment the report cannot make for it does a
+    section exist, in ``hooks/context/dispatch-playbook.md``. None of it belongs here:
+    every string guard prints is paid for in the main agent's context on the turn it
+    prints it.
     """
 
     reads: str
@@ -100,10 +100,11 @@ class AuditAgent(NamedTuple):
     report_entry: str | None = None
 
 
-# No `subagent_type` is built here any more. `cmd_candidates` prints the bare agent name and
-# the router copies it into its report; the `guard:` prefix is added by the main agent, which
-# reads it from the playbook. Python that also knew the namespace would be a second place for
-# the same string to live.
+# No `subagent_type` is built here any more. `cmd_candidates` prints the bare entry name and
+# the router copies it into its report, where its own template supplies the `guard:` prefix.
+# The direct path has no router, so `_agent_pointer`'s lead supplies it there — once, as
+# `guard:<name>`, not per agent. Building it per row here would put the namespace on every
+# line of a list whose reader already has it from the lead.
 
 
 # Order here is the order the agents appear in a recommendation. The three read-only
@@ -174,9 +175,9 @@ def _path_entry(key: str, path: str) -> str | None:
     """What runs audit ``key`` on ``path``, or None if it does not run there.
 
     The ONE place a roster key becomes an entry-point name. Everything downstream of
-    ``cmd_candidates`` — the router's report, the playbook section its caller opens, the
-    ``subagent_type`` that caller dispatches — carries the name this returns, so the key and
-    the name cannot drift apart anywhere else by construction: nowhere else translates.
+    ``cmd_candidates`` — the router's report, and the skill or ``subagent_type`` its caller
+    then runs — carries the name this returns, so the key and the name cannot drift apart
+    anywhere else by construction: nowhere else translates.
 
     ``None`` on the report path is the normal answer, not an error. Most of the roster has
     nothing to do with a document, and returning the key as a fallback would offer the
@@ -283,10 +284,12 @@ def _edited_bucket(target: Path, refs_dir: Path | None = None) -> str | None:
 # template per agent. An agent absent from the roster cannot be picked, which beats
 # describing a disabled agent and appending "but this one is off".
 #
-# The result-handling line for an agent lives in exactly one place: its section of
-# `hooks/context/dispatch-playbook.md`. Both dispatch paths reach it from there — the direct
-# one via `_agent_pointer`, the routed one via the router's own report — so there is nothing
-# in Python to keep in sync with the markdown, and no duplicated guidance that could drift.
+# How to dispatch an agent is said by whoever dispatches it, once per path: the router's own
+# report template on the routed path, `_agent_pointer`'s lead on the direct one. It used to be
+# a playbook section per agent, reached from both — which gave the playbook a place to state,
+# and then to contradict, decisions the router had already made. What is left in the playbook
+# is the part no report can carry: the turn's closeout, and the two file-writing audits whose
+# findings must not be applied on autopilot.
 # --------------------------------------------------------------------------- #
 ROUTER_AGENT = "guard:turn-router"
 

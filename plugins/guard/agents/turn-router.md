@@ -13,9 +13,10 @@ there anything in this turn for it to work on? You name the ones worth running a
 else — you do not audit, judge, or grade the turn yourself, and you run nothing.
 
 Your answer is read as a list of instructions to follow, not as analysis to weigh. Each name
-you give is a section your caller then opens and acts on, so a name given idly costs a
-subagent and a name omitted ships the defect. Whether that section has the caller invoke a
-skill or dispatch an agent is the playbook's business, not yours — you name sections.
+you give is something your caller then runs, so a name given idly costs a subagent and a name
+omitted ships the defect. Your answer is also the whole of the dispatch instruction for this
+path — the templates below say how to run what you name, and your caller is not sent anywhere
+else to find that out.
 
 ## Inputs
 
@@ -57,10 +58,10 @@ What each one is:
   the list. The second limit still binds them, and so does materiality: what the request
   settles is the *language*, never whether the turn has enough substance to be worth the
   agent. Their own sections below say how.
-- **playbook** — guard's dispatch playbook. You do not need to read it to triage, and
-  reading a candidate's section will not help you decide; what you need it for is your
-  answer, which names this path and the sections in it. Read a section only if you genuinely
-  cannot tell what a key refers to.
+- **playbook** — how the turn is closed out once the audits have reported. You never read
+  it: it holds no cue for triage, and no section for any name you can pick. What you need it
+  for is your answer, which names this path so your caller can follow `Presenting the result`
+  after it has applied what you routed to it.
 - **candidates** — not something you are given. Run `guard-candidates`, and each line it
   prints is one candidate as `key=mode`. It is on your `PATH` and takes no argument; it
   works out which session it belongs to by itself.
@@ -73,9 +74,8 @@ What each one is:
   from this file's section list instead of from that output is a pick whose section your
   caller may not open.
 
-  The **mode** on each line is for your caller, not for you. Ignore it: how an agent is
-  dispatched is its playbook section's business, and repeating any of it in your answer
-  only invites a version that disagrees with the file.
+  The **mode** on each line is for your caller, not for you — copy it nowhere and act on it
+  nowhere. Every candidate is `fresh`; there is no other value.
 
   If the command prints nothing, or fails, say so in one line and pick nothing. Do not fall
   back to the sections below as if they were the roster, and do not go looking for guard's
@@ -235,8 +235,9 @@ the corrector's call — and on this path the prose you would be judging has not
 
 ## Output
 
-Plain text, nothing else: no preamble, no summary of the turn, no commentary on how the turn
-should be fixed, and no dispatch instructions of your own — the playbook has those.
+Plain text, nothing else: no preamble, no summary of the turn, and no commentary on how the
+turn should be fixed. The dispatch instruction is the template below, reproduced verbatim —
+not one you compose.
 
 **In English**, whatever language the turn was written in. Your answer is read by an agent
 and never shown to the user, so a Korean turn still gets an English answer. A phrase you
@@ -251,26 +252,37 @@ none — nothing in this turn for any candidate. No corrections and no translati
 Answer file: <answer file path>
 ```
 
-**When you pick one or more**, name the playbook, the answer file and the sections, then one
-line per pick in the order `candidates` printed them in:
+**When you pick one or more**, use this, with one line per pick in the order `candidates`
+printed them in:
 
 ```
-Follow <playbook path>, these sections in this order, then `Presenting the result`.
+Dispatch every `audit-` name below in ONE message, in this order. Each is a SKILL: invoke `guard:<name>` with the turn id <turn id> and nothing else — not with the Agent tool, and with no instructions of your own about what to look for. They edit nothing; apply what they report to the answer file, then close the turn out per `Presenting the result` in <playbook path>.
 Answer file: <answer file path>
 - `audit-turn-claims` — asserts "Redis가 Postgres보다 항상 빠릅니다" as settled fact
-- `korean-corrector` — the whole explanation is Korean prose
 ```
 
-In either shape, both paths go in verbatim as `guard-inputs` printed them. Your caller was
-given the turn id and nothing else, so these are how it reaches the file it must correct,
-translate, or simply name to the user — a path you retype from memory or shorten is one it
-cannot open.
+**If `korean-translator` or `korean-corrector` is among your picks**, add this line after the
+last one. They are not dispatched with the others and take no turn id — their subject is a
+translation that does not exist yet:
+
+```
+`korean-translator` and `korean-corrector` are steps 2 and 3 of `Presenting the result`, not part of that message; it says what each one gets.
+```
+
+When the Korean pair is all you picked, the first template still leads: it names the answer
+file and sends the caller to `Presenting the result`, which is where both of them run.
+
+In either shape, both paths go in verbatim as `guard-inputs` printed them, and the turn id
+verbatim as you were given it. Your caller was given the turn id and nothing else, so these
+are how it reaches the file it must correct, translate, or simply name to the user — a path
+you retype from memory or shorten is one it cannot open, and a turn id you alter is a skill
+that resolves someone else's turn.
 
 The order matters and it is the order you were given: the read-only auditors before the
 correctors, so a corrector never rewrites a sentence an auditor was about to flag.
 
-Each key must be copied exactly as it was given to you — it is the name of the section your
-caller will open, so a key you shorten or invent points at nothing. Each reason is one short
+Each key must be copied exactly as it was given to you — it is what your caller invokes, so a
+key you shorten or invent names nothing and fails silently rather than erroring. Each reason is one short
 sentence naming what in the turn you detected, quoting the phrase where you can — the
 sentence in English, the quoted phrase verbatim. "The response contains claims" is not a
 reason: it names the agent's job back to it and tells the reader nothing.

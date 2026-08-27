@@ -554,6 +554,48 @@ payloads, not memory.
   section, steps 2 and 3, and a `none` paragraph beside the existing no-answer-file one. The
   router's `none` template says "no corrections and no translation" for the same reason — the
   caller reads that line before it reads any section.
+
+- **How to dispatch travels with the dispatch; the playbook keeps only the closeout — v0.92.0.**
+  The bullet above fixed one contradiction between the playbook and the router. The shape that
+  produced it was still there: two files each holding a per-agent list, one of them read by the
+  party the other had just instructed. So the playbook's per-agent sections are gone, and the
+  turn router's report template carries the dispatch instruction the way `report-router`'s
+  already did — that path has shipped this design all along (`agents/report-router.md`: "Your
+  Output section below is the whole of the dispatch instructions for this path, so do not send
+  your caller to the playbook"), which is the counter-evidence to the objection recorded at
+  `_agent_pointer` and the reason it is overturned here rather than argued with.
+
+  What made this cheap is the roster the turn router actually sees. `cmd_candidates` filters to
+  turn-reading agents, so its whole world is three `audit-turn-*` skills and the Korean pair —
+  two shapes, not eight. The template is one sentence for the skills plus one conditional line
+  for the pair. The objection stands where it was aimed: an LLM re-typing per-agent blocks it
+  was handed is where wording drifts. Reproducing a fixed template verbatim is not that, and
+  the alternative was worse than drift — a second authority over a decision already made.
+
+  Three things did not move, and each is a boundary worth stating rather than a leftover:
+
+  - *The closeout.* `Presenting the result` and the answer-file convention are a sequence, not
+    a call, and the router would have to reproduce all of it on every routed turn. This is what
+    the file is now, and the Korean pair's inputs are stated at steps 2 and 3 where the caller
+    already is rather than in sections of their own — which is also where their ordering rule
+    lived, so the duplicate that caused v0.91.0 no longer has two homes to disagree between.
+  - *The agents the router never sees.* `comment-corrector`, `agents-md-auditor` and
+    `ext-docs-auditor` are dispatched by the hook off the file lists, with no report to ride
+    on. `_agent_pointer`'s lead now says the shape (`subagent_type: "guard:<name>"`), once, and
+    their sections stay — because each is a judgment no report can make for the caller: a
+    passage that must be moved rather than deleted, a finding whose fix would mean inventing a
+    document.
+  - *What the audits report.* The three skills needed nothing added and got nothing: their
+    agents' report blocks already carry `verdict`, a `Fix:` per finding, and — for
+    `clarity-auditor` — `profile: present | MISSING`. The deleted sections said "invoke with the
+    turn id" (now the router's), "it changes nothing you need to review" (now one clause in the
+    router's template) and "address what it reports" (the report's own `Fix:` lines). Two of the
+    three sections were byte-identical apart from their first line, which is what a section with
+    no content of its own looks like.
+
+  The rule that replaces them is negative, and that is the useful half: a playbook sentence that
+  decides WHETHER an agent runs, or restates how to call one, is a second authority over a
+  decision already made. 376 lines to 267.
 - **Nobody gathers the session's history; agents extract it.** guard's turn store holds the
   response, plus one sibling file holding the request for the router alone (see the router
   bullets above).

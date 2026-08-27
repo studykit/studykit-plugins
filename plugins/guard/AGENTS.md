@@ -105,7 +105,7 @@ how the code here is organised.
   caller invokes for that audit on one path. `agents._path_entry` is the ONLY place one
   becomes the other, and `cmd_candidates` is its only caller. An entry is an agent for some
   rows and a skill for others — whichever it is, the name the router prints is the
-  name the caller invokes, and its playbook section says with which tool. A key must never be renamed to follow an agent —
+  name the caller invokes, and the router's own report template says with which tool. A key must never be renamed to follow an agent —
   `_load_config` honours only keys it knows, so a configured audit would silently read as its
   default. Nothing else may derive a dispatchable identity from a key.
 - Nothing resolves a plugin path by counting `__file__` parents.
@@ -113,6 +113,13 @@ how the code here is organised.
   every routed turn, `agents/turn-router.md` once per routed turn by the router alone,
   `hooks/context/dispatch-playbook.md` only by whoever is sent to a section. Nobody re-types
   another home's text, and nothing in the playbook describes routing.
+- **How to dispatch travels with the dispatch; the playbook holds only what happens after.**
+  Each router's report template says how to run what it named, `_agent_pointer`'s lead says it
+  on the no-router path, and an agent's own report says what its findings mean. A playbook
+  section exists only where the caller faces a judgment no report can make for it. The rule is
+  negative and that is the useful half: a playbook sentence that decides WHETHER an agent runs,
+  or restates how to call one, is a second authority over a decision already made — see
+  `dev/design.md` for the turn it cost.
 - guard writes the turn record's **response** section itself, verbatim from the Stop payload —
   it is the text being audited, so it must not pass through the author's hands. The main
   session appends only what guard cannot see, and that half is asked for as inclusion, never

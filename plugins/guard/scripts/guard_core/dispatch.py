@@ -109,11 +109,14 @@ def _agent_pointer(project_dir: Path, session_id: str, prompt_id: str, keys: lis
                    files: dict[str, list[str]], modes: dict[str, AgentMode]) -> str:
     """Name the playbook sections for these agents and hand over their per-turn inputs.
 
-    This is the whole dispatch instruction, and what is NOT in it is the point: how to
-    dispatch an agent, what its report means, and what to do about it are the same on every
-    turn, so they are stored once in the playbook and read only when a turn is actually
-    routed. What guard prints is only what the playbook cannot know — which agents, in
-    which mode, and the paths for this turn.
+    The lead carries the one mechanical fact — these are agents, and the namespace they
+    live in — because no router speaks on this path and the playbook no longer holds
+    dispatch mechanics for anyone. What its section holds is the part that needs a judgment
+    the report cannot make for the caller: an `ext-docs-auditor` finding that must be moved
+    rather than deleted, an `agents-md-auditor` one that would mean inventing a document.
+    That is the same on every turn, so it is stored once and read only when a turn actually
+    writes one of these files. What guard prints is only what the playbook cannot know —
+    which agents, in which mode, and the paths for this turn.
 
     The alternative, printing each agent's dispatch block here, costs the same text in the
     main agent's context on every routed turn, times every candidate, to be used by at
@@ -124,7 +127,9 @@ def _agent_pointer(project_dir: Path, session_id: str, prompt_id: str, keys: lis
     ``modes`` is passed in rather than re-read from config because the caller resolved it
     from session state, which can differ from the file for the live session.
     """
-    lines = [f"Follow {_playbook_path()}, these sections in this order:"]
+    lines = [f"Dispatch each of these with the Agent tool and "
+             f'subagent_type: "guard:<name>", in this order, giving it only the inputs '
+             f"named under it. Then follow its section of {_playbook_path()}:"]
     for key in keys:
         lines.append(f"- `{key}`={modes[key].value}")
         lines.extend("  " + line for line in _agent_inputs(
