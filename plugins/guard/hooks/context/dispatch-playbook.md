@@ -23,8 +23,11 @@ against that English file.
 
 **You do not write the user's language yourself.** Every word of Korean the user reads comes
 from `korean-translator` and is then checked by `korean-corrector`. Neither has a switch, so
-this is not conditional. The one exception is the short line you type in the terminal beside
-the path — a pointer, not the deliverable — and it stays short for that reason.
+the user cannot turn them off — but that is not the same as running on every turn. Whether
+this turn has substance being delivered to a reader is the router's call, and when it names
+neither of them there is no translation at all: you do not write one in their place. The one
+exception is the short line you type in the terminal beside the path — a pointer, not the
+deliverable — and it stays short for that reason.
 
 Only after they have run and their findings are applied do you produce the version the user
 reads, in their language, as a **separate file**: the answer file's path with `.md` replaced
@@ -124,7 +127,9 @@ the others they are pointed at an English file — the corrector correctly decli
 and the translator would translate an answer that is about to change under it.
 
 They also carry **no switch**: `guard-candidates` prints `fresh` for each, from the roster
-rather than from any setting.
+rather than from any setting. That is about the user's settings, not about this turn — the
+roster is what the router may pick from, and it still decides whether there is anything here
+to translate.
 
 Each one carries **only its own inputs** — the ones this playbook's section names, and for a
 skill that is the turn id alone. An audit learns what to look for from being that audit, not
@@ -203,8 +208,11 @@ sentence it listed as translated-but-unsure; that one is yours to resolve, and i
 about what the English meant, not about the Korean. It may `SendMessage` you mid-run to ask
 exactly that — answer it.
 
-If the router did not name it, dispatch it anyway. It has no switch and is always available,
-and step 2 forbids you translating the file yourself.
+**If the router did not name it, there is no translation on this turn.** Do not dispatch it
+to make one, and do not write one yourself — the ban on translating the file is not a reason
+to conjure the translator, it is why the answer file simply stays English and is the path you
+name. The router is the only step that sees whether this turn is Korean prose being delivered
+to a reader; having no switch makes this agent always *available* to it, never automatic.
 
 ## `korean-corrector`
 
@@ -302,15 +310,18 @@ in this order:
    a language other than English, the corrected text goes to a **new file**: the answer file's
    path with `.md` replaced by `.<lang>.md` (`.ko.md` for Korean). **Dispatch
    `korean-translator` now** — alone, per its section, with both paths — and it writes that
-   file. It has no switch, so it is always available to you; if the router did not name it,
-   dispatch it anyway rather than translating yourself. The English file stays as it is: it is
-   what a later audit of this turn reads, and overwriting it would leave that path with the
-   weaker version. Skip this step entirely when you are answering in English; there is nothing
-   to translate and no second file.
-3. **Check the translation.** Dispatch `korean-corrector` now — alone, on the translation
-   file, per its section. The translator's own report ends by telling you to, and that
-   instruction stands whether or not the router named the agent: it has no switch either, and
-   the two are one step. It edits in place. Relay what it left unfixed.
+   file. The English file stays as it is: it is what a later audit of this turn reads, and
+   overwriting it would leave that path with the weaker version. Skip this step entirely when
+   you are answering in English; there is nothing to translate and no second file. **Skip it
+   equally when the router did not name `korean-translator`** — that is the router saying this
+   turn has nothing worth translating, and the answer to it is no translation, not a
+   translation you write instead.
+3. **Check the translation.** Only when step 2 made one. Dispatch `korean-corrector` now —
+   alone, on the translation file, per its section. The translator's own report ends by
+   telling you to, and that instruction stands whether or not the router named the agent: the
+   two are one step, so a translation that exists is always checked. With no translation there
+   is nothing for it to read, and dispatching it on the English answer file is the one thing
+   its own section says it would rightly report nothing about.
 4. **Reply short.** What changed and why, in a line or two per finding, then the path. A
    clean audit is one line. Do not restate the answer and do not paste the file. This reply
    reports on the answer; it never stands in for it. The user reads the document — so a
@@ -350,6 +361,12 @@ whose language it already is.
 And do not open a file you wrote during the audit, or start a new one for this report: an
 audit summary is worth a line in the reply, not a document, and opening it hands the user a
 memo about the answer instead of the answer.
+
+**When the router picked nothing**, steps 1 through 3 and step 5 do not apply either. `none`
+means no agent had material here — the Korean pair included, since the router judges them on
+the same materiality bar as everything else. So there are no findings to apply, no translation
+to make, and nothing audited to open: reply per step 4, in the user's language, naming the
+answer file. Say nothing about auditing; a turn that drew no agent is not news.
 
 **When the dispatch named no answer file**, steps 1 through 3 and step 5 do not apply — there
 is nothing to correct, nothing to translate and nothing to open. That is the file-reading agents dispatched on their own:

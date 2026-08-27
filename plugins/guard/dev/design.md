@@ -528,6 +528,32 @@ payloads, not memory.
   one-sentence file is indistinguishable from a turn that skipped the convention. So the rule
   is stated at the router instead: judge what the turn established, and treat the file's
   length as format.
+
+- **`none` means nothing runs, the Korean pair included — v0.91.0.** The two bullets above
+  gave the router the materiality bar and applied it to `korean-corrector` explicitly. The
+  playbook then overrode the result: `korean-translator`'s section said "if the router did not
+  name it, dispatch it anyway", step 2 of `Presenting the result` repeated it, and step 3
+  dispatched the corrector behind it. So a turn the router cleared still spent both agents —
+  measured on a turn whose entire content was spawning `interviewer` and saying it was running,
+  the relay shape the router's own empty-answer list names. It reported `none`, correctly, and
+  the caller translated a one-line relay anyway.
+
+  The mistake was reading "no switch" as "unconditional". No switch means the *user* cannot
+  turn the pair off, and it exists because `off` on a translator did not mean "no translation"
+  — it meant the author translates, which is the defect. It never meant every turn gets one.
+  The router is the only step that sees whether this turn is Korean prose being delivered to a
+  reader, and `_eligible_agents` puts the pair on its roster precisely so it can answer that.
+  A rider that cannot be declined is not a candidate.
+
+  What made the override look reasonable is worth naming, because it is the thing not to
+  restore: the caller must never translate the answer file itself, so "the router did not name
+  the translator" reads like a gap someone has to fill. It is not a gap. The answer to it is no
+  translation — the answer file stays English and is the path the reply names — and the short
+  Korean line beside that path is the one piece of the user's language the caller writes. Both
+  halves are now stated wherever the old rule was: the preamble, the `korean-translator`
+  section, steps 2 and 3, and a `none` paragraph beside the existing no-answer-file one. The
+  router's `none` template says "no corrections and no translation" for the same reason — the
+  caller reads that line before it reads any section.
 - **Nobody gathers the session's history; agents extract it.** guard's turn store holds the
   response, plus one sibling file holding the request for the router alone (see the router
   bullets above).

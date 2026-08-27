@@ -247,7 +247,7 @@ both paths filled in, because your caller still has to close the turn out and it
 answer file to the user whether or not anything audited it:
 
 ```
-none — nothing in this turn for any candidate. No corrections; go straight to `Presenting the result` in <playbook path> and say nothing about auditing.
+none — nothing in this turn for any candidate. No corrections and no translation; go straight to `Presenting the result` in <playbook path> and say nothing about auditing.
 Answer file: <answer file path>
 ```
 
