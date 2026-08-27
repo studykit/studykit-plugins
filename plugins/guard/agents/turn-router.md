@@ -199,10 +199,6 @@ unanswerable from the answer file; whether the turn has substance worth translat
 answerable, and you answer it the way you do for every other agent. A Korean request is what
 makes this agent *possible*; it is not on its own what makes it *worth running*.
 
-**`korean-corrector` is not yours to name and is not on your roster.** It audits the
-translation, and the translator's own report hands it over once that file exists. You would be
-naming it from evidence nobody has written yet.
-
 **Materiality applies here as it does everywhere.** The caller never translates the file
 itself, so on a turn delivered in Korean this agent is how the user gets Korean at all — which
 means the materiality question is not "is this worth a translator" but the same one you ask
@@ -246,7 +242,7 @@ instruction for the translation — your caller reads nothing else about it, and
 closes the turn out with names no translator at all:
 
 ```
-Once those findings are applied, dispatch `guard:korean-translator` (subagent_type: "guard:korean-translator") on its own, with two inputs and nothing else: the answer file above as its source, and <translation path> as the file it writes. Give it no history and no repository paths, and write no draft of your own for it to fix. Its report ends in a `next` line; follow that line.
+Last, once those findings are applied, dispatch `guard:korean-translator` (subagent_type: "guard:korean-translator") on its own, with two inputs and nothing else: the answer file above as its source, and <translation path> as the file it writes. Give it no history and no repository paths, and write no draft of your own for it to fix. Then do what its report tells you.
 ```
 
 `<translation path>` is the answer file's path with `.md` replaced by `.ko.md`. Write it out in
@@ -261,13 +257,13 @@ are how it reaches the file it must correct, translate, or simply name to the us
 you retype from memory or shorten is one it cannot open, and a turn id you alter is a skill
 that resolves someone else's turn.
 
-**Say whether the things you name run together or one after another, because your caller
-cannot work it out from the names.** The `audit-` picks are read-only and touch nothing each
-other reads, so they go out at once and the template says so; keep them in the order
-`candidates` printed, which is only the order they are listed in. `korean-translator` is the
-one serial step on this path — its source is the answer file after the findings are applied, so
-its line begins by saying that. Both statements are in the templates above; reproduce them
-verbatim rather than rewording either into a schedule of your own.
+**Your caller cannot tell from a list of names whether they wait on each other, so the
+templates say it and you reproduce them verbatim.** The `audit-` picks are read-only and touch
+nothing each other reads, so they go out at once; keep them in the order `candidates` printed,
+which is only the order they are listed in. `korean-translator` is always last — it translates
+the answer file after the findings are in it — and whatever follows the translation is in the
+translator's own report, not yours. Do not reword either template into a schedule of your
+own.
 
 Each key must be copied exactly as it was given to you — it is what your caller invokes, so a
 key you shorten or invent names nothing and fails silently rather than erroring. Each reason is one short

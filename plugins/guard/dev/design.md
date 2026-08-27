@@ -685,6 +685,20 @@ payloads, not memory.
   roster order, but as a stable listing for a reader comparing two turns, not as a constraint.
   Saying so where the order is produced is what stops the next reader reconstructing a
   dependency that is not there.
+
+- **The router stops naming `korean-corrector` in any direction — v0.97.0.** v0.93.0 took it
+  off the roster and left a paragraph telling the router not to name it, plus a clause in the
+  template telling the caller to follow the translator's `next` line. Both were the router
+  speaking about an agent it has no relationship with. The roster rule already forbids naming
+  what `candidates` did not print, so the paragraph defended nothing, and the `next` line is
+  marked never-drop in the translator's own report — a caller that has just been handed one
+  does not need a second party to say it exists. The template now ends "Then do what its report
+  tells you", which is true of every agent and names none.
+
+  The translator's position is stated as the fixed thing it is — "Last, once those findings are
+  applied" — rather than as a per-turn schedule the router works out. What the router decides
+  about the pair is one question, the language; everything after that is sequence the parties
+  involved already know.
 - **Nobody gathers the session's history; agents extract it.** guard's turn store holds the
   response, plus one sibling file holding the request for the router alone (see the router
   bullets above).
@@ -999,8 +1013,11 @@ payloads, not memory.
   Consequences worth keeping straight: `agents/turn-router.md` has no `comment-corrector` section
   and candidate lines carry no paths, which restores its "record missing → pick nothing" rule
   to always-correct (the router is now dispatched only when an answer file exists). And a
-  dispatch of `comment-corrector` alone names no answer file at all, which the closeout file's
-  `Presenting the result` has to branch on — there is nothing to correct and nothing to open.
+  dispatch of `comment-corrector` alone names no answer file at all, and since v0.94.0 it does
+  not reach the closeout file either: it is handed its files, it edits comments in source, and
+  its report is what the caller acts on. Nothing about it is the router's, in either direction —
+  the router cannot select it (`cmd_candidates` filters to turn-reading agents) and it never
+  touches the answer file the router is reading.
 - **The session mute is not `audit_gate` coming back, and it now has a config key.**
   The mute adds one boolean in front of the switches, which is the shape removed
   below, so the difference has to be stated or it reads as a regression — and `audit-turn` /
