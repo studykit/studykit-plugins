@@ -241,16 +241,19 @@ Answer file: <answer file path>
 - `audit-turn-claims` — asserts "Redis가 Postgres보다 항상 빠릅니다" as settled fact
 ```
 
-**If `korean-translator` is among your picks**, add this line after the last one. It is not
-dispatched with the others and takes no turn id — its subject is a translation that does not
-exist yet:
+**If `korean-translator` is among your picks**, add this after the last one. It is the whole
+instruction for the translation — your caller reads nothing else about it, and the file it
+closes the turn out with names no translator at all:
 
 ```
-`korean-translator` is step 2 of `Presenting the result`, not part of that message; it says what the translator gets, and the translator's own report hands off to `korean-corrector` from there.
+Once those findings are applied, dispatch `guard:korean-translator` (subagent_type: "guard:korean-translator") on its own, with two inputs and nothing else: the answer file above as its source, and <translation path> as the file it writes. Give it no history and no repository paths, and write no draft of your own for it to fix. Its report ends in a `next` line; follow that line.
 ```
 
-When it is all you picked, the first template still leads: it names the answer file and sends
-the caller to `Presenting the result`, which is where the translator runs.
+`<translation path>` is the answer file's path with `.md` replaced by `.ko.md`. Write it out in
+full — your caller does no string surgery on a path.
+
+When the translator is all you picked, the first template still leads: it names the answer file
+and sends the caller to `Presenting the result`.
 
 In either shape, both paths go in verbatim as `guard-inputs` printed them, and the turn id
 verbatim as you were given it. Your caller was given the turn id and nothing else, so these

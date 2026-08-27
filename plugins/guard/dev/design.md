@@ -643,11 +643,28 @@ payloads, not memory.
   reader following the closeout does not need guard's cost model. The transcript fallback lost
   its mechanics and kept its two rules: raw text, and say it came from you.
 
-  What is left is a four-line lead, the answer-file convention and `Presenting the result` — 376
-  lines at v0.91.0, 101 now, naming only the two agents the closeout itself sequences. The rule
-  that keeps it that way is in `AGENTS.md`: a closeout sentence naming a particular agent is
+  What is left is a four-line lead, the answer-file convention and `Presenting the result`. The
+  rule that keeps it that way is in `AGENTS.md`: a closeout sentence naming a particular agent is
   either a second authority over a decision already made, or a lookup that belongs in that
   agent's report.
+
+- **The translation instruction moves to the router too, and the closeout names nobody — v0.95.0.**
+  The last two agent names in the file were `korean-translator` and `korean-corrector`, in steps
+  the caller was told to run. That put the decision in the wrong hands twice over: the caller was
+  reading a step that told it to translate, when whether this turn is translated at all is the
+  router's judgment — the one thing v0.91.0 had just established. So the router's template, when
+  it picks the translator, now carries the whole instruction: dispatch it after the findings are
+  applied, with the answer file as source and the `.ko.md` path as its target, spelled out in
+  full rather than left to the caller's string surgery. The corrector was already reached from
+  the translator's `next` line.
+
+  The closeout keeps one sentence in its place — anything the dispatch asked for after step 1
+  happens before the reply — which is ordering, not an agent. Its language rule is now the plain
+  one: you never write the user's language yourself and you never decide whether it gets
+  written. Both are the router's.
+
+  376 lines at v0.91.0, 80 now, and the only proper noun left in it is `/guard:reader-profile`,
+  which is the user's command rather than an agent.
 - **Nobody gathers the session's history; agents extract it.** guard's turn store holds the
   response, plus one sibling file holding the request for the router alone (see the router
   bullets above).

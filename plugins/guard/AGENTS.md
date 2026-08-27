@@ -115,15 +115,15 @@ how the code here is organised.
   every routed turn, `agents/turn-router.md` once per routed turn by the router alone,
   `hooks/context/turn-closeout.md` only by a turn that has an answer file to close out.
   Nobody re-types another home's text, and nothing in the closeout file describes routing.
-- **Nothing about an individual agent lives in the closeout file.** How to dispatch one travels
-  with the dispatch — each router's report template, `_agent_pointer`'s lead on the no-router
-  path — and what its findings mean travels in its own report, which is why the file-editing
-  audits end each finding in a disposition (apply / move / decide) rather than leaving the
-  caller to look one up. What the closeout holds is the turn: which file findings go into, when
-  the translation is made, what the reply says, what gets opened. The rule is negative and that
-  is the useful half: a closeout sentence naming a particular agent is either a second
-  authority over a decision already made or a lookup that belongs in a report — see
-  `dev/design.md` for the turn it cost.
+- **The closeout file names no agent, and decides nothing about one.** How to dispatch one
+  travels with the dispatch — each router's report template, `_agent_pointer`'s lead on the
+  no-router path — and what its findings mean travels in its own report, which is why the
+  file-editing audits end each finding in a disposition (apply / move / decide) and the router,
+  not the closeout, carries the translation instruction. What the closeout holds is the turn:
+  findings go into the answer file, the reply is short and in the user's language, and only an
+  audited file is opened. The rule is negative and that is the useful half: a closeout sentence
+  naming a particular agent is either a second authority over a decision already made or a
+  lookup that belongs in a report — see `dev/design.md` for the turn it cost.
 - guard writes the turn record's **response** section itself, verbatim from the Stop payload —
   it is the text being audited, so it must not pass through the author's hands. The main
   session appends only what guard cannot see, and that half is asked for as inclusion, never
