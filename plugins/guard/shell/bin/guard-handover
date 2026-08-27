@@ -1,0 +1,19 @@
+#!/bin/sh
+# guard-handover — record <path> as the handover this session wrote.
+#
+#   guard-handover <handover-file-path>
+#
+# For the `guard:handover` skill, and for nothing else. It is what lets a `/clear` offer the
+# file: SessionEnd copies the path into the handoff record, and the session replacing this one
+# asks the user whether to read it.
+#
+# Run it LAST, after the handover file exists — it checks the path, so a record naming a file
+# that was never written is refused here rather than discovered by the next session.
+#
+# Same PATH as `guard`, put there by the SessionStart hook.
+if [ -z "$GUARD_TOGGLE_CLI" ] || [ ! -f "$GUARD_TOGGLE_CLI" ]; then
+  echo "guard-handover: GUARD_TOGGLE_CLI is unset or missing — this command works inside a Claude Code session. The handover file itself is unaffected." >&2
+  exit 1
+fi
+
+exec uv run --script "$GUARD_TOGGLE_CLI" handover-written "$@"

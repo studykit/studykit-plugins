@@ -41,6 +41,7 @@ Subcommands
 - knowledge-dirs CLI, prints the configured knowledge dirs — ``guard_core.cmd_plan``
 - exit-plan      PreToolUse/ExitPlanMode, gates an unaudited plan — ``guard_core.cmd_plan_gate``
 - plan-audited   CLI (argv), records the audited plan — ``guard_core.cmd_plan_gate``
+- handover-written CLI (argv), records this session's handover — ``guard_core.cmd_handover``
 - plan-toggle-cli CLI (argv), the plan-audit session switch — ``guard_core.cmd_plan_gate``
 - transcript     CLI (argv), run by an audit agent — ``guard_core.transcript``
 
@@ -57,6 +58,7 @@ from guard_core.cmd_turn import cmd_user_prompt
 from guard_core.cmd_edit import cmd_post_edit
 from guard_core.cmd_search import cmd_pre_search
 from guard_core.cmd_stop import cmd_stop
+from guard_core.cmd_handover import cmd_handover_written
 from guard_core.cmd_session import cmd_session_end, cmd_session_start
 from guard_core.cmd_candidates import cmd_candidates
 from guard_core.cmd_inputs import cmd_inputs
@@ -74,6 +76,7 @@ SUBCOMMANDS = {
     "stop": cmd_stop,
     "session-start": cmd_session_start,
     "session-end": cmd_session_end,
+    "handover-written": cmd_handover_written,
     "refs-dir": cmd_refs_dir,
     "candidates": cmd_candidates,
     "inputs": cmd_inputs,

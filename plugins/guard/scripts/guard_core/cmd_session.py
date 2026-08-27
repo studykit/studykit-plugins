@@ -161,6 +161,23 @@ def _default_paused(config: dict) -> tuple[bool, bool]:
     return (not _audit_on(config, AUDIT_TURN_KEY), not _audit_on(config, AUDIT_PLAN_KEY))
 
 
+def _recorded_handover(state: dict) -> str:
+    """The handover file this session wrote, or ``""``. Checked for existence, not trusted.
+
+    Recorded by ``guard-handover`` (``cmd_handover``) and re-tested here because the two are
+    separated by the rest of the session: a handover written and then deleted, moved, or
+    renamed leaves a path that only looks valid. Offering it costs the next session a failed
+    read and a question it cannot answer, so an absent file is treated as no handover.
+    """
+    raw = state.get("handover_file")
+    if not isinstance(raw, str) or not raw.strip():
+        return ""
+    try:
+        return str(raw) if Path(raw).is_file() else ""
+    except OSError:
+        return ""
+
+
 def cmd_session_end() -> int:
     """SessionEnd, matched on ``clear`` — hand this session's switches to its replacement.
 
@@ -186,6 +203,13 @@ def cmd_session_end() -> int:
     with `audit-turn` defaulting to on, a `guard off` before a `/clear` is precisely the
     intention most likely to be lost. A stale record from a previous clear is removed when
     there is nothing to carry, rather than left to be read later.
+
+    The record carries a SECOND, independent thing: the handover file this session wrote, if
+    the `handover` skill recorded one. Same boundary and the same reason — the conversation was
+    cleared, the work was not — but the two halves are written and read independently, so a
+    session that wrote a handover and never touched a switch still hands the file over, and a
+    session that muted guard and wrote no handover still hands the mute over. Combining them
+    into one "is there anything to carry" test is what would break that.
 
     NOT handed over: `plan_audited_hash`. The plan a cleared session had audited is gone from
     the conversation that approved it, so the gate should audit again rather than wave through
@@ -214,7 +238,8 @@ def cmd_session_end() -> int:
     state = _read_state(project_dir, sid, config)
     audit_paused = _audit_paused(state)
     plan_paused = _plan_audit_paused(state)
-    if (audit_paused, plan_paused) == _default_paused(config):
+    handover = _recorded_handover(state)
+    if (audit_paused, plan_paused) == _default_paused(config) and not handover:
         try:
             handoff.unlink()
         except OSError:
@@ -226,6 +251,7 @@ def cmd_session_end() -> int:
         "from_session": sid,
         "audit_paused": audit_paused,
         "plan_audit_paused": plan_paused,
+        "handover_file": handover,
         "written_at": time.time(),
     }
     try:
@@ -236,7 +262,8 @@ def cmd_session_end() -> int:
     except OSError:
         return 0
     _trace(project_dir, sid, "session-end", "clear_handoff_written",
-           audit_paused=audit_paused, plan_audit_paused=plan_paused)
+           audit_paused=audit_paused, plan_audit_paused=plan_paused,
+           handover=bool(handover))
     return 0
 
 
@@ -284,29 +311,50 @@ def _consume_clear_handoff(project_dir: Path, config: dict, payload: dict | None
     if time.time() - written > CLEAR_INHERIT_MAX_AGE_SECONDS:
         _trace(project_dir, sid, "session-start", "clear_handoff_expired")
         return None
+    # The handover is read independently of the switches, and nothing below may make one
+    # depend on the other: a record written for a handover alone carries the switches at
+    # their defaults, and a record written for a mute alone carries no handover.
+    handover = record.get("handover_file")
+    if not isinstance(handover, str) or not handover.strip():
+        handover = ""
+    elif not Path(handover).is_file():
+        # Written, recorded, and gone between the two sessions — deleted, moved, or renamed.
+        # Offering a path that cannot be read costs the next session a failed read and a
+        # question the user has no way to answer.
+        _trace(project_dir, sid, "session-start", "clear_handoff_handover_missing")
+        handover = ""
+
+    switches = None
     audit_paused = record.get("audit_paused")
     plan_paused = record.get("plan_audit_paused")
-    if not isinstance(audit_paused, bool) or not isinstance(plan_paused, bool):
-        return None
-    if (audit_paused, plan_paused) == _default_paused(config):
-        # The record says exactly what this session would have opened in anyway — either the
-        # config changed between the two sessions, or the writer's check and this one
-        # disagree. Nothing to apply, and nothing to announce.
-        return None
+    if (isinstance(audit_paused, bool) and isinstance(plan_paused, bool)
+            and (audit_paused, plan_paused) != _default_paused(config)):
+        # Anything else leaves nothing to apply: either the record says exactly what this
+        # session would have opened in anyway — the config changed between the two sessions,
+        # or the writer's check and this one disagree — or it is malformed.
+        state = _read_state(project_dir, sid, config)
+        state["audit_paused"] = audit_paused
+        state["plan_audit_paused"] = plan_paused
+        _write_state(project_dir, sid, state)
+        # Confirm by reading back: `_write_state` swallows OSError by design, and a line
+        # saying the switches were carried over a write that failed is worse than no line.
+        check = _read_state(project_dir, sid, config)
+        if _audit_paused(check) == audit_paused and _plan_audit_paused(check) == plan_paused:
+            switches = {"audit_paused": audit_paused, "plan_audit_paused": plan_paused}
+            _trace(project_dir, sid, "session-start", "clear_handoff_applied",
+                   audit_paused=audit_paused, plan_audit_paused=plan_paused)
+        else:
+            _trace(project_dir, sid, "session-start", "clear_handoff_write_failed")
 
-    state = _read_state(project_dir, sid, config)
-    state["audit_paused"] = audit_paused
-    state["plan_audit_paused"] = plan_paused
-    _write_state(project_dir, sid, state)
-    # Confirm by reading back: `_write_state` swallows OSError by design, and a line saying
-    # the switches were carried over a write that failed is worse than no line at all.
-    check = _read_state(project_dir, sid, config)
-    if _audit_paused(check) != audit_paused or _plan_audit_paused(check) != plan_paused:
-        _trace(project_dir, sid, "session-start", "clear_handoff_write_failed")
+    if switches is None and not handover:
         return None
-    _trace(project_dir, sid, "session-start", "clear_handoff_applied",
-           audit_paused=audit_paused, plan_audit_paused=plan_paused)
-    return {"audit_paused": audit_paused, "plan_audit_paused": plan_paused}
+    # The handover path is deliberately NOT written into this session's state. It is
+    # announced once, to the session replacing the one that wrote it; a session that carried
+    # the key would hand the same file on again at its own `/clear`, offering the user a
+    # handover they have already been shown with nothing new behind it.
+    if handover:
+        _trace(project_dir, sid, "session-start", "clear_handoff_handover_offered")
+    return {"switches": switches, "handover": handover}
 
 
 def cmd_session_start() -> int:
@@ -402,20 +450,41 @@ def cmd_session_start() -> int:
     # which read the state this may have just written. Said out loud, because an inheritance
     # nobody is told about is the invisible gate that was deleted.
     carried = _consume_clear_handoff(project_dir, session_cfg, payload)
-    if carried:
+    if carried and carried["switches"]:
         # Both switches, in both directions. The record only exists because one of them
         # differs from this project's setting, and that difference can be either way now that
         # the settings default to on — so a line naming only the armed ones would go silent on
         # exactly the case it was added for, a mute carried across a `/clear`.
+        switches = carried["switches"]
         parts = [
-            "audits are " + ("OFF" if carried["audit_paused"] else "ON"),
-            "plan audits are " + ("OFF" if carried["plan_audit_paused"] else "ON"),
+            "audits are " + ("OFF" if switches["audit_paused"] else "ON"),
+            "plan audits are " + ("OFF" if switches["plan_audit_paused"] else "ON"),
         ]
         print(
             "guard: carried the previous session's switches across the /clear — "
             f"{' and '.join(parts)} for this session, whatever this project's settings say. "
             "`guard` / `guard-plan` in a shell change either. Do not mention this unless the "
             "user asks."
+        )
+    if carried and carried["handover"]:
+        # The opposite instruction to the line above, and deliberately so. A switch the user
+        # already set is theirs; a handover is a document they wrote for THIS session and
+        # cannot see from inside it, so silence about it wastes the whole point of writing it.
+        #
+        # An offer rather than a read. The handover names an unfinished piece of work, and the
+        # first prompt after a `/clear` frequently is not that work — reading it unasked
+        # spends the context the clear just freed on a document the user may have moved on
+        # from. Asking costs one line and puts the choice where it belongs.
+        #
+        # This ignores the session mute and every agent switch, because it is not an audit and
+        # not an opinion about the answer: it is the second half of something the user
+        # explicitly asked for by running the skill. A `guard off` that also swallowed the
+        # handover would make the mute a setting for something it does not name.
+        print(
+            "guard: the session this /clear replaced left a handover at "
+            f"{carried['handover']}. Open your first reply by asking the user, in one line "
+            "and in their language, whether to read it; read it only if they say yes. If "
+            "they say no or say nothing about it, drop the subject and do not ask again."
         )
 
     # The injected contract states the general rule — a doc-based claim cites the source

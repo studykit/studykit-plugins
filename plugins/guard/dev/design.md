@@ -68,12 +68,13 @@ there is nothing shared to factor out beyond the state root.
 | `PostToolUse` (`Write\|Edit\|MultiEdit\|NotebookEdit`) | `post-edit` | Record a source file, an agent instruction file, or a saved reference this turn wrote (the candidate lists for `comment-corrector`, `agents-md-auditor` and `ext-docs-auditor`), then block when a file saved in the refs dir is not listed in that dir's `AGENTS.md`. |
 | (called via Bash, not a hook) | `settings` | `guard:settings` (a `context: fork` skill, so it runs in a forked `general-purpose` agent rather than in the main session) shows/sets/unsets guard.local.json settings; the agent modes also apply to the live session's `state/<sid>.json` (session id from `--session`/`CLAUDE_CODE_SESSION_ID`). `set` preserves every other key; `unset <key>` is the only way to delete one. |
 | `Stop` | `stop` | Write the response section of the turn record and mark the turn as the on-demand target — always (only Codex reads that marker now; see below). Then, when any agent is not `off`, emit `additionalContext` asking the main agent to dispatch `guard:turn-router` over the record, carrying this turn's paths and the `candidates` command the router runs to get the roster itself. The router names sections of `hooks/context/turn-closeout.md`; the main agent follows those, completing the record's second section only if a named section asks for it. `comment-corrector` never goes to the router: it is dispatched directly in the same emission, to be sent in the same message — see the invariant below. A third block names `ext-docs-auditor` over the refs files the turn wrote; it has no switch, so it can be the only block a turn produces. |
-| `SessionEnd` (`clear`) | `session-end` | Hand this session's two switches to the session `/clear` is about to open, then let it announce what it adopted. Writes nothing when both still match this project's `audit-turn` / `audit-plan` — the replacement reads the same config and lands there on its own. |
+| `SessionEnd` (`clear`) | `session-end` | Hand this session's two switches, and the handover file it recorded, to the session `/clear` is about to open, then let it announce what it adopted. The two halves are independent: writes nothing only when both switches still match this project's `audit-turn` / `audit-plan` AND no handover was recorded. |
 | `SessionStart` | `session-start` | Sweep state and turn records past retention, export `GUARD_REFS_DIR` and `GUARD_TOGGLE_CLI`, state the refs rule as session context, say once — when any agent is on — either that the session opened muted (`guard on` arms it) or that audits are on and where the turn closeout is. |
 | (called via Bash, not a hook) | `candidates` | The router's own roster: prints the turn-reading agents switched on for this session, one `agent=mode` per line, in `AUDIT_AGENTS` order. `--doc` answers for the document path instead — the same eligibility, mapped through `report_entry`, so an audit with no document-side entry point drops out. Session id from `CLAUDE_CODE_SESSION_ID`, which a subagent's Bash carries as its parent's. Read-only, and the only command the router runs. |
 | (called via Bash, not a hook) | `transcript` | `index` / `turn` / `find` over the session transcript, for the audit agents. Writes an extract file and prints only its path plus a one-line summary; `--since` / `--until` / `--last` bound which turns are scanned. |
 | (called via Bash, not a hook) | `toggle-cli` | Arm/mute the automatic audit for THIS session (`audit_paused`, session state only — never guard.local.json), from a shell prompt: `on` / `off` / `status` / empty flips. A session opens in whatever `audit-turn` says, armed unless the config says otherwise, so `off` is the direction that usually needs typing. Session id from `CLAUDE_CODE_SESSION_ID`; project from `_cli_project_dir`. The ONE subcommand that does not fail open — see `_MUST_REPORT` in `guard_hook.py`. |
 | (called via Bash, not a hook) | `status` | Status-line segment: `guard <will run>/<switched on>` plus the plan gate's flag (`⚑` armed, `⚐` muted), green armed and dim muted on each half; nothing at all on any failure. Reads one state file; runs on every assistant message. |
+| (called via Bash, not a hook) | `handover-written` | Record `<path>` as the handover this session wrote, for the `guard:handover` skill to run as its last step. Writes one key into `state/<sid>.json`; the file must exist, so a path that was never written is refused while someone can still act on it. Session id from `CLAUDE_CODE_SESSION_ID`. Fails open — the handover file is the deliverable, and the record only decides whether the next session is offered it. |
 | (called via Bash, not a hook) | `refs-dir` | Print the resolved refs directory (auditor fallback; applies `refs_dir` validation). |
 
 ## Storage layout (`${CLAUDE_PROJECT_DIR}/.claude/guard/`)
@@ -102,7 +103,10 @@ written by the main agent.
   PostToolUse never having run. `audit_paused` and `plan_audit_paused` are **seeded from the
   config** on every read — `audit-turn` / `audit-plan`, armed when the file says nothing — and
   are the session's own from then on: the shell toggles write here and never there. See the
-  session-mute invariant below.
+  session-mute invariant below. `handover_file` is the odd one out: written by
+  `guard-handover` and read by exactly one event, `SessionEnd` on `/clear`. Nothing in the
+  turn path touches it, and the session that inherits it never stores it — see the `/clear`
+  invariant.
 - `turns/<sid>/<prompt_id>.md` — the answer to the user's question, one file per typed
   prompt. The session writes it during the turn (the path comes from `UserPromptSubmit`);
   guard fills it in at Stop from `last_assistant_message` only when the turn left it empty,
@@ -122,6 +126,11 @@ written by the main agent.
   like a session id; do not build on it. Nothing needs to, because nothing looks these up
   by name — the subcommand prints the path it wrote, and the SessionStart sweep decides by
   the directory's mtime.
+- `clear-handoff.json` — what a `/clear`ed session leaves for the session replacing it:
+  the two switches, and the handover file it recorded. One file per project, written by
+  `SessionEnd` and deleted by the `SessionStart` that reads it. Beside `state/` rather
+  than inside it, so the seven-day sweep cannot be confused by a file meant to live for
+  milliseconds; its own expiry is `CLEAR_INHERIT_MAX_AGE_SECONDS`.
 - `trace.log` — file-only debug trace (`GUARD_TRACE` truthy).
 
 Not state, but part of the same picture: `hooks/context/turn-closeout.md` in the plugin
@@ -137,7 +146,8 @@ performs while building the command, so the path arrives already resolved and th
 process still sees no such variable in its environment.
 
 State survives session end (a resumed `claude --resume` must keep its flags);
-age-based `SessionStart` sweep is the only reaper. There is no SessionEnd hook.
+age-based `SessionStart` sweep is the only reaper. The one SessionEnd hook is matched on
+`clear` and writes `clear-handoff.json`, which is not session state and not swept with it.
 
 ## Verified runtime facts (confirmed against the CLI / real payloads; do not regress)
 
@@ -735,6 +745,74 @@ payloads, not memory.
   almost every turn. The direct path is untouched and still concurrent — its agents read
   disjoint file lists and no caller edit sits between them.
 
+- **Withholding the document is for a skipped audit, not for no audit — v0.111.0.** The open rule
+  had four cases and one of them was wrong in the common direction: "no agent read anything this
+  turn → open nothing" also caught the turn the router answered `none` on. `none` is the router
+  saying no agent had material here, so that turn ended with nothing unfixed and nothing
+  unchecked, and the file was withheld anyway — the user got a path and had to open it by hand
+  for the reason that the audit correctly declined to run. The gate now asks whether an audit
+  ran and skipped this document, which is the only condition under which "unchecked" is a claim
+  about the text rather than about the routing. A `none` turn opens its answer file, and the
+  closeout's last paragraph covers steps 2 and 3 rather than step 2 alone.
+
+  The translation case collapsed in the same edit. Two branches — checked, unchecked — were a
+  restatement of the general gate applied to one file, so the case list now says only that a
+  translation is what gets opened when one exists, and the unchecked branch is shared. The one
+  thing it still spells out is why an audited English file is not a substitute: it was checked,
+  but it is not what this user reads.
+
+  **And the unchecked branch retries before it withholds.** Naming the two survivors made it
+  obvious what they have in common: a document reaches step 3 unaudited only because a dispatch
+  fell through — `korean-corrector` not reached off the translator's `next` line, or a picked
+  audit that errored. Neither is a fact about the text, and withholding answered them as
+  though it were: the check that did not happen still does not happen, and the user is handed a
+  path to a document nobody will look at again. The turn is still open and the file is still
+  there, so the branch now dispatches the missing audit, applies what it finds, and opens.
+  Withholding is the residue — refused, or failed twice.
+
+  This does not make the handoff safe, and the closeout is the wrong place to try. The
+  translator→corrector step is still held by prose, which v0.110.0 established is the form that
+  fails silently; a real session had already been observed ignoring an explicit "ONE AT A TIME",
+  and `dev/handoff-audit-workflow.md` listed "a `.ko.md` opened when `korean-corrector` did not
+  run" as a failure to watch for. What changed here is only the *response* to that failure, and
+  it shares the weakness of every rule in this file: it runs when the main agent notices. A
+  mechanism — state that records the translation and a hook that checks the corrector against it
+  — is the fix, and is not built.
+
+- **The serial order needed a mechanism, not a rule — v0.110.0.** v0.98.0 argued the turn audits
+  fully serial and said so in three places, then left the enforcement to prose while the three
+  skills kept `background: true`. Observed in a real session: the caller invoked
+  `audit-turn-claims`, `audit-turn-deferrals` and `audit-turn-clarity` in ONE message, all three
+  backgrounded, and went back to running integration tests while they ran — the exact batching
+  the template's "ONE AT A TIME ... Do not send two of them in one message" was written to
+  prevent. Then it applied the clarity findings to a file the claims audit was still reading.
+
+  Instruction-following is the visible failure and the wrong thing to fix. A backgrounded fork
+  returns control the instant it is dispatched, so a caller that obeyed the rule perfectly — one
+  skill per message — would still have nothing to wait on and nothing to apply: there is no point
+  in the turn where the findings exist and the next dispatch has not happened. The rule was
+  unenforceable, and asking for it more firmly would only make the next violation quieter.
+
+  So the three turn skills are `background: false`, which is documented to make the invoking turn
+  wait for the fork's result (`wiki/ref/claude-code-skill-fork-context.md`). The order is now held
+  by the host rather than by the caller's willingness. The reason for keeping `true` was
+  consistency with the asynchronous Agent-tool dispatches around it, and that was the wrong thing
+  to optimise: one audit waiting by mechanism while the rest wait by rule is *precisely* the
+  arrangement worth having, because only one of the two kinds has a caller edit sitting between
+  its steps. The tool-set cost of a background fork is still not a factor either direction —
+  these agents carry `Read, Grep, Glob, Bash, SendMessage` and the background filter keeps all
+  five — it just no longer has to be the deciding argument.
+
+  `audit-report-*` stays `background: true`, and its comments now say why on their own terms
+  rather than pointing at the turn path: `report-router` hands all three the same file and
+  dispatches them concurrently, with no caller edit in between, so there is no order for blocking
+  to hold. The two paths differ here, and the cross-reference that used to make them look
+  identical was how the turn path's `false` got argued away in the first place.
+
+  Two stale statements of the old behavior went with it: "and they run in parallel" in both
+  plugin manifests' `description`, and "The main agent dispatches those, concurrently" in
+  `AGENTS.md`. Both predate v0.98.0. The manifest line is the one users read.
+
 - **A turn spent addressing an agent directly is empty, and the agent's own answer arrives as a
   file — v0.100.0.** `@some-agent ...` is typed by a person, so `origin.kind` is `human` and the
   Stop hook routes it like any other turn. Measured: the router spent 15s on such a turn and
@@ -1116,6 +1194,44 @@ payloads, not memory.
   Not carried: `plan_audited_hash`. The plan a cleared session had audited is gone from the
   conversation that approved it, so the gate audits again rather than waving through a plan on
   the strength of a review nobody in this session saw.
+
+  **The record's second half is the handover, and it is independent of the first.** The
+  `guard:handover` skill writes a handover file and records its path (`guard-handover` →
+  `handover_file`); `SessionEnd` copies the path into the same record, and the replacing
+  `SessionStart` tells the model to ask the user whether to read it. Nothing about the two
+  halves is shared but the file they travel in: a session that wrote a handover and never
+  touched a switch still hands the file over, and a session that muted guard and wrote no
+  handover still hands the mute over. Collapsing them into one "is there anything to carry"
+  test is the way that breaks, and it breaks silently — the record is written, the half that
+  was checked survives, and the other half is simply not there.
+
+  The path is checked for existence twice, at both ends, because a handover written and then
+  deleted, moved, or renamed leaves a record that only looks valid. What that buys is a
+  failure someone can act on: refused at `guard-handover` time, where the skill is still
+  running, rather than discovered by a session with no way to ask what went wrong.
+
+  The inheriting session does **not** store `handover_file`. It is announced once, to the
+  session replacing the one that wrote it; a session that carried the key would hand the same
+  file on again at its own `/clear`, offering a handover the user has already been shown.
+
+  **Why the skill records it rather than the next session going looking.** The alternative
+  considered was scanning the handover directory at session start for the newest untracked
+  file, which needs no cooperation from the skill and answers a different question: it finds
+  *a* handover, not *this session's*. A file left by a session two days ago, by a colleague, or
+  by the same session three clears ago all look identical to that scan, and each one offered is
+  a session told to resume work that is already done. What it costs is that a skill step can be
+  skipped — a session that crashes between writing the file and recording it hands over
+  nothing. That is the right direction to fail: the user still has the file.
+
+  **It is an offer, not a read**, and it ignores the session mute and every agent switch. An
+  offer because the first prompt after a `/clear` frequently is not the work the handover
+  describes, and reading it unasked spends the context the clear just freed on a document the
+  user may have moved on from. Unmutable because it is not an audit and not an opinion about
+  the answer — it is the second half of something the user explicitly asked for by running the
+  skill, and a `guard off` that also swallowed the handover would make the mute a setting for
+  something it does not name. Note the asymmetry with the switch line beside it, which ends
+  "do not mention this unless the user asks": a switch the user set is already theirs, while a
+  handover is a document they wrote for this session and cannot see from inside it.
 - **guard cannot install the status line it wants.** A plugin's `settings.json` honors only
   `agent` and `subagentStatusLine` (`wiki/ref/claude-code-statusline.md`), so the main status
   line stays the user's. `status` prints a segment for them to compose into their own and
@@ -1837,16 +1953,18 @@ plan mode reads `ExitPlanMode` as its cue. What is *not* the alternative is
 `disable-model-invocation: true` — it would shut guard out as well, and guard is the only
 thing that should invoke these.
 
-**All six set `background: true`**, which is the default stated rather than a change — they run
-backgrounded like every other audit the caller dispatches, and writing it down keeps the next
-reader from assuming the field was overlooked. `background: false` was written in first and
-taken out: the reason given for it was the narrower tool set a backgrounded fork gets, and that
-reason does not hold here — these agents carry `Read, Grep, Glob, Bash, SendMessage` and the
-background filter keeps all five. What a backgrounded fork actually loses is `Agent`, which
-none of them uses. The real consideration was ordering — findings belong in the English answer
-file before `korean-translator` writes the translation — and that is the caller's job either
-way, since the Agent-tool dispatches it is already waiting on are asynchronous too. Making one
-audit wait by mechanism while the rest wait by rule buys less than it costs in inconsistency.
+**`background` splits by path, and it is the one field here that is load-bearing rather than a
+default written down.** The three `audit-turn-*` skills are `background: false`: the caller
+applies each audit's findings to the answer file before dispatching the next, and a backgrounded
+fork returns control immediately, so there is no moment at which the findings exist and the next
+dispatch has not happened. Blocking the invoking turn is what makes that order real; the rule
+alone did not (v0.110.0 above has the session where all three went out in one message). The three
+`audit-report-*` skills stay `background: true`, because `report-router` dispatches them
+concurrently over one file with no caller edit between them — nothing to hold.
+
+The tool-set question is settled and is not what decides this: these agents carry
+`Read, Grep, Glob, Bash, SendMessage` and the background filter keeps all five. What a
+backgrounded fork actually loses is `Agent`, which none of them uses.
 
 **So the roster field is `turn_entry` / `report_entry`, not `turn_agent` / `report_agent`.** An
 entry is a skill for the three shared audits and the agent's own name for the rest; the

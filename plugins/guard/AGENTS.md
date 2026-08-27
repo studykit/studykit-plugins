@@ -14,7 +14,8 @@ follows is a pointer into it rather than a second copy.
 **guard makes no model call.** When a turn finishes it asks the main agent, through the Stop
 hook's `additionalContext`, to dispatch one subagent — `guard:turn-router` — which reads the turn
 and names which of guard's audit agents would actually find something in it, with a reason for
-each. The main agent dispatches those, concurrently. guard audits nothing itself, and every
+each. The main agent dispatches those — one at a time on the turn path, since it applies each
+one's findings to the answer file the next one reads. guard audits nothing itself, and every
 audit criterion lives in an agent definition under `agents/`.
 
 Everything guard recommends, it recommends at turn end. Two shipped agents sit outside that
@@ -73,6 +74,13 @@ the opening prompt, which the main agent still writes; the agent's own body has 
 
 `guard on` / `guard off` flips this session's mute from a shell prompt, without entering the conversation at all — the reason it is not a slash command. It leaves `audit-turn` alone, so muting the session you are in never changes what the next one does. SessionStart puts it on `PATH` through `$CLAUDE_ENV_FILE`, which is sourced rather than scanned for exports, so there is nothing to install and nothing left behind. It is an executable rather than a shell function so that subprocesses inherit it. `guard-plan` is its counterpart for the plan gate. `toggle-cli` is the one subcommand that must not fail open — a person is reading its output, so silence would read as success.
 
+`handover` is the one skill here that is not about auditing anything. The user runs it to
+write a session handover, and its last step records the file's path (`guard-handover`) — which
+is the whole reason it lives in guard rather than beside it: the `/clear` handoff record is
+already the one thing that survives a cleared conversation, and the offer to read the handover
+rides in it. `dev/design.md` has why the skill records the path instead of the next session
+scanning for one, and why the offer ignores the mute.
+
 That same `PATH` carries `guard-candidates` and `guard-inputs`, which are the dispatched agents' and never the user's. Between them the routed dispatch is down to `- turn: <id>`, and the document dispatch to `- file: <path>`. `dev/design.md` has why that beats printing the roster and the paths, and what each fallback line is for.
 
 ## Hard requirements
@@ -126,8 +134,8 @@ how the code here is organised.
   no-router path — and what its findings mean travels in its own report, which is why the
   file-editing audits end each finding in a disposition (apply / move / decide) and the router,
   not the closeout, carries the translation instruction. What the closeout holds is the turn:
-  findings go into the answer file, the reply is short and in the user's language, and only an
-  audited file is opened. The rule is negative and that is the useful half: a closeout sentence
+  findings go into the answer file, the reply is short and in the user's language, and the file
+  opened is the one the user reads, retried before it is ever withheld. The rule is negative and that is the useful half: a closeout sentence
   naming a particular agent is either a second authority over a decision already made or a
   lookup that belongs in a report — see `dev/design.md` for the turn it cost.
 - guard writes the turn record's **response** section itself, verbatim from the Stop payload —
@@ -158,13 +166,17 @@ how the code here is organised.
   never the config. The persistence lives in `audit-turn` / `audit-plan`, which say what a
   session opens in and nothing else; do not let the toggle start writing them, and if the
   indicator ever becomes unshippable, drop the mute rather than let it go invisible.
-- A `/clear` inherits both switches from the session it replaced, and that is the ONLY
-  boundary that inherits anything — every other start reads the settings. It carries a session
+- A `/clear` inherits both switches from the session it replaced, plus the handover file that
+  session recorded, and that is the ONLY boundary that inherits anything — every other start
+  reads the settings. It carries a session
   that DIFFERS from those settings, in either direction, which is why the comparison is
   against the config rather than against "armed". The predecessor is named by the
   `SessionEnd` record rather than inferred from file times, the record is single-use and
   expiring, and the adoption is announced. Weaken any one of those four and this becomes the
   persistent gate wearing a different name; `dev/design.md` has the measurements.
+- The handoff record's two halves — the switches and the handover — are written and read
+  INDEPENDENTLY. Collapse them into one "is there anything to carry" test and the record is
+  still written, the checked half still survives, and the other half is simply absent.
 - guard always exits 0 and fails open.
 
 ## Deliberately not enforced
