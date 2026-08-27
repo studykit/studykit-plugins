@@ -228,28 +228,31 @@ none — nothing in this turn for any candidate. No corrections and no translati
 Answer file: <answer file path>
 ```
 
-**When you pick one or more**, use this, with one line per pick under its wave:
+**When you pick one or more**, use this, with one numbered line per pick in the order
+`candidates` printed them in:
 
 ```
-Dispatch these in waves, and apply what a wave reports to the answer file before starting the next. Every name is a SKILL: invoke `guard:<name>` with the turn id <turn id> and nothing else — not with the Agent tool, and with no instructions of your own about what to look for. When the last wave's findings are in the file, close the turn out per `Presenting the result` in <closeout path>.
+Dispatch these ONE AT A TIME, in the order below, and apply what each reports to the answer file before you dispatch the next. Do not send two of them in one message. Every name is a SKILL: invoke `guard:<name>` with the turn id <turn id> and nothing else — not with the Agent tool, and with no instructions of your own about what to look for. When the last one's findings are in the file, close the turn out per `Presenting the result` in <closeout path>.
 Answer file: <answer file path>
-Wave 1 — dispatch these together in ONE message; they edit nothing and share no input, so neither waits on the other:
-- `audit-turn-claims` — asserts "Redis가 Postgres보다 항상 빠릅니다" as settled fact
-- `audit-turn-deferrals` — leaves "정확한 수치는 확인 필요" for a number the repo records
-Wave 2 — after wave 1's findings are in the answer file:
-- `audit-turn-clarity` — the whole explanation is new to this reader
+1. `audit-turn-claims` — asserts "Redis가 Postgres보다 항상 빠릅니다" as settled fact
+2. `audit-turn-deferrals` — leaves "정확한 수치는 확인 필요" for a number the repo records
+3. `audit-turn-clarity` — the whole explanation is new to this reader
 ```
 
-**Drop a wave you have no pick for, and keep the other's label as it is** — the labels name the
-stage, not a position in your list, so a turn that drew only `audit-turn-clarity` still says
-`Wave 2`. With one wave the phrase "in ONE message" still belongs on it if it has two picks.
+**The order is not yours; which of its steps happen is.** It is fixed — `candidates` prints it
+and it is the order they must run in — so never reorder it and never move a name up because it
+looks more urgent. What you decide is which steps this turn has material for. Number only those,
+keeping `candidates`' order: a turn that drew clarity alone gets a single `1.`, and a turn that
+skipped deferrals numbers claims `1.` and clarity `2.` with nothing between them.
 
-Why the split, so you do not collapse it back: wave 1's findings are **applied by your caller**,
-and applying them rewrites the answer — an unsupported claim gains its evidence, a deferral gets
-resolved into new text. `audit-turn-clarity` judges whether a reader can follow what the user
-will actually be given, so it has to read the file after those edits. Run beside wave 1 it would
-be judging prose that is about to change, and would miss the passages the corrections
-introduce — which are the densest ones in the file.
+Why serial, so you do not collapse it back into one message: each one's findings are **applied
+by your caller**, and applying them rewrites the answer file that the next one reads. Evidence
+goes into a sentence that had none; a punt is resolved into new text. Fixing an unsupported
+claim is also how a deferral gets written — "I could not establish this" is the honest repair,
+and it is exactly what the next audit exists to catch. And the passages the corrections
+introduce are the ones most likely to be hard to follow, which is why clarity reads the file
+last. Run together, each would be judging prose that is about to change and blind to the prose
+the change adds.
 
 **If `korean-translator` is among your picks**, add this after the last one. It is the whole
 instruction for the translation — your caller reads nothing else about it, and the file it
@@ -274,9 +277,10 @@ that resolves someone else's turn.
 **Your caller cannot tell from a list of names what waits on what, so the templates say it and
 you reproduce them verbatim.** None of these agents waits on another directly; what they wait on
 is an edit your caller makes in between, which is why it has to be told. Keep the order
-`candidates` printed — it is the wave order — and `korean-translator` is always last, after the
-last wave's findings are in the file. Whatever follows the translation is in the translator's
-own report, not yours. Do not reword a template into a schedule of your own.
+`candidates` printed — it is the order they run in — and `korean-translator` is always last,
+after the last audit's findings are in the file. Whatever follows the translation is in the
+translator's own report, not yours. Do not reword a template into a schedule of your own, do not
+reorder it, and do not decide that two of them could run together after all.
 
 Each key must be copied exactly as it was given to you — it is what your caller invokes, so a
 key you shorten or invent names nothing and fails silently rather than erroring. Each reason is one short

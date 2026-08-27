@@ -709,15 +709,29 @@ payloads, not memory.
   `clarity-auditor` beside it judges prose that is about to change and cannot see the prose the
   correction introduces.
 
-  So the routed audits run in two waves: claims and deferrals together, the caller applies, then
-  clarity on the corrected file. `korean-translator` is the same dependency one step further on,
-  which is what makes the roster order load-bearing again — not as auditors-before-correctors,
-  which really did stop meaning anything, but as the wave order. `cmd_candidates` says so where
-  the order is produced.
+  It applies to every pair on the list, not just to clarity, which is why the routed audits are
+  **fully serial**: claims, then deferrals, then clarity, then the translator, each dispatched
+  only after the one before it has been applied. Claims and deferrals looked independent — one
+  judges evidence, the other judges punts — but the repair links them. Fixing an unsupported
+  claim you cannot substantiate is *how a deferral gets written*: "I could not establish this"
+  is the honest correction, and it is exactly what the next audit exists to catch. Run beside
+  each other, the deferrals audit never sees the deferrals the claims fix introduced.
 
-  The router emits only the waves it has picks for and keeps the other's label, so a turn that
-  drew clarity alone still says `Wave 2`. The cost is one extra round trip on a turn that draws
-  both waves; what it buys is the clarity audit reading the file the user is actually given.
+  This makes the roster order load-bearing again — not as auditors-before-correctors, which
+  really did stop meaning anything, but as the run order. Said at the roster, at
+  `cmd_candidates` and in the router's template, which spells out "ONE AT A TIME ... Do not send
+  two of them in one message" because a caller reading three read-only audits will otherwise
+  batch them.
+
+  The split of authority is worth stating because it is easy to slide: the ORDER is fixed and
+  belongs to the roster, and what the router decides is which of its steps this turn has material
+  for. It names a subset, never a sequence of its own — a router free to reorder would be making
+  the dependency argument above per turn, from the one position that cannot check it.
+
+  One pass, and the cycle is real but not chased: a deferral resolved in step 2 introduces facts
+  that nothing re-audits for evidence. A second round would cost double for something empty on
+  almost every turn. The direct path is untouched and still concurrent — its agents read
+  disjoint file lists and no caller edit sits between them.
 - **Nobody gathers the session's history; agents extract it.** guard's turn store holds the
   response, plus one sibling file holding the request for the router alone (see the router
   bullets above).

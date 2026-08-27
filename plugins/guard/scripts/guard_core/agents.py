@@ -115,12 +115,17 @@ class AuditAgent(NamedTuple):
 
 
 # Order here is the order the agents appear in a recommendation, and on the routed path it is
-# the order they RUN in — as waves, not as a single list. `claims-auditor` and
-# `deferrals-auditor` go out together; the caller applies what they found; `clarity-auditor`
-# then reads the corrected answer file, because the corrections are new prose and they are the
-# prose most likely to be hard to follow. `korean-translator` is last, translating what all of
-# them settled. No agent here waits on another directly: every dependency runs through an edit
-# the caller makes in between, which is why the router's template has to state it.
+# the order they RUN in, one at a time. Each one's findings are applied before the next is
+# dispatched, so each reads a file the one before it changed: fixing an unsupported claim is
+# often how a deferral gets written ("I could not establish this"), and both kinds of repair add
+# prose that is then the likeliest thing in the file to be hard to follow. `korean-translator`
+# is last, translating what all of them settled. No agent here waits on another directly — every
+# dependency runs through an edit the CALLER makes in between, which is why the router's
+# template has to state it rather than leaving an agent to notice.
+#
+# One pass, in this order, and the cycle is real but not chased: a deferral resolved in step 2
+# introduces facts nothing re-audits for evidence. Running the list twice would cost double for
+# a second round that is empty on almost every turn.
 AUDIT_AGENTS: dict[str, AuditAgent] = {
     # Every audit that runs on both dispatch paths splits at the ENTRY, not at the agent: one
     # agent judges, and a `context: fork` skill per path carries the input-gathering. What

@@ -1,6 +1,6 @@
 {
   "name": "guard",
-  "version": "0.98.0",
+  "version": "0.99.0",
   "description": "When a turn ends, guard asks the session to run its router subagent over the response; the router names which audit agents would actually find something in it — unsupported claims, deferrals the repo could answer, explanation the reader cannot follow, a Korean answer translated by its own author, unnatural Korean, comments in the source it edited, AGENTS.md/CLAUDE.md that drifted from a map into a payload, saved reference docs that filled up with local reasoning — each with a reason, and they run in parallel. A documentation agent reports what is already saved or fetches and saves the primary source, and a saved reference the turn wrote is checked by an auditor of its own. One switch per agent, all off until you turn one on, plus two saved settings for whether a session starts with turn and plan auditing armed — armed unless the project says otherwise, and `guard off` mutes just the session you are in. A separate `interviewer` agent is not part of that: you talk to it directly in its own transcript before any work starts, and it questions you one at a time — testing what you said rather than guessing the rest — until the request is clear, then researches it and, when you close the interview, leaves one brief on disk for the session to act on. Claude Code and Codex. Requires Python 3.11+.",
   "author": {
     "name": "studykit"
