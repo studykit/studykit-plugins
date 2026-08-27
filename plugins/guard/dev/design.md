@@ -776,6 +776,26 @@ payloads, not memory.
   ones guard itself dispatched, and the machinery it takes to exclude them is larger than the
   one line an agent that wants routing can write for itself.
 
+- **The user decides whether their brief is audited — v0.102.0.** The handoff above made routing
+  automatic, which is the wrong default for this one document: the brief is the record of a
+  conversation the user had, and an audit of it spends several subagents on something they may
+  simply want written down. So the interviewer asks, once, when they close the interview — in
+  their language, one line, with what it costs — and relays the answer.
+
+  Three things make it work rather than becoming a prompt nobody reads:
+
+  - *It is asked at the close, not earlier.* Mid-interview it is a question about machinery
+    inside a conversation about their problem, and it invites them to close before they are done.
+  - *The second line is never dropped in either shape.* "Declined" is sent explicitly rather than
+    by omitting the routing line, because that line was just made never-drop: silence would read
+    as the agent forgetting it, not as a decision. Same rule guard applies to `guard-inputs`,
+    where an absent field is printed as a stated fact rather than left as silence.
+  - *Anything but a clear no is a yes.* A brief that skipped the audit reads exactly like one
+    that passed it, and the user is the only party who can tell them apart.
+
+  It is also the only question in the interview whose answer does not go into the brief: it is
+  about what happens to the document, not about the request.
+
 - **Nobody gathers the session's history; agents extract it.** guard's turn store holds the
   response, plus one sibling file holding the request for the router alone (see the router
   bullets above).
