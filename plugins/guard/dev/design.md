@@ -757,6 +757,25 @@ payloads, not memory.
   What this does not cover, and cannot: an agent that writes no file. guard cannot make a
   third-party agent report a path, so its answer is audited only if the agent chose to leave
   one. That is a property of the agent, not a gap in the routing.
+
+- **The interviewer hands off its own brief — v0.101.0.** The routing instruction lived in the
+  agent's `description`, which is standing text the caller reads when it picks an agent, not
+  when a brief arrives. Same defect as the two the Korean pair had: a third party stating a
+  handoff whose precondition — this file now exists at this path — only one party knows. So the
+  interviewer's last message is now the path **and** the dispatch line, marked never-drop, and
+  the description says only that the line will come and to do what it says.
+
+  What did not change is the ban it sits inside. "Your last message is that path and nothing
+  else" existed so no summary of the brief travels beside the brief, and that still holds: the
+  handoff is one imperative line, not a second version of the document. The write-failure branch
+  sends no routing line at all — there is no file to route.
+
+  This is deliberately the only agent with it. A general mechanism was considered and dropped: a
+  `SubagentStop` hook would reach every subagent's `last_assistant_message` (documented, see
+  `wiki/ref/claude-code-hooks-in-subagents.md`), but auditing every subagent means auditing the
+  ones guard itself dispatched, and the machinery it takes to exclude them is larger than the
+  one line an agent that wants routing can write for itself.
+
 - **Nobody gathers the session's history; agents extract it.** guard's turn store holds the
   response, plus one sibling file holding the request for the router alone (see the router
   bullets above).
