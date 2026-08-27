@@ -27,6 +27,7 @@ from setup import (  # noqa: E402
     CODEX_AGENT_INSTALL_MARKER_BEGIN,
     CODEX_AGENT_INSTALL_MARKER_END,
     CODEX_CONFIG_RELATIVE_PATH,
+    CODEX_HOOKS_RELATIVE_PATH,
     CODEX_SPECTRACK_AGENT_DIR,
     CLAUDE_AGENTS_SHIM,
     CLAUDE_FILENAME,
@@ -1000,6 +1001,21 @@ def test_install_codex_agents_creates_project_roles(tmp_path: Path) -> None:
     assert "# Issue Implementer" in role_text
     assert "[apps._default]" in role_text
     assert "enabled = false" in role_text
+    hooks = json.loads((tmp_path / CODEX_HOOKS_RELATIVE_PATH).read_text(encoding="utf-8"))
+    assert set(hooks["hooks"]) == {"SessionStart", "SubagentStart", "UserPromptSubmit", "Stop"}
+    assert "hook_codex.py" in hooks["hooks"]["SessionStart"][0]["hooks"][0]["command"]
+
+
+def test_install_codex_agents_preserves_existing_project_hooks(tmp_path: Path) -> None:
+    hooks_path = tmp_path / CODEX_HOOKS_RELATIVE_PATH
+    hooks_path.parent.mkdir()
+    hooks_path.write_text(json.dumps({"hooks": {"SessionStart": [{"hooks": [{"type": "command", "command": "uv run .hooks/glossary.py"}]}]}}), encoding="utf-8")
+
+    install_codex_agents(tmp_path)
+
+    hooks = json.loads(hooks_path.read_text(encoding="utf-8"))
+    assert len(hooks["hooks"]["SessionStart"]) == 2
+    assert hooks["hooks"]["SessionStart"][0]["hooks"][0]["command"] == "uv run .hooks/glossary.py"
 
 
 def test_install_codex_agents_removes_legacy_managed_block_only(tmp_path: Path) -> None:

@@ -618,6 +618,7 @@ CODEX_DIRNAME = ".codex"
 CODEX_CONFIG_FILENAME = "config.toml"
 CODEX_CONFIG_RELATIVE_PATH = f"{CODEX_DIRNAME}/{CODEX_CONFIG_FILENAME}"
 CODEX_SPECTRACK_AGENT_DIR = f"{CODEX_DIRNAME}/agents"
+CODEX_HOOKS_RELATIVE_PATH = f"{CODEX_DIRNAME}/hooks.json"
 CODEX_AGENT_INSTALL_MARKER_BEGIN = "# BEGIN spectrack custom agents"
 CODEX_AGENT_INSTALL_MARKER_END = "# END spectrack custom agents"
 SPECTRACK_CODEX_AGENT_ROLES: Mapping[str, str] = {
@@ -692,7 +693,7 @@ def ensure_agents_knowledge_root(
 
 
 def install_codex_agents(project: Path) -> dict[str, Any]:
-    """Install SpecTrack agents as project-local Codex custom agent roles."""
+    """Install SpecTrack Codex roles and project-local hook adapters."""
 
     project = project.expanduser().resolve()
     codex_dir = project / CODEX_DIRNAME
@@ -727,14 +728,76 @@ def install_codex_agents(project: Path) -> dict[str, Any]:
     if config_action != "skip":
         _atomic_write_text(config_path, updated_config)
 
+    hooks = install_codex_hooks(project)
+
     return {
         "operation": "install_codex_agents",
         "config_path": str(config_path),
         "config_action": config_action,
         "agent_dir": str(role_dir),
         "agents": installed_roles,
+        "hooks": hooks,
         "restart_required": True,
     }
+
+
+def install_codex_hooks(project: Path) -> dict[str, Any]:
+    """Merge SpecTrack lifecycle hooks into the project's Codex hook config."""
+
+    project = project.expanduser().resolve()
+    hooks_path = project / CODEX_HOOKS_RELATIVE_PATH
+    if hooks_path.exists():
+        try:
+            payload = json.loads(hooks_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as exc:
+            raise WorkflowSetupError(f"invalid Codex hook config at {hooks_path}: {exc}") from exc
+    else:
+        payload = {}
+    if not isinstance(payload, dict):
+        raise WorkflowSetupError(f"invalid Codex hook config at {hooks_path}: expected an object")
+    hooks = payload.setdefault("hooks", {})
+    if not isinstance(hooks, dict):
+        raise WorkflowSetupError(f"invalid Codex hook config at {hooks_path}: hooks must be an object")
+
+    plugin_root = Path(__file__).resolve().parent.parent
+    hook_script = plugin_root / "hooks" / "scripts" / "hook_codex.py"
+    command = (
+        f"PLUGIN_ROOT={json.dumps(str(plugin_root))} "
+        f"uv run --script {json.dumps(str(hook_script))}"
+    )
+    definitions: dict[str, dict[str, Any]] = {
+        "SessionStart": {"matcher": "startup|resume|clear|compact", "hooks": [{"type": "command", "command": command, "timeout": 5, "statusMessage": "Loading workflow authoring policy"}]},
+        "SubagentStart": {"hooks": [{"type": "command", "command": command, "timeout": 5, "statusMessage": "Loading workflow subagent policy"}]},
+        "UserPromptSubmit": {"hooks": [{"type": "command", "command": command, "timeout": 10, "statusMessage": "Caching workflow issue references"}]},
+        "Stop": {"hooks": [{"type": "command", "command": command, "timeout": 5}]},
+    }
+    changed = not hooks_path.exists()
+    for event, definition in definitions.items():
+        current = hooks.setdefault(event, [])
+        if not isinstance(current, list):
+            raise WorkflowSetupError(f"invalid Codex hook config at {hooks_path}: {event} must be a list")
+        filtered = [item for item in current if not _is_spectrack_codex_hook(item)]
+        updated = filtered + [definition]
+        if updated != current:
+            hooks[event] = updated
+            changed = True
+    if changed:
+        _atomic_write_text(hooks_path, json.dumps(payload, indent=2) + "\n")
+    return {"path": str(hooks_path), "action": "update" if changed else "skip"}
+
+
+def _is_spectrack_codex_hook(value: Any) -> bool:
+    if not isinstance(value, dict):
+        return False
+    entries = value.get("hooks")
+    if not isinstance(entries, list):
+        return False
+    return any(
+        isinstance(entry, dict)
+        and isinstance(entry.get("command"), str)
+        and entry["command"].endswith("/hooks/scripts/hook_codex.py\"")
+        for entry in entries
+    )
 
 
 def _load_agent_instruction_body(path: Path) -> str:

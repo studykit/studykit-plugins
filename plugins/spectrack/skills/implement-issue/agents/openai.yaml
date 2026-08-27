@@ -4,4 +4,4 @@ interface:
   default_prompt: "Implement issue #123"
 
 policy:
-  allow_implicit_invocation: false
+  allow_implicit_invocation: true

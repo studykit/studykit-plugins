@@ -1682,7 +1682,7 @@ def test_user_prompt_lists_relationships_path_when_frontmatter_has_relationships
     payload = json.loads(captured.getvalue())
     context = payload["hookSpecificOutput"]["additionalContext"]
     assert context == (
-        "## Workflow issue cache\n\n"
+        "## Spectrack issue cache\n\n"
         "- #39 → `.spectrack-cache/issues/39/issue.md`\n"
         "  - relationships: `.spectrack-cache/issues/39/relation.md`"
     )
@@ -1715,7 +1715,7 @@ def test_user_prompt_reports_relationships_none_when_issue_has_no_links(
     payload = json.loads(captured.getvalue())
     context = payload["hookSpecificOutput"]["additionalContext"]
     assert context == (
-        "## Workflow issue cache\n\n"
+        "## Spectrack issue cache\n\n"
         "- #39 → `.spectrack-cache/issues/39/issue.md`\n"
         "  - relationships: none"
     )

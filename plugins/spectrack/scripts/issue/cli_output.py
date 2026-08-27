@@ -143,7 +143,7 @@ def format_issue_cache_context(
 
     _ = include_details
     shared_base = shared_issue_dir_base(contexts)
-    lines = ["## Workflow issue cache", ""]
+    lines = ["## Spectrack issue cache", ""]
     if shared_base is not None:
         lines.append(f"Base: `{shared_base}`")
     for context in contexts:
