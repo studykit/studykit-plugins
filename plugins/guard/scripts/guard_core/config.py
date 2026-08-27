@@ -258,8 +258,9 @@ def _load_config(project_dir: Path) -> dict[str, Any]:
     """Load the JSON config at guard.local.json, if present. Fail-open to defaults.
 
     Only keys present in DEFAULT_CONFIG are honored, and only when the supplied value
-    matches the default's JSON type (every key is a str: the agent modes and ``refs_dir``),
-    so a malformed value can never change a setting by accident.
+    matches the default's JSON type — a str for the agent modes and ``refs_dir``, a list
+    (or a bare str) for ``knowledge_dir`` — so a malformed value can never change a setting
+    by accident.
     """
     config = dict(DEFAULT_CONFIG)
     path = project_dir / CONFIG_REL

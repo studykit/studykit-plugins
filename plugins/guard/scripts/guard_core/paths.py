@@ -177,6 +177,23 @@ def _knowledge_dirs(project_dir: Path, config: dict[str, Any] | None = None) -> 
     is reported, because this runs on a dispatch and an agent cannot act on a warning it was
     not built to read.
     """
+    out: list[Path] = []
+    for _, resolved in _knowledge_dir_entries(project_dir, config):
+        if resolved is not None and resolved not in out:
+            out.append(resolved)
+    return out
+
+
+def _knowledge_dir_entries(project_dir: Path, config: dict[str, Any] | None = None
+                           ) -> list[tuple[str, Path | None]]:
+    """Each configured knowledge-dir entry as written, paired with the directory it resolves
+    to — ``None`` when it resolves to nothing that exists.
+
+    Split out of ``_knowledge_dirs`` so the two audiences can differ while the normalization
+    does not: the dispatch path drops a bad entry silently (above), and the ``settings`` CLI
+    reports it. Duplicating the rules instead is how the two would come to disagree about
+    what a ``~`` or a relative path means.
+    """
     raw = (config or {}).get("knowledge_dir", [])
     # A bare string is accepted as a one-element list: it is what a user who has one
     # directory will write, and what every earlier version of this key was.
@@ -184,19 +201,20 @@ def _knowledge_dirs(project_dir: Path, config: dict[str, Any] | None = None) -> 
         raw = [raw]
     if not isinstance(raw, list):
         return []
-    out: list[Path] = []
+    out: list[tuple[str, Path | None]] = []
     for entry in raw:
         if not isinstance(entry, str) or not entry.strip():
             continue
+        text = entry.strip()
         try:
-            candidate = Path(entry.strip()).expanduser()
+            candidate = Path(text).expanduser()
             if not candidate.is_absolute():
                 candidate = project_dir / candidate
             candidate = candidate.resolve()
         except (OSError, RuntimeError):
+            out.append((text, None))
             continue
-        if candidate.is_dir() and candidate not in out:
-            out.append(candidate)
+        out.append((text, candidate if candidate.is_dir() else None))
     return out
 
 

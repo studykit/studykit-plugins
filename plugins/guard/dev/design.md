@@ -1907,6 +1907,33 @@ user-selected (no `force-for-plugin`), so nothing load-bearing may depend on it 
 active. guard fixes no reference-mark syntax — `claims-auditor` is told to check that a
 mark *resolves*, never to grade its form.
 
+`knowledge_dir` (list of strings, default `[]`; a bare string is accepted as one entry) —
+where the project records what its **deployed** system looks like: topology, environments,
+runbooks. Read by `paths._knowledge_dirs` for `design-environment` and by nothing else, and
+nothing derives a write path from it, which is why it is deliberately NOT confined to the
+project the way `refs_dir` is: this material routinely lives in a knowledge base outside the
+repository, so an absolute path and a `~` are the expected shapes. Order is precedence. A list
+because the knowledge is normally split — one directory per system, per team, or per source.
+
+It had no CLI surface at all until v0.113.0, and that is the failure worth recording. The key
+was honored by `_load_config`, read by `_knowledge_dirs`, and printed by the
+`knowledge-dirs` subcommand — which only prints. `settings show` did not list it, `settings
+set` refused it, and the settings command forbids hand-editing the file in bold while calling
+the CLI the file's only supported writer. So the one documented way to configure it was the one
+way the documentation prohibits. Nothing failed: every piece worked, and the missing piece was
+a branch nobody wrote. `docs-finder` has an explicit "no key, deliberately" comment beside its
+absence; this had none, which is the difference between a decision and an omission and the
+reason a new key should carry one either way.
+
+`set` replaces the whole list rather than appending, because order is precedence and an
+append-only verb leaves no way to reorder or drop one entry. The value is stored as written
+rather than filtered to what exists — configuring a directory before creating it is normal, and
+filtering would discard the setting with nothing on screen to say so. Instead `show` names any
+entry that does not resolve, and it is the ONLY place that happens: `_knowledge_dirs` drops a
+bad entry silently because it runs on a dispatch, where the agent reading the list was not built
+to act on a warning. `_knowledge_dir_entries` exists so both audiences share one normalization;
+duplicating the `~`-and-relative rules is how the two would come to disagree.
+
 `settings unset <key>` is the only way a key leaves the file, and it exists because `set`'s
 preserve-everything rule has no other exit. A key guard stopped honoring — `exempt_skills`,
 `audit_gate` — is invisible to `show`, ignored by `_load_config`, and carried forward by

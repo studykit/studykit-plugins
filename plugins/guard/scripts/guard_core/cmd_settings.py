@@ -3,7 +3,9 @@
 ``settings`` is run by the ``guard:settings`` skill via Bash, in-session. ``show`` prints the
 current settings; ``set <key> <value>`` changes one of the per-agent settings — each named
 after the agent it controls, valued ``off``/``fresh`` — one of the two audit
-switches (``audit-turn`` / ``audit-plan``, ``on``/``off``) or ``refs_dir``; ``unset <key>`` removes a key from the file entirely, back to its default. The
+switches (``audit-turn`` / ``audit-plan``, ``on``/``off``), ``refs_dir`` or ``knowledge_dir``
+(comma-separated, the whole list replaced); ``unset <key>`` removes a key from the file
+entirely, back to its default. The
 agent settings and the audit switches also apply to the live session's ``state/<sid>.json``
 when a session id is
 available (``--session``, which the skill passes as ``${CLAUDE_SESSION_ID}``, else the
@@ -28,7 +30,7 @@ from .config import (
     _audit_on, _cli_write_allowed, _load_config, _load_raw_config, _parse_mode, _parse_switch,
     _write_config
 )
-from .paths import _cli_project_dir, _refs_dir, _trace
+from .paths import _cli_project_dir, _knowledge_dir_entries, _refs_dir, _trace
 from .agents import AUDIT_AGENTS, SETTABLE_AGENTS
 from .state import _audit_paused, _plan_audit_paused, _read_state, _write_state
 
@@ -122,6 +124,21 @@ def _config_show_lines(project_dir: Path, session_id: str | None) -> list[str]:
                     f"setting")
         return f"{key}: on"
 
+    def knowledge_line() -> str:
+        """The configured knowledge directories, and which of them do not exist.
+
+        This is the ONLY place a bad entry is reported. `paths._knowledge_dirs` drops one
+        silently because it runs on a dispatch, where the agent reading the list was not
+        built to act on a warning; the user running `settings` is the audience that can."""
+        entries = _knowledge_dir_entries(project_dir, cfg)
+        if not entries:
+            return "knowledge_dir: (none configured)"
+        line = "knowledge_dir: " + ", ".join(text for text, _ in entries)
+        missing = [text for text, resolved in entries if resolved is None]
+        if missing:
+            line += "  [no such directory, ignored at use: " + ", ".join(missing) + "]"
+        return line
+
     refs_rel = raw.get("refs_dir") if isinstance(raw.get("refs_dir"), str) else ""
     # The two audit switches are listed FIRST: each overrides every agent line below it, so a
     # reader who sees the switches without them would read the wrong answer to "is guard
@@ -132,6 +149,7 @@ def _config_show_lines(project_dir: Path, session_id: str | None) -> list[str]:
         *(audit_line(k) for k in AUDIT_SWITCHES),
         *(switch_line(k) for k in SETTABLE_AGENTS),
         "refs_dir: " + (refs_rel if refs_rel else "(default wiki/ref/)"),
+        knowledge_line(),
     ]
 
 
@@ -191,7 +209,8 @@ def cmd_settings() -> int:
         settings unset <key>                 — delete one key from the file
 
     Settable keys: the two audit switches (``AUDIT_SWITCHES``), the agent switches (the keys
-    of ``SETTABLE_AGENTS`` — each is the name of the agent it admits) and ``refs_dir``. The
+    of ``SETTABLE_AGENTS`` — each is the name of the agent it admits), ``refs_dir`` and
+    ``knowledge_dir``. The
     switches
     also apply to the live session's ``state/<sid>.json`` when a session id is available
     (``--session <id>``, which the forked skill passes as ``${CLAUDE_SESSION_ID}``, else
@@ -258,10 +277,20 @@ def cmd_settings() -> int:
         _apply_session_scalar(project_dir, session_id, _SWITCH_STATE_KEY[key], not on)
     elif key == "refs_dir":
         raw["refs_dir"] = value  # "" resets to the default; _refs_dir validates at use
+    elif key == "knowledge_dir":
+        # Comma-separated, and the whole list is REPLACED. Order is precedence, so the user
+        # has to be able to state it; an append-only verb would leave no way to reorder or
+        # drop one. `""` writes the empty list, which is the default.
+        #
+        # The value is stored as given rather than filtered to what exists: a directory the
+        # user is about to create is a normal thing to configure, and dropping it here would
+        # discard the setting with no way to see that it happened. The `show` lines below
+        # name any entry that does not resolve.
+        raw["knowledge_dir"] = [p.strip() for p in value.split(",") if p.strip()]
     else:
         print(f"guard settings: unknown or unsettable key {key!r}. Settable: "
               + ", ".join((*AUDIT_SWITCHES, *SETTABLE_AGENTS))
-              + ", refs_dir.",
+              + ", refs_dir, knowledge_dir.",
               file=sys.stderr)
         return 0
 

@@ -1,6 +1,6 @@
 ---
 name: settings
-description: "View and change guard's settings for this project — whether new sessions start with turn and plan auditing armed (audit-turn / audit-plan, on unless set), one setting per agent, each off / fresh, plus refs_dir — recorded in .claude/guard.local.json. Use when the user wants to configure guard: turn an audit on or off by default, admit an agent, or point guard at a different refs directory. Claude Code only."
+description: "View and change guard's settings for this project — whether new sessions start with turn and plan auditing armed (audit-turn / audit-plan, on unless set), one setting per agent, each off / fresh, plus refs_dir and knowledge_dir — recorded in .claude/guard.local.json. Use when the user wants to configure guard: turn an audit on or off by default, admit an agent, point guard at a different refs directory, or tell it where the project's deployment knowledge lives. Claude Code only."
 argument-hint: '[key] [value]'
 disable-model-invocation: true
 # Runs in a forked subagent, not in the main session. Changing a setting is a few CLI calls
@@ -70,6 +70,13 @@ GUARD_SETTINGS_SKILL=1 "${CLAUDE_PLUGIN_ROOT}/scripts/guard_hook.py" settings un
 Always pass `--session`. Without it a change lands in the config file but not in the live
 session, and the user watches the setting they just made appear to do nothing.
 
+`knowledge_dir` takes a comma-separated list and **the whole list is replaced** on every
+`set` — order is precedence, so the user states it, and there is no append verb to reorder
+around. `set knowledge_dir ""` empties it. A path that does not exist yet is stored rather
+than dropped (configuring a directory before creating it is normal), and `show` names any
+entry that does not currently resolve; the agents that read the list skip those silently, so
+this command is the only place a typo is visible. Say so when one shows up.
+
 `unset` is for a key guard no longer honors — an old `exempt_skills` or `audit_gate` sitting
 in the file is ignored, never listed by `show`, and preserved by every `set`, so `unset` is
 the only way it leaves. It also works on a live key, which puts that setting back to its
@@ -93,6 +100,7 @@ made through the CLI, report that instead of working around it.
 | `comment-corrector` | `off` / `fresh` | Admits `guard:comment-corrector`, for the source files the turn actually edited. This one **edits those files in place**, so its fixes land without being asked — say so when the user turns it on. |
 | `agents-md-auditor` | `off` / `fresh` | Admits `guard:agents-md-auditor`, for the `AGENTS.md` / `CLAUDE.md` files the turn actually edited, judged as instruction files. Reports only — but its findings often mean moving content into a doc that does not exist yet, which is the user's decision, not the agent's. |
 | `refs_dir` | a project-relative path, or empty | Where guard saves cited-doc copies. Empty = the git-tracked default `wiki/ref/`, committed with the repo; a different tracked path (e.g. `docs/refs`) overrides it. |
+| `knowledge_dir` | comma-separated directories, or empty | Where this project writes down what its **deployed** system looks like — topology, environments, runbooks. Read by the plan audit's `design-environment` and by nothing else; guard never writes here. Unlike `refs_dir` it is not confined to the project: an absolute path or a `~` is the expected shape, since this material usually lives in a knowledge base outside the repo. Order is precedence. Empty (the default) is a normal state — that agent then falls back to the repo's own deploy surface, a read-only probe, and finally asking the user. |
 
 **Every agent setting ships off**, and with all of them off guard is silent: a finished turn adds
 nothing to the main session's context and makes no model call. Turning one on only makes
@@ -136,11 +144,20 @@ A config file may still hold `"reuse"` from before. It is not a mode any more, s
 
 1. **Run `settings show`** and report the current settings. Do this first, every time,
    including on a follow-up — something may have changed since you last looked.
+
+   **`audit-turn` and `audit-plan` are reported every time, whatever their value.** They
+   are listed first because each one overrides every agent line under it: with `audit-turn`
+   off, every agent switch below reads `on` and nothing runs. A user who is shown the agent
+   lines alone gets the wrong answer to "is guard auditing right now", and `audit-turn: on`
+   is a single word that is easy to drop as unremarkable — it is the most load-bearing line
+   in the listing. Observed being omitted, which is why this is spelled out.
 2. **If `$ARGUMENTS` names a key and a value**, apply it and report what changed. They told
    you; do not ask first.
 3. **Otherwise ask**, in your transcript, as plain prose the user can reply to. Name the
    keys worth changing, their current values, and what the alternatives would do. For an
-   agent key say what the agent does, not just that it can be on or off.
+   agent key say what the agent does, not just that it can be on or off. "Worth changing"
+   is about which keys you invite them to change; it is not licence to leave one out of the
+   report in step 1.
 4. **Report what changed** and show the settings the command printed, verbatim.
 
 If `show` and the file disagree — the file holds a key the listing never mentions — that key
