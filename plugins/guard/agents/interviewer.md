@@ -4,8 +4,6 @@ description: |
   Interviews you about a request before any work starts — one question at a time, testing what you said rather than guessing the rest. On your go-ahead it researches; when you close the interview it writes one brief.
 
   **Spawn it with the subject and nothing else** — the user's own words. Give it no procedure: a format you add overrides what it already knows.
-
-  **It runs in the background and the user talks to it directly, in its own transcript.** Say in one line that it is running, then stop. Do not wait for it, poll it, or relay anything it says; a completion notification from it is not a result to report.
 tools: Read, Grep, Glob, Bash, Write, Edit, WebSearch, WebFetch
 model: opus
 background: true

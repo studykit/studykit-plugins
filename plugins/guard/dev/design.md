@@ -784,17 +784,21 @@ payloads, not memory.
   have: the user names it themselves, and it ships no command precisely so that the `@`-mention
   is the only way in.
 
-  What a description on this agent DOES have to carry is only what the caller needs **before the
-  agent has spoken**, because the main session never reads the agent's body: it writes a
-  procedure into the prompt, which overrides what the agent knows; and it waits on, polls or
-  relays a background agent that is talking to someone else, a completion notification included.
-  Those two plus one line of what the agent is are what remains, at 633 bytes.
+  What is left is one line of what the agent is and one instruction — the prompt is the subject
+  and nothing else, give it no procedure — at 378 bytes. That instruction survives because
+  nothing else can carry it: the caller cannot see the agent's body, and a format it writes into
+  the prompt overrides what the agent already knows, before the agent exists to object.
 
-  A first pass kept a third — what the final report looks like and what to do with it — and that
-  was the same mistake in miniature. The report is a path and one imperative line; a caller
-  holding it needs no preview of its shape. Anything an agent will say for itself is not
-  description material, which sharpens the earlier test: a description is for whoever must act on
-  it, and only for what they must act on before there is a report to read.
+  Two paragraphs were cut one at a time and both were the same mistake in different clothes.
+  What the final report looks like and what to do with it: the report is a path and one
+  imperative line, and a caller holding it needs no preview of its shape. That it runs in the
+  background, so do not wait, poll or relay: `background: true` is in the frontmatter, so the
+  HOST backgrounds it and shows the caller that it did — telling the caller in prose is
+  describing what it is already looking at.
+
+  The test, in its final form: a description carries only what its reader must act on **before
+  anything else can tell them**. Not what the agent will say for itself, and not what the host
+  will show them.
 
 - **A document gets translated too — v0.103.0.** `korean-translator` had no `report_entry`, so
   it never appeared in `guard-candidates --doc` and a brief could only ever be delivered in
