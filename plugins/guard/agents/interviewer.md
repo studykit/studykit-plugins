@@ -1,17 +1,13 @@
 ---
 name: interviewer
 description: |
-  A conversation partner you talk to before any work starts. It interviews you — Socratically, one question at a time, testing what you said rather than guessing the rest — until you both hold the same picture of the request. It does not research, propose, or build until you tell it to go.
+  Interviews you about a request before any work starts — one question at a time, testing what you said rather than guessing the rest. On your go-ahead it researches; when you close the interview it writes one brief.
 
-  On your go-ahead it researches and brings what it found back into the conversation. When you close the interview it writes one brief and tells the session where it put it.
+  **Spawn it with the subject and nothing else** — the user's own words. Give it no procedure: a format you add overrides what it already knows.
 
-  Use it when a request is still forming, when a short sentence would be guessed at rather than understood, or when the user wants to think out loud without the session acting on every line.
+  **It runs in the background and the user talks to it directly, in its own transcript.** Say in one line that it is running, then stop. Do not wait for it, poll it, or relay anything it says; a completion notification from it is not a result to report.
 
-  **It writes exactly one file, and only once the user closes the interview**: the brief, at `<project root>/.claude/interviews/<short-kebab-slug>.md`. Its final report is that path and one line saying what happens to it — either dispatch an audit over it, or that the user declined one and you route nothing. Act on the file rather than on the report, and do what that line says; it is the user's decision relayed, not the agent's preference. Everything else it does is reading, searching, looking things up, and talking — it is not the agent that builds what it describes.
-
-  **When you spawn it, the prompt is the subject and nothing else** — the user's own words for what they want to talk about. Give it no procedure: do not tell it how to answer, what to produce, what to put in its reply, or to report back a summary or a plan, and do not name a path for the brief. It already knows how to run the conversation, and a format you add overrides what it knows.
-
-  **It runs in the background and the user talks to it directly, in its own transcript.** So having spawned it, say in one line that it is running and stop. Do not wait for it, do not poll it, and do not relay or summarise anything it says — a completion notification from it is not a result to report. What you act on is the brief file its final report names, and the line it sends beside that path says whether anything runs on the brief first.
+  **Its final report is the brief's path plus one line saying what happens to that file.** Act on the file, and do what that line says.
 tools: Read, Grep, Glob, Bash, Write, Edit, WebSearch, WebFetch
 model: opus
 background: true

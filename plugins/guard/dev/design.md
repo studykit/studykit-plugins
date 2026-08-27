@@ -776,6 +776,24 @@ payloads, not memory.
   ones guard itself dispatched, and the machinery it takes to exclude them is larger than the
   one line an agent that wants routing can write for itself.
 
+- **An explicitly-invoked agent needs a short description — v0.104.0.** `interviewer`'s was
+  2087 bytes against 655 for the next largest and ~90 for most of the roster, and every byte of
+  it is in the system prompt of every session that has guard installed, whether or not anyone
+  ever types `@guard:interviewer`. Most of it was selection prose — what the agent is for, when
+  to reach for it, what it will not do — and selection is the one job this description does not
+  have: the user names it themselves, and it ships no command precisely so that the `@`-mention
+  is the only way in.
+
+  What a description on this agent DOES have to carry is the caller's instructions, because the
+  main session never reads the agent's body and gets three things wrong without being told:
+  it writes a procedure into the prompt, which overrides what the agent knows; it waits on or
+  relays a background agent talking to someone else; and it treats a completion notification as
+  a result. Those three plus one line of what the agent is are what remains, at 770 bytes.
+
+  The test that survives this: a description is for whoever must ACT on it. When the model picks
+  the agent, that is selection text; when a person picks it, everything but the dispatch
+  instructions is being paid for on every turn to be read by nobody.
+
 - **A document gets translated too — v0.103.0.** `korean-translator` had no `report_entry`, so
   it never appeared in `guard-candidates --doc` and a brief could only ever be delivered in
   English. The code said this was deliberate — "a translation that the document path never
