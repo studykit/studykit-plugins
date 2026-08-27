@@ -732,6 +732,31 @@ payloads, not memory.
   that nothing re-audits for evidence. A second round would cost double for something empty on
   almost every turn. The direct path is untouched and still concurrent — its agents read
   disjoint file lists and no caller edit sits between them.
+
+- **A turn spent addressing an agent directly is empty, and the agent's own answer arrives as a
+  file — v0.100.0.** `@some-agent ...` is typed by a person, so `origin.kind` is `human` and the
+  Stop hook routes it like any other turn. Measured: the router spent 15s on such a turn and
+  returned `none`, correctly — the answer file held "it is running" and a path. Correct but not
+  reliable, because nothing in the router's cues named the shape; it got there through "a relay"
+  in the empty-answer list, which the turn only resembles.
+
+  So the cue is stated. What makes it worth its own paragraph rather than a fourth word in that
+  list is the second half: the agent's real answer is auditable, and a router that treated the
+  relay as thin-but-auditable would be auditing the wrong text on the wrong turn.
+
+  **The mechanism for the real answer already exists and needs no new hook.** The agent writes
+  its answer to a file and reports the path; the session routes that path with
+  `guard:report-router` on the document path. `interviewer` has done exactly this since v0.85.0.
+  The alternative considered and rejected was a `SubagentStop` hook: it is the only event that
+  hands guard a subagent's text (`last_assistant_message`, and `agent_type` would even settle
+  the `@`-versus-file-reference ambiguity that defeats parsing the prompt —
+  `wiki/ref/claude-code-hooks-in-subagents.md`). It was rejected because it solves a problem the
+  file already solves, and it would make guard slice and store a transcript it has no other
+  reason to read.
+
+  What this does not cover, and cannot: an agent that writes no file. guard cannot make a
+  third-party agent report a path, so its answer is audited only if the agent chose to leave
+  one. That is a property of the agent, not a gap in the routing.
 - **Nobody gathers the session's history; agents extract it.** guard's turn store holds the
   response, plus one sibling file holding the request for the router alone (see the router
   bullets above).

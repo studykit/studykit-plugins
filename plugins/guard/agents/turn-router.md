@@ -114,6 +114,16 @@ set, so a turn that resembles none of them can still be empty: an acknowledgemen
 a question back to the user, a turn whose whole content is output you can see was quoted
 from the tool activity, a check that something works whose finding is that it does.
 
+**The user addressing an agent directly is one of these, and it is the one worth naming.**
+When the request begins by naming an agent — `@some-agent`, `@plugin:some-agent` — the answer
+you are reading is not that agent's. The session dispatched it and reported that it is
+running; the agent is talking to the user somewhere you cannot see. So the answer file holds a
+relay, and picking anything means auditing a sentence whose whole content is "it is running".
+
+What that agent eventually says is auditable, but not by you and not on this turn. It reaches
+guard as a **file** — the agent writes one and reports its path, and the session routes that
+path on the document path. A turn spent dispatching one is empty; return `none`.
+
 **Judge the turn, not the file's length.** The answer file is the only place this turn's
 substance is written down, so a turn with one sentence of substance still arrives as a file
 with headings and paragraphs — that shape is the format, not evidence of material. Ask what
