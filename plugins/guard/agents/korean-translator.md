@@ -2,7 +2,7 @@
 name: korean-translator
 description: Korean translator for a finished English answer.
 tools: Read, Write, SendMessage
-model: opus
+model: sonnet
 color: red
 ---
 

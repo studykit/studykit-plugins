@@ -14,9 +14,11 @@ follows is a pointer into it rather than a second copy.
 **guard makes no model call.** When a turn finishes it asks the main agent, through the Stop
 hook's `additionalContext`, to dispatch one subagent — `guard:turn-router` — which reads the turn
 and names which of guard's audit agents would actually find something in it, with a reason for
-each. The main agent dispatches those — one at a time on the turn path, since it applies each
-one's findings to the answer file the next one reads. guard audits nothing itself, and every
-audit criterion lives in an agent definition under `agents/`.
+each. The main agent dispatches those together and applies nothing until they have all reported,
+so every audit judges the same text and overlapping findings are reconciled in one pass. Then one
+further round, over the corrections and limited to the audits that produced them, because a
+correction is prose no audit has read. guard audits nothing itself, and every audit criterion
+lives in an agent definition under `agents/`.
 
 Everything guard recommends, it recommends at turn end. Two shipped agents sit outside that
 path entirely and have no switch: `docs-finder`, which the main agent selects from its

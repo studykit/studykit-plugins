@@ -264,7 +264,7 @@ def cmd_pre_search_payload(payload: dict, project_dir: Path | None,
     _emit_pre_tool_deny(_deny_reason(offender))
 
 
-def cmd_pre_search() -> None:
+def cmd_pre_search() -> int:
     """PreToolUse on Bash/Grep/Glob: deny a search rooted at the filesystem root.
 
     Silent (no output, normal permission flow) for every call that is not one. Fails open
@@ -273,5 +273,6 @@ def cmd_pre_search() -> None:
     """
     payload = _read_payload()
     if payload is None:
-        return
+        return 0
     cmd_pre_search_payload(payload, _project_dir(), _session_id(payload))
+    return 0

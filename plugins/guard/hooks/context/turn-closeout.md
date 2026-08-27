@@ -41,15 +41,20 @@ what it has.
 The agents have reported and the ones that edit have already edited. What is left is yours, in
 this order:
 
-1. **Apply the findings to the answer file.** Each report says what its findings need; fix each
-   where it is written, in the English, with `Edit`. A finding you are leaving unfixed stays
-   unfixed on purpose and is named in your reply. Some ask you to **add** rather than correct —
+1. **Apply the findings to the answer file.** Every audit reported before you changed anything,
+   so you have all of them in hand and they all judged the same text: apply them in one pass, in
+   the order your dispatch listed them. Where two land on the same sentence, write the one
+   correction that satisfies both rather than applying one and then patching it. Each report says
+   what its findings need; fix each where it is written, in the English, with `Edit`. A finding
+   you are leaving unfixed stays unfixed on purpose and is named in your reply. Some ask you to **add** rather than correct —
    a definition, an example, a paragraph cut — and those go in the same way. A report that says
    the reader profile is MISSING is telling the user something, not you: relay it in one line
    (they establish one with `/guard:reader-profile`) and say it once, not every turn.
 
-   Anything your dispatch asked for **after** this — a translation and whatever its own report
-   hands off to — happens now, in the order it was given, before you write the reply below.
+   Anything your dispatch asked for **after** this — a further round of audits, a translation and
+   whatever its own report hands off to — happens now, in the order it was given, before you write
+   the reply below. Your reply covers every round: a finding from the first round that the second
+   round raised again is one finding, not two.
 2. **Reply short.** What changed and why, a line or two per finding, then the path — with the
    router's reason for a pick relayed alongside what that pick found. **A clean audit is one
    line**; a paragraph celebrating it trains the user to skip the report that matters, and a pick
@@ -57,24 +62,29 @@ this order:
    restate the answer and do not paste the file. Write the reply in the user's language. The path
    you name is the one the **user** reads: the translation when this turn made one, the answer
    file when it did not.
-3. **Open that file, but only if an agent has read it**: `open <path>` on macOS, `xdg-open` on
-   Linux, `start` on Windows. Once, at the end, after every correction has landed. Opening is not
-   "here is where it is" — the user has the path from your reply — it is you putting a document
-   in front of them, so doing it with text nothing checked presents an unchecked draft as a
-   finished one.
+3. **Open the file you named**: `open <path>` on macOS, `xdg-open` on Linux, `start` on
+   Windows. Once, at the end, after every correction has landed. Opening is not "here is where
+   it is" — the user has the path from your reply — it is you putting a document in front of
+   them, so what you open is the document this turn audited and then corrected.
 
-   - A translation exists and an agent checked it → open the translation. This is the normal case
-     on a turn that made one.
-   - A translation exists and nothing read it → open nothing, name the path, and say it is
-     unchecked and why. Whoever wrote it does not count as having read it. Do not open the
-     English file in its place: it was checked, but it is not what this user reads.
-   - There is no translation, and at least one agent audited the answer file → open the answer
-     file. Here it is both the audited document and the one the user reads.
-   - No agent read anything this turn → open nothing.
+   - A translation exists → open the translation. It is what this user reads, and the English
+     file is not a stand-in for it however well it was checked.
+   - There is no translation → open the answer file. Here it is both the audited document and
+     the one the user reads.
+   - The document you would open went through no audit → **dispatch the audit that was meant to
+     read it**, apply what it finds the way step 1 does, and then open it. A dispatch that fell
+     through is not a verdict on the text: the turn is still open and the file is still there,
+     so the answer to a check that did not happen is to run it, not to hand over a document
+     nobody will look at again. Only when it cannot run — refused, or failed a second time — do
+     you open nothing, name the path, and say what is unchecked and why. Whoever wrote a file
+     does not count as having read it, so a translation nothing audited is unchecked no matter
+     how thoroughly the English was audited.
 
    And do not open a file you wrote during the audit, or start a new one for this report: an
    audit summary is worth a line in the reply, not a document.
 
-**When the router picked nothing**, only step 2 applies. `none` means no agent had material
-here, translation included. Reply in the user's language, name the answer file, and say nothing
-about auditing: a turn that drew no agent is not news.
+**When the router picked nothing**, steps 2 and 3 apply. `none` means no agent had material
+here, translation included — nothing is left unfixed and nothing is being withheld as
+unchecked, so name the answer file and open it. The unchecked case above is for a turn whose
+audit skipped the document, not for a turn that had no audit to skip. Say nothing about
+auditing either way: a turn that drew no agent is not news.

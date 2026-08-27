@@ -117,8 +117,8 @@ def _inputs_for_file(argv: list[str]) -> int:
     - no **request file**, because nobody typed a prompt that produced this document. The
       materiality call the router makes from a request is simply unavailable here.
     - no **closeout**. guard's turn closeout is written around a turn: findings go into the
-      answer file, the reply is short and in the user's language, and only an audited file is
-      opened. A document has no reply and nothing to open. The document router carries its own,
+      answer file, the reply is short and in the user's language, and the file the user reads
+      is opened at the end. A document has no reply and nothing to open. The document router carries its own,
       much shorter, dispatch instructions instead — including the translation, which a document
       does get when its reader reads another language.
     - no **transcript** and no **turn**, and this one is easy to get wrong. The brief is

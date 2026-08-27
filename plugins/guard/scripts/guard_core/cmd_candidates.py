@@ -46,12 +46,11 @@ def cmd_candidates() -> int:
     Read-only: it touches no state and honors no write marker, because it answers a question
     the router is entitled to ask and changes nothing by asking. Prints in ``AUDIT_AGENTS``
     order, which is the order the router's report preserves and it is load-bearing again — not
-    as it was, auditors before correctors, but as the order the routed audits RUN in, one at a
-    time. Each one's findings are applied before the next is dispatched, so each reads a file the
-    one before it changed. ``korean-translator`` is last for the same reason one step further on.
-    None of these agents waits on another directly — every dependency here runs through an edit
-    the CALLER makes in between, which is why the ordering is stated in the router's template
-    rather than left for an agent to notice.
+    as it was, auditors before correctors, and no longer as a run order either, since the routed
+    audits are dispatched together. It is the order their findings are APPLIED once they have all
+    reported — in both rounds — with ``korean-translator`` after all of them. None of these agents waits on another
+    directly — every dependency here runs through an edit the CALLER makes, which is why the
+    ordering is stated in the router's template rather than left for an agent to notice.
 
     Three shapes that print no keys, and they must not look alike on stderr. No session id
     is an installation problem. A muted session is the user having switched guard off, which

@@ -184,16 +184,16 @@ File: <resolved path>
 printed them in:
 
 ```
-Run each of these concurrently, handing it this one file and nothing else. Every name below is a SKILL, not a subagent: invoke `guard:<name>` with the file path as its argument, and do not dispatch it with the Agent tool. Then apply what they report to the file itself and say in one line what changed.
+Dispatch these CONCURRENTLY, all in one message, handing each one this file and nothing else, and change nothing until every one of them has reported. Every name below is a SKILL, not a subagent: invoke `guard:<name>` with the file path as its argument, and do not dispatch it with the Agent tool. Once they have all reported, apply their findings to the file in one pass, taking them in the order below. Then run ONE more round over the corrected file: dispatch again, concurrently and in one message, exactly those audits whose findings you actually applied — an audit you changed nothing for is finished and does not run again — and apply that round's findings the same way. Stop there; there is no third round. Then say in one line what changed.
 File: <resolved path>
 - `audit-report-claims` — states "the API rate-limits at 100 rps" with no source
 ```
 
 **If `korean-translator` is among your picks**, add this after the last one. It is an AGENT, not
-a skill, and it runs last — its source is the file after the audits' findings are in it:
+a skill, and it runs last — its source is the file after the final round's findings are in it:
 
 ```
-Last, once those findings are applied, dispatch `guard:korean-translator` (subagent_type: "guard:korean-translator") on its own, with two inputs and nothing else: the file above as its source, and <translation path> as the file it writes. Give it no history and no repository paths, and write no draft of your own for it to fix. Then do what its report tells you.
+Last, once the final round's findings are in the file, dispatch `guard:korean-translator` (subagent_type: "guard:korean-translator") on its own, with two inputs and nothing else: the file above as its source, and <translation path> as the file it writes. Give it no history and no repository paths, and write no draft of your own for it to fix. Then do what its report tells you.
 ```
 
 `<translation path>` is the file's path with `.md` replaced by `.<lang>.md` — `.ko.md` for
@@ -204,7 +204,18 @@ nothing else, and a path you retype from memory or shorten is one it cannot open
 given that path and nothing else — they resolve what else they need themselves, and there is
 no turn id and no transcript to pass, because the document was not written in a turn.
 
-Keep the order you were given, which is the order `candidates` printed.
+Keep the order you were given, which is the order `candidates` printed. It is no longer the
+order anything runs in — they all go out at once — but it is the order their findings go into
+the file, in both rounds, and `korean-translator` is after all of them because its source is the
+corrected file. None of the audits waits on another: they read this one file and none of them
+writes it. What waits is your caller's own editing, which is why the template says so rather
+than leaving an agent to notice.
+
+The second round is in the template because the corrections are prose no audit has read, and it
+is limited to the audits that actually produced a correction: one that had nothing to fix has
+already passed this file, and the edits it did not ask for are not its subject. Which audits the
+re-round contains is therefore your caller's to determine, not yours — you cannot know from here
+what it ended up changing, so name nobody for it.
 
 Each name must be copied exactly as it was given to you — a name you shorten or invent names
 nothing, and the invocation fails silently rather than erroring. Each reason is one short

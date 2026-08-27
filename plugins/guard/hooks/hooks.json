@@ -13,6 +13,19 @@
         ]
       }
     ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash|Grep|Glob",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "uv run --script \"${CLAUDE_PLUGIN_ROOT}/scripts/guard_hook.py\" pre-search",
+            "timeout": 10,
+            "description": "Deny a search rooted at the filesystem root — `find /`, `grep -r /`, `rg /` and the `fd`/`ag`/`ack`/`locate` equivalents, a `/`-anchored glob, or a Grep/Glob call whose `path` is `/`. Classifies the tool ARGUMENT and never the caller, so it ignores the agent switches and the mute. Silent for every other call, and fails open on a command it cannot parse."
+          }
+        ]
+      }
+    ],
     "PostToolUse": [
       {
         "matcher": "ExitPlanMode",

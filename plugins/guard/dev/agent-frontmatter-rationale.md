@@ -55,7 +55,8 @@ every turn. Use it for anything else it does well.
 former name `ext-docs-fetcher`) and `ext-docs-auditor` were run head-to-head on `sonnet` and `opus` before the field was set;
 design.md § "Picking a model for an agent" records what those runs showed and what to re-run
 before changing either field. Every other `opus` in this directory is a claim about the job,
-not a measurement.
+not a measurement — and so is the `sonnet` on the Korean pair, which was set by decision rather
+than by a run.
 
 **`color` warns about the user's own files; it is not an identity.** Red for report-only,
 yellow where the agent can write. See design.md.
@@ -275,8 +276,14 @@ after it, including the ones where it was wrong, and a translation is the one ar
 diffs against its predecessor. What consistency there is has to come from the source document
 in front of it, which is what the body tells it to use.
 
-`model: opus`. The cheap failure mode of a weak translator is not a mistranslation — it is exactly
-the 직역 this agent was added to remove, which is fluent, grammatical, and invisible in review.
+`model: sonnet`, set by the maintainer's decision rather than by a head-to-head. The argument for
+`opus` still stands on paper and is worth knowing: the cheap failure mode of a weak translator is
+not a mistranslation but exactly the 직역 this agent was added to remove, which is fluent,
+grammatical, and invisible in review. What makes `sonnet` defensible is that this agent is not the
+last word — `korean-corrector` reads what it wrote and is dispatched by its own report, so 직역
+here has a reader downstream. If 직역 starts surviving to the user, this field is the first place
+to look, and a head-to-head belongs in design.md § "Picking a model for an agent" before it is
+changed back.
 
 ### `korean-corrector`
 
@@ -292,7 +299,12 @@ and a wrong one silently stops a whole class of correction from ever being raise
 leave alone are visible in the file being corrected; a preference worth keeping goes in the
 report, where the user can confirm it.
 
-`model: opus`.
+`model: sonnet`, changed with `korean-translator` by the maintainer's decision and not measured.
+This one carries the more of the two risks, because nothing reads it afterwards: it is the last
+judgment made on the Korean the user is about to be shown. Korean prose the agent cannot hear as
+unnatural is a pass it will report, and a pass is indistinguishable from a clean file. The same
+note applies — a head-to-head before changing it back, and this field first if unnatural Korean
+starts reaching the user.
 
 ## External-documentation agents
 

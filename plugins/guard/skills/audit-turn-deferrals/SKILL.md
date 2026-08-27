@@ -9,7 +9,8 @@ argument-hint: '<turn id>'
 # what differs is the record of what the author already did, and that is what this file carries.
 context: fork
 agent: guard:deferrals-auditor
-# The default, stated — see `audit-turn-clarity` for why it is not `false`.
+# `true`, the default, stated — see `audit-turn-clarity`: the audits are dispatched together and
+# nothing is applied until they have all reported, so blocking would buy no ordering.
 background: true
 ---
 

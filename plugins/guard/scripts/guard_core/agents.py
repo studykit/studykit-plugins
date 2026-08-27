@@ -113,18 +113,27 @@ class AuditAgent(NamedTuple):
 # line of a list whose reader already has it from the lead.
 
 
-# Order here is the order the agents appear in a recommendation, and on the routed path it is
-# the order they RUN in, one at a time. Each one's findings are applied before the next is
-# dispatched, so each reads a file the one before it changed: fixing an unsupported claim is
-# often how a deferral gets written ("I could not establish this"), and both kinds of repair add
-# prose that is then the likeliest thing in the file to be hard to follow. `korean-translator`
-# is last, translating what all of them settled. No agent here waits on another directly — every
-# dependency runs through an edit the CALLER makes in between, which is why the router's
-# template has to state it rather than leaving an agent to notice.
+# Order here is the order the agents appear in a recommendation. On the routed path the audits
+# all go out in ONE message, so this is no longer the order they run in — it is the order their
+# findings are applied, once every one of them has reported. `korean-translator` is after all of
+# them, translating what they settled.
 #
-# One pass, in this order, and the cycle is real but not chased: a deferral resolved in step 2
-# introduces facts nothing re-audits for evidence. Running the list twice would cost double for
-# a second round that is empty on almost every turn.
+# The dependency was never between two agents; it runs through an edit the CALLER makes, which
+# is why the router's template states what waits on what rather than leaving an agent to notice.
+# Holding every edit until the last report is in is what makes concurrency safe: each audit
+# judges the same text, and the caller reconciles findings that overlap in one pass instead of
+# meeting the second against prose the first already rewrote.
+#
+# Two passes, not one, and the second is narrower: the corrections are prose no audit has read,
+# so the router's template has the caller re-dispatch exactly the audits whose findings it
+# applied. One that had nothing to fix has already passed this file and is not re-run. The chain
+# the old serial order bought — a deferral written as the repair of an unsupported claim, then
+# caught by the deferrals audit — is bought back here for every audit at once instead of only for
+# whichever one ran last.
+#
+# It stops at two. The second round's corrections are unread prose by the same argument, so the
+# rule has no natural end and each round is emptier than the last; the limit is stated in the
+# template rather than left to the caller.
 AUDIT_AGENTS: dict[str, AuditAgent] = {
     # Every audit that runs on both dispatch paths splits at the ENTRY, not at the agent: one
     # agent judges, and a `context: fork` skill per path carries the input-gathering. What

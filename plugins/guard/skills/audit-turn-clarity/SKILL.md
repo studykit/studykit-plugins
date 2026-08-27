@@ -9,11 +9,12 @@ argument-hint: '<turn id>'
 # paths; what differs is where its inputs come from, and that is what this file carries.
 context: fork
 agent: guard:clarity-auditor
-# The default, stated. Every other audit the caller runs is an asynchronous Agent dispatch, so
-# this one backgrounding too is what keeps the turn one shape. `false` was tried and removed:
-# the reason given for it — a backgrounded fork's narrower tool set — does not bite here, since
-# `clarity-auditor` uses only tools that survive that filter. Ordering is the caller's job
-# either way, and the router's report template says so.
+# `true`, the default, stated. Both routers now dispatch their audits in one message and neither
+# caller applies a finding until the last report is in, so there is no order for a blocking
+# invocation to hold — `false` would only serialise what the template asks to overlap. It was
+# tried while the turn path was serial and is recorded in `dev/design.md`. The cost of `true` is
+# the narrower background tool set, which does not bite: `clarity-auditor` carries
+# `Read, Grep, Glob, Bash, SendMessage` and the filter keeps all five.
 background: true
 ---
 

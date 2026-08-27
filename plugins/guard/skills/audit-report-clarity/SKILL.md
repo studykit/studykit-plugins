@@ -6,7 +6,8 @@ description: Invoked by guard only.
 argument-hint: '<path to the document>'
 context: fork
 agent: guard:clarity-auditor
-# The default, stated — see `audit-turn-clarity` for why it is not `false`.
+# `true`, the default, stated — see `audit-turn-clarity`: the audits are dispatched together and
+# nothing is applied until they have all reported, so blocking would buy no ordering.
 background: true
 ---
 

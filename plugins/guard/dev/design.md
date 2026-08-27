@@ -813,6 +813,59 @@ payloads, not memory.
   plugin manifests' `description`, and "The main agent dispatches those, concurrently" in
   `AGENTS.md`. Both predate v0.98.0. The manifest line is the one users read.
 
+- **Both paths dispatch concurrently and correct once — v0.112.0.** The serial turn order this
+  reverses was argued from v0.96.0 through v0.110.0, and what it bought was each audit reading
+  the file its predecessor had already corrected. The cost was paid every routed turn: three
+  blocking forks in sequence, and a caller that has been observed batching them anyway. The
+  ordering is now the same on both paths — the router dispatches every audit in one message, the
+  caller applies nothing until the last report is in, then corrects in one pass, and
+  `korean-translator` runs on the result.
+
+  What makes the concurrency safe is the barrier, not the dispatch: with no edit landing while a
+  fork is reading, every audit judges the same text, so no finding can quote prose that has since
+  been rewritten. What is given up is the chain v0.98.0 wanted — a deferral written as the honest
+  repair of an unsupported claim is no longer seen by the deferrals audit, and the prose the
+  corrections introduce is not read by clarity. That is now a known gap rather than a bug, and it
+  is the same gap the report path has always had. The overlap it creates instead is the caller's
+  to reconcile: two findings on one sentence become one correction, which `turn-closeout.md` step
+  1 now says explicitly.
+
+  `background` goes back to `true` on the three `audit-turn-*` skills, since blocking now holds
+  no order — and the three `audit-report-*` comments stop saying "unlike the turn path", because
+  the paths no longer differ here. The run-order claims in `agents.py`, `cmd_candidates.py`,
+  `AGENTS.md` and both manifest descriptions were rewritten the same way: `AUDIT_AGENTS` order is
+  still load-bearing, but as the order findings are APPLIED, not the order anything runs in.
+
+  **The chain is bought back as a second round, not as an order.** What the serial arrangement
+  actually protected against is that a correction is prose no audit has read: evidence written
+  into a sentence that had none, a punt resolved into new text, and a deferral written as the
+  honest repair of an unsupported claim — the exact case v0.98.0 built the ordering around. So
+  both templates now end with one further round over the corrected file, dispatched concurrently
+  like the first.
+
+  It is limited to the audits whose findings were actually applied. An audit that had nothing to
+  fix has already read this file and passed it, and the edits it did not ask for are not its
+  subject — the claims audit does not acquire an interest in a sentence because clarity rewrote
+  it, so re-running it spends a fork to re-derive a verdict already given. Which audits the round
+  contains is therefore the CALLER's to determine and cannot be named by the router, which does
+  not know what the caller ended up changing; both templates say so explicitly, because a router
+  that guessed would be naming a subset of a subset from the one position that cannot check it.
+
+  And it stops at two. The second round's own corrections are unread prose by the same argument,
+  so the rule has no natural end; each round is emptier than the one before, and the caller is
+  given the limit rather than left to decide when to stop. This supersedes the "one pass, and the
+  cycle is real but not chased" reasoning in the v0.98.0 entry above — the cycle is now chased
+  exactly once, and paid for only where something changed.
+
+- **The Korean pair moves to `sonnet` — v0.112.0.** `korean-translator` and `korean-corrector`
+  were `model: opus`, argued from the failure mode and never measured. Changed by the
+  maintainer's decision, so it is recorded as a decision and not as a result. The asymmetry worth
+  knowing: the translator has a reader downstream — the corrector is dispatched by its own report
+  — while the corrector is the last judgment made on the Korean the user is about to be shown, so
+  prose it cannot hear as unnatural becomes a pass, and a pass looks exactly like a clean file.
+  If 직역 or unnatural Korean starts reaching users, this field is the first place to look, and a
+  head-to-head under § "Picking a model for an agent" belongs before it changes back.
+
 - **A turn spent addressing an agent directly is empty, and the agent's own answer arrives as a
   file — v0.100.0.** `@some-agent ...` is typed by a person, so `origin.kind` is `human` and the
   Stop hook routes it like any other turn. Measured: the router spent 15s on such a turn and
@@ -1953,14 +2006,12 @@ plan mode reads `ExitPlanMode` as its cue. What is *not* the alternative is
 `disable-model-invocation: true` — it would shut guard out as well, and guard is the only
 thing that should invoke these.
 
-**`background` splits by path, and it is the one field here that is load-bearing rather than a
-default written down.** The three `audit-turn-*` skills are `background: false`: the caller
-applies each audit's findings to the answer file before dispatching the next, and a backgrounded
-fork returns control immediately, so there is no moment at which the findings exist and the next
-dispatch has not happened. Blocking the invoking turn is what makes that order real; the rule
-alone did not (v0.110.0 above has the session where all three went out in one message). The three
-`audit-report-*` skills stay `background: true`, because `report-router` dispatches them
-concurrently over one file with no caller edit between them — nothing to hold.
+**`background` is `true` on all six audit skills, and no longer splits by path.** Both routers
+dispatch every audit in one message and neither caller edits the file until the last report is
+in, so there is no order for a blocking invocation to hold and `false` would only serialise what
+the template asks to overlap. It was `false` on the three `audit-turn-*` skills for one version
+(v0.110.0 above, and v0.112.0 for why the serial order went away) — the mechanism worked; what it
+enforced stopped being wanted.
 
 The tool-set question is settled and is not what decides this: these agents carry
 `Read, Grep, Glob, Bash, SendMessage` and the background filter keeps all five. What a
@@ -2682,6 +2733,22 @@ sequel is the same walk retried one top-level directory at a time.
 project may read is not guard's business. Denied: a bare `/`, the slash runs (`//`), `/.` and
 `/..`, and any glob whose FIRST path segment carries a wildcard (`/*`, `/**`, `/*.py`,
 `/**/*.py`) — all of which descend from the root.
+
+**It was never registered on Claude until v0.112.0, and that is the failure worth recording.**
+`cmd_search.py` shipped in v0.78.1, `guard_hook.py` had the `pre-search` verb, the hook table in
+this document listed `PreToolUse (Bash|Grep|Glob)` — and `hooks/hooks.json` had no `PreToolUse`
+entry at all, so on Claude Code the rule was dead code for fourteen versions. Codex enforced it
+the whole time, because `hooks.codex.json` routes every event through one adapter with matcher
+`*` and the adapter dispatches on `hook_event_name`: registration there is not per-rule, so a
+rule reaches Codex the moment the adapter calls it. Claude's manifest is per-event, and that is
+the entry someone has to remember.
+
+Nothing failed loudly. Every unit of it was correct in isolation and the design doc described a
+hook that existed, which is exactly why reading either the code or the doc confirmed it worked.
+What would have caught it is asking the host: the only honest test of a hook is a session that
+triggers it. So when adding a rule to a `cmd_*.py`, check `hooks/hooks.json` for the event and
+matcher in the same change — and for the Codex side, check that the adapter's dispatch actually
+reaches the new call.
 
 That last clause is wider than it first shipped, and the widening is the useful record here.
 The original test was "strip a trailing glob segment", which caught `/*` and `/**` and missed

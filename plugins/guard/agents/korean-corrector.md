@@ -2,7 +2,7 @@
 name: korean-corrector
 description: Korean prose corrector.
 tools: Read, Edit, Write, SendMessage
-model: opus
+model: sonnet
 color: red
 ---
 

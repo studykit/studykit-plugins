@@ -242,34 +242,55 @@ Answer file: <answer file path>
 `candidates` printed them in:
 
 ```
-Dispatch these ONE AT A TIME, in the order below, and apply what each reports to the answer file before you dispatch the next. Do not send two of them in one message. Every name is a SKILL: invoke `guard:<name>` with the turn id <turn id> and nothing else — not with the Agent tool, and with no instructions of your own about what to look for. When the last one's findings are in the file, close the turn out per `Presenting the result` in <closeout path>.
+Dispatch these CONCURRENTLY, all in one message, and change nothing until every one of them has reported. Every name is a SKILL: invoke `guard:<name>` with the turn id <turn id> and nothing else — not with the Agent tool, and with no instructions of your own about what to look for. Once they have all reported, apply their findings to the answer file in one pass, taking them in the order below. Then run ONE more round over the corrected file: dispatch again, concurrently and in one message, exactly those audits whose findings you actually applied — an audit you changed nothing for is finished and does not run again — and apply that round's findings the same way. Stop there; there is no third round. When those corrections are in the file, close the turn out per `Presenting the result` in <closeout path>.
 Answer file: <answer file path>
 1. `audit-turn-claims` — asserts "Redis가 Postgres보다 항상 빠릅니다" as settled fact
 2. `audit-turn-deferrals` — leaves "정확한 수치는 확인 필요" for a number the repo records
 3. `audit-turn-clarity` — the whole explanation is new to this reader
 ```
 
-**The order is not yours; which of its steps happen is.** It is fixed — `candidates` prints it
-and it is the order they must run in — so never reorder it and never move a name up because it
-looks more urgent. What you decide is which steps this turn has material for. Number only those,
-keeping `candidates`' order: a turn that drew clarity alone gets a single `1.`, and a turn that
-skipped deferrals numbers claims `1.` and clarity `2.` with nothing between them.
+**The order is not yours; which of its steps happen is.** It is fixed — `candidates` prints it,
+and it is the order their findings go into the file — so never reorder it and never move a name
+up because it looks more urgent. What you decide is which steps this turn has material for.
+Number only those, keeping `candidates`' order: a turn that drew clarity alone gets a single
+`1.`, and a turn that skipped deferrals numbers claims `1.` and clarity `2.` with nothing
+between them.
 
-Why serial, so you do not collapse it back into one message: each one's findings are **applied
-by your caller**, and applying them rewrites the answer file that the next one reads. Evidence
-goes into a sentence that had none; a punt is resolved into new text. Fixing an unsupported
-claim is also how a deferral gets written — "I could not establish this" is the honest repair,
-and it is exactly what the next audit exists to catch. And the passages the corrections
-introduce are the ones most likely to be hard to follow, which is why clarity reads the file
-last. Run together, each would be judging prose that is about to change and blind to the prose
-the change adds.
+Why concurrent, so you do not turn the list back into a queue: all of them read the same answer
+file and none of them writes it, so there is nothing for one to wait on. Sent together they cost
+the time of the slowest, and a queue would charge the caller that time once per audit for
+findings it could already have had in hand.
+
+Why nothing is applied until they have all reported: a correction landing while a fork is still
+reading moves the prose out from under it, and its findings then quote phrasing that is no
+longer in the file. Holding the edits until the last report is in means every finding was taken
+against the same text, and the caller reconciles them in one pass — where two of them land on
+the same sentence it sees both at once, instead of meeting the second against prose the first
+already rewrote.
+
+Why a second round, and why it is where the concurrency is paid for: the corrections are new
+prose that no audit has read. Evidence goes into a sentence that had none, and a punt is
+resolved into text nobody checked — fixing an unsupported claim is often how a deferral gets
+written ("I could not establish this"), and both kinds of repair add the passages most likely to
+be hard to follow. Running the audits together buys them a shared subject at the cost of nobody
+reading the result; the re-round buys that back, and buys it for every audit at once rather than
+only for whichever one the old serial order happened to put last.
+
+Why only the ones whose findings were applied: an audit that had nothing to fix has already read
+this file and passed it, and the corrections it did not ask for are not its subject — the claims
+audit does not become interested in a sentence because clarity rewrote it. Re-running it would
+cost a fork to re-derive a verdict it already gave. And why exactly one extra round: the second
+round's own corrections are unread prose by the same argument, so the rule has no natural end,
+and each further round is emptier than the one before. Two is where the return stops paying, and
+your caller is told the limit rather than left to decide it — nothing in your report invites a
+third.
 
 **If `korean-translator` is among your picks**, add this after the last one. It is the whole
 instruction for the translation — your caller reads nothing else about it, and the file it
 closes the turn out with names no translator at all:
 
 ```
-Last, once those findings are applied, dispatch `guard:korean-translator` (subagent_type: "guard:korean-translator") on its own, with two inputs and nothing else: the answer file above as its source, and <translation path> as the file it writes. Give it no history and no repository paths, and write no draft of your own for it to fix. Then do what its report tells you.
+Last, once the final round's findings are in the file, dispatch `guard:korean-translator` (subagent_type: "guard:korean-translator") on its own, with two inputs and nothing else: the answer file above as its source, and <translation path> as the file it writes. Give it no history and no repository paths, and write no draft of your own for it to fix. Then do what its report tells you.
 ```
 
 `<translation path>` is the answer file's path with `.md` replaced by `.ko.md`. Write it out in
@@ -285,12 +306,15 @@ you retype from memory or shorten is one it cannot open, and a turn id you alter
 that resolves someone else's turn.
 
 **Your caller cannot tell from a list of names what waits on what, so the templates say it and
-you reproduce them verbatim.** None of these agents waits on another directly; what they wait on
-is an edit your caller makes in between, which is why it has to be told. Keep the order
-`candidates` printed — it is the order they run in — and `korean-translator` is always last,
-after the last audit's findings are in the file. Whatever follows the translation is in the
-translator's own report, not yours. Do not reword a template into a schedule of your own, do not
-reorder it, and do not decide that two of them could run together after all.
+you reproduce them verbatim.** None of the audits waits on another — they read the same file and
+none of them writes it, which is why they go out together. What waits is your caller's own work:
+the findings go in once every audit has reported, the re-round goes out over the file those
+findings produced, and `korean-translator` is always last, after the final corrections, because
+its source is the corrected English. Whatever follows the translation is in the translator's own
+report, not yours. Do not reword a template into a schedule of your own, do not reorder the
+list, do not send one of them on ahead of the others or start editing before the last report
+lands, and do not name the re-round's members yourself — which audits it contains is decided by
+what your caller ended up changing, and it cannot be known from here.
 
 Each key must be copied exactly as it was given to you — it is what your caller invokes, so a
 key you shorten or invent names nothing and fails silently rather than erroring. Each reason is one short
