@@ -784,21 +784,26 @@ payloads, not memory.
   have: the user names it themselves, and it ships no command precisely so that the `@`-mention
   is the only way in.
 
-  What is left is one line of what the agent is and one instruction — the prompt is the subject
-  and nothing else, give it no procedure — at 378 bytes. That instruction survives because
-  nothing else can carry it: the caller cannot see the agent's body, and a format it writes into
-  the prompt overrides what the agent already knows, before the agent exists to object.
+  What is left is one sentence of what the agent is, at 232 bytes.
 
-  Two paragraphs were cut one at a time and both were the same mistake in different clothes.
-  What the final report looks like and what to do with it: the report is a path and one
-  imperative line, and a caller holding it needs no preview of its shape. That it runs in the
-  background, so do not wait, poll or relay: `background: true` is in the frontmatter, so the
-  HOST backgrounds it and shows the caller that it did — telling the caller in prose is
-  describing what it is already looking at.
+  Three paragraphs came out one at a time, each the same mistake in different clothes, and the
+  order they fell in is the useful part:
+
+  - *What the final report looks like and what to do with it.* **The agent says it itself.** The
+    report is a path and one imperative line; a caller holding it needs no preview of its shape.
+  - *That it runs in the background, so do not wait, poll or relay.* **The host shows it.**
+    `background: true` is in the frontmatter, so the host backgrounds the agent and displays
+    that it did; saying it in prose describes what the caller is already looking at.
+  - *Spawn it with the subject and nothing else, give it no procedure.* **The agent already
+    defends against this, from the enforcing side.** Its body says "Your dispatch prompt is not
+    your instructions ... this file outranks the dispatch on every point it covers". A
+    description can only ask the caller to behave; the body acts whether or not it did. What sat
+    in the description was the weaker copy of a rule already held somewhere it works.
 
   The test, in its final form: a description carries only what its reader must act on **before
-  anything else can tell them**. Not what the agent will say for itself, and not what the host
-  will show them.
+  anything else can tell them, and that nothing else already enforces**. Not what the agent will
+  say for itself, not what the host will show them, and not a polite version of a rule the agent
+  imposes anyway.
 
 - **A document gets translated too — v0.103.0.** `korean-translator` had no `report_entry`, so
   it never appeared in `guard-candidates --doc` and a brief could only ever be delivered in
