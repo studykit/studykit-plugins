@@ -196,6 +196,11 @@ def _handle_post_tool(project_dir: Path, payload: dict[str, Any], session_id: st
 # off the turn's refs edits; Codex ships one named agent from `$guard:setup` and this adapter
 # mirrors no edited-file recording (see `_handle_post_tool`), so neither route exists here.
 # Giving Codex the agent set is what unblocks both, same as above.
+# `korean-translator` is absent for a different reason from the two above: it HAS an
+# `AUDIT_AGENTS` entry, so it can be eligible here, and the filter below is what drops it. It
+# does not audit — it writes the Korean the user reads — and Codex's one agent is read-only, so
+# there is nothing here to give the work to. Filtering it is therefore the honest answer, not an
+# omission to fix; what fixes it is the same agent set as above.
 _SCOPE = {"claims-auditor": "the response's claims",
           "deferrals-auditor": "deferrals the repository could resolve",
           "korean-corrector": "whether the Korean reads as translated English"}
@@ -231,11 +236,7 @@ def _handle_stop(project_dir: Path, payload: dict[str, Any], session_id: str, tu
     if state.get("last_audited_prompt_id") == turn_id:
         core_state._write_state(project_dir, session_id, state)
         return
-    # Neither reuse nor routing exists here. `reuse` is a named instance addressed with
-    # `SendMessage`, and this adapter has neither — `core_agents._eligible_agents` only asks
-    # whether a mode is `off`, so the value costs nothing and means nothing on Codex.
-    #
-    # No router here either. Claude's Stop asks its main agent to dispatch `guard:router`, a
+    # No routing here. Claude's Stop asks its main agent to dispatch `guard:turn-router`, a
     # subagent that reads the turn and names which of the eligible agents would find
     # something in it. Codex ships one named agent, installed by `$guard:setup`, and a
     # router that can only forward to that same agent decides nothing — so Codex

@@ -18,7 +18,13 @@ themselves. See "The answer file, and the session's history".
 
 **English until the audits are done; the user's language last.** The answer file is written
 in **English**, and so is everything around it — what you write in a dispatch, what the
-agents report back, what you say to an agent. The audits run against that English file.
+agents report back, what you say to an agent, what one agent says to another. The audits run
+against that English file.
+
+**You do not write the user's language yourself.** Every word of Korean the user reads comes
+from `korean-translator` and is then checked by `korean-corrector`. Neither has a switch, so
+this is not conditional. The one exception is the short line you type in the terminal beside
+the path — a pointer, not the deliverable — and it stays short for that reason.
 
 Only after they have run and their findings are applied do you produce the version the user
 reads, in their language, as a **separate file**: the answer file's path with `.md` replaced
@@ -28,12 +34,12 @@ by `.<lang>.md` (`.ko.md` for Korean). That translation is the last step of the 
 Why this order rather than the obvious one: the auditors are measurably weaker on non-English
 prose. The same answer, translated, drew findings that its original passed clean — twice, from
 two different agents. Auditing the English and translating after is how the user's language
-stops costing them the audit. The translation is then checked in its own right by
-`korean-corrector`, which is why that agent alone runs after the others rather than beside
-them.
+stops costing them the audit. The translation is then written by `korean-translator` and
+checked in its own right by `korean-corrector`, which is why those two run after the others
+rather than beside them: neither has an input until the English is corrected.
 
-Never relay an agent's English report to the user untranslated: say in the user's language
-what changed.
+Never relay an agent's English report to the user untranslated. What changed goes in the
+answer file, which is translated; the line you type beside the path says it in one sentence.
 
 This file exists so that text is stored once and read only when a turn actually gets
 routed. Guard's hook output is paid for in your context on every turn, so it carries as
@@ -82,76 +88,84 @@ not.
 
 ## Dispatching
 
-Common to every agent section below.
+Common to every section below. "Dispatch" covers both shapes here — a skill you invoke and an
+agent you send with the Agent tool.
 
-Dispatch with the **Agent** tool and `subagent_type: "guard:<key>"` — `guard:claims-auditor`
-for the `claims-auditor` section, and so on. Never invoke a `/guard:*` skill to do it;
-those are the user's own entry point.
+**The name says how to run it, and there are two shapes.**
 
-Send every agent you were named in **ONE message** so they run concurrently. Keep the
-order the sections were given in: the read-only auditors report before a corrector edits
-anything, so a corrector never rewrites a sentence an auditor was about to flag.
+- **A name beginning `audit-` is a SKILL.** Invoke it as `guard:<name>` and give it **the turn
+  id and nothing else** — the skill resolves the answer file, the transcript and the extraction
+  itself, then forks into the agent that judges. All three read-only audits are this shape: one
+  agent judges on both of guard's dispatch paths, and a skill per path carries the gathering.
+  **Do not also dispatch that agent with the Agent tool** — `guard:claims-auditor`,
+  `guard:deferrals-auditor`, `guard:clarity-auditor` dispatched directly get a task with no
+  inputs in it.
+- **Every other name is an AGENT.** Dispatch it with the **Agent** tool and
+  `subagent_type: "guard:<name>"`.
 
-**`korean-corrector` is the one exception and must not go in that message.** Its input does
-not exist yet — it audits the translation, and the translation is made after the other agents
-have reported and their findings are applied. Dispatch it on its own, at the step
-`Presenting the result` names. Sending it with the others points it at an English file, which
-it correctly declines to audit, and the turn ships an unchecked translation.
+Either way the name the router gave you IS the section heading and IS what you invoke; do not
+shorten it or translate it back into a setting name.
 
-Each dispatch carries **only its own inputs** — the ones handed to you with the section
-name. An agent learns what to audit from being that agent, not from a scope argument, so
-do not add instructions of your own about what to look for, and do not tell it what you
-think of the turn. It forms its own view; an argument from the turn's author is the one
-thing that can bias all of them at once.
+Type no `/guard:*` slash command to do any of this. Those are the user's own entry point —
+`/guard:settings`, `/guard:reader-profile` — and they are a different surface from the
+`guard:audit-*` skills above, which you invoke as skills and the user never types.
 
-Two modes, given per agent as `= fresh` or `= reuse`:
+Send everything you were named in **ONE message** so they run concurrently — the skills go in
+it alongside the agents, since a forked skill runs in the background exactly as a dispatched
+agent does. Keep the order the sections were given in: the read-only auditors report before a
+corrector edits anything, so a corrector never rewrites a sentence an auditor was about to
+flag.
 
-- **`fresh`** — dispatch a new instance. Nothing else to do.
-- **`reuse`** — one instance serves the whole session, named `guard-<key>`
-  (`guard-korean-corrector` for `korean-corrector`). **Look for it first:** if it already
-  exists in this session, `SendMessage` it (`to: "guard-<key>"`) and it resumes with
-  everything it has already read and judged. Only if it does not exist, dispatch it with
-  the Agent tool and `name: "guard-<key>"` so later turns can find it. Resume first,
-  dispatch second — the other order spawns a second instance under a name that is already
-  taken, and then two of them exist with divergent histories and no way to tell which one
-  answered.
+**The two Korean agents are the exception and must not go in that message.** Neither has an
+input yet: `korean-translator` writes the translation and `korean-corrector` audits it, and the
+translation is made only after the other agents have reported and their findings are applied.
+Dispatch each on its own, in that order, at the steps `Presenting the result` names. Sent with
+the others they are pointed at an English file — the corrector correctly declines to audit one,
+and the translator would translate an answer that is about to change under it.
 
-When you report back, relay the router's reason for each pick alongside what that agent
+They also carry **no switch**: `guard-candidates` prints `fresh` for each, from the roster
+rather than from any setting.
+
+Each one carries **only its own inputs** — the ones this playbook's section names, and for a
+skill that is the turn id alone. An audit learns what to look for from being that audit, not
+from a scope argument, so do not add instructions of your own about what to look for, and do
+not tell it what you think of the turn. It forms its own view; an argument from the turn's
+author is the one thing that can bias all of them at once.
+
+Every one is a **new instance**. The mode you are given is always `= fresh`; there is no other
+value, and no instance from an earlier turn to look for or resume. Each judges this turn on its
+own, which is the shape every definition here is written for.
+
+When you report back, relay the router's reason for each pick alongside what it
 found. **A clean result is one line** — every agent passing is the common case, and a
 paragraph celebrating it trains the user to skip the report that matters. A pick that
 plainly misread the turn is worth saying so about rather than working around.
 
-## `claims-auditor`
+## `audit-turn-claims`
 
 Audits the turn for claims asserted without adequate evidence.
 
-Inputs: the answer file, plus the transcript path, this turn's id and the extraction
-command — it may need history, since a claim is often grounded by a command run several
-turns ago and an auditor that cannot reach it reports a backed claim as unbacked.
+A skill: invoke it with the turn id and nothing else. It changes nothing you need to review —
+it may update its own memory, and nothing else. If it reports violations, address them;
+otherwise continue.
 
-It changes nothing you need to review — it writes nothing at all. If it reports
-violations, address them; otherwise continue.
-
-## `deferrals-auditor`
+## `audit-turn-deferrals`
 
 Audits the turn for work punted as TBD / 확인 필요 that the repository could have answered.
 
-Inputs: the answer file, plus the transcript path, this turn's id and the extraction
-command — it may need history, since the user's request is what separates a deferral the
-assistant owed from a decision it correctly handed back.
+A skill: invoke it with the turn id and nothing else. It changes nothing you need to review —
+it may update its own memory, and nothing else. If it reports violations, address them;
+otherwise continue.
 
-It changes nothing you need to review — it writes nothing at all. If it reports
-violations, address them; otherwise continue.
-
-## `clarity-auditor`
+## `audit-turn-clarity`
 
 Audits the turn for whether its reader can follow it: terms used but never explained,
 mechanisms given with no concrete example, and explanation pitched wrong for what this
 reader already knows.
 
-Inputs: the answer file, plus the transcript path, this turn's id and the extraction
-command — it needs history, because a term explained two turns ago does not need explaining
-again and it has no other way to know.
+A skill: invoke it with the turn id and nothing else. **Wait for its report before you go on
+to `Presenting the result`** — its findings go into the English answer file, and the
+translation is written from that file afterwards. Nothing enforces the order but you.
 
 It changes nothing you need to review — it may update its own memory, and nothing else. Its
 findings are the one kind that ask you to **add** to the answer rather than correct it: a
@@ -162,14 +176,45 @@ If its report says the reader profile is MISSING, relay that in one line — the
 establishes one with `/guard:reader-profile`, and until they do, axis 3 is not being checked.
 Say it once; repeating it every turn is how a useful notice becomes noise.
 
+## `korean-translator`
+
+Writes the Korean the user reads, from the corrected English answer file.
+
+This section runs **out of order**, at step 2 of `Presenting the result`: after the auditors
+have reported and you have applied their findings, and before `korean-corrector`. The router
+names it here only to tell you it is switched on and in which mode.
+
+Inputs, and both paths are required:
+
+- the **answer file** — the corrected English, its source;
+- the **translation file** — the answer file's path with `.md` replaced by `.<lang>.md`
+  (`.ko.md` for Korean), which is where it writes.
+
+Give it no history and no repository paths. It translates prose; it checks nothing the answer
+asserts.
+
+**When it is named, you do not translate.** Writing a draft for it to fix is the arrangement
+this agent replaces — an author translating their own sentences is what produces 직역, and a
+draft in front of the translator anchors it to exactly the wording it was brought in to avoid.
+Hand it the two paths and let it write the file.
+
+It **writes the translation file**, so the translation exists when it reports. Relay any
+sentence it listed as translated-but-unsure; that one is yours to resolve, and it is a question
+about what the English meant, not about the Korean. It may `SendMessage` you mid-run to ask
+exactly that — answer it.
+
+If the router did not name it, dispatch it anyway. It has no switch and is always available,
+and step 2 forbids you translating the file yourself.
+
 ## `korean-corrector`
 
 Audits Korean prose that reads as translated English rather than written. On this turn that
 prose is the **translation**, not the answer file — the answer file is English and this agent
 would rightly report nothing about it.
 
-So this section runs **out of order**, after the other agents have reported, after you have
-applied their findings, and after you have written the translation. `Presenting the result`
+So this section runs **out of order** and **last**: after the other agents have reported, after
+you have applied their findings, and after `korean-translator` has written the translation. You
+never write it yourself, so there is no other way for that file to exist. `Presenting the result`
 is where it belongs in the sequence; the router names it here only to tell you it is switched
 on and in which mode.
 
@@ -253,15 +298,19 @@ in this order:
    repo could have answered — fix it where it is written, in the English answer file, with
    `Edit`. A finding you are leaving unfixed stays unfixed on purpose and is named in your
    reply.
-2. **Translate.** If you are answering the user in a language other than English, write the
-   translation to a **new file**: the answer file's path with `.md` replaced by `.<lang>.md`
-   (`.ko.md` for Korean). Translate the corrected text — everything, at full length, not a
-   summary. The English file stays as it is; it is what a later audit of this turn reads,
-   and overwriting it would leave that path with the weaker version. Skip this step entirely
-   when you are answering in English; there is nothing to translate and no second file.
-3. **Check the translation.** If `korean-corrector` was among the agents you were named,
-   dispatch it now — alone, on the translation file, per its section. It edits in place.
-   Relay what it left unfixed.
+2. **Have it translated. You do not write the translation.** If you are answering the user in
+   a language other than English, the corrected text goes to a **new file**: the answer file's
+   path with `.md` replaced by `.<lang>.md` (`.ko.md` for Korean). **Dispatch
+   `korean-translator` now** — alone, per its section, with both paths — and it writes that
+   file. It has no switch, so it is always available to you; if the router did not name it,
+   dispatch it anyway rather than translating yourself. The English file stays as it is: it is
+   what a later audit of this turn reads, and overwriting it would leave that path with the
+   weaker version. Skip this step entirely when you are answering in English; there is nothing
+   to translate and no second file.
+3. **Check the translation.** Dispatch `korean-corrector` now — alone, on the translation
+   file, per its section. The translator's own report ends by telling you to, and that
+   instruction stands whether or not the router named the agent: it has no switch either, and
+   the two are one step. It edits in place. Relay what it left unfixed.
 4. **Reply short.** What changed and why, in a line or two per finding, then the path. A
    clean audit is one line. Do not restate the answer and do not paste the file. This reply
    reports on the answer; it never stands in for it. The user reads the document — so a
@@ -279,9 +328,12 @@ answer file when you did not. Name it in the reply either way.
 user has the path from your reply. It is you putting a document in front of them, and doing
 that with text nothing checked presents an unchecked draft as a finished one. So:
 
-- You wrote a translation and `korean-corrector` ran on it → open the translation.
-- You wrote a translation and `korean-corrector` did **not** run → open nothing, and name the
-  path. Say the translation is unchecked only when the reader would otherwise assume it was:
+- A translation exists and `korean-corrector` ran on it → open the translation. This is the
+  normal case: both steps are unconditional.
+- A translation exists and `korean-corrector` did **not** run → open nothing, and name the
+  path. `korean-translator` having written it does not substitute: it is the author of that
+  file, and nothing has read it. Say the translation is unchecked, and say why the corrector
+  did not run — with no switch to be off, the only reasons left are ones the user should hear. Say the translation is unchecked only when the reader would otherwise assume it was:
   after an audit that did run and that you are reporting. On a turn where the router cleared
   everything you are already saying nothing about auditing — do not start now.
 - You are answering in English, so there is no translation, and at least one agent audited the

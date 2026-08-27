@@ -13,7 +13,9 @@ what this verb adds is the turn-reading filter, because the file-reading agents 
 dispatched around the router (see ``cmd_stop``) and naming one to the router would be
 offering it a key its caller never opens.
 
-It takes NO argument. The session id comes from ``CLAUDE_CODE_SESSION_ID``, which a
+Its only argument is which dispatch path is asking (``--doc`` for the document router,
+nothing for the turn router). Neither router is told a session id: it comes from
+``CLAUDE_CODE_SESSION_ID``, which a
 subagent's Bash carries as its PARENT session's id — verified in 2.1.239: a subagent's
 `echo $CLAUDE_CODE_SESSION_ID` printed the main session's id, not one of its own. That is
 what makes this verb usable from the router at all, since guard's state and turn
@@ -30,14 +32,16 @@ import sys
 
 from .config import _agent_mode, _load_config
 from .paths import _cli_project_dir, _trace
-from .agents import AUDIT_AGENTS, _eligible_agents
+from .agents import (AUDIT_AGENTS, REPORT_PATH, TURN_PATH, _eligible_agents,
+                     _path_entry)
 from .state import _audit_paused, _read_state
 
 
 def cmd_candidates() -> int:
-    """Print the turn-reading agents the router may name, one ``key=mode`` per line.
+    """Print what the router may name, one ``entry=mode`` per line.
 
-        candidates
+        candidates            # the turn path, for `turn-router`
+        candidates --doc      # the document path, for `report-router`
 
     Read-only: it touches no state and honors no write marker, because it answers a question
     the router is entitled to ask and changes nothing by asking. Prints in ``AUDIT_AGENTS``
@@ -59,6 +63,8 @@ def cmd_candidates() -> int:
     case is explicit: the router is told the lookup came back empty rather than being handed
     silence it could read as "nothing is on".
     """
+    argv = sys.argv[2:]
+    path = REPORT_PATH if argv and argv[0].strip() == "--doc" else TURN_PATH
     session_id = os.environ.get("CLAUDE_CODE_SESSION_ID", "").strip()
     project_dir = _cli_project_dir()
     if not session_id:
@@ -92,7 +98,26 @@ def cmd_candidates() -> int:
               file=sys.stderr)
         _trace(project_dir, session_id, "candidates", "none")
         return 0
-    for key in eligible:
-        print(f"{key}={_agent_mode(state, key)}")
-    _trace(project_dir, session_id, "candidates", "listed", eligible=",".join(eligible))
+
+    # Key to entry-point name, once, here — see `_path_entry`. What the line names is what
+    # the caller invokes, which is an agent for most rows and a skill for `clarity-auditor`;
+    # which tool to reach for is the playbook section's business, not this verb's. An audit
+    # with no entry on this path drops out, and on `--doc` that is most of them: the Korean
+    # pair writes and checks a translation a document never gets, and this is what replaces
+    # the paragraph the document router used to need telling it to refuse those two by name.
+    named = [(k, e) for k in eligible if (e := _path_entry(k, path))]
+    if not named:
+        print(f"guard candidates: nothing on the {path} path is switched on for this "
+              "session.", file=sys.stderr)
+        _trace(project_dir, session_id, "candidates", "none_on_path", path=path)
+        return 0
+    for key, entry in named:
+        # A switch-free agent has no config key to read a mode from, so its mode is the one
+        # in the roster. Reading `_agent_mode` for it would return the OFF default and print
+        # a line the router is told to ignore. The mode is the AUDIT's, so it is read from
+        # the key even though the line prints the entry point.
+        fixed = AUDIT_AGENTS[key].fixed_mode
+        print(f"{entry}={fixed or _agent_mode(state, key)}")
+    _trace(project_dir, session_id, "candidates", "listed", path=path,
+           eligible=",".join(e for _, e in named))
     return 0

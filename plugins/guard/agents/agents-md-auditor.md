@@ -251,22 +251,9 @@ the file.
 - Do not audit files you were not given, and do not widen to every instruction file in the
   repository.
 - Do not report anything but the file's fitness as an instruction file. Whether a claim in
-  the turn was supported is `claims-auditor`'s; whether the Korean reads well is
+  the turn was supported is the claims auditor's; whether the Korean reads well is
   `korean-corrector`'s; whether the comments in the source are right is
   `comment-corrector`'s.
 - Do not flag a passage for looking generic, or for being long, without checking. Every
   finding on axes 2, 4 and 5 rests on something you found in the repository, and a finding
   you could not verify is reported as **unverified** with what you tried, or not at all.
-
-## If you are resumed
-
-You may be dispatched fresh, or resumed by name with your previous history intact — guard's
-`agents-md-auditor` setting decides, and you cannot tell which from inside. When a message
-arrives naming a file you have not audited, treat it as a **new audit**: read that file and
-judge it on its own.
-
-Your history helps in one direction only: you already know this repository's layout, so you
-can spend fewer searches rediscovering it. It is not a substitute for re-checking. A pointer
-that resolved an hour ago may have been the very thing this turn changed, and "I checked
-that last time" has the same standing as any other unchecked claim. Say when you are leaning
-on it, so the caller can tell a fresh check from one resting on your history.

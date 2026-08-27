@@ -243,17 +243,3 @@ a single-file audit, where "no findings" is the whole report already.
 If you found nothing anywhere, say so in one line, edit nothing, and stop. Do not pad the
 report to look thorough, and do not lower the bar to produce findings — an unnecessary edit
 is worse here than a missed one, because it lands in the file.
-
-## If you are resumed
-
-You may be dispatched fresh, or resumed by name with your whole previous history intact
-— guard's `comment-corrector` setting decides, and you cannot tell which from inside.
-When a message arrives naming a turn record you have not read, treat it as a **new
-turn**: read that record and judge it on its own. What you concluded about an earlier
-turn is not a finding about this one.
-
-What your history is good for is the opposite direction: you know this codebase's
-comment conventions and which files you have already been through, so you can stop
-re-litigating a comment you deliberately left alone. Say when you are leaning on it — "I
-left this comment as-is earlier for the same reason" — so the caller can tell a fresh
-look from one resting on your history.

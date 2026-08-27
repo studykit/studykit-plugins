@@ -84,14 +84,23 @@ changing it is a change to the shipped value.
 
 ### `claims-auditor`
 
+One agent for both dispatch paths, entered through the `audit-turn-claims` and
+`audit-report-claims` skills. Hand-written — nothing about it is generated.
+
 `tools: Read, Grep, Glob, Bash, SendMessage`
 
-`SendMessage` is how "ask the main session where to look" in the body actually happens. It is
-**not** a way to obtain evidence: an answer from the turn's author is a claim, so use it to be
-pointed at a file, then read the file yourself. In reuse mode it also reaches the other guard
-agents running in this session.
+`SendMessage` is how "ask the main session where to look" actually happens. It is **not** a way
+to obtain evidence: an answer from the turn's author is a claim, so use it to be pointed at a
+file, then read the file yourself.
 
-`memory: project` for the reviewability. `model: opus`.
+The skill narrows it further on the document path, and says so there: the agent may ask which
+of two candidate paths a reference means, but must not ask what the document says or how it
+came to say it. The main session did not write a brief and did not watch the interview that
+produced it, so its account there is not even the author's testimony.
+
+`memory: project` for the reviewability — and it is what settles the one-agent question, since
+the directory is named after the agent and two definitions would learn this repository twice.
+`model: opus`.
 
 ### `clarity-auditor`
 
@@ -116,6 +125,9 @@ becomes a calibration fact for months. See design.md on the reader profile and `
 `model: opus`.
 
 ### `deferrals-auditor`
+
+One agent for both dispatch paths, entered through the `audit-turn-deferrals` and
+`audit-report-deferrals` skills. Hand-written — nothing about it is generated.
 
 `tools: Read, Grep, Glob, Bash, SendMessage`
 
@@ -157,7 +169,7 @@ answer stored in this project?", answer no, and stop. The cost is real — a def
 an opus call — and a project that would rather trade the catch rate for it changes one word in
 the file.
 
-### `router`
+### `turn-router`
 
 `tools: Read, Bash`
 
@@ -174,8 +186,8 @@ asked to merely nominate.
 **No `memory:`, deliberately.** Memory would inject this project's accumulated triage habits into
 every routing decision, and the one thing routing must not do is decide from a pattern instead of
 from this turn — a remembered "this project rarely writes Korean" is exactly how a Korean turn
-goes unrouted, silently, at the step nothing else checks. For the same reason the router is never
-reused across turns.
+goes unrouted, silently, at the step nothing else checks. That is also why nothing here is held open across
+turns — see design.md on the removal of `reuse`.
 
 `model: opus`, not the cheapest model that fits the method. Every other agent here is paid for by
 a decision this one makes, so a router that misreads a turn does not save anything: it either
@@ -184,19 +196,19 @@ named on material that was not there. The second failure is the one that compoun
 teaches the user to wave the recommendation through unread, and then the omissions stop being
 caught either. The triage itself is short, so the model is the cheap part of it.
 
-### `file-router`
+### `report-router`
 
 `tools: Read, Bash`
 
-Same frontmatter as `router`, and for the same reasons; what differs is what it is pointed at.
-`router` triages a TURN and gets there from a turn id. This one triages a DOCUMENT and gets
+Same frontmatter as `turn-router`, and for the same reasons; what differs is what it is pointed at.
+`turn-router` triages a TURN and gets there from a turn id. This one triages a DOCUMENT and gets
 there from a path — `guard-inputs --file <path>`, the second form of the same verb.
 
-**Why a second agent rather than a second mode of `router`.** The two share the mechanism and
+**Why a second agent rather than a second mode of `turn-router`.** The two share the mechanism and
 disagree on three judgments, each of which would have to become a conditional inside a body that
 is already the longest in this plugin:
 
-- **No request file.** `router`'s materiality call leans on what the user asked for. A document
+- **No request file.** `turn-router`'s materiality call leans on what the user asked for. A document
   had no user in front of it, so that whole section is inapplicable rather than merely empty.
 - **`korean-corrector` can never be named.** On the turn path the agent corrects a translation
   the caller writes *after* routing, which is why the request is allowed to put it on the list.
@@ -237,6 +249,34 @@ then costs a diff on every later turn. What a run learns goes in the report, and
 whether it is worth writing down.
 
 `model: opus`. `color: yellow` — this one edits the user's files.
+
+### `korean-translator`
+
+`tools: Read, Write, SendMessage`
+
+`Read` for the English answer file, `Write` for the translation file. No `Edit`, which shapes the
+agent rather than fencing it: it produces a new file rather than revising one, and the surgical
+change — a sentence improved in passing while translating — is the one it has no tool for. It is
+not a fence, because `Write` takes any path; what makes the English read-only is the body saying
+so twice. The reason either way is that a later audit of this turn reads that file, and an
+unaudited edit would be sitting in it.
+
+`SendMessage` for the one thing it may not decide alone. A sentence it cannot render without
+choosing what the author meant is a claim, not a phrasing, so it asks the session that wrote the
+English.
+
+No `Grep`, `Glob` or `Bash`: it translates prose and verifies nothing the answer asserts. Handing
+it the repository would invite exactly the failure the body forbids — noticing a defect in the
+English and translating a corrected version of it.
+
+**No `memory:`.** Tempting here, since glossary consistency is real: the same concept should keep
+the same Korean word across turns. But a store would fix a first-turn word choice for every turn
+after it, including the ones where it was wrong, and a translation is the one artifact nobody
+diffs against its predecessor. What consistency there is has to come from the source document
+in front of it, which is what the body tells it to use.
+
+`model: opus`. The cheap failure mode of a weak translator is not a mistranslation — it is exactly
+the 직역 this agent was added to remove, which is fluent, grammatical, and invisible in review.
 
 ### `korean-corrector`
 

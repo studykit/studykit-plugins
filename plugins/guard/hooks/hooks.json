@@ -56,7 +56,7 @@
             "type": "command",
             "command": "uv run --script \"${CLAUDE_PLUGIN_ROOT}/scripts/guard_hook.py\" session-start",
             "timeout": 5,
-            "description": "Sweep guard state and turn records past the retention window, export GUARD_PROJECT_DIR and GUARD_REFS_DIR, and state the refs rule as session context — plus the playbook path when any agent is on and the reuse policy when any is set to reuse."
+            "description": "Sweep guard state and turn records past the retention window, export GUARD_PROJECT_DIR and GUARD_REFS_DIR, and state the refs rule as session context — plus the playbook path when any agent is on."
           }
         ]
       }

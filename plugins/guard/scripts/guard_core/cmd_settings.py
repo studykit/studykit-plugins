@@ -2,7 +2,7 @@
 
 ``settings`` is run by the ``guard:settings`` skill via Bash, in-session. ``show`` prints the
 current settings; ``set <key> <value>`` changes one of the per-agent settings — each named
-after the agent it controls, valued ``off``/``fresh``/``reuse`` — one of the two audit
+after the agent it controls, valued ``off``/``fresh`` — one of the two audit
 switches (``audit-turn`` / ``audit-plan``, ``on``/``off``) or ``refs_dir``; ``unset <key>`` removes a key from the file entirely, back to its default. The
 agent settings and the audit switches also apply to the live session's ``state/<sid>.json``
 when a session id is
@@ -29,7 +29,7 @@ from .config import (
     _write_config
 )
 from .paths import _cli_project_dir, _refs_dir, _trace
-from .agents import AUDIT_AGENTS, _instance_name
+from .agents import AUDIT_AGENTS, SETTABLE_AGENTS
 from .state import _audit_paused, _plan_audit_paused, _read_state, _write_state
 
 
@@ -101,10 +101,9 @@ def _config_show_lines(project_dir: Path, session_id: str | None) -> list[str]:
     def switch_line(key: str) -> str:
         default = _agent_mode(cfg, key)
         live = _agent_mode(state, key) if state is not None else default
-        suffix = " — one instance for the session" if live is AgentMode.REUSE else ""
         if live != default:
-            return f"{key}: {live} (this session; default {default}){suffix}"
-        return f"{key}: {default}{suffix}"
+            return f"{key}: {live} (this session; default {default})"
+        return f"{key}: {default}"
 
     def audit_line(key: str) -> str:
         """One audit switch: the project's setting, and the live session's value when it
@@ -131,37 +130,9 @@ def _config_show_lines(project_dir: Path, session_id: str | None) -> list[str]:
     # way to tell from a guard that does not have it.
     return [
         *(audit_line(k) for k in AUDIT_SWITCHES),
-        *(switch_line(k) for k in AUDIT_AGENTS),
+        *(switch_line(k) for k in SETTABLE_AGENTS),
         "refs_dir: " + (refs_rel if refs_rel else "(default wiki/ref/)"),
     ]
-
-
-def _live_agent_mode(project_dir: Path, session_id: str | None,
-                     cfg: dict[str, Any], key: str) -> AgentMode:
-    """The mode ``key`` is running under right now — session state when there is a
-    session, the config file otherwise. Read BEFORE a write, so the change can be
-    reported."""
-    return _agent_mode(_read_state(project_dir, session_id, cfg) if session_id else cfg, key)
-
-
-def _mode_transition_note(key: str, before: AgentMode, after: AgentMode) -> str:
-    """The note a mode change owes the session, or "" when it owes none.
-
-    A mode change is the one setting change that leaves something behind: an instance the
-    main agent may still be addressing. Nothing in guard can see or stop that instance —
-    this CLI has no channel to it — so the change has to be reported to the session that
-    can, and this text is that report. It reaches the main agent because the skill relays
-    what the CLI printed.
-    """
-    if before is AgentMode.REUSE and after is not AgentMode.REUSE:
-        return (f"guard: {key} is no longer reused. Stop sending to "
-                f"`{_instance_name(key)}` — shut it down if your session offers a way to "
-                f"— and from the next turn dispatch a new instance each time.")
-    if after is AgentMode.REUSE and before is not AgentMode.REUSE:
-        return (f"guard: {key} now runs as one instance for the session, named "
-                f"`{_instance_name(key)}`. Dispatch it under that name once, then "
-                f"SendMessage it on later turns instead of dispatching again.")
-    return ""
 
 
 def _settings_unset(project_dir: Path, session_id: str | None,
@@ -169,9 +140,8 @@ def _settings_unset(project_dir: Path, session_id: str | None,
     """``settings unset <key>`` — delete one key from guard.local.json.
 
     Deleting an agent switch is a change to what guard does, not just to the file, so it
-    goes through the same two steps a ``set`` does: the session's cached mode is reset to
-    the default and any reuse transition is reported. Deleting a key guard does not
-    honor touches neither.
+    goes through the same step a ``set`` does: the session's cached mode is reset to the
+    default. Deleting a key guard does not honor touches neither.
     """
     if not positional:
         print("guard settings: usage: settings unset <key>", file=sys.stderr)
@@ -187,13 +157,9 @@ def _settings_unset(project_dir: Path, session_id: str | None,
         _trace(project_dir, session_id, "settings", "unset_absent", key=key)
         return 0
 
-    cfg = _load_config(project_dir)
-    transition = ""
-    if key in AUDIT_AGENTS:
-        before = _live_agent_mode(project_dir, session_id, cfg, key)
+    if key in SETTABLE_AGENTS:
         after = AgentMode(DEFAULT_CONFIG[key])
         _apply_session_scalar(project_dir, session_id, key, after.value)
-        transition = _mode_transition_note(key, before, after)
     elif key in AUDIT_SWITCHES:
         # Same as a `set` to the default: removing the key changes what guard does now, not
         # only what the next session opens in, so the live session follows it back.
@@ -213,9 +179,6 @@ def _settings_unset(project_dir: Path, session_id: str | None,
     print()
     for line in _config_show_lines(project_dir, session_id):
         print(line)
-    if transition:
-        print()
-        print(transition)
     _trace(project_dir, session_id, "settings", "unset", key=key, known=known)
     return 0
 
@@ -228,7 +191,7 @@ def cmd_settings() -> int:
         settings unset <key>                 — delete one key from the file
 
     Settable keys: the two audit switches (``AUDIT_SWITCHES``), the agent switches (the keys
-    of ``AUDIT_AGENTS`` — each is the name of the agent it admits) and ``refs_dir``. The
+    of ``SETTABLE_AGENTS`` — each is the name of the agent it admits) and ``refs_dir``. The
     switches
     also apply to the live session's ``state/<sid>.json`` when a session id is available
     (``--session <id>``, which the forked skill passes as ``${CLAUDE_SESSION_ID}``, else
@@ -273,26 +236,15 @@ def cmd_settings() -> int:
     value = positional[2]
 
     raw = _load_raw_config(project_dir)
-    cfg = _load_config(project_dir)
-    transition = ""
 
-    if key in AUDIT_AGENTS:
+    if key in SETTABLE_AGENTS:
         v = _parse_mode(value)
         if v is None:
             print(f"guard settings: {key} must be one of "
                   f"{[m.value for m in AgentMode]} (got {value!r})", file=sys.stderr)
             return 0
-        # Read the mode this replaces BEFORE writing, so the transition can be reported.
-        # A mode change is the one setting change that leaves something behind: an
-        # instance the main agent may still be addressing. Nothing in guard can see or
-        # stop that instance — the settings CLI runs in a forked skill with no channel to
-        # it — so the change has to be reported to the session that CAN, and this print
-        # is that report. It reaches the main agent because the skill relays what the CLI
-        # printed.
-        before = _live_agent_mode(project_dir, session_id, cfg, key)
         raw[key] = v.value
         _apply_session_scalar(project_dir, session_id, key, v.value)
-        transition = _mode_transition_note(key, before, v)
     elif key in AUDIT_SWITCHES:
         on = _parse_switch(value)
         if on is None:
@@ -308,7 +260,7 @@ def cmd_settings() -> int:
         raw["refs_dir"] = value  # "" resets to the default; _refs_dir validates at use
     else:
         print(f"guard settings: unknown or unsettable key {key!r}. Settable: "
-              + ", ".join((*AUDIT_SWITCHES, *AUDIT_AGENTS))
+              + ", ".join((*AUDIT_SWITCHES, *SETTABLE_AGENTS))
               + ", refs_dir.",
               file=sys.stderr)
         return 0
@@ -319,9 +271,6 @@ def cmd_settings() -> int:
 
     for line in _config_show_lines(project_dir, session_id):
         print(line)
-    if transition:
-        print()
-        print(transition)
     _trace(project_dir, session_id, "settings", "set", key=key)
     return 0
 

@@ -18,11 +18,17 @@ from .config import _switch_on
 class AuditAgent(NamedTuple):
     """One agent guard can recommend. Mechanical facts only — no prose.
 
-    Keyed in ``AUDIT_AGENTS`` by the agent's own bare name, which is also its config
-    switch key, its playbook section, and — namespaced — its ``subagent_type``. One string
-    for one agent: the setting the user types, the key in the state file, the section that
-    says how to dispatch it, and the agent that gets dispatched cannot drift apart because
-    they are the same string.
+    Keyed in ``AUDIT_AGENTS`` by the name of the AUDIT. That key is the config switch the
+    user types and the key in the state file, and for most rows it is also the agent's own
+    name — its playbook section and, namespaced, its ``subagent_type``.
+
+    Some audits are reached through a different ENTRY POINT per dispatch path
+    (``turn_entry`` / ``report_entry``), and there the key names the audit while each entry
+    has a name of its own. The key does NOT follow the entry: it is user-visible
+    configuration, and ``_load_config`` honours only keys it already knows, so renaming one
+    would silently downgrade a configured audit to its default and say nothing. What holds
+    instead is that the translation happens in exactly one place — ``_path_entry``, which
+    ``cmd_candidates`` calls — and downstream of it the entry name is the only string used.
 
     ``reads`` is what the agent is pointed at — ``"turn"`` for the turn record guard
     wrote, ``"files"`` for the source files the turn edited, ``"agent-docs"`` for the
@@ -38,6 +44,18 @@ class AuditAgent(NamedTuple):
     stay DISJOINT (``_edited_bucket``): a name landing in two would be audited twice under
     criteria only one of which applies to it.
 
+    ``fixed_mode`` marks an agent with NO config switch. ``None`` (the usual case) means the
+    user's switch decides whether it runs and in which mode; a mode value means the agent is
+    always eligible and always dispatched in that mode, and ``settings set <key>`` refuses the
+    name because there is no key behind it. One agent is like this — ``korean-translator`` —
+    because it does not audit: it writes the Korean the user reads, and a writer of the
+    deliverable that a setting can switch off produces two tiers of Korean depending on a
+    config nobody remembers. ``korean-corrector`` is the other, because it is the second half
+    of that one step rather than an audit of its own. Neither makes guard speak on a turn it
+    would otherwise be silent on; see ``_eligible_agents``.
+
+    The mode is ``fresh`` for both, which is now the only mode there is.
+
     ``needs_history`` is whether this agent may need to look past the response — at the
     request, at what the turn ran, at what an earlier turn established. Those agents are
     given the transcript path and the turn id so they can extract what they need with the
@@ -49,6 +67,25 @@ class AuditAgent(NamedTuple):
     on whether an earlier turn already explained it. The correctors do not — Korean prose is
     judged as prose, and comments are judged against the code under them.
 
+    ``turn_entry`` and ``report_entry`` name what the caller INVOKES to run this audit on
+    each dispatch path — the finished turn, and a standalone document such as an interview
+    brief. ``turn_entry=None`` (the usual case) means the agent's name IS the key.
+    ``report_entry=None`` means the audit is not offered on the document path at all, which
+    is the right answer for part of the roster: the Korean pair writes and checks a
+    translation that the document path never produces, and the file-reading agents are
+    pointed at a turn's edits.
+
+    An entry is a SKILL for every audit that runs on both paths and the agent's own name for
+    the rest; the three shared audits are each one agent behind two `context: fork` skills.
+    Which tool the caller reaches for is the playbook
+    section's business, not this module's; what this module guarantees is that the name it
+    hands over is the name of a real entry point, checked by ``dev/check-entries.py`` against
+    both ``agents/`` and ``skills/``.
+
+    Entries are spelled out rather than derived as ``"turn-" + key``. A derived name that
+    matches no file fails silently — the dispatch simply finds nothing — whereas a literal
+    can be checked.
+
     What the agent DOES, how to dispatch it, and what to do with its report are all in
     ``hooks/context/dispatch-playbook.md``, under the section named by this key. None of
     it belongs here: every string guard prints is paid for in the main agent's context on
@@ -58,39 +95,97 @@ class AuditAgent(NamedTuple):
 
     reads: str
     needs_history: bool
+    fixed_mode: str | None = None
+    turn_entry: str | None = None
+    report_entry: str | None = None
 
 
-# The plugin namespace every agent name is qualified with to become a `subagent_type`.
-AGENT_NAMESPACE = "guard:"
-
-
-def _agent_id(name: str) -> str:
-    """The dispatchable `subagent_type` for an agent name (a plain AUDIT_AGENTS key)."""
-    return AGENT_NAMESPACE + name
-
-
-def _instance_name(name: str) -> str:
-    """The addressable instance name for an agent held open across turns.
-
-    Hyphen rather than colon, and prefixed: it is a `name` on the Agent call, not a
-    `subagent_type`, and the two must not be confusable in the dispatch text. One name
-    per agent per session is the whole scheme — guard needs no registry of running
-    instances, because the name is derived from the agent, so the main agent can look for
-    it and guard can name it without either of them tracking anything.
-    """
-    return "guard-" + name
+# No `subagent_type` is built here any more. `cmd_candidates` prints the bare agent name and
+# the router copies it into its report; the `guard:` prefix is added by the main agent, which
+# reads it from the playbook. Python that also knew the namespace would be a second place for
+# the same string to live.
 
 
 # Order here is the order the agents appear in a recommendation. The three read-only
 # auditors come first: their findings may change what the correctors should be run on.
 AUDIT_AGENTS: dict[str, AuditAgent] = {
-    "claims-auditor": AuditAgent(reads="turn", needs_history=True),
-    "deferrals-auditor": AuditAgent(reads="turn", needs_history=True),
-    "clarity-auditor": AuditAgent(reads="turn", needs_history=True),
-    "korean-corrector": AuditAgent(reads="turn", needs_history=False),
+    # Every audit that runs on both dispatch paths splits at the ENTRY, not at the agent: one
+    # agent judges, and a `context: fork` skill per path carries the input-gathering. What
+    # settles it is memory — a memory directory is named after the AGENT, so two definitions
+    # are two memories, and what one learned about this repository is invisible to the other.
+    #
+    # A judgment that genuinely differs by path is stated in the skill, and the agent says
+    # which one that is rather than picking a side. Here it is the documentation rule: the
+    # turn path requires a local saved copy under the refs directory, because the session that
+    # wrote the turn was told to save one. On the document path that same rule would fail
+    # every citation in every brief.
+    "claims-auditor": AuditAgent(reads="turn", needs_history=True,
+                                 turn_entry="audit-turn-claims",
+                                 report_entry="audit-report-claims"),
+    # Same shape, and the reversal it carries is the sharper one: on a turn, "the assistant
+    # handed this back to the user" is legitimate because the user was there to be asked. In a
+    # document nobody was, so the same sentence is the author deferring on their own behalf
+    # unless the text records the question actually being put to someone. That is stated in
+    # each skill, and the agent says in so many words that the ruling is the skill's — which
+    # is what lets one definition hold a rule that comes out opposite on the two paths.
+    "deferrals-auditor": AuditAgent(reads="turn", needs_history=True,
+                                    turn_entry="audit-turn-deferrals",
+                                    report_entry="audit-report-deferrals"),
+    # Same shape, and here the memory argument is sharpest: what lives in this agent's
+    # `memory: user` directory is the READER PROFILE. Two definitions would be two
+    # `user`-scoped directories drifting apart and neither would be the reader's. Nothing
+    # about what makes an explanation followable differs by path, so neither skill overrides
+    # a judgment; they carry only the gathering.
+    "clarity-auditor": AuditAgent(reads="turn", needs_history=True,
+                                  turn_entry="audit-turn-clarity",
+                                  report_entry="audit-report-clarity"),
+    # Before the corrector, and that order is the point: the translator writes the Korean
+    # the user reads, and the corrector then judges what it wrote. Reversed, the corrector
+    # would be repairing a draft that is about to be replaced.
+    #
+    # No switch (`fixed_mode`): the answer the user reads is not an audit to opt into. What
+    # decides whether it runs is the router, on the language of the turn — so an
+    # English-answering project never pays for it, and a Korean-answering one cannot end up
+    # with the main session translating its own text because a config key was left off.
+    "korean-translator": AuditAgent(reads="turn", needs_history=False, fixed_mode="fresh"),
+    # Switch-free for the same reason, and it has to be the same reason: these two are one
+    # step. A corrector the user can switch off behind a translator they cannot is a Korean
+    # deliverable nothing reads — and the pair is what makes the writer/reader split hold.
+    "korean-corrector": AuditAgent(reads="turn", needs_history=False, fixed_mode="fresh"),
     "comment-corrector": AuditAgent(reads="files", needs_history=False),
     "agents-md-auditor": AuditAgent(reads="agent-docs", needs_history=False),
 }
+
+
+# The agents that HAVE a config switch, in roster order — the only names `settings set` and
+# `settings show` may touch. A `fixed_mode` agent has no key behind it, so writing one would
+# record a setting nothing reads and showing one would offer a switch that does not exist.
+SETTABLE_AGENTS: tuple[str, ...] = tuple(
+    k for k, spec in AUDIT_AGENTS.items() if spec.fixed_mode is None)
+
+
+# The dispatch paths an audit can run on. `"turn"` is the routed Stop path; `"report"` is a
+# standalone document, routed by `report-router` with no hook in front of it.
+TURN_PATH = "turn"
+REPORT_PATH = "report"
+
+
+def _path_entry(key: str, path: str) -> str | None:
+    """What runs audit ``key`` on ``path``, or None if it does not run there.
+
+    The ONE place a roster key becomes an entry-point name. Everything downstream of
+    ``cmd_candidates`` — the router's report, the playbook section its caller opens, the
+    ``subagent_type`` that caller dispatches — carries the name this returns, so the key and
+    the name cannot drift apart anywhere else by construction: nowhere else translates.
+
+    ``None`` on the report path is the normal answer, not an error. Most of the roster has
+    nothing to do with a document, and returning the key as a fallback would offer the
+    document router a turn agent whose whole body is about a transcript it will not get.
+    """
+    spec = AUDIT_AGENTS[key]
+    if path == REPORT_PATH:
+        return spec.report_entry
+    return spec.turn_entry or key
 
 
 # Source files whose comments `comment-corrector` can judge. Deliberately not "every
@@ -160,7 +255,7 @@ def _edited_bucket(target: Path, refs_dir: Path | None = None) -> str | None:
 # on every turn to be used at most four times and usually zero — the router clearing a
 # turn is the common case. So the hook carries only what the router cannot know (where the
 # answer file is, which agents are on, their modes, the edited files, the transcript
-# pointer) and `agents/router.md` carries everything that describes an agent.
+# pointer) and `agents/turn-router.md` carries everything that describes an agent.
 #
 # That the router is an agent and not a `claude -p` child guard spawns itself is the
 # design. A spawned child made the Stop hook block for the router's whole runtime at
@@ -182,7 +277,7 @@ def _edited_bucket(target: Path, refs_dir: Path | None = None) -> str | None:
 # the edited-file list, the router's picks and its reason per pick. Routing a two-line
 # verdict through a file would only add a read.
 #
-# The roster is built HERE, not in `agents/router.md`, because eligibility is per turn
+# The roster is built HERE, not in `agents/turn-router.md`, because eligibility is per turn
 # and per project: which switches are on, and which files this turn wrote. The router's
 # definition holds everything that is the same every turn — the method, and the dispatch
 # template per agent. An agent absent from the roster cannot be picked, which beats
@@ -193,7 +288,7 @@ def _edited_bucket(target: Path, refs_dir: Path | None = None) -> str | None:
 # one via `_agent_pointer`, the routed one via the router's own report — so there is nothing
 # in Python to keep in sync with the markdown, and no duplicated guidance that could drift.
 # --------------------------------------------------------------------------- #
-ROUTER_AGENT = "guard:router"
+ROUTER_AGENT = "guard:turn-router"
 
 
 def _reads_turn(keys: Iterable[str]) -> bool:
@@ -223,6 +318,12 @@ def _eligible_agents(state: dict[str, Any], edited: list[str],
     shares this function but mirrors no edited-file recording of its own, so every
     file-reading agent is ineligible there and passing empty lists is the honest answer.
 
+    A third gate, in the other direction: an agent with a ``fixed_mode`` has no switch and so
+    passes the first one always — but it is dropped again unless some SWITCHABLE turn-reading
+    agent also got through, so it can only ever join a turn that was already being routed and
+    already has an answer file. Only those riders are dropped; the rest of the result stands,
+    which is what keeps a ``comment-corrector``-only project working.
+
     Notably absent: any language test for ``korean-corrector``. Deciding whether a
     response is Korean enough to audit is a reading task, and the router does it better
     than a Hangul ratio that has to guess how many English identifiers a Korean answer
@@ -230,10 +331,27 @@ def _eligible_agents(state: dict[str, Any], edited: list[str],
     """
     inputs = {"files": edited, "agent-docs": agent_docs or []}
     out: list[str] = []
+    carries_the_turn = False
     for key, spec in AUDIT_AGENTS.items():
-        if not _switch_on(state, key):
+        switchable = spec.fixed_mode is None
+        if switchable and not _switch_on(state, key):
             continue
         if spec.reads in inputs and not inputs[spec.reads]:
             continue
+        if switchable and spec.reads == "turn":
+            carries_the_turn = True
         out.append(key)
-    return out
+    # The switch-free agents ride along; they never make a turn routed on their own. What
+    # they ride on is a switchable TURN-reading agent that got through both gates above —
+    # nothing weaker works. With no switch on at all, guard must add nothing to the main
+    # agent's context, which is what "every switch ships off" buys. And with only a
+    # file-reading agent on, there is no answer file (`_reads_turn` decides that off this
+    # list) and so nothing for a translator to translate: letting the pair through there
+    # would conjure the answer file that configuration exists to avoid paying for.
+    #
+    # Only the riders are dropped, never the list. A `comment-corrector`-only project is a
+    # working configuration — it is dispatched around the router on the files the turn wrote —
+    # and emptying its result here would silence guard for it entirely.
+    if carries_the_turn:
+        return out
+    return [k for k in out if AUDIT_AGENTS[k].fixed_mode is None]

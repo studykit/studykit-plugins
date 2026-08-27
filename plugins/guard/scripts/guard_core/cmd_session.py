@@ -3,8 +3,8 @@
 Sweeps state files, ``trace.log``, and turns/ and extracts/ dirs older than retention;
 exports ``GUARD_PROJECT_DIR`` and ``GUARD_REFS_DIR`` via ``$CLAUDE_ENV_FILE`` (append-once,
 since this event also fires on every compaction); and states as session context the refs rule
-always, the dispatch playbook's path when any agent is on, and the standing reuse policy when
-any agent is in ``reuse``. Each is said ONCE here rather than in every Stop, which is the
+always, and the dispatch playbook's path when any agent is on. Each is said ONCE here rather
+than in every Stop, which is the
 whole reason this hook prints anything.
 
 There is deliberately no line naming ``ext-docs-fetcher``. That agent has no switch to
@@ -23,15 +23,15 @@ import time
 from pathlib import Path
 
 from .config import (
-    AUDIT_PLAN_KEY, AUDIT_TURN_KEY, AgentMode, CLEAR_INHERIT_MAX_AGE_SECONDS,
-    ORPHAN_MAX_AGE_SECONDS, _HOST_IS_CODEX, _agent_mode, _audit_on, _load_config, _switch_on
+    AUDIT_PLAN_KEY, AUDIT_TURN_KEY, CLEAR_INHERIT_MAX_AGE_SECONDS,
+    ORPHAN_MAX_AGE_SECONDS, _HOST_IS_CODEX, _audit_on, _load_config, _switch_on
 )
 from .paths import (
     _clear_handoff_file, _project_dir, _refs_dir, _state_root, _trace, _trace_file
 )
 from .payload import _read_payload, _session_id
 from .state import _audit_paused, _plan_audit_paused, _read_state, _write_state
-from .agents import AUDIT_AGENTS, _agent_id, _instance_name
+from .agents import SETTABLE_AGENTS
 from .dispatch import CLI_REL, _playbook_path, _plugin_root
 
 
@@ -435,7 +435,7 @@ def cmd_session_start() -> int:
     # on. The Stop hook repeats the path on each routed turn — one line, and it must,
     # because context compaction can drop this one — but stating it here is what lets that
     # line stay a path instead of an explanation of what the file is for.
-    if any(_switch_on(session_cfg, k) for k in AUDIT_AGENTS):
+    if any(_switch_on(session_cfg, k) for k in SETTABLE_AGENTS):
         # Which of the two lines goes out is the mute, not the switches. Saying "audits are
         # on" to a muted session would be false in the one place a false line is most
         # expensive: nothing later in the session contradicts it, so the model spends the
@@ -455,24 +455,5 @@ def cmd_session_start() -> int:
                 "you are named; do not read the file until then."
             )
 
-    # The standing reuse policy is stated ONCE, here, rather than in every Stop
-    # recommendation. Reuse is a session-long fact — the instance lives under the session
-    # id — so the session's opening is where it belongs, and repeating it per turn would
-    # pay for it on every turn. The per-turn text still carries the mechanic (resume this
-    # name, or dispatch under it), because that is what changes with which agents were
-    # picked; what it does not carry is the explanation.
-    #
-    # A mode changed mid-session leaves this line stale, which is exactly why
-    # `cmd_settings` prints its own transition note: the two together are how the main
-    # agent learns the policy and then learns it changed.
-    reused = [k for k in AUDIT_AGENTS if _agent_mode(session_cfg, k) is AgentMode.REUSE]
-    if reused:
-        named = ", ".join(f"{_agent_id(k)} as `{_instance_name(k)}`" for k in reused)
-        print(
-            "guard: these guard agents run as ONE instance for this whole session, not a "
-            f"fresh one per turn — {named}. Keep those instances; they can message each "
-            "other and you by name. Every other guard agent, the router included, is "
-            "fresh each time. The playbook says how to reach a reused instance."
-        )
     _trace(project_dir, None, "session-start", "swept", exported_project_dir=exported)
     return 0

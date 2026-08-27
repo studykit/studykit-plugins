@@ -13,7 +13,7 @@ description: |
 
   **It runs in the background and the user talks to it directly, in its own transcript.** So having spawned it, say in one line that it is running and stop. Do not wait for it, do not poll it, and do not relay or summarise anything it says — a completion notification from it is not a result to report. What you act on is the brief file its final report names.
 
-  **When the brief arrives, route it before you build on it.** Dispatch `guard:file-router` (subagent_type: `"guard:file-router"`) with `- file: <the path it reported>` and follow its report. The brief is research that later work rests on, and it is the one document guard's turn audit never sees — it was written inside a conversation no turn of yours covers. The router works out for itself which audits are switched on, so a project with them off pays one subagent and gets `none`.
+  **When the brief arrives, route it before you build on it.** Dispatch `guard:report-router` (subagent_type: `"guard:report-router"`) with `- file: <the path it reported>` and follow its report. The brief is research that later work rests on, and it is the one document guard's turn audit never sees — it was written inside a conversation no turn of yours covers. The router works out for itself which audits are switched on, so a project with them off pays one subagent and gets `none`.
 tools: Read, Grep, Glob, Bash, Write, Edit, WebSearch, WebFetch
 model: opus
 background: true

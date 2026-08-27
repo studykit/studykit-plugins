@@ -26,7 +26,11 @@ from .agents import AUDIT_AGENTS
 
 def _read_state(project_dir: Path, session_id: str, config: dict[str, Any]) -> dict[str, Any]:
     default = {
-        **{k: str(_agent_mode(config, k)) for k in AUDIT_AGENTS},
+        # Switchable agents only. A `fixed_mode` agent has no config key, so there is no
+        # mode to seed and nothing the session could move it to — its mode is the roster's.
+        # Seeding one here would also make it look settable in `settings show`.
+        **{k: str(_agent_mode(config, k))
+           for k, spec in AUDIT_AGENTS.items() if spec.fixed_mode is None},
         # Per-turn guards keyed by the transcript prompt_id (a turn == one promptId).
         "last_audited_prompt_id": "",
         # The most recent auditable turn's prompt_id, recorded by every Stop, switches or

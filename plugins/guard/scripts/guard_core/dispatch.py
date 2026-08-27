@@ -3,7 +3,7 @@
 Where each piece of text lives is decided by how often it is paid for, and that split must
 hold. What this module builds reaches the main agent on every routed turn, so it is one
 imperative plus a list of fields: paths, which agents are on, each one's mode.
-``agents/router.md`` is read once per routed turn by the router alone, so it carries the
+``agents/turn-router.md`` is read once per routed turn by the router alone, so it carries the
 triage method and the dispatch per candidate. ``hooks/context/dispatch-playbook.md`` is read
 only by whoever is sent to a section, so it carries how to dispatch an agent and what to do
 with its report. Nobody re-types another home's text.
@@ -91,7 +91,7 @@ CLI_REL = "scripts/guard_hook.py"
 # existed, testing `is_file()` on each wrapper and adding the long `uv run --script <cli>
 # <verb>` form to the dispatch when it was absent. Measuring it found it caught nothing real:
 #
-# - A version mismatch cannot happen. `agents/router.md` and `shell/bin/` install as one
+# - A version mismatch cannot happen. `agents/turn-router.md` and `shell/bin/` install as one
 #   tree, so a version whose router names `guard-candidates` is a version that ships it.
 # - A lost exec bit, or a PATH the wrappers never reached, leaves the FILE in place — so
 #   `is_file()` passes and the fallback never fires, which is every realistic failure.
@@ -178,7 +178,7 @@ def _router_context(prompt_id: str, lead: str) -> str:
     from the wrong one — the failure would be silent, and routing is the step nothing else
     checks. Cheapness is not what it is tuned for: a router that misreads the turn either
     ships the defect or spends a subagent for every agent it named for nothing, and both cost
-    more than the routing call itself ever will. Hence `agents/router.md` pins `opus`, and
+    more than the routing call itself ever will. Hence `agents/turn-router.md` pins `opus`, and
     there is no per-project override: the one setting that could make routing cheaper is the
     one setting whose failure is invisible, since a router that stops naming an agent looks
     exactly like a turn with nothing in it.
@@ -201,8 +201,8 @@ def _router_context(prompt_id: str, lead: str) -> str:
 # that trains them to wave it through. What the main agent must not do is quietly swallow
 # the result — the report is the point.
 _ROUTE_LEAD = (
-    "guard: audit the turn you just finished. Dispatch `guard:router` (subagent_type: "
-    "\"guard:router\") with the inputs below and follow its report."
+    "guard: audit the turn you just finished. Dispatch `guard:turn-router` (subagent_type: "
+    "\"guard:turn-router\") with the inputs below and follow its report."
 )
 
 

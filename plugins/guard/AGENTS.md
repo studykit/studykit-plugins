@@ -12,7 +12,7 @@ follows is a pointer into it rather than a second copy.
 ## What guard is
 
 **guard makes no model call.** When a turn finishes it asks the main agent, through the Stop
-hook's `additionalContext`, to dispatch one subagent — `guard:router` — which reads the turn
+hook's `additionalContext`, to dispatch one subagent — `guard:turn-router` — which reads the turn
 and names which of guard's audit agents would actually find something in it, with a reason for
 each. The main agent dispatches those, concurrently. guard audits nothing itself, and every
 audit criterion lives in an agent definition under `agents/`.
@@ -21,6 +21,17 @@ Everything guard recommends, it recommends at turn end. Two shipped agents sit o
 path entirely and have no switch: `ext-docs-fetcher`, which the main agent selects from its
 own description, and `ext-docs-auditor`, which the Stop hook names off the refs files the turn
 wrote. Anything below that says "the turn" or "the response" is about the routed path.
+
+Two agents on that path are one step rather than an audit: `korean-translator` writes the Korean
+the user reads, from the corrected English answer file, and `korean-corrector` then judges what
+it wrote. **Neither has a switch**, because the answer the user reads is not something to opt
+into — a switch there would make the quality of a delivered answer depend on a config key, and
+`off` would put the session back to translating its own text, which is the arrangement that
+produced 직역. What keeps them free for everyone else is the router: it names them only for a
+turn being delivered in Korean prose, and they never make a turn routed on their own — with
+every switch `off`, guard is still silent. `dev/design.md` has why an author cannot translate
+their own text, what the translator must not move while doing it, and the eligibility rule that
+keeps a switch-free agent from reinstating the router call.
 
 Every agent switch ships `off`: guard installed is guard available, not guard running. The two
 audit switches (`audit-turn`, `audit-plan`) are the exception — absent from the config they read
@@ -41,8 +52,8 @@ version to disagree with.
 
 That brief is the one document guard's turn audit can never reach: the skip above is what keeps
 the interview free, and the same skip means no `Stop` ever sees the text. So it is audited on a
-path of its own — the `description` tells the MAIN agent to dispatch `file-router` over the
-saved path, and that router triages the document the way `router` triages a turn. Nothing in
+path of its own — the `description` tells the MAIN agent to dispatch `report-router` over the
+saved path, and that router triages the document the way `turn-router` triages a turn. Nothing in
 the hooks is involved, which is why the switches and the mute had to move into
 `guard-candidates`: it is the only thing both routers run, and on this path there is no hook in
 front to check them.
@@ -76,9 +87,30 @@ carries the full set with the reasoning and the measurements; these are the ones
 how the code here is organised.
 
 - `guard_core.config` is the ONLY reader of `GUARD_HOST`, once, at import.
+- A definition that exists once per dispatch path is named `<path>-<what it does>` —
+  `turn-router` / `report-router`. An entry-point skill is the same rule with the verb in
+  front: `audit-turn-claims` / `audit-report-claims`. A definition used on one path only, or
+  outside the routers, keeps its bare name; do not prefix one speculatively.
+- Split at the ENTRY, never at the agent. Every audit that runs on both dispatch paths —
+  claims, deferrals, clarity — is ONE agent behind two `context: fork` skills, and the reason
+  is memory: a memory directory is named after the agent, so two definitions are two memories
+  and what one learns the other relearns. A judgment that genuinely differs by path goes in
+  the skill, with the agent saying which judgment that is rather than picking a side; the
+  refs-copy rule for a documentation claim and what it takes for a deferral handed to a person
+  to stand are the two that do.
+- A router-named skill's `description` is as short as it can be: the router names it and the
+  caller invokes it by name, so the line never has to attract an invocation, and it is loaded
+  into every session's context whether or not guard runs.
+- A roster key names the AUDIT and is user-visible configuration; an ENTRY names what the
+  caller invokes for that audit on one path. `agents._path_entry` is the ONLY place one
+  becomes the other, and `cmd_candidates` is its only caller. An entry is an agent for some
+  rows and a skill for others — whichever it is, the name the router prints is the
+  name the caller invokes, and its playbook section says with which tool. A key must never be renamed to follow an agent —
+  `_load_config` honours only keys it knows, so a configured audit would silently read as its
+  default. Nothing else may derive a dispatchable identity from a key.
 - Nothing resolves a plugin path by counting `__file__` parents.
 - Where a piece of text lives is decided by how often it is paid for: hook output is read on
-  every routed turn, `agents/router.md` once per routed turn by the router alone,
+  every routed turn, `agents/turn-router.md` once per routed turn by the router alone,
   `hooks/context/dispatch-playbook.md` only by whoever is sent to a section. Nobody re-types
   another home's text, and nothing in the playbook describes routing.
 - guard writes the turn record's **response** section itself, verbatim from the Stop payload —
@@ -143,6 +175,15 @@ each one cost.
   two and this is a switch; lose either and it is the gate again. `dev/design.md` has the
   argument.
 - A `reuse_agents` list separate from the per-agent mode, or an `exempt_skills` list.
+- The `reuse` mode itself — one named instance per session, resumed on later turns. Removed
+  once each agent's "If you are resumed" section was, since that section was the whole
+  mitigation for what reuse costs: a verdict the instance got wrong stays in its history as
+  settled. Reviving the mode means reviving those sections, and fixing what it took with it —
+  instance names derived from the roster KEY rather than the agent name, which made every
+  agent rename silently emit a stale name.
+- `keep` / `resume` as aliases pointing at `fresh`. They meant `reuse`; a user typing one is
+  asking for what no longer exists, and answering with a different mode is worse than saying
+  the value is not a mode.
 - A `.ko-fix.md` rewrite file beside the answer.
 - A `UserPromptExpansion` matcher with no command file of that name behind it: the host
   answers `Unknown command` before the hook runs, silently, which is how every one of guard's
@@ -173,11 +214,26 @@ When editing, record what must not regress — do not restate function bodies he
 runtime are installed into repositories that are not this one, so they must not name this
 repo's paths, documents, or measurements. Those belong here or in `dev/`.
 
+**No agent file is generated any more.** There was a build step
+(`dev/agent-src/` + `dev/build-agents.py`) while the shared audits ran as two agents each and
+their criteria had to be inlined into both; the entry split removed the duplication it
+existed to manage. `dev/design.md` keeps the argument, because the same pressure returns the
+moment two definitions share a body.
+
 ## Testing
 
-There is no automated suite. `dev/design.md` § "Manual testing" is the recipe — run it end to
+`uv run dev/check-entries.py` is the one thing close to a test: it fails if a roster entry
+point matches neither `agents/<name>.md` nor `skills/<name>/SKILL.md`, or if the file it does
+match declares a different `name:` in its frontmatter. That is the only place the Python roster
+and the markdown definitions can be compared at all, and both failures are silent at runtime —
+a dispatch or an invocation that matches nothing finds nothing rather than raising. Nothing
+runs it for you; put it in a local pre-commit hook.
+
+Beyond that there is no automated suite. `dev/design.md` § "Manual testing" is the recipe — run it end to
 end after changing hook output, state, eligibility, or the dispatch text, and read its
 comments: several steps exist to stop the assertions from passing as silent no-ops.
 
 `dev/fixtures/` holds answers with known defects planted in them, for exercising an audit
 agent against a ground truth rather than against whatever the last turn happened to produce.
+`defective-brief.md` is the document-path counterpart — its planted defects are the ones that
+path gets wrong, and it lists two things the agent must NOT report.

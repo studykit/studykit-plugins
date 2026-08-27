@@ -2,11 +2,10 @@
 
 Configuration is optional: a JSON object at ``${CLAUDE_PROJECT_DIR}/.claude/guard.local.json``
 (``.codex/`` on Codex). One ``AgentMode`` per agent, keyed by that agent's own name —
-``claims-auditor`` / ``deferrals-auditor`` / ``clarity-auditor`` / ``korean-corrector`` /
-``comment-corrector`` / ``agents-md-auditor``, each
-``"off"`` (the default) / ``"fresh"`` / ``"reuse"`` — which together are the only control
-over whether guard says anything unasked and over whether an agent is respawned per turn or
-held open for the session. Plus ``audit-turn`` / ``audit-plan`` (``"on"``, the default, or
+``claims-auditor`` / ``deferrals-auditor`` / ``clarity-auditor`` / ``comment-corrector`` /
+``agents-md-auditor``, each
+``"off"`` (the default) or ``"fresh"`` — which together are the only control
+over whether guard says anything unasked. Plus ``audit-turn`` / ``audit-plan`` (``"on"``, the default, or
 ``"off"``: the state each session's two audits OPEN in — the shell toggles move the session
 only and never write here) and ``refs_dir`` (project-relative directory for saved copies of cited docs; empty
 means the git-tracked default ``wiki/ref/``, and an unsafe value falls back to it — see
@@ -78,27 +77,27 @@ class AgentMode(StrEnum):
 
     ``OFF`` — never recommended unasked. ``FRESH`` — a new instance per dispatch, which
     is the shape every agent definition is written for: judged in a fresh context, by a
-    reader rather than the author. ``REUSE`` — one named instance per session, resumed on
-    later turns with its full history.
+    reader rather than the author.
 
-    ``REUSE`` is not strictly better and not strictly worse, which is why it is the
-    user's call and not a default. It buys continuity: the instance already knows this
-    repository and this session's conventions, it does not re-derive the same thing every
-    turn, and the main agent can go back to it ("you cleared this claim two turns ago —
-    does the change I just made break it?"). It costs independence: a verdict it got
-    wrong is now in its own history as settled, and every later turn inherits that error,
-    where a fresh instance would have looked again. Continuity is worth most where the
-    judgment is about text and conventions (the correctors); independence is worth most
-    where it is about whether something is true (the auditors).
+    There used to be a third, ``REUSE``: one named instance per session, resumed on later
+    turns with its full history. It bought continuity and cost independence — a verdict it
+    got wrong sat in its own history as settled, and every later turn inherited that error
+    where a fresh instance would have looked again. What made the trade survivable was one
+    section in each agent's definition telling a resumed instance that a turn record it has
+    not read is a NEW turn and that a remembered verdict is not a checked one. Those sections
+    were removed, and a hazard whose only mitigation is gone is not a mode worth keeping. Do
+    not add it back without them.
 
-    Reuse is per SESSION, not per project — subagent transcripts live under the session
-    id, so a new session starts every agent fresh whatever this says
-    (``wiki/ref/claude-code-subagent-resume.md``).
+    Two things it took with it, both worth knowing before reviving it. Instance names were
+    derived from the ROSTER KEY rather than from the agent name, so a renamed agent kept
+    emitting its old instance name with nothing failing — a trap for every future rename,
+    and one that is live again the moment anything derives a dispatchable identity from a
+    key (see ``agents._path_entry``, which is now the only translation). And its two mode-transition notices existed only because guard
+    cannot see or stop a running instance; that asymmetry comes back with it.
     """
 
     OFF = "off"
     FRESH = "fresh"
-    REUSE = "reuse"
 
 
 # The words that mean armed and muted, for BOTH ways a two-valued switch is written: the
@@ -125,26 +124,35 @@ AUDIT_SWITCHES = (AUDIT_TURN_KEY, AUDIT_PLAN_KEY)
 # CLI spellings accepted for a mode, beyond the member values themselves. The boolean
 # words are kept because "on"/"off" is what a switch has always been set with here, and
 # "on" has to mean something: it means the mode the agents were designed for.
+#
+# `keep` and `resume` used to alias the removed REUSE mode. They are NOT re-pointed at
+# FRESH: a user who types one is asking for the thing that no longer exists, and silently
+# giving them a fresh instance per turn would answer a different question. `_parse_mode`
+# returns None and the CLI says the value is not a mode, which is the honest reply.
 _MODE_ALIASES = {
     "on": AgentMode.FRESH, "true": AgentMode.FRESH, "yes": AgentMode.FRESH,
     "1": AgentMode.FRESH, "new": AgentMode.FRESH,
     "false": AgentMode.OFF, "no": AgentMode.OFF, "0": AgentMode.OFF,
-    "keep": AgentMode.REUSE, "resume": AgentMode.REUSE,
 }
 
 
 DEFAULT_CONFIG: dict[str, Any] = {
-    # There is deliberately no key for the router's model. `agents/router.md` pins `opus` and
+    # There is deliberately no key for the router's model. `agents/turn-router.md` pins `opus` and
     # that is the whole decision: every other agent in the set is paid for by one the router
     # makes, so the direction a project would tune this in — cheaper — is the direction whose
     # failure is invisible. A router that stops naming an agent looks exactly like a turn with
     # nothing in it, and the audit that never happened is the failure guard exists to prevent.
     #
-    # One key per agent, named after the agent it controls — the key IS the agent's name,
-    # so `settings set korean-corrector reuse` and `guard:korean-corrector` are the same
-    # string and there is no second vocabulary to learn or to keep in sync. The value is
+    # One key per AUDIT, named after what it audits. For most of these the key is also the
+    # agent's own name, so `settings set deferrals-auditor fresh` and
+    # `guard:deferrals-auditor` are the same string and there is no second vocabulary. Where
+    # one audit is reached through two entry points — `claims-auditor` through the
+    # `audit-turn-claims` and `audit-report-claims` skills — the key stays the audit's,
+    # because it is what a project has already written in its config file;
+    # `agents._path_entry` is the one place it becomes an entry-point name, and the user
+    # never types either of those. The value is
     # an `AgentMode`, so how the agent runs is the same setting as whether it runs: there
-    # is no separate reuse list that could name an agent that is off.
+    # is no separate list of any kind that could name an agent that is off.
     #
     # These are the ONLY control over whether guard says anything unasked. All of them off
     # (the default) is guard silent at Stop: no router, no recommendation, nothing added
@@ -181,10 +189,6 @@ DEFAULT_CONFIG: dict[str, Any] = {
     # it degrades loudly — with no reader profile it says so and checks less, instead of
     # guessing a level and flagging either every technical term or none of them.
     "clarity-auditor": AgentMode.OFF,
-    # Does a Korean response read as natural Korean, or as translated English?
-    # Switching it on in an English-answering project costs nothing on those turns: the
-    # router reads the response and simply does not pick it.
-    "korean-corrector": AgentMode.OFF,
     # Comments in the source files THIS TURN edited. Unlike the three above it is not
     # an audit of the response: it points a corrector at real files and that corrector
     # EDITS them, unattended, in the turn the user is still reading. That is why it is
@@ -269,7 +273,7 @@ def _load_config(project_dir: Path) -> dict[str, Any]:
         return config
     for key, default in DEFAULT_CONFIG.items():
         # An ``AgentMode`` default round-trips through JSON as a plain str, and
-        # ``isinstance("reuse", AgentMode)`` is False — so the accepted type has to be
+        # ``isinstance("fresh", AgentMode)`` is False — so the accepted type has to be
         # widened for those keys or every mode in the file is silently dropped and only
         # the session state is ever honored. The accessor (``_agent_mode``) validates the
         # value; this only checks the shape.
@@ -342,10 +346,15 @@ def _agent_mode(cfg: dict[str, Any], key: str) -> AgentMode:
     ``off`` — the safe direction, since the alternative is guard acting on a setting the
     user did not write.
     """
+    # A key with no default is an agent with no switch (`AuditAgent.fixed_mode`). Callers
+    # are meant to consult the roster for those, so reaching here is a bug — but it must not
+    # be a crash: this runs inside hooks, and an exception here took `settings show` down to
+    # silent-and-exit-0 once, which is the shape guard must never fail into.
+    default = DEFAULT_CONFIG.get(key, AgentMode.OFF)
     try:
-        return AgentMode(str(cfg.get(key, DEFAULT_CONFIG[key])).strip().lower())
+        return AgentMode(str(cfg.get(key, default)).strip().lower())
     except ValueError:
-        return AgentMode(DEFAULT_CONFIG[key])
+        return AgentMode(default)
 
 
 def _switch_on(cfg: dict[str, Any], key: str) -> bool:

@@ -1,12 +1,14 @@
 ---
 name: audit-plan
-# One sentence, and it withholds rather than informs. The model reads this line every turn
-# and acts on whatever it finds, so the line's whole job is to remove this skill from what
-# the model chooses; guard tells it when. Naming the hook would put the trigger back — a
-# model that just left plan mode reads `ExitPlanMode` as its cue. The description that
+# Extremely short — see `audit-turn-claims` for why. The plan gate names this skill in its
+# hook output ("Run the `guard:audit-plan` skill over the plan", `cmd_plan_gate.py`) and the
+# user types `/guard:audit-plan`, so the line never has to attract an invocation; its one job
+# is keeping the model from choosing it. That job is not optional: the description that
 # described the review got twelve agents dispatched over a plan nobody had approved
-# (measured). `disable-model-invocation: true` would shut guard out too.
-description: You will be told when to run this. Never decide it yourself.
+# (measured), and naming the hook would put the trigger back — a model that just left plan
+# mode reads `ExitPlanMode` as its cue. `disable-model-invocation: true` would shut guard out
+# too.
+description: Invoked by guard only.
 # The two read-only guard commands this skill runs on every review, pre-approved so the
 # review does not open with a permission prompt for guard's own bundled scripts. Both print
 # and exit: one lists the project's configured knowledge directories, the other records that

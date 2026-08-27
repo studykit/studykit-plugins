@@ -1,6 +1,6 @@
 ---
 name: settings
-description: "View and change guard's settings for this project — whether new sessions start with turn and plan auditing armed (audit-turn / audit-plan, on unless set), one setting per agent, each off / fresh / reuse, plus refs_dir — recorded in .claude/guard.local.json. Use when the user wants to configure guard: turn an audit on or off by default, admit an agent, keep one running across turns instead of respawning it, or point guard at a different refs directory. Claude Code only."
+description: "View and change guard's settings for this project — whether new sessions start with turn and plan auditing armed (audit-turn / audit-plan, on unless set), one setting per agent, each off / fresh, plus refs_dir — recorded in .claude/guard.local.json. Use when the user wants to configure guard: turn an audit on or off by default, admit an agent, or point guard at a different refs directory. Claude Code only."
 argument-hint: '[key] [value]'
 disable-model-invocation: true
 # Runs in a forked subagent, not in the main session. Changing a setting is a few CLI calls
@@ -87,23 +87,29 @@ made through the CLI, report that instead of working around it.
 | --- | --- | --- |
 | `audit-turn` | `on` (default) / `off` | Whether a session **starts** with turn auditing armed. `off` and guard recommends nothing when a turn ends, whatever the agent keys below say. This is the project's default, not the live session: `guard on` / `guard off` in a shell move the session you are in and leave this alone. |
 | `audit-plan` | `on` (default) / `off` | Whether a session **starts** with the plan gate armed. While armed, an approved plan is held before it is built until it has been through `/guard:audit-plan`, and revising the plan holds it again. Its session-level command is `guard-plan on` / `guard-plan off`. |
-| `claims-auditor` | `off` / `fresh` / `reuse` | Admits `guard:claims-auditor` — it flags statements asserted without adequate evidence. |
-| `deferrals-auditor` | `off` / `fresh` / `reuse` | Admits `guard:deferrals-auditor` — it flags work punted as "TBD" / "확인 필요" that the repo could have answered. |
-| `clarity-auditor` | `off` / `fresh` / `reuse` | Admits `guard:clarity-auditor` — it flags terms used but never explained, mechanisms given with no concrete example, and explanation pitched wrong for this reader. It calibrates against a reader profile; without one it says so and checks less, so `/guard:reader-profile` comes first if the user means to rely on it. |
-| `korean-corrector` | `off` / `fresh` / `reuse` | Admits `guard:korean-corrector` — it flags 번역체 phrasing and a register that is not 존댓말, and hands back the corrected text. Identifiers, paths, commands, and established loanwords (커밋, 리팩토링) are left alone. |
-| `comment-corrector` | `off` / `fresh` / `reuse` | Admits `guard:comment-corrector`, for the source files the turn actually edited. This one **edits those files in place**, so its fixes land without being asked — say so when the user turns it on. |
-| `agents-md-auditor` | `off` / `fresh` / `reuse` | Admits `guard:agents-md-auditor`, for the `AGENTS.md` / `CLAUDE.md` files the turn actually edited, judged as instruction files. Reports only — but its findings often mean moving content into a doc that does not exist yet, which is the user's decision, not the agent's. |
+| `claims-auditor` | `off` / `fresh` | Flags statements asserted without adequate evidence. One switch, two entry points: the `audit-turn-claims` skill on a finished turn, `audit-report-claims` on a saved document. Both fork the same `claims-auditor`. |
+| `deferrals-auditor` | `off` / `fresh` | Flags work punted as "TBD" / "확인 필요" that the repo could have answered. One switch, two entry points: the `audit-turn-deferrals` skill on a finished turn, `audit-report-deferrals` on a saved document. Both fork the same `deferrals-auditor`. |
+| `clarity-auditor` | `off` / `fresh` | Flags terms used but never explained, mechanisms given with no concrete example, and explanation pitched wrong for this reader. One switch, one agent, two entry points: the `audit-turn-clarity` skill on a finished turn, `audit-report-clarity` on a saved document. It calibrates against a reader profile; without one it says so and checks less, so the `reader-profile` skill comes first if the user means to rely on it. |
+| `comment-corrector` | `off` / `fresh` | Admits `guard:comment-corrector`, for the source files the turn actually edited. This one **edits those files in place**, so its fixes land without being asked — say so when the user turns it on. |
+| `agents-md-auditor` | `off` / `fresh` | Admits `guard:agents-md-auditor`, for the `AGENTS.md` / `CLAUDE.md` files the turn actually edited, judged as instruction files. Reports only — but its findings often mean moving content into a doc that does not exist yet, which is the user's decision, not the agent's. |
 | `refs_dir` | a project-relative path, or empty | Where guard saves cited-doc copies. Empty = the git-tracked default `wiki/ref/`, committed with the repo; a different tracked path (e.g. `docs/refs`) overrides it. |
 
 **Every agent setting ships off**, and with all of them off guard is silent: a finished turn adds
 nothing to the main session's context and makes no model call. Turning one on only makes
 that agent *available* — the router still has to find something in the turn before it names
-it, which is why turning `korean-corrector` on costs nothing on an English turn. The two
+it. The two
 file-reading agents (`comment-corrector`, `agents-md-auditor`) skip the router entirely and
 need a file of their own kind that the turn wrote, so they cost nothing on the many turns that
 write none.
 
-**Two agents have no setting here and cannot be given one.** `guard:ext-docs-fetcher` is
+**Four agents have no setting here and cannot be given one.** `guard:korean-translator` writes
+the Korean the user reads and `guard:korean-corrector` checks what it wrote — one step, not an
+audit to opt into, and a switch on either half would mean a Korean answer the user reads in a
+quality that depends on a config key. They cost nothing where they are not needed: the router
+names them only when the turn is being delivered in Korean prose, and they never make a turn
+routed on their own — with every switch below `off`, guard is still silent.
+
+`guard:ext-docs-fetcher` is
 selected from its own description, the way any agent is — there is nothing said unasked for a
 switch to govern. `guard:ext-docs-auditor` is named by the Stop hook whenever the turn wrote a
 file under `refs_dir`, whoever wrote it, and deliberately so: the party most likely to break
@@ -115,28 +121,16 @@ only way an audit runs. So a user switching everything off is switching guard of
 project, not merely quieting it; say that plainly rather than reassuring them they can still
 ask for one turn to be checked.
 
-### `fresh` vs `reuse`
+### `fresh` is the only mode
 
-`fresh` (what "on" means) spawns a new instance every time the agent is needed. `reuse`
-keeps **one** instance for the session, named `guard-<agent>`: the main session dispatches
-it under that name once and messages it by name afterwards, so it keeps everything it has
-already read and judged.
+`fresh` (what "on" means) spawns a new instance every time the agent is needed, and that is
+now the only way an agent runs. A `reuse` mode used to keep one named instance per session;
+it was removed along with the instruction in each agent's definition that told a resumed
+instance a turn it had not read was a new turn. A reused instance without that instruction
+carries an earlier verdict forward as settled, so the mode went with it.
 
-Neither is simply better:
-
-- `reuse` buys continuity — the instance already knows this repository and this session's
-  conventions and stops re-deriving them every turn.
-- `fresh` buys independence — a verdict a reused instance got wrong sits in its own history
-  as settled, and every later turn inherits that error where a new instance would look
-  again.
-
-Continuity is worth most where the judgment is about text and conventions: the correctors.
-Independence is worth most where it is about whether something is true: the auditors. Reuse
-lasts one session — a new session starts every agent fresh whatever this says.
-
-A mode moved **away** from `reuse` makes the CLI print a stand-down note. Pass it through
-verbatim: it is guard's only channel for telling the main session to stop addressing an
-instance guard itself cannot see.
+A config file may still hold `"reuse"` from before. It is not a mode any more, so it reads as
+`off` — say so if you see one, and offer `unset` or a `set` to `fresh`.
 
 ## What to do
 
@@ -146,9 +140,8 @@ instance guard itself cannot see.
    you; do not ask first.
 3. **Otherwise ask**, in your transcript, as plain prose the user can reply to. Name the
    keys worth changing, their current values, and what the alternatives would do. For an
-   agent key give one line on `fresh` and one on `reuse` rather than only listing them.
-4. **Report what changed** and show the settings the command printed, including any
-   stand-down note, verbatim.
+   agent key say what the agent does, not just that it can be on or off.
+4. **Report what changed** and show the settings the command printed, verbatim.
 
 If `show` and the file disagree — the file holds a key the listing never mentions — that key
 is one guard no longer honors. Say so and offer `unset`. Do not run it unprompted: the user

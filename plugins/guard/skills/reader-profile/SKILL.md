@@ -1,6 +1,6 @@
 ---
 name: reader-profile
-description: 'Establish or update the reader profile guard''s clarity-auditor calibrates against — the user''s field, experience and vocabulary. Run once before relying on /guard:clarity-auditor, and again whenever the auditor over- or under-explains. Use when the user asks to set up, review, or correct what guard knows about them as a reader. Claude Code only.'
+description: 'Establish or update the reader profile guard''s clarity-auditor calibrates against — the user''s field, experience and vocabulary. Run once before relying on guard's clarity audit, and again whenever the auditor over- or under-explains. Use when the user asks to set up, review, or correct what guard knows about them as a reader. Claude Code only.'
 argument-hint: '[what to record or correct]'
 disable-model-invocation: true
 ---
@@ -36,7 +36,7 @@ every project and is written once, not per repository.
    telling it to record the confirmed profile in its memory and to report nothing else. It
    owns that directory; do not write there yourself, and do not audit anything in this run.
 
-4. **Confirm in one line** what was recorded and that `/guard:clarity-auditor` will now
+4. **Confirm in one line** what was recorded and that the clarity audit will now
    calibrate against it.
 
 ## Updating

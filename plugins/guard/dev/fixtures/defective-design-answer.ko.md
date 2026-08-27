@@ -65,7 +65,7 @@ description: >
   end of an audited turn; invoke it then, and not otherwise. Claude Code only.
 argument-hint: ''
 context: fork
-agent: guard:router
+agent: guard:turn-router
 background: false
 allowed-tools: Bash(uv run --script ${CLAUDE_PLUGIN_ROOT}/scripts/guard_hook.py route*)
 ---
@@ -74,7 +74,7 @@ allowed-tools: Bash(uv run --script ${CLAUDE_PLUGIN_ROOT}/scripts/guard_hook.py 
 ```
 
 본문이 거의 비어 있는 게 정상입니다. `context: fork`에서는 **에이전트 정의가 시스템
-프롬프트, skill 본문이 task**입니다. 판단 방법은 이미 `agents/router.md`에 있습니다.
+프롬프트, skill 본문이 task**입니다. 판단 방법은 이미 `agents/turn-router.md`에 있습니다.
 본문은 이번 턴의 입력만 실어 나르면 됩니다.
 
 `allowed-tools`에 같은 `${CLAUDE_PLUGIN_ROOT}` 문자열을 쓰는 게 필수입니다. 주입 명령은
@@ -103,7 +103,7 @@ guard: audit the turn you just finished — invoke the `guard:routing` skill.
 필드 블록은 `cmd_route`의 stdout으로 옮겨 갑니다. 파일 판독 에이전트
 (`comment-corrector` 등) 블록은 라우터를 안 거치므로 지금 자리에 그대로 둡니다.
 
-### `agents/router.md` — 출력에 answer file 경로 추가
+### `agents/turn-router.md` — 출력에 answer file 경로 추가
 
 이게 놓치기 쉬운 필수 변경입니다. 지금은 메인 에이전트가 훅 블록에서 answer file 경로를
 받습니다. skill 경로에서는 그 블록이 fork 안으로만 들어갑니다. 라우터가 보고서에 그
@@ -118,7 +118,7 @@ guard: audit the turn you just finished — invoke the `guard:routing` skill.
   `disable-model-invocation`이 없는 유일한 `/guard:*` 파일.
 - **`dispatch-playbook.md`의 `Dispatching` 절.** "Never invoke a `/guard:*` skill to do
   it" 에 같은 예외를 명시.
-- **`router_model` 설정이 죽습니다.** 지금은 훅이 `- dispatch guard:router with model: …`
+- **`router_model` 설정이 죽습니다.** 지금은 훅이 `- dispatch guard:turn-router with model: …`
   를 찍어 `guard.local.json`의 값을 반영합니다. skill의 `model:`은 프론트매터라 정적입니다.
   설정을 접고 프론트매터에 `opus`를 박든지, 이 한 항목 때문에 Agent 디스패치 경로를
   남기든지 — 전자를 권합니다.

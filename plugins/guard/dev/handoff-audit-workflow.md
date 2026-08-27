@@ -53,7 +53,7 @@ version the user reads is translated afterwards into a sibling file (`<turn>.md`
     reply → open. Plus a rule that **only an audited file may be opened**, with the four cases
     spelled out. The English answer file is never opened as a stand-in for an unchecked
     translation, but is opened normally when English is the user's own language.
-- **`agents/router.md`** — the `korean-corrector` triage rule cannot read the answer file any
+- **`agents/turn-router.md`** — the `korean-corrector` triage rule cannot read the answer file any
   more (it is English by design), so it judges from the request file: will this turn be
   delivered in Korean. That required an explicit exception to the standing rule in `Inputs`
   that the request may only ever remove candidates, never add one.

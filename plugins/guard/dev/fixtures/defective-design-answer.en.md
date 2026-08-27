@@ -66,7 +66,7 @@ description: >
   end of an audited turn; invoke it then, and not otherwise. Claude Code only.
 argument-hint: ''
 context: fork
-agent: guard:router
+agent: guard:turn-router
 background: false
 allowed-tools: Bash(uv run --script ${CLAUDE_PLUGIN_ROOT}/scripts/guard_hook.py route*)
 ---
@@ -76,7 +76,7 @@ allowed-tools: Bash(uv run --script ${CLAUDE_PLUGIN_ROOT}/scripts/guard_hook.py 
 
 An almost empty body is correct here. Under `context: fork`, **the agent definition is the
 system prompt and the skill body is the task**. The method of judgment is already in
-`agents/router.md`. The body only has to carry this turn's inputs.
+`agents/turn-router.md`. The body only has to carry this turn's inputs.
 
 Using the same `${CLAUDE_PLUGIN_ROOT}` string in `allowed-tools` is mandatory. Injected
 commands never prompt for permission, and anything other than an allow verdict **aborts the
@@ -106,7 +106,7 @@ guard: audit the turn you just finished — invoke the `guard:routing` skill.
 The field block moves into `cmd_route`'s stdout. The block for the file-reading agents
 (`comment-corrector` and friends) never goes through the router, so it stays where it is.
 
-### `agents/router.md` — add the answer file path to the output
+### `agents/turn-router.md` — add the answer file path to the output
 
 This is the easy-to-miss mandatory change. Today the main agent gets the answer file path from
 the hook block. On the skill path that block goes only into the fork. If the router does not
@@ -122,7 +122,7 @@ added to each of the two templates in the `Output` section does it.
 - **The `Dispatching` section of `dispatch-playbook.md`.** State the same exception against
   "Never invoke a `/guard:*` skill to do it".
 - **The `router_model` setting dies.** Today the hook prints
-  `- dispatch guard:router with model: …` and that reflects the value in `guard.local.json`.
+  `- dispatch guard:turn-router with model: …` and that reflects the value in `guard.local.json`.
   A skill's `model:` is frontmatter, so it is static. Either fold the setting away and hardcode
   `opus` in the frontmatter, or keep the Agent dispatch path alive for this one item — I would
   take the former.
