@@ -76,10 +76,9 @@ class AuditAgent(NamedTuple):
     ``turn_entry`` and ``report_entry`` name what the caller INVOKES to run this audit on
     each dispatch path — the finished turn, and a standalone document such as an interview
     brief. ``turn_entry=None`` (the usual case) means the agent's name IS the key.
-    ``report_entry=None`` means the audit is not offered on the document path at all, which
-    is the right answer for part of the roster: the Korean pair writes and checks a
-    translation that the document path never produces, and the file-reading agents are
-    pointed at a turn's edits.
+    ``report_entry=None`` means the audit is not offered on the document path at all: the
+    file-reading agents are pointed at a turn's edits, and ``korean-corrector`` is not offered
+    anywhere, since the translator's report is what reaches it.
 
     An entry is a SKILL for every audit that runs on both paths and the agent's own name for
     the rest; the three shared audits are each one agent behind two `context: fork` skills.
@@ -165,7 +164,13 @@ AUDIT_AGENTS: dict[str, AuditAgent] = {
     # decides whether it runs is the router, on the language of the turn — so an
     # English-answering project never pays for it, and a Korean-answering one cannot end up
     # with the main session translating its own text because a config key was left off.
-    "korean-translator": AuditAgent(reads="turn", needs_history=False, fixed_mode="fresh"),
+    #
+    # It has a `report_entry` — a document gets translated too. The language cannot be worked
+    # out from the document (it is English by design, like the answer file) and there is no
+    # request file on that path, so the caller states it in the dispatch; on the interviewer's
+    # brief that is the language of the `@` conversation the brief came out of.
+    "korean-translator": AuditAgent(reads="turn", needs_history=False, fixed_mode="fresh",
+                                    report_entry="korean-translator"),
     # Switch-free for the same reason, and it has to be the same reason: these two are one
     # step. A corrector the user can switch off behind a translator they cannot is a Korean
     # deliverable nothing reads — and the pair is what makes the writer/reader split hold.

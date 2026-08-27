@@ -252,8 +252,13 @@ They agreed to the audit:
 
 ```
 <the brief path>
-Route this before building on it: dispatch `guard:report-router` (subagent_type: "guard:report-router") with `- file: <the brief path>` and follow its report.
+Route this before building on it: dispatch `guard:report-router` (subagent_type: "guard:report-router") with `- file: <the brief path>` and `- language: <the language the user wrote to me in>`, then follow its report.
 ```
+
+The `language` line is the language **the user used with you**, named in English — `Korean`,
+`Japanese`, `English`. You are the only party that was in that conversation, and the brief
+itself is English by design, so nothing downstream can work it out once you stop. Send the line
+even when the answer is `English`; a stated language is a fact and an omitted one is a guess.
 
 They declined:
 

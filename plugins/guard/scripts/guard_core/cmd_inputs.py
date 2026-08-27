@@ -116,11 +116,11 @@ def _inputs_for_file(argv: list[str]) -> int:
 
     - no **request file**, because nobody typed a prompt that produced this document. The
       materiality call the router makes from a request is simply unavailable here.
-    - no **closeout**. guard's turn closeout is written around a turn: it routes findings
-      back into the answer file, then into a translation of it, then into how the turn is
-      presented to the user. None of that exists for a document, and a caller following those
-      steps over a brief would produce a translation nobody asked for. The document router
-      carries its own, much shorter, dispatch instructions instead.
+    - no **closeout**. guard's turn closeout is written around a turn: findings go into the
+      answer file, the reply is short and in the user's language, and only an audited file is
+      opened. A document has no reply and nothing to open. The document router carries its own,
+      much shorter, dispatch instructions instead — including the translation, which a document
+      does get when its reader reads another language.
     - no **transcript** and no **turn**, and this one is easy to get wrong. The brief is
       written inside a subagent's own conversation, which the MAIN session's transcript does
       not contain — so handing that path over would offer history that provably cannot hold

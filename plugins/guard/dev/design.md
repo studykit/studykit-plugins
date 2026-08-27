@@ -776,6 +776,27 @@ payloads, not memory.
   ones guard itself dispatched, and the machinery it takes to exclude them is larger than the
   one line an agent that wants routing can write for itself.
 
+- **A document gets translated too — v0.103.0.** `korean-translator` had no `report_entry`, so
+  it never appeared in `guard-candidates --doc` and a brief could only ever be delivered in
+  English. The code said this was deliberate — "a translation that the document path never
+  produces", "a translation nobody asked for" — but the exclusion was a consequence of how the
+  language gets decided, not a decision about documents. On the turn path the request file
+  settles the language; the document path has no request file, so nothing could answer the
+  question and the agent was left off.
+
+  What answers it is the party that was in the conversation. The interviewer's handoff line now
+  carries `- language: <the language the user wrote to me in>` beside the brief path, and
+  `report-router` treats that line as the one input it cannot derive: present, the document is
+  being delivered in that language and the translator is nameable; absent, there is nothing to
+  translate. The line is sent even when the answer is `English` — a stated language is a fact and
+  an omitted one is a guess.
+
+  `korean-corrector` stays off both rosters. It has no `report_entry` and `routed=False`, which
+  is not two exclusions but one fact stated twice: the translator's report hands it the file it
+  audits, and that is the only party that knows the file exists. It has no config key either,
+  and `_switch_on` reads it as `off` everywhere — so its roster row now does nothing but keep it
+  out of the way.
+
 - **The user decides whether their brief is audited — v0.102.0.** The handoff above made routing
   automatic, which is the wrong default for this one document: the brief is the record of a
   conversation the user had, and an audit of it spends several subagents on something they may

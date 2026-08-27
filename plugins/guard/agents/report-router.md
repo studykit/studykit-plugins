@@ -19,9 +19,16 @@ ships the defect.
 
 ## Inputs
 
-The dispatch hands you one thing: **the file**, as `- file: <path>`. Run
+The dispatch hands you **the file**, as `- file: <path>`, and sometimes one more line,
+`- language: <language>` — the language this document's reader reads. Run
 `guard-inputs --file <path>` — it is on your `PATH` — and it prints one `key: value` per
 line: `file` (the same path, resolved) and any `knowledge dir` the project has configured. Use the resolved path in your answer, not the one you were handed.
+
+**`language` is the only thing you cannot work out for yourself, which is why it is handed to
+you.** The document is written in English by design, so reading it tells you nothing about who
+reads it, and unlike the turn router you get no request file — nobody typed a prompt that
+produced this document. When the line is absent, the document is not being delivered to a
+reader in another language and there is nothing to translate.
 
 It prints no closeout file, and that is deliberate: guard's turn closeout is written around a
 turn — it routes findings into the answer file, then a translation of it, then how the turn is
@@ -40,9 +47,9 @@ your document expecting a transcript. It works out which session it belongs to b
 Every name it prints is an audit that exists for documents. Nothing you have to refuse is
 offered — an audit with no document-side entry point simply does not appear.
 
-**Every one of them is a SKILL your caller invokes**, not an agent it dispatches; the names all
-begin `audit-`. You do not invoke anything yourself, but your output has to say which it is,
-because there is no closeout file on this path to say it for you.
+**A name beginning `audit-` is a SKILL your caller invokes**; anything else is an AGENT it
+dispatches with the Agent tool. You invoke nothing yourself, but your output has to say which it
+is, because there is no closeout file on this path to say it for you.
 
 **You may name only the names it printed.** A name that is not printed is not available, so
 ignore its section below and never name it. If the command prints nothing, or fails, or says
@@ -141,6 +148,21 @@ No when it is not explaining at all: a bare list, a record of what was said, a s
 Do **not** decide whether the explanation is *good*. A clear one and a baffling one both go
 to it. You are answering "is this an explanation".
 
+### `korean-translator`
+
+**Do not judge this one from the document**, which is English by design and tells you nothing
+about who will read it. The question is whether the `- language:` line was in your dispatch. If
+it was, this document is being delivered to a reader in that language and the translation is how
+they get it. If it was not, do not name this agent.
+
+Materiality still applies, the same as everywhere: a document with nothing in it worth
+delivering — a stub, a file that records that there was nothing to record — has nothing to
+translate either.
+
+Do **not** judge any of the prose, and do not judge how it would translate. Word choice and
+phrasing are this agent's whole job, and the text it would be judged on does not exist yet.
+Whatever checks the translation afterwards is named by the translator's own report, not by you.
+
 ## Output
 
 Plain text, nothing else: no preamble, no summary of the document, no commentary on how it
@@ -166,6 +188,16 @@ Run each of these concurrently, handing it this one file and nothing else. Every
 File: <resolved path>
 - `audit-report-claims` — states "the API rate-limits at 100 rps" with no source
 ```
+
+**If `korean-translator` is among your picks**, add this after the last one. It is an AGENT, not
+a skill, and it runs last — its source is the file after the audits' findings are in it:
+
+```
+Last, once those findings are applied, dispatch `guard:korean-translator` (subagent_type: "guard:korean-translator") on its own, with two inputs and nothing else: the file above as its source, and <translation path> as the file it writes. Give it no history and no repository paths, and write no draft of your own for it to fix. Then do what its report tells you.
+```
+
+`<translation path>` is the file's path with `.md` replaced by `.<lang>.md` — `.ko.md` for
+Korean. Write it out in full; your caller does no string surgery on a path.
 
 The path goes in verbatim as `guard-inputs` printed it: your caller was given one path and
 nothing else, and a path you retype from memory or shorten is one it cannot open. Each one is
