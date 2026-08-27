@@ -236,7 +236,7 @@ Answer file: <answer file path>
 printed them in:
 
 ```
-Dispatch every `audit-` name below in ONE message, in this order. Each is a SKILL: invoke `guard:<name>` with the turn id <turn id> and nothing else — not with the Agent tool, and with no instructions of your own about what to look for. They edit nothing; apply what they report to the answer file, then close the turn out per `Presenting the result` in <closeout path>.
+Dispatch every `audit-` name below CONCURRENTLY, all of them in ONE message — they edit nothing and share no input, so none of them waits on another and the order they are listed in is only a listing. Each is a SKILL: invoke `guard:<name>` with the turn id <turn id> and nothing else — not with the Agent tool, and with no instructions of your own about what to look for. When they have all reported, apply what they found to the answer file, then close the turn out per `Presenting the result` in <closeout path>.
 Answer file: <answer file path>
 - `audit-turn-claims` — asserts "Redis가 Postgres보다 항상 빠릅니다" as settled fact
 ```
@@ -261,8 +261,13 @@ are how it reaches the file it must correct, translate, or simply name to the us
 you retype from memory or shorten is one it cannot open, and a turn id you alter is a skill
 that resolves someone else's turn.
 
-The order matters and it is the order you were given: the read-only auditors before the
-correctors, so a corrector never rewrites a sentence an auditor was about to flag.
+**Say whether the things you name run together or one after another, because your caller
+cannot work it out from the names.** The `audit-` picks are read-only and touch nothing each
+other reads, so they go out at once and the template says so; keep them in the order
+`candidates` printed, which is only the order they are listed in. `korean-translator` is the
+one serial step on this path — its source is the answer file after the findings are applied, so
+its line begins by saying that. Both statements are in the templates above; reproduce them
+verbatim rather than rewording either into a schedule of your own.
 
 Each key must be copied exactly as it was given to you — it is what your caller invokes, so a
 key you shorten or invent names nothing and fails silently rather than erroring. Each reason is one short

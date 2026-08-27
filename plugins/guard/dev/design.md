@@ -665,6 +665,26 @@ payloads, not memory.
 
   376 lines at v0.91.0, 80 now, and the only proper noun left in it is `/guard:reader-profile`,
   which is the user's command rather than an agent.
+
+- **Concurrent or serial is something the caller has to be told — v0.96.0.** Moving the dispatch
+  instruction into the router's template exposed a gap that the playbook had covered by
+  accident: it used to say "Send everything you were named in ONE message so they run
+  concurrently", and the rewritten template kept only "in ONE message, in this order" — which
+  states neither, and reads as a sequence. Nothing in a list of names says whether they wait on
+  each other, and this is not derivable: the routed audits are simultaneous, `korean-translator`
+  is not, and both facts are properties of what those agents read rather than of the list.
+
+  So both leads say it outright, with the reason attached, because the reason is what makes it
+  checkable when the roster changes: the `audit-` picks "edit nothing and share no input", the
+  direct-path agents' "file lists are disjoint" (`_edited_bucket` keeps them so). The
+  translator's line begins "Once those findings are applied", which is its serial dependency
+  stated as the condition it is.
+
+  The roster order stopped meaning anything on the routed path at the same time. It encoded
+  auditors-before-correctors, and no corrector is routed now — `cmd_candidates` still prints in
+  roster order, but as a stable listing for a reader comparing two turns, not as a constraint.
+  Saying so where the order is produced is what stops the next reader reconstructing a
+  dependency that is not there.
 - **Nobody gathers the session's history; agents extract it.** guard's turn store holds the
   response, plus one sibling file holding the request for the router alone (see the router
   bullets above).

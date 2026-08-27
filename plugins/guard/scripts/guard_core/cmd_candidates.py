@@ -45,10 +45,12 @@ def cmd_candidates() -> int:
 
     Read-only: it touches no state and honors no write marker, because it answers a question
     the router is entitled to ask and changes nothing by asking. Prints in ``AUDIT_AGENTS``
-    order, which is the order the router's report must preserve — the read-only auditors
-    before the correctors, so a corrector never rewrites a sentence an auditor was about to
-    flag. That ordering therefore lives in one place, the roster, and reaches the router as
-    the order of the lines rather than as a rule it has to be told.
+    order, which the router's report preserves — but on this path that is a listing order and
+    nothing more: everything routed here is read-only except ``korean-translator``, whose one
+    dependency (the corrected answer file) its own dispatch line states. The roster order used
+    to carry a real constraint, auditors before correctors, and stopped when the correctors
+    left the routed path. It is kept because a stable order is worth having for a reader
+    comparing two turns, not because anything breaks if it changes.
 
     Three shapes that print no keys, and they must not look alike on stderr. No session id
     is an installation problem. A muted session is the user having switched guard off, which

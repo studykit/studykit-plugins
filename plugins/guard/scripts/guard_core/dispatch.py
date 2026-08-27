@@ -125,11 +125,11 @@ The lead carries the one mechanical fact — these are agents, and the namespace
     ``modes`` is passed in rather than re-read from config because the caller resolved it
     from session state, which can differ from the file for the live session.
     """
-    lines = ["Dispatch each of these with the Agent tool and "
-             'subagent_type: "guard:<name>", in this order, giving it only the inputs '
-             "named under it and no instructions of your own. Then apply what each reports — "
-             "its findings say which of them you may apply and which are the user's call — "
-             "and say in one line what changed:"]
+    lines = ["Dispatch these CONCURRENTLY, all in one message, with the Agent tool and "
+             'subagent_type: "guard:<name>" — their file lists are disjoint, so none waits on '
+             "another. Give each only the inputs named under it and no instructions of your "
+             "own. Then apply what each reports — its findings say which of them you may apply "
+             "and which are the user's call — and say in one line what changed:"]
     for key in keys:
         lines.append(f"- `{key}`={modes[key].value}")
         lines.extend("  " + line for line in _agent_inputs(
