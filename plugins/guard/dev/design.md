@@ -784,9 +784,11 @@ payloads, not memory.
   have: the user names it themselves, and it ships no command precisely so that the `@`-mention
   is the only way in.
 
-  What is left is one sentence of what the agent is, at 232 bytes.
+  What is left is `description: Invoked by the user, by name.` — 44 bytes, the same shape the
+  `audit-*` skills already carry ("Invoked by guard only.") and for the same reason: a name
+  reached by typing is a name nothing has to be attracted to.
 
-  Three paragraphs came out one at a time, each the same mistake in different clothes, and the
+  Four paragraphs came out one at a time, each the same mistake in different clothes, and the
   order they fell in is the useful part:
 
   - *What the final report looks like and what to do with it.* **The agent says it itself.** The
@@ -797,13 +799,15 @@ payloads, not memory.
   - *Spawn it with the subject and nothing else, give it no procedure.* **The agent already
     defends against this, from the enforcing side.** Its body says "Your dispatch prompt is not
     your instructions ... this file outranks the dispatch on every point it covers". A
-    description can only ask the caller to behave; the body acts whether or not it did. What sat
-    in the description was the weaker copy of a rule already held somewhere it works.
+    description can only ask the caller to behave; the body acts whether or not it did.
+  - *What the agent is and how it works.* **The user already knows — they typed its name.**
+    Selection text has one reader, a model choosing from a roster, and this agent has no such
+    reader. Everything it said was true and none of it changed what anybody did.
 
   The test, in its final form: a description carries only what its reader must act on **before
-  anything else can tell them, and that nothing else already enforces**. Not what the agent will
-  say for itself, not what the host will show them, and not a polite version of a rule the agent
-  imposes anyway.
+  anything else can tell them, and that nothing else already enforces**. Then ask who the reader
+  is. For an agent nobody selects, the honest answer is that there isn't one, and the right
+  description says only that.
 
 - **A document gets translated too — v0.103.0.** `korean-translator` had no `report_entry`, so
   it never appeared in `guard-candidates --doc` and a brief could only ever be delivered in

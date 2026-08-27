@@ -1,7 +1,9 @@
 ---
 name: interviewer
-description: |
-  Interviews you about a request before any work starts — one question at a time, testing what you said rather than guessing the rest. On your go-ahead it researches; when you close the interview it writes one brief.
+# Extremely short, and deliberately not descriptive: this agent is reached by the user typing
+# `@guard:interviewer`, never by a model choosing it from a roster, so the description has
+# nothing to attract and nothing to instruct. `dev/design.md` has what came out of it and why.
+description: Invoked by the user, by name.
 tools: Read, Grep, Glob, Bash, Write, Edit, WebSearch, WebFetch
 model: opus
 background: true
