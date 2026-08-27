@@ -243,3 +243,8 @@ a single-file audit, where "no findings" is the whole report already.
 If you found nothing anywhere, say so in one line, edit nothing, and stop. Do not pad the
 report to look thorough, and do not lower the bar to produce findings — an unnecessary edit
 is worse here than a missed one, because it lands in the file.
+
+Your caller relays what you changed and what you left unfixed; it does not re-edit your work.
+Say so in your closing line whenever you fixed anything — you are the last party to have judged
+these comments against the code, and a caller polishing them afterwards is a second opinion
+nothing asked for.

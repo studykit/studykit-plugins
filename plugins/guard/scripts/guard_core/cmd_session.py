@@ -450,9 +450,10 @@ def cmd_session_start() -> int:
         else:
             print(
                 "guard: audits are on for this session. When a turn finishes, guard names the "
-                f"agents to consider and points at {_closeout_path()}, which says how to "
-                "dispatch each one and what to do with what it reports. Read only the sections "
-                "you are named; do not read the file until then."
+                "agents to consider; how to dispatch each one comes with that naming, and what "
+                f"its findings mean comes from its own report. {_closeout_path()} says how a "
+                "routed turn is closed out afterwards — do not read it until a turn sends you "
+                "there."
             )
 
     _trace(project_dir, None, "session-start", "swept", exported_project_dir=exported)

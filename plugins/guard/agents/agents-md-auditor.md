@@ -234,6 +234,12 @@ On findings, one block, grouped by axis, dropping any group with nothing under i
 </report>
 ```
 
+A `Fix:` whose destination does not exist yet is **not** your caller's to carry out: creating a
+document nobody asked for is a change of its own, and a section deleted before its new home
+exists is content lost. Write those as `<or: no such file yet — create it>` and expect them to
+be relayed to the user rather than applied. The shim, the pointer fixes, the dead links and the
+outright deletions carry no such cost, and your caller applies them.
+
 Name specific passages and paths; do not paraphrase long stretches, and do not reproduce
 the file.
 

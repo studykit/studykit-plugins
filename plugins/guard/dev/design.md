@@ -616,6 +616,38 @@ payloads, not memory.
   happening where the fact is actually known. The router now judges one question about the
   language instead of the same question twice, and `_eligible_agents` still returns the
   corrector so `settings set` keeps refusing it and `status` keeps showing it.
+
+- **The closeout file stops naming agents at all — v0.94.0.** v0.92.0 kept three sections, for
+  `comment-corrector`, `ext-docs-auditor` and `agents-md-auditor`, on the argument that their
+  findings need a judgment no report can make: a passage that must be moved rather than deleted,
+  a fix whose destination does not exist yet. The argument was wrong about *where* — the agent
+  is the party that knows which kind a finding is, and it was already writing one line per
+  finding. So each of the three now ends a finding in its disposition (`ext-docs-auditor`:
+  apply / move to `<where>` / decide; `agents-md-auditor`: a `Fix:` needing a file nobody asked
+  for is relayed, not applied; `comment-corrector`: its caller relays and does not re-edit),
+  and the sections are gone. The Stop hook's two leads stop naming the closeout file with
+  them: a turn dispatched that way wrote no answer file, so it had nothing to close out and
+  was being sent to a file it did not need.
+
+  `Common to every dispatch` went the same way and for a plainer reason: every rule in it was
+  already in the hook output or the router's template — pass only the named inputs, add no
+  instructions of your own, every instance is `fresh`. Its last paragraph was not about
+  dispatching at all but about the reply, and moved into step 4 where the reply is written.
+  The `/guard:*` warning went with it; the per-agent commands it guarded against no longer
+  exist.
+
+  Then the same test was applied to what remained, and most of it failed too. The turn id is in
+  the Stop hook's output and in the router's template, so the closeout has no reason to explain
+  passing it on. The measurement behind auditing English first is rationale and moved to the
+  bullet above. So did the paragraph explaining why guard stores text in a file at all — a
+  reader following the closeout does not need guard's cost model. The transcript fallback lost
+  its mechanics and kept its two rules: raw text, and say it came from you.
+
+  What is left is a four-line lead, the answer-file convention and `Presenting the result` — 376
+  lines at v0.91.0, 101 now, naming only the two agents the closeout itself sequences. The rule
+  that keeps it that way is in `AGENTS.md`: a closeout sentence naming a particular agent is
+  either a second authority over a decision already made, or a lookup that belongs in that
+  agent's report.
 - **Nobody gathers the session's history; agents extract it.** guard's turn store holds the
   response, plus one sibling file holding the request for the router alone (see the router
   bullets above).
@@ -1237,6 +1269,13 @@ payloads, not memory.
   the relay of its path existed for that reason alone. An answer the user has not read yet
   can simply be fixed, one `Edit` per finding, which also makes the diff the findings. Do
   not reintroduce a rewrite file.
+- **The audits run on the English, and the translation is made after them.** Not the obvious
+  order, and the reason is measured: the auditors are weaker on non-English prose. The same
+  answer, translated, drew findings that its original passed clean — twice, from two different
+  agents. Auditing the English and translating afterwards is how the user's language stops
+  costing them the audit, and it is also why the Korean pair runs after everything else rather
+  than beside it: neither has an input until the English is corrected. This used to be stated in
+  the closeout file itself; it is rationale, and the closeout now carries rules only.
 - **The Korean the user reads is written by an agent that did not write the English.**
   `korean-translator`, ordered before `korean-corrector` in the roster and dispatched at step 2
   of `Presenting the result`. The arrangement it replaces — the main session translating its own

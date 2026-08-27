@@ -107,16 +107,14 @@ CLI_REL = "scripts/guard_hook.py"
 
 def _agent_pointer(project_dir: Path, session_id: str, prompt_id: str, keys: list[str],
                    files: dict[str, list[str]], modes: dict[str, AgentMode]) -> str:
-    """Name the closeout sections for these agents and hand over their per-turn inputs.
+    """Name these agents to the main agent and hand over their per-turn inputs.
 
-    The lead carries the one mechanical fact — these are agents, and the namespace they
-    live in — because no router speaks on this path and the closeout file no longer holds
-    dispatch mechanics for anyone. What its section holds is the part that needs a judgment
-    the report cannot make for the caller: an `ext-docs-auditor` finding that must be moved
-    rather than deleted, an `agents-md-auditor` one that would mean inventing a document.
-    That is the same on every turn, so it is stored once and read only when a turn actually
-    writes one of these files. What guard prints is only what the closeout file cannot know —
-    which agents, in which mode, and the paths for this turn.
+The lead carries the one mechanical fact — these are agents, and the namespace they
+    live in — because no router speaks on this path. Everything else the caller needs comes
+    from the reports: each of these agents ends its findings in a disposition (apply, move,
+    decide) because only the agent knows which one a finding is. Nothing here points at the
+    closeout file: a turn dispatched this way wrote no answer file, so it has no closeout to
+    run.
 
     The alternative, printing each agent's dispatch block here, costs the same text in the
     main agent's context on every routed turn, times every candidate, to be used by at
@@ -127,9 +125,11 @@ def _agent_pointer(project_dir: Path, session_id: str, prompt_id: str, keys: lis
     ``modes`` is passed in rather than re-read from config because the caller resolved it
     from session state, which can differ from the file for the live session.
     """
-    lines = [f"Dispatch each of these with the Agent tool and "
-             f'subagent_type: "guard:<name>", in this order, giving it only the inputs '
-             f"named under it. Then follow its section of {_closeout_path()}:"]
+    lines = ["Dispatch each of these with the Agent tool and "
+             'subagent_type: "guard:<name>", in this order, giving it only the inputs '
+             "named under it and no instructions of your own. Then apply what each reports — "
+             "its findings say which of them you may apply and which are the user's call — "
+             "and say in one line what changed:"]
     for key in keys:
         lines.append(f"- `{key}`={modes[key].value}")
         lines.extend("  " + line for line in _agent_inputs(
@@ -238,20 +238,20 @@ _DIRECT_LEAD_WITH_ROUTER = (
 # answers that. Routing it could only restate what the file list says, and a switch in front
 # of it would be a way to save a saved reference from ever being checked.
 #
-# The section is named the same way the other file-reading agents' sections are, so what to
-# do with its report stays in the closeout file and is read only when a turn actually wrote one of
-# these files. Worded as what the turn did, not as what to look for — the criteria are the
-# agent's own.
+# Worded as what the turn did, not as what to look for — the criteria are the agent's own, and
+# so is what its findings need: each one ends in a disposition saying whether the caller may
+# apply it, must only relay it, or has a decision to make. Nothing here names the closeout file;
+# a turn that only wrote refs files has no answer file and so no closeout to run.
 _REFS_LEAD = (
     "guard: this turn wrote saved reference files. Dispatch `guard:ext-docs-auditor` "
-    "(subagent_type: \"guard:ext-docs-auditor\") over them and follow the "
-    "`ext-docs-auditor` section of {closeout}."
+    "(subagent_type: \"guard:ext-docs-auditor\") over them, then act on what it reports — "
+    "its findings say which are yours to apply and which are the user's call."
 )
 
 
 def _refs_context(refs: list[str]) -> str:
     """``additionalContext`` naming ``ext-docs-auditor`` for the refs files this turn wrote."""
-    lines = [_REFS_LEAD.format(closeout=_closeout_path()),
+    lines = [_REFS_LEAD,
              "- saved reference files to audit:"]
     lines.extend(f"    {p}" for p in refs)
     return "\n".join(lines)

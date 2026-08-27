@@ -113,14 +113,16 @@ how the code here is organised.
 - Nothing resolves a plugin path by counting `__file__` parents.
 - Where a piece of text lives is decided by how often it is paid for: hook output is read on
   every routed turn, `agents/turn-router.md` once per routed turn by the router alone,
-  `hooks/context/turn-closeout.md` only by whoever is sent to a section. Nobody re-types
-  another home's text, and nothing in the closeout file describes routing.
-- **How to dispatch travels with the dispatch; the closeout file holds only what happens after.**
-  Each router's report template says how to run what it named, `_agent_pointer`'s lead says it
-  on the no-router path, and an agent's own report says what its findings mean. A closeout
-  section exists only where the caller faces a judgment no report can make for it. The rule is
-  negative and that is the useful half: a closeout sentence that decides WHETHER an agent runs,
-  or restates how to call one, is a second authority over a decision already made — see
+  `hooks/context/turn-closeout.md` only by a turn that has an answer file to close out.
+  Nobody re-types another home's text, and nothing in the closeout file describes routing.
+- **Nothing about an individual agent lives in the closeout file.** How to dispatch one travels
+  with the dispatch — each router's report template, `_agent_pointer`'s lead on the no-router
+  path — and what its findings mean travels in its own report, which is why the file-editing
+  audits end each finding in a disposition (apply / move / decide) rather than leaving the
+  caller to look one up. What the closeout holds is the turn: which file findings go into, when
+  the translation is made, what the reply says, what gets opened. The rule is negative and that
+  is the useful half: a closeout sentence naming a particular agent is either a second
+  authority over a decision already made or a lookup that belongs in a report — see
   `dev/design.md` for the turn it cost.
 - guard writes the turn record's **response** section itself, verbatim from the Stop payload —
   it is the text being audited, so it must not pass through the author's hands. The main

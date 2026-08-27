@@ -101,14 +101,30 @@ result — do not round it to a violation to look decisive.
 Plain text, **in English**, whatever language the session is in. Quoted passages stay in their
 original language, exactly as written.
 
+Every finding ends in a **`Fix:`** line, and it is the one thing your caller acts on. Which of
+three kinds it is decides what your caller may do with it, so say which:
+
+- **apply** — a heading, a `Retrieved:` date, an index row. Mechanical: it moves nothing and
+  loses nothing, so your caller just makes the edit.
+- **move to `<where>`** — a passage that is project content. It must not be deleted, and if the
+  destination does not exist, creating it is a change nobody asked for: your caller names the
+  finding and leaves it. Name the destination anyway; you are the one who knows where the
+  passage belongs.
+- **decide** — an assertion with no attribution. Repairing it from memory is the failure being
+  reported, so your caller either quotes what the source actually says, which means fetching it,
+  or marks it as the derivation it is. Both are decisions, not fixes.
+
 ```
 <report by="ext-docs-auditor">
 - verdict: violations
 - /abs/path/to/refs/some-doc.md
   - axis 3 (project content) — "## Bearing on guard" through the end of the file, 19 lines:
     every sentence is about which of guard's agents the field affects and why guard chose
-    `local`. Belongs in the plugin's own design notes next to that choice.
+    `local`.
+    Fix: move to the plugin's own design notes, next to that choice — not deleted here until
+    it lands there.
   - axis 1 (source) — no `Retrieved:` line; the `Source:` URL is present.
+    Fix: apply — add the date you can establish, or say you could not.
 - /abs/path/to/refs/other-doc.md
   - clean.
 </report>
