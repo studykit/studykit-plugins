@@ -891,6 +891,38 @@ payloads, not memory.
   third-party agent report a path, so its answer is audited only if the agent chose to leave
   one. That is a property of the agent, not a gap in the routing.
 
+- **The main session asked the interviewer for a report, and got one — v0.114.0.** Reported
+  from use, with the transcript. A `@guard:interviewer` dispatch went straight to research
+  without a single user message in it, ended a turn with nothing to show, and the main session —
+  holding a background agent that had finished empty — messaged it asking for its report. It
+  complied: conclusions it had reached alone, a recommendation, and five questions. The main
+  session put those five to the user through `AskUserQuestion` and committed. The user never had
+  the interview, and the thing the interview exists to prevent — the blank filled in by somebody
+  else — happened *through* the interview.
+
+  Every rule that broke was already in the file. What was not in the file is the party that
+  broke them: the body said "Nobody relays for you" as a fact about the world, so when a message
+  arrived asking for output there was nothing to read it as except the user asking.
+
+  Three things are stated now, and the first is what the other two rest on.
+
+  - *The main session can message it, and it is not the user.* The test is not a heuristic
+    about phrasing — it is that **the user never asks for the report**, having read every line
+    of it as it was written. A request to produce, send or hand over anything is therefore the
+    main session by construction, and gets one line back and nothing else.
+  - *Whatever ends a turn reaches the main session too.* The old text implied the transcript
+    was private to the two of them, which made a premature summary read as untidiness rather
+    than as a report being filed. It is a report being filed.
+  - *The handoff is approved, not assumed.* The close signal produces the brief; the user's yes
+    produces the path. Splitting them costs one message and buys the only gate that matters,
+    because the path is the one thing in this conversation the main session can act on.
+
+  The audit question moved into that same message — still at the close, now after the file
+  exists — so the round trip is nobody's extra. Its default is unchanged and is deliberately the
+  opposite of the new one beside it: the audit is a yes unless it is a clear no (v0.102.0), the
+  handoff is a no unless it is a yes. An audit skipped can be run later; a brief handed over
+  early cannot be taken back.
+
 - **The interviewer hands off its own brief — v0.101.0.** The routing instruction lived in the
   agent's `description`, which is standing text the caller reads when it picks an agent, not
   when a brief arrives. Same defect as the two the Korean pair had: a third party stating a

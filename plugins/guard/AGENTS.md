@@ -57,9 +57,11 @@ transcript fires no `UserPromptSubmit`, and the `Stop` it does fire in the main 
 non-human origin, so guard's own skip catches it. **That skip is the only thing keeping it free.**
 Registering a `SubagentStop` hook, or relaxing the origin test, closes this with nothing failing;
 `dev/design.md` has the measurement. `interviewer`'s deliverable is one brief file, written when
-the user closes the interview and never before, and its final message to the main session is
-that path and nothing else — the file is the handoff, so a summary beside it would be a second
-version to disagree with.
+the user closes the interview and never before, and its path reaches the main session only once
+the user has approved the handoff — the file is the handoff, so a summary beside it would be a
+second version to disagree with. Two parties can message that agent, and only one of them is the
+user: the main session pinging it for a report is not a go-ahead, not a close, and not the
+approval, which is the failure `dev/design.md` records under v0.114.0.
 
 That brief is the one document guard's turn audit can never reach: the skip above is what keeps
 the interview free, and the same skip means no `Stop` ever sees the text. So it is audited on a
