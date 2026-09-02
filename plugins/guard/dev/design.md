@@ -1925,12 +1925,13 @@ the same agent.
 one takes any on-word or off-word, or a JSON boolean — the state each session's turn audit and plan gate **open** in. They seed
 `audit_paused` / `plan_audit_paused` in `state/<sid>.json` and nothing else: `guard` and
 `guard-plan` write that state, never this file, so the setting is the project's answer and the
-toggle is one session's. An absent or unreadable value reads as `on`, the opposite fallback
-direction from the agent modes, which fall back to `off` — an unreadable agent mode would run an
-agent nobody named, while an unreadable switch here can only leave guard auditing, and that is
-what an absent key already does. Two keys and not one: the two audits run at different moments
-on different material, and wanting turns checked is not wanting every plan held. Why the default
-is `on`, and what that costs, is the session-mute invariant above.
+toggle is one session's. An absent or unreadable value reads as THAT KEY's own default — `off`
+for `audit-turn`, `on` for `audit-plan` — so a mistyped switch lands where an absent one would.
+That per-key rule replaced a single "unreadable reads as `on`" in v0.116.0, when the two keys
+stopped agreeing; one fixed direction would now be right for one key and wrong for the other.
+Two keys and not one: the two audits run at different moments on different material, and
+wanting turns checked is not wanting every plan held. Why they default in opposite directions,
+and what that costs, is the session-mute invariant above.
 
 `refs_dir` (string, default `""`) — project-relative directory for guard's cited-doc
 copies; empty = the git-tracked default `wiki/ref/` (references committed with the repo), a

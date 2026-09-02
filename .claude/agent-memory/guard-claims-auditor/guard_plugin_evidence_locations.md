@@ -146,3 +146,45 @@ the **slash** prompt prefix `/guard:claims-auditor`; the installed agent is name
   `installed_plugins.json` has **no** entry for `/Users/myungo/GitHub/studykit-plugins`, so a
   peer session that loads guard from the versioned cache would not see uncommitted renames even
   after a restart. Check before crediting advice aimed at another session.
+
+## The two audit switches stopped sharing a default (v0.116.0, audited 2026-09-02)
+
+`DEFAULT_CONFIG` now has `audit-turn: "off"` and `audit-plan: "on"` (`config.py`, the
+`AUDIT_TURN_KEY`/`AUDIT_PLAN_KEY` entries), and `AgentMode.FRESH = "fresh"` became
+`AgentMode.ON = "on"` with `"fresh"` kept as a `_MODE_ALIASES` entry read through
+`_parse_mode` inside `_agent_mode` (not only at the CLI).
+
+Two places still described the two switches under the OLD single rule after that commit, and
+were fixed in v0.116.1 once this audit named them — `config.py`'s `_audit_on` docstring and
+`dev/design.md`'s config reference (~L1928). Both now state the per-key fallback. The lesson
+outlives the fix: a `DEFAULT_CONFIG` change leaves prose behind in the accessor's own docstring
+and in the design doc's config reference, so those are the two places to check before crediting
+any "every place was updated" claim about a switch default.
+
+Also: the `/clear` handoff record is written when the switches differ from the config **or**
+the session recorded a handover file (`cmd_session.py`, `if (audit_paused, plan_paused) ==
+_default_paused(config) and not handover:`), so an "only when the switches differ" claim is
+too narrow.
+
+**How to apply:** for turns about guard's switch defaults, these are the counterexamples to a
+completeness claim.
+
+## "guard's shell commands are missing from PATH" claims (audited 2026-09-02)
+
+- The PATH prepend is written by `cmd_session.py::_add_shell_command_to_path` (~L64-105),
+  called from `cmd_session_start` (~L449) after the `project_dir is None` early return.
+- **`SessionStart` registers no matcher** (`hooks/hooks.json`), so per
+  `wiki/ref/claude-code-hooks-session-env.md:70-81` it fires on `startup`, `resume`, `clear`,
+  `compact` and `fork`. So "SessionStart already fired, therefore the PATH entry was never
+  written for this session" is a **broken inference** — a later compaction/resume writes it.
+  `_append_env_file` exists precisely because it fires repeatedly.
+- A "no code fix would address this" claim is contradicted by `dispatch.py` (~L89-105), which
+  records the removed `is_file()` fallback and names the fix: "the router [should] distinguish
+  'the command failed' from 'nothing to audit' in its report".
+- Per-session runtime state that IS in the repo: `.claude/guard/state/<sid>.json` (has
+  `audit_paused`, `transcript_path`) and `.claude/guard/turns/<sid>/` — these prove guard's
+  hooks ran in a session even when its Bash PATH lacked the wrappers.
+
+**How to apply:** a subagent's own `command -v guard-inputs` is about ITS session id
+(`CLAUDE_CODE_SESSION_ID`), which for a forked child session differs from the audited turn's
+session — do not use it to refute a PATH claim about the other session.

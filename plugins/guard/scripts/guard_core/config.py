@@ -402,7 +402,10 @@ def _audit_on(cfg: dict[str, Any], key: str) -> bool:
     A CONFIG reader, never a state reader: the live answer for a session is
     ``state._audit_paused`` / ``state._plan_audit_paused``, which this seeds and the shell
     toggle then overrides. Absent, malformed, or written as a JSON boolean all resolve here —
-    and anything unrecognized resolves to the default, which is armed (see ``DEFAULT_CONFIG``).
+    and anything unrecognized resolves to THAT KEY's own default, which is muted for
+    ``audit-turn`` and armed for ``audit-plan`` (see ``DEFAULT_CONFIG``). Per-key rather than one
+    direction for both: a mistyped switch then lands where an absent one would, which is the
+    only fallback a project can predict once the two keys disagree.
     """
     raw = cfg.get(key, DEFAULT_CONFIG[key])
     if isinstance(raw, bool):
