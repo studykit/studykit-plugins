@@ -25,7 +25,7 @@ import sys
 
 from pathlib import Path
 
-from .config import CLEAR_INHERIT_MAX_AGE_SECONDS, _load_config
+from .config import _load_config
 from .paths import _cli_project_dir, _trace
 from .state import _read_state, _write_state
 
@@ -72,10 +72,11 @@ def cmd_handover_written() -> int:
     state = _read_state(project_dir, session_id, config)
     state["handover_file"] = str(path)
     _write_state(project_dir, session_id, state)
-    # The window is read from the constant rather than written out: it is the handoff
-    # record's expiry, and a sentence naming a number would go stale the moment it moved.
-    minutes = max(1, CLEAR_INHERIT_MAX_AGE_SECONDS // 60)
-    print(f"guard: handover recorded — {path}. Clear this session within {minutes} minutes "
-          "and the session replacing it is offered this file.")
+    # No deadline is stated because none applies to the user. What this writes is session
+    # state, which outlives the conversation; `CLEAR_INHERIT_MAX_AGE_SECONDS` bounds the
+    # `SessionEnd`-to-`SessionStart` handoff instead, and quoting it here read as a clock on
+    # when to `/clear`. The boundary worth naming is single use.
+    print(f"guard: handover recorded — {path}. The session a /clear opens next is offered "
+          "this file, once.")
     _trace(project_dir, session_id, "handover-written", "recorded")
     return 0
