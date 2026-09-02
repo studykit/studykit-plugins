@@ -115,6 +115,18 @@
       "license": "MIT",
       "category": "development",
       "keywords": ["evidence", "claims", "grounding", "hallucination-guard", "korean", "audit", "handover", "hooks", "output-style", "claude-code", "codex"]
+    },
+    {
+      "name": "peers",
+      "source": "./peers",
+      "description": "A peer is a Claude Code session running somewhere else on this machine — another repository, another checkout, another project. This plugin finds the peer already serving a folder and reuses the context it has built up, or starts one there and tells you which folder is getting an agent before it does; the peer runs under that project's own permission settings, never a mode the plugin imposed. Tasks go out with a reply address written into them, because a peer's answer reaches you only if the peer sends it, and you are told when one finishes instead of waiting on it. Two peers can also be introduced to each other to settle a cross-repository question directly, with one of them named as the reporter. Background peers it started can be stopped when the work is done; a session you started yourself in a terminal is left to you. Claude Code only — Codex has no cross-session messaging. Requires the `claude` CLI and `uv`.",
+      "author": {
+        "name": "studykit"
+      },
+      "repository": "https://github.com/studykit/studykit-plugins",
+      "license": "MIT",
+      "category": "development",
+      "keywords": ["peer", "delegation", "cross-session", "multi-agent", "session", "background-agent", "claude-code"]
     }
   ]
 }

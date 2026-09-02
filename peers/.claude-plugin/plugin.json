@@ -1,0 +1,11 @@
+{
+  "name": "peers",
+  "version": "0.1.0",
+  "description": "Set up Claude Code sessions in other directories on this machine and delegate work to them over cross-session messaging",
+  "author": {
+    "name": "studykit"
+  },
+  "repository": "https://github.com/studykit/studykit-plugins",
+  "license": "MIT",
+  "keywords": ["peer", "delegation", "cross-session", "multi-agent", "session", "background-agent", "claude-code"]
+}
