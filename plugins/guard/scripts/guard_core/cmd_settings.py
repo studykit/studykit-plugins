@@ -2,7 +2,8 @@
 
 ``settings`` is run by the ``guard:settings`` skill via Bash, in-session. ``show`` prints the
 current settings; ``set <key> <value>`` changes one of the per-agent settings — each named
-after the agent it controls, valued ``off``/``fresh`` — one of the two audit
+after the agent it controls, valued ``off``/``on`` (``fresh``, what pre-v0.116.0 wrote, is
+still accepted and rewritten as ``on``) — one of the two audit
 switches (``audit-turn`` / ``audit-plan``, ``on``/``off``), ``refs_dir`` or ``knowledge_dir``
 (comma-separated, the whole list replaced); ``unset <key>`` removes a key from the file
 entirely, back to its default. The

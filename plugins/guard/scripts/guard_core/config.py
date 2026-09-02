@@ -4,10 +4,11 @@ Configuration is optional: a JSON object at ``${CLAUDE_PROJECT_DIR}/.claude/guar
 (``.codex/`` on Codex). One ``AgentMode`` per agent, keyed by that agent's own name —
 ``claims-auditor`` / ``deferrals-auditor`` / ``clarity-auditor`` / ``comment-corrector`` /
 ``agents-md-auditor``, each
-``"off"`` (the default) or ``"fresh"`` — which together are the only control
-over whether guard says anything unasked. Plus ``audit-turn`` / ``audit-plan`` (``"on"``, the default, or
-``"off"``: the state each session's two audits OPEN in — the shell toggles move the session
-only and never write here) and ``refs_dir`` (project-relative directory for saved copies of cited docs; empty
+``"off"`` (the default) or ``"on"`` — which together are the only control
+over whether guard says anything unasked. Plus ``audit-turn`` (``"off"`` by default) and
+``audit-plan`` (``"on"`` by default), each ``"on"`` or ``"off"``: the state each session's two
+audits OPEN in — the shell toggles move the session
+only and never write here. And ``refs_dir`` (project-relative directory for saved copies of cited docs; empty
 means the git-tracked default ``wiki/ref/``, and an unsafe value falls back to it — see
 ``paths._refs_dir``). There is no model key: every agent, the router included, brings its own
 model from its own definition under ``agents/``.
@@ -75,9 +76,15 @@ CLEAR_INHERIT_MAX_AGE_SECONDS = 5 * 60
 class AgentMode(StrEnum):
     """How one audit agent runs. The value of that agent's config key.
 
-    ``OFF`` — never recommended unasked. ``FRESH`` — a new instance per dispatch, which
+    ``OFF`` — never recommended unasked. ``ON`` — a new instance per dispatch, which
     is the shape every agent definition is written for: judged in a fresh context, by a
     reader rather than the author.
+
+    ``ON`` was spelled ``fresh`` until v0.116.0, when the one surviving mode stopped needing
+    a name that only made sense beside a second one. ``fresh`` is still parsed, and never
+    stops being: it is written into every config file this plugin has already touched, and a
+    value that silently reads as its default is exactly the failure this file is careful
+    about elsewhere. What changed is what gets WRITTEN and DISPLAYED.
 
     There used to be a third, ``REUSE``: one named instance per session, resumed on later
     turns with its full history. It bought continuity and cost independence — a verdict it
@@ -97,7 +104,7 @@ class AgentMode(StrEnum):
     """
 
     OFF = "off"
-    FRESH = "fresh"
+    ON = "on"
 
 
 # The words that mean armed and muted, for BOTH ways a two-valued switch is written: the
@@ -121,17 +128,20 @@ AUDIT_PLAN_KEY = "audit-plan"
 AUDIT_SWITCHES = (AUDIT_TURN_KEY, AUDIT_PLAN_KEY)
 
 
-# CLI spellings accepted for a mode, beyond the member values themselves. The boolean
-# words are kept because "on"/"off" is what a switch has always been set with here, and
-# "on" has to mean something: it means the mode the agents were designed for.
+# Spellings accepted for a mode, beyond the member values themselves. `fresh` heads the list
+# because it is not a convenience: it is the value v0.115.0 and earlier WROTE into
+# guard.local.json, so every config file already on disk says it. Drop it and those projects
+# read as `off` — an agent switched on a year ago silently stops being recommended, which is
+# the one failure shape this plugin must not have. It is an alias rather than a member so that
+# nothing writes or prints it again.
 #
 # `keep` and `resume` used to alias the removed REUSE mode. They are NOT re-pointed at
-# FRESH: a user who types one is asking for the thing that no longer exists, and silently
+# ON: a user who types one is asking for the thing that no longer exists, and silently
 # giving them a fresh instance per turn would answer a different question. `_parse_mode`
 # returns None and the CLI says the value is not a mode, which is the honest reply.
 _MODE_ALIASES = {
-    "on": AgentMode.FRESH, "true": AgentMode.FRESH, "yes": AgentMode.FRESH,
-    "1": AgentMode.FRESH, "new": AgentMode.FRESH,
+    "fresh": AgentMode.ON,
+    "true": AgentMode.ON, "yes": AgentMode.ON, "1": AgentMode.ON, "new": AgentMode.ON,
     "false": AgentMode.OFF, "no": AgentMode.OFF, "0": AgentMode.OFF,
 }
 
@@ -144,7 +154,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
     # nothing in it, and the audit that never happened is the failure guard exists to prevent.
     #
     # One key per AUDIT, named after what it audits. For most of these the key is also the
-    # agent's own name, so `settings set deferrals-auditor fresh` and
+    # agent's own name, so `settings set deferrals-auditor on` and
     # `guard:deferrals-auditor` are the same string and there is no second vocabulary. Where
     # one audit is reached through two entry points — `claims-auditor` through the
     # `audit-turn-claims` and `audit-report-claims` skills — the key stays the audit's,
@@ -165,8 +175,12 @@ DEFAULT_CONFIG: dict[str, Any] = {
     # audits on demand, so `off` now means the audit cannot happen at all rather than
     # merely that it is not offered. See `AGENTS.md`.
     # The state each session's two audits OPEN in — the project's answer to "audit by
-    # default?", and ON when the file says nothing, so a project that installs guard and
-    # switches an agent on gets the audit without a second step.
+    # default?". They part company when the file says nothing, and the split is the point:
+    # the turn audit costs a router call plus whatever it names on EVERY finished turn, so it
+    # opens muted and the user arms it (`guard on`) for the stretch of work that wants it. The
+    # plan gate opens armed because it fires only at `ExitPlanMode` — rare, and at the one
+    # moment where letting a deferral through is paid for by the whole implementation that
+    # follows.
     #
     # These are the DEFAULT, not the live value: `guard` / `guard-plan` move `audit_paused` /
     # `plan_audit_paused` in `state/<sid>.json` for one session and never write here, so a
@@ -175,12 +189,11 @@ DEFAULT_CONFIG: dict[str, Any] = {
     # material — a finished answer against a plan awaiting approval — and wanting one is not
     # wanting the other.
     #
-    # A value that is neither an on-word nor an off-word reads as ON (`_audit_on` falls back
-    # to the default), the opposite direction from the agent modes. The two are not
-    # inconsistent: an unreadable agent mode would have guard running an agent the user never
-    # named, while an unreadable switch here can only leave guard auditing — which is what an
-    # absent key already does, and the failure a guard plugin should fail toward.
-    AUDIT_TURN_KEY: "on",
+    # A value that is neither an on-word nor an off-word falls back to this key's own default
+    # (`_audit_on`), so an unreadable value lands wherever an absent one would. That is the
+    # only guarantee worth making here: a project that mistypes a switch gets the behaviour it
+    # would have had without the key at all, rather than a third answer it never wrote.
+    AUDIT_TURN_KEY: "off",
     AUDIT_PLAN_KEY: "on",
     "claims-auditor": AgentMode.OFF,
     "deferrals-auditor": AgentMode.OFF,
@@ -274,7 +287,7 @@ def _load_config(project_dir: Path) -> dict[str, Any]:
         return config
     for key, default in DEFAULT_CONFIG.items():
         # An ``AgentMode`` default round-trips through JSON as a plain str, and
-        # ``isinstance("fresh", AgentMode)`` is False — so the accepted type has to be
+        # ``isinstance("on", AgentMode)`` is False — so the accepted type has to be
         # widened for those keys or every mode in the file is silently dropped and only
         # the session state is ever honored. The accessor (``_agent_mode``) validates the
         # value; this only checks the shape.
@@ -346,16 +359,21 @@ def _agent_mode(cfg: dict[str, Any], key: str) -> AgentMode:
     gets rejected out loud. A stringy value that is not a mode word therefore reads as
     ``off`` — the safe direction, since the alternative is guard acting on a setting the
     user did not write.
+
+    It reads through ``_parse_mode``, so the aliases apply HERE and not only at the CLI. That
+    is what makes a config file written before v0.116.0 — every one of which spells the on
+    mode ``fresh`` — keep working: the hooks read this function, never the CLI, so an alias
+    the CLI alone honoured would leave those projects silently unaudited.
     """
     # A key with no default is an agent with no switch (`AuditAgent.fixed_mode`). Callers
     # are meant to consult the roster for those, so reaching here is a bug — but it must not
     # be a crash: this runs inside hooks, and an exception here took `settings show` down to
     # silent-and-exit-0 once, which is the shape guard must never fail into.
     default = DEFAULT_CONFIG.get(key, AgentMode.OFF)
-    try:
-        return AgentMode(str(cfg.get(key, default)).strip().lower())
-    except ValueError:
-        return AgentMode(default)
+    parsed = _parse_mode(str(cfg.get(key, default)))
+    if parsed is not None:
+        return parsed
+    return _parse_mode(str(default)) or AgentMode.OFF
 
 
 def _switch_on(cfg: dict[str, Any], key: str) -> bool:

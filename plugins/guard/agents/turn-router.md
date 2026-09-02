@@ -74,7 +74,7 @@ What each one is:
   caller may not open.
 
   The **mode** on each line is for your caller, not for you — copy it nowhere and act on it
-  nowhere. Every candidate is `fresh`; there is no other value.
+  nowhere. Every candidate is `on`; there is no other value.
 
   If the command prints nothing, or fails, say so in one line and pick nothing. Do not fall
   back to the sections below as if they were the roster, and do not go looking for guard's

@@ -54,7 +54,7 @@ class AuditAgent(NamedTuple):
     of that one step rather than an audit of its own. Neither makes guard speak on a turn it
     would otherwise be silent on; see ``_eligible_agents``.
 
-    The mode is ``fresh`` for both, which is now the only mode there is.
+    The mode is ``on`` for both, which is now the only mode there is.
 
     ``needs_history`` is whether this agent may need to look past the response — at the
     request, at what the turn ran, at what an earlier turn established. Those agents are
@@ -178,7 +178,7 @@ AUDIT_AGENTS: dict[str, AuditAgent] = {
     # out from the document (it is English by design, like the answer file) and there is no
     # request file on that path, so the caller states it in the dispatch; on the interviewer's
     # brief that is the language of the `@` conversation the brief came out of.
-    "korean-translator": AuditAgent(reads="turn", needs_history=False, fixed_mode="fresh",
+    "korean-translator": AuditAgent(reads="turn", needs_history=False, fixed_mode="on",
                                     report_entry="korean-translator"),
     # Switch-free for the same reason, and it has to be the same reason: these two are one
     # step. A corrector the user can switch off behind a translator they cannot is a Korean
@@ -188,7 +188,7 @@ AUDIT_AGENTS: dict[str, AuditAgent] = {
     # line naming this agent and the file it wrote, so the hand-off happens where the fact it
     # depends on — the translation exists — is actually known. The router, reading before either
     # ran, could only have guessed at it from the request.
-    "korean-corrector": AuditAgent(reads="turn", needs_history=False, fixed_mode="fresh",
+    "korean-corrector": AuditAgent(reads="turn", needs_history=False, fixed_mode="on",
                                    routed=False),
     "comment-corrector": AuditAgent(reads="files", needs_history=False),
     "agents-md-auditor": AuditAgent(reads="agent-docs", needs_history=False),

@@ -72,7 +72,7 @@ there is nothing shared to factor out beyond the state root.
 | `SessionStart` | `session-start` | Sweep state and turn records past retention, export `GUARD_REFS_DIR` and `GUARD_TOGGLE_CLI`, state the refs rule as session context, say once — when any agent is on — either that the session opened muted (`guard on` arms it) or that audits are on and where the turn closeout is. |
 | (called via Bash, not a hook) | `candidates` | The router's own roster: prints the turn-reading agents switched on for this session, one `agent=mode` per line, in `AUDIT_AGENTS` order. `--doc` answers for the document path instead — the same eligibility, mapped through `report_entry`, so an audit with no document-side entry point drops out. Session id from `CLAUDE_CODE_SESSION_ID`, which a subagent's Bash carries as its parent's. Read-only, and the only command the router runs. |
 | (called via Bash, not a hook) | `transcript` | `index` / `turn` / `find` over the session transcript, for the audit agents. Writes an extract file and prints only its path plus a one-line summary; `--since` / `--until` / `--last` bound which turns are scanned. |
-| (called via Bash, not a hook) | `toggle-cli` | Arm/mute the automatic audit for THIS session (`audit_paused`, session state only — never guard.local.json), from a shell prompt: `on` / `off` / `status` / empty flips. A session opens in whatever `audit-turn` says, armed unless the config says otherwise, so `off` is the direction that usually needs typing. Session id from `CLAUDE_CODE_SESSION_ID`; project from `_cli_project_dir`. The ONE subcommand that does not fail open — see `_MUST_REPORT` in `guard_hook.py`. |
+| (called via Bash, not a hook) | `toggle-cli` | Arm/mute the automatic audit for THIS session (`audit_paused`, session state only — never guard.local.json), from a shell prompt: `on` / `off` / `status` / empty flips. A session opens in whatever `audit-turn` says, MUTED unless the config arms it, so `on` is the direction that usually needs typing. Session id from `CLAUDE_CODE_SESSION_ID`; project from `_cli_project_dir`. The ONE subcommand that does not fail open — see `_MUST_REPORT` in `guard_hook.py`. |
 | (called via Bash, not a hook) | `status` | Status-line segment: `guard <will run>/<switched on>` plus the plan gate's flag (`⚑` armed, `⚐` muted), green armed and dim muted on each half; nothing at all on any failure. Reads one state file; runs on every assistant message. |
 | (called via Bash, not a hook) | `handover-written` | Record `<path>` as the handover this session wrote, for the `guard:handover` skill to run as its last step. Writes one key into `state/<sid>.json`; the file must exist, so a path that was never written is refused while someone can still act on it. Session id from `CLAUDE_CODE_SESSION_ID`. Fails open — the handover file is the deliverable, and the record only decides whether the next session is offered it. |
 | (called via Bash, not a hook) | `refs-dir` | Print the resolved refs directory (auditor fallback; applies `refs_dir` validation). |
@@ -84,7 +84,7 @@ reads the transcript only for the turn's *kind* (`_turn_identity`), and the turn
 written by the main agent.
 
 - `state/<sid>.json` — the session's live agent modes (one key per agent, named after it,
-  valued `off`/`fresh`), the per-turn markers keyed on `prompt_id` that keep each once-only action once-only
+  valued `off`/`on`), the per-turn markers keyed on `prompt_id` that keep each once-only action once-only
   (`last_audited_prompt_id`, `pending_verify_prompt_id`), and the turn's edited files
   (`edited_prompt_id` + `edited_files` + `edited_agent_docs` + `edited_refs`). The edited
   lists are stored WITH the prompt_id they belong to, not as bare lists: PostToolUse appends
@@ -101,7 +101,7 @@ written by the main agent.
   both the `default` dict and the `keys` tuple. `edited_refs` was added to `default` alone at
   first: every write landed and the next read dropped it, which is indistinguishable from
   PostToolUse never having run. `audit_paused` and `plan_audit_paused` are **seeded from the
-  config** on every read — `audit-turn` / `audit-plan`, armed when the file says nothing — and
+  config** on every read — `audit-turn` muted when the file says nothing, `audit-plan` armed — and
   are the session's own from then on: the shell toggles write here and never there. See the
   session-mute invariant below. `handover_file` is the odd one out: written by
   `guard-handover` and read by exactly one event, `SessionEnd` on `/clear`. Nothing in the
@@ -643,7 +643,7 @@ payloads, not memory.
 
   `Common to every dispatch` went the same way and for a plainer reason: every rule in it was
   already in the hook output or the router's template — pass only the named inputs, add no
-  instructions of your own, every instance is `fresh`. Its last paragraph was not about
+  instructions of your own, every instance is `on`. Its last paragraph was not about
   dispatching at all but about the reply, and moved into step 4 where the reply is written.
   The `/guard:*` warning went with it; the per-agent commands it guarded against no longer
   exist.
@@ -1256,9 +1256,10 @@ payloads, not memory.
 
   What it carries is a session that **differs from the settings**, and that comparison
   (`_default_paused`) is the whole test — in either direction. It used to be "is anything
-  armed", which was the same question while the switches defaulted to muted and is now the
-  wrong one: with them defaulting to on, the intention most likely to be lost across a `/clear`
-  is a `guard off`, and a check for "armed" would have written no record for exactly that case.
+  armed", and a comparison against the config is the only version that survives the two
+  switches defaulting differently (v0.116.0: `audit-turn` off, `audit-plan` on). The intention
+  most likely to be lost across a `/clear` is a `guard on` for one and a `guard-plan off` for
+  the other, so any test naming a fixed direction writes no record for one of the two cases.
   The announcement names both switches for the same reason.
 
   **The predecessor is named, not inferred.** Three payload facts, measured in a live session
@@ -1394,7 +1395,8 @@ payloads, not memory.
 - **The session mute is not `audit_gate` coming back, and it now has a config key.**
   The mute adds one boolean in front of the switches, which is the shape removed
   below, so the difference has to be stated or it reads as a regression — and `audit-turn` /
-  `audit-plan` (`config.DEFAULT_CONFIG`, `on` when absent) make stating it more urgent, because
+  `audit-plan` (`config.DEFAULT_CONFIG`, `off` and `on` respectively when absent) make stating
+  it more urgent, because
   persistence used to be half the answer and is not available any more. Two things differ, and
   both are load-bearing. It is **two-valued**, so there is no `ask` to reason about — the
   question the old gate forced on the user ("the switch is on, but is the gate open, and does
@@ -1417,10 +1419,13 @@ payloads, not memory.
   every agent it names before the user can object. That argument still holds; it lost to a
   plainer one: a user who configured agents and installed the status line has asked, and making
   them ask again every session is a per-session tax on the setup they already did. The cost is
-  real and is accepted — a fresh install with an agent switched on now audits without a second
-  step, and `audit-plan` defaulting on means an approved plan is held for review in a project
-  that never ran `guard-plan`. `audit-turn: off` in the config is the one-line answer for a
-  project that does not want it, and unlike the old default it survives the session.
+  real and is accepted for the plan gate only: `audit-plan` defaulting on means an approved
+  plan is held for review in a project that never ran `guard-plan`, which is cheap because the
+  gate fires once per plan approval. The turn audit is charged on every finished turn, so
+  v0.116.0 moved `audit-turn` back to `off` by default — a fresh install with an agent switched
+  on stays silent until `guard on` or `audit-turn: on`. `audit-turn: on` in the config is the
+  one-line answer for a project that wants it from the first turn, and unlike a shell toggle it
+  survives the session.
 
   Codex has the SETTING but not the toggle. The toggle is a shell command against a Claude Code
   session id, which Codex has no equivalent for, so `_session_muted` tests `_HOST_IS_CODEX`
@@ -1443,13 +1448,14 @@ payloads, not memory.
   be recommended; every switch `off` means guard emits nothing and makes no model call, which
   is what `audit_gate off` used to mean. Every switch ships `off`, so installing guard does not
   start auditing; and the key is the agent's own bare name, so `settings set
-  korean-corrector fresh`, `/guard:korean-corrector`, and
+  korean-corrector on`, `/guard:korean-corrector`, and
   `subagent_type: "guard:korean-corrector"` are one string. Renaming an agent means
   renaming its directory under `agents/`, its skill directory and `name:`, its
   `AUDIT_AGENTS` key, its `hooks.json` matcher, and `_CONTROL_CMD_RE` — together, or the
   vocabulary splits again.
 - **`reuse` was removed, and reviving it costs more than the mode.** `AgentMode` was
-  `off` / `fresh` / `reuse`: one named instance per session (`_instance_name` →
+  `off` / `fresh` / `reuse` (`fresh` is spelled `on` since v0.116.0): one named instance per
+  session (`_instance_name` →
   `guard-<agent>`), resumed on later turns with its whole history. It bought continuity —
   the instance already knew the repository and the session's conventions and stopped
   re-deriving them — and cost independence, since a verdict it got wrong sat in its history
@@ -1463,7 +1469,7 @@ payloads, not memory.
 
   Three things went with it, and each is a reason not to bring it back casually:
 
-  - *`keep` / `resume` are not re-pointed at `fresh`.* They meant `reuse`. A user typing one
+  - *`keep` / `resume` are not re-pointed at the on mode.* They meant `reuse`. A user typing one
     is asking for something that no longer exists, and quietly giving them a different mode
     answers a different question; `_parse_mode` returns `None` and the CLI says so.
   - *The stand-down notices are gone.* guard has no handle on a running instance — no
@@ -1477,7 +1483,7 @@ payloads, not memory.
     addressed a name no agent answered to. Both call sites are deleted now; a revived
     `reuse` must derive from the agent name, not the key.
 
-  The boolean CLI aliases survive (`on` → `fresh`, `off` → `off`) because that is what a
+  The boolean CLI aliases survive (`true`/`yes`/`1` → `on`, `false`/`no`/`0` → `off`) because that is what a
   setting here has always been set with, and `on` has to keep meaning something: the mode
   every agent definition was written for. The value stays a *mode* rather than a boolean so
   that a third state can be added without a second key to disagree with the first.
@@ -1735,7 +1741,7 @@ payloads, not memory.
     like every other agent, and `off` there did not mean "no translation" — it meant the author
     translates, i.e. the defect. A setting whose off-state is the bug is not a setting. So both
     it and `korean-corrector` carry `fixed_mode` instead: no config key, `settings set` refuses
-    the name, and `guard-candidates` prints `fresh` from the roster. The pair moves together
+    the name, and `guard-candidates` prints `on` from the roster. The pair moves together
     because it is one step; a corrector that could be switched off behind a translator that
     could not would ship Korean nothing had read.
 
@@ -1903,7 +1909,7 @@ and what reviving it would cost, and why they all ship off. A value that is not 
 direction, since the alternative is guard acting on a setting the user did not write.
 
 One subtlety `_load_config` must keep: an `AgentMode` default round-trips through JSON as a
-plain `str`, and `isinstance("fresh", AgentMode)` is False, so the accepted type is widened
+plain `str`, and `isinstance("on", AgentMode)` is False, so the accepted type is widened
 to `str` for those keys. Without that widening every mode in the file is dropped and only
 the session state is ever honored — which is exactly the bug this shape introduced once.
 
@@ -1915,8 +1921,8 @@ Every agent brings its own model and effort from its own frontmatter in `agents/
 also where its criteria live; a second copy in guard's config would let the two disagree about
 the same agent.
 
-`audit-turn` / `audit-plan` (string, `"on"` by default; `"off"`, or any off-word, or a JSON
-boolean) — the state each session's turn audit and plan gate **open** in. They seed
+`audit-turn` (string, `"off"` by default) / `audit-plan` (string, `"on"` by default) — either
+one takes any on-word or off-word, or a JSON boolean — the state each session's turn audit and plan gate **open** in. They seed
 `audit_paused` / `plan_audit_paused` in `state/<sid>.json` and nothing else: `guard` and
 `guard-plan` write that state, never this file, so the setting is the project's answer and the
 toggle is one session's. An absent or unreadable value reads as `on`, the opposite fallback
@@ -2196,10 +2202,11 @@ run(){ anchor "$1"; echo "{\"session_id\":\"s1\",\"prompt_id\":\"$1\",\"transcri
 "$H" settings show --session s1        # read verbs need no marker
 export GUARD_SETTINGS_SKILL=1         # mutating verbs do — see _cli_write_allowed
 
-# ARM THE SESSION EXPLICITLY, even though `audit-turn` defaults to on and this project has no
-# config file. The default is not the assertion: a project that ships `audit-turn: off`, or a
-# state file left behind by an earlier run, makes every `run` below silent for the WRONG reason
-# and each assertion that expects a recommendation passes as (EMPTY) while testing nothing.
+# ARM THE SESSION EXPLICITLY. Since v0.116.0 `audit-turn` defaults to OFF, so without this line
+# every `run` below is silent and each assertion that expects a recommendation passes as
+# (EMPTY) while testing nothing. It was worth typing even when the default was on — a project
+# shipping `audit-turn: off`, or a state file left behind by an earlier run, produced the same
+# silent pass — and now it is load-bearing rather than defensive.
 # `toggle-cli` takes its argument in argv and its session id from the ENVIRONMENT, so both are
 # set per command.
 CLAUDE_CODE_SESSION_ID=s1 "$H" toggle-cli on > /dev/null
@@ -2247,8 +2254,8 @@ cat "$CLAUDE_PROJECT_DIR/.claude/guard/turns/s1/p0.md"
 #      then the empty "## Request, tool activity, and prior evidence" section.
 
 # One agent not-off is guard on. Check the shape, not just non-emptiness:
-"$H" settings set claims-auditor fresh --session s1     # "on" is an accepted alias
-"$H" settings set korean-corrector fresh --session s1
+"$H" settings set claims-auditor on --session s1     # `fresh` is still accepted here
+"$H" settings set korean-corrector on --session s1
 run p1 "Redis는 Postgres보다 항상 빠릅니다."
 #   -> one imperative plus fields: the closeout path, the turn dir, the answer and request
 #      files, the `candidates` COMMAND (never the roster itself — the router runs it), and
@@ -2267,17 +2274,17 @@ cat "$CLAUDE_PROJECT_DIR/.claude/guard/turns/s1/p1.md"
 # korean-corrector off` is refused and would assert nothing.
 "$H" settings set deferrals-auditor off --session s1
 run p2 "Redis는 Postgres보다 항상 빠릅니다."   # -> the `candidates:` line, unchanged by the switch
-CLAUDE_CODE_SESSION_ID=s1 "$H" candidates     # -> audit-turn-claims=fresh (+ the Korean pair),
+CLAUDE_CODE_SESSION_ID=s1 "$H" candidates     # -> audit-turn-claims=on (+ the Korean pair),
                                               #    and no deferrals-auditor
 # The line prints the ENTRY POINT, not the switch key. `claims-auditor` is what the user sets
 # and must never appear here; `audit-turn-claims` is what the router names and its caller
 # invokes. A regression in `_path_entry` shows up as the key leaking into this output.
-CLAUDE_CODE_SESSION_ID=s1 "$H" candidates | grep -qx 'claims-auditor=fresh' && \
+CLAUDE_CODE_SESSION_ID=s1 "$H" candidates | grep -qx 'claims-auditor=on' && \
   echo 'REGRESSION: the switch key reached the router'
 # The document path: same eligibility, mapped through `report_entry`. The Korean pair must be
 # absent — that mapping is what replaced the paragraph telling the document router to refuse
 # them by name, so if they appear here the router has nothing left to stop it naming them.
-CLAUDE_CODE_SESSION_ID=s1 "$H" candidates --doc  # -> audit-report-claims=fresh, nothing else
+CLAUDE_CODE_SESSION_ID=s1 "$H" candidates --doc  # -> audit-report-claims=on, nothing else
 # The two failure shapes must not both be silence: one is an installation problem, the other
 # a real (if unexpected) answer, and the router is told to report each in one line.
 CLAUDE_CODE_SESSION_ID= "$H" candidates       # -> stderr: no CLAUDE_CODE_SESSION_ID; exit 0
@@ -2327,7 +2334,7 @@ echo '{"session_id":"s1","prompt_id":"pc","prompt":"rename a variable"}' | "$H" 
 echo "{\"session_id\":\"s1\",\"prompt_id\":\"pc\",\"tool_input\":{\"file_path\":\"$CLAUDE_PROJECT_DIR/src/cache.py\"}}" | "$H" post-edit
 run pc "Renamed it."   # -> the direct block only: closeout and `files to audit` — and NO
                        #    router block at all, so no `answer file:` and no `candidates:`
-"$H" settings set claims-auditor fresh --session s1     # both on -> the line is back
+"$H" settings set claims-auditor on --session s1     # both on -> the line is back
 
 # comment-corrector needs a source file the turn actually WROTE, and the file must exist.
 echo 'x = 1' > "$CLAUDE_PROJECT_DIR/src/cache.py"
@@ -2342,7 +2349,7 @@ run p4 "Refactored the cache."          # -> claims-auditor only: p4 wrote nothi
 # The two edited lists must stay disjoint and must not cross-trigger. `notes.md` above lands
 # in NEITHER; `AGENTS.md` and `CLAUDE.md` land in the agent-doc list only. Three things to
 # check here, and the first is the one a per-bucket reset would break.
-"$H" settings set agents-md-auditor fresh --session s1
+"$H" settings set agents-md-auditor on --session s1
 printf '# x\n' > "$CLAUDE_PROJECT_DIR/AGENTS.md"
 buckets(){ python3 -c "import json;d=json.load(open('$CLAUDE_PROJECT_DIR/.claude/guard/state/s1.json'));print(d['edited_files'],d['edited_agent_docs'],d['edited_refs'])"; }
 edit(){ echo "{\"session_id\":\"s1\",\"prompt_id\":\"$1\",\"tool_input\":{\"file_path\":\"$CLAUDE_PROJECT_DIR/$2\"}}" | "$H" post-edit; }
@@ -2411,9 +2418,9 @@ echo "{\"session_id\":\"s1\",\"prompt_id\":\"p6b\",\"transcript_path\":\"$T\",\"
 #   -> empty; trace: skip_bash_input; no .claude/guard/turns/s1/p6b.md
 
 # `reuse` is gone. The word must not be accepted as a mode, and neither must the two aliases
-# that used to mean it — silently resolving one to `fresh` would answer a different question
+# that used to mean it — silently resolving one to the on mode would answer a different question
 # than the user asked. Check all three, and check a config file that still holds the old value.
-"$H" settings set claims-auditor reuse --session s1   # -> error naming off/fresh
+"$H" settings set claims-auditor reuse --session s1   # -> error naming off/on
 "$H" settings set claims-auditor keep --session s1    # -> same
 "$H" settings set claims-auditor resume --session s1  # -> same
 # Then hand-edit `.claude/guard.local.json` to put `"claims-auditor": "reuse"` back, and:
@@ -2426,15 +2433,15 @@ echo '{"session_id":"s1"}' | "$H" session-start
 # The switch-free agents. The two Korean ones ride along and must never make guard speak on
 # their own; the two ext-docs ones may reach no switch-driven path at all, and the refs block
 # must survive a config with everything off — that is the point of them having no switch.
-"$H" settings set korean-translator fresh --session s1  # -> error: not a settable key
-"$H" settings set korean-corrector fresh --session s1   # -> same
+"$H" settings set korean-translator on --session s1  # -> error: not a settable key
+"$H" settings set korean-corrector on --session s1   # -> same
 for k in claims-auditor deferrals-auditor clarity-auditor comment-corrector \
          agents-md-auditor; do
   "$H" settings set $k off --session s1
 done
-"$H" settings set docs-finder fresh --session s1
+"$H" settings set docs-finder on --session s1
 #   -> error listing the settable keys: not a config key, and must stay refused
-"$H" settings set ext-docs-auditor fresh --session s1   # -> same
+"$H" settings set ext-docs-auditor on --session s1   # -> same
 "$H" settings list
 #   -> six agent lines and refs_dir. Neither `docs-finder` nor `ext-docs-auditor` appears,
 #      and there is no router_model line.
@@ -2469,9 +2476,11 @@ CLAUDE_CODE_SESSION_ID=s1 "$H" toggle-cli on > /dev/null
 "$H" settings show --session s1
 #   -> `audit-turn: on (this session; project setting off)`. Both halves, because the toggle
 #      does not write the file and the file no longer describes the session.
-"$H" settings unset audit-turn --session s1     # -> back to the default ('on'), session too
+"$H" settings unset audit-turn --session s1     # -> back to the default ('off'), session too
 python3 -c "import json;print(json.load(open('$CLAUDE_PROJECT_DIR/.claude/guard/state/s1.json'))['audit_paused'])"
-#   -> False
+#   -> True. The unset follows the DEFAULT, which is now muted — so re-arm before any later
+#      step that expects a recommendation.
+CLAUDE_CODE_SESSION_ID=s1 "$H" toggle-cli on > /dev/null
 "$H" settings set audit-plan false --session s1   # a JSON-style word is accepted, like `off`
 "$H" settings set audit-turn sometimes --session s1   # -> error naming on/off; nothing written
 "$H" settings unset audit-plan --session s1
@@ -2479,7 +2488,12 @@ python3 -c "import json;print(json.load(open('$CLAUDE_PROJECT_DIR/.claude/guard/
 # Unknown keys and unknown values are both rejected outright rather than silently accepted.
 "$H" settings set audit_gate off --session s1   # -> error listing the settable keys;
 #   `audit_gate` was the old off/ask/auto gate in front of the switches and must stay rejected
-"$H" settings set claims-auditor maybe --session s1  # -> error naming off/fresh
+"$H" settings set claims-auditor maybe --session s1  # -> error naming off/on
+"$H" settings set claims-auditor fresh --session s1  # -> accepted; WRITTEN BACK as 'on'.
+#   The pre-v0.116.0 spelling. Every config file older than that release says it, so this must
+#   stay an accepted input and must never be what the file ends up holding.
+python3 -c "import json;print(json.load(open('$CLAUDE_PROJECT_DIR/.claude/guard.local.json'))['claims-auditor'])"
+#   -> on
 
 # `unset` is the only way a key leaves the file. It must handle the key that is not there,
 # the key guard does not honor, and the live switch whose instance has to stand down.

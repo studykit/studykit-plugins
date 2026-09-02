@@ -38,8 +38,8 @@ from .dispatch import CLI_REL, _closeout_path, _plugin_root
 def _session_muted(project_dir: Path, config: dict, payload: dict | None) -> bool:
     """Is the session this SessionStart opens muted? Claude only.
 
-    At `startup` this is the project's `audit-turn` setting, armed unless the config says
-    otherwise (`state._read_state`). It is not only that: SessionStart registers no matcher,
+    At `startup` this is the project's `audit-turn` setting, muted unless the config arms it
+    (`state._read_state`). It is not only that: SessionStart registers no matcher,
     so it also fires on `resume`, `clear`, `compact` and `fork`, where the session may already
     have been flipped by `guard` — or, on `clear`, by the handoff from the session it
     replaced — and the state file says so. Either way the line below reports what it finds
@@ -199,9 +199,12 @@ def cmd_session_end() -> int:
     Nothing is written unless a switch differs from what this project configures — a session
     still sitting on its defaults has nothing to hand over, since the replacement reads the
     same config and arrives at the same two values on its own. That comparison, not "is
-    anything armed", is what makes the record carry a MUTE as readily as it carries an arming:
-    with `audit-turn` defaulting to on, a `guard off` before a `/clear` is precisely the
-    intention most likely to be lost. A stale record from a previous clear is removed when
+    anything armed", is what makes the record carry an ARMING as readily as it carries a mute:
+    with `audit-turn` defaulting to off, a `guard on` before a `/clear` is precisely the
+    intention most likely to be lost, and with `audit-plan` defaulting to on it is a
+    `guard-plan off` — the two switches lose their intention in opposite directions, which is
+    why the test is against the config and not against a fixed idea of which state is
+    noteworthy. A stale record from a previous clear is removed when
     there is nothing to carry, rather than left to be read later.
 
     The record carries a SECOND, independent thing: the handover file this session wrote, if

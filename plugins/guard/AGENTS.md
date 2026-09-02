@@ -45,8 +45,11 @@ their own text, what the translator must not move while doing it, and the eligib
 keeps a switch-free agent from reinstating the router call.
 
 Every agent switch ships `off`: guard installed is guard available, not guard running. The two
-audit switches (`audit-turn`, `audit-plan`) are the exception — absent from the config they read
-as `on`, so a project that switches an agent on gets the audit without a second step. They are
+audit switches (`audit-turn`, `audit-plan`) do not agree with each other, and that is the
+design rather than an oversight: absent from the config, `audit-turn` reads as `off` and
+`audit-plan` as `on`. The turn audit is charged on every finished turn, so the user arms it for
+the stretch of work that wants it; the plan gate fires only at `ExitPlanMode`, where the cost is
+rare and letting a deferral through is paid for by the whole implementation after it. They are
 the value each session OPENS in; `guard` / `guard-plan` then move that session alone.
 
 `interviewer` is not part of any of that. It is a background agent the **user** talks to directly, in
@@ -214,9 +217,11 @@ each one cost.
   settled. Reviving the mode means reviving those sections, and fixing what it took with it —
   instance names derived from the roster KEY rather than the agent name, which made every
   agent rename silently emit a stale name.
-- `keep` / `resume` as aliases pointing at `fresh`. They meant `reuse`; a user typing one is
-  asking for what no longer exists, and answering with a different mode is worse than saying
-  the value is not a mode.
+- `keep` / `resume` as aliases pointing at the on mode. They meant `reuse`; a user typing one
+  is asking for what no longer exists, and answering with a different mode is worse than saying
+  the value is not a mode. `fresh` is the opposite case and stays: it is the on mode's own
+  former spelling, so every config file written before v0.116.0 says it, and dropping it would
+  read those projects as `off`.
 - A `.ko-fix.md` rewrite file beside the answer.
 - A `UserPromptExpansion` matcher with no command file of that name behind it: the host
   answers `Unknown command` before the hook runs, silently, which is how every one of guard's

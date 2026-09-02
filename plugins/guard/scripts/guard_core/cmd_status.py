@@ -3,8 +3,8 @@
 ``toggle-cli`` (CLI, argv) arms or mutes the automatic audit for THIS SESSION —
 ``audit_paused`` in the session state, never guard.local.json, so it cannot change what the
 project does by default. The state a session opens in is the project's ``audit-turn`` setting,
-armed when the file says nothing (``state._read_state``), which makes ``off`` the common
-direction: one session that does not want auditing, with the setting left alone. An empty
+MUTED when the file says nothing (``state._read_state``), which makes ``on`` the common
+direction: one stretch of work that wants auditing, with the setting left alone. An empty
 argument flips, and ``status`` reports without writing. While muted, ``stop`` recommends
 nothing and ``user-prompt`` names no answer file, but the pending target and the answer file
 are still recorded — the Codex adapter reads that marker.

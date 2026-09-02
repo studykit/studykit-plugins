@@ -172,7 +172,9 @@ def cmd_plan_toggle_cli() -> int:
     Session-scoped like the turn audit's mute, and separate from it: the two audits run at
     different moments on different material, so one switch for both would arm a review the
     user did not ask for. The state a session opens in is the project's ``audit-plan``
-    setting, armed when the config says nothing (``state._read_state``).
+    setting, armed when the config says nothing — the opposite of ``audit-turn``'s default,
+    because this gate fires only at ``ExitPlanMode`` rather than on every finished turn
+    (``state._read_state``).
     """
     session_id = os.environ.get("CLAUDE_CODE_SESSION_ID", "").strip()
     project_dir = _cli_project_dir()

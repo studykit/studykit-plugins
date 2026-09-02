@@ -57,7 +57,7 @@ def _read_state(project_dir: Path, session_id: str, config: dict[str, Any]) -> d
         "edited_agent_docs": [],
         "edited_refs": [],
         # Session-only mute, flipped by the `guard` shell command. The value a session OPENS
-        # in is the project's `audit-turn` setting, armed when the file says nothing; from
+        # in is the project's `audit-turn` setting, MUTED when the file says nothing; from
         # then on this key is the session's own, and the toggle never writes back to the
         # config — so muting the session you are in cannot change what the next one does.
         # NOT a mode in front of the agent switches the way the removed `audit_gate` was:
