@@ -10,7 +10,7 @@
   "plugins": [
     {
       "name": "doc",
-      "source": "./plugins/doc",
+      "source": "./doc",
       "description": "A plugin for reading and searching various document formats including CHM files",
       "author": {
         "name": "studykit"
@@ -22,7 +22,7 @@
     },
     {
       "name": "jdk-source",
-      "source": "./plugins/jdk-source",
+      "source": "./jdk-source",
       "description": "View JDK internal source code for Java development and debugging",
       "author": {
         "name": "studykit"
@@ -34,7 +34,7 @@
     },
     {
       "name": "korea-gov-data",
-      "source": "./plugins/korea-gov-data",
+      "source": "./korea-gov-data",
       "description": "Extract and organize Open API specifications from KOSIS (Korean Statistical Information Service)",
       "author": {
         "name": "studykit"
@@ -46,7 +46,7 @@
     },
     {
       "name": "dom-analyzer",
-      "source": "./plugins/dom-analyzer",
+      "source": "./dom-analyzer",
       "description": "HTML/XML DOM structure analysis toolkit with hierarchy visualization and CSS selector discovery",
       "author": {
         "name": "studykit"
@@ -58,7 +58,7 @@
     },
     {
       "name": "spectrack",
-      "source": "./plugins/spectrack",
+      "source": "./spectrack",
       "description": "Provider-backed workflow over GitHub Issues, Jira, GitHub repository wiki directory, and Confluence with issue and knowledge authoring contracts",
       "author": {
         "name": "studykit"
@@ -70,7 +70,7 @@
     },
     {
       "name": "obsidian",
-      "source": "./plugins/obsidian",
+      "source": "./obsidian",
       "description": "Generate query blocks, modify templates, and guide plugin usage for Obsidian knowledge management (Dataview, Tasks, Jira Issue, Templater, CLI)",
       "author": {
         "name": "studykit"
@@ -82,7 +82,7 @@
     },
     {
       "name": "plantuml",
-      "source": "./plugins/plantuml",
+      "source": "./plantuml",
       "description": "PlantUML diagram reference, creation, and validation plugin",
       "author": {
         "name": "studykit"
@@ -94,7 +94,7 @@
     },
     {
       "name": "structurizr",
-      "source": "./plugins/structurizr",
+      "source": "./structurizr",
       "description": "Structurizr DSL diagram composition, C4 model visualization, and architecture documentation plugin",
       "author": {
         "name": "studykit"
@@ -106,7 +106,7 @@
     },
     {
       "name": "d2",
-      "source": "./plugins/d2",
+      "source": "./d2",
       "description": "D2 diagram composition, rendering, and visualization plugin",
       "author": {
         "name": "studykit"
@@ -118,7 +118,7 @@
     },
     {
       "name": "dev-rules",
-      "source": "./plugins/dev-rules",
+      "source": "./dev-rules",
       "description": "Gate file edits via a PreToolUse deny + reason that points to the project's coding rule sets (logging conventions; extensible by category) and tells the model to Read them before retrying. Rulesets are organized as `rulesets/<category>/<key>.md`; the hook lists absolute pointer paths (not bodies) in the deny reason so the model Reads the rule files itself, landing them in the transcript as its own tool-result. Per `<category>:<key>` dedup keeps each pointer to once per session.",
       "author": {
         "name": "studykit"
@@ -130,7 +130,7 @@
     },
     {
       "name": "guard",
-      "source": "./plugins/guard",
+      "source": "./guard",
       "description": "When a turn ends, guard asks the session to run its router subagent over the response; the router names which audit agents would actually find something in it — unsupported claims, deferrals the repo could answer, explanation the reader cannot follow, unnatural Korean, comments in the source it edited, AGENTS.md/CLAUDE.md that drifted from a map into a payload, saved reference docs that filled up with local reasoning — each with a reason; they run in parallel and nothing is corrected until all of them have reported, so every audit judges the same text — then the ones that found something read the corrections once more. It also keeps the session off the network: documentation lookups go to an agent that reports where the document is — already saved, in the repository, or in a knowledge base the project configures — and fetches and saves the primary source only when the network is the only place it lives. One switch per agent, all off until you turn one on; whether a session starts with turn and plan auditing armed is itself a saved setting: the plan gate armed unless the project says otherwise, the turn audit muted until you arm it. A separate `interviewer` agent is not part of that: you talk to it directly in its own transcript before any work starts, and it questions you one at a time — testing what you said rather than guessing the rest — until the request is clear, then researches it and, when you close the interview, leaves one brief on disk for the session to act on. A `handover` skill writes a self-contained session handover before you clear the conversation, and the session `/clear` opens next is offered it: guard carries the file's path across that boundary and the session asks whether to read it. Claude Code and Codex. Requires Python 3.11+.",
       "author": {
         "name": "studykit"
@@ -142,7 +142,7 @@
     },
     {
       "name": "hindsight",
-      "source": "./plugins/hindsight",
+      "source": "./hindsight",
       "description": "Mine past Claude Code session transcripts to surface recurring agent mistakes and how the user works, accumulating both as durable, project-independent guidance. Review refreshes the analysis from new sessions; report shows the accumulated findings and profile. Claude Code only.",
       "author": {
         "name": "studykit"

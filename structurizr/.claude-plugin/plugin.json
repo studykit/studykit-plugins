@@ -1,0 +1,11 @@
+{
+  "name": "structurizr",
+  "version": "0.2.1",
+  "description": "Structurizr DSL diagram composition, C4 model visualization, and architecture documentation plugin",
+  "author": {
+    "name": "studykit"
+  },
+  "repository": "https://github.com/studykit/claude-plugin-marketplace",
+  "license": "MIT",
+  "keywords": ["structurizr", "c4", "diagram", "architecture", "container", "deployment", "visualization"]
+}

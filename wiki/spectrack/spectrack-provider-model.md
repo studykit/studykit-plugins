@@ -4,7 +4,7 @@ Date: 2026-05-13
 
 ## Purpose
 
-This note summarizes the current design direction for `plugins/spectrack` as a provider-backed workflow system.
+This note summarizes the current design direction for `spectrack` as a provider-backed workflow system.
 
 The goal is to let workflow operate over multiple sources of truth:
 
@@ -15,7 +15,7 @@ The goal is to let workflow operate over multiple sources of truth:
 
 ## Core Direction
 
-`plugins/spectrack` should be a provider-agnostic workflow and semantic layer.
+`spectrack` should be a provider-agnostic workflow and semantic layer.
 
 Local Markdown remains a possible projection or future provider, but the workflow plugin is designed around provider-backed sources of truth. When GitHub, Jira, or repository-backed `wiki/` are configured as the source of truth, local Markdown files are optional projections rather than required canonical records.
 
@@ -566,13 +566,13 @@ Output:
     "provider": "github"
   },
   "required_authoring_files": [
-    "/absolute/path/to/plugins/spectrack/authoring/common/issue-body.md",
-    "/absolute/path/to/plugins/spectrack/authoring/common/issue-authoring.md",
-    "/absolute/path/to/plugins/spectrack/authoring/common/review-authoring.md",
-    "/absolute/path/to/plugins/spectrack/authoring/providers/github-issue-convention.md",
-    "/absolute/path/to/plugins/spectrack/authoring/providers/github-issue-relationships.md",
-    "/absolute/path/to/plugins/spectrack/authoring/providers/github-issue-review-authoring.md",
-    "/absolute/path/to/plugins/spectrack/authoring/providers/github-issue-anti-patterns.md"
+    "/absolute/path/to/spectrack/authoring/common/issue-body.md",
+    "/absolute/path/to/spectrack/authoring/common/issue-authoring.md",
+    "/absolute/path/to/spectrack/authoring/common/review-authoring.md",
+    "/absolute/path/to/spectrack/authoring/providers/github-issue-convention.md",
+    "/absolute/path/to/spectrack/authoring/providers/github-issue-relationships.md",
+    "/absolute/path/to/spectrack/authoring/providers/github-issue-review-authoring.md",
+    "/absolute/path/to/spectrack/authoring/providers/github-issue-anti-patterns.md"
   ]
 }
 ```

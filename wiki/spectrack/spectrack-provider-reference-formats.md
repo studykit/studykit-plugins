@@ -4,7 +4,7 @@ Date: 2026-05-13
 
 ## Summary recommendation
 
-`plugins/spectrack` should prefer provider-native short references in bodies, commits, branch names, PR titles, and comments. The provider adapter resolves those short references using `.spectrack/config.yml`, git remotes, and provider context.
+`spectrack` should prefer provider-native short references in bodies, commits, branch names, PR titles, and comments. The provider adapter resolves those short references using `.spectrack/config.yml`, git remotes, and provider context.
 
 Use full normalized references only when local context is ambiguous or when writing machine-only metadata that needs a stable provider object.
 

@@ -10,7 +10,7 @@ keypress, check whether an already-trusted path was available instead of a fresh
 
 `~/.claude.json` → `projects.<abs path>.hasTrustDialogAccepted`. Trust is keyed on the path,
 so recreating a previously trusted throwaway path (e.g. the one named in
-`plugins/guard/dev/design.md` `## Testing against the real CLI`) skips the dialog with no
+`guard/dev/design.md` `## Testing against the real CLI`) skips the dialog with no
 config edit. Verified once by launching `claude` in such a path under tmux — no dialog.
 
 design.md's own recipe states the alternative: "sends one extra Enter, or runs in a directory

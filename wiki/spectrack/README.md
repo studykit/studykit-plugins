@@ -4,7 +4,7 @@ This directory is the GitHub-backed knowledge backend for the workflow plugin do
 
 It intentionally uses a normal repository directory instead of the separate GitHub Wiki feature.
 
-Runtime authoring contracts remain under [`plugins/spectrack/authoring/`](../../plugins/spectrack/authoring/). Wiki pages may link to those contracts, but should not duplicate their full rule bodies.
+Runtime authoring contracts remain under [`spectrack/authoring/`](../../spectrack/authoring/). Wiki pages may link to those contracts, but should not duplicate their full rule bodies.
 
 ## Pages
 

@@ -196,7 +196,7 @@ New configuration files should use `providers`.
 Shared loader:
 
 ```text
-plugins/spectrack/scripts/config.py
+spectrack/scripts/config.py
 ```
 
 The loader discovers `.spectrack/config.yml` from the project path upward.

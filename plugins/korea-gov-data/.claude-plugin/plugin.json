@@ -1,9 +1,0 @@
-{
-  "name": "korea-gov-data",
-  "version": "0.1.1",
-  "description": "Extract and organize Open API specifications from KOSIS (Korean Statistical Information Service)",
-  "author": {
-    "name": "studykit"
-  },
-  "keywords": ["korea-gov-data", "open-api", "korea", "public-data", "api-spec"]
-}

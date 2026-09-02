@@ -77,18 +77,18 @@ Use this layering pattern:
 1. Host-specific entrypoints parse host inputs.
 2. Shared plugin modules receive concrete values, not host payloads.
 3. Utility modules contain only host-neutral helpers.
-4. Claude integration lives in `plugins/<name>/.claude-plugin/`, Claude hook manifests, Claude-specific agents, or Claude adapters.
-5. Codex integration lives in `plugins/<name>/.codex-plugin/`, Codex hook manifests, or Codex adapters.
+4. Claude integration lives in `<name>/.claude-plugin/`, Claude hook manifests, Claude-specific agents, or Claude adapters.
+5. Codex integration lives in `<name>/.codex-plugin/`, Codex hook manifests, or Codex adapters.
 6. Marketplace registration lives in the host-specific marketplace file.
 
 Host-specific files should translate host inputs into shared inputs. They should not contain durable business logic.
 
 For cross-runtime hooks, use this concrete file split:
 
-- `plugins/<name>/hooks/scripts/hook_claude.py` for Claude hook dispatch, payload parsing, environment lookup, and Claude output.
-- `plugins/<name>/hooks/scripts/hook_codex.py` for Codex hook dispatch, payload parsing, environment lookup, Codex transcript metadata, and Codex output.
-- `plugins/<name>/scripts/<plugin>_hook.py` for shared hook behavior as plain functions only. For example, the SpecTrack plugin uses `plugins/spectrack/scripts/hook.py`.
-- `plugins/<name>/scripts/util.py` for host-neutral helpers only.
+- `<name>/hooks/scripts/hook_claude.py` for Claude hook dispatch, payload parsing, environment lookup, and Claude output.
+- `<name>/hooks/scripts/hook_codex.py` for Codex hook dispatch, payload parsing, environment lookup, Codex transcript metadata, and Codex output.
+- `<name>/scripts/<plugin>_hook.py` for shared hook behavior as plain functions only. For example, the SpecTrack plugin uses `spectrack/scripts/hook.py`.
+- `<name>/scripts/util.py` for host-neutral helpers only.
 
 Do not put an abstract `Hook` class, runtime factory, host detector, or shared hook `main` in the shared hook module.
 
@@ -96,14 +96,14 @@ Do not put an abstract `Hook` class, runtime factory, host detector, or shared h
 
 Use these paths consistently:
 
-- `plugins/<name>/` contains the plugin implementation.
-- `plugins/<name>/.claude-plugin/plugin.json` contains Claude plugin metadata.
-- `plugins/<name>/.codex-plugin/plugin.json` contains Codex plugin metadata when the plugin supports Codex.
-- `plugins/<name>/hooks/hooks.json` contains Claude hook declarations when hooks are needed.
-- `plugins/<name>/hooks/hooks.codex.json` contains Codex hook declarations when Codex hook syntax differs.
-- `plugins/<name>/skills/` contains reusable skills.
-- `plugins/<name>/agents/` contains reusable agent definitions when supported.
-- `plugins/<name>/scripts/` contains shared runtime code.
+- `<name>/` contains the plugin implementation.
+- `<name>/.claude-plugin/plugin.json` contains Claude plugin metadata.
+- `<name>/.codex-plugin/plugin.json` contains Codex plugin metadata when the plugin supports Codex.
+- `<name>/hooks/hooks.json` contains Claude hook declarations when hooks are needed.
+- `<name>/hooks/hooks.codex.json` contains Codex hook declarations when Codex hook syntax differs.
+- `<name>/skills/` contains reusable skills.
+- `<name>/agents/` contains reusable agent definitions when supported.
+- `<name>/scripts/` contains shared runtime code.
 - `.claude-plugin/marketplace.json` registers Claude marketplace entries.
 - `.agents/plugins/marketplace.json` registers Codex marketplace entries.
 
@@ -114,9 +114,9 @@ Keep host manifests aligned where both hosts are supported:
 - Use the same plugin `name` in Claude and Codex manifests.
 - Keep descriptions semantically equivalent, even when schemas differ.
 - Keep author, repository, license, category, and keywords consistent where the schemas support them.
-- Claude plugin versions live in `plugins/<name>/.claude-plugin/plugin.json` as a top-level `version` field using SemVer.
+- Claude plugin versions live in `<name>/.claude-plugin/plugin.json` as a top-level `version` field using SemVer.
 - Do not set `version` on the matching entry in `.claude-plugin/marketplace.json`; if both are set, `plugin.json` wins silently and a stale marketplace value would be masked.
-- Codex plugin manifests at `plugins/<name>/.codex-plugin/plugin.json` carry their own top-level `version` field.
+- Codex plugin manifests at `<name>/.codex-plugin/plugin.json` carry their own top-level `version` field.
 - When a plugin supports both hosts, bump the Claude and Codex `version` strings together and keep them identical.
 - Update `.claude-plugin/marketplace.json` for Claude registration changes such as entries, source, and metadata, not for version.
 - Update `.agents/plugins/marketplace.json` for Codex registration changes.

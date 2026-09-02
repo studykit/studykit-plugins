@@ -10,7 +10,7 @@ This is repo-local machinery, not part of any plugin: it enforces the rules in t
 Two buckets, two auditors, both defined in `.claude/agents/`:
 
 - `AGENTS.md` / `CLAUDE.md`  -> `contributor-docs-auditor`
-- `plugins/*/agents/*.md`    -> `plugin-agent-doc-auditor`
+- `*/agents/*.md`            -> `plugin-agent-doc-auditor`
 
 `PostToolUse` only records paths; the dispatch is asked for once, at `Stop`. Recording and
 dispatching are split for two reasons. A turn usually edits the same file several times, and
@@ -172,7 +172,7 @@ def _bucket(project_dir: Path, target: Path) -> str | None:
         if len(parts) >= 2 and parts[0] == "wiki" and parts[1] == "ref":
             return None
         return "contributor_docs"
-    if (len(parts) == 4 and parts[0] == "plugins" and parts[2] == "agents"
+    if (len(parts) == 3 and parts[1] == "agents"
             and target.suffix.lower() == ".md"):
         return "plugin_agent_docs"
     return None

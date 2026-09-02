@@ -30,11 +30,11 @@ for writes and verification.
 
 Detailed launcher usage, authoring path resolution, and the body-file write
 contract live in on-demand main-assistant context policy files under
-`plugins/spectrack/authoring/runbook/`.
+`spectrack/authoring/runbook/`.
 
 ### Workflow scripts
 
-The bundled workflow scripts under `plugins/spectrack/scripts/` resolve
+The bundled workflow scripts under `spectrack/scripts/` resolve
 authoring paths and perform provider/cache writes. The authoring resolver
 returns:
 
@@ -48,13 +48,13 @@ They do not summarize provider body content.
 ### Plugin contributors
 
 Plugin contributors may inspect resolver, launcher, hook, cache, and test
-implementation details while editing `plugins/spectrack/`. Keep those details in
+implementation details while editing `spectrack/`. Keep those details in
 source code, tests, or contributor-facing documentation, not in main-agent
 runtime guidance.
 
 ## Authoring Contract Source
 
-Runtime authoring contracts live under `plugins/spectrack/authoring/`.
+Runtime authoring contracts live under `spectrack/authoring/`.
 
 Common contracts are provider-neutral. Provider contracts define provider
 identity, relationship authoring boundaries, and provider-specific body rules.
@@ -80,7 +80,7 @@ operator handoff expectations.
 
 1. SessionStart injects only the concise workflow policy entry point when
    `.spectrack/config.yml` exists; detail files under
-   `plugins/spectrack/authoring/runbook/` are loaded on demand.
+   `spectrack/authoring/runbook/` are loaded on demand.
 2. Before a workflow artifact write, the main assistant runs
    `workflow authoring_resolver.py --type <type> --role <role> --json` for
    required authoring paths.

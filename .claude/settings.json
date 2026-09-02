@@ -9,7 +9,7 @@
             "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/doc_audit.py",
             "args": ["post-edit"],
             "timeout": 10,
-            "description": "Record an AGENTS.md/CLAUDE.md or plugins/*/agents/*.md file this turn wrote, for the turn-end audit dispatch. Records only; never blocks."
+            "description": "Record an AGENTS.md/CLAUDE.md or */agents/*.md file this turn wrote, for the turn-end audit dispatch. Records only; never blocks."
           }
         ]
       }

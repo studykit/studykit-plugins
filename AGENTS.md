@@ -4,9 +4,9 @@ This is the plugin marketplace directory - a collection of Claude Code and Codex
 
 ## Version Management
 
-Claude plugin versions live in each plugin's `plugins/<name>/.claude-plugin/plugin.json` (top-level `version` field, SemVer). Plugin entries in `.claude-plugin/marketplace.json` MUST NOT set `version` — if `version` is set in both places, `plugin.json` wins silently and a stale marketplace value would be masked.
+Claude plugin versions live in each plugin's `<name>/.claude-plugin/plugin.json` (top-level `version` field, SemVer). Plugin entries in `.claude-plugin/marketplace.json` MUST NOT set `version` — if `version` is set in both places, `plugin.json` wins silently and a stale marketplace value would be masked.
 
-Codex plugin manifests at `plugins/<name>/.codex-plugin/plugin.json` carry their own top-level `version` field. When a plugin supports both runtimes, bump the Claude and Codex `version` strings together and keep them identical.
+Codex plugin manifests at `<name>/.codex-plugin/plugin.json` carry their own top-level `version` field. When a plugin supports both runtimes, bump the Claude and Codex `version` strings together and keep them identical.
 
 When a new plugin is added or new features are added to an existing plugin, update the relevant marketplace files accordingly — `.claude-plugin/marketplace.json` for Claude and `.agents/plugins/marketplace.json` for Codex (registration only, not version).
 
@@ -38,7 +38,7 @@ the session it runs in, and testing in your own would take your work with it.
 test "${HERDR_ENV:-}" = 1                      # refuse to drive Herdr from outside it
 herdr pane split --current --direction down --cwd "$PWD" --no-focus
 herdr agent start <name> --kind claude --pane <returned pane id> \
-  -- --plugin-dir /abs/path/to/plugins/<plugin>
+  -- --plugin-dir /abs/path/to/<plugin>
 herdr agent prompt <name> '<what to run>' --wait --timeout 120000
 herdr agent read <name> --source recent-unwrapped --lines 60
 ```
@@ -72,8 +72,8 @@ Two things to check before believing a result:
 ## Shipped Definitions Must Be Repo-Portable
 
 Everything this repository publishes gets installed into **someone else's repository**.
-That applies to every plugin here, not one of them: `plugins/*/agents/*.md`,
-`plugins/*/skills/*/SKILL.md`, and any instruction text a plugin injects at runtime
+That applies to every plugin here, not one of them: `*/agents/*.md`,
+`*/skills/*/SKILL.md`, and any instruction text a plugin injects at runtime
 (hook context, dispatch playbooks, command bodies).
 
 So a shipped definition must not name anything that exists only here — `dev/design.md`,
@@ -103,7 +103,7 @@ Do **not** write detailed implementation content into any `AGENTS.md` file: no l
 
 ## Plugin README Scope
 
-Each plugin's `plugins/<name>/README.md` is written for **end users who install the plugin from the marketplace**. It is not a contributor guide and is not context for the assistant at runtime.
+Each plugin's `<name>/README.md` is written for **end users who install the plugin from the marketplace**. It is not a contributor guide and is not context for the assistant at runtime.
 
 Keep it scoped to user-visible surface:
 

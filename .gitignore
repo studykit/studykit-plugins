@@ -211,7 +211,7 @@ session-tree.lock
 
 # Agent runtime state. Matched at ANY depth, not just the repo root: a pattern with a
 # slash in it is anchored to this file's directory, so `.claude/guard/` alone left a state
-# tree written under a subdirectory (e.g. `plugins/<name>/.claude/guard/`) committable. That
+# tree written under a subdirectory (e.g. `<name>/.claude/guard/`) committable. That
 # is a tooling bug where it happens, but the ignore rule must not be the thing that lets a
 # session extract reach a commit.
 **/.claude/sessions/
@@ -226,7 +226,7 @@ session-tree.lock
 # `local` is never tracked, at any depth. Nothing here uses that scope any more, and the
 # name says what it is for — a store an agent keeps to itself.
 # Both are ignored at every depth below the root, which is the part that must not be lost: a
-# store under a subdirectory (e.g. `plugins/<name>/.claude/agent-memory/`) is state written
+# store under a subdirectory (e.g. `<name>/.claude/agent-memory/`) is state written
 # with a misresolved project root, and it must not become committable just because the root
 # one is wanted.
 **/.claude/agent-memory/

@@ -4,9 +4,9 @@ A curated plugin repository that is compatible with both **Claude Code** and **O
 
 ## Repository layout
 
-- `plugins/<plugin-name>/`: shared plugin content
-- `plugins/<plugin-name>/.claude-plugin/plugin.json`: Claude plugin manifest
-- `plugins/<plugin-name>/.codex-plugin/plugin.json`: Codex plugin manifest
+- `<plugin-name>/`: shared plugin content
+- `<plugin-name>/.claude-plugin/plugin.json`: Claude plugin manifest
+- `<plugin-name>/.codex-plugin/plugin.json`: Codex plugin manifest
 - `.claude-plugin/marketplace.json`: Claude marketplace catalog
 - `.agents/plugins/marketplace.json`: Codex marketplace catalog
 
@@ -40,7 +40,7 @@ Codex reads the repo marketplace from `.agents/plugins/marketplace.json`.
 Claude compatibility is preserved through the existing Claude marketplace files:
 
 - `.claude-plugin/marketplace.json`
-- `plugins/<plugin-name>/.claude-plugin/plugin.json`
+- `<plugin-name>/.claude-plugin/plugin.json`
 
 ## Compatibility policy
 

@@ -67,7 +67,7 @@ names the evidence you found.
 Content written for someone who **installed** the plugin rather than someone changing it:
 what the plugin does for a user, install and configuration instructions, the slash-command
 catalogue, usage examples, marketing framing. The root `AGENTS.md` § *Plugin README Scope*
-places that in `plugins/<name>/README.md`.
+places that in `<name>/README.md`.
 
 The reverse direction is also a finding, but only report it if you actually see it in the
 `README.md`: contributor-only material sitting in the user-facing README — test commands,
@@ -212,7 +212,7 @@ file.
 - Do not create the deeper documents you recommend. Naming where content should go is your
   job; moving it is not.
 - Do not audit files you were not given, and do not widen to every instruction file here.
-- Do not judge plugin agent definitions (`plugins/*/agents/*.md`) — that is
+- Do not judge plugin agent definitions (`*/agents/*.md`) — that is
   `plugin-agent-doc-auditor`'s axis set, and it is a different one.
 - Do not flag a passage for *looking* generic, or for being long, without checking. A finding
   you could not verify is reported as **unverified**, with what you tried, or not at all.
