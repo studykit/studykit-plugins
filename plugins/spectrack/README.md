@@ -26,6 +26,12 @@ receive the full hook, skill, slash-command, and agent surface. Hermes receives
 first-turn workflow policy injection for repositories with `.spectrack/config.yml`
 and bundled plugin skills such as `spectrack:handoff`.
 
+SpecTrack depends on the **guard** plugin. In Claude Code, installing or
+enabling SpecTrack installs and enables `guard` automatically, and `guard`
+cannot be disabled on its own while SpecTrack is enabled. In Codex and Hermes
+the dependency is not resolved for you — install `guard` from the same
+marketplace yourself.
+
 For a local Hermes install from this repository:
 
 ```bash
