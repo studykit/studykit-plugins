@@ -50,7 +50,6 @@ For compatibility and versioning rules, see `AGENTS.md`.
 
 - `lang`
 - `doc`
-- `jdk-source`
 - `korea-gov-data`
 - `dom-analyzer`
 - `workflow`

@@ -91,8 +91,7 @@ def _is_control_command_name(name: str) -> bool:
 # slash-command envelopes, `!` command echoes, the compaction caveat. Matched as a prefix
 # on the record's text. Without this filter the record's "user request" is whatever the
 # host happened to prepend, which is both wrong and the kind of wrong an auditor cannot
-# detect — it has no other copy of the request to compare against. The same list drives
-# hindsight's transcript renderer (`hindsight/skills/review/scripts/render.py`).
+# detect — it has no other copy of the request to compare against.
 # The envelope a user `!` command's input arrives in. It is also the record that ANCHORS
 # such a turn, which is what `_turn_identity` keys its Stop skip on.
 _BASH_TAG = "<bash-input>"
