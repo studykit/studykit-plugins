@@ -122,3 +122,19 @@ Do **not** put in `README.md`:
 
 Contributor- and runtime-facing guidance lives in `AGENTS.md` files and under each plugin's `dev/`; runtime-injected context lives under `hooks/context/` (or the equivalent path for that plugin). When in doubt, ask whether a plugin user — not an author of the plugin — needs the information to install, configure, or invoke the plugin. If not, it does not belong in `README.md`.
 
+
+## Global Definitions
+
+`global/` holds definitions that install into the user's own `~/.claude` rather than into a
+project or a plugin, and mirrors that directory's layout — `global/agents/` becomes
+`~/.claude/agents/`. `global/install.sh` links them into place instead of copying, so the
+checkout stays the single source of truth; see `global/README.md`.
+
+Prefer a plugin when a definition belongs with commands, skills, or hooks that ship alongside
+it. `global/` is for one that stands alone and would gain nothing from a manifest — an agent
+invoked as `claude --agent <name>`, for instance, since that surface resolves names from
+`~/.claude/agents` and never from a project.
+
+Everything here installs into a directory shared by every project on the machine, so the same
+repo-portability rule applies as to a plugin's shipped definitions: no path, document, or
+measurement that exists only in this repository.
