@@ -92,8 +92,8 @@ def _turn_command_name(user_text: str) -> str:
 
 def _is_control_command_name(name: str) -> bool:
     """True when a normalized command name is one of guard's own control commands
-    (``settings``/``reader-profile``/``*-auditor``/``korean-corrector``, with or without
-    the ``guard:`` prefix)."""
+    (``settings``, ``reader-profile``, ``audit-turn`` and the ``audit-turn-*`` /
+    ``audit-report-*`` entries, ``audit-plan`` — with or without the ``guard:`` prefix)."""
     return bool(name) and bool(_CONTROL_CMD_RE.match("/" + name))
 
 
@@ -114,10 +114,11 @@ _INJECTED_PREFIXES = (
 )
 
 
-# Caps on the tool activity guard slices into a turn record. Generous, because the record
-# is a file rather than context — but not unbounded: whoever is dispatched Reads the whole
-# file, so an uncapped 5MB transcript turn would arrive in an auditor's context intact.
-# Per-result first, so one runaway command cannot crowd out ten useful ones, then a total.
+# Caps on the tool activity guard renders into a turn EXTRACT (`_render_turn`). Generous,
+# because the extract is a file rather than context — but not unbounded: whoever is
+# dispatched Reads the whole file, so an uncapped 5MB transcript turn would arrive in an
+# auditor's context intact. Per-result first, so one runaway command cannot crowd out ten
+# useful ones, then a total.
 TOOL_RESULT_MAX_CHARS = 4000
 
 

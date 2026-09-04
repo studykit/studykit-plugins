@@ -36,8 +36,8 @@ from .paths import _state_root
 # be stored anywhere, and nothing breaks if the state file holding it were lost.
 #
 # 8 hex characters. A collision needs two turns in ONE session whose UUIDs share a 32-bit
-# prefix; at a few hundred turns that is around one in ten million, and the cost of losing
-# that bet is one turn's answer file being reused rather than anything unrecoverable.
+# prefix; at a few hundred turns that is around one in a hundred thousand, and the cost of
+# losing that bet is one turn's answer file being reused rather than anything unrecoverable.
 _ID_PATH_CHARS = 8
 
 
