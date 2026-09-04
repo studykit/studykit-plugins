@@ -14,6 +14,8 @@ parties that pass it around (``_turn_translation_file``).
 guard at UserPromptSubmit. It goes to the ROUTER and to nothing else: never audited, never
 corrected, never handed to an audit agent. It is there so triage can tell the part of an
 answer the user asked for from the part nobody asked for (``_write_turn_request``).
+
+``<sid>`` and ``<pid>`` in all of the above are the SHORT forms — see ``_short``.
 """
 
 from __future__ import annotations
@@ -21,6 +23,43 @@ from __future__ import annotations
 from pathlib import Path
 
 from .paths import _state_root
+
+# How many leading characters of an id go into a path. The ids guard is handed are 36-char
+# UUIDs, and the answer file's path is printed into the main agent's context on every turn:
+# at full length the session id and the turn id together are 72 characters of hex, which
+# tokenizes far worse than the English around it.
+#
+# A prefix rather than a hash or a counter, because a prefix stays DERIVABLE. A subagent
+# holding only `CLAUDE_CODE_SESSION_ID` builds the same directory by applying the same rule,
+# and the transcript's full `promptId` is matched against the short turn id by prefix
+# (`transcript._turn_slice`) — so no mapping from the short form back to the long one has to
+# be stored anywhere, and nothing breaks if the state file holding it were lost.
+#
+# 8 hex characters. A collision needs two turns in ONE session whose UUIDs share a 32-bit
+# prefix; at a few hundred turns that is around one in ten million, and the cost of losing
+# that bet is one turn's answer file being reused rather than anything unrecoverable.
+_ID_PATH_CHARS = 8
+
+
+def _short(identifier: str) -> str:
+    """The path form of a session or turn id.
+
+    Idempotent on a value that is already short, and that is what makes it safe to apply at
+    every call site: an id typed back at guard — `inputs <turn-id>`, by an agent reading the
+    short form guard printed — passes through unchanged, while a full UUID from a hook
+    payload is cut down. Neither caller has to know which form it is holding.
+    """
+    return identifier[:_ID_PATH_CHARS]
+
+
+def _turn_dir(project_dir: Path, session_id: str) -> Path:
+    """The per-session directory the turn files live in.
+
+    Named from the short session id. The SessionStart sweep reaps these on the directory's
+    own mtime and never on its name (`cmd_session`), so shortening the name costs it
+    nothing.
+    """
+    return _state_root(project_dir) / "turns" / _short(session_id)
 
 
 def _turn_record_file(project_dir: Path, session_id: str, prompt_id: str) -> Path:
@@ -45,7 +84,7 @@ def _turn_record_file(project_dir: Path, session_id: str, prompt_id: str) -> Pat
     way to extract, and materiality is the one judgment that cannot be made from the answer
     by itself.
     """
-    return _state_root(project_dir) / "turns" / session_id / f"{prompt_id}.md"
+    return _turn_dir(project_dir, session_id) / f"{_short(prompt_id)}.md"
 
 
 # Section headings in the turn record. Fixed strings, because both the instruction that
@@ -126,7 +165,7 @@ def _turn_request_file(project_dir: Path, session_id: str, prompt_id: str) -> Pa
     it. It also lands in the same per-session directory, so the SessionStart sweep reaps it
     with the answer it belongs to and there is no second tree to keep bounded.
     """
-    return _state_root(project_dir) / "turns" / session_id / f"{prompt_id}.request.md"
+    return _turn_dir(project_dir, session_id) / f"{_short(prompt_id)}.request.md"
 
 
 # Header on the request file. guard writes this file itself, so unlike the answer file it

@@ -25,6 +25,7 @@ from pathlib import Path
 from typing import Any
 
 from .paths import _cli_project_dir, _state_root, _trace
+from .turnrec import _short
 
 
 # guard's own control commands, e.g. "/guard:settings claims-auditor off", "/settings",
@@ -146,11 +147,25 @@ def _transcript_records(path: Path):
                 yield rec
 
 
+def _is_turn(rec_pid: Any, prompt_id: str) -> bool:
+    """Does this record's ``promptId`` belong to the turn ``prompt_id`` names?
+
+    A PREFIX test, not equality, because the id a caller holds may be the short form guard
+    prints into paths and dispatches (`turnrec._short`) while the transcript always carries
+    the host's full UUID. Matching by prefix is what lets the short form be used everywhere
+    without guard storing a short-to-full mapping that could go missing.
+
+    An empty ``prompt_id`` would match every record, so every caller rejects one before
+    reaching here.
+    """
+    return isinstance(rec_pid, str) and bool(rec_pid) and rec_pid.startswith(prompt_id)
+
+
 def _turn_slice(transcript_path: Any, prompt_id: Any) -> dict[str, Any] | None:
     """Everything guard can read about one turn from the transcript. None when it cannot.
 
     Returns ``{origin_kind, command_name, user, assistant, tools}``. A turn is
-    anchored on the FIRST record whose top-level ``promptId`` equals ``prompt_id``, and the
+    anchored on the FIRST record whose top-level ``promptId`` matches ``prompt_id`` (`_is_turn`), and the
     slice runs to the next record carrying a DIFFERENT non-empty promptId. That positional
     rule is not a convenience: only ``user`` records carry a promptId at all — the assistant
     records, and the ``tool_use`` blocks inside them, carry none — so a filter on promptId
@@ -181,7 +196,7 @@ def _turn_slice(transcript_path: Any, prompt_id: Any) -> dict[str, Any] | None:
     for rec in _transcript_records(path):
         rec_pid = rec.get("promptId")
         if not in_turn:
-            if rec_pid != prompt_id:
+            if not _is_turn(rec_pid, prompt_id):
                 continue
             in_turn = True
             origin = rec.get("origin")
@@ -189,7 +204,7 @@ def _turn_slice(transcript_path: Any, prompt_id: Any) -> dict[str, Any] | None:
                 origin_kind = str(origin.get("kind") or "")
             anchor = _message_of(rec).get("content")
             command_name = _turn_command_name(anchor if isinstance(anchor, str) else "")
-        elif isinstance(rec_pid, str) and rec_pid and rec_pid != prompt_id:
+        elif isinstance(rec_pid, str) and rec_pid and not _is_turn(rec_pid, prompt_id):
             break
 
         if rec.get("isMeta") is True or rec.get("isSidechain") is True:
@@ -294,12 +309,18 @@ def _turn_index(path: Path) -> list[dict[str, str]]:
     looking for where a number came from is better served by seeing the gap.
     """
     out: list[dict[str, str]] = []
+    # Deduped on the FULL id and printed short. The short form is what every other surface
+    # names a turn by, and it is what an agent will type back at `transcript turn` — but two
+    # adjacent turns sharing a prefix would merge into one row if the run detection used it.
+    last_full = ""
     for rec in _transcript_records(path):
         pid = rec.get("promptId")
         if not isinstance(pid, str) or not pid:
             continue
-        if out and out[-1]["turn"] == pid:
+        if pid == last_full:
             continue
+        last_full = pid
+        pid = _short(pid)
         content = _message_of(rec).get("content")
         text = content if isinstance(content, str) else ""
         head = " ".join(text.split())
@@ -446,7 +467,7 @@ def cmd_transcript() -> int:
         m = rx.search(blob)
         if m:
             lo = max(0, m.start() - 200)
-            hits.append(f"- turn `{current}`: …{blob[lo:m.end() + 200]}…")
+            hits.append(f"- turn `{_short(current)}`: …{blob[lo:m.end() + 200]}…")
             seen.add(current)
     body = (f"# Matches for `{pattern}`\n\n"
             f"Searched {len(window)} of {len(order)} turns.\n\n"
@@ -504,7 +525,7 @@ def _turn_identity(transcript_path: Any, prompt_id: Any) -> dict[str, Any] | Non
             rec = json.loads(line)
         except (json.JSONDecodeError, ValueError):
             continue
-        if not isinstance(rec, dict) or rec.get("promptId") != prompt_id:
+        if not isinstance(rec, dict) or not _is_turn(rec.get("promptId"), prompt_id):
             continue
         origin = rec.get("origin")
         content = _message_of(rec).get("content")

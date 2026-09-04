@@ -360,6 +360,26 @@ def _consume_clear_handoff(project_dir: Path, config: dict, payload: dict | None
     return {"switches": switches, "handover": handover}
 
 
+def _mark_closeout_stated(project_dir: Path, payload: dict | None, config: dict,
+                          stated: bool) -> None:
+    """Record whether this session has been told where the turn closeout file is.
+
+    Written at SessionStart and read by the Stop hook, which names the path only while this
+    is false. Both branches set it — the armed one because it just printed the path, the
+    muted one because it did not and the first turn after `guard on` has to.
+
+    Best-effort like everything else at SessionStart: a state file guard cannot write leaves
+    the flag at its default of false, which costs one repeated path per turn rather than a
+    session that never learns where the file is.
+    """
+    sid = _session_id(payload) if payload else None
+    if sid is None:
+        return
+    state = _read_state(project_dir, sid, config)
+    state["closeout_stated"] = stated
+    _write_state(project_dir, sid, state)
+
+
 def cmd_session_start() -> int:
     # Sweep both state and logs on the same age policy. State is intentionally NOT
     # cleared at SessionEnd: a session can be resumed later (`claude --resume`), and
@@ -504,10 +524,11 @@ def cmd_session_start() -> int:
     )
 
     # Name the closeout file, and the audit command, once at the session's opening, when guard
-    # has anything switched on. The Stop hook repeats the closeout path on each turn that has an
-    # answer file — one line, and it must, because context compaction can drop this one — but
-    # stating it here is what lets that line stay a path instead of an explanation of what the
-    # file is for.
+    # has anything switched on. Stating it here is what lets the Stop block's line stay a path
+    # instead of an explanation of what the file is for — and, since this event fires on
+    # `compact` as well as on startup, what lets that block stop repeating the path at all:
+    # the flag written below tells `cmd_stop` the session already has it, and a compaction
+    # that drops this line re-runs this same event.
     #
     # The command is stated here and nowhere else in the standing context: `audit-turn` is
     # `disable-model-invocation: true`, so its own description is not loaded, and a session that
@@ -519,6 +540,9 @@ def cmd_session_start() -> int:
         # expensive: nothing later in the session contradicts it, so the model spends the
         # session expecting a recommendation that never comes.
         if _session_muted(project_dir, session_cfg, payload):
+            # A muted session is told nothing about the closeout, so the first turn after
+            # `guard on` is the one that has to name it.
+            _mark_closeout_stated(project_dir, payload, session_cfg, False)
             print(
                 "guard: agents are configured for this project, but guard is OFF for this "
                 "session — no answer file is named, nothing is said when a turn ends, and an "
@@ -527,6 +551,7 @@ def cmd_session_start() -> int:
                 "asks."
             )
         else:
+            _mark_closeout_stated(project_dir, payload, session_cfg, True)
             print(
                 "guard: this session writes its answers to the file guard names at the start of "
                 f"each turn, and {_closeout_path()} says how the turn is then delivered — do "

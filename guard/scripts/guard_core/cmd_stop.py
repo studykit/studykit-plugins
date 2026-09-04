@@ -14,8 +14,9 @@ must work in a project that keeps everything off.
 
 **No audit is recommended here.** The turn audit is the user's to ask for
 (``/guard:audit-turn``, or one ``audit-turn-*`` skill by name), and this hook's turn block
-says so: it carries the turn id the user's command resolves to, the answer file, the closeout
-path, and the prohibition on routing the turn unasked. Recommending one on every finished
+says so: it carries the answer file — whose basename is the turn id the user's command
+resolves to — the closeout path until this session has been told it once, and the prohibition
+on routing the turn unasked. Recommending one on every finished
 turn spent a router on turns that plainly had nothing in them, and a recommendation that
 fires whether or not it is wanted is one the user learns to wave through.
 
@@ -172,8 +173,18 @@ def cmd_stop() -> int:
 
     # The marker is spent before the context goes out, not after. One block per turn,
     # whatever the main agent does with it: the alternative is a turn that gets its closeout
-    # named twice because the first dispatch is still in flight.
+    # named twice because the first dispatch is still in flight. `closeout_stated` is spent in
+    # the same write and for the same reason — it is the record that this session has been
+    # told where the closeout file is, and a block that went out without the write landing
+    # would state the path on every turn thereafter.
     state["last_audited_prompt_id"] = prompt_id
+    # Spent only when a turn block is actually going out. A turn with nothing but file audits
+    # names no closeout, so marking the path as stated there would consume the one turn that
+    # was going to print it.
+    turn_agents = [k for k in eligible if AUDIT_AGENTS[k].reads == "turn"]
+    with_closeout = bool(turn_agents) and not state.get("closeout_stated")
+    if with_closeout:
+        state["closeout_stated"] = True
     _write_state(project_dir, session_id, state)
 
     transcript = payload.get("transcript_path")
@@ -191,12 +202,12 @@ def cmd_stop() -> int:
     # closeout's ordering applies to them. They need no ordering among themselves: their file
     # lists are disjoint by construction (`_edited_bucket`), so the one that edits cannot
     # touch what the one that only reports is reading.
-    turn_agents = [k for k in eligible if AUDIT_AGENTS[k].reads == "turn"]
     direct = [k for k in eligible
               if AUDIT_AGENTS[k].reads in ("files", "agent-docs")]
     blocks: list[str] = []
     if turn_agents:
-        blocks.append(_turn_context(project_dir, session_id, prompt_id, _TURN_LEAD))
+        blocks.append(_turn_context(project_dir, session_id, prompt_id, _TURN_LEAD,
+                                    with_closeout))
     if direct:
         lead = _DIRECT_LEAD_WITH_TURN if turn_agents else _DIRECT_LEAD
         blocks.append(_dispatch_context(

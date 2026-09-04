@@ -31,7 +31,7 @@ from pathlib import Path
 from .config import _load_config
 from .paths import _cli_project_dir, _knowledge_dirs, _trace
 from .state import _read_state
-from .turnrec import (_turn_record_file, _turn_request_file,
+from .turnrec import (_short, _turn_record_file, _turn_request_file,
                       _turn_translation_file)
 from .dispatch import _closeout_path
 
@@ -109,7 +109,10 @@ def cmd_inputs() -> int:
     # supplied it: a bare invocation resolved the turn HERE, and everything the caller then
     # says about it — the id it passes to an audit, the id it names in its report — has to be
     # this one rather than one it guessed at.
-    print(f"turn: {prompt_id}")
+    # The SHORT form (`turnrec._short`), which is what every other surface names a turn by and
+    # what the caller will pass onward. It matches the transcript's full `promptId` by prefix,
+    # so `transcript turn <id>` accepts it unchanged.
+    print(f"turn: {_short(prompt_id)}")
     print(f"closeout: {_closeout_path()}")
     print(f"answer file: {answer}")
     # Derived, and printed whether or not the file is there. The caller is the party that knows

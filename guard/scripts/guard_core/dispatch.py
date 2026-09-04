@@ -15,7 +15,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from .config import AgentMode
-from .turnrec import _turn_record_file, _turn_translation_file
+from .turnrec import _turn_record_file
 from .agents import AUDIT_AGENTS
 
 
@@ -155,7 +155,8 @@ def _dispatch_context(project_dir: Path, session_id: str, prompt_id: str, lead: 
     return "\n\n".join([lead, block])
 
 
-def _turn_context(project_dir: Path, session_id: str, prompt_id: str, lead: str) -> str:
+def _turn_context(project_dir: Path, session_id: str, prompt_id: str, lead: str,
+                  with_closeout: bool) -> str:
     """``additionalContext`` for the Stop path: close the turn out, and audit nothing.
 
     Every line here is paid in the main agent's context at the end of EVERY turn that named
@@ -163,16 +164,28 @@ def _turn_context(project_dir: Path, session_id: str, prompt_id: str, lead: str)
     this instead, or could the party that needs it derive it? If either, it is deleted from
     here.
 
-    What survives that test is four paths and one prohibition. The turn id, because nothing
-    downstream can work it out and it is what the user's own audit command resolves to. The
-    answer file, because it is the deliverable and this block is the last thing the turn
-    reads. The translation file, because the caller now decides for itself whether the turn is
-    delivered in Korean — that was the router's pick while a router ran on every turn — and
-    ``korean-translator`` is forbidden from deriving its own target, so the one path it writes
-    has to come from the code that owns the layout rather than from a caller assembling a
-    suffix. The closeout file, because ``SessionStart`` states it once and a compaction can
-    drop that line. The prohibition, because guard no longer asks for an audit here and a
-    main agent that had been told to route every turn will keep routing on habit.
+    What survives that test is ONE path and one prohibition. The answer file, because it is
+    the deliverable, this block is the last thing the turn reads, and it is the one value no
+    reader here can work out for itself. The prohibition, because guard no longer asks for an
+    audit here and a main agent that had been told to route every turn will keep routing on
+    habit.
+
+    Three lines were removed once the test was applied honestly rather than to the block as
+    it stood:
+
+    - The turn id, which is now the answer file's own basename (`turnrec._short`) and so is
+      read off the path. It was kept for the audit command to resolve to, but
+      ``/guard:audit-turn`` with no argument already resolves to the last recorded turn.
+    - The translation file, which is the answer file with ``.ko`` before the extension. That
+      rule is in the closeout, which is read on the turns that translate and by nobody else,
+      so the derivation is paid for only when it is used. ``korean-translator`` is still
+      forbidden from deriving its own target and is still handed an explicit path — by the
+      caller, from that rule, rather than by this block on every turn including the ones that
+      never translate.
+    - The closeout path, on every turn after the one that first stated it (``with_closeout``).
+      ``SessionStart`` names it when the session opens armed, and fires again on ``compact``
+      on both hosts, so the line the compaction drops is re-stated by the event that dropped
+      it rather than by a toll on every turn in between.
 
     No audit is named and no router is dispatched. **Auditing is the user's to ask for**
     (``/guard:audit-turn``, or one audit by name): a recommendation at the end of every turn
@@ -186,17 +199,11 @@ def _turn_context(project_dir: Path, session_id: str, prompt_id: str, lead: str)
     established one — every agent reads the turn itself and forms its own view, which is why
     the record is required to be verbatim.
     """
-    return "\n\n".join([
-        lead,
-        "\n".join([
-            f"- turn: {prompt_id}",
-            "- answer file: "
-            f"{_turn_record_file(project_dir, session_id, prompt_id).resolve()}",
-            "- translation file, if this turn is delivered in Korean: "
-            f"{_turn_translation_file(project_dir, session_id, prompt_id).resolve()}",
-            f"- closeout: {_closeout_path()}",
-        ]),
-    ])
+    lines = ["- answer file: "
+             f"{_turn_record_file(project_dir, session_id, prompt_id).resolve()}"]
+    if with_closeout:
+        lines.append(f"- closeout: {_closeout_path()}")
+    return "\n\n".join([lead, "\n".join(lines)])
 
 
 # The lead at the end of a turn that has an answer file. It asks for delivery and forbids
@@ -209,7 +216,7 @@ def _turn_context(project_dir: Path, session_id: str, prompt_id: str, lead: str)
 # offering one every turn, which is the noise this replaced.
 _TURN_LEAD = (
     "guard: the turn is finished. Its answer file is the deliverable — close the turn out per "
-    "the closeout file below. NO audit runs unless the user asks for one, and the audit is "
+    "guard's turn closeout. NO audit runs unless the user asks for one, and the audit is "
     "theirs to start: do not dispatch an audit, an auditor or a router yourself, and do not "
     "ask whether to run one. When the user does ask for one in prose, tell them to run "
     "`/guard:audit-turn` (or `/guard:audit-turn-claims`, `-clarity`, `-deferrals` for a single "
@@ -291,6 +298,6 @@ _DRAFT_LEAD = (
     "what the file says, no excerpt from it, no findings list. Nothing audits it unless the "
     "user asks; when they do, the audit corrects that file in place, which is why the answer "
     "lives there rather than in the transcript. When you will answer the user in another "
-    "language, the version they read is translated from this file — the closeout file named "
-    "when the turn ends says how."
+    "language, the version they read is translated from this file — guard's turn closeout "
+    "says how."
 )

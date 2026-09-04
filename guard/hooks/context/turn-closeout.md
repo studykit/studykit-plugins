@@ -45,9 +45,15 @@ This is the whole of a normal turn's closeout, in this order:
 1. **Translate, if the user reads a language other than English.** Dispatch
    `guard:korean-translator` (subagent_type: `"guard:korean-translator"`) with two inputs and
    nothing else: the **answer file** as its source, and the **translation file** as the file it
-   writes — both paths were named in the block that sent you here. Give it no history, no
-   repository paths, and no draft of your own to fix. Then do what its report tells you; it
-   hands the translation on to the agent that checks it.
+   writes. Give it no history, no repository paths, and no draft of your own to fix. Then do
+   what its report tells you; it hands the translation on to the agent that checks it.
+
+   **The translation file is the answer file with `.ko` before the extension** — an answer
+   file `…/<id>.md` is translated into `…/<id>.ko.md`, in the same directory. The block that
+   sent you here names only the answer file, because most turns never translate and a second
+   path on every one of them is paid for by all of them. Write the full path out yourself and
+   hand it over; the translator is not allowed to derive its own target, so it has to arrive
+   as a path.
 
    You are the only party that knows the language, which is why this is yours. What it is not
    is automatic: translate substance being delivered to a reader — two ordinary sentences of

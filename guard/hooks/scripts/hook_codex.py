@@ -51,6 +51,7 @@ from guard_core import config as core_config  # noqa: E402
 from guard_core import payload as core_payload  # noqa: E402
 from guard_core import paths as core_paths  # noqa: E402
 from guard_core import state as core_state  # noqa: E402
+from guard_core import turnrec as core_turnrec  # noqa: E402
 
 def _payload() -> dict[str, Any]:
     try:
@@ -92,7 +93,13 @@ def _turn_id(payload: dict[str, Any]) -> str:
 # the Claude side moved to markdown, its JSON helpers went away, and the adapter kept
 # calling names that no longer existed — silently, because every hook here fails open.
 def _turn_path(project_dir: Path, session_id: str, turn_id: str) -> Path:
-    return core_paths._state_root(project_dir) / "turns" / session_id / f"{turn_id}.json"
+    # Short ids, by the same rule as the Claude side (`turnrec._short`) and for the same
+    # reason: this path is printed into the model's context when the user asks for an audit,
+    # and two 36-char UUIDs in it are hex the tokenizer handles badly. The two hosts never
+    # share a tree — `STATE_DIR_REL` differs — so the shape is a convention here, not a
+    # coupling.
+    return (core_paths._state_root(project_dir) / "turns" / core_turnrec._short(session_id)
+            / f"{core_turnrec._short(turn_id)}.json")
 
 
 def _load_turn(project_dir: Path, session_id: str, turn_id: str) -> dict[str, Any]:

@@ -85,6 +85,14 @@ def _read_state(project_dir: Path, session_id: str, config: dict[str, Any]) -> d
         # inherits the record never carries this key — a second `/clear` with no new handover
         # would otherwise re-offer a file the user has already been shown.
         "handover_file": "",
+        # Has this session already been told where the turn closeout file is? The path is
+        # static for the whole install, so the Stop block repeats it only until something has
+        # stated it once: `session-start` sets this when it names the file, and clears it when
+        # it does not (a session that opened muted was never told), so the first armed turn
+        # supplies it and no later turn pays for it again. SessionStart fires on `compact` too
+        # on both hosts, which is what makes this safe against a compaction dropping the line —
+        # the event that re-states the path is the same event that re-sets the flag.
+        "closeout_stated": False,
         "updated_at": None,
     }
     path = _state_file(project_dir, session_id)
@@ -99,7 +107,7 @@ def _read_state(project_dir: Path, session_id: str, config: dict[str, Any]) -> d
     keys = (*AUDIT_AGENTS, "last_audited_prompt_id", "pending_verify_prompt_id",
             "transcript_path", "audit_paused", "plan_audit_paused", "plan_audited_hash",
             "handover_file", "edited_prompt_id", "edited_files",
-            "edited_agent_docs", "edited_refs", "updated_at")
+            "edited_agent_docs", "edited_refs", "closeout_stated", "updated_at")
     default.update({k: data[k] for k in keys if k in data})
     return default
 
