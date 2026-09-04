@@ -1,32 +1,34 @@
 # guard turn closeout
 
-How a routed turn is closed out once its audits have reported. **Nothing here is about any one
-agent** — how to dispatch it, what its inputs are, and what its findings mean all travel with
-the dispatch: the router's report for the agents it picked, guard's Stop hook for the ones it
-names directly, and each agent's own report for what to do with what it found.
+Two different things happen here and they must not be confused. **Delivering the turn** happens
+on every turn that has an answer file, and it is short. **Applying an audit** happens only when
+the user asked for one, which is rare, and the router's report is what drives it.
+
+**Nothing here is about any one audit** — how to dispatch it, what its inputs are, and what its
+findings mean all travel with the dispatch: the router's report for the audits it picked, and
+guard's Stop hook for the file-reading agents it names directly. The one agent this file does
+name is the translator, and only because the decision to run it is the caller's rather than any
+report's.
 
 ## The answer file
 
 The **answer file** is where this turn's substance lives, **written in English** whatever
 language the user reads. You wrote it during the turn; the reply you gave was short and named
-this path. It is not a copy of something already delivered — it is the deliverable, which is
-why the agents can still fix it.
+this path. It is not a copy of something already delivered — it is the deliverable.
 
 Do not paste its contents into a reply. **Summarising it is the same failure in a shorter
-form** — a bulleted digest, or a preview of how it opens, puts the unaudited answer in front of
-the user just as effectively as quoting it, and it passes for brevity while doing so. If you
+form** — a bulleted digest, or a preview of how it opens, puts the answer in the transcript a
+second time just as effectively as quoting it, and it passes for brevity while doing so. If you
 find the file empty or missing, guard filled it in from the response after the fact and said so
 in a comment at the top; treat it as the answer anyway, and write it properly next time.
 
-Everything around it is English too — what you write in a dispatch, what the agents report
-back, what one agent says to another. Never relay an agent's English report to the user
-untranslated: what changed goes in the answer file.
+Everything around it is English too — what you write in a dispatch, what an agent reports back,
+what one agent says to another. Never relay an agent's English report to the user untranslated:
+what changed goes in the answer file, and the reply is in the user's language.
 
-**You never write the user's language yourself, and you never decide whether it gets written.**
-Both are the router's: when this turn is delivered in another language, it names the agent that
-writes it and says what that agent gets. When it names none, this turn has no translation, and
-the answer file is what you name. The one exception is the short line you type in the terminal
-beside the path — a pointer, not the deliverable, which is why it stays short.
+**You never write the user's language yourself.** The translation is written by the translator,
+from the English, and dispatching it is yours — see below. Your own Korean, or any other
+language you produce directly, is the arrangement that produced 직역.
 
 **You never gather the session's history.** It is in the transcript, and an agent that needs it
 resolves and extracts it itself. If one fails to — the file is gone, a compaction dropped the
@@ -36,55 +38,76 @@ plainly that it came from you rather than from the transcript: you wrote the tex
 so anything you supply is testimony. If you cannot supply it either, say so and let it report on
 what it has.
 
-## Presenting the result
+## Delivering the turn
 
-The agents have reported and the ones that edit have already edited. What is left is yours, in
-this order:
+This is the whole of a normal turn's closeout, in this order:
+
+1. **Translate, if the user reads a language other than English.** Dispatch
+   `guard:korean-translator` (subagent_type: `"guard:korean-translator"`) with two inputs and
+   nothing else: the **answer file** as its source, and the **translation file** as the file it
+   writes — both paths were named in the block that sent you here. Give it no history, no
+   repository paths, and no draft of your own to fix. Then do what its report tells you; it
+   hands the translation on to the agent that checks it.
+
+   You are the only party that knows the language, which is why this is yours. What it is not
+   is automatic: translate substance being delivered to a reader — two ordinary sentences of
+   explanation is enough — and not an acknowledgement, a bare list of paths, or a question back
+   to the user with nothing else in it. There is nothing there to translate.
+
+2. **Reply short**, in the user's language: one headline sentence plus the path the user reads —
+   the translation when this turn made one, the answer file when it did not. Do not restate the
+   answer and do not paste the file.
+
+3. **Open the file you named**: `open <path>` on macOS, `xdg-open` on Linux, `start` on
+   Windows. Once, at the end. Opening is not "here is where it is" — the user has the path from
+   your reply — it is you putting the document in front of them, so what you open is the
+   document they read: the translation when there is one, the answer file otherwise.
+
+**Say nothing about auditing.** No audit ran, nothing is being withheld as unchecked, and a
+turn that was not audited is not news. Do not offer one; the user starts an audit themselves
+when they want it.
+
+## When the user has asked for an audit
+
+The router's report is the instruction — which audits ran, in which order their findings are
+applied, and whether a second round is due. This section is only what no report can carry.
 
 1. **Apply the findings to the answer file.** Every audit reported before you changed anything,
    so you have all of them in hand and they all judged the same text: apply them in one pass, in
-   the order your dispatch listed them. Where two land on the same sentence, write the one
-   correction that satisfies both rather than applying one and then patching it. Each report says
-   what its findings need; fix each where it is written, in the English, with `Edit`. A finding
-   you are leaving unfixed stays unfixed on purpose and is named in your reply. Some ask you to **add** rather than correct —
-   a definition, an example, a paragraph cut — and those go in the same way. A report that says
-   the reader profile is MISSING is telling the user something, not you: relay it in one line
-   (they establish one with `/guard:reader-profile`) and say it once, not every turn.
+   the order the report lists them. Where two land on the same sentence, write the one correction
+   that satisfies both rather than applying one and then patching it. Each report says what its
+   findings need; fix each where it is written, in the English, with `Edit`. A finding you are
+   leaving unfixed stays unfixed on purpose and is named in your reply. Some ask you to **add**
+   rather than correct — a definition, an example, a paragraph cut — and those go in the same
+   way. A report that says the reader profile is MISSING is telling the user something, not you:
+   relay it in one line and say it once, not every time.
 
-   Anything your dispatch asked for **after** this — a further round of audits, a translation and
-   whatever its own report hands off to — happens now, in the order it was given, before you write
-   the reply below. Your reply covers every round: a finding from the first round that the second
-   round raised again is one finding, not two.
-2. **Reply short.** What changed and why, a line or two per finding, then the path — with the
+   Anything the report asks for **after** this — a further round of audits — happens now, before
+   the steps below. Your reply covers every round: a finding from the first round that the
+   second round raised again is one finding, not two.
+
+2. **Rewrite the translation, if this turn has one.** The file the user read was translated from
+   the English as it stood before the audit, so every correction you just applied is missing
+   from it. Dispatch `guard:korean-translator` again, exactly as step 1 of *Delivering the turn*
+   says, over the same two paths — it rewrites the translation from the corrected source.
+
+   Only you know this is needed. The audit read the English and the router never saw the
+   translation, so an audited turn whose translation is left alone hands the user a document
+   that is still wrong in the way the audit just found.
+
+3. **Reply**, in the user's language: what changed and why, a line or two per finding, with the
    router's reason for a pick relayed alongside what that pick found. **A clean audit is one
-   line**; a paragraph celebrating it trains the user to skip the report that matters, and a pick
-   that plainly misread the turn is worth saying so about rather than working around. Do not
-   restate the answer and do not paste the file. Write the reply in the user's language. The path
-   you name is the one the **user** reads: the translation when this turn made one, the answer
-   file when it did not.
-3. **Open the file you named**: `open <path>` on macOS, `xdg-open` on Linux, `start` on
-   Windows. Once, at the end, after every correction has landed. Opening is not "here is where
-   it is" — the user has the path from your reply — it is you putting a document in front of
-   them, so what you open is the document this turn audited and then corrected.
+   line**; a paragraph celebrating it trains the user to skip the report that matters, and a
+   pick that plainly misread the turn is worth saying so about rather than working around.
 
-   - A translation exists → open the translation. It is what this user reads, and the English
-     file is not a stand-in for it however well it was checked.
-   - There is no translation → open the answer file. Here it is both the audited document and
-     the one the user reads.
-   - The document you would open went through no audit → **dispatch the audit that was meant to
-     read it**, apply what it finds the way step 1 does, and then open it. A dispatch that fell
-     through is not a verdict on the text: the turn is still open and the file is still there,
-     so the answer to a check that did not happen is to run it, not to hand over a document
-     nobody will look at again. Only when it cannot run — refused, or failed a second time — do
-     you open nothing, name the path, and say what is unchecked and why. Whoever wrote a file
-     does not count as having read it, so a translation nothing audited is unchecked no matter
-     how thoroughly the English was audited.
+4. **Open the corrected file the user reads** — the translation when there is one, the answer
+   file otherwise — once, after every correction has landed. Never open a translation you did
+   not rewrite in step 2: it is the pre-audit text, and opening it presents the defect as the
+   answer.
 
-   And do not open a file you wrote during the audit, or start a new one for this report: an
-   audit summary is worth a line in the reply, not a document.
+   Do not open a file you wrote during the audit, and do not start one for this report: an audit
+   summary is worth a line in the reply, not a document.
 
-**When the router picked nothing**, steps 2 and 3 apply. `none` means no agent had material
-here, translation included — nothing is left unfixed and nothing is being withheld as
-unchecked, so name the answer file and open it. The unchecked case above is for a turn whose
-audit skipped the document, not for a turn that had no audit to skip. Say nothing about
-auditing either way: a turn that drew no agent is not news.
+**When the router picked nothing**, there is nothing to apply, nothing to re-translate and
+nothing new to open — the user already has the document from the turn itself. Say so in one
+line and stop there. `none` means no audit had material here, not that something was skipped.

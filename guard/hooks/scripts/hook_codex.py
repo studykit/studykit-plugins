@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -140,15 +141,37 @@ def _handle_prompt(project_dir: Path, payload: dict[str, Any], session_id: str, 
     state = core_state._read_state(project_dir, session_id, config)
     _save_turn(project_dir, session_id, turn_id, {"user": prompt, "tools": [], "assistant": ""})
 
-    if prompt.strip().lower().startswith("/guard:claims-auditor"):
+    # The user asking for an audit, and on this host that is the only thing that starts one:
+    # `_handle_stop` recommends nothing. The trigger is a prompt PREFIX rather than a real
+    # command — Codex command hooks cannot launch an agent, so there is nothing to install —
+    # and both prefixes are accepted because a user typing this has seen `$guard:setup` and
+    # Claude's `/guard:audit-turn`.
+    if _AUDIT_TURN_RE.match(prompt.strip()):
+        # The mute, which on this host is only ever the project's `audit-turn` setting — Codex
+        # has no `guard` command. Honored here because this is the one path that can start an
+        # audit now, the same place Claude honors it (`guard-candidates`): a project that wrote
+        # `off` and gets audited anyway has been told nothing. Said out loud rather than
+        # silently, because the user just asked for something.
+        if core_state._audit_paused(state):
+            _emit({"hookSpecificOutput": {"hookEventName": "UserPromptSubmit", "additionalContext": (
+                "guard: audits are off for this project (`audit-turn`), so there is nothing to "
+                "run. Tell the user, and that setting `audit-turn` to `on` in "
+                ".codex/guard.local.json arms it."
+            )}})
+            return
         pending = state.get("pending_verify_prompt_id")
         if isinstance(pending, str) and pending and _turn_path(project_dir, session_id, pending).is_file():
+            # The whole eligible set's scope, not just the claims half. On Claude a router
+            # picks from that set; Codex has one agent, so the set becomes one sentence saying
+            # what to check — the same sentence `_handle_stop` used to emit unasked.
+            keys = [k for k in core_agents._eligible_agents(state, []) if k in _SCOPE]
+            scope = ", ".join(_SCOPE[k] for k in keys) or "the response's claims"
             _emit({"hookSpecificOutput": {"hookEventName": "UserPromptSubmit", "additionalContext": (
                 "guard: audit the saved turn before answering. Spawn the read-only "
                 "guard_claims_auditor named subagent in a fresh context, give it "
-                f"the turn file {_turn_path(project_dir, session_id, pending)}, and have it verify the "
-                "assistant claims against the repository. If that agent is unavailable, tell the user "
-                "to run $guard:setup in this project."
+                f"the turn file {_turn_path(project_dir, session_id, pending)}, and have it check "
+                f"{scope} against the repository; then address what it reports. If that agent is "
+                "unavailable, tell the user to run $guard:setup in this project."
             )}})
 
 
@@ -178,6 +201,16 @@ def _handle_post_tool(project_dir: Path, payload: dict[str, Any], session_id: st
             reason = core_edit.refs_index_gap(project_dir, target, config)
             if reason is not None:
                 _emit({"decision": "block", "reason": reason})
+
+
+# What the user types to audit the turn just finished. A prefix on the prompt, matched at
+# `UserPromptSubmit`, because Codex command hooks cannot launch an agent — there is no command
+# file behind this and nothing to install. Both prefixes are accepted: `$` is how Codex's own
+# skills are invoked and `/` is what Claude's `/guard:audit-turn` trains. The optional suffix
+# mirrors Claude's per-audit entries so the same thing typed on either host reaches an audit,
+# even though this host has one agent to give the work to.
+_AUDIT_TURN_RE = re.compile(r"^[/$]guard:audit-turn(-claims|-clarity|-deferrals)?(?=\s|$)",
+                            re.IGNORECASE)
 
 
 # How each shared recommendation key reads in the sentence handed to Codex's single
@@ -218,53 +251,18 @@ def _handle_stop(project_dir: Path, payload: dict[str, Any], session_id: str, tu
     _save_turn(project_dir, session_id, turn_id, turn)
     config = core_config._load_config(project_dir)
     state = core_state._read_state(project_dir, session_id, config)
-    # Recorded whether or not a switch is on: it is what `$guard:claims-auditor` is
-    # pointed at, and switching the automatic recommendation off is not meant to take
-    # away the user's own command.
+    # Recorded whether or not a switch is on: it is what the audit prefix in `_handle_prompt`
+    # is pointed at, and a project that keeps guard off is not a project whose user may not ask.
     state["pending_verify_prompt_id"] = turn_id
-    # `audit-turn: off` in this project's config, read through the state it seeds. Codex has no
-    # `guard` command, so on this host the switch is only ever the config's value — but it IS a
-    # config key, and a project that writes one and gets audited anyway has been told nothing.
-    # Placed after the line above for the same reason Claude's Stop places it there: the pending
-    # target is still recorded, so `$guard:claims-auditor` still works on the turn.
-    if core_state._audit_paused(state):
-        core_state._write_state(project_dir, session_id, state)
-        return
-    # Codex command hooks cannot launch an agent themselves, and unlike Claude's Stop
-    # there is no continuation to piggyback on — so the once-guard cannot lean on
-    # `stop_hook_active` and keys on the turn id instead.
-    if state.get("last_audited_prompt_id") == turn_id:
-        core_state._write_state(project_dir, session_id, state)
-        return
-    # No routing here. Claude's Stop asks its main agent to dispatch `guard:turn-router`, a
-    # subagent that reads the turn and names which of the eligible agents would find
-    # something in it. Codex ships one named agent, installed by `$guard:setup`, and a
-    # router that can only forward to that same agent decides nothing — so Codex
-    # recommends the whole ELIGIBLE set, unrouted, and is correspondingly noisier.
-    # Fixing that means giving Codex the agent set first, not adding a router.
-    #
-    # `_SCOPE` filters before the once-guard is spent, not after: a turn whose only
-    # recommendation is one Codex cannot act on must stay eligible for the next event
-    # rather than be marked audited on the strength of a message never sent.
-    keys = [k for k in core_agents._eligible_agents(state, []) if k in _SCOPE]
-    if not keys:
-        core_state._write_state(project_dir, session_id, state)
-        return
-    state["last_audited_prompt_id"] = turn_id
     core_state._write_state(project_dir, session_id, state)
-
-    # Codex has ONE named agent (`guard_claims_auditor`, installed by `$guard:setup`),
-    # so the per-agent fan-out Claude gets is expressed here as a scope sentence handed
-    # to that single agent. The eligibility rules are shared (`core_agents._eligible_agents`);
-    # what Claude adds on top is the router.
-    scope = ", ".join(_SCOPE[k] for k in keys)
-    _emit({"decision": "block", "reason": (
-        "guard: before completing, audit the turn you just finished. Spawn the "
-        "read-only guard_claims_auditor named subagent in a fresh context, give it the "
-        f"saved turn record at {_turn_path(project_dir, session_id, turn_id)}, and have "
-        f"it check {scope} against the repository; then address what it reports. If that "
-        "agent is unavailable, tell the user to run $guard:setup in this project."
-    )})
+    # And that is all Stop does. It used to end every turn with a `decision: "block"` naming
+    # the whole eligible set to Codex's single agent — unrouted, and so noisier than Claude's
+    # routed recommendation ever was, on turns that frequently had nothing in them. The audit
+    # is now the user's to ask for on this host too (`_handle_prompt`), which is also what
+    # retires the two things this handler needed only in order to recommend: the `audit-turn`
+    # mute check, since nothing is emitted for a mute to suppress, and the
+    # `last_audited_prompt_id` once-guard, since a user who types the prefix twice is asking
+    # twice.
 
 
 def main() -> int:

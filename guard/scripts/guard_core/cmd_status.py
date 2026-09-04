@@ -1,13 +1,14 @@
 """``toggle-cli`` and ``status`` — the session mute, and the indicator that makes it visible.
 
-``toggle-cli`` (CLI, argv) arms or mutes the automatic audit for THIS SESSION —
+``toggle-cli`` (CLI, argv) arms or mutes guard for THIS SESSION —
 ``audit_paused`` in the session state, never guard.local.json, so it cannot change what the
 project does by default. The state a session opens in is the project's ``audit-turn`` setting,
 MUTED when the file says nothing (``state._read_state``), which makes ``on`` the common
-direction: one stretch of work that wants auditing, with the setting left alone. An empty
-argument flips, and ``status`` reports without writing. While muted, ``stop`` recommends
-nothing and ``user-prompt`` names no answer file, but the pending target and the answer file
-are still recorded — the Codex adapter reads that marker.
+direction: one stretch of work that wants guard, with the setting left alone. An empty
+argument flips, and ``status`` reports without writing. While muted, ``stop`` says nothing,
+``user-prompt`` names no answer file, and ``candidates`` tells an invoked audit that the
+session is muted — but the pending target and the answer file are still recorded, so arming
+guard and asking still reaches the turn.
 
 The shell is the ONLY way in, through the ``guard`` wrapper the SessionStart hook puts on
 ``PATH``. There was a ``/guard:toggle`` slash command beside it and it was removed: flipping
@@ -100,24 +101,30 @@ def _mute_sentence(state: dict, paused: bool) -> str:
     fire — the flip is the one thing the user is checking for here.
 
     ON or OFF, and nothing about the roster. Neither the names nor a count belongs here:
-    which agents run is the router's answer, decided per turn against what the turn actually
-    contains, so anything stated at toggle time describes a different question than the one
-    the user will see answered. A roster restated here is also a second copy to drift.
-    ``/guard:settings`` is where the switches live.
+    which agents run is the router's answer, decided against what the turn actually contains
+    when the user asks for an audit, so anything stated at toggle time describes a different
+    question than the one the user will see answered. A roster restated here is also a second
+    copy to drift. ``/guard:settings`` is where the switches live.
 
     The one exception is having nothing switched on, which is not a roster detail but a
     different outcome — the turn-reading agents cannot run at all — and saying so is what
-    stops `guard on` from promising an audit that will not come.
+    stops `guard on` from promising an audit that could not run.
+
+    "ON" means armed, not running. Nothing audits a turn until the user invokes
+    ``/guard:audit-turn``; what arming does is give that invocation a turn to work on. The
+    sentence stays short rather than teaching that here — the session was told at
+    ``SessionStart``, and this is a line printed at a shell prompt.
     """
     if paused:
         return f"guard: audits OFF for this session. `{_shell_arm_hint()}` to arm."
     if any(_switch_on(state, k) for k in AUDIT_AGENTS):
-        return "guard: audits ON for this session."
+        return "guard: audits ON for this session — `/guard:audit-turn` to audit a turn."
     # Not "nothing will run": `ext-docs-auditor` has no switch, so a turn that writes a
     # saved reference is still named at Stop with every agent off. Overstating the silence
     # here is how a user reads that dispatch as guard ignoring their settings.
-    return ("guard: audits ON for this session, but no agent is switched on — only saved "
-            "references are checked. `/guard:settings` to switch one on.")
+    return ("guard: audits ON for this session, but no agent is switched on — nothing to "
+            "audit a turn with, and only saved references are checked. `/guard:settings` to "
+            "switch one on.")
 
 
 def _apply_toggle(project_dir: Path, session_id: str, action: str) -> str:

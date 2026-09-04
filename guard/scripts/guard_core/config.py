@@ -5,10 +5,12 @@ Configuration is optional: a JSON object at ``${CLAUDE_PROJECT_DIR}/.claude/guar
 ``claims-auditor`` / ``deferrals-auditor`` / ``clarity-auditor`` / ``comment-corrector`` /
 ``agents-md-auditor``, each
 ``"off"`` (the default) or ``"on"`` — which together are the only control
-over whether guard says anything unasked. Plus ``audit-turn`` (``"off"`` by default) and
-``audit-plan`` (``"on"`` by default), each ``"on"`` or ``"off"``: the state each session's two
-audits OPEN in — the shell toggles move the session
-only and never write here. And ``refs_dir`` (project-relative directory for saved copies of cited docs; empty
+over whether guard says anything unasked, and over which audits exist to be invoked. Plus
+``audit-turn`` (``"off"`` by default) and ``audit-plan`` (``"on"`` by default), each ``"on"``
+or ``"off"``: the state each session opens in — the shell toggles move the session
+only and never write here. ``audit-turn`` no longer arms an automatic audit, because there is
+none: it arms the turn discipline the audit needs — the answer file, the recorded turn — and
+the user invokes the audit itself. And ``refs_dir`` (project-relative directory for saved copies of cited docs; empty
 means the git-tracked default ``wiki/ref/``, and an unsafe value falls back to it — see
 ``paths._refs_dir``). There is no model key: every agent, the router included, brings its own
 model from its own definition under ``agents/``.
@@ -76,7 +78,8 @@ CLEAR_INHERIT_MAX_AGE_SECONDS = 5 * 60
 class AgentMode(StrEnum):
     """How one audit agent runs. The value of that agent's config key.
 
-    ``OFF`` — never recommended unasked. ``ON`` — a new instance per dispatch, which
+    ``OFF`` — not offered to either router, and not runnable: the audit does not exist for
+    this project. ``ON`` — a new instance per dispatch, which
     is the shape every agent definition is written for: judged in a fresh context, by a
     reader rather than the author.
 
@@ -164,16 +167,17 @@ DEFAULT_CONFIG: dict[str, Any] = {
     # an `AgentMode`, so how the agent runs is the same setting as whether it runs: there
     # is no separate list of any kind that could name an agent that is off.
     #
-    # These are the ONLY control over whether guard says anything unasked. All of them off
-    # (the default) is guard silent at Stop: no router, no recommendation, nothing added
-    # to the main agent's context. There is deliberately no separate mode setting in
-    # front of them — switching one on IS switching guard on, and a project that wants
-    # the claim check without the deferral check just switches the one it wants.
+    # These are the ONLY control over which audits exist for a project. All of them off
+    # (the default) is guard silent at Stop and empty when an audit is invoked: no answer
+    # file, no router roster, nothing added to the main agent's context. There is
+    # deliberately no separate mode setting in front of them — switching one on IS switching
+    # guard on, and a project that wants the claim check without the deferral check just
+    # switches the one it wants.
     #
-    # Every switch ships off: guard installed is guard available, not guard running. Note
-    # what changed under that — there is no longer a per-agent command to run one of these
-    # audits on demand, so `off` now means the audit cannot happen at all rather than
-    # merely that it is not offered. See `AGENTS.md`.
+    # Every switch ships off: guard installed is guard available, not guard running. What
+    # `off` costs is unchanged by the audit becoming on-demand — the user's own
+    # `/guard:audit-turn` reads this same roster, so `off` still means the audit cannot
+    # happen rather than merely that it is not offered. See `AGENTS.md`.
     # The state each session's two audits OPEN in — the project's answer to "audit by
     # default?". They part company when the file says nothing, and the split is the point:
     # the turn audit costs a router call plus whatever it names on EVERY finished turn, so it

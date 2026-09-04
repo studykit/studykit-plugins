@@ -1,9 +1,14 @@
 ---
 name: audit-turn-deferrals
-# Extremely short — see `audit-turn-claims` for why. guard's router names this skill and the
-# caller invokes it by name, so the description never has to attract anything.
-description: Invoked by guard only.
-argument-hint: '<turn id>'
+# Extremely short — see `audit-turn-claims` for why. The router names this skill and the
+# caller invokes it by name, or the user types it; the description never has to attract
+# anything.
+description: Invoked by guard's turn router, or by the user by name.
+argument-hint: '[turn id]'
+# A NAMED argument, not `$ARGUMENTS`: the user may invoke this directly and name no turn, and
+# an omitted named argument expands to the empty string while an omitted `$0` would stay in the
+# body as literal text (`wiki/ref/claude-code-skill-arguments.md`).
+arguments: turn
 # The agent is the system prompt and this file is the task
 # (`wiki/ref/claude-code-skill-fork-context.md`). One `deferrals-auditor` judges on both paths;
 # what differs is the record of what the author already did, and that is what this file carries.
@@ -25,19 +30,23 @@ you need.
 
 ## 1. Resolve the paths
 
-The turn id is `$ARGUMENTS`. Run `guard-inputs $ARGUMENTS`; it is on your `PATH` and prints one
-`key: value` per line. You want:
+The turn id is `$turn` — empty when the user invoked this without naming one. Run
+`guard-inputs $turn`; it is on your `PATH` and prints one `key: value` per line. With an id it
+resolves that turn, with nothing it resolves the last turn guard recorded, and either way its
+first line is `turn: <id>` — the turn you are auditing, whatever you were handed. You want:
 
 - **`answer file`** — the answer this turn is giving, written by guard from the response itself
   and verbatim. **The deferrals you audit are in it.** It does not carry the user's request,
   which matters here as much as the response — that comes from the transcript.
-- **`transcript`** and **`turn`** — present when the session recorded a transcript. Step 3.
+- **`transcript`** — present when the session recorded a transcript; the `turn` line is
+  always there. Step 3.
 
 Read the paths as printed. If the command fails or prints no answer file, say so in one line
 and stop — a path you rebuild by guessing at guard's layout points at an empty turn, and an
 empty turn reads as a clean one.
 
-If you were given no turn id at all, say that and stop.
+If it prints no turn at all — no id was given and none is recorded for this session — say
+that and stop.
 
 ## 2. Triage
 

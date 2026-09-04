@@ -15,6 +15,13 @@ from typing import Any, NamedTuple
 from .config import _switch_on
 
 
+# The dispatch paths an audit can run on. `"turn"` is a finished turn, audited when the user
+# asks for one; `"report"` is a standalone document the caller points `report-router` at.
+# Neither has a hook behind it any more — both routers run because somebody asked.
+TURN_PATH = "turn"
+REPORT_PATH = "report"
+
+
 class AuditAgent(NamedTuple):
     """One agent guard can recommend. Mechanical facts only — no prose.
 
@@ -67,15 +74,19 @@ class AuditAgent(NamedTuple):
     on whether an earlier turn already explained it. The correctors do not — Korean prose is
     judged as prose, and comments are judged against the code under them.
 
-    ``routed=False`` marks an audit the turn router must not be offered, because something
-    else already hands it over: ``korean-corrector`` is named by ``korean-translator``'s own
-    report, which is the only party that knows the translation now exists. Routing it as well
-    would make two authorities for one step and give the router a name to judge from evidence
-    that is not written yet.
+    ``routed`` names the paths whose ROUTER may be offered this audit, and it is per path
+    rather than a flag because one row differs by path. It drops an audit that something else
+    already hands over: ``korean-corrector`` is named by ``korean-translator``'s own report,
+    which is the only party that knows the translation now exists, and on a turn the
+    translator itself is dispatched by the caller from the closeout — the turn's language is
+    a fact the caller holds, not a judgment worth a router. A document still routes the
+    translator, because there the caller states who will read it. Routing either of them where
+    something else decides would make two authorities for one step and give the router a name
+    to judge from evidence that is not written yet.
 
     ``turn_entry`` and ``report_entry`` name what the caller INVOKES to run this audit on
-    each dispatch path — the finished turn, and a standalone document such as an interview
-    brief. ``turn_entry=None`` (the usual case) means the agent's name IS the key.
+    each dispatch path — the finished turn, and a standalone document the caller points the
+    document router at. ``turn_entry=None`` (the usual case) means the agent's name IS the key.
     ``report_entry=None`` means the audit is not offered on the document path at all: the
     file-reading agents are pointed at a turn's edits, and ``korean-corrector`` is not offered
     anywhere, since the translator's report is what reaches it.
@@ -103,7 +114,7 @@ class AuditAgent(NamedTuple):
     fixed_mode: str | None = None
     turn_entry: str | None = None
     report_entry: str | None = None
-    routed: bool = True
+    routed: tuple[str, ...] = (TURN_PATH, REPORT_PATH)
 
 
 # No `subagent_type` is built here any more. `cmd_candidates` prints the bare entry name and
@@ -169,27 +180,34 @@ AUDIT_AGENTS: dict[str, AuditAgent] = {
     # the user reads, and the corrector then judges what it wrote. Reversed, the corrector
     # would be repairing a draft that is about to be replaced.
     #
-    # No switch (`fixed_mode`): the answer the user reads is not an audit to opt into. What
-    # decides whether it runs is the router, on the language of the turn — so an
+    # No switch (`fixed_mode`): the answer the user reads is not an audit to opt into. So an
     # English-answering project never pays for it, and a Korean-answering one cannot end up
     # with the main session translating its own text because a config key was left off.
     #
-    # It has a `report_entry` — a document gets translated too. The language cannot be worked
-    # out from the document (it is English by design, like the answer file) and there is no
-    # request file on that path, so the caller states it in the dispatch; on the interviewer's
-    # brief that is the language of the `@` conversation the brief came out of.
+    # `routed=(REPORT_PATH,)`: on a TURN the caller dispatches it from the closeout, on the
+    # language it is answering the user in. That was the router's call while the router ran on
+    # every turn, and it was the one pick the answer file could not evidence — it had to be
+    # inferred from the request file. Now that a turn is only routed when the user asks for an
+    # audit, leaving it there would make the Korean the user reads depend on their having
+    # asked for one. The caller knows the language for certain, so it decides.
+    #
+    # It keeps its `report_entry` — a document gets translated too. The language cannot be
+    # worked out from the document (it is English by design, like the answer file) and there is
+    # no request file on that path, so the caller states it in the dispatch: whoever pointed
+    # the router at the file is the only party that knows who is going to read it.
     "korean-translator": AuditAgent(reads="turn", needs_history=False, fixed_mode="on",
-                                    report_entry="korean-translator"),
+                                    report_entry="korean-translator",
+                                    routed=(REPORT_PATH,)),
     # Switch-free for the same reason, and it has to be the same reason: these two are one
     # step. A corrector the user can switch off behind a translator they cannot is a Korean
     # deliverable nothing reads — and the pair is what makes the writer/reader split hold.
     #
-    # `routed=False` because being one step is enough: the translator's report ends in a `next`
-    # line naming this agent and the file it wrote, so the hand-off happens where the fact it
-    # depends on — the translation exists — is actually known. The router, reading before either
-    # ran, could only have guessed at it from the request.
+    # `routed=()` — no router on any path — because being one step is enough: the translator's
+    # report ends in a `next` line naming this agent and the file it wrote, so the hand-off
+    # happens where the fact it depends on — the translation exists — is actually known. A
+    # router reading before either ran could only have guessed at it.
     "korean-corrector": AuditAgent(reads="turn", needs_history=False, fixed_mode="on",
-                                   routed=False),
+                                   routed=()),
     "comment-corrector": AuditAgent(reads="files", needs_history=False),
     "agents-md-auditor": AuditAgent(reads="agent-docs", needs_history=False),
 }
@@ -200,12 +218,6 @@ AUDIT_AGENTS: dict[str, AuditAgent] = {
 # record a setting nothing reads and showing one would offer a switch that does not exist.
 SETTABLE_AGENTS: tuple[str, ...] = tuple(
     k for k, spec in AUDIT_AGENTS.items() if spec.fixed_mode is None)
-
-
-# The dispatch paths an audit can run on. `"turn"` is the routed Stop path; `"report"` is a
-# standalone document, routed by `report-router` with no hook in front of it.
-TURN_PATH = "turn"
-REPORT_PATH = "report"
 
 
 def _path_entry(key: str, path: str) -> str | None:
@@ -280,20 +292,21 @@ def _edited_bucket(target: Path, refs_dir: Path | None = None) -> str | None:
 # --------------------------------------------------------------------------- #
 # the router
 #
-# guard makes NO model call of its own. When a turn finishes, the Stop hook decides one
-# mechanical thing — is any agent even eligible — and then asks the main agent to dispatch
-# ONE subagent, the router. The router reads the finished response and answers with the
-# INSTRUCTIONS: which of the eligible specialists would find something in it, why each,
-# and the dispatch for each.
+# guard makes NO model call of its own, and it no longer asks for one either. The turn
+# router runs when the USER asks for an audit — the `audit-turn` skill forks it — and it
+# reads the finished response and answers with the INSTRUCTIONS: which of the eligible
+# specialists would find something in it, why each, and the dispatch for each.
 #
-# It writes the dispatch rather than guard printing it because of where the cost falls.
-# guard's context lands in the main agent on every routed turn; the router's own
-# definition is read once, by the router, and only when a turn is actually routed. A
-# per-candidate dispatch block in the hook's `additionalContext` is paid four times over
-# on every turn to be used at most four times and usually zero — the router clearing a
-# turn is the common case. So the hook carries only what the router cannot know (where the
-# answer file is, which agents are on, their modes, the edited files, the transcript
-# pointer) and `agents/turn-router.md` carries everything that describes an agent.
+# What moved the trigger was the hit rate. The Stop hook used to ask for a router on every
+# turn that had an answer file, and the common result was `none`: a subagent per turn to be
+# told there was nothing in it. Triage is worth its cost when something is being triaged, so
+# the person who knows whether this turn is worth checking now decides — and the hook keeps
+# only the two jobs that cannot wait, recording the turn verbatim and naming the file the
+# answer was written to.
+#
+# The router still writes the dispatch rather than guard printing it, and that split is
+# unchanged: `agents/turn-router.md` carries everything that describes an agent and is read
+# once per audit, while the hook carries only what nothing downstream can derive.
 #
 # That the router is an agent and not a `claude -p` child guard spawns itself is the
 # design. A spawned child made the Stop hook block for the router's whole runtime at
@@ -322,13 +335,16 @@ def _edited_bucket(target: Path, refs_dir: Path | None = None) -> str | None:
 # describing a disabled agent and appending "but this one is off".
 #
 # How to dispatch an agent is said by whoever dispatches it, once per path: the router's own
-# report template on the routed path, `_agent_pointer`'s lead on the direct one. It used to be
+# report template on the audited path, `_agent_pointer`'s lead on the direct one. It used to be
 # a section per agent in the closeout file, reached from both — which gave that file a place
 # to state, and then to contradict, decisions the router had already made. What is left in it
-# is the part no report can carry: the turn's closeout, and the two file-writing audits whose
-# findings must not be applied on autopilot.
+# is the part no report can carry: how the turn is delivered, and what to do with the findings
+# of an audit the user asked for.
+#
+# There is no `ROUTER_AGENT` constant any more. Nothing in the Python names the router: the
+# only thing that reaches it is `skills/audit-turn/SKILL.md`'s `agent:` field, and a second
+# copy of the name here would be one nothing checks against that file.
 # --------------------------------------------------------------------------- #
-ROUTER_AGENT = "guard:turn-router"
 
 
 def _reads_turn(keys: Iterable[str]) -> bool:

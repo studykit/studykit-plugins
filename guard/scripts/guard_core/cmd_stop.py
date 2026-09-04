@@ -1,4 +1,4 @@
-"""``stop`` (Stop) — the turn-end recommendation.
+"""``stop`` (Stop) — the turn-end record, and the turn's closeout.
 
 A turn == the transcript ``prompt_id``. guard reads ONE transcript record, for the turn's
 kind only (``transcript._turn_identity``). It skips when ``stop_hook_active``, when the
@@ -10,16 +10,22 @@ answer file was ever named).
 
 Otherwise it records the turn as the pending on-demand target and fills in the answer
 file if the turn left it empty — both regardless of the switches, because an on-demand audit
-must work in a project that keeps everything off. Then, when a turn-reading agent is
-eligible, it emits ``additionalContext`` asking the main agent to dispatch the router
-(``agents.ROUTER_AGENT``) over the answer file and to follow the sections its report names —
-the router reads its own eligible-agent roster from the ``candidates`` CLI rather than being
-handed it here, so the roster never passes through the main agent's context; the eligible file-reading agents —
-``comment-corrector`` (``reads="files"``) and ``agents-md-auditor``
-(``reads="agent-docs"``) — are dispatched directly over the turn's edited files
-instead, bypassing the router. A third block names ``ext-docs-auditor`` when the turn wrote
-anything under the refs directory; that one has no switch and no eligibility to compute, so
-it can be the only block a turn produces. guard runs no model itself and never blocks here.
+must work in a project that keeps everything off.
+
+**No audit is recommended here.** The turn audit is the user's to ask for
+(``/guard:audit-turn``, or one ``audit-turn-*`` skill by name), and this hook's turn block
+says so: it carries the turn id the user's command resolves to, the answer file, the closeout
+path, and the prohibition on routing the turn unasked. Recommending one on every finished
+turn spent a router on turns that plainly had nothing in them, and a recommendation that
+fires whether or not it is wanted is one the user learns to wave through.
+
+Two blocks still name an agent, and neither is a triage question. The eligible file-reading
+agents — ``comment-corrector`` (``reads="files"``) and ``agents-md-auditor``
+(``reads="agent-docs"``) — are dispatched over the files this turn actually edited, and
+``ext-docs-auditor`` over anything it wrote under the refs directory; in both cases the
+condition is a file list rather than a judgment about the answer, so there is nothing for the
+user to decide and nothing for a router to weigh. Either can be the only block a turn
+produces. guard runs no model itself and never blocks here.
 """
 
 from __future__ import annotations
@@ -33,8 +39,8 @@ from .transcript import _is_control_command_name, _turn_identity
 from .agents import AUDIT_AGENTS, _eligible_agents
 from .state import _audit_paused, _edited_files, _read_state, _write_state
 from .dispatch import (
-    _DIRECT_LEAD, _DIRECT_LEAD_WITH_ROUTER, _ROUTE_LEAD, _dispatch_context, _refs_context,
-    _router_context
+    _DIRECT_LEAD, _DIRECT_LEAD_WITH_TURN, _TURN_LEAD, _dispatch_context, _refs_context,
+    _turn_context
 )
 
 
@@ -114,10 +120,11 @@ def cmd_stop() -> int:
             return 0
 
     # Both of these happen whether or not any switch is on. They are what an on-demand audit
-    # targets — the user asking for one now — and refusing that because the automatic
-    # recommendation is off would take away the very thing switching everything off is meant
-    # to leave in place. Claude's per-agent commands that used this are gone; the marker is
-    # still maintained because the Codex adapter reads it.
+    # targets — the user asking for one now — and refusing that because a switch is off would
+    # take away the very thing switching everything off is meant to leave in place. The marker
+    # is load-bearing on both hosts now: `guard-inputs` with no turn id resolves it, which is
+    # how `/guard:audit-turn` finds the turn the user means without the caller having to
+    # remember an id, and the Codex adapter reads the same key.
     #
     # Writing the response here rather than in the recommendation path is deliberate: it
     # is the one part of the record guard is handed for free, and it is the part that must
@@ -129,18 +136,20 @@ def cmd_stop() -> int:
     _write_turn_response(project_dir, session_id, prompt_id, response)
 
     # Muted by `guard off`. Checked AFTER the two lines above, on purpose: the pending
-    # target and the response still get recorded, so an audit asked for on the turn the user
-    # just muted still has something to work on. Muting stops the recommendation, not the
-    # user's ability to ask for one.
+    # target and the response still get recorded, so the turn is still there to work on if
+    # the user arms guard and asks. `guard off` means guard says nothing unasked — the
+    # closeout block, the file audits, the answer file — and `guard-candidates` keeps the
+    # other half of it, so an audit invoked while muted is told the session is muted rather
+    # than quietly running against switches the user turned off.
     if _audit_paused(state):
         _write_state(project_dir, session_id, state)
         _trace(project_dir, session_id, "stop", "skip_paused", prompt_id=prompt_id)
         return 0
 
-    # Once per turn. `stop_hook_active` already covers the normal path, but the
-    # recommendation asks the main agent to dispatch background agents, and each of
-    # those completions opens a transcript turn of its own; a marker keyed on the
-    # prompt_id does not depend on the payload flag surviving that.
+    # Once per turn. `stop_hook_active` already covers the normal path, but the block below
+    # asks the main agent to dispatch background agents, and each of those completions opens
+    # a transcript turn of its own; a marker keyed on the prompt_id does not depend on the
+    # payload flag surviving that.
     if state.get("last_audited_prompt_id") == prompt_id:
         _write_state(project_dir, session_id, state)
         _trace(project_dir, session_id, "stop", "skip_already_recommended",
@@ -161,51 +170,49 @@ def cmd_stop() -> int:
         _trace(project_dir, session_id, "stop", "none_eligible", prompt_id=prompt_id)
         return 0
 
-    # The marker is spent before the recommendation goes out, not after. One
-    # recommendation per turn, whatever the main agent does with it: the alternative is
-    # a turn that gets re-recommended because the first dispatch is still in flight.
+    # The marker is spent before the context goes out, not after. One block per turn,
+    # whatever the main agent does with it: the alternative is a turn that gets its closeout
+    # named twice because the first dispatch is still in flight.
     state["last_audited_prompt_id"] = prompt_id
     _write_state(project_dir, session_id, state)
 
     transcript = payload.get("transcript_path")
     transcript = transcript if isinstance(transcript, str) else ""
-    # Split by what each agent reads, because only one of the two groups is a triage
-    # question. Routing asks "is there material here for this agent", and for a
-    # file-reading agent that is a diff-level judgment — logic changed, or just a rename
-    # or a formatting pass — the router cannot make from what it would be given: a file
-    # list is the agent's input, not a diff, and reading those files shows their current
-    # state, never what this turn changed in them. So routing them can only restate what
-    # `_eligible_agents` already decided, and bill a subagent for it.
+    # Split by what each agent reads, because only one of the two groups is a question at
+    # all. Whether the ANSWER is worth auditing is a judgment about this turn, so it is the
+    # user's to make and nothing is dispatched for it here. For a file-reading agent there is
+    # no such judgment to make: the turn either edited a file of its kind or it did not, the
+    # list is the agent's whole input, and `_eligible_agents` has already answered it. So
+    # these go out as they always did — asking the user to confirm a file list would be asking
+    # them to re-decide what the switch already decided.
     #
-    # The two dispatches also need no ordering between them. The auditors-before-correctors
-    # rule in the closeout file exists so a corrector does not rewrite a sentence an auditor was
-    # about to flag, and it is entirely about the answer file — which no file-reading agent
-    # opens. Sharing no input with the routed agents, they go out in the same message and
-    # run alongside the router rather than after it. They need no ordering among themselves
-    # either: their file lists are disjoint by construction (`_edited_bucket`), so the one
-    # that edits cannot touch what the one that only reports is reading.
-    routed = [k for k in eligible if AUDIT_AGENTS[k].reads == "turn"]
+    # The two blocks need no ordering between them either. The file-reading agents never open
+    # the answer file, so they share no input with the turn's own delivery and none of the
+    # closeout's ordering applies to them. They need no ordering among themselves: their file
+    # lists are disjoint by construction (`_edited_bucket`), so the one that edits cannot
+    # touch what the one that only reports is reading.
+    turn_agents = [k for k in eligible if AUDIT_AGENTS[k].reads == "turn"]
     direct = [k for k in eligible
               if AUDIT_AGENTS[k].reads in ("files", "agent-docs")]
     blocks: list[str] = []
-    if routed:
-        blocks.append(_router_context(prompt_id, _ROUTE_LEAD))
+    if turn_agents:
+        blocks.append(_turn_context(project_dir, session_id, prompt_id, _TURN_LEAD))
     if direct:
-        lead = _DIRECT_LEAD_WITH_ROUTER if routed else _DIRECT_LEAD
+        lead = _DIRECT_LEAD_WITH_TURN if turn_agents else _DIRECT_LEAD
         blocks.append(_dispatch_context(
             project_dir, session_id, prompt_id, lead, direct, modes,
             {"files": edited, "agent-docs": agent_docs}, transcript))
     if refs:
         blocks.append(_refs_context(refs))
     context = "\n\n".join(blocks)
-    parts = [n for n, on in (("routed", routed), ("direct", direct), ("refs", refs)) if on]
+    parts = [n for n, on in (("turn", turn_agents), ("direct", direct), ("refs", refs)) if on]
     outcome = "+".join(parts)
     # `additionalContext`, not `decision: "block"`. Per the official hooks docs
     # (https://code.claude.com/docs/en/hooks, "Stop decision control"; excerpt saved at
     # wiki/ref/claude-code-stop-hook-decision-control.md) the two continue the
     # conversation identically and share the same loop protections, but block is
-    # reported as a hook ERROR while this shows as `Stop hook feedback`. A
-    # recommendation is guard working as designed, so it must not look like a failure.
+    # reported as a hook ERROR while this shows as `Stop hook feedback`. Naming a turn's
+    # closeout is guard working as designed, so it must not look like a failure.
     _emit_stop_context(context)
     _trace(project_dir, session_id, "stop", outcome, prompt_id=prompt_id,
            eligible=",".join(eligible))

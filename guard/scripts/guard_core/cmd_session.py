@@ -503,10 +503,16 @@ def cmd_session_start() -> int:
         "and that local path. The same path is in $GUARD_REFS_DIR for Bash."
     )
 
-    # Name the closeout file once, at the session's opening, when guard has anything switched
-    # on. The Stop hook repeats the path on each routed turn — one line, and it must,
-    # because context compaction can drop this one — but stating it here is what lets that
-    # line stay a path instead of an explanation of what the file is for.
+    # Name the closeout file, and the audit command, once at the session's opening, when guard
+    # has anything switched on. The Stop hook repeats the closeout path on each turn that has an
+    # answer file — one line, and it must, because context compaction can drop this one — but
+    # stating it here is what lets that line stay a path instead of an explanation of what the
+    # file is for.
+    #
+    # The command is stated here and nowhere else in the standing context: `audit-turn` is
+    # `disable-model-invocation: true`, so its own description is not loaded, and a session that
+    # has never been told the name cannot answer a user who asks for an audit in prose. Once per
+    # session, not once per turn — the Stop block repeats the prohibition, not the offer.
     if any(_switch_on(session_cfg, k) for k in SETTABLE_AGENTS):
         # Which of the two lines goes out is the mute, not the switches. Saying "audits are
         # on" to a muted session would be false in the one place a false line is most
@@ -514,18 +520,21 @@ def cmd_session_start() -> int:
         # session expecting a recommendation that never comes.
         if _session_muted(project_dir, session_cfg, payload):
             print(
-                "guard: agents are configured for this project, but audits are OFF for this "
-                "session — nothing is recommended when a turn ends and no answer file is "
-                "named. Running `guard on` in a shell arms it for this session only. Do not "
-                "mention this unless the user asks."
+                "guard: agents are configured for this project, but guard is OFF for this "
+                "session — no answer file is named, nothing is said when a turn ends, and an "
+                "audit invoked now would report that the session is muted. Running `guard on` "
+                "in a shell arms it for this session only. Do not mention this unless the user "
+                "asks."
             )
         else:
             print(
-                "guard: audits are on for this session. When a turn finishes, guard names the "
-                "agents to consider; how to dispatch each one comes with that naming, and what "
-                f"its findings mean comes from its own report. {_closeout_path()} says how a "
-                "routed turn is closed out afterwards — do not read it until a turn sends you "
-                "there."
+                "guard: this session writes its answers to the file guard names at the start of "
+                f"each turn, and {_closeout_path()} says how the turn is then delivered — do "
+                "not read it until a turn sends you there. The turn AUDIT is not automatic and "
+                "is not yours to start: the user runs `/guard:audit-turn` when they want one, "
+                "or `/guard:audit-turn-claims` / `-clarity` / `-deferrals` for a single audit, "
+                "and a document is audited with `/guard:audit-report <path>`. If they ask for "
+                "an audit in prose, name the command rather than dispatching anything."
             )
 
     _trace(project_dir, None, "session-start", "swept", exported_project_dir=exported)

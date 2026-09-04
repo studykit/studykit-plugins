@@ -1,21 +1,21 @@
 """The text guard hands the main agent.
 
 Where each piece of text lives is decided by how often it is paid for, and that split must
-hold. What this module builds reaches the main agent on every routed turn, so it is one
-imperative plus a list of fields: paths, which agents are on, each one's mode.
-``agents/turn-router.md`` is read once per routed turn by the router alone, so it carries the
-triage method and the dispatch per candidate. ``hooks/context/turn-closeout.md`` is read
-only by whoever is sent to a section, so it carries how to dispatch an agent and what to do
-with its report. Nobody re-types another home's text.
+hold. What this module builds reaches the main agent on every turn that has an answer file,
+so it is one imperative plus a list of fields: paths, which agents are on, each one's mode.
+``agents/turn-router.md`` is read once per AUDIT — and an audit happens only when the user
+asks for one — so it carries the triage method and the dispatch per candidate.
+``hooks/context/turn-closeout.md`` is read by the turn that has a file to deliver, so it
+carries how the turn is delivered and what to do once an audit has reported. Nobody re-types
+another home's text.
 """
 
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
 
 from .config import AgentMode
-from .turnrec import _turn_record_file
+from .turnrec import _turn_record_file, _turn_translation_file
 from .agents import AUDIT_AGENTS
 
 
@@ -95,7 +95,7 @@ CLI_REL = "scripts/guard_hook.py"
 #   tree, so a version whose router names `guard-candidates` is a version that ships it.
 # - A lost exec bit, or a PATH the wrappers never reached, leaves the FILE in place — so
 #   `is_file()` passes and the fallback never fires, which is every realistic failure.
-# - Codex never calls `_router_context` at all (see `hooks/scripts/hook_codex.py`).
+# - Codex never builds a turn block at all (see `hooks/scripts/hook_codex.py`).
 #
 # So the test and the failure it was meant to cover were about different things, and the
 # only state it caught was one produced by deleting the files by hand. It also had a real
@@ -155,59 +155,65 @@ def _dispatch_context(project_dir: Path, session_id: str, prompt_id: str, lead: 
     return "\n\n".join([lead, block])
 
 
-def _router_context(prompt_id: str, lead: str) -> str:
-    """``additionalContext`` for the Stop path: one imperative and the turn id.
+def _turn_context(project_dir: Path, session_id: str, prompt_id: str, lead: str) -> str:
+    """``additionalContext`` for the Stop path: close the turn out, and audit nothing.
 
-    Every line here is paid in the main agent's context at the end of EVERY routed turn,
-    including the many the router then clears, so the test each line has to pass is: could
-    the closeout file have said this instead, or could the party that needs it derive it? If
-    either, it is deleted from here.
+    Every line here is paid in the main agent's context at the end of EVERY turn that named
+    an answer file, so the test each line has to pass is: could the closeout file have said
+    this instead, or could the party that needs it derive it? If either, it is deleted from
+    here.
 
-    Everything else failed that test. The procedure went to the closeout file, read once by
-    whoever is sent to a section. The roster and the per-turn paths went to `guard-candidates`
-    and `guard-inputs`, run by the agents that use them — the main agent opens none of those
-    files, so relaying their paths only gave it text to carry and a copy step to get wrong.
-    The ROUTER returns the next instruction itself, naming the closeout file and the sections, so
-    the main agent never reads a section about routing.
+    What survives that test is four paths and one prohibition. The turn id, because nothing
+    downstream can work it out and it is what the user's own audit command resolves to. The
+    answer file, because it is the deliverable and this block is the last thing the turn
+    reads. The translation file, because the caller now decides for itself whether the turn is
+    delivered in Korean — that was the router's pick while a router ran on every turn — and
+    ``korean-translator`` is forbidden from deriving its own target, so the one path it writes
+    has to come from the code that owns the layout rather than from a caller assembling a
+    suffix. The closeout file, because ``SessionStart`` states it once and a compaction can
+    drop that line. The prohibition, because guard no longer asks for an audit here and a
+    main agent that had been told to route every turn will keep routing on habit.
 
-    The turn id is what remains because it is the one thing nothing downstream can work out
-    for itself.
+    No audit is named and no router is dispatched. **Auditing is the user's to ask for**
+    (``/guard:audit-turn``, or one audit by name): a recommendation at the end of every turn
+    spent a router on turns that plainly had nothing in them, and the recommendation that
+    fires whether or not it is wanted is the one that gets waved through unread. What the
+    hook still does is the part the user cannot do afterwards — recording the turn verbatim
+    while it is fresh, and naming the file the answer was written to.
 
     Deliberately absent: any summary of the turn, from guard or from the main agent. Priming
     an audit with the author's account of the work is how an unexamined claim becomes an
     established one — every agent reads the turn itself and forms its own view, which is why
     the record is required to be verbatim.
-
-    The ROUTER is always a fresh instance, whatever the agents are set to. Its question is
-    about this turn, and an instance carrying the last five turns is one that can answer it
-    from the wrong one — the failure would be silent, and routing is the step nothing else
-    checks. Cheapness is not what it is tuned for: a router that misreads the turn either
-    ships the defect or spends a subagent for every agent it named for nothing, and both cost
-    more than the routing call itself ever will. Hence `agents/turn-router.md` pins `opus`, and
-    there is no per-project override: the one setting that could make routing cheaper is the
-    one setting whose failure is invisible, since a router that stops naming an agent looks
-    exactly like a turn with nothing in it.
     """
-    # ONE field: the turn id. Everything else the agent needs — the closeout file, the answer
-    # file, the request file beside it, the transcript and the turn to look up in it — is
-    # derivable from that id plus the session, so `guard-inputs` derives them and the agent
-    # runs it. What this replaces is the main agent relaying four absolute paths it never
-    # opens: text paid for in its context on every routed turn, and a copy step whose only
-    # possible contribution is to get one wrong.
-    #
-    # It also puts the layout back with the code that owns it. A dispatch that spelled the
-    # turn directory out was a second copy of `turnrec`'s layout, in prose, and a drifted
-    # copy reads nothing and clears every turn silently.
-    return lead + "\n\n" + f"- turn: {prompt_id}"
+    return "\n\n".join([
+        lead,
+        "\n".join([
+            f"- turn: {prompt_id}",
+            "- answer file: "
+            f"{_turn_record_file(project_dir, session_id, prompt_id).resolve()}",
+            "- translation file, if this turn is delivered in Korean: "
+            f"{_turn_translation_file(project_dir, session_id, prompt_id).resolve()}",
+            f"- closeout: {_closeout_path()}",
+        ]),
+    ])
 
 
-# The lead for a routed turn. There is no second mode: a switch the user turned on is
-# the user saying they want this audit, so asking again every turn would be a formality
-# that trains them to wave it through. What the main agent must not do is quietly swallow
-# the result — the report is the point.
-_ROUTE_LEAD = (
-    "guard: audit the turn you just finished. Dispatch `guard:turn-router` (subagent_type: "
-    "\"guard:turn-router\") with the inputs below and follow its report."
+# The lead at the end of a turn that has an answer file. It asks for delivery and forbids
+# the audit, and the second half is the load-bearing one: the turn audit used to be dispatched
+# from here on every turn, so this is where a main agent reaches for it out of habit.
+#
+# The command is named because the session cannot invoke it — `audit-turn` is
+# `disable-model-invocation: true`, so it is not even in the session's skill list — and a user
+# who asks for an audit in prose has to be told what to type. That is a different thing from
+# offering one every turn, which is the noise this replaced.
+_TURN_LEAD = (
+    "guard: the turn is finished. Its answer file is the deliverable — close the turn out per "
+    "the closeout file below. NO audit runs unless the user asks for one, and the audit is "
+    "theirs to start: do not dispatch an audit, an auditor or a router yourself, and do not "
+    "ask whether to run one. When the user does ask for one in prose, tell them to run "
+    "`/guard:audit-turn` (or `/guard:audit-turn-claims`, `-clarity`, `-deferrals` for a single "
+    "audit) — you cannot invoke it for them."
 )
 
 
@@ -221,14 +227,14 @@ _DIRECT_LEAD = (
 )
 
 
-# Same dispatch, when a router block precedes it. The one thing the main agent could
-# plausibly get wrong here is sequencing — the router block above it ends in "follow its
-# report", which reads as something to finish first — so the concurrency is spelled out.
-# Waiting would cost a round trip for agents that share no input with the routed ones.
-_DIRECT_LEAD_WITH_ROUTER = (
-    "guard: this turn also edited files in the repository. Audit them. Dispatch these in "
-    "the SAME message as the router above — they read neither the answer file nor the "
-    "router's report, so they wait for nothing."
+# Same dispatch, when the turn block precedes it. The one thing the main agent could
+# plausibly get wrong here is sequencing — the block above it ends in closing the turn out,
+# which reads as something to finish first — so the concurrency is spelled out. Waiting would
+# cost a round trip for agents that share no input with the turn's own delivery.
+_DIRECT_LEAD_WITH_TURN = (
+    "guard: this turn also edited files in the repository. Audit them. Dispatch these BEFORE "
+    "you close the turn out above, in one message — they read neither the answer file nor "
+    "anything the closeout produces, so they wait for nothing and nothing waits on them."
 )
 
 
@@ -269,16 +275,22 @@ def _refs_context(refs: list[str]) -> str:
 # shape left the user reading the flawed text with a list of fixes underneath it.
 #
 # "Keep the reply short" was the whole instruction once, and short is not the property that
-# matters: a compressed restatement of the answer obeys it and still puts the unaudited text
-# in front of the user, which is the one thing this lead exists to prevent. So the reply is
+# matters: a compressed restatement of the answer obeys it and still puts a second copy of the
+# answer in the transcript, which is the one thing this lead exists to prevent. So the reply is
 # specified by CONTENT — a headline and the path — rather than by length. The two named
 # exclusions are the shapes that were observed slipping through as "short": a bullet summary
 # of the file, and a preview of its opening.
+#
+# The audit is no longer what the file is for — it is asked for afterwards, if at all — and the
+# file still is. It is the one copy of the answer, so an audit the user asks for an hour later
+# corrects the document they have rather than a transcript nothing can reach, and it is the
+# English source a translation is written from.
 _DRAFT_LEAD = (
-    "guard: put your answer's substance in {path}, written in ENGLISH. Until the audits have "
-    "run, the user should be reading that file and not a copy of it in the transcript: your "
-    "reply is ONE headline sentence plus that path — no summary of what the file says, no "
-    "excerpt from it, no findings list. guard audits that file when the turn ends. When you "
-    "will answer the user in another language, the version they read is translated from this "
-    "file after the audits have run — the closeout file says how."
+    "guard: put your answer's substance in {path}, written in ENGLISH. That file IS the answer, "
+    "not a record of one: your reply is ONE headline sentence plus the path — no summary of "
+    "what the file says, no excerpt from it, no findings list. Nothing audits it unless the "
+    "user asks; when they do, the audit corrects that file in place, which is why the answer "
+    "lives there rather than in the transcript. When you will answer the user in another "
+    "language, the version they read is translated from this file — the closeout file named "
+    "when the turn ends says how."
 )

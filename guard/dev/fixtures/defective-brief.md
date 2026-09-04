@@ -1,8 +1,8 @@
 # Brief: caching the settings file read
 
-A fixture for `audit-report-claims` (which forks `claims-auditor`), shaped like an `interviewer` brief — the document path's
-input. It is NOT a turn: no request, no tool activity, no transcript, and the reader is whoever
-picks it up later.
+A fixture for `audit-report-claims` (which forks `claims-auditor`), shaped like the standalone
+brief the document path was built for. It is NOT a turn: no request, no tool activity, no
+transcript, and the reader is whoever picks it up later.
 
 Defects are planted, and they are the ones this path gets wrong rather than the ones a turn
 gets wrong. Expected findings are listed at the bottom; read them only after running the agent.

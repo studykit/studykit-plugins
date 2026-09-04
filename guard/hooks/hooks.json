@@ -8,7 +8,7 @@
             "type": "command",
             "command": "uv run --script \"${CLAUDE_PLUGIN_ROOT}/scripts/guard_hook.py\" user-prompt",
             "timeout": 120,
-            "description": "Name the file this turn's answer is written to, so the audit has something editable to correct. Silent when every agent is off, when the session is muted, and on guard's own control commands. guard keeps no copy of the prompt."
+            "description": "Name the file this turn's answer is written to, so the answer is a document the user can be handed and an audit can still correct. Silent when every agent is off, when the session is muted, and on guard's own control commands. guard keeps no copy of the prompt."
           }
         ]
       }
@@ -57,7 +57,7 @@
             "type": "command",
             "command": "uv run --script \"${CLAUDE_PLUGIN_ROOT}/scripts/guard_hook.py\" stop",
             "timeout": 120,
-            "description": "Mark the finished turn as the on-demand audit target; when any agent switch is on, ask the main agent to route the turn and dispatch the agents worth running on it; and when the turn wrote a file under the refs dir, name ext-docs-auditor over those files regardless of the switches."
+            "description": "Record the finished turn as the target an audit resolves to, and fill in its answer file if the turn left it empty. Recommends no audit: the turn block names the turn id, the answer file, the translation file and the closeout, and forbids routing the turn unasked — the user runs /guard:audit-turn when they want one. Still names comment-corrector / agents-md-auditor over the files the turn edited, and ext-docs-auditor over anything it wrote under the refs dir, since those conditions are file lists rather than judgments."
           }
         ]
       }
@@ -69,7 +69,7 @@
             "type": "command",
             "command": "uv run --script \"${CLAUDE_PLUGIN_ROOT}/scripts/guard_hook.py\" session-start",
             "timeout": 5,
-            "description": "Sweep guard state and turn records past the retention window, export GUARD_PROJECT_DIR and GUARD_REFS_DIR, and state the refs rule as session context — plus the turn closeout path when any agent is on."
+            "description": "Sweep guard state and turn records past the retention window, export GUARD_PROJECT_DIR and GUARD_REFS_DIR, and state the refs rule as session context — plus, when any agent is on, the turn closeout path and the audit commands the user invokes."
           }
         ]
       }

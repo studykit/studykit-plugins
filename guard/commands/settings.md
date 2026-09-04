@@ -92,11 +92,11 @@ made through the CLI, report that instead of working around it.
 
 | Key | Values | What it controls |
 | --- | --- | --- |
-| `audit-turn` | `on` / `off` (default) | Whether a session **starts** with turn auditing armed. `off` and guard recommends nothing when a turn ends, whatever the agent keys below say. It ships `off` because this audit is charged on every finished turn — the usual way to use it is `guard on` in a shell for the stretch of work that wants it, and `set audit-turn on` only for a project that wants every session audited from the first turn. This is the project's default, not the live session: `guard on` / `guard off` move the session you are in and leave this alone. |
+| `audit-turn` | `on` / `off` (default) | Whether a session **starts** with guard's turn discipline armed. `on` and each turn's answer is written to a file guard names, the turn is recorded, and `/guard:audit-turn` has something to work on; `off` and none of that happens, whatever the agent keys below say — an audit invoked in an off session reports that it is off. The audit itself is never automatic in either state: the user invokes it. It ships `off` because the discipline, not the audit, is what every turn pays for — the usual way to use it is `guard on` in a shell for the stretch of work that wants it, and `set audit-turn on` only for a project that wants it from the first turn. This is the project's default, not the live session: `guard on` / `guard off` move the session you are in and leave this alone. |
 | `audit-plan` | `on` (default) / `off` | Whether a session **starts** with the plan gate armed. Defaults the opposite way to `audit-turn`: this gate fires only at plan approval, so it is rare enough to leave armed. While armed, an approved plan is held before it is built until it has been through `/guard:audit-plan`, and revising the plan holds it again. Its session-level command is `guard-plan on` / `guard-plan off`. |
-| `claims-auditor` | `off` / `on` | Flags statements asserted without adequate evidence. One switch, two entry points: the `audit-turn-claims` skill on a finished turn, `audit-report-claims` on a saved document. Both fork the same `claims-auditor`. |
-| `deferrals-auditor` | `off` / `on` | Flags work punted as "TBD" / "확인 필요" that the repo could have answered. One switch, two entry points: the `audit-turn-deferrals` skill on a finished turn, `audit-report-deferrals` on a saved document. Both fork the same `deferrals-auditor`. |
-| `clarity-auditor` | `off` / `on` | Flags terms used but never explained, mechanisms given with no concrete example, and explanation pitched wrong for this reader. One switch, one agent, two entry points: the `audit-turn-clarity` skill on a finished turn, `audit-report-clarity` on a saved document. It calibrates against a reader profile; without one it says so and checks less, so the `reader-profile` skill comes first if the user means to rely on it. |
+| `claims-auditor` | `off` / `on` | Flags statements asserted without adequate evidence. One switch, two entry points: `audit-turn-claims` on a finished turn, `audit-report-claims` on a saved document — named by the matching router, or invoked by the user directly. Both fork the same `claims-auditor`. |
+| `deferrals-auditor` | `off` / `on` | Flags work punted as "TBD" / "확인 필요" that the repo could have answered. One switch, two entry points: `audit-turn-deferrals` on a finished turn, `audit-report-deferrals` on a saved document — named by the matching router, or invoked by the user directly. Both fork the same `deferrals-auditor`. |
+| `clarity-auditor` | `off` / `on` | Flags terms used but never explained, mechanisms given with no concrete example, and explanation pitched wrong for this reader. One switch, one agent, two entry points: `audit-turn-clarity` on a finished turn, `audit-report-clarity` on a saved document — named by the matching router, or invoked by the user directly. It calibrates against a reader profile; without one it says so and checks less, so the `reader-profile` skill comes first if the user means to rely on it. |
 | `comment-corrector` | `off` / `on` | Admits `guard:comment-corrector`, for the source files the turn actually edited. This one **edits those files in place**, so its fixes land without being asked — say so when the user turns it on. |
 | `agents-md-auditor` | `off` / `on` | Admits `guard:agents-md-auditor`, for the `AGENTS.md` / `CLAUDE.md` files the turn actually edited, judged as instruction files. Reports only — but its findings often mean moving content into a doc that does not exist yet, which is the user's decision, not the agent's. |
 | `refs_dir` | a project-relative path, or empty | Where guard saves cited-doc copies. Empty = the git-tracked default `wiki/ref/`, committed with the repo; a different tracked path (e.g. `docs/refs`) overrides it. |
@@ -151,12 +151,12 @@ Two older spellings turn up in config files, and they are not the same case:
 
    **`audit-turn` and `audit-plan` are reported every time, whatever their value.** They
    are listed first because each one overrides every agent line under it: with `audit-turn`
-   off, an agent switched `on` below still runs nothing. That is now the state a project gets
-   without configuring anything, so it is the common case rather than the exception — a user
-   who is shown the agent lines alone gets the wrong answer to "is guard auditing right now",
-   and `audit-turn` is a single word that is easy to drop as unremarkable. It is the most
-   load-bearing line in the listing. Observed being omitted, which is why this is spelled
-   out.
+   off, an agent switched `on` below can be invoked and will report that the session is off.
+   That is the state a project gets without configuring anything, so it is the common case
+   rather than the exception — a user who is shown the agent lines alone gets the wrong answer
+   to "can I audit this turn", and `audit-turn` is a single word that is easy to drop as
+   unremarkable. It is the most load-bearing line in the listing. Observed being omitted,
+   which is why this is spelled out.
 2. **If `$ARGUMENTS` names a key and a value**, apply it and report what changed. They told
    you; do not ask first.
 3. **Otherwise ask**, in your transcript, as plain prose the user can reply to. Name the
@@ -176,7 +176,7 @@ may be keeping it for something else.
   not a setting. `audit-turn` and `audit-plan` say what a session *starts* as, so a session the
   user has already flipped no longer matches them — `show` reports that as
   `audit-turn: on (this session; project setting off)`, and it is the session value, not the
-  setting, that answers "is guard auditing right now". Report both when they differ instead of
+  setting, that answers "can guard audit this turn". Report both when they differ instead of
   reading out the setting alone. A `set` here does reach the live session (this is why
   `--session` matters), so it can also *undo* a `guard off` the user ran a minute ago: if they
   asked only to change the project default, say that the session moved too.

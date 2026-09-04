@@ -1,6 +1,6 @@
 ---
 name: reader-profile
-description: 'Establish or update the reader profile guard''s clarity-auditor calibrates against — the user''s field, experience and vocabulary. Run once before relying on guard's clarity audit, and again whenever the auditor over- or under-explains. Use when the user asks to set up, review, or correct what guard knows about them as a reader. Claude Code only.'
+description: 'Establish or update the reader profile guard''s clarity-auditor calibrates against — the user''s field, experience and vocabulary. Run once before relying on guard''s clarity audit, and again whenever the auditor over- or under-explains. Use when the user asks to set up, review, or correct what guard knows about them as a reader. Claude Code only.'
 argument-hint: '[what to record or correct]'
 disable-model-invocation: true
 ---

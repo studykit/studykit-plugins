@@ -142,9 +142,11 @@ def _plan_audit_paused(state: dict[str, Any]) -> bool:
 
 
 def _audit_paused(state: dict[str, Any]) -> bool:
-    """Is the automatic audit muted for this session?
+    """Is guard muted for this session?
 
     The session's own answer, not the project's: `_read_state` seeds it from `audit-turn` and
-    `guard off` overrides it for the rest of the session.
+    `guard off` overrides it for the rest of the session. Muted means guard says nothing
+    unasked AND an audit the user invokes reports that the session is muted
+    (`cmd_candidates`) — but the turn is still recorded, so arming guard and asking reaches it.
     """
     return state.get("audit_paused") is True

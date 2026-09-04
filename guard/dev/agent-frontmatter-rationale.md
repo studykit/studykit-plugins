@@ -96,8 +96,8 @@ file, then read the file yourself.
 
 The skill narrows it further on the document path, and says so there: the agent may ask which
 of two candidate paths a reference means, but must not ask what the document says or how it
-came to say it. The main session did not write a brief and did not watch the interview that
-produced it, so its account there is not even the author's testimony.
+came to say it. The main session did not write the document and did not watch it being written,
+so its account there is not even the author's testimony.
 
 `memory: project` for the reviewability — and it is what settles the one-agent question, since
 the directory is named after the agent and two definitions would learn this repository twice.
@@ -215,25 +215,26 @@ is already the longest in this plugin:
   the caller writes *after* routing, which is why the request is allowed to put it on the list.
   A document is already written and is the deliverable; there is no later prose. A shared body
   would carry a rule whose one job is to be switched off half the time.
-- **A declared-open section has to be read as a claim, not as a clearance.** The interview
-  brief carries `Open` and `Could not determine` headings, and the first draft of this router
-  told it to skip them as the document doing its job. That was backwards, and the maintainer
-  caught it: the heading asserts that somebody decided to leave these open, and the interviewer
-  is perfectly capable of parking a question it never asked under it. An item nobody put to the
-  user sits there indistinguishable from one the user declined, with the heading making it look
-  accounted for — which is `deferrals-auditor`'s subject exactly. So the rule is the opposite of
-  what it started as: that section is the strongest reason to name the agent.
+- **A declared-open section has to be read as a claim, not as a clearance.** A document that
+  carries `Open` or `Could not determine` headings — the interview brief this path was built
+  for did — got skipped by the first draft of this router, as the document doing its job. That
+  was backwards, and the maintainer caught it: the heading asserts that somebody decided to
+  leave these open, and an author is perfectly capable of parking a question it never asked
+  under it. An item nobody put to the user sits there indistinguishable from one the user
+  declined, with the heading making it look accounted for — which is `deferrals-auditor`'s
+  subject exactly. So the rule is the opposite of what it started as: that section is the
+  strongest reason to name the agent.
 
 It also carries its own dispatch instructions instead of pointing at the closeout file, which is
 why `inputs --file` prints no closeout path: the closeout routes findings into the answer file, then
-a translation, then the presentation of a turn, and a caller following that over a brief would
+a translation, then the presentation of a turn, and a caller following that over a document would
 produce a Korean translation nobody asked for.
 
-**The mute is honored by `guard-candidates`, not by this agent.** There is no Stop hook in front
-of this path to check it — the main agent dispatches this router off the interviewer's
-`description` — so the switch check had to move into the command both routers already run. On
-the turn path that is dead weight (a muted session returns before the router is dispatched);
-here it is the only thing that makes `guard off` mean off.
+**The mute is honored by `guard-candidates`, not by this agent.** There is no hook in front of
+this path to check it — the user points this router at a path — so the switch check lives in the
+command both routers already run. Since v0.118.0 that is true of the turn path as well: a turn
+audit is invoked rather than recommended, so this command is the only thing standing between
+`guard off` and an audit that runs anyway.
 
 ## Correctors
 
@@ -526,73 +527,3 @@ No `memory:` — same reason as the checkers, and stronger here: a stored ruling
 premise is the one most likely to be wrong.
 
 `model: opus`.
-
-## Conversation
-
-### `interviewer`
-
-`tools: Read, Grep, Glob, Bash, Write, Edit, WebSearch, WebFetch`
-
-The only agent here the USER talks to directly, in its own transcript, rather than one the main
-session dispatches and reads. `WebSearch`/`WebFetch` for sources outside the repository,
-`Read`/`Grep`/`Glob`/`Bash` for the project, `Write`/`Edit` for the brief and nothing else.
-
-**`Write` and `Edit` were taken away after two measured runs, and put back on 2026-08-26 at the
-maintainer's direction.** The evidence that removed them still stands, so it is recorded here
-rather than deleted — what changed is the conclusion drawn from it, not the measurement. The body
-said, in the go-ahead section and again in the prohibitions, that it must never build the thing
-under discussion. On the first run it scaffolded an entire Python project and CI workflow after
-the go-ahead. The prohibition was strengthened at the decision point, and on the second run it
-did the same thing *before any go-ahead at all*, and offered to `gh repo create` and push.
-
-Two honest qualifications on that evidence, both of which the maintainer raised. Both runs used
-`--permission-mode bypassPermissions`; in an ordinary session each of those calls would have
-surfaced as a permission prompt in the user's main conversation, named to this agent, and could
-have been denied — so the runs show what the agent *reaches for*, not what it gets away with.
-And `Bash` stayed, at the maintainer's direction, because research needs it — which already left
-the boundary open, since a shell redirect writes. Removing `Write`/`Edit` therefore never closed
-it; it only made the scaffolding path less obvious, at the cost of a second agent standing
-between the brief and the disk.
-
-**So the boundary is prose plus the permission prompt, and the body is written to be exactly
-that.** It does not tell the agent it lacks a capability it can see it holds — that is worse
-than a rule, because the agent finds out — it names the one file `Write` is for and says the
-attempt at anything else surfaces as a prompt in the user's main conversation, with this agent's
-name on it, asking them to approve a build they came here to avoid. Whether that holds where the
-tool removal did not is the thing to watch on the next run.
-
-The brief follows from the grant: the agent writes it itself, to
-`.claude/interviews/<short-kebab-slug>.md`, and its final message is that path and nothing else.
-The `description` tells the main agent to act on the file rather than on the report, and to name
-no path of its own — the slug rule lives with the agent that applies it. `color: red` — this
-agent reports and leaves the rest of the user's project alone.
-
-**`background: true` is load-bearing, not a default spelled out.** Only background agents appear
-in the interactive panel, and that panel is the only way the user opens a transcript and talks to
-the agent (`wiki/ref/claude-code-subagent-resume.md`). Dispatched foreground, this agent has no
-user to listen to.
-
-**No `memory:`, and the reason is the opposite of the auditors'.** Their hazard is a stored
-verdict that suppresses a finding. This agent's hazard is a stored *user profile* — "they always
-mean X", "they prefer Y" — which is a conclusion about the person it is supposed to be asking.
-An interviewer that already knows what you want has stopped doing the job.
-
-`model: opus`, argued from the failure mode: the input is a short sentence with the context left
-out on purpose, and the failure is supplying that context yourself and answering confidently.
-That is a reading-intent job, which is where the tier is worth paying for.
-
-No `SendMessage`: it has nobody to message. Its report reaches the main session as its final
-message, and the user is reached by talking back in the transcript. No `AskUserQuestion` either,
-and not by choice — the host strips it from every subagent, so the questions have to be prose,
-which the body is written around.
-
-No `maxTurns`. A conversation has no turn budget that could be set correctly in advance.
-
-**No command file, and the `description` carries what one would have.** `@agent-guard:interviewer`
-is documented to guarantee this agent runs, so the launch needs no command. Three instructions do
-have to reach the MAIN agent rather than this one — pass it the subject and no procedure, do not
-wait for it or relay it, and treat the brief's open questions as questions — and all three are in
-text the main agent already reads: the `description` for the first two, the brief's own `Open`
-heading for the third. A command would have been a
-third copy that drifts, and its body speaks for exactly one turn, which is not when either
-instruction is needed.

@@ -5,6 +5,11 @@ and the main agent writes the substance there; the agents audit it and the corre
 in place, so the corrected file is what the user is shown. guard fills it in only if the turn
 left it empty (``_write_turn_response``).
 
+``turns/<sid>/<pid>.ko.md`` is the turn's TRANSLATION — the file the user reads when the turn
+is delivered in Korean, written by ``korean-translator`` from the answer file and rewritten
+from it again if an audit corrects the English. Its path is derived here rather than by the
+parties that pass it around (``_turn_translation_file``).
+
 ``turns/<sid>/<pid>.request.md`` is the user's REQUEST for that turn, verbatim, written by
 guard at UserPromptSubmit. It goes to the ROUTER and to nothing else: never audited, never
 corrected, never handed to an audit agent. It is there so triage can tell the part of an
@@ -83,6 +88,31 @@ def _write_turn_response(project_dir: Path, session_id: str, prompt_id: str,
     except OSError:
         return None
     return path
+
+
+# The suffix on the file the user reads when the turn is delivered in Korean. One place owns
+# it, and that is the point: the caller dispatches the translator at turn end and the router
+# names the same file again after an audit has corrected the English, so a suffix derived
+# twice by two parties is a translation written to one path and re-read from another.
+_TRANSLATION_SUFFIX = ".ko.md"
+
+
+def _turn_translation_file(project_dir: Path, session_id: str, prompt_id: str) -> Path:
+    """Where this turn's translation goes, whether or not one exists yet.
+
+    Derived, never probed. The callers that need it are the turn's own closeout — which has
+    not written it yet — and an audit that may have to have it rewritten, and a field that
+    appeared only once the file existed would be absent exactly when it is being created.
+    Whether a translation exists is the caller's own knowledge: it either delivered one this
+    turn or it did not.
+
+    ``korean-translator`` is forbidden from deriving a path of its own, so this is the only
+    producer of the value it is handed.
+    """
+    # `with_suffix` replaces the answer file's `.md`, so a prompt id carrying a dot of its
+    # own keeps it: `<pid>.md` -> `<pid>.ko.md`.
+    return _turn_record_file(project_dir, session_id,
+                             prompt_id).with_suffix(_TRANSLATION_SUFFIX)
 
 
 def _turn_request_file(project_dir: Path, session_id: str, prompt_id: str) -> Path:

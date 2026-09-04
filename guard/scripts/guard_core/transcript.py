@@ -28,14 +28,22 @@ from .paths import _cli_project_dir, _state_root, _trace
 
 
 # guard's own control commands, e.g. "/guard:settings claims-auditor off", "/settings",
-# "/guard:claims-auditor". `settings` is a forked skill and each per-agent command a
-# UserPromptExpansion — either way the turn is a relay, not real work to log/judge. The
+# "/guard:audit-turn". Each is a forked skill whose turn is a RELAY — of guard's settings, or
+# of an audit's findings — rather than real work to log or judge. The
 # name is `settings`, not `config`, precisely so the bare form does NOT match Claude Code's
 # built-in `/config` command (which the optional `(guard:)?` would otherwise capture,
 # making guard treat every `/config` as its own control command). `(?=\s|$)` rather than
 # `\b`: the name must END here, not merely hit a word boundary — `\b` would also accept a
-# longer hyphenated name (`/settings-export` matching `settings`, `/claims-auditor-extra`
-# matching `claims-auditor`), which is how another plugin's command becomes guard's.
+# longer hyphenated name (`/settings-export` matching `settings`, `/audit-turn-extra`
+# matching `audit-turn`), which is how another plugin's command becomes guard's.
+#
+# The audit entry points are the load-bearing half now that the user invokes them. A
+# `/guard:audit-turn` turn that was NOT matched here would become the pending target itself,
+# and the next audit the user asked for would read guard's own report of the last one instead
+# of the answer they wanted checked. Both spellings of every entry are covered by the
+# optional suffix group: bare `audit-turn` for the routed form and `audit-turn-<audit>` for a
+# single one.
+#
 # `comment-corrector` is deliberately ABSENT: that skill's relayed findings are claims about
 # real files and about edits made to them, so its turn stays auditable like any other work.
 # `statusline` is absent for the same reason: it reports what is in the user's settings files
@@ -44,8 +52,9 @@ from .paths import _cli_project_dir, _state_root, _trace
 # about the user, so the "answer" is the user's own words read back to them, and auditing
 # that would have guard grading the user on how they described themselves.
 _CONTROL_CMD_RE = re.compile(
-    r"^/(guard:)?(settings|reader-profile|claims-auditor|deferrals-auditor"
-    r"|clarity-auditor|korean-corrector)(?=\s|$)",
+    r"^/(guard:)?(settings|reader-profile"
+    r"|audit-turn(-claims|-clarity|-deferrals)?"
+    r"|audit-report-(claims|clarity|deferrals)|audit-plan)(?=\s|$)",
     re.IGNORECASE)
 
 

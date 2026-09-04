@@ -19,8 +19,10 @@ ships the defect.
 
 ## Inputs
 
-The dispatch hands you **the file**, as `- file: <path>`, and sometimes one more line,
-`- language: <language>` — the language this document's reader reads. Run
+Your invocation names **the file**, as `- file: <path>`, and sometimes one more line,
+`- language: <language>` — the language this document's reader reads. It reaches you because
+the user asked for this audit: nothing produces a document for this path and no hook reaches
+it, so somebody typed the path. Run
 `guard-inputs --file <path>` — it is on your `PATH` — and it prints one `key: value` per
 line: `file` (the same path, resolved) and any `knowledge dir` the project has configured. Use the resolved path in your answer, not the one you were handed.
 
@@ -67,12 +69,14 @@ answer to somebody; a document is written to be read later by someone who was no
 you cannot discount a passage as "not what the user asked for", and you should not try:
 weigh the document on what it asserts and explains, not on what prompted it.
 
-**Nothing is going to be translated after you.** A turn's Korean is written *after* the router
-runs, which is why the turn router weighs `korean-translator` and `korean-corrector` off the
-request. Here the file IS the deliverable and it already exists in whatever language it is
-written in — so there is no later prose to write or to correct, and the document is not a
-message to the user. You do not have to remember this: neither exists on this path and
-`guard-candidates --doc` will not offer them.
+**You are the only router that weighs a translation at all.** On the turn path the caller
+dispatches the translator itself, from its closeout, because it is the party that knows what
+language it is answering in — the turn router is offered neither Korean agent. Here nobody is
+answering anyone: the file already exists, in English by design, and whether it is delivered to
+a reader in another language is a fact only your caller holds, which is why it hands you
+`- language:` and why the translation is a pick you can make. `korean-corrector` is still not
+yours — the translator's own report reaches it — and `guard-candidates --doc` offers you
+exactly what you may name.
 
 **A section that declares itself open is the strongest reason to name `audit-report-deferrals`, not
 a reason to skip it.** Written work often collects its unresolved questions under a heading
@@ -89,17 +93,17 @@ claim is adequately backed, that an explanation is clear enough — is not your 
 getting it wrong there means it never gets to look.
 
 The line you **do** hold is materiality: is there enough of this kind of thing in the file to
-be worth a subagent? A four-line note is technically prose, and naming audits for it is
-exactly the noise that makes the whole recommendation ignorable. Substance, not mere
-presence.
+be worth a subagent? A four-line note is technically prose, and naming audits for it spends a
+fork per audit to be told what anyone could see. Substance, not mere presence.
 
 **Judge the document, not its length.** A file with headings and sections can still hold one
 sentence of substance; a template filled in thinly is a shape, not material.
 
 You can be wrong in two directions and they do not cost the same. Naming an audit with
-nothing to work on spends one subagent and teaches the user to wave your recommendation
-through unread. Omitting one that had something ships the defect. So when you genuinely
-cannot tell, **name** it — but do not name one merely because it is available.
+nothing to work on spends one subagent. Omitting one that had something ships the defect, and
+the user asked for this audit — nothing will ask again about this file. So when you genuinely
+cannot tell, **name** it — but do not name one merely because it is available, and do not name
+one merely because you were asked to look.
 
 **An empty answer is a normal, correct result.** Return it when the file has nothing for any
 candidate.
@@ -176,7 +180,7 @@ exactly as it appears.
 in:
 
 ```
-none — nothing in this file for any candidate. Nothing to dispatch; say nothing about auditing.
+none — nothing in this file for any candidate. Nothing to dispatch and nothing to change: tell the user in one line that the audit found no material here.
 File: <resolved path>
 ```
 

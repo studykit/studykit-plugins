@@ -11,19 +11,33 @@ follows is a pointer into it rather than a second copy.
 
 ## What guard is
 
-**guard makes no model call.** When a turn finishes it asks the main agent, through the Stop
-hook's `additionalContext`, to dispatch one subagent — `guard:turn-router` — which reads the turn
-and names which of guard's audit agents would actually find something in it, with a reason for
-each. The main agent dispatches those together and applies nothing until they have all reported,
-so every audit judges the same text and overlapping findings are reconciled in one pass. Then one
+**guard makes no model call, and asks for none when a turn ends.** The turn audit is the
+USER's to start: `/guard:audit-turn` forks `guard:turn-router`, which reads the turn and names
+which of guard's audit agents would actually find something in it, with a reason for each. The
+caller dispatches those together and applies nothing until they have all reported, so every
+audit judges the same text and overlapping findings are reconciled in one pass. Then one
 further round, over the corrections and limited to the audits that produced them, because a
 correction is prose no audit has read. guard audits nothing itself, and every audit criterion
 lives in an agent definition under `agents/`.
 
-Everything guard recommends, it recommends at turn end. Two shipped agents sit outside that
-path entirely and have no switch: `docs-finder`, which the main agent selects from its
-own description, and `ext-docs-auditor`, which the Stop hook names off the refs files the turn
-wrote. Anything below that says "the turn" or "the response" is about the routed path.
+The trigger moved off the Stop hook in v0.118.0, and the reason was the hit rate: a router was
+asked for on every turn that had an answer file and the common answer was `none`, so the usual
+cost of the feature was a subagent per turn reporting that there was nothing to do — and a
+recommendation that arrives whether or not it is wanted is one the user learns to wave through.
+What the hook still does is the half a user cannot do afterwards: record the turn verbatim
+while it is fresh, and name the file the answer is written to. `dev/design.md` has the argument
+and what it gave up.
+
+`/guard:audit-turn` and `/guard:audit-report` are `disable-model-invocation: true` — the user's
+and only the user's. That is the other half of the same fix: an entry the model can reach is an
+audit that can still arrive unasked, and a description in every session's standing context is
+an invitation to reach for it. The three `audit-turn-*` / `audit-report-*` skills stay
+model-invocable and must, since each router names them for its CALLER to invoke.
+
+Two shipped agents sit outside all of that and have no switch: `docs-finder`, which the main
+agent selects from its own description, and `ext-docs-auditor`, which the Stop hook names off
+the refs files the turn wrote. Anything below that says "the turn" or "the response" is about
+the audited path.
 
 The two names no longer rhyme, and that is the shape rather than drift: the finder searches
 wider than it writes — saved references, the repository's own documentation, any configured
@@ -31,53 +45,44 @@ knowledge directory — while the auditor's subject is still only the refs copie
 WHERE a document is and never what it says, because a gist in its report is a second version
 of the document for the caller to disagree with.
 
-Two agents on that path are one step rather than an audit: `korean-translator` writes the Korean
-the user reads, from the corrected English answer file, and `korean-corrector` then judges what
-it wrote. **Neither has a switch**, because the answer the user reads is not something to opt
-into — a switch there would make the quality of a delivered answer depend on a config key, and
-`off` would put the session back to translating its own text, which is the arrangement that
-produced 직역. What keeps them free for everyone else is the router: it names
-`korean-translator` only for a turn being delivered in Korean prose, and the pair never makes a
-turn routed on its own — with every switch `off`, guard is still silent. Only the translator is
-routed (`routed=False` on the corrector): the translator's report hands the corrector its file,
-which is the one place the fact it turns on — the translation now exists — is actually known. `dev/design.md` has why an author cannot translate
-their own text, what the translator must not move while doing it, and the eligibility rule that
-keeps a switch-free agent from reinstating the router call.
+Two agents are one step rather than an audit: `korean-translator` writes the Korean the user
+reads, from the English answer file, and `korean-corrector` then judges what it wrote.
+**Neither has a switch**, because the answer the user reads is not something to opt into — a
+switch there would make the quality of a delivered answer depend on a config key, and `off`
+would put the session back to translating its own text, which is the arrangement that produced
+직역.
+
+**Neither is routed on the turn path** (`routed` is per path, and holds only `report` for the
+translator and nothing for the corrector). The translator was the router's one pick that the
+answer file could not evidence — the language had to be inferred from the request — and with
+the router now running only when the user asks for an audit, leaving it there would make the
+Korean the user reads depend on their having asked. So the caller dispatches it from the
+closeout, on a fact it holds with certainty; the corrector is still handed over by the
+translator's own report, which is the one place the fact it turns on — the translation now
+exists — is actually known. A document still routes the translator, because there the caller
+states in the dispatch who will read it. `dev/design.md` has why an author cannot translate
+their own text, what the translator must not move while doing it, and why the turn's
+translation is rewritten after an audit rather than translated once.
 
 Every agent switch ships `off`: guard installed is guard available, not guard running. The two
 audit switches (`audit-turn`, `audit-plan`) do not agree with each other, and that is the
 design rather than an oversight: absent from the config, `audit-turn` reads as `off` and
-`audit-plan` as `on`. The turn audit is charged on every finished turn, so the user arms it for
-the stretch of work that wants it; the plan gate fires only at `ExitPlanMode`, where the cost is
-rare and letting a deferral through is paid for by the whole implementation after it. They are
-the value each session OPENS in; `guard` / `guard-plan` then move that session alone.
+`audit-plan` as `on`. What `audit-turn` arms is no longer an automatic audit but the discipline
+one needs — the answer file named at the start of every turn, the turn recorded at the end — and
+that is still charged per turn, so the user arms it for the stretch of work that wants it. The
+plan gate fires only at `ExitPlanMode`, where the cost is rare and letting a deferral through is
+paid for by the whole implementation after it. They are the value each session OPENS in; `guard`
+/ `guard-plan` then move that session alone.
 
-`interviewer` is not part of any of that. It is a background agent the **user** talks to directly, in
-its own transcript, and it answers to nobody here: no switch, no hook, no router, and guard never
-dispatches it. It exists because a turn audited is a turn that cost a router call plus whatever
-the router named, and thinking out loud should not cost that — a message sent inside a subagent's
-transcript fires no `UserPromptSubmit`, and the `Stop` it does fire in the main session carries a
-non-human origin, so guard's own skip catches it. **That skip is the only thing keeping it free.**
-Registering a `SubagentStop` hook, or relaxing the origin test, closes this with nothing failing;
-`dev/design.md` has the measurement. `interviewer`'s deliverable is one brief file, written when
-the user closes the interview and never before, and its path reaches the main session only once
-the user has approved the handoff — the file is the handoff, so a summary beside it would be a
-second version to disagree with. Two parties can message that agent, and only one of them is the
-user: the main session pinging it for a report is not a go-ahead, not a close, and not the
-approval, which is the failure `dev/design.md` records under v0.114.0.
+`audit-report`, `report-router` and the three `audit-report-*` skills are the **document**
+path. Its subject is a standalone document rather than a finished turn, and no hook reaches it:
+the user points `/guard:audit-report <path>` at a file and that router triages the document the
+way `turn-router` triages a turn. Nothing in the hooks is involved, which is why the switches
+and the mute live in `guard-candidates` — it is the only thing both routers run, and neither
+has a hook in front of it to check them any more.
 
-That brief is the one document guard's turn audit can never reach: the skip above is what keeps
-the interview free, and the same skip means no `Stop` ever sees the text. So it is audited on a
-path of its own — the `description` tells the MAIN agent to dispatch `report-router` over the
-saved path, and that router triages the document the way `turn-router` triages a turn. Nothing in
-the hooks is involved, which is why the switches and the mute had to move into
-`guard-candidates`: it is the only thing both routers run, and on this path there is no hook in
-front to check them.
-
-It ships **no command**. `@agent-guard:interviewer` is documented to guarantee a given subagent
-runs, lands it in the background panel, and keeps a running one reachable — so a command would
-only be a second, driftable way to say the same thing. What that entry point does not settle is
-the opening prompt, which the main agent still writes; the agent's own body has to carry that.
+Nothing in this plugin produces a document for this path — the user names the file. `dev/design.md`
+has why the surface was kept without a producer, and what it replaced.
 
 `guard on` / `guard off` flips this session's mute from a shell prompt, without entering the conversation at all — the reason it is not a slash command. It leaves `audit-turn` alone, so muting the session you are in never changes what the next one does. SessionStart puts it on `PATH` through `$CLAUDE_ENV_FILE`, which is sourced rather than scanned for exports, so there is nothing to install and nothing left behind. It is an executable rather than a shell function so that subprocesses inherit it. `guard-plan` is its counterpart for the plan gate. `toggle-cli` is the one subcommand that must not fail open — a person is reading its output, so silence would read as success.
 
@@ -88,7 +93,7 @@ already the one thing that survives a cleared conversation, and the offer to rea
 rides in it. `dev/design.md` has why the skill records the path instead of the next session
 scanning for one, and why the offer ignores the mute.
 
-That same `PATH` carries `guard-candidates` and `guard-inputs`, which are the dispatched agents' and never the user's. Between them the routed dispatch is down to `- turn: <id>`, and the document dispatch to `- file: <path>`. `dev/design.md` has why that beats printing the roster and the paths, and what each fallback line is for.
+That same `PATH` carries `guard-candidates` and `guard-inputs`, which are the dispatched agents' and never the user's. Between them a turn audit's inputs are down to `- turn: <id>` — or nothing at all, since `guard-inputs` resolves the last recorded turn when the user names none — and a document audit's to `- file: <path>`. `dev/design.md` has why that beats printing the roster and the paths, and what each fallback line is for.
 
 ## Hard requirements
 
@@ -112,7 +117,8 @@ how the code here is organised.
 - `guard_core.config` is the ONLY reader of `GUARD_HOST`, once, at import.
 - A definition that exists once per dispatch path is named `<path>-<what it does>` —
   `turn-router` / `report-router`. An entry-point skill is the same rule with the verb in
-  front: `audit-turn-claims` / `audit-report-claims`. A definition used on one path only, or
+  front: `audit-turn` / `audit-report` for the path's own entry, `audit-turn-claims` /
+  `audit-report-claims` for one audit on it. A definition used on one path only, or
   outside the routers, keeps its bare name; do not prefix one speculatively.
 - Split at the ENTRY, never at the agent. Every audit that runs on both dispatch paths —
   claims, deferrals, clarity — is ONE agent behind two `context: fork` skills, and the reason
@@ -123,7 +129,10 @@ how the code here is organised.
   to stand are the two that do.
 - A router-named skill's `description` is as short as it can be: the router names it and the
   caller invokes it by name, so the line never has to attract an invocation, and it is loaded
-  into every session's context whether or not guard runs.
+  into every session's context whether or not guard runs. The two ENTRY skills are the
+  opposite case and are handled by the opposite means — `disable-model-invocation: true`,
+  which keeps their descriptions out of that context entirely and leaves them free to say
+  plainly what the user is about to run.
 - A roster key names the AUDIT and is user-visible configuration; an ENTRY names what the
   caller invokes for that audit on one path. `agents._path_entry` is the ONLY place one
   becomes the other, and `cmd_candidates` is its only caller. An entry is an agent for some
@@ -133,18 +142,23 @@ how the code here is organised.
   default. Nothing else may derive a dispatchable identity from a key.
 - Nothing resolves a plugin path by counting `__file__` parents.
 - Where a piece of text lives is decided by how often it is paid for: hook output is read on
-  every routed turn, `agents/turn-router.md` once per routed turn by the router alone,
-  `hooks/context/turn-closeout.md` only by a turn that has an answer file to close out.
-  Nobody re-types another home's text, and nothing in the closeout file describes routing.
-- **The closeout file names no agent, and decides nothing about one.** How to dispatch one
-  travels with the dispatch — each router's report template, `_agent_pointer`'s lead on the
-  no-router path — and what its findings mean travels in its own report, which is why the
-  file-editing audits end each finding in a disposition (apply / move / decide) and the router,
-  not the closeout, carries the translation instruction. What the closeout holds is the turn:
-  findings go into the answer file, the reply is short and in the user's language, and the file
-  opened is the one the user reads, retried before it is ever withheld. The rule is negative and that is the useful half: a closeout sentence
-  naming a particular agent is either a second authority over a decision already made or a
-  lookup that belongs in a report — see `dev/design.md` for the turn it cost.
+  every turn that has an answer file, `hooks/context/turn-closeout.md` by that same turn when
+  it delivers it, and `agents/turn-router.md` once per AUDIT — which now means once per time
+  the user asks for one, the rarest of the three. Nobody re-types another home's text, and
+  nothing in the closeout file describes routing.
+- **The closeout file names exactly one agent, and it is the translator.** Everything an
+  audit needs travels with the dispatch — each router's report template, `_agent_pointer`'s
+  lead on the no-router path — and what its findings mean travels in its own report, which is
+  why the file-editing audits end each finding in a disposition (apply / move / decide). The
+  translator is the exception because nothing else can carry it: the decision is the caller's
+  own, taken on a fact only the caller holds — what language it is answering in — and taken on
+  turns where no report exists to state it. Before v0.118.0 the router named it and this file
+  named no agent at all. What the closeout holds otherwise is the turn: the answer file is the
+  deliverable, the reply is short and in the user's language, the file opened is the one the
+  user reads, and an audit's findings go into the English before the translation is rewritten
+  from it. The rule stays as narrow as it can be: a second agent named here is either a
+  second authority over a decision already made or a lookup that belongs in a report — see
+  `dev/design.md` for the turn that cost.
 - guard writes the turn record's **response** section itself, verbatim from the Stop payload —
   it is the text being audited, so it must not pass through the author's hands. The main
   session appends only what guard cannot see, and that half is asked for as inclusion, never
@@ -153,19 +167,23 @@ how the code here is organised.
   and extract what they want themselves.
 - One user question gets exactly one answer file. Nothing else in an audit may become a
   document.
-- Only a turn a person typed is audited. A non-human origin guard has never seen must still
-  skip, while an *absent* origin must still audit — guard noisy is recoverable, guard silently
-  dormant is not.
-- The recommendation is `additionalContext`; the refs-index gap is the one `decision: "block"`
+- Only a turn a person typed is recorded as auditable. A non-human origin guard has never
+  seen must still skip, while an *absent* origin must still be recorded — guard noisy is
+  recoverable, guard silently dormant is not. guard's own control turns skip too, and that
+  list has to include the audit entry points: an unmatched `/guard:audit-turn` becomes the
+  pending target itself, so the next audit would read guard's report of the last one.
+- Hook output is `additionalContext`; the refs-index gap is the one `decision: "block"`
   that means unfinished work. The `/`-rooted search refusal is a `PreToolUse` `deny` and is
   the only thing guard forbids outright rather than recommends — it gates a tool ARGUMENT,
   never a caller's identity, which is what separates it from the removed hook below.
 - It names **agents**, never guard's own skills — those are the user's entry point, so a hook
   must not reach through them.
 - The three edited-file lists stay disjoint, and the refs test runs first, by location.
-- `guard-candidates` is where a switch and the mute are enforced for the document path, and
-  `cmd_stop` is where they are enforced for the turn path. Neither is redundant: drop the check
-  in the command and `guard off` silences the turn audit while the brief audit keeps running.
+- `guard-candidates` is where a switch and the mute are enforced for BOTH routers — neither
+  has a hook in front of it any more — and `cmd_stop` enforces them for what guard says
+  unasked. Neither is redundant: drop the check in the command and `guard off` silences the
+  hook while every audit the user can invoke keeps running. The Codex adapter needs the same
+  check on the one path that can start an audit there (`_handle_prompt`).
 - Two things ignore the agent switches AND the session mute, because both are prohibitions
   rather than opinions: the refs-index check and the `/`-rooted search refusal. A mute that
   could lift a prohibition would not be one.
@@ -227,21 +245,23 @@ each one cost.
   answers `Unknown command` before the hook runs, silently, which is how every one of guard's
   matchers ended up orphaned. guard registers none now — the session mute is a shell command
   (`guard`), not a slash command, so nothing has to keep a matcher and a command file in
-  step. There is no per-agent on-demand command on Claude either; Codex keeps its own path,
-  which is why the turn marker is still written on every Stop.
+  step, and the on-demand audit is a real skill rather than a matcher.
 - A slash command for the session mute. Flipping guard is not something to say to the model:
   it cost a turn, and it cost a command file whose body never ran.
-- A command that spawns `interviewer`. It was written and removed the same day: `@`-mention
-  already guarantees the agent runs, so all the command added was a copy of the agent's own
-  description and a standing instruction placed in a file that only speaks for one turn.
+- A command that launches an `@`-mentioned agent. Written and removed the same day for the one
+  guard used to ship: `@`-mention already guarantees the agent runs, so all the command added
+  was a copy of the agent's own description and a standing instruction placed in a file that
+  only speaks for one turn.
 
 ## Codex
 
 Different by necessity: its transcript is not a stable hook interface, so its adapter keeps
 its own turn record, and it has one named agent rather than a set — a router that can only
-forward to that same agent decides nothing, so Codex recommends the whole eligible set,
-unrouted and correspondingly noisier. Projects run `$guard:setup` once to install it. State is
-host-specific, under `.claude/guard/` or `.codex/guard/`.
+forward to that same agent decides nothing, so there is no routing here: the whole eligible
+set becomes one scope sentence handed to that agent. The audit is on demand on this host too,
+and it has to be a prompt PREFIX (`$guard:audit-turn`, `/guard:audit-turn`) rather than a
+skill, because a Codex command hook cannot launch an agent. Projects run `$guard:setup` once
+to install the agent. State is host-specific, under `.claude/guard/` or `.codex/guard/`.
 
 ## Editing this plugin
 

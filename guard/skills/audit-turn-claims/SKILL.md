@@ -2,13 +2,20 @@
 name: audit-turn-claims
 # Extremely short, and deliberately. This line is loaded into every session's context whether
 # or not guard runs, so its cost is paid on every turn — while its only job is to keep the
-# model from choosing this skill for itself. It never has to attract an invocation: guard's
-# router names this skill by name and the caller invokes it from the router's report, so a
-# description that described the audit would buy nothing and would get it run over turns
-# nobody routed. `disable-model-invocation: true` is not the answer — it would shut guard out
-# too, and guard is the only thing that should be invoking this.
-description: Invoked by guard only.
-argument-hint: '<turn id>'
+# model from choosing this skill for itself. It never has to attract an invocation: it is named
+# by guard's router, or typed by a user who wants this one audit and nothing else, and both
+# arrive with the name already decided. A description that described the audit would buy
+# nothing and would get it run over turns nobody asked about — which is the whole failure the
+# on-demand entry exists to fix, reintroduced one description at a time.
+# `disable-model-invocation: true` is not the answer either: the router names this skill for
+# the CALLER to invoke, so blocking model invocation would break the only path that dispatches
+# it. What steers this is `audit-turn`'s description, which is where the user's intent lands.
+description: Invoked by guard's turn router, or by the user by name.
+argument-hint: '[turn id]'
+# A NAMED argument, not `$ARGUMENTS`: the user may invoke this directly and name no turn, and
+# an omitted named argument expands to the empty string while an omitted `$0` would stay in the
+# body as literal text (`wiki/ref/claude-code-skill-arguments.md`).
+arguments: turn
 # The agent is the system prompt and this file is the task
 # (`wiki/ref/claude-code-skill-fork-context.md`). One `claims-auditor` judges on both paths;
 # what differs is where its evidence comes from, and that is what this file carries.
@@ -30,19 +37,23 @@ you need.
 
 ## 1. Resolve the paths
 
-The turn id is `$ARGUMENTS`. Run `guard-inputs $ARGUMENTS`; it is on your `PATH` and prints one
-`key: value` per line. You want:
+The turn id is `$turn` — empty when the user invoked this without naming one. Run
+`guard-inputs $turn`; it is on your `PATH` and prints one `key: value` per line. With an id it
+resolves that turn, with nothing it resolves the last turn guard recorded, and either way its
+first line is `turn: <id>` — the turn you are auditing, whatever you were handed. You want:
 
 - **`answer file`** — the answer this turn is giving, written by guard from the response itself
   and verbatim. **This is what you audit.** Nobody appends to it, so it will not tell you what
   the turn ran or what an earlier turn established; that is what the transcript is for.
-- **`transcript`** and **`turn`** — present when the session recorded a transcript. Step 3.
+- **`transcript`** — present when the session recorded a transcript; the `turn` line is
+  always there. Step 3.
 
 Read the paths as printed. If the command fails or prints no answer file, say so in one line
 and stop — a path you rebuild by guessing at guard's layout points at an empty turn, and an
 empty turn reads as a clean one.
 
-If you were given no turn id at all, say that and stop.
+If it prints no turn at all — no id was given and none is recorded for this session — say
+that and stop.
 
 ## 2. Triage, and on this path it can end the audit
 

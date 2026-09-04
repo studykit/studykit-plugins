@@ -1,6 +1,6 @@
 ---
 name: setup
-description: Install guard's read-only Codex claims-auditor agent in the current project's .codex/agents directory. Use when guard is installed in Codex and automatic or on-demand evidence audits need their named subagent.
+description: Install guard's read-only Codex claims-auditor agent in the current project's .codex/agents directory. Use when guard is installed in Codex and the on-demand evidence audit ($guard:audit-turn) needs its named subagent.
 disable-model-invocation: true
 ---
 

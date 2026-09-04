@@ -1,11 +1,11 @@
 """``candidates`` — the CLI verb the ROUTER runs to learn which agents it may name.
 
-Not a hook event. The Stop hook used to print this list into ``additionalContext``, which
-put it in the MAIN AGENT's context on every routed turn even though the main agent has no
-use for it: it dispatches the router and then follows whatever sections the report names,
-and the roster it was handed in between is a detail of a decision it does not make. So the
-hook prints the command instead of the answer, and the router — the one reader — runs it and
-gets the list first-hand.
+Not a hook event, and now nothing upstream of it is one either: a turn is routed when the
+user asks for an audit. The Stop hook used to print this list into ``additionalContext``,
+which put it in the MAIN AGENT's context on every turn even though the main agent has no use
+for it — it dispatched the router and then followed whatever sections the report named, and
+the roster it was handed in between is a detail of a decision it does not make. So the
+router — the one reader — runs this verb and gets the list first-hand.
 
 The list is derived, not stored. ``_eligible_agents`` is the same function ``cmd_stop``
 calls, over the same session state, so the two cannot disagree about which switches are on;
@@ -54,10 +54,9 @@ def cmd_candidates() -> int:
 
     Three shapes that print no keys, and they must not look alike on stderr. No session id
     is an installation problem. A muted session is the user having switched guard off, which
-    is an answer. An empty list is a real answer too, and one the router should never see on
-    the routed path, since the hook prints this command only when at least one turn-reading
-    agent is eligible — so each is called out rather than left as silence the router would
-    have to interpret.
+    is an answer. An empty list is a real answer too, and both routers can now see it — an
+    audit the user asks for in a project with every switch off reaches this verb — so each is
+    called out rather than left as silence the router would have to interpret.
 
     On the ``--continue`` / bare ``--resume`` carve-out in the reference above, the env var
     may carry the startup id while the hooks carry the resumed one. That surfaces here as an
@@ -77,12 +76,11 @@ def cmd_candidates() -> int:
 
     config = _load_config(project_dir)
     state = _read_state(project_dir, session_id, config)
-    # The mute, honored here as well as in `cmd_stop`. On the routed path this is dead
-    # weight — a muted session returns before the router is ever dispatched, so this verb
-    # is not reached — but the document path (`inputs --file`) has no Stop hook in front of
-    # it, and its router asks this command what is on. Without this, `guard off` would
-    # silence the turn audit and leave the document audit running, which is not what a
-    # switch labelled off means.
+    # The mute, honored here as well as in `cmd_stop`, and load-bearing on BOTH paths now.
+    # Neither router has a hook in front of it: a document audit never did, and a turn audit
+    # is invoked by the user. So this is the only place a muted session is told so before an
+    # audit runs, and without it `guard off` would silence what guard says unasked while
+    # leaving every audit the user could still invoke running.
     if _audit_paused(state):
         print("guard candidates: this session is muted (`guard off`) — nothing is eligible.",
               file=sys.stderr)
@@ -93,10 +91,12 @@ def cmd_candidates() -> int:
     # passing nothing is what makes those ineligible here, which is exactly the filter this
     # verb wants. Reading the recorded lists instead would let a file-reading agent through
     # to a router whose caller opens no section for it.
-    # `routed` drops `korean-corrector`: the translator's report hands it over, so offering it
-    # here would ask the router to judge a translation that does not exist while it reads.
+    # `routed` is per path and drops the Korean pair from the turn path: the corrector is
+    # handed over by the translator's report, and the translator by the caller's own closeout
+    # once it knows what language it is answering in. Offering either here would ask the
+    # router to judge a translation that does not exist while it reads.
     eligible = [k for k in _eligible_agents(state, [], [])
-                if AUDIT_AGENTS[k].reads == "turn" and AUDIT_AGENTS[k].routed]
+                if AUDIT_AGENTS[k].reads == "turn" and path in AUDIT_AGENTS[k].routed]
     if not eligible:
         print("guard candidates: no turn-reading agent is switched on for this session.",
               file=sys.stderr)
