@@ -48,10 +48,15 @@ For compatibility and versioning rules, see `AGENTS.md`.
 
 ## Available plugins
 
-- `lang`
-- `doc`
-- `korea-gov-data`
-- `dom-analyzer`
-- `workflow`
-- `obsidian`
-- `plantuml`
+- `doc-util` — reading and searching various document formats including CHM files
+- `korea-gov-data` — extract and organize Open API specifications from KOSIS (Korean Statistical Information Service)
+- `dom-analyzer` — HTML/XML DOM structure analysis toolkit with hierarchy visualization
+- `spectrack` — provider-backed workflow over GitHub Issues, Jira, GitHub repository wiki directory, and Confluence with issue and knowledge authoring contracts
+- `obsidian` — generate query blocks, modify templates, and run CLI commands for Obsidian knowledge management (Dataview, Tasks, Jira Issue, Templater, CLI)
+- `plantuml` — PlantUML diagram reference, creation, and validation
+- `structurizr` — Structurizr DSL diagram composition, C4 model visualization, and architecture documentation
+- `d2` — D2 diagram composition, rendering, and visualization
+- `guard` — on-demand audit agents that review a finished turn, or a document, for unsupported claims, deferrals the repo could answer, unclear explanation, unnatural Korean, and drifted `AGENTS.md` / saved reference docs, plus a session `handover` skill
+- `peers` — set up Claude Code sessions in other directories on this machine, delegate work to them, and introduce two of them so they settle a cross-repository question directly
+
+`structurizr`, `d2` and `peers` are Claude Code only; the rest run in both Claude Code and Codex.
