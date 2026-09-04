@@ -1,8 +1,13 @@
 # Claude Code — persistent memory for subagents
 
 Source: https://code.claude.com/docs/en/sub-agents (section "Persistent Memory for
-Subagents"), fetched 2026-08-22 via the `.md` endpoint.
-Related: https://code.claude.com/docs/en/memory#auto-memory
+Subagents"), fetched 2026-08-22 via the `.md` endpoint. Section re-read verbatim
+2026-09-03 (now titled "Enable persistent memory"): the field, the three scopes, their
+directories, the auto-memory dependency and the three "when memory is enabled" bullets are
+unchanged in substance.
+Related: https://code.claude.com/docs/en/memory#auto-memory, and
+`claude-code-auto-memory-in-subagents.md` for the *session's* auto memory, which is a
+different directory and a different question.
 
 Verbatim excerpts.
 
@@ -106,7 +111,45 @@ judged, including the turn it saw ten minutes ago. An agent can sensibly have bo
 or `CLAUDE_CODE_DISABLE_AUTO_MEMORY` gets no memory and no warning, so nothing in guard
 may treat a memory file as guaranteed to exist.
 
-Not verified: what `<name-of-agent>` resolves to for a *plugin* subagent — the bare name
-(`korean-corrector`) or the namespaced one (`guard:korean-corrector`). The docs say only
-"name-of-agent". guard does not depend on the answer: it never reads or writes these
-directories itself, and each agent is told to use whatever directory it was given.
+## `<name-of-agent>` for a plugin subagent — measured
+
+The docs say only "name-of-agent" and never say what that is for a plugin-scoped agent.
+Measured 2026-09-03, `claude` 2.1.258: it is the **namespaced identifier with the colon
+replaced by a hyphen**.
+
+A throwaway plugin `memprobe-plugin` shipping `agents/plugmem.md` with `memory: local`, loaded
+with `--plugin-dir` and dispatched through a `context: fork` skill, reported its memory
+directory as `<project>/.claude/agent-memory-local/memprobe-plugin-plugmem/`, and the file it
+wrote landed there. This repository's own tree agrees on both halves of the rule: the
+plugin agent `guard:clarity-auditor` (`memory: user`) has
+`~/.claude/agent-memory/guard-clarity-auditor/`, while the project-level agent
+`plugin-agent-doc-auditor` (no plugin scope) has
+`.claude/agent-memory/plugin-agent-doc-auditor/`.
+
+The consequence worth stating: **renaming a plugin moves every one of its agents' memory
+directories**, and nothing migrates the old contents.
+
+## The `memory` grant reaches a `context: fork` skill's agent — measured
+
+The pages describe `memory:` on the agent and say nothing about how it interacts with a skill
+that runs that agent via `context: fork`. Measured 2026-09-03, `claude` 2.1.258, with a
+throwaway agent carrying `tools: Read, Grep, Glob, Bash` and `memory: local`, invoked by a
+`context: fork` skill naming it in `agent:` with `background: false`:
+
+- the fork's system prompt **did** carry the memory instructions and named the memory
+  directory absolutely;
+- it **did** carry the seeded `MEMORY.md` content — a nonce in the index came back verbatim
+  with no tool call;
+- it did **not** carry the topic file's content, matching the documented "first 200 lines or
+  25KB of `MEMORY.md`" and nothing else;
+- the reported tool list included `Write` and `Edit`, neither declared — the silent grant
+  above, confirmed on this path too.
+
+This is what the skills page's own loading table predicts ("System prompt: from agent type"),
+but it is inference from two pages until measured, so it is measured here. The pattern it
+licenses is the one guard uses: durable knowledge lives in the agent's memory, the forked
+skill body carries only this run's task.
+
+Separate and not to be confused with the above: the *session's* auto memory also reaches
+these agents on 2.1.258 even though both pages say it does not — see
+`claude-code-auto-memory-in-subagents.md`.
