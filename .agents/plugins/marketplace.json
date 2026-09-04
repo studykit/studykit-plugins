@@ -5,10 +5,10 @@
   },
   "plugins": [
     {
-      "name": "doc",
+      "name": "doc-util",
       "source": {
         "source": "local",
-        "path": "./doc"
+        "path": "./doc-util"
       },
       "policy": {
         "installation": "AVAILABLE",

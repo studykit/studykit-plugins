@@ -9,8 +9,8 @@
   },
   "plugins": [
     {
-      "name": "doc",
-      "source": "./doc",
+      "name": "doc-util",
+      "source": "./doc-util",
       "description": "A plugin for reading and searching various document formats including CHM files",
       "author": {
         "name": "studykit"
