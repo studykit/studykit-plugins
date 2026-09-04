@@ -64,15 +64,16 @@ What each one is:
 
   Nothing escapes those two limits. The translation used to: it was a pick the answer file
   could not evidence, since the file it judges is written after you, and the request was the
-  only thing that could settle the language. It is no longer yours at all — your caller
-  dispatches the translator itself, at the end of the turn and again after your findings are
-  applied, because it is the party that knows what language it is answering in. So there is no
-  candidate here that the answer file cannot evidence.
-- **translation file** — where the turn's translation lives when the turn was delivered in
-  Korean. You never read it and you judge nothing about it; it is a path you relay, because
-  your caller has to have the translation rewritten from the corrected English once your
-  findings are in and it may not derive that path itself. It is printed whether or not the file
-  exists — whether this turn has one is your caller's own knowledge, not yours.
+  only thing that could settle the language. It is no longer yours at all — the user asks for a
+  translation with a command of its own, and your caller re-runs it after your findings are
+  applied when one already exists. So there is no candidate here that the answer file cannot
+  evidence.
+- **translation file** — where the turn's translation lives IF the user asked for one. You
+  never read it and you judge nothing about it; it is a path you relay, because your caller has
+  to have an existing translation rewritten from the corrected English once your findings are
+  in and it may not derive that path itself. It is printed whether or not the file exists —
+  whether this turn has one is your caller's own knowledge, not yours, and most turns have
+  none.
 - **closeout** — how the audit is closed out once the audits have reported. You never read
   it: it holds no cue for triage, and no section for any name you can pick. What you need it
   for is your answer, which names this path so your caller can follow

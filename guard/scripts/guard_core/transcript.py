@@ -45,6 +45,11 @@ from .turnrec import _short
 # optional suffix group: bare `audit-turn` for the routed form and `audit-turn-<audit>` for a
 # single one.
 #
+# `translate-turn` is here for the same reason as the audit entries: its turn is a relay — the
+# translator's report and a path — and left unmatched it would become the pending target, so the
+# next audit would read guard's report of a translation instead of the answer that was
+# translated.
+#
 # `comment-corrector` is deliberately ABSENT: that skill's relayed findings are claims about
 # real files and about edits made to them, so its turn stays auditable like any other work.
 # `statusline` is absent for the same reason: it reports what is in the user's settings files
@@ -53,7 +58,7 @@ from .turnrec import _short
 # about the user, so the "answer" is the user's own words read back to them, and auditing
 # that would have guard grading the user on how they described themselves.
 _CONTROL_CMD_RE = re.compile(
-    r"^/(guard:)?(settings|reader-profile"
+    r"^/(guard:)?(settings|reader-profile|translate-turn"
     r"|audit-turn(-claims|-clarity|-deferrals)?"
     r"|audit-report-(claims|clarity|deferrals)|audit-plan)(?=\s|$)",
     re.IGNORECASE)
@@ -92,8 +97,9 @@ def _turn_command_name(user_text: str) -> str:
 
 def _is_control_command_name(name: str) -> bool:
     """True when a normalized command name is one of guard's own control commands
-    (``settings``, ``reader-profile``, ``audit-turn`` and the ``audit-turn-*`` /
-    ``audit-report-*`` entries, ``audit-plan`` — with or without the ``guard:`` prefix)."""
+    (``settings``, ``reader-profile``, ``translate-turn``, ``audit-turn`` and the
+    ``audit-turn-*`` / ``audit-report-*`` entries, ``audit-plan`` — with or without the
+    ``guard:`` prefix)."""
     return bool(name) and bool(_CONTROL_CMD_RE.match("/" + name))
 
 

@@ -138,7 +138,8 @@ more than one that is skimmed on all of them.
   `korean-corrector`), the caller dispatches the translator from the closeout on a fact it
   holds with certainty, and `turnrec._turn_translation_file` owns the `.ko.md` path so that
   neither the caller nor the router derives it. A document still routes the translator: there
-  the caller states the reader's language in the dispatch.
+  the caller states the reader's language in the dispatch. (The closeout stopped dispatching it in
+  v0.121.0; `routed` is unchanged, and `_turn_translation_file` still owns the path.)
 - **An audited turn re-translates.** The turn was delivered before the user asked for the
   audit, so the translation they read was made from the pre-audit English. The closeout's audit
   half rewrites it after the findings land, and refuses to open one it did not rewrite —
@@ -147,6 +148,46 @@ more than one that is skimmed on all of them.
   `../AGENTS.md` used to forbid outright. The reason the rule held before was that every
   dispatch decision belonged to a report; this decision belongs to no report — it is taken on
   turns where no audit ran at all. The rule is kept as narrow as it can be rather than dropped.
+  (v0.121.0 took the name out again — see below.)
+
+## The translation goes on demand — v0.121.0
+
+The same argument v0.118.0 made about the audit, one release later and about the other
+automatic dispatch. Translating ran from the closeout on every turn that delivered substance,
+which is a subagent per turn — plus the corrector its report hands off to, so two — spent
+whether or not the Korean was going to be read. The user asked for it to be on request.
+
+- **`/guard:translate-turn` is the entry**, built to the same shape as `/guard:audit-turn`:
+  `disable-model-invocation: true`, a named optional `turn` argument, and `guard-inputs` to
+  resolve the turn. It is NOT `context: fork` with `agent: guard:korean-translator` the way the
+  audit entries fork their router — the translator has no `Bash`, so it cannot run
+  `guard-inputs`, and it must be handed its two paths rather than find them. So the skill runs
+  in the caller's context and dispatches the translator itself, which is also what lets it
+  follow the translator's `next` line to the corrector.
+- **The closeout's delivery half now dispatches nothing at all** and names no agent, which puts
+  the `../AGENTS.md` invariant back the way it was before v0.118.0.
+- **The audit half still re-translates, and that is not a second decision.** It fires only when
+  a translation ALREADY exists: the user asked for that document, and the corrections just
+  applied made the copy they hold wrong. A turn that was never translated is not translated by
+  being audited. The dispatch had to be spelled out inline there, since the step it used to
+  point at ("exactly as step 1 of *Delivering the turn* says") no longer describes one.
+- **`translate-turn` joins `_CONTROL_CMD_RE`.** Its turn is a relay — a report and a path —
+  so left unmatched it would become `pending_verify_prompt_id` and the next audit would read
+  guard's report of a translation instead of the answer that was translated. Exactly the
+  failure the audit entries were added to that pattern for.
+- **`session-start` names the command.** All three entry skills are
+  `disable-model-invocation: true`, so their descriptions never reach a session's context;
+  that line is the only place a session learns the names, and a session that cannot name the
+  command cannot answer a user who asks for a translation in prose.
+- The `_DRAFT_LEAD` had to change too: it told the model the answer file was what "the version
+  they read is translated from", which described an automatic step that no longer happens. It
+  now says the file stays English and names the command.
+
+What this gives up: a user who wants Korean every turn now types a command every turn. That is
+the same trade the audit made, and the same answer — the alternative is paying for it on the
+turns where nobody wanted it. A config switch was considered and rejected for the reason the
+switchless rule already gives: `off` on a translator does not mean "no translation", it means
+the session translates its own text, which is the arrangement that produced 직역.
 
 ### What must not regress
 

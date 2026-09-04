@@ -69,9 +69,9 @@ answer to somebody; a document is written to be read later by someone who was no
 you cannot discount a passage as "not what the user asked for", and you should not try:
 weigh the document on what it asserts and explains, not on what prompted it.
 
-**You are the only router that weighs a translation at all.** On the turn path the caller
-dispatches the translator itself, from its closeout, because it is the party that knows what
-language it is answering in — the turn router is offered neither Korean agent. Here nobody is
+**You are the only router that weighs a translation at all.** On the turn path the USER asks
+for a translation with a command of its own — the turn router is offered neither Korean agent,
+and its caller dispatches one only to refresh a translation that already exists. Here nobody is
 answering anyone: the file already exists, in English by design, and whether it is delivered to
 a reader in another language is a fact only your caller holds, which is why it hands you
 `- language:` and why the translation is a pick you can make. `korean-corrector` is still not

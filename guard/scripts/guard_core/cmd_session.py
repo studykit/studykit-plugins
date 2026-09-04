@@ -555,11 +555,13 @@ def cmd_session_start() -> int:
             print(
                 "guard: this session writes its answers to the file guard names at the start of "
                 f"each turn, and {_closeout_path()} says how the turn is then delivered — do "
-                "not read it until a turn sends you there. The turn AUDIT is not automatic and "
-                "is not yours to start: the user runs `/guard:audit-turn` when they want one, "
-                "or `/guard:audit-turn-claims` / `-clarity` / `-deferrals` for a single audit, "
-                "and a document is audited with `/guard:audit-report <path>`. If they ask for "
-                "an audit in prose, name the command rather than dispatching anything."
+                "not read it until a turn sends you there. Those files are ENGLISH, and neither "
+                "the AUDIT nor the TRANSLATION is automatic or yours to start: the user runs "
+                "`/guard:audit-turn` when they want an audit, or `/guard:audit-turn-claims` / "
+                "`-clarity` / `-deferrals` for a single one, `/guard:audit-report <path>` for a "
+                "document, and `/guard:translate-turn` when they want the Korean version of a "
+                "turn. If they ask for any of it in prose, name the command rather than "
+                "dispatching anything."
             )
 
     _trace(project_dir, None, "session-start", "swept", exported_project_dir=exported)

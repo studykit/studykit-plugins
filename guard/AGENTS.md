@@ -28,8 +28,8 @@ What the hook still does is the half a user cannot do afterwards: record the tur
 while it is fresh, and name the file the answer is written to. `dev/design.md` has the argument
 and what it gave up.
 
-`/guard:audit-turn` and `/guard:audit-report` are `disable-model-invocation: true` — the user's
-and only the user's. That is the other half of the same fix: an entry the model can reach is an
+`/guard:audit-turn`, `/guard:audit-report` and `/guard:translate-turn` are
+`disable-model-invocation: true` — the user's and only the user's. That is the other half of the same fix: an entry the model can reach is an
 audit that can still arrive unasked, and a description in every session's standing context is
 an invitation to reach for it. The three `audit-turn-*` / `audit-report-*` skills stay
 model-invocable and must, since each router names them for its CALLER to invoke.
@@ -45,24 +45,33 @@ knowledge directory — while the auditor's subject is still only the refs copie
 WHERE a document is and never what it says, because a gist in its report is a second version
 of the document for the caller to disagree with.
 
-Two agents are one step rather than an audit: `korean-translator` writes the Korean the user
-reads, from the English answer file, and `korean-corrector` then judges what it wrote.
-**Neither has a switch**, because the answer the user reads is not something to opt into — a
-switch there would make the quality of a delivered answer depend on a config key, and `off`
-would put the session back to translating its own text, which is the arrangement that produced
-직역.
+Two agents are one step rather than an audit: `korean-translator` writes the Korean version of
+a finished English answer, and `korean-corrector` then judges what it wrote. **Neither has a
+switch**, and neither runs unasked: `/guard:translate-turn` is the user's entry to both, the
+same shape and for the same reason as `/guard:audit-turn` — `disable-model-invocation: true`,
+so the model cannot reach it and its description never enters a session's context.
+
+The turn is delivered in ENGLISH now. Translating from the closeout on every turn that carried
+substance was a subagent per turn spent whether or not the Korean was going to be read, which
+is the cost that moved the audit off the Stop hook in v0.118.0 — the same argument, one release
+later, about the other automatic dispatch. What replaced it is one command and one exception:
+the closeout still re-runs the translator after an audit corrects a turn that ALREADY has a
+translation, because that document exists, the user asked for it, and the audit has just made
+their copy wrong.
+
+The switchless part is unchanged and still deliberate: how well a translation reads must not
+depend on a config key, and `off` would put the session back to translating its own text, which
+is the arrangement that produced 직역. What is opted into is whether a translation happens at
+all, and that is a request, not a setting.
 
 **Neither is routed on the turn path** (`routed` is per path, and holds only `report` for the
-translator and nothing for the corrector). The translator was the router's one pick that the
-answer file could not evidence — the language had to be inferred from the request — and with
-the router now running only when the user asks for an audit, leaving it there would make the
-Korean the user reads depend on their having asked. So the caller dispatches it from the
-closeout, on a fact it holds with certainty; the corrector is still handed over by the
-translator's own report, which is the one place the fact it turns on — the translation now
-exists — is actually known. A document still routes the translator, because there the caller
-states in the dispatch who will read it. `dev/design.md` has why an author cannot translate
-their own text, what the translator must not move while doing it, and why the turn's
-translation is rewritten after an audit rather than translated once.
+translator and nothing for the corrector). The translator was the router's one pick the answer
+file could not evidence — the language had to be inferred from the request. The corrector is
+handed over by the translator's own report, which is the one place the fact it turns on — the
+translation now exists — is actually known. A document still routes the translator, because
+there the caller states in the dispatch who will read it. `dev/design.md` has why an author
+cannot translate their own text, what the translator must not move while doing it, and why a
+turn's translation is rewritten after an audit rather than translated once.
 
 Every agent switch ships `off`: guard installed is guard available, not guard running. The two
 audit switches (`audit-turn`, `audit-plan`) do not agree with each other, and that is the
@@ -118,7 +127,8 @@ how the code here is organised.
 - A definition that exists once per dispatch path is named `<path>-<what it does>` —
   `turn-router` / `report-router`. An entry-point skill is the same rule with the verb in
   front: `audit-turn` / `audit-report` for the path's own entry, `audit-turn-claims` /
-  `audit-report-claims` for one audit on it. A definition used on one path only, or
+  `audit-report-claims` for one audit on it, `translate-turn` for the one step on the turn path
+  that is not an audit at all. A definition used on one path only, or
   outside the routers, keeps its bare name; do not prefix one speculatively.
 - Split at the ENTRY, never at the agent. Every audit that runs on both dispatch paths —
   claims, deferrals, clarity — is ONE agent behind two `context: fork` skills, and the reason
@@ -129,10 +139,12 @@ how the code here is organised.
   to stand are the two that do.
 - A router-named skill's `description` is as short as it can be: the router names it and the
   caller invokes it by name, so the line never has to attract an invocation, and it is loaded
-  into every session's context whether or not guard runs. The two ENTRY skills are the
+  into every session's context whether or not guard runs. The three ENTRY skills are the
   opposite case and are handled by the opposite means — `disable-model-invocation: true`,
   which keeps their descriptions out of that context entirely and leaves them free to say
-  plainly what the user is about to run.
+  plainly what the user is about to run. `session-start` is then the only place a session
+  learns those names, since a description it cannot see is a command it cannot name when the
+  user asks for one in prose.
 - A roster key names the AUDIT and is user-visible configuration; an ENTRY names what the
   caller invokes for that audit on one path. `agents._path_entry` is the ONLY place one
   becomes the other, and `cmd_candidates` is its only caller. An entry is an agent for some
@@ -146,19 +158,20 @@ how the code here is organised.
   it delivers it, and `agents/turn-router.md` once per AUDIT — which now means once per time
   the user asks for one, the rarest of the three. Nobody re-types another home's text, and
   nothing in the closeout file describes routing.
-- **The closeout file names exactly one agent, and it is the translator.** Everything an
-  audit needs travels with the dispatch — each router's report template, `_agent_pointer`'s
-  lead on the no-router path — and what its findings mean travels in its own report, which is
-  why the file-editing audits end each finding in a disposition (apply / move / decide). The
-  translator is the exception because nothing else can carry it: the decision is the caller's
-  own, taken on a fact only the caller holds — what language it is answering in — and taken on
-  turns where no report exists to state it. Before v0.118.0 the router named it and this file
-  named no agent at all. What the closeout holds otherwise is the turn: the answer file is the
-  deliverable, the reply is short and in the user's language, the file opened is the one the
-  user reads, and an audit's findings go into the English before the translation is rewritten
-  from it. The rule stays as narrow as it can be: a second agent named here is either a
-  second authority over a decision already made or a lookup that belongs in a report — see
-  `dev/design.md` for the turn that cost.
+- **Delivering a turn dispatches nothing, and the closeout names no agent for it.**
+  Everything an audit needs travels with the dispatch — each router's report template,
+  `_agent_pointer`'s lead on the no-router path — and what its findings mean travels in its own
+  report, which is why the file-editing audits end each finding in a disposition (apply / move
+  / decide). The file named the translator between v0.118.0 and v0.121.0, when translating was
+  the caller's own decision taken on a fact only the caller held; `/guard:translate-turn` took
+  that decision back to the user, and the name came out with it. The one agent the file still
+  names is that same translator in the AUDIT section, re-run over a translation that already
+  exists — which is not a decision at all, since the document is there and the audit just made
+  it wrong. What the closeout holds otherwise is the turn: the answer file is the deliverable,
+  the reply is short and in the user's language, the file opened is the one the user reads, and
+  an audit's findings go into the English first. The rule stays as narrow as it can be: an
+  agent named here for the normal path is either a second authority over a decision already
+  made or a lookup that belongs in a report — see `dev/design.md` for the turn that cost.
 - guard writes the turn record's **response** section itself, verbatim from the Stop payload —
   it is the text being audited, so it must not pass through the author's hands. The main
   session appends only what guard cannot see, and that half is asked for as inclusion, never
@@ -170,8 +183,9 @@ how the code here is organised.
 - Only a turn a person typed is recorded as auditable. A non-human origin guard has never
   seen must still skip, while an *absent* origin must still be recorded — guard noisy is
   recoverable, guard silently dormant is not. guard's own control turns skip too, and that
-  list has to include the audit entry points: an unmatched `/guard:audit-turn` becomes the
-  pending target itself, so the next audit would read guard's report of the last one.
+  list has to include every entry whose turn is a RELAY — the audits and
+  `/guard:translate-turn`: an unmatched one becomes the pending target itself, so the next
+  audit would read guard's report of the last one.
 - Hook output is `additionalContext`; the refs-index gap is the one `decision: "block"`
   that means unfinished work. The `/`-rooted search refusal is a `PreToolUse` `deny` and is
   the only thing guard forbids outright rather than recommends — it gates a tool ARGUMENT,

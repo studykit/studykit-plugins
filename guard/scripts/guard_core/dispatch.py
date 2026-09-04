@@ -297,7 +297,7 @@ _DRAFT_LEAD = (
     "not a record of one: your reply is ONE headline sentence plus the path — no summary of "
     "what the file says, no excerpt from it, no findings list. Nothing audits it unless the "
     "user asks; when they do, the audit corrects that file in place, which is why the answer "
-    "lives there rather than in the transcript. When you will answer the user in another "
-    "language, the version they read is translated from this file — guard's turn closeout "
-    "says how."
+    "lives there rather than in the transcript. It stays ENGLISH whatever language you reply "
+    "in: a Korean version is written only when the user runs `/guard:translate-turn`, so do "
+    "not translate it yourself and do not offer to."
 )

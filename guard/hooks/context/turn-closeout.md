@@ -6,9 +6,8 @@ the user asked for one, which is rare, and the router's report is what drives it
 
 **Nothing here is about any one audit** — how to dispatch it, what its inputs are, and what its
 findings mean all travel with the dispatch: the router's report for the audits it picked, and
-guard's Stop hook for the file-reading agents it names directly. The one agent this file does
-name is the translator, and only because the decision to run it is the caller's rather than any
-report's.
+guard's Stop hook for the file-reading agents it names directly. This file names **no agent at
+all** for the normal path: delivering a turn dispatches nothing.
 
 ## The answer file
 
@@ -26,9 +25,11 @@ Everything around it is English too — what you write in a dispatch, what an ag
 what one agent says to another. Never relay an agent's English report to the user untranslated:
 what changed goes in the answer file, and the reply is in the user's language.
 
-**You never write the user's language yourself.** The translation is written by the translator,
-from the English, and dispatching it is yours — see below. Your own Korean, or any other
-language you produce directly, is the arrangement that produced 직역.
+**You never write the user's language into the answer file, or into a document of any kind.**
+The reply in the transcript is yours to write in the user's language and is meant to be one
+sentence. A translated *document* is written by `guard:korean-translator`, from the English, and
+only when the user has asked for one — your own Korean at document length is the arrangement
+that produced 직역.
 
 **You never gather the session's history.** It is in the transcript, and an agent that needs it
 resolves and extracts it itself. If one fails to — the file is gone, a compaction dropped the
@@ -42,36 +43,28 @@ what it has.
 
 This is the whole of a normal turn's closeout, in this order:
 
-1. **Translate, if the user reads a language other than English.** Dispatch
-   `guard:korean-translator` (subagent_type: `"guard:korean-translator"`) with two inputs and
-   nothing else: the **answer file** as its source, and the **translation file** as the file it
-   writes. Give it no history, no repository paths, and no draft of your own to fix. Then do
-   what its report tells you; it hands the translation on to the agent that checks it.
+1. **Do not translate.** The answer file is English and that is how the turn is delivered.
+   Translating it is a separate thing the user asks for by running `/guard:translate-turn`, and
+   it is theirs to start for the same reason the audit is: it is a subagent per turn, spent on
+   every turn whether or not anyone was going to read the result. Do not dispatch
+   `guard:korean-translator` yourself, and do not offer to.
 
-   **The translation file is the answer file with `.ko` before the extension** — an answer
-   file `…/<id>.md` is translated into `…/<id>.ko.md`, in the same directory. The block that
-   sent you here names only the answer file, because most turns never translate and a second
-   path on every one of them is paid for by all of them. Write the full path out yourself and
-   hand it over; the translator is not allowed to derive its own target, so it has to arrive
-   as a path.
-
-   You are the only party that knows the language, which is why this is yours. What it is not
-   is automatic: translate substance being delivered to a reader — two ordinary sentences of
-   explanation is enough — and not an acknowledgement, a bare list of paths, or a question back
-   to the user with nothing else in it. There is nothing there to translate.
+   The exception is a user who asked **in this turn** — "번역해줘", "이건 한국어로", a standing
+   instruction earlier in this session that has not been withdrawn. That is a request, and it is
+   answered by running the command, not by translating around it.
 
 2. **Reply short**, in the user's language: one headline sentence plus the path the user reads —
-   the translation when this turn made one, the answer file when it did not. Do not restate the
-   answer and do not paste the file.
+   the answer file, or the translation if this turn produced one. Do not restate the answer and
+   do not paste the file.
 
 3. **Open the file you named**: `open <path>` on macOS, `xdg-open` on Linux, `start` on
    Windows. Once, at the end. Opening is not "here is where it is" — the user has the path from
    your reply — it is you putting the document in front of them, so what you open is the
    document they read: the translation when there is one, the answer file otherwise.
 
-**Say nothing about auditing.** No audit ran, nothing is being withheld as unchecked, and a
-turn that was not audited is not news. Do not offer one; the user starts an audit themselves
-when they want it.
+**Say nothing about auditing, and nothing about translating.** No audit ran and no translation
+was written; neither is being withheld, and a turn that had neither is not news. The user starts
+either one themselves when they want it.
 
 ## When the user has asked for an audit
 
@@ -92,14 +85,20 @@ applied, and whether a second round is due. This section is only what no report 
    the steps below. Your reply covers every round: a finding from the first round that the
    second round raised again is one finding, not two.
 
-2. **Rewrite the translation, if this turn has one.** The file the user read was translated from
-   the English as it stood before the audit, so every correction you just applied is missing
-   from it. Dispatch `guard:korean-translator` again, exactly as step 1 of *Delivering the turn*
-   says, over the same two paths — it rewrites the translation from the corrected source.
+2. **Rewrite the translation, but only if this turn already has one.** A turn that was never
+   translated stays untranslated — the audit is not a reason to start; skip to step 3.
 
-   Only you know this is needed. The audit read the English and the router never saw the
-   translation, so an audited turn whose translation is left alone hands the user a document
-   that is still wrong in the way the audit just found.
+   Where a translation does exist, the file the user read was translated from the English as it
+   stood before the audit, so every correction you just applied is missing from it. Dispatch
+   `guard:korean-translator` (subagent_type: `"guard:korean-translator"`) with two inputs and
+   nothing else: the **answer file** as its source, and the existing **translation file** as
+   the file it writes. Give it no history, no repository paths, and no draft of your own to
+   fix; it is not allowed to derive its own target, so the path has to arrive from you. Then
+   do what its report tells you — it hands the translation on to the agent that checks it.
+
+   This is the one dispatch you make without being asked again, and it is not a new decision:
+   the user asked for that document, and the audit has just made the copy they hold wrong. Only
+   you know it is needed — the audit read the English and the router never saw the translation.
 
 3. **Reply**, in the user's language: what changed and why, a line or two per finding, with the
    router's reason for a pick relayed alongside what that pick found. **A clean audit is one
