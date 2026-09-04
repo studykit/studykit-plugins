@@ -57,6 +57,22 @@ Expect one short field — `guard 3/3 · ⚐`, `guard 0/3 · ⚑`, `guard 0/0 ·
 nothing. If it prints nothing for a project with agents switched on,
 stop and say so rather than installing a segment that will stay blank.
 
+**Then check whether the line you found already carries guard's field** — by RUNNING it, not
+by reading its path. Someone who wired guard in by hand has a script under a name of their
+own choosing, and chaining that one prints guard twice with nothing to say which of the two
+rows is stale:
+
+```sh
+printf '{"session_id":"probe","workspace":{"project_dir":"<project root>","current_dir":"<project root>"}}' \
+  | sh -c '<the existing command>' | grep -q '⚑\|⚐' && echo "already carries guard"
+```
+
+The flag is the marker, not the word `guard`: a hand-written line commonly swaps an icon in
+for the word, but guard appends the flag in every branch, so it is the one part that cannot
+be absent. If the existing line already carries it, **do not chain and do not install** —
+name the script, say it is already reporting guard, and stop. Putting the wrapper in front
+of a line that already reports guard is the one outcome this command must not produce.
+
 ## 2. Install
 
 Copy the wrapper to `~/.claude/guard-statusline.sh` and `chmod +x` it. Copy it verbatim — it
@@ -95,6 +111,11 @@ single quotes. Keep every other field of the `statusLine` object (`padding`,
 it**, the install is done: refresh the copy from the plugin (it may be newer) and change the
 setting only if the chained argument no longer matches what the user wants shown.
 
+The check in step 1 is what decides this, not the path. A setting pointing at some other
+script whose output already carries the flag is equally done, and the only thing left to
+offer there is refreshing that script's own copy of the segment — the user's file, not
+guard's, so ask before touching it.
+
 ## 3. Verify, then report
 
 Run the installed wrapper the way the host will, with a mock payload — a status line that
@@ -105,10 +126,33 @@ printf '{"session_id":"probe","workspace":{"project_dir":"<project root>","curre
   | ~/.claude/guard-statusline.sh
 ```
 
-One non-empty line, guard's field first. If the chained command is in play, its output must
-still be there too.
+Check the **two halves separately**. One non-empty line is not the test: the wrapper prints
+whichever half it has, so guard's field alone looks exactly like success. Guard's field must
+be there, and so must the rest of the row — from the chained command if one is in play,
+otherwise from the wrapper's own default.
 
-Then tell the user three things and stop:
+Two things fail silently, and a passing run above shows neither:
+
+- **`uv` has to be on the PATH the HOST runs the status line with, which is not the PATH your
+  shell has.** guard's CLI is a `uv run --script` file; where `uv` does not resolve it exits
+  before printing anything and the field simply goes quiet. Re-run the same payload under a
+  bare PATH as a proxy for the host's:
+
+  ```sh
+  printf '<the same payload>' | env PATH=/usr/bin:/bin:/usr/local/bin ~/.claude/guard-statusline.sh
+  ```
+
+  This is a diagnostic, not a gate: a field that drops out here is not broken, it is telling
+  you that it depends on a PATH entry your login shell adds — commonly the prefix `uv` was
+  installed under. Report it that way. It is the answer to have ready if the row later shows
+  every other field and no guard, which is the shape this failure takes.
+- **`jq` is required by the wrapper's own default line, and only by it.** Without `jq` that
+  half is empty and guard's field prints alone. A chained command is unaffected.
+
+Say which of the two you checked. A probe from your shell is evidence that the files are
+right, not that the host can run them; the row itself, after the next assistant message, is.
+
+Then tell the user four things and stop:
 
 - The fraction is *how many agents can run on the next finished turn* over *how many are
   switched on*: `guard 3/3` with three switched on and the session armed, `guard 0/3` when the
@@ -123,8 +167,9 @@ Then tell the user three things and stop:
 - Green means armed, dim means muted, on each half independently: a green fraction beside a
   dim flag is a session auditing turns with the plan gate off. Colour is the only difference
   between the two `0/0` states, so a terminal that drops it loses the mute there.
-- The row updates on assistant messages, session start, `/compact` and permission-mode
-  changes, not on the shell command that flips a switch: after `guard on` or `guard-plan on`
+- The row updates on assistant messages, session start, `/compact`, permission-mode changes,
+  vim-mode toggles, and a `refreshInterval` tick where one is set — not on the shell command
+  that flips a switch: after `guard on` or `guard-plan on`
   the segment moves at the next message. If it ever goes blank, that is deliberate — the
   wrapper prints nothing rather than an error, because a status line is the wrong place to
   report a failure.
