@@ -9,7 +9,6 @@ this turn wrote.
 from __future__ import annotations
 
 from pathlib import Path
-from collections.abc import Iterable
 from typing import Any, NamedTuple
 
 from .config import _switch_on
@@ -77,10 +76,11 @@ class AuditAgent(NamedTuple):
     ``routed`` names the paths whose ROUTER may be offered this audit, and it is per path
     rather than a flag because one row differs by path. It drops an audit that something else
     already hands over: ``korean-corrector`` is named by ``korean-translator``'s own report,
-    which is the only party that knows the translation now exists, and on a turn the
-    translator itself is dispatched by the caller from the closeout — the turn's language is
-    a fact the caller holds, not a judgment worth a router. A document still routes the
-    translator, because there the caller states who will read it. Routing either of them where
+    which is the only party that knows the translation now exists. The translator is dropped
+    from the turn path for a different reason — there is nothing to translate there. An
+    ordinary turn produces no document, and the audits on that path report rather than
+    rewrite. A document still routes the translator, because there a file exists and the
+    caller states who will read it. Routing either of them where
     something else decides would make two authorities for one step and give the router a name
     to judge from evidence that is not written yet.
 
@@ -103,10 +103,8 @@ class AuditAgent(NamedTuple):
     can be checked.
 
     What the agent DOES is its own definition, and what to do with its report is that
-    report. Only where the caller has a judgment the report cannot make for it does a
-    section exist, in ``hooks/context/turn-closeout.md``. None of it belongs here:
-    every string guard prints is paid for in the main agent's context on the turn it
-    prints it.
+    report. None of it belongs here: every string guard prints is paid for in the main
+    agent's context on the turn it prints it.
     """
 
     reads: str
@@ -171,8 +169,16 @@ AUDIT_AGENTS: dict[str, AuditAgent] = {
     # Same shape, and here the memory argument is sharpest: what lives in this agent's
     # `memory: user` directory is the READER PROFILE. Two definitions would be two
     # `user`-scoped directories drifting apart and neither would be the reader's. Nothing
-    # about what makes an explanation followable differs by path, so neither skill overrides
-    # a judgment; they carry only the gathering.
+    # about what makes an explanation followable differs by path, so no skill overrides a
+    # judgment; what they carry is the gathering and one fact the agent cannot work out —
+    # WHO the reader is. A turn is read by the person it answers, a document by someone who
+    # was not there, a plan by the person deciding whether to approve it.
+    #
+    # There is a third entry, `audit-plan-clarity`, and it is deliberately not in this row:
+    # the plan review invokes it by name and reads no switch, because a plan the user asked
+    # to have reviewed is not something a per-agent setting should be able to half-review.
+    # Same for `audit-plan-deferrals`. A `plan_entry` field here would put those two behind
+    # `_switch_on` and undo that.
     "clarity-auditor": AuditAgent(reads="turn", needs_history=True,
                                   turn_entry="audit-turn-clarity",
                                   report_entry="audit-report-clarity"),
@@ -184,12 +190,11 @@ AUDIT_AGENTS: dict[str, AuditAgent] = {
     # English-answering project never pays for it, and a Korean-answering one cannot end up
     # with the main session translating its own text because a config key was left off.
     #
-    # `routed=(REPORT_PATH,)`: on a TURN the caller dispatches it from the closeout, on the
-    # language it is answering the user in. That was the router's call while the router ran on
-    # every turn, and it was the one pick the answer file could not evidence — it had to be
-    # inferred from the request file. Now that a turn is only routed when the user asks for an
-    # audit, leaving it there would make the Korean the user reads depend on their having
-    # asked for one. The caller knows the language for certain, so it decides.
+    # `routed=(REPORT_PATH,)`, and on the turn path there is no translation at all. It was
+    # the router's call while the router ran on every turn and a turn had an answer file to
+    # translate; v0.122.0 removed that file, so an ordinary turn produces no document and the
+    # turn audits report rather than rewrite. Nothing there is a translation's source. What
+    # gets translated is a document — which is the other path.
     #
     # It keeps its `report_entry` — a document gets translated too. The language cannot be
     # worked out from the document (it is English by design, like the answer file) and there is
@@ -336,27 +341,14 @@ def _edited_bucket(target: Path, refs_dir: Path | None = None) -> str | None:
 #
 # How to dispatch an agent is said by whoever dispatches it, once per path: the router's own
 # report template on the audited path, `_agent_pointer`'s lead on the direct one. It used to be
-# a section per agent in the closeout file, reached from both — which gave that file a place
-# to state, and then to contradict, decisions the router had already made. What is left in it
-# is the part no report can carry: how the turn is delivered, and what to do with the findings
-# of an audit the user asked for.
+# a section per agent in a closeout file reached from both — which gave that file a place
+# to state, and then to contradict, decisions the router had already made. The file itself is
+# gone with the answer lane; do not reintroduce one to hold dispatch text.
 #
 # There is no `ROUTER_AGENT` constant any more. Nothing in the Python names the router: the
 # only thing that reaches it is `skills/audit-turn/SKILL.md`'s `agent:` field, and a second
 # copy of the name here would be one nothing checks against that file.
 # --------------------------------------------------------------------------- #
-
-
-def _reads_turn(keys: Iterable[str]) -> bool:
-    """Does any of ``keys`` read the turn's answer file?
-
-    The gate on everything the answer file costs. That file exists for the agents whose
-    input it IS (``reads="turn"``); ``comment-corrector`` reads the source files the turn
-    wrote and never opens it. So a configuration with only ``comment-corrector`` on must
-    not pay for it — neither the per-prompt instruction telling the session to write into
-    it, nor the dispatch line naming it.
-    """
-    return any(AUDIT_AGENTS[k].reads == "turn" for k in keys if k in AUDIT_AGENTS)
 
 
 def _eligible_agents(state: dict[str, Any], edited: list[str],
@@ -402,9 +394,9 @@ def _eligible_agents(state: dict[str, Any], edited: list[str],
     # they ride on is a switchable TURN-reading agent that got through both gates above —
     # nothing weaker works. With no switch on at all, guard must add nothing to the main
     # agent's context, which is what "every switch ships off" buys. And with only a
-    # file-reading agent on, there is no answer file (`_reads_turn` decides that off this
-    # list) and so nothing for a translator to translate: letting the pair through there
-    # would conjure the answer file that configuration exists to avoid paying for.
+    # file-reading agent on there is nothing for a translator to translate: no audit of the
+    # turn's text was asked for, so no text was cut out of the transcript for one, and letting
+    # the pair through would dispatch a translator at nothing.
     #
     # Only the riders are dropped, never the list. A `comment-corrector`-only project is a
     # working configuration — it is dispatched around the router on the files the turn wrote —

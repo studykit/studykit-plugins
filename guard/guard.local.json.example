@@ -1,5 +1,4 @@
 {
-  "audit-turn": "off",
   "audit-plan": "on",
   "claims-auditor": "off",
   "deferrals-auditor": "off",

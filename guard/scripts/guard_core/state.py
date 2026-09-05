@@ -1,7 +1,8 @@
 """The per-session state file, ``state/<sid>.json``.
 
-Holds the agent modes as of this session, the two audit mutes (``audit_paused`` /
-``plan_audit_paused``, seeded from the project's ``audit-turn`` / ``audit-plan``), the files this turn edited
+Holds the agent modes as of this session, the two audit mutes (``audit_paused``, which opens
+armed, and ``plan_audit_paused``, seeded from the project's ``audit-plan``), the files this
+turn edited
 (``edited_prompt_id`` / ``edited_files`` / ``edited_agent_docs`` / ``edited_refs``),
 ``last_audited_prompt_id``, ``pending_verify_prompt_id``, ``transcript_path``, the handover
 file this session wrote (``handover_file``) and ``updated_at``.
@@ -19,7 +20,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from .config import AUDIT_PLAN_KEY, AUDIT_TURN_KEY, _agent_mode, _audit_on
+from .config import AUDIT_PLAN_KEY, _agent_mode, _audit_on
 from .paths import _now_iso, _state_file
 from .agents import AUDIT_AGENTS
 
@@ -57,20 +58,23 @@ def _read_state(project_dir: Path, session_id: str, config: dict[str, Any]) -> d
         "edited_files": [],
         "edited_agent_docs": [],
         "edited_refs": [],
-        # Session-only mute, flipped by the `guard` shell command. The value a session OPENS
-        # in is the project's `audit-turn` setting, MUTED when the file says nothing; from
-        # then on this key is the session's own, and the toggle never writes back to the
-        # config — so muting the session you are in cannot change what the next one does.
+        # Session-only mute, flipped by the `guard` shell command. A session OPENS ARMED and
+        # there is no config key seeding this one (the `audit-turn` setting was retired in
+        # v0.124.0 — `config.RETIRED_KEYS`): every entry that could be muted is one the user
+        # types, so a project default in front of them refused a command that had just been
+        # asked for. From here on the key is the session's own, and the toggle never writes
+        # back to the config — muting the session you are in cannot change what the next one
+        # does.
         # NOT a mode in front of the agent switches the way the removed `audit_gate` was:
         # it is two-valued, and the `status` subcommand puts it in the user's status line so
         # the muted state is visible rather than remembered. A hidden mute is the failure
         # that killed the old gate, which is why `session-start` says which state the session
         # opened in.
-        "audit_paused": not _audit_on(config, AUDIT_TURN_KEY),
-        # The plan audit reads its own config key, and is a SEPARATE key here, because the two
-        # run at different moments on different material — one on a finished answer, one on a
-        # plan awaiting approval — and a user who wants their turns audited has not thereby
-        # asked for every plan to be.
+        "audit_paused": False,
+        # The plan audit keeps a config key and is a SEPARATE state key, because it is the
+        # one audit that is NOT invoked by the user: `exit-plan` blocks an approved plan on
+        # its own, so whether a session opens with that gate armed is a real question a
+        # project can answer in advance — which is exactly what the turn side stopped being.
         "plan_audit_paused": not _audit_on(config, AUDIT_PLAN_KEY),
         # Which plan this session has already audited, as a hash of the plan text. The
         # ExitPlanMode hook lets a plan through once its audit is recorded here and blocks
@@ -152,9 +156,10 @@ def _plan_audit_paused(state: dict[str, Any]) -> bool:
 def _audit_paused(state: dict[str, Any]) -> bool:
     """Is guard muted for this session?
 
-    The session's own answer, not the project's: `_read_state` seeds it from `audit-turn` and
-    `guard off` overrides it for the rest of the session. Muted means guard says nothing
-    unasked AND an audit the user invokes reports that the session is muted
-    (`cmd_candidates`) — but the turn is still recorded, so arming guard and asking reaches it.
+    The session's own answer and nobody else's: it opens armed and only `guard off` mutes it,
+    for the rest of that session. Muted means guard says nothing unasked AND an audit the user
+    invokes reports that the session is muted (`cmd_candidates`) — and nothing is lost by it,
+    since `guard-inputs` cuts the turn out of the transcript when an audit asks for one, so a
+    turn that went by while muted is still reachable after `guard on`.
     """
     return state.get("audit_paused") is True

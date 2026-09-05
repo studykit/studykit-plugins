@@ -10,7 +10,7 @@ the one step the review cannot afford: a model transcribing the plan, which is w
 becomes a paraphrase of the plan.
 
 ``knowledge-dirs`` prints the project's configured knowledge directories, one absolute path
-per line, in configured order. Only ``design-environment`` consumes them, but the SKILL is
+per line, in configured order. Only ``plan-environment`` consumes them, but the SKILL is
 what reads this: the agent is dispatched with the paths rather than resolving them, so a
 project with none dispatches the agent anyway and the agent falls back to its other sources
 without having to tell "unset" apart from "lookup failed".

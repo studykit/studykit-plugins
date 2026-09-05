@@ -92,9 +92,9 @@ def cmd_candidates() -> int:
     # verb wants. Reading the recorded lists instead would let a file-reading agent through
     # to a router whose caller opens no section for it.
     # `routed` is per path and drops the Korean pair from the turn path: the corrector is
-    # handed over by the translator's report, and the translator by the caller's own closeout
-    # once it knows what language it is answering in. Offering either here would ask the
-    # router to judge a translation that does not exist while it reads.
+    # handed over by the translator's report, and the translator has no source on that path —
+    # an ordinary turn produces no document. Offering either here would ask the router to
+    # judge a translation that does not exist while it reads.
     eligible = [k for k in _eligible_agents(state, [], [])
                 if AUDIT_AGENTS[k].reads == "turn" and path in AUDIT_AGENTS[k].routed]
     if not eligible:

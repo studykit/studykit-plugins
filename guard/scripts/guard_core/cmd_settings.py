@@ -3,8 +3,8 @@
 ``settings`` is run by the ``guard:settings`` skill via Bash, in-session. ``show`` prints the
 current settings; ``set <key> <value>`` changes one of the per-agent settings — each named
 after the agent it controls, valued ``off``/``on`` (``fresh``, what pre-v0.116.0 wrote, is
-still accepted and rewritten as ``on``) — one of the two audit
-switches (``audit-turn`` / ``audit-plan``, ``on``/``off``), ``refs_dir`` or ``knowledge_dir``
+still accepted and rewritten as ``on``) — the audit
+switch (``audit-plan``, ``on``/``off``), ``refs_dir`` or ``knowledge_dir``
 (comma-separated, the whole list replaced); ``unset <key>`` removes a key from the file
 entirely, back to its default. The
 agent settings and the audit switches also apply to the live session's ``state/<sid>.json``
@@ -27,7 +27,7 @@ from pathlib import Path
 from typing import Any
 
 from .config import (
-    AUDIT_PLAN_KEY, AUDIT_SWITCHES, AUDIT_TURN_KEY, AgentMode, DEFAULT_CONFIG, _agent_mode,
+    AUDIT_PLAN_KEY, AUDIT_SWITCHES, RETIRED_KEYS, AgentMode, DEFAULT_CONFIG, _agent_mode,
     _audit_on, _cli_write_allowed, _load_config, _load_raw_config, _parse_mode, _parse_switch,
     _write_config
 )
@@ -39,17 +39,17 @@ from .state import _audit_paused, _plan_audit_paused, _read_state, _write_state
 # Which session-state key each audit switch seeds, and the shell command that moves it for one
 # session. The state key is the switch INVERTED — the config says armed, the state says paused —
 # and that inversion is why this mapping is written down once rather than open-coded per call
-# site: a `set audit-turn off` that wrote `audit_paused = False` would report the change the
-# user asked for and apply its opposite.
-_SWITCH_STATE_KEY = {AUDIT_TURN_KEY: "audit_paused", AUDIT_PLAN_KEY: "plan_audit_paused"}
+# site: a `set audit-plan off` that wrote `plan_audit_paused = False` would report the change
+# the user asked for and apply its opposite.
+_SWITCH_STATE_KEY = {AUDIT_PLAN_KEY: "plan_audit_paused"}
 
 
-_SWITCH_COMMAND = {AUDIT_TURN_KEY: "guard", AUDIT_PLAN_KEY: "guard-plan"}
+_SWITCH_COMMAND = {AUDIT_PLAN_KEY: "guard-plan"}
 
 
-# And how each one is read back out of a state dict, since the two accessors are what hold the
+# And how it is read back out of a state dict, since the accessor is what holds the
 # "missing key means armed" rule.
-_SWITCH_PAUSED = {AUDIT_TURN_KEY: _audit_paused, AUDIT_PLAN_KEY: _plan_audit_paused}
+_SWITCH_PAUSED = {AUDIT_PLAN_KEY: _plan_audit_paused}
 
 
 def _parse_settings_argv(argv: list[str]) -> tuple[list[str], str | None]:
@@ -140,17 +140,43 @@ def _config_show_lines(project_dir: Path, session_id: str | None) -> list[str]:
             line += "  [no such directory, ignored at use: " + ", ".join(missing) + "]"
         return line
 
+    def mute_line() -> str:
+        """This session's mute, which is state and not a setting.
+
+        It has no config key — a session opens armed — so nothing below reports it, and the
+        reader would otherwise have no answer here to "is guard actually on right now". That
+        answer must stay visible somewhere a person looks: the status line carries it, and so
+        does this. Printed whichever way it sits, because a line that appears only while muted
+        cannot be told from a guard that does not report mutes at all.
+        """
+        if session_id is None or state is None:
+            return "guard (session): unknown — no session id in this environment"
+        if _audit_paused(state):
+            return ("guard (session): OFF — `guard on` in a shell arms it; audits you invoke "
+                    "report that the session is muted")
+        return "guard (session): ON — `guard off` in a shell mutes it for this session"
+
+    def retired_lines() -> list[str]:
+        """One line per retired key still present in the file.
+
+        `_load_config` ignores an unknown key in silence, which is right for a typo and wrong
+        for a key that used to decide something: without this the file says `audit-turn: off`
+        and the session is armed, with nothing connecting the two.
+        """
+        return [f"{k}: (retired) {RETIRED_KEYS[k]}" for k in RETIRED_KEYS if k in raw]
+
     refs_rel = raw.get("refs_dir") if isinstance(raw.get("refs_dir"), str) else ""
-    # The two audit switches are listed FIRST: each overrides every agent line below it, so a
-    # reader who sees the switches without them would read the wrong answer to "is guard
-    # running". Always listed, unlike the old mute line, which appeared only while muted —
-    # armed is now the default, and a state that is never printed is a state the reader has no
-    # way to tell from a guard that does not have it.
+    # The session mute and the audit switch are listed FIRST: each overrides every agent line
+    # below it, so a reader who sees the agent switches without them would read the wrong
+    # answer to "is guard running". Always listed, both of them — a state that is never
+    # printed is a state the reader has no way to tell from a guard that does not have it.
     return [
+        mute_line(),
         *(audit_line(k) for k in AUDIT_SWITCHES),
         *(switch_line(k) for k in SETTABLE_AGENTS),
         "refs_dir: " + (refs_rel if refs_rel else "(default wiki/ref/)"),
         knowledge_line(),
+        *retired_lines(),
     ]
 
 
@@ -192,9 +218,16 @@ def _settings_unset(project_dir: Path, session_id: str | None,
 
     known = key in DEFAULT_CONFIG
     # `str()` first: an `AgentMode` default would otherwise print as `<AgentMode.OFF: 'off'>`.
-    print(f"guard: removed {key!r} — "
-          + (f"back to the default ({str(DEFAULT_CONFIG[key])!r})." if known
-             else "guard does not honor that key, so nothing changes."))
+    # A retired key gets its own sentence: "guard does not honor that key" is true of it and
+    # useless, since the user is clearing a key that used to work and wants to know what
+    # replaced it.
+    if known:
+        after = f"back to the default ({str(DEFAULT_CONFIG[key])!r})."
+    elif key in RETIRED_KEYS:
+        after = RETIRED_KEYS[key]
+    else:
+        after = "guard does not honor that key, so nothing changes."
+    print(f"guard: removed {key!r} — " + after)
     print()
     for line in _config_show_lines(project_dir, session_id):
         print(line)
@@ -288,6 +321,13 @@ def cmd_settings() -> int:
         # discard the setting with no way to see that it happened. The `show` lines below
         # name any entry that does not resolve.
         raw["knowledge_dir"] = [p.strip() for p in value.split(",") if p.strip()]
+    elif key in RETIRED_KEYS:
+        # Told apart from an unknown key on purpose: a user typing this one is not guessing,
+        # they are asking for something that used to work, and "unknown key" would read as a
+        # typo. Nothing is written — the key is gone, not settable to a new default.
+        print(f"guard settings: {key!r} is {RETIRED_KEYS[key]}", file=sys.stderr)
+        _trace(project_dir, session_id, "settings", "set_retired", key=key)
+        return 0
     else:
         print(f"guard settings: unknown or unsettable key {key!r}. Settable: "
               + ", ".join((*AUDIT_SWITCHES, *SETTABLE_AGENTS))

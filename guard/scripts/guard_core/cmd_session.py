@@ -23,7 +23,7 @@ import time
 from pathlib import Path
 
 from .config import (
-    AUDIT_PLAN_KEY, AUDIT_TURN_KEY, CLEAR_INHERIT_MAX_AGE_SECONDS,
+    AUDIT_PLAN_KEY, CLEAR_INHERIT_MAX_AGE_SECONDS,
     ORPHAN_MAX_AGE_SECONDS, _HOST_IS_CODEX, _audit_on, _load_config, _switch_on
 )
 from .paths import (
@@ -38,12 +38,12 @@ from .dispatch import CLI_REL, _plugin_root
 def _session_muted(project_dir: Path, config: dict, payload: dict | None) -> bool:
     """Is the session this SessionStart opens muted? Claude only.
 
-    At `startup` this is the project's `audit-turn` setting, muted unless the config arms it
+    At `startup` the answer is no: a session opens armed and no config key seeds it any more
     (`state._read_state`). It is not only that: SessionStart registers no matcher,
     so it also fires on `resume`, `clear`, `compact` and `fork`, where the session may already
     have been flipped by `guard` — or, on `clear`, by the handoff from the session it
-    replaced — and the state file says so. Either way the line below reports what it finds
-    rather than what the project configured, because the two can differ.
+    replaced — and the state file says so. So this reads the state rather than assuming the
+    fresh answer, and the line below reports what it finds.
 
     The payload is passed in rather than read here: stdin can be read once, and the clear
     handoff needs the same payload's `source`. On Codex it is None (that adapter consumed
@@ -54,10 +54,10 @@ def _session_muted(project_dir: Path, config: dict, payload: dict | None) -> boo
         return False
     sid = _session_id(payload) if payload else None
     if sid is None:
-        # No session id, no state file to read — so answer from the project setting, which is
-        # what a session with no state of its own would have opened in anyway. Answering a
-        # fixed `True` here would print "audits are OFF" to a project that configured them on.
-        return not _audit_on(config, AUDIT_TURN_KEY)
+        # No session id, no state file to read — so answer with what a session with no state
+        # of its own opens in, which is armed. This used to consult the project setting; the
+        # setting is gone and a fixed `False` is now the same answer.
+        return False
     return _audit_paused(_read_state(project_dir, sid, config))
 
 
@@ -157,8 +157,13 @@ def _default_paused(config: dict) -> tuple[bool, bool]:
     The baseline the `/clear` handoff is judged against: a session sitting on exactly these
     has nothing to hand over, because its replacement reads the same config and lands on the
     same pair without being told.
+
+    The turn half is a constant now rather than a config read — a session opens armed and the
+    `audit-turn` setting that used to decide it is retired. It stays in the tuple because the
+    handoff still carries the pair: `guard off` moves the live value away from this baseline
+    just as a setting used to, and that difference is the whole trigger for the record.
     """
-    return (not _audit_on(config, AUDIT_TURN_KEY), not _audit_on(config, AUDIT_PLAN_KEY))
+    return (False, not _audit_on(config, AUDIT_PLAN_KEY))
 
 
 def _recorded_handover(state: dict) -> str:
@@ -182,8 +187,9 @@ def cmd_session_end() -> int:
     """SessionEnd, matched on ``clear`` — hand this session's switches to its replacement.
 
     `/clear` starts a NEW session with a new id, so `state/<sid>.json` no longer applies and
-    both switches would go back to the project's `audit-turn` / `audit-plan` defaults: the user
-    who muted guard a minute ago has to mute it again, with nothing saying why. This is the one
+    both switches would go back to their defaults — armed for the turn side, the project's
+    `audit-plan` for the gate: the user who muted guard a minute ago has to mute it again,
+    with nothing saying why. This is the one
     boundary where that is worth fixing, because it is the one boundary where a new session is
     not a new intention — the conversation was cleared, the work was not.
 
@@ -199,13 +205,13 @@ def cmd_session_end() -> int:
     Nothing is written unless a switch differs from what this project configures — a session
     still sitting on its defaults has nothing to hand over, since the replacement reads the
     same config and arrives at the same two values on its own. That comparison, not "is
-    anything armed", is what makes the record carry an ARMING as readily as it carries a mute:
-    with `audit-turn` defaulting to off, a `guard on` before a `/clear` is precisely the
-    intention most likely to be lost, and with `audit-plan` defaulting to on it is a
-    `guard-plan off` — the two switches lose their intention in opposite directions, which is
-    why the test is against the config and not against a fixed idea of which state is
-    noteworthy. A stale record from a previous clear is removed when
-    there is nothing to carry, rather than left to be read later.
+    anything armed", is what makes the record carry an ARMING as readily as it carries a mute.
+    Both switches now default armed, so what a `/clear` would lose is a `guard off` or a
+    `guard-plan off` — but the test stays a comparison against the baseline rather than "is
+    anything muted", because the baseline is a config read for the plan half and a project
+    that sets `audit-plan: off` then loses its `guard-plan on` in exactly the same way.
+    A stale record from a previous clear is removed when there is nothing to carry, rather
+    than left to be read later.
 
     The record carries a SECOND, independent thing: the handover file this session wrote, if
     the `handover` skill recorded one. Same boundary and the same reason — the conversation was

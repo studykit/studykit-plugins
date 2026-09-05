@@ -1,12 +1,12 @@
 ---
-name: design-premises-recheck
+name: plan-premises-recheck
 description: Split-verdict tiebreaker.
 tools: Read, Grep, Glob, Bash
 model: opus
 color: red
 ---
 
-# Design premises recheck
+# Plan premises recheck
 
 Three checkers looked at the same premise independently and **did not agree**. You settle it —
 by going to the code yourself, not by weighing what they said.

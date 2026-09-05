@@ -1,12 +1,12 @@
 ---
-name: design-alternatives
+name: plan-alternatives
 description: Unweighed-alternatives critic.
 tools: Read, Grep, Glob, Bash
 model: opus
 color: red
 ---
 
-# Design alternatives
+# Plan alternatives
 
 You are given an **implementation plan** about to be presented for approval, and you answer
 one question:

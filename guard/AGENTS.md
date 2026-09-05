@@ -77,9 +77,10 @@ translation on the turn path: an ordinary turn produces no document, so there is
 translate.
 
 Every agent switch ships `off`: guard installed is guard available, not guard running.
-`audit-turn` and `audit-plan` say what a session OPENS in; `guard` / `guard-plan` then move
-that session alone, from a shell prompt, without entering the conversation — which is why
-neither is a slash command. SessionStart puts them on `PATH` through `$CLAUDE_ENV_FILE`, which
+`audit-plan` says what a session OPENS in for the plan gate — the one audit nobody invokes —
+and there is no counterpart for the turn side: a session opens armed there, because every
+entry on it is one the user types. `guard` / `guard-plan` then move that session alone, from a
+shell prompt, without entering the conversation — which is why neither is a slash command. SessionStart puts them on `PATH` through `$CLAUDE_ENV_FILE`, which
 is sourced rather than scanned for exports. `toggle-cli` is the one subcommand that must not
 fail open: a person is reading its output, so silence would read as success.
 
@@ -114,18 +115,33 @@ how the code here is organised.
 
 - `guard_core.config` is the ONLY reader of `GUARD_HOST`, once, at import.
 - A definition that exists once per dispatch path is named `<path>-<what it does>` —
-  `turn-router` / `report-router`. An entry-point skill is the same rule with the verb in
-  front: `audit-turn` / `audit-report` for the path's own entry, `audit-turn-claims` /
-  `audit-report-claims` for one audit on it. `answer` keeps a bare name: it is not a path's
-  audit entry but the thing that produces what one audits. A definition used on one path only, or
-  outside the routers, keeps its bare name; do not prefix one speculatively.
-- Split at the ENTRY, never at the agent. Every audit that runs on both dispatch paths —
-  claims, deferrals, clarity — is ONE agent behind two `context: fork` skills, and the reason
-  is memory: a memory directory is named after the agent, so two definitions are two memories
-  and what one learns the other relearns. A judgment that genuinely differs by path goes in
-  the skill, with the agent saying which judgment that is rather than picking a side; the
-  refs-copy rule for a documentation claim and what it takes for a deferral handed to a person
-  to stand are the two that do.
+  `turn-router` / `report-router`, and the plan critics `plan-coherence`, `plan-fit` and the
+  rest. An entry-point skill is the same rule with the verb in front: `audit-turn` /
+  `audit-report` for the path's own entry, `audit-turn-claims` / `audit-report-claims` /
+  `audit-plan-deferrals` for one audit on it. `answer` keeps a bare name: it is not a path's
+  audit entry but the thing that produces what one audits. A definition used on one path only,
+  or outside the routers, keeps its bare name; do not prefix one speculatively. The plan
+  critics were `design-*` until v0.123.0 and that prefix read as *visual* design, while the
+  path is called plan everywhere else (`audit-plan`, `guard-plan`, the plan gate), so they
+  follow it. Nothing derives these names — a rename is silent at runtime, so the whole set and
+  `skills/audit-plan/SKILL.md` move together or not at all.
+- Split at the ENTRY, never at the agent. Every audit that runs on more than one dispatch path
+  — claims, deferrals, clarity — is ONE agent behind a `context: fork` skill per path, and the
+  reason is memory: a memory directory is named after the agent, so two definitions are two
+  memories and what one learns the other relearns. A judgment that genuinely differs by path
+  goes in the skill, with the agent saying which judgment that is rather than picking a side;
+  the refs-copy rule for a documentation claim and what it takes for a deferral handed to a
+  person to stand are the two that do, and on the plan path clarity adds a third: WHO the
+  reader is — the person deciding whether to approve it. Deferrals and clarity both run on
+  three paths: the turn, a document, and — since v0.123.0 — the approved plan, through
+  `audit-plan-deferrals` and `audit-plan-clarity`. The first replaced a `design-deferrals`
+  agent asking the same question in almost the same words, which is exactly what this rule
+  exists to prevent. What the plan path gained is the half the
+  retired agent lacked — a deferral answerable by RUNNING the thing — and what it took on is
+  that agent's store, held back by prose alone (`dev/agent-frontmatter-rationale.md`). The
+  plan critics that ask a question nothing else asks are still agents of their own, so before
+  adding one, check whether `claims-auditor`, `deferrals-auditor` or `clarity-auditor` already
+  holds it.
 - A router-named skill's `description` is as short as it can be: the router names it and the
   caller invokes it by name, so the line never has to attract an invocation, and it is loaded
   into every session's context whether or not guard runs. The three ENTRY skills are the
@@ -178,21 +194,34 @@ how the code here is organised.
 - `guard-candidates` is where a switch and the mute are enforced for every entry — none has a
   hook in front of it — and `cmd_stop` enforces them for what guard says unasked. It answers
   per PATH: `--doc` for the document roster, bare for the turn's. `/guard:answer` must pass
-  `--doc`; without it the roster names turn entries that resolve a turn that does not exist. Neither is redundant: drop the check in the command and `guard off` silences the
-  hook while every audit the user can invoke keeps running. The Codex adapter needs the same
-  check on the one path that can start an audit there (`_handle_prompt`).
+  `--doc`; without it the roster names turn entries that resolve a turn that does not exist.
+  Neither is redundant: drop the check in the command and `guard off` silences the
+  hook while every audit the user can invoke keeps running. The PLAN review is outside this and must stay
+  outside: `audit-plan` invokes its critics by name and reads none of the per-agent switches,
+  because a plan held for review is reviewed whole or not at all — half a review is worse than
+  none, since what it passes over reads as checked. Whether a plan is held at all is
+  `audit-plan` / `guard-plan`'s question, answered before the review starts. Do not give the
+  plan entries a roster row. What the mute must NOT be is a
+  project default — that was `audit-turn`, and it refused commands the user had just typed;
+  the Codex adapter therefore checks no mute at all on its audit prefix, since that host has
+  no `guard` command and so nothing but a setting could ever have set one.
 - Two things ignore the agent switches AND the session mute, because both are prohibitions
   rather than opinions: the refs-index check and the `/`-rooted search refusal. A mute that
   could lift a prohibition would not be one.
 - The session mute is two-valued and visible, and the shell toggle writes session state only —
-  never the config. The persistence lives in `audit-turn` / `audit-plan`, which say what a
-  session opens in and nothing else; do not let the toggle start writing them, and if the
-  indicator ever becomes unshippable, drop the mute rather than let it go invisible.
+  never the config. It has no setting behind it at all since v0.124.0: the persistence that is
+  left is `audit-plan`, which says what a session opens in for the gate and nothing else. Do
+  not let the toggle start writing it, do not give the turn mute a key again, and if the
+  indicator ever becomes unshippable, drop the mute rather than let it go invisible. It is
+  visible in two places — the status line and `settings show`'s first line — and neither is
+  optional.
 - A `/clear` inherits both switches from the session it replaced, plus the handover file that
   session recorded, and that is the ONLY boundary that inherits anything — every other start
-  reads the settings. It carries a session
-  that DIFFERS from those settings, in either direction, which is why the comparison is
-  against the config rather than against "armed". The predecessor is named by the
+  reads the settings. It carries a session that DIFFERS from the pair a fresh session lands on,
+  in either direction. For the plan half that baseline is a config read, which is why the
+  comparison is against the config rather than against a fixed idea of which state is
+  noteworthy — a project setting `audit-plan: off` loses its `guard-plan on` the same way
+  anyone else loses a `guard-plan off`. For the turn half the baseline is simply armed. The predecessor is named by the
   `SessionEnd` record rather than inferred from file times, the record is single-use and
   expiring, and the adoption is announced. Weaken any one of those four and this becomes the
   persistent gate wearing a different name; `dev/design.md` has the measurements.
@@ -220,11 +249,14 @@ each one cost.
 - Any hook that redirects by naming a replacement in a `PreToolUse` deny reason — a deny
   reason is weighed as tool output, which was measured.
 - Judging inside the hook, or picking agents by lexical pattern.
-- `audit_gate` (`off`/`ask`/`auto`) in front of the per-agent switches. `audit-turn` is a
-  boolean in that position and is persistent, so the difference is no longer persistence: it is
-  that there is no `ask` to reason about and that both of its states are on screen. Keep those
-  two and this is a switch; lose either and it is the gate again. `dev/design.md` has the
-  argument.
+- `audit_gate` (`off`/`ask`/`auto`) in front of the per-agent switches. What is left in that
+  position is the session mute: a boolean, with no `ask` to reason about and both states on
+  screen. Keep those two and it is a switch; lose either and it is the gate again.
+  `audit-turn`, the setting that seeded it, is now in the same list — retired in v0.124.0. A
+  default that opened a session muted was the gate itself once every entry became one the user
+  types: `guard-candidates` reported the mute, so a typed `/guard:audit-turn` was refused by a
+  config file. Do not add a key for it again; a project that wants guard quiet has the agent
+  switches, which already ship `off`. `dev/design.md` has both arguments.
 - A `reuse_agents` list separate from the per-agent mode, or an `exempt_skills` list.
 - The `reuse` mode itself — one named instance per session, resumed on later turns. Removed
   once each agent's "If you are resumed" section was, since that section was the whole

@@ -151,7 +151,12 @@ def cmd_inputs() -> int:
 
 
 def _inputs_for_file(argv: list[str]) -> int:
-    """``inputs --file <path>`` — the same keys, for a document with no turn behind it.
+    """``inputs --file <path>`` — the same keys, for a file with no turn behind it.
+
+    Two callers, and they point it at different things: the document path, where the file is a
+    brief or a note the user named, and the plan path, where it is the plan the host wrote in
+    plan mode. Both want the same answer — this path, resolved, and only if something is
+    actually there — so neither gets a verb of its own.
 
     Three fields are absent and each absence is a fact, not a gap:
 
@@ -189,8 +194,8 @@ def _inputs_for_file(argv: list[str]) -> int:
         _trace(project_dir, None, "inputs", "file_missing")
         return 0
 
-    # `file:`, not `answer file:`. Only the document router reads this form, and calling a
-    # brief an "answer" would invite it to reason about a turn that does not exist.
+    # `file:`, not `answer file:`. No turn produced any of these, and calling one an "answer"
+    # would invite its reader to reason about a turn that does not exist.
     print(f"file: {target}")
     config = _load_config(project_dir)
     for kdir in _knowledge_dirs(project_dir, config):

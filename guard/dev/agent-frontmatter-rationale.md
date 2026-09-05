@@ -127,8 +127,9 @@ becomes a calibration fact for months. See design.md on the reader profile and `
 
 ### `deferrals-auditor`
 
-One agent for both dispatch paths, entered through the `audit-turn-deferrals` and
-`audit-report-deferrals` skills. Hand-written — nothing about it is generated.
+One agent for all three dispatch paths, entered through the `audit-turn-deferrals`,
+`audit-report-deferrals` and `audit-plan-deferrals` skills. Hand-written — nothing about it is
+generated.
 
 `tools: Read, Grep, Glob, Bash, SendMessage`
 
@@ -161,6 +162,16 @@ never for the finding itself.
 failure recorded in the shared section above; it additionally carries the asymmetric rule in
 prose — never store a remembered `legitimate` — because that specific direction is the one that
 reproduces itself.
+
+That store is what the plan path took on when `design-deferrals` was retired into
+`audit-plan-deferrals` (v0.123.0), and it is the one thing the swap made worse rather than
+better: the retired agent had no store and so could not remember a ruling, while this one can
+and is held back only by prose. It was accepted because the prose is the mitigation that was
+already carrying the other two paths, and because two definitions of one audit is the failure
+this repository has measured — a memory directory is named after the AGENT, so the retired
+critic could never learn what this one already knows about the repository it audits. If the
+stored-`legitimate` failure ever reappears on the plan path, the fix is the same rule, not a
+second agent.
 
 `model: opus`, and here the reason is specific. This agent's whole job is noticing that a
 sentence claiming impossibility is actually a sentence about effort, which means holding the
@@ -353,18 +364,25 @@ rather than a suppressed finding.
 argued for `opus`, but on a run that predates the `curl` step now in the body — **re-run it before
 treating either tier as settled.** `color: yellow` — this one writes files.
 
-## Design critics
+## Plan critics
 
-These are dispatched against a proposal or plan rather than against a finished turn. All of them
-report and none of them writes, which the tool lists make a fact: no `Edit`, no `Write`, and no
-`memory:` (which would grant both).
+These are dispatched against a plan the user has approved rather than against a finished turn.
+All of them report and none of them writes, which the tool lists make a fact: no `Edit`, no
+`Write`, and no `memory:` (which would grant both).
+
+**They were named `design-*` until v0.123.0.** The prefix was read as *visual* design — a
+reviewer opening `agents/` could not tell whether `design-fit` judged a layout or an
+implementation plan — and every one of them takes a plan file as its subject. `plan-` is also
+what the rest of the path is already called: `audit-plan`, `guard-plan`, the plan gate,
+`plan_audited_hash`. Renaming an agent is silent at runtime, so the whole set moved at once and
+`skills/audit-plan/SKILL.md` moved with it; nothing derives these names from anything else.
 
 The shared reason none of them has a store: what a design critic would remember is a **verdict**
 about a design, and the next proposal will resemble the one that was cleared. Matching the stored
 verdict is cheaper than working the problem again, and the stored one is what suppresses the
 finding. Each entry below adds the agent-specific form of that.
 
-### `design-adversary`
+### `plan-adversary`
 
 `tools: Read, Grep, Glob, Bash`. A failure mode is only real if the code admits it: the proposal
 says what it intends, the repository says what it will actually do when the input is empty, the
@@ -375,7 +393,7 @@ later proposal will resemble.
 
 `model: opus`.
 
-### `design-alternatives`
+### `plan-alternatives`
 
 `tools: Read, Grep, Glob, Bash`. The strongest alternative is usually already in the repository —
 a mechanism that solves the same problem, which the proposal either did not find or did not say
@@ -386,7 +404,7 @@ agent is asking whether X was actually weighed THIS time.
 
 `model: opus`.
 
-### `design-coherence`
+### `plan-coherence`
 
 `tools: Read, Grep, Glob, Bash`. `Read` for the plan, which is most of the work — this agent's
 findings come from holding the whole plan in view at once, not from searching. `Grep`/`Glob`/`Bash`
@@ -398,19 +416,25 @@ carrying, and what would carry is a habit of expecting the shape the last plan h
 
 `model: opus`.
 
-### `design-deferrals`
+### the deferrals critic, which is no longer an agent
 
-`tools: Read, Grep, Glob, Bash`. The finding this agent exists for is not "the plan defers
-something" — that is visible in the plan — but "the plan defers something the REPOSITORY already
-answers". Only searching settles that, and it is the difference between flagging every open
-question and flagging the ones that did not have to be open.
+There is no `plan-deferrals`. The sixth seat in stage 2 is the `audit-plan-deferrals` skill, a
+`context: fork` entry onto `deferrals-auditor` — the same agent that reads a finished turn and a
+standalone document.
 
-No `memory:` — it would store which deferrals this project treats as acceptable, and that stored
-ruling is exactly what stops the next instance from looking.
+What it replaced was `design-deferrals`, and the two asked the same question in almost the same
+words: not "does the plan defer something", which is visible in the plan, but "does it defer
+something the REPOSITORY already answers". The shared agent asks it better — it carries the
+second half the retired one never had, that an answer obtainable by RUNNING the thing was also
+within reach — and asks it out of a store of what it has already learned about this repository.
+The plan-specific part is small enough to be a skill: what a plan may legitimately leave open,
+and the rule that a decision genuinely the user's has to be put to them AT approval rather than
+carried past it.
 
-`model: opus`.
+Its `tools:` and `model:` are `deferrals-auditor`'s, not this seat's, which is the cost of the
+share and is recorded there along with what the store brings with it.
 
-### `design-env-prober`
+### `plan-env-prober`
 
 `tools: Bash, Read, Grep, Glob`
 
@@ -418,7 +442,7 @@ ruling is exactly what stops the next instance from looking.
 runs commands against infrastructure rather than against the repository.** The boundary is
 READ-ONLY, it is stated in the body rather than in the tool list, and it cannot be enforced by the
 tool list — `Bash` is `Bash`. What keeps it honest is that this agent is small, does one thing, and
-is dispatched only by `design-environment`; a boundary in a general-purpose agent's prose would be
+is dispatched only by `plan-environment`; a boundary in a general-purpose agent's prose would be
 one paragraph among many.
 
 No `Agent`: a prober that could dispatch could route around its own boundary. No
@@ -434,14 +458,14 @@ should produce a file.
 
 `model: sonnet`, `effort: medium`. `color: yellow` — it acts on things outside the repository.
 
-### `design-environment`
+### `plan-environment`
 
 `tools: Read, Grep, Glob, Bash, Agent, AskUserQuestion`
 
 **`Agent` is the one thing that separates this agent's tool list from the other design critics, and
 it is deliberate:** the environment is the one input that is NOT in the repository, so when the
 knowledge directories are silent this agent has to send someone to look. It dispatches
-`guard:design-env-prober` and nothing else — see the body's "When the files do not answer".
+`guard:plan-env-prober` and nothing else — see the body's "When the files do not answer".
 
 `AskUserQuestion` is the last resort, and it is a real one: an environment fact that exists only in
 the user's head is still the fact the design will be judged by in production, and reporting
@@ -454,7 +478,7 @@ one at the moment it is read. Every run re-reads.
 
 `model: opus`.
 
-### `design-feasibility`
+### `plan-feasibility`
 
 `tools: Read, Grep, Glob, Bash`. These are the whole job: this agent's verdict is a claim about
 THIS codebase, so every finding has to come from having gone and looked. `Bash` also runs the
@@ -468,7 +492,7 @@ every time.
 
 `model: opus`.
 
-### `design-fit`
+### `plan-fit`
 
 `tools: Read, Grep, Glob, Bash, SendMessage`
 
@@ -483,7 +507,7 @@ of their intent into the next one, which is the exact error this agent detects.
 
 `model: opus`.
 
-### `design-premises-lister`
+### `plan-premises-lister`
 
 `tools: Read, Grep, Glob, Bash`
 
@@ -497,7 +521,7 @@ precisely how a premise stops being listed. The ones that go unlisted are never 
 
 `model: opus`.
 
-### `design-premises-checker`
+### `plan-premises-checker`
 
 `tools: Read, Grep, Glob, Bash` **and nothing else**, because a verdict here is worth exactly the
 evidence behind it: every CONFIRMED and every FALSE has to come from having opened the file or run
@@ -513,7 +537,7 @@ again, which is the failure this agent exists to prevent, made permanent.
 
 `model: opus`.
 
-### `design-premises-recheck`
+### `plan-premises-recheck`
 
 `tools: Read, Grep, Glob, Bash` for the one thing this agent does: go to the evidence the three
 checkers cited and see which of them actually read it right.

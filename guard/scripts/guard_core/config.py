@@ -6,11 +6,11 @@ Configuration is optional: a JSON object at ``${CLAUDE_PROJECT_DIR}/.claude/guar
 ``agents-md-auditor``, each
 ``"off"`` (the default) or ``"on"`` — which together are the only control
 over whether guard says anything unasked, and over which audits exist to be invoked. Plus
-``audit-turn`` (``"off"`` by default) and ``audit-plan`` (``"on"`` by default), each ``"on"``
-or ``"off"``: the state each session opens in — the shell toggles move the session
-only and never write here. ``audit-turn`` no longer arms an automatic audit, because there is
-none: it arms the turn discipline the audit needs — the answer file, the recorded turn — and
-the user invokes the audit itself. And ``refs_dir`` (project-relative directory for saved copies of cited docs; empty
+``audit-plan`` (``"on"`` by default, ``"on"`` or ``"off"``): the state each session's plan gate
+opens in — the shell toggle moves the session only and never writes here. It is the only audit
+with a setting, because it is the only one the user does not invoke; the turn side had one,
+``audit-turn``, until v0.124.0 retired it (``RETIRED_KEYS``). And ``refs_dir``
+(project-relative directory for saved copies of cited docs; empty
 means the git-tracked default ``wiki/ref/``, and an unsafe value falls back to it — see
 ``paths._refs_dir``). There is no model key: every agent, the router included, brings its own
 model from its own definition under ``agents/``.
@@ -111,7 +111,7 @@ class AgentMode(StrEnum):
 
 
 # The words that mean armed and muted, for BOTH ways a two-valued switch is written: the
-# `audit-turn` / `audit-plan` values in guard.local.json and the argument to the `guard` /
+# `audit-plan` value in guard.local.json and the argument to the `guard` /
 # `guard-plan` shell commands. One vocabulary, because a word the config file accepts and the
 # shell command rejects is a difference the user has no way to predict.
 _ON_WORDS = frozenset({"on", "true", "yes", "1", "resume", "enable", "arm", "unmute"})
@@ -120,15 +120,29 @@ _ON_WORDS = frozenset({"on", "true", "yes", "1", "resume", "enable", "arm", "unm
 _OFF_WORDS = frozenset({"off", "false", "no", "0", "pause", "disable", "mute"})
 
 
-# The two audit switches, keyed the way the agent switches are: the key is what the user
-# reads, and each names the audit it opens. Values are `_ON_WORDS` / `_OFF_WORDS` words.
-AUDIT_TURN_KEY = "audit-turn"
-
-
+# The audit switch, keyed the way the agent switches are: the key is what the user reads, and
+# it names the audit it opens. Values are `_ON_WORDS` / `_OFF_WORDS` words.
 AUDIT_PLAN_KEY = "audit-plan"
 
 
-AUDIT_SWITCHES = (AUDIT_TURN_KEY, AUDIT_PLAN_KEY)
+# A tuple of one, and it stays a tuple. The settings verb reads it to decide which keys are
+# two-valued rather than modes, and that is a property of the key's TYPE — a second one would
+# be added here and nowhere else.
+AUDIT_SWITCHES = (AUDIT_PLAN_KEY,)
+
+
+# Keys guard used to honor and no longer does, with what to tell a user who still has one in
+# their config file. `_load_config` ignores an unknown key in silence, which is right for a typo
+# and wrong for a key that USED to decide something: a project carrying `"audit-turn": "off"`
+# opens armed from now on with nothing saying why. `cmd_settings` reads this map so the change
+# is stated where the user is already looking at the file.
+RETIRED_KEYS: dict[str, str] = {
+    "audit-turn": (
+        "retired in v0.124.0 — a session now opens armed, and `/guard:audit-turn`, "
+        "`/guard:answer` and `/guard:audit-report` run when you invoke them. `guard off` in a "
+        "shell still mutes the session you are in."
+    ),
+}
 
 
 # Spellings accepted for a mode, beyond the member values themselves. `fresh` heads the list
@@ -167,37 +181,46 @@ DEFAULT_CONFIG: dict[str, Any] = {
     # an `AgentMode`, so how the agent runs is the same setting as whether it runs: there
     # is no separate list of any kind that could name an agent that is off.
     #
-    # These are the ONLY control over which audits exist for a project. All of them off
-    # (the default) is guard silent at Stop and empty when an audit is invoked: no answer
-    # file, no router roster, nothing added to the main agent's context. There is
+    # These are the ONLY control over what guard does UNASKED and over what the routers may
+    # offer. All of them off (the default) is guard silent at Stop and an empty roster for
+    # every router: nothing added to the main agent's context. There is
     # deliberately no separate mode setting in front of them — switching one on IS switching
     # guard on, and a project that wants the claim check without the deferral check just
     # switches the one it wants.
     #
-    # Every switch ships off: guard installed is guard available, not guard running. What
-    # `off` costs is unchanged by the audit becoming on-demand — the user's own
-    # `/guard:audit-turn` reads this same roster, so `off` still means the audit cannot
-    # happen rather than merely that it is not offered. See `AGENTS.md`.
-    # The state each session's two audits OPEN in — the project's answer to "audit by
-    # default?". They part company when the file says nothing, and the split is the point:
-    # the turn audit costs a router call plus whatever it names on EVERY finished turn, so it
-    # opens muted and the user arms it (`guard on`) for the stretch of work that wants it. The
-    # plan gate opens armed because it fires only at `ExitPlanMode` — rare, and at the one
-    # moment where letting a deferral through is paid for by the whole implementation that
-    # follows.
+    # What `off` does NOT do is refuse an audit the user names. Only `cmd_candidates` reads
+    # these, and only three callers run it: the two routers and `/guard:answer`. The
+    # `audit-{turn,report,plan}-*` skills are invoked by name and read no switch, so
+    # `/guard:audit-turn-claims` runs in a project with `claims-auditor: off`. That is the
+    # same rule that retired `audit-turn`: a setting written once does not overrule a command
+    # typed now. `off` means guard is not running on its own, not that guard is unavailable.
     #
-    # These are the DEFAULT, not the live value: `guard` / `guard-plan` move `audit_paused` /
-    # `plan_audit_paused` in `state/<sid>.json` for one session and never write here, so a
-    # session muted at a shell prompt stays muted without changing what the next session does.
-    # Two keys rather than one because the two audits run at different moments on different
-    # material — a finished answer against a plan awaiting approval — and wanting one is not
-    # wanting the other.
+    # Every switch ships off: guard installed is guard available, not guard running.
+    # See `AGENTS.md`.
+    # The state each session's plan gate OPENS in — the project's answer to "hold an approved
+    # plan by default?". It ships ARMED: the gate fires only at `ExitPlanMode`, which is rare,
+    # and at the one moment where letting a deferral through is paid for by the whole
+    # implementation that follows.
+    #
+    # A second key sat here until v0.124.0, `audit-turn`, seeding the turn side the same way and
+    # shipping OFF. What it was buying went away in v0.122.0. It opened a session muted because
+    # the turn audit used to cost a router call on EVERY finished turn; once nothing ran unasked,
+    # the only thing that default still did was refuse the commands the user typed —
+    # `cmd_candidates` reports a muted session, so `/guard:audit-turn` and `/guard:answer` stopped
+    # before doing anything in a project that had switched agents on. A default answering "no" to
+    # a question the user just asked out loud is the `audit_gate` this design removed, wearing
+    # the switch's clothes. The session mute stays and is unaffected: `guard off` still silences
+    # what guard says unasked, and it is a decision made now rather than one a config file made
+    # months ago. `RETIRED_KEYS` carries what a project still holding the key is told.
+    #
+    # This is the DEFAULT, not the live value: `guard-plan` moves `plan_audit_paused` in
+    # `state/<sid>.json` for one session and never writes here, so a session muted at a shell
+    # prompt stays muted without changing what the next session does.
     #
     # A value that is neither an on-word nor an off-word falls back to this key's own default
     # (`_audit_on`), so an unreadable value lands wherever an absent one would. That is the
-    # only guarantee worth making here: a project that mistypes a switch gets the behaviour it
+    # only guarantee worth making here: a project that mistypes the switch gets the behaviour it
     # would have had without the key at all, rather than a third answer it never wrote.
-    AUDIT_TURN_KEY: "off",
     AUDIT_PLAN_KEY: "on",
     "claims-auditor": AgentMode.OFF,
     "deferrals-auditor": AgentMode.OFF,
@@ -218,7 +241,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
     # eligibility needs one this turn actually wrote.
     "agents-md-auditor": AgentMode.OFF,
     # Where this project writes down what its DEPLOYED system looks like — topology,
-    # environments, runbooks. Read by `design-environment` and by nothing else; guard never
+    # environments, runbooks. Read by `plan-environment` and by nothing else; guard never
     # writes here. Empty (the default) means the project has none, which is a normal state:
     # that agent then falls back to the repository's own deploy surface, to a read-only
     # probe, and finally to asking the user.
@@ -404,12 +427,15 @@ def _audit_on(cfg: dict[str, Any], key: str) -> bool:
     """Does this project's config open a session with ``key``'s audit armed?
 
     A CONFIG reader, never a state reader: the live answer for a session is
-    ``state._audit_paused`` / ``state._plan_audit_paused``, which this seeds and the shell
-    toggle then overrides. Absent, malformed, or written as a JSON boolean all resolve here —
-    and anything unrecognized resolves to THAT KEY's own default, which is muted for
-    ``audit-turn`` and armed for ``audit-plan`` (see ``DEFAULT_CONFIG``). Per-key rather than one
-    direction for both: a mistyped switch then lands where an absent one would, which is the
-    only fallback a project can predict once the two keys disagree.
+    ``state._plan_audit_paused``, which this seeds and the shell toggle then overrides. Absent,
+    malformed, or written as a JSON boolean all resolve here — and anything unrecognized
+    resolves to THAT KEY's own default (see ``DEFAULT_CONFIG``), so a mistyped switch lands
+    where an absent one would, which is the only fallback a project can predict. Written
+    per-key, though ``audit-plan`` is currently the only key: the rule is about what a
+    misspelling costs, not about how many switches there happen to be.
+
+    ``state._audit_paused`` has no key behind it any more and is not seeded from here — a
+    session opens armed and only ``guard off`` mutes it.
     """
     raw = cfg.get(key, DEFAULT_CONFIG[key])
     if isinstance(raw, bool):

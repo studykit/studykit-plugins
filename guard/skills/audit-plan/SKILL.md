@@ -26,7 +26,7 @@ the user asked for this review directly. Neither in your context — you just wr
 are about to show one — means you invoked it by mistake: say so in one line and stop.
 
 The user has approved a plan and you were held before building it. It gets checked first —
-the environment it assumes and its premises settled, then the plan itself read by six
+the environment it assumes and its premises settled, then the plan itself read by seven
 independent critics.
 
 That timing is deliberate at both ends. It is not inside plan mode, because the review takes
@@ -36,10 +36,11 @@ of something already built is a bug report. Approval ended plan mode; it built n
 everything the review finds can still change the plan.
 
 You are the caller. You run the two stages below, weigh what comes back, and revise the plan
-yourself. Nothing dispatched here edits anything.
+yourself. Nothing dispatched here touches the plan or the repository.
 
 **A dispatched agent's report is delivered to you. You do not go and get it.** When you send
-an `Agent` call, its report arrives in your context when the agent finishes — that delivery
+an `Agent` call — or invoke the one skill in stage 2, which forks an agent the same way — its
+report arrives in your context when that agent finishes; the delivery
 is the mechanism, and it needs nothing from you. So after dispatching, **end your turn**.
 Say what you dispatched, stop, and the report will be there when you next speak.
 
@@ -78,7 +79,7 @@ system it runs in. If one of those is false, the critics in stage 2 will be revi
 that does not exist. So this stage runs **first**, and its results go into stage 2 with the
 plan.
 
-**1a. The environment, first.** Dispatch one `guard:design-environment` with the plan file and
+**1a. The environment, first.** Dispatch one `guard:plan-environment` with the plan file and
 the knowledge directories, in order. Dispatch it even when there are none; it has other
 sources, and it will ask the user if a gap blocks its verdict.
 
@@ -94,12 +95,12 @@ the normal case, not a wasted step.
 It may have **asked the user a question** while it ran. If its report says so, do not ask it
 again, and treat what they said as settled — including by the checkers below.
 
-**1b. Enumerate.** Dispatch one `guard:design-premises-lister` with the plan file. It returns
+**1b. Enumerate.** Dispatch one `guard:plan-premises-lister` with the plan file. It returns
 a numbered list of the plan's factual claims. It checks nothing.
 
 If it returns an empty list, skip to stage 2 — carrying 1a's environment report with you.
 
-**1c. Check, three times over.** Dispatch **three** `guard:design-premises-checker` agents in
+**1c. Check, three times over.** Dispatch **three** `guard:plan-premises-checker` agents in
 ONE message, each with the same premise list, the plan file, the knowledge directories, and
 **1a's environment report** — an environment fact already settled is not theirs to re-derive.
 
@@ -116,7 +117,7 @@ three times.
 
 - **All three agree** → that is the verdict. Done, no matter which verdict it is: three
   independent UNVERIFIEDs mean the premise genuinely cannot be settled from here.
-- **They differ in any way** → dispatch one `guard:design-premises-recheck` for that premise,
+- **They differ in any way** → dispatch one `guard:plan-premises-recheck` for that premise,
   with the premise and all three verdicts including the evidence each cited. Dispatch every
   contested premise in one message.
 
@@ -139,30 +140,46 @@ first.
 
 ## Stage 2 — the critics
 
-Dispatch all six with the **Agent** tool, in **ONE message**, so they run concurrently — six
-`Agent` calls in a single reply, not six replies with one call each. Each holds one question
-and is told the others hold theirs, which is why six short reports beat one agent asked to
-think about everything.
+Seven of them, in **ONE message**, so they run concurrently — five `Agent` calls and two skill
+invocations in a single reply, not seven replies with one call each. Each holds one question and
+is told the others hold theirs, which is why seven short reports beat one agent asked to think
+about everything.
 
-| `subagent_type` | Holds |
+| Invoke | Holds |
 | --- | --- |
-| `guard:design-coherence` | Does the plan hold together as a plan? |
-| `guard:design-adversary` | How does it fail at runtime? |
-| `guard:design-alternatives` | What else could have been done? |
-| `guard:design-feasibility` | Can it be built in this codebase? |
-| `guard:design-fit` | Does it solve the user's actual problem? |
-| `guard:design-deferrals` | What does it leave for later that it should settle now? |
+| Agent `guard:plan-coherence` | Does the plan hold together as a plan? |
+| Agent `guard:plan-adversary` | How does it fail at runtime? |
+| Agent `guard:plan-alternatives` | What else could have been done? |
+| Agent `guard:plan-feasibility` | Can it be built in this codebase? |
+| Agent `guard:plan-fit` | Does it solve the user's actual problem? |
+| Skill `guard:audit-plan-deferrals` | What does it leave for later that it should settle now? |
+| Skill `guard:audit-plan-clarity` | Can the person approving it tell what they are agreeing to? |
 
-Every dispatch carries the **plan file path** and **everything stage 1 settled** — the
+**The last two are skills and not agents**, and the plan file path is the only argument either
+takes. They are guard's own deferrals and clarity audits — the same ones that read a finished
+turn and a standalone document — pointed at a plan, which is why they arrive knowing what a plan
+may legitimately leave open and that the plan's reader is the person about to approve it. Invoke
+both in the same message as the five dispatches; their reports come back the way the others do.
+
+**Neither is switchable, and neither is the five.** The per-agent settings gate what guard says
+unasked and what its routers may offer; this review consults none of them. A plan that reached
+this review gets the whole set, in a project with every switch `off` — the decision those
+switches exist to record was already made when the plan was approved and held.
+
+Every **Agent** dispatch carries the **plan file path** and **everything stage 1 settled** — the
 premise verdicts and the environment report both. The critics must not re-litigate either,
 and one reviewing a plan whose false premise or missing layer you already know about wastes
 its whole run. Beyond that:
 
-- `design-fit` also gets **the user's request**.
+- `plan-fit` also gets **the user's request**.
+- The two skills get **the path and nothing else**, deliberately. The deferrals audit settles
+  an open question by going and reading the repository itself, so a premise verdict would only
+  bias what it goes to look at; the clarity audit judges what the plan's own words convey to
+  its reader, and stage 1's findings are not in the plan the user will read.
 
 **Send no instructions of your own.** Do not tell an agent what to look for, do not tell it
 what you think of the plan, and do not forward one critic's finding to another. You wrote the
-plan; an argument from its author is the one thing that can bias all six at once.
+plan; an argument from its author is the one thing that can bias all seven at once.
 
 ## What comes back
 
@@ -176,7 +193,7 @@ code, and the difference decides what you do with them:
 2. **Revise the plan.** Usually it gains what it was missing: the failure mode handled or
    acknowledged, the alternative named and rejected with a reason, the constraint stated. A
    plan that carries a real objection is better than one that hides it.
-3. **Settle what `design-deferrals` raises, before presenting.** An open question inside an
+3. **Settle what `audit-plan-deferrals` raises, before presenting.** An open question inside an
    approved plan is a decision the user delegated without being asked. Where the repository
    answers it, go and settle it and fold the answer in. Where it is genuinely the user's
    decision, put that question to them **with** the plan rather than leaving it inside the
@@ -202,7 +219,7 @@ UNVERIFIED that still matters. A clean review is one line.
 
 **They approved the plan you had, so a plan that now differs needs their word before you
 build it.** Where the review only sharpened it — a failure mode handled, a constraint stated —
-say so and carry on. Where it changed what will be done, or where `design-deferrals` surfaced
+say so and carry on. Where it changed what will be done, or where `audit-plan-deferrals` surfaced
 a decision that is genuinely theirs, ask before building. That is the whole reason this runs
 before the work rather than after it.
 

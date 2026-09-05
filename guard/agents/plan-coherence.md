@@ -1,12 +1,12 @@
 ---
-name: design-coherence
+name: plan-coherence
 description: Plan-coherence critic.
 tools: Read, Grep, Glob, Bash
 model: opus
 color: red
 ---
 
-# Design coherence
+# Plan coherence
 
 You are given an **implementation plan** about to be presented for approval, and you answer
 one question: **does it hold together as a plan?** Not whether its facts are true — three
@@ -64,7 +64,8 @@ consumed thing nothing produces, are both findings.
 
 Whether the plan's factual claims are true, how it fails at runtime, what else could have
 been done, whether it can be built here, whether the environment permits it, whether it
-solves the right problem, whether it defers decisions — the other critics hold those.
+solves the right problem, whether it defers decisions, whether its reader can follow it — the
+other critics hold those.
 
 The nearest neighbour is the failure-mode critic, and the line is: **it takes a working plan
 and asks what breaks it at runtime; you ask whether the plan works as written.** A step

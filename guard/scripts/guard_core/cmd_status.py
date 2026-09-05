@@ -2,9 +2,9 @@
 
 ``toggle-cli`` (CLI, argv) arms or mutes guard for THIS SESSION —
 ``audit_paused`` in the session state, never guard.local.json, so it cannot change what the
-project does by default. The state a session opens in is the project's ``audit-turn`` setting,
-MUTED when the file says nothing (``state._read_state``), which makes ``on`` the common
-direction: one stretch of work that wants guard, with the setting left alone. An empty
+project does by default. A session opens ARMED and no setting seeds it
+(``state._read_state``), which makes ``off`` the direction that gets typed: one stretch of work
+that wants guard quiet, with nothing persisting it. An empty
 argument flips, and ``status`` reports without writing. While muted, ``stop`` says nothing,
 ``user-prompt`` names no answer file, and ``candidates`` tells an invoked audit that the
 session is muted — but the pending target and the answer file are still recorded, so arming
@@ -76,7 +76,7 @@ def _parse_toggle_arg(arg: str) -> str | None:
     """Map a user's word to ``on`` / ``off`` / ``flip``, or None if it is not one.
 
     One vocabulary for every entry point: the on/off words come from ``config``, which is
-    also what the ``audit-turn`` / ``audit-plan`` settings are read with, because a word the
+    also what the ``audit-plan`` setting is read with, because a word the
     config file accepts and this command rejects is a difference the user has no way to
     predict. ``flip`` is this command's alone — a setting has no "the other one".
     """

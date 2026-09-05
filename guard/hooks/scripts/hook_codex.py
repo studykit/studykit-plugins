@@ -154,18 +154,12 @@ def _handle_prompt(project_dir: Path, payload: dict[str, Any], session_id: str, 
     # and both prefixes are accepted because a user typing this has seen `$guard:setup` and
     # Claude's `/guard:audit-turn`.
     if _AUDIT_TURN_RE.match(prompt.strip()):
-        # The mute, which on this host is only ever the project's `audit-turn` setting — Codex
-        # has no `guard` command. Honored here because this is the one path that can start an
-        # audit now, the same place Claude honors it (`guard-candidates`): a project that wrote
-        # `off` and gets audited anyway has been told nothing. Said out loud rather than
-        # silently, because the user just asked for something.
-        if core_state._audit_paused(state):
-            _emit({"hookSpecificOutput": {"hookEventName": "UserPromptSubmit", "additionalContext": (
-                "guard: audits are off for this project (`audit-turn`), so there is nothing to "
-                "run. Tell the user, and that setting `audit-turn` to `on` in "
-                ".codex/guard.local.json arms it."
-            )}})
-            return
+        # No mute is consulted, and on this host there is nothing that could set one: Codex has
+        # no `guard` command, so `audit_paused` was only ever the project's `audit-turn`
+        # setting, and that key was retired in v0.124.0 (`config.RETIRED_KEYS`). The reason it
+        # went is the reason this check would be wrong anyway — the user typed the prefix, and a
+        # config file answering "no" to a request just made out loud is the gate this design
+        # removed. What still decides is the agent switches, through the scope sentence below.
         pending = state.get("pending_verify_prompt_id")
         if isinstance(pending, str) and pending and _turn_path(project_dir, session_id, pending).is_file():
             # The whole eligible set's scope, not just the claims half. On Claude a router
@@ -266,10 +260,9 @@ def _handle_stop(project_dir: Path, payload: dict[str, Any], session_id: str, tu
     # the whole eligible set to Codex's single agent — unrouted, and so noisier than Claude's
     # routed recommendation ever was, on turns that frequently had nothing in them. The audit
     # is now the user's to ask for on this host too (`_handle_prompt`), which is also what
-    # retires the two things this handler needed only in order to recommend: the `audit-turn`
-    # mute check, since nothing is emitted for a mute to suppress, and the
-    # `last_audited_prompt_id` once-guard, since a user who types the prefix twice is asking
-    # twice.
+    # retires the two things this handler needed only in order to recommend: the mute check,
+    # since nothing is emitted for a mute to suppress, and the `last_audited_prompt_id`
+    # once-guard, since a user who types the prefix twice is asking twice.
 
 
 def main() -> int:

@@ -157,9 +157,9 @@ Then tell the user four things and stop:
 - The fraction is *how many agents can run on the next finished turn* over *how many are
   switched on*: `guard 3/3` with three switched on and the session armed, `guard 0/3` when the
   session is muted, `guard 0/0` when nothing is switched on at all. So `guard on|off` moves
-  the numerator for this session and `/guard:settings` moves the denominator — and the
-  `audit-turn` setting there is which numerator a new session starts on — `off` unless the
-  project changes it, so a new session usually opens on `0/n` until `guard on`.
+  the numerator for this session and `/guard:settings` moves the denominator. A new session
+  opens armed, so it starts on `n/n`; nothing in the settings changes that, and `0/n` means
+  somebody ran `guard off` in this session.
 - The flag is the plan gate, and it is always shown: filled `⚑` means plan audits are armed
   for this session, so an approved plan is held until it has been audited; outline `⚐` means
   they are off. Separate switch, own command — `guard-plan on|off` in a shell for this

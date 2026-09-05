@@ -51,12 +51,22 @@ def _agent_inputs(project_dir: Path, session_id: str, prompt_id: str, key: str,
             f"{_turn_record_file(project_dir, session_id, prompt_id).resolve()}"]
 
 
-# A file that is present in every install and nowhere else, used to find the plugin root.
-CLOSEOUT_REL = "hooks/context/answer-lane.md"
-# The plugin root, found by looking for a directory that HAS the closeout file rather than by
+# The CLI behind guard's shell wrappers and the Codex adapter, and also the marker that finds
+# the plugin root: it is present in every install, at a fixed place, and it is the one file
+# guard cannot run without.
+#
+# The marker used to be `hooks/context/answer-lane.md`, the closeout file — deleted with the
+# answer lane, which left this pointing at nothing. Nothing failed, and that is the point:
+# `_plugin_root` fell through to its fallback and went on returning the right directory by
+# COUNTING PARENTS, which is exactly what a marker exists to avoid. So a marker must be a
+# file the plugin cannot ship without, never one whose whole purpose is text a redesign can
+# retire.
+CLI_REL = "scripts/guard_hook.py"
+
+# The plugin root, found by looking for a directory that HAS that file rather than by
 # counting parents. A fixed `parent.parent` is a bet on this file's depth, and this module
 # has already moved once — out of `scripts/guard_hook.py` and into `scripts/guard_core/`,
-# which silently turned every closeout path guard printed into `scripts/hooks/context/…`.
+# which silently turned every path guard printed into one under `scripts/`.
 # Walking up until the file is there costs a few `is_file()` calls once per process and
 # cannot be wrong about a depth it never assumes.
 _PLUGIN_ROOT_MAX_DEPTH = 5
@@ -65,18 +75,13 @@ _PLUGIN_ROOT_MAX_DEPTH = 5
 def _plugin_root() -> Path:
     here = Path(__file__).resolve()
     for parent in here.parents[:_PLUGIN_ROOT_MAX_DEPTH]:
-        if (parent / CLOSEOUT_REL).is_file():
+        if (parent / CLI_REL).is_file():
             return parent
-    # No closeout file on disk (a partial install, or a test tree). Fall back to the layout as
+    # Marker not on disk (a partial install, or a test tree). Fall back to the layout as
     # shipped — `<root>/scripts/guard_core/dispatch.py` — so the path printed is still the
     # one a correct install would have, rather than a path under `scripts/`.
     return here.parent.parent.parent
 
-
-# The CLI behind guard's shell wrappers and the Codex adapter. Built from the same
-# `_plugin_root` the closeout path is, so a moved install cannot leave one of the two
-# pointing at nothing.
-CLI_REL = "scripts/guard_hook.py"
 
 # There is deliberately NO fallback for a tree whose `shell/bin/` wrappers are missing. One
 # existed, testing `is_file()` on each wrapper and adding the long `uv run --script <cli>

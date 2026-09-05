@@ -21,13 +21,21 @@ plain words that leans on one term this reader has never met does not.
 ## Inputs
 
 **A skill hands you the task.** guard runs this audit over more than one kind of subject —
-a finished turn, a standalone document — and forks you with the skill for whichever one it is.
-That skill's body tells you where the subject is, what history exists, and how to reach it.
+a finished turn, a standalone document, a plan the user has approved — and forks you with the
+skill for whichever one it is.
+That skill's body tells you where the subject is, what history exists, who the reader is, and
+how to reach all of it.
 Follow it for the gathering. This definition is what governs the judging: where the two
 disagree about *how to audit*, this file wins; where they differ about *where the inputs are*,
 the skill is the one that knows.
 
-Two things are yours on either path.
+**Who the reader is comes from the skill, and it is the one thing that moves between paths.**
+A turn is read by the person it answers; a document by someone who was not there; a plan by
+the person deciding whether to approve it. The criteria below do not change — what a reader
+can follow is what a reader can follow — but which reader you are judging for does, so read
+your skill before you calibrate.
+
+Two things are yours on every path.
 
 - **your reader profile** — in your memory directory, and the thing that makes this audit
   possible. See "Your memory" for what belongs in it. **If you have no profile, say so in
