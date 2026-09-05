@@ -45,10 +45,12 @@ from .turnrec import _short
 # optional suffix group: bare `audit-turn` for the routed form and `audit-turn-<audit>` for a
 # single one.
 #
-# `translate-turn` is here for the same reason as the audit entries: its turn is a relay — the
-# translator's report and a path — and left unmatched it would become the pending target, so the
-# next audit would read guard's report of a translation instead of the answer that was
-# translated.
+# `answer` is here for the same reason as the audit entries, and it took a reversal to see it.
+# While the answer file was the deliverable of an ORDINARY turn it had to stay auditable, so
+# adding the entry that produced one would have been a bug. That is no longer what it is: a
+# `/guard:answer` turn puts its substance in a document that the same turn has already audited,
+# and what is left in the transcript is a one-line relay naming the path. Left unmatched, that
+# relay becomes what `/guard:audit-turn` resolves to, and the real turn behind it is unreachable.
 #
 # `comment-corrector` is deliberately ABSENT: that skill's relayed findings are claims about
 # real files and about edits made to them, so its turn stays auditable like any other work.
@@ -58,7 +60,7 @@ from .turnrec import _short
 # about the user, so the "answer" is the user's own words read back to them, and auditing
 # that would have guard grading the user on how they described themselves.
 _CONTROL_CMD_RE = re.compile(
-    r"^/(guard:)?(settings|reader-profile|translate-turn"
+    r"^/(guard:)?(settings|reader-profile|answer"
     r"|audit-turn(-claims|-clarity|-deferrals)?"
     r"|audit-report-(claims|clarity|deferrals)|audit-plan)(?=\s|$)",
     re.IGNORECASE)
@@ -97,7 +99,7 @@ def _turn_command_name(user_text: str) -> str:
 
 def _is_control_command_name(name: str) -> bool:
     """True when a normalized command name is one of guard's own control commands
-    (``settings``, ``reader-profile``, ``translate-turn``, ``audit-turn`` and the
+    (``settings``, ``reader-profile``, ``answer``, ``audit-turn`` and the
     ``audit-turn-*`` / ``audit-report-*`` entries, ``audit-plan`` — with or without the
     ``guard:`` prefix)."""
     return bool(name) and bool(_CONTROL_CMD_RE.match("/" + name))
@@ -260,6 +262,54 @@ def _turn_slice(transcript_path: Any, prompt_id: Any) -> dict[str, Any] | None:
         "assistant": "\n\n".join(assistant),
         "tools": tools,
     }
+
+
+def _last_auditable_prompt_id(transcript_path: Any) -> str | None:
+    """The most recent turn an audit may target, read from the transcript. None if there is none.
+
+    This is where the three skips live now. They used to run in ``cmd_stop``, once per turn,
+    to keep a marker in session state pointing at the last auditable turn; the marker is gone
+    and the same judgment is made here instead, when a user actually asks for an audit. It is
+    the identical rule — a turn qualifies only if a PERSON opened it — and the reasons are
+    unchanged:
+
+    - a non-human ``origin_kind`` is machinery reporting in (a background subagent completing,
+      an inbound ``SendMessage``), and guard's own dispatch is what produces those, so auditing
+      one puts guard in a loop with itself. An ABSENT kind still qualifies: guard noisy is
+      recoverable, guard silently finding nothing to audit is not.
+    - one of guard's own control commands opened a turn whose response is a relay of an audit,
+      not an answer. Unmatched, the previous audit's own report becomes the next audit's target.
+    - a user ``!`` command is not a prompt and its turn has no answer in it.
+
+    Walks the whole file and keeps the LAST qualifying id rather than stopping at the first
+    from the end, because only the anchor record of a turn carries its identity and the file
+    is read forwards. Fail-open: an unreadable transcript yields None and the caller says it
+    could not resolve a turn.
+    """
+    if not isinstance(transcript_path, str) or not transcript_path:
+        return None
+    path = Path(transcript_path)
+    if not path.is_file():
+        return None
+    seen: set[str] = set()
+    last: str | None = None
+    for rec in _transcript_records(path):
+        pid = rec.get("promptId")
+        if not isinstance(pid, str) or not pid or pid in seen:
+            continue
+        seen.add(pid)
+        origin = rec.get("origin")
+        content = _message_of(rec).get("content")
+        text = content if isinstance(content, str) else ""
+        origin_kind = str(origin.get("kind") or "") if isinstance(origin, dict) else ""
+        if origin_kind and origin_kind != "human":
+            continue
+        if _is_control_command_name(_turn_command_name(text)):
+            continue
+        if text.lstrip().startswith(_BASH_TAG):
+            continue
+        last = pid
+    return last
 
 
 def _extract_dir(project_dir: Path, session_id: str) -> Path:

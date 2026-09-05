@@ -38,8 +38,8 @@ The turn id is `$turn` — empty when the user invoked this without naming one. 
 resolves that turn, with nothing it resolves the last turn guard recorded, and either way its
 first line is `turn: <id>` — the turn you are auditing, whatever you were handed. You want:
 
-- **`answer file`** — the answer this turn is giving, written during the turn by the session
-  that gave it. **This is what you audit.**
+- **`answer file`** — the response this turn gave, cut from the transcript by guard and not
+  written by the session that gave it. **This is what you audit.**
 - **`transcript`** — present when the session recorded a transcript; the `turn` line is
   always there. Step 3.
 

@@ -32,7 +32,7 @@ from .paths import (
 from .payload import _read_payload, _session_id
 from .state import _audit_paused, _plan_audit_paused, _read_state, _write_state
 from .agents import SETTABLE_AGENTS
-from .dispatch import CLI_REL, _closeout_path, _plugin_root
+from .dispatch import CLI_REL, _plugin_root
 
 
 def _session_muted(project_dir: Path, config: dict, payload: dict | None) -> bool:
@@ -360,23 +360,36 @@ def _consume_clear_handoff(project_dir: Path, config: dict, payload: dict | None
     return {"switches": switches, "handover": handover}
 
 
-def _mark_closeout_stated(project_dir: Path, payload: dict | None, config: dict,
-                          stated: bool) -> None:
-    """Record whether this session has been told where the turn closeout file is.
+def _record_transcript_path(project_dir: Path, payload: dict | None, config: dict) -> None:
+    """Save this session's transcript path into its state.
 
-    Written at SessionStart and read by the Stop hook, which names the path only while this
-    is false. Both branches set it — the armed one because it just printed the path, the
-    muted one because it did not and the first turn after `guard on` has to.
+    The one field guard cannot derive. It is the HOST's path — where a transcript lives and
+    what it is called is the host's business, and guessing at that layout is the class of bet
+    this codebase refuses everywhere else — so it has to be taken from a payload. SessionStart
+    carries it (verified against the real payload; see `dev/design.md`), fires once per
+    session, and fires again on `compact` and `clear`, so a session that is replaced or
+    compacted re-records rather than keeping a stale value.
 
-    Best-effort like everything else at SessionStart: a state file guard cannot write leaves
-    the flag at its default of false, which costs one repeated path per turn rather than a
-    session that never learns where the file is.
+    It used to be recorded by the Stop hook, on every turn. Once that hook stopped touching
+    anything turn-scoped, that line would have been the only turn-scoped write left in it —
+    an orphan whose deletion shows up not as an error but as an audit quietly finding no
+    history.
+
+    Written unconditionally, before any switch or mute is consulted: `/guard:audit-turn`
+    resolves its target through this path, and a session that armed guard halfway through
+    would otherwise have no way back to the turns before it.
+
+    Best-effort. A state file guard cannot write leaves the field empty, and `guard-inputs`
+    says it cannot reach the turn rather than guessing at one.
     """
     sid = _session_id(payload) if payload else None
-    if sid is None:
+    if sid is None or payload is None:
+        return
+    transcript = payload.get("transcript_path")
+    if not (isinstance(transcript, str) and transcript):
         return
     state = _read_state(project_dir, sid, config)
-    state["closeout_stated"] = stated
+    state["transcript_path"] = transcript
     _write_state(project_dir, sid, state)
 
 
@@ -468,6 +481,11 @@ def cmd_session_start() -> int:
     _export_to_bash_env("GUARD_TOGGLE_CLI", str(_plugin_root() / CLI_REL))
     _add_shell_command_to_path()
 
+    # Before the clear handoff and before anything reads a switch: `/guard:audit-turn` reaches
+    # every turn of this session through this path, including the ones taken before guard was
+    # armed.
+    _record_transcript_path(project_dir, payload, session_cfg)
+
     # A `/clear` is the one boundary where a new session is not a new intention, so the
     # switches the ended session was carrying are adopted here — before the lines below,
     # which read the state this may have just written. Said out loud, because an inheritance
@@ -540,28 +558,22 @@ def cmd_session_start() -> int:
         # expensive: nothing later in the session contradicts it, so the model spends the
         # session expecting a recommendation that never comes.
         if _session_muted(project_dir, session_cfg, payload):
-            # A muted session is told nothing about the closeout, so the first turn after
-            # `guard on` is the one that has to name it.
-            _mark_closeout_stated(project_dir, payload, session_cfg, False)
             print(
                 "guard: agents are configured for this project, but guard is OFF for this "
-                "session — no answer file is named, nothing is said when a turn ends, and an "
-                "audit invoked now would report that the session is muted. Running `guard on` "
-                "in a shell arms it for this session only. Do not mention this unless the user "
-                "asks."
+                "session — nothing is said when a turn ends, and an audit invoked now would "
+                "report that the session is muted. Running `guard on` in a shell arms it for "
+                "this session only. Do not mention this unless the user asks."
             )
         else:
-            _mark_closeout_stated(project_dir, payload, session_cfg, True)
             print(
-                "guard: this session writes its answers to the file guard names at the start of "
-                f"each turn, and {_closeout_path()} says how the turn is then delivered — do "
-                "not read it until a turn sends you there. Those files are ENGLISH, and neither "
-                "the AUDIT nor the TRANSLATION is automatic or yours to start: the user runs "
-                "`/guard:audit-turn` when they want an audit, or `/guard:audit-turn-claims` / "
-                "`-clarity` / `-deferrals` for a single one, `/guard:audit-report <path>` for a "
-                "document, and `/guard:translate-turn` when they want the Korean version of a "
-                "turn. If they ask for any of it in prose, name the command rather than "
-                "dispatching anything."
+                "guard: nothing here is automatic and none of it is yours to start. Answer "
+                "normally; guard writes no file for an ordinary turn. The user runs "
+                "`/guard:answer <question>` when they want the answer as an audited document, "
+                "`/guard:audit-turn` to have the turn just finished checked (or "
+                "`/guard:audit-turn-claims` / `-clarity` / `-deferrals` for a single audit), "
+                "and `/guard:audit-report <path>` for a document that already exists. If they "
+                "ask for any of it in prose, name the command — you cannot invoke these for "
+                "them."
             )
 
     _trace(project_dir, None, "session-start", "swept", exported_project_dir=exported)

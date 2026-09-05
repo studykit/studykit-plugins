@@ -1,1 +1,32 @@
-{"name": "guard", "version": "0.121.0", "description": "Nothing is audited until you ask for it. `/guard:audit-turn` runs guard's router subagent over the answer the finished turn wrote, and the router names which audit agents would actually find something in it — unsupported claims, deferrals the repo could answer, explanation the reader cannot follow, unnatural Korean, comments in the source it edited, AGENTS.md/CLAUDE.md that drifted from a map into a payload, saved reference docs that filled up with local reasoning — each with a reason; they run together and nothing is corrected until all of them have reported, so every audit judges the same text — then the ones that found something read the corrections once more. `/guard:audit-report <path>` does the same for a standalone document. When a turn ends guard recommends nothing: it records the turn verbatim and names the file the answer was written to, which is what makes an audit asked for an hour later able to correct the document the user actually has — that file is written in English and is what the turn is delivered from; `/guard:translate-turn` writes the Korean version of it when you ask for one, and nothing translates unasked. A documentation agent reports where a cited document is — already saved, in the repository, or in a knowledge base the project configures — and fetches and saves the primary source when only the network has it; a saved reference the turn wrote is checked by an auditor of its own. One switch per agent, all off until you turn one on, plus two saved settings for whether a session starts armed: the plan gate armed unless the project says otherwise, the turn side muted until you arm it, since every turn pays for the answer file even though no audit runs unasked; `guard on` / `guard off` move just the session you are in. A `handover` skill writes a self-contained session handover before you clear the conversation, and the session `/clear` opens next is offered it: guard carries the file's path across that boundary and the session asks whether to read it. Claude Code and Codex. Requires Python 3.11+.", "author": {"name": "studykit"}, "repository": "https://github.com/studykit/studykit-plugins", "license": "MIT", "keywords": ["evidence", "claims", "grounding", "korean", "audit", "hooks", "codex", "handover"], "interface": {"displayName": "Guard", "shortDescription": "Audit finished turns for unsupported claims", "developerName": "studykit", "category": "Coding", "capabilities": ["Interactive", "Read"]}, "skills": "./skills/", "hooks": "./hooks/hooks.codex.json"}
+{
+  "name": "guard",
+  "version": "0.122.0",
+  "description": "Nothing is written and nothing is audited until you ask. An ordinary turn is an ordinary turn — guard names no file and says nothing when it ends. `/guard:answer <question>` is the entry that produces a document: it writes the answer to `.claude/answers/`, decides which audits have material in it, runs them together, applies what they find, translates the corrected text when you do not read English, and hands you the finished file — so the first version you read is the audited one. `/guard:audit-turn` goes the other way, over a reply you already read: guard's router names which audits would find something in the turn just finished — unsupported claims, deferrals the repo could answer, explanation the reader cannot follow — and reports what they found. `/guard:audit-report <path>` audits a document that already exists. A claim about anything outside the repository has to rest on a saved local copy of the source, on every path; a documentation agent finds the primary source and saves one as you draft, and a saved reference the turn wrote is checked by an auditor of its own. When a turn edits files guard names the audits that read that kind of file — comments in the source, AGENTS.md/CLAUDE.md that drifted from a map into a payload — since a file list is not a judgment anyone has to make. One switch per agent, all off until you turn one on; `guard on` / `guard off` move just the session you are in. A `handover` skill writes a self-contained session handover before you clear the conversation, and the session `/clear` opens next is offered it. Claude Code and Codex. Requires Python 3.11+.",
+  "author": {
+    "name": "studykit"
+  },
+  "repository": "https://github.com/studykit/studykit-plugins",
+  "license": "MIT",
+  "keywords": [
+    "evidence",
+    "claims",
+    "grounding",
+    "korean",
+    "audit",
+    "hooks",
+    "codex",
+    "handover"
+  ],
+  "interface": {
+    "displayName": "Guard",
+    "shortDescription": "Audit finished turns for unsupported claims",
+    "developerName": "studykit",
+    "category": "Coding",
+    "capabilities": [
+      "Interactive",
+      "Read"
+    ]
+  },
+  "skills": "./skills/",
+  "hooks": "./hooks/hooks.codex.json"
+}

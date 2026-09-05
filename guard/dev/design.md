@@ -10,8 +10,7 @@ runtime facts verified against the real CLI, not a line-by-line walkthrough.
 
 `guard_hook.py` is the entry point and nothing else: the subcommand table and `main()`. It
 keeps that path because the path is a published interface — `hooks/hooks.json`, every
-command and agent definition that shells out to the CLI, the turn closeout, and the
-Codex adapter all name it. Everything else is `guard_core/`, and each subcommand's own
+command and agent definition that shells out to the CLI, and the Codex adapter all name it. Everything else is `guard_core/`, and each subcommand's own
 docstring lives in the module that implements it rather than in a catalogue at the top of
 one file, which is where such a catalogue drifts.
 
@@ -26,14 +25,13 @@ config -> paths -> turnrec / payload / emit -> transcript
 | --- | --- |
 | `config` | the host split, `AgentMode`, the config schema, guard.local.json I/O |
 | `paths` | the two project-root resolvers, the state tree's paths, the debug trace |
-| `turnrec` | the answer file, and the request and translation paths beside it |
+| `turnrec` | the turn's response and request files, written from the transcript |
 | `payload` | the hook payload on stdin, and the session id in it |
 | `emit` | the three hook-output shapes guard writes to stdout |
 | `transcript` | reading the host's transcript, and the `transcript` CLI over it |
 | `agents` | the roster, and mechanical eligibility |
 | `state` | `state/<sid>.json` |
 | `dispatch` | the text handed to the main agent |
-| `cmd_turn` | `user-prompt` |
 | `cmd_edit` | `post-edit` |
 | `cmd_search` | `pre-search` |
 | `cmd_stop` | `stop` |
@@ -47,29 +45,30 @@ Two rules this layout exists to hold, both of which broke once already:
   that variable before importing anything here, so a second reader is a second answer to
   "which host am I". `grep -rn GUARD_HOST scripts/guard_core/` must show one line.
 - **Nothing resolves a plugin path by counting `__file__` parents.** `dispatch._plugin_root`
-  walks up looking for a directory that *has* the closeout file. A fixed `parent.parent` is a bet
-  on a file's depth in the tree, and the split moved this code one level deeper, which
-  silently turned every closeout path guard printed into `scripts/hooks/context/…`.
+  walks up looking for a directory that *has* a file only an install has (`CLOSEOUT_REL`). A
+  fixed `parent.parent` is a bet on a file's depth in the tree, and the split moved this code
+  one level deeper, which silently turned every plugin path guard printed into
+  `scripts/hooks/context/…`.
 
 The Codex adapter imports the `guard_core` modules it needs by name rather than through a
 single façade, so the layers it leans on are visible in its import block and a name that
 moves breaks at import instead of at the call. That is not hypothetical: the façade version
 called two turn-record helpers that had been renamed out from under it, and because every
 hook there fails open it failed silently for several releases. The adapter also owns the
-JSON turn-record format itself — Claude's answer file is markdown the main agent writes, so
-there is nothing shared to factor out beyond the state root.
+JSON turn-record format itself — and since v0.122.0 Claude keeps no turn record at all, cutting
+the turn out of the transcript on demand instead, so there is nothing shared to factor out
+beyond the state root.
 
 ## Hook wiring (`hooks/hooks.json`)
 
 | Event | Subcommand | Role |
 | --- | --- | --- |
-| `UserPromptSubmit` | `user-prompt` | Name the answer file for this turn — Stop is too late for it, since by then the answer is already printed and a printed answer cannot be corrected. Silent (trace only) when every agent is `off`, when `audit_paused` is set, on a control command, and with no `prompt_id`. Also saves the prompt verbatim to `<prompt_id>.request.md` for the router, which is the only copy guard keeps and the only reader it has. The hook stays registered even when silent so a "guard said nothing" report can be told apart from a hook that never ran. |
 | `PreToolUse` (`Bash\|Grep\|Glob`) | `pre-search` | Deny a search rooted at the filesystem root: `find /`, `grep -r /`, `rg /` (and `fd`/`ag`/`ack`/`locate`), a `/`-anchored glob like `/*`, or a `Grep`/`Glob` call whose `path` is `/`. Reads the tool ARGUMENT only — never the caller — which is why it survives where the removed `pre-write` hook could not. Ignores the agent switches and the mute. Silent for every other call, and fails open on a command `shlex` cannot parse. |
 | `PostToolUse` (`Write\|Edit\|MultiEdit\|NotebookEdit`) | `post-edit` | Record a source file, an agent instruction file, or a saved reference this turn wrote (the candidate lists for `comment-corrector`, `agents-md-auditor` and `ext-docs-auditor`), then block when a file saved in the refs dir is not listed in that dir's `AGENTS.md`. |
 | (called via Bash, not a hook) | `settings` | `guard:settings` (a `context: fork` skill, so it runs in a forked `general-purpose` agent rather than in the main session) shows/sets/unsets guard.local.json settings; the agent modes also apply to the live session's `state/<sid>.json` (session id from `--session`/`CLAUDE_CODE_SESSION_ID`). `set` preserves every other key; `unset <key>` is the only way to delete one. |
-| `Stop` | `stop` | Fill in the answer file if the turn left it empty, and mark the turn as the audit target — always, whatever the switches say, because that marker is what `guard-inputs` resolves when the user asks for an audit without naming a turn (and what the Codex adapter reads). Then, when any turn-reading agent is not `off`, emit `additionalContext` naming the answer file — plus `hooks/context/turn-closeout.md`, but only until this session has been told that path once — and forbidding an audit: the turn audit is the user's to invoke (`/guard:audit-turn`), so nothing is routed here. Two blocks still name agents, both off file lists rather than judgments — `comment-corrector` / `agents-md-auditor` over the files the turn edited, and `ext-docs-auditor` over anything it wrote under the refs dir. The last has no switch, so it can be the only block a turn produces. |
+| `Stop` | `stop` | The edited-file audits and nothing else. Emits `additionalContext` naming `comment-corrector` / `agents-md-auditor` over the files this turn edited, and `ext-docs-auditor` over anything it wrote under the refs dir — in each case the file list is the whole condition, so no router weighs it and no user decides it. It records nothing about the turn, names no answer file and reads none of the response: as of v0.122.0 the turn audit resolves and cuts its own target (`inputs`). Silent while the session is muted, and silent for a turn that edited nothing.
 | `SessionEnd` (`clear`) | `session-end` | Hand this session's two switches, and the handover file it recorded, to the session `/clear` is about to open, then let it announce what it adopted. The two halves are independent: writes nothing only when both switches still match this project's `audit-turn` / `audit-plan` AND no handover was recorded. |
-| `SessionStart` | `session-start` | Sweep state and turn records past retention, export `GUARD_REFS_DIR` and `GUARD_TOGGLE_CLI`, state the refs rule as session context, say once — when any agent is on — either that the session opened muted (`guard on` arms it) or where the turn closeout is and which commands the USER invokes to audit. The commands are stated here and nowhere else in the standing context: `audit-turn` / `audit-report` are `disable-model-invocation: true`, so their own descriptions are never loaded. |
+| `SessionStart` | `session-start` | Sweep state and turn records past retention, export `GUARD_REFS_DIR` and `GUARD_TOGGLE_CLI`, state the refs rule as session context, say once — when any agent is on — either that the session opened muted (`guard on` arms it) or where the turn closeout is and which commands the USER invokes to audit. The commands are stated here and nowhere else in the standing context: `audit-turn` / `audit-report` are `disable-model-invocation: true`, so their own descriptions are never loaded. Also records this session's `transcript_path` from the payload — the one field guard cannot derive, and what every turn audit reaches its turn through. |
 | (called via Bash, not a hook) | `candidates` | The router's own roster: prints the turn-reading agents switched on for this session, one `agent=mode` per line, in `AUDIT_AGENTS` order, filtered by `routed` for the asking path — which is what keeps the Korean pair off the turn roster. `--doc` answers for the document path instead — the same eligibility, mapped through `report_entry`, so an audit with no document-side entry point drops out. It is where the mute is enforced for both routers, since neither has a hook in front of it. Session id from `CLAUDE_CODE_SESSION_ID`, which a subagent's Bash carries as its parent's. Read-only, and the only command the router runs. |
 | (called via Bash, not a hook) | `transcript` | `index` / `turn` / `find` over the session transcript, for the audit agents. Writes an extract file and prints only its path plus a one-line summary; `--since` / `--until` / `--last` bound which turns are scanned. |
 | (called via Bash, not a hook) | `toggle-cli` | Arm/mute guard for THIS session (`audit_paused`, session state only — never guard.local.json), from a shell prompt: `on` / `off` / `status` / empty flips. A session opens in whatever `audit-turn` says, MUTED unless the config arms it, so `on` is the direction that usually needs typing. Session id from `CLAUDE_CODE_SESSION_ID`; project from `_cli_project_dir`. The ONE subcommand that does not fail open — see `_MUST_REPORT` in `guard_hook.py`. |
@@ -81,7 +80,9 @@ there is nothing shared to factor out beyond the state root.
 
 For every release before this one, the Stop hook ended each turn by asking the main agent to
 dispatch `guard:turn-router`. That is gone. The hook still records the turn and names the
-answer file; the audit starts when the **user** runs `/guard:audit-turn`.
+answer file; the audit starts when the **user** runs `/guard:audit-turn`. (v0.122.0 took the
+recording and the answer file away too — see `The answer file goes on demand` below. Read this
+section for the argument, not for what the hook does now.)
 
 **What was wrong with the recommendation was its hit rate, not its content.** A router ran on
 every turn that had an answer file, and the answer was frequently `none` — an acknowledgement,
@@ -152,6 +153,11 @@ more than one that is skimmed on all of them.
 
 ## The translation goes on demand — v0.121.0
 
+(v0.122.0 removed `/guard:translate-turn` along with the turn's answer file: an ordinary turn
+produces no document, so there is nothing on that path to translate. Translation now belongs to
+`/guard:answer`, which runs it after the audit. The argument below is why it stopped being
+automatic; the mechanism it describes is gone.)
+
 The same argument v0.118.0 made about the audit, one release later and about the other
 automatic dispatch. Translating ran from the closeout on every turn that delivered substance,
 which is a subagent per turn — plus the corrector its report hands off to, so two — spent
@@ -203,6 +209,165 @@ the session translates its own text, which is the arrangement that produced 직�
   eligible set to its single agent; the trigger is a prompt prefix (`$guard:audit-turn`), since
   a Codex command hook cannot launch an agent. Leaving that host on the automatic path would
   have made "guard audits when you ask" false on one of the two runtimes.
+
+## The answer file goes on demand — v0.122.0
+
+The third turn of the same argument v0.118.0 made about the audit and v0.121.0 made about the
+translation, and the one that reaches the thing those two left standing: the **answer file
+itself**. `UserPromptSubmit` named one on every turn an armed session took, so a session
+running guard turned "안녕" into a document. The user's report was that ordinary conversation
+had become paperwork.
+
+What is wrong here is the same hit rate, one level lower. The audit and the translation had
+already moved to the user; what still ran per turn was the *preparation* for them — a file
+named, an English-document discipline imposed, a one-sentence reply enforced — on every turn,
+including the ones nobody was ever going to audit or translate. The preparation is cheap in
+tokens and expensive in what it does to a conversation.
+
+So the answer file moves to the user too, and the shape it moves into is not a switch but a
+**separate entry**: `/guard:answer <question>` produces a document, and nothing else does.
+
+### Three lanes that do not touch each other
+
+- **Ordinary conversation.** No file, no instruction, no closeout. guard is silent.
+- **`/guard:answer <question>`** — the user asks for a checked deliverable. One turn: write the
+  answer to a file, triage it, dispatch the audits, apply the findings, hand over the file.
+  The user reads the audited version and never the draft.
+- **`/guard:audit-turn`** — the user read an ordinary reply and wants it checked. Audits the
+  last turn and **reports only**; there is no document to correct, which is the honest shape
+  for a turn already printed.
+
+The two entry points share no state, no file and no code path. Treating them as two halves of
+one feature is what produced the earlier drafts of this design, each of which tried to reuse
+the other's plumbing and had to invent a reconciliation step to do it.
+
+### What moved, and what could not
+
+- **`/guard:answer` owns its own file, and guard's Python gains nothing.** The document is
+  written to `.claude/answers/`, named by the skill from a date and a slug. It is deliberately
+  **outside** guard's state root: the `SessionStart` sweep reaps `turns/` on a retention
+  window, and a deliverable the user explicitly asked for must not expire. Nothing needs to
+  mint the path — an earlier draft had a `guard answer-new` verb for it, whose three jobs
+  (mint, record in state, save the request) were all removed by later decisions until only
+  `mkdir` was left. The whole lane is two markdown files.
+- **A `.md` under `.claude/answers/` falls into no edited-file bucket** (`agents._edited_bucket`):
+  not a source suffix, not under the refs dir, not an agent-doc name. The date prefix also makes
+  a collision with `CLAUDE.md` unreachable. Checked, because a document that audited itself as
+  a turn's edit would be silent.
+- **The triage is inline here and forked on the other entry, and that asymmetry is the point.**
+  On `/guard:answer` the party deciding which audits have material is the party that just wrote
+  the text, and it knows what a fork cannot recover from the file: which claims came from a
+  document it actually opened this turn, which from recollection, which judgment it passed over
+  without saying so. A forked router re-derives all of that from the prose, badly. On
+  `/guard:audit-turn` the reverse holds — the answer is printed, the author has moved on, the
+  author-knowledge advantage is gone and only the independence argument is left — so that entry
+  keeps `guard:turn-router`.
+- **The author-as-router risk is handled by inverting the question, not by adding a check.**
+  `turn-router` may answer `none` and often should. An author asking "does my answer need
+  auditing" and answering `none` is that same output arriving from the one party with a reason
+  to want it. So the skill does not ask which audits are worth running; it asks **which audits
+  can be ruled out, with a stated reason**. Silence includes. The default fails toward running
+  an audit nobody needed rather than skipping one that was.
+- **The Stop hook stops recording the turn.** `_write_turn_response`,
+  `pending_verify_prompt_id` and the whole turn block go. Both reasons they existed are gone:
+  audit-then-correct needed an editable copy, and `/guard:answer` writes its own while
+  `/guard:audit-turn` corrects nothing; and the recorded copy was safer than the transcript
+  only against compaction, which cannot have reached the turn that just ended. What Stop keeps
+  is the edited-file recommendations, which never read the turn's text at all — their whole
+  input is a path list from `PostToolUse`.
+- **The three Stop skips move rather than vanish.** Non-human origin, guard's own control
+  commands, `!` input: whoever resolves "the last turn" still has to skip them, so the
+  classification moves into `guard-inputs`, walking the transcript backwards with the
+  `_turn_identity` that Stop used to call with a `prompt_id` in hand. It is the same judgment,
+  paid when an audit is asked for instead of on every turn.
+- **The `UserPromptSubmit` hook can be removed entirely.** Its two jobs were the draft lead and
+  the request file. The lead is gone with the lane. The request file existed because
+  `turn-router` needed the user's words to judge materiality and could not extract them itself —
+  but the audit now resolves its turn from the transcript, which carries the request in the same
+  slice, and `transcript.py` already filters the host-injected envelopes off a user record. A
+  file re-recording what the reader is already holding is a second copy to keep in step.
+- **`transcript_path` moves to `SessionStart`.** guard cannot derive it — it is the host's path,
+  and guessing at the host's storage layout is the class of bet this codebase refuses elsewhere —
+  so it must be recorded from a payload. Stop survives and could keep doing it, but that one line
+  would be the only turn-scoped state left in a hook stripped of turn logic, and an orphan line
+  whose loss shows up as an audit quietly missing its history is the wrong thing to leave lying
+  around. `SessionStart`'s payload carries it and a session's transcript path is a session-scoped
+  fact. Only `/guard:audit-turn` reads it now: `/guard:answer` does not, and the edited-file
+  agents never did (`needs_history=False` for all three).
+- **`/guard:answer` audits as a DOCUMENT, not as a turn, and this reversed twice before
+  settling.** The first draft credited the turn's tool activity as evidence, reasoning that a
+  claim verified by a command this turn would otherwise be flagged. That is backwards: the
+  deliverable is read later by someone who was not there, so a claim with no evidence *in the
+  text* is a defect whatever the author happened to run. Crediting the transcript would let an
+  under-evidenced document ship. So the existing `audit-report-*` entries apply unchanged, and
+  the answer path needs no entry files of its own.
+- **`audit-report-claims` § 5 changes, and the rule then leaves both skills.** The document path
+  accepted a URL plus a quote and treated a missing local copy as no finding. But the auditor
+  has no `WebFetch` and that is deliberate rather than a limitation: fetching belongs to
+  `docs-finder`, upstream, *before* the claim is made, and it saves the local copy as it goes.
+  A citation with no local copy therefore does not mean "the auditor cannot check this" — it
+  means the step that makes a claim checkable was skipped, which is itself the defect. With the
+  standard the same on both paths, the refs-copy rule stops being one of the two path-dependent
+  judgments and hoists into `agents/claims-auditor.md`; § 5 comes out of both skills. What this
+  costs is `/guard:audit-report` pointed at a foreign document, where every external citation
+  now reports — truthfully, as unverifiable from here, which is a fact that document's reader
+  should have.
+- **The translation runs after the audit, once, and the skill decides it.** A `/guard:answer`
+  document is English like every other document guard produces, so a Korean reader cannot read
+  the deliverable they asked for — the translation is part of finishing the lane, not a second
+  request. This is not the case v0.121.0 moved off automatic: what was wasteful there was
+  translating turns nobody would read, and here the user asked for the document. The skill holds
+  the one fact the decision needs, which is the language it is answering in.
+
+  The ORDER inverts against the turn lane, and that is the improvement. On a turn the translation
+  goes out first and the audit arrives after it, so the closeout has to rewrite a translation the
+  user already holds. Here the audit finishes before anything is handed over, so the translation
+  is made from the corrected English and made once. The skill's steps are draft, triage, audit,
+  apply, translate, open — and what it opens is the translation.
+
+  `korean-translator` may not derive its own target, so the skill hands it both paths: the answer
+  file as source, and the `.ko.md` sibling as the file to write. `turnrec._turn_translation_file`
+  owns that derivation for turns and this lane has no turn, so the suffix is a convention in the
+  skill body alongside the filename rule — still one producer of the value, still not the
+  translator. What follows the translation is the translator's report to say, as on every other
+  path; the skill does what it is told and names nothing further itself.
+- **The answer skill dispatches `docs-finder` while drafting, not after.** The audit it is about
+  to run requires a local copy of anything it cites, so finding the document after the draft is
+  written means writing the citation twice. Order the steps and it is paid once.
+
+### What the end-to-end run found
+
+Run against a throwaway project with all switches on, in a second pane, with `--plugin-dir`
+pointed at the working tree. All four paths behaved; two defects surfaced that only a live run
+could have.
+
+- **`guard-candidates` needs `--doc` on the answer path.** The skill said to run it bare, which
+  answers for the TURN path and names `audit-turn-*`. Those resolve a turn when handed none, so
+  the failure is silent: three audits would have run against whatever turn came last instead of
+  against the document. The run survived it only because the skill's next step named the report
+  entries explicitly and the model followed that over the roster — a contradiction that happened
+  to fall the right way. Both halves now say `--doc`.
+- **The router's `none` template still mentioned re-translating and "this turn's document".**
+  Text from the answer-file lane, left behind because it was in the one branch the earlier edits
+  did not touch. It printed verbatim on the first clean audit.
+
+What worked without intervention: an ordinary turn produced no file and no guard output at all;
+`/guard:audit-turn` resolved the last human turn past a `/guard:audit-turn` relay, a
+`task-notification`, and a `!` command, and cut it out of the transcript at that moment; the
+Stop hook named `comment-corrector` over an edited source file and nothing about the turn; and
+`/guard:answer` wrote its document, dispatched `docs-finder` mid-draft (which saved two refs
+copies and indexed them, exercising the refs gate), ruled out no audit, ran all three
+concurrently, waited for all of them before editing, and applied findings that included one
+deferral the session then went and settled empirically against three interpreters.
+
+### Still untested
+
+- **The translation step (§ 6 of the skill).** The e2e run was answered in Korean, so the step
+  should fire; it had not yet at the point the run was inspected. Nothing verifies that
+  `korean-translator` receives a `.ko.md` sibling path it did not derive itself.
+- **Whether this session's tool calls are in the transcript while `/guard:answer` is still
+  running.** Nothing in this design reads them — the audits are document-flavoured on purpose —
+  so the answer does not matter yet. It would if a later change wanted them.
 
 ## Storage layout (`${CLAUDE_PROJECT_DIR}/.claude/guard/`)
 
@@ -2460,302 +2625,119 @@ sh -c ". $ENVF; sh -c 'CLAUDE_CODE_SESSION_ID=s1 guard status'"   # -> one line
 python3 -c "import json;print(json.load(open('$CLAUDE_PROJECT_DIR/.claude/guard/state/s1.json'))['audit_paused'])"
 #   -> False. Every case below assumes it.
 
-# All switches off (the shipped default): NOTHING is emitted, but the pending target must
-# still be recorded: it is what `/guard:audit-turn` resolves on either host when the user names
-# no turn, and a marker written only for armed sessions is a marker that is missing exactly
-# when someone arms guard and asks about the turn they just read.
-# Check the TRACE, not just the emptiness: an armed session with no switches records
-# `none_eligible`, and a muted one records `skip_paused` instead — the two are indistinguishable
-# from stdout alone, which is how a mute reason can masquerade as this case.
-run p0 "Redis is always faster."        # -> (EMPTY); trace: none_eligible
-python3 -c "import json;print(json.load(open('$CLAUDE_PROJECT_DIR/.claude/guard/state/s1.json'))['pending_verify_prompt_id'])"
+# --- The turn path (v0.122.0) -----------------------------------------------------------
+#
+# There is no `user-prompt` verb any more and `stop` records nothing about a turn, so the
+# turn assertions here are all against `inputs`, which is what resolves and cuts a turn when
+# an audit asks for one. A transcript is therefore REQUIRED for every one of them — build a
+# fixture rather than pointing at a real session's file, so the skips can be exercised.
 
-# guard writes the response section itself, on EVERY Stop, whatever the modes say. This is the
-# verbatim guarantee — check it survived, including multi-line and non-ASCII text.
-cat "$CLAUDE_PROJECT_DIR/.claude/guard/turns/s1/p0.md"
-#   -> "## Assistant response (written by guard, verbatim)" holding the exact response,
-#      then the empty "## Request, tool activity, and prior evidence" section.
+TR=$CLAUDE_PROJECT_DIR/t.jsonl
+u() { printf '{"promptId":"%s","type":"user","message":{"role":"user","content":%s}%s}\n' \
+        "$1" "$2" "${3:-,\"origin\":{\"kind\":\"human\"}}"; }
+a() { printf '{"promptId":"%s","type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":%s}]}}\n' "$1" "$2"; }
+{
+  u p1 '"Redis 성능 어때?"';                     a p1 '"Redis is always faster than Postgres."'
+  u p2 '"<command-name>/guard:audit-turn</command-name>"'; a p2 '"audit relay"'
+  u p3 '"background done"' ',"origin":{"kind":"task-notification"}'; a p3 '"noted"'
+  u p4 '"<bash-input>ls</bash-input>"';           a p4 '"output"'
+} > "$TR"
 
-# One agent not-off is guard on. Check the shape, not just non-emptiness — and check what is
-# NOT there, which is the whole of v0.118.0: no router, no agent named, no offer to audit.
-"$H" settings set claims-auditor on --session s1     # `fresh` is still accepted here
-"$H" settings set korean-corrector on --session s1
-run p1 "Redis는 Postgres보다 항상 빠릅니다."
-#   -> one imperative plus the ANSWER FILE, and — on this first armed turn only — the
-#      closeout path. No turn id (it is the answer file's basename) and no translation file
-#      (the closeout derives it). Run a second turn: the closeout line must be gone.
-#      The imperative forbids dispatching an audit and names `/guard:audit-turn` as the user's.
-#      Nothing here dispatches `guard:turn-router`, and there is no `candidates` line — the
-#      router runs that itself, when the user asks for it.
-run p1b "Redis는 Postgres보다 항상 빠릅니다." | grep -qi 'turn-router' \
-  && echo 'REGRESSION: the Stop hook is routing turns again'
+# `inputs` needs the transcript from STATE, which `session-start` records — not `stop`, which
+# no longer touches it. Record it the way the host would.
+echo "{\"session_id\":\"s1\",\"source\":\"startup\",\"transcript_path\":\"$TR\"}" \
+  | "$H" session-start > /dev/null
+python3 -c "import json;print(json.load(open('$CLAUDE_PROJECT_DIR/.claude/guard/state/s1.json'))['transcript_path'])"
+#   -> $TR. Empty means SessionStart stopped recording it and every audit below will report
+#      that it cannot reach the turn — which reads like "nothing to audit", not like a bug.
 
-# The audit the user asks for resolves the turn by itself. This is what makes
-# `/guard:audit-turn` work with no argument, and a forked skill has no conversation to read an
-# id from — so a bare `inputs` must print the LAST recorded turn and say which it was.
+# The three skips, all at once. A bare `inputs` must resolve p1 — NOT p4 (a `!` command), NOT
+# p3 (a background completion), NOT p2 (guard's own audit entry, whose response is a relay of
+# the previous audit). Each of those was a `cmd_stop` skip before v0.122.0; if one regresses,
+# the wrong turn is audited and nothing errors.
 CLAUDE_CODE_SESSION_ID=s1 "$H" inputs
-#   -> `turn: p1b` first, then closeout / answer file / translation file / request file, and
-#      the transcript on stderr-or-not depending on what `stop` recorded. A bare invocation
-#      that printed nothing means `pending_verify_prompt_id` is not being written.
-CLAUDE_CODE_SESSION_ID=s1 "$H" inputs p1   # -> the same keys for the turn NAMED, not the last
+#   -> turn: p1
+#      answer file: .../turns/s1/p1.md
+#      request file: .../turns/s1/p1.request.md
+#      transcript: $TR
+#      NO closeout line and NO translation line — both are gone with the answer-file lane.
 
-# The audit entries are control turns. Unmatched, a `/guard:audit-turn` turn would become the
-# pending target itself and the next bare audit would read guard's report of the last one.
-anchor p1c human '/guard:audit-turn'
-echo "{\"session_id\":\"s1\",\"prompt_id\":\"p1c\",\"transcript_path\":\"$T\",\"last_assistant_message\":\"clean\",\"stop_hook_active\":false}" | "$H" stop
-#   -> empty; trace: skip_control_cmd
-CLAUDE_CODE_SESSION_ID=s1 "$H" inputs | head -1   # -> still `turn: p1b`, NOT p1c
+# And the extraction is guard's, verbatim, with a header saying so. The author of the turn
+# must not be the author of the record.
 cat "$CLAUDE_PROJECT_DIR/.claude/guard/turns/s1/p1.md"
-#   -> the second section reads "Not collected" and carries the ask for earlier evidence
-#      plus the ban on the main agent's own case for the claim. Nothing collected it.
+#   -> the guard header, then exactly "Redis is always faster than Postgres."
+cat "$CLAUDE_PROJECT_DIR/.claude/guard/turns/s1/p1.request.md"
+#   -> the guard header, then exactly "Redis 성능 어때?"
 
-# The roster must never offer a switched-off agent. The closeout file is the second bound: a key
-# the router invents has no section to follow. The roster is not in the Stop output any more,
-# so this is checked where the router now reads it — and note the FILTER: the verb prints only
-# the turn-reading agents, so a `comment-corrector` that is on must NOT appear here.
-# Use a SETTABLE agent for this: the Korean pair has no switch, so `settings set
-# korean-corrector off` is refused and would assert nothing.
-"$H" settings set deferrals-auditor off --session s1
-run p2 "Redis는 Postgres보다 항상 빠릅니다."   # -> the same four fields, unchanged by the switch
-CLAUDE_CODE_SESSION_ID=s1 "$H" candidates     # -> audit-turn-claims=on ALONE: no
-                                              #    deferrals-auditor, and NOT the Korean pair
-# The Korean pair is `routed` on the document path only. On a turn the caller dispatches the
-# translator from the closeout, so a pair that reappears here is the per-path `routed` filter
-# having regressed to a boolean — and the router would then name a translator for a file that
-# does not exist yet.
-CLAUDE_CODE_SESSION_ID=s1 "$H" candidates | grep -qi 'korean' && \
-  echo 'REGRESSION: the Korean pair is on the turn roster again'
-# The line prints the ENTRY POINT, not the switch key. `claims-auditor` is what the user sets
-# and must never appear here; `audit-turn-claims` is what the router names and its caller
-# invokes. A regression in `_path_entry` shows up as the key leaking into this output.
-CLAUDE_CODE_SESSION_ID=s1 "$H" candidates | grep -qx 'claims-auditor=on' && \
-  echo 'REGRESSION: the switch key reached the router'
-# The document path: same eligibility, mapped through `report_entry`. The Korean pair must be
-# absent — that mapping is what replaced the paragraph telling the document router to refuse
-# them by name, so if they appear here the router has nothing left to stop it naming them.
-CLAUDE_CODE_SESSION_ID=s1 "$H" candidates --doc  # -> audit-report-claims=on, nothing else
-# The two failure shapes must not both be silence: one is an installation problem, the other
-# a real (if unexpected) answer, and the router is told to report each in one line.
-CLAUDE_CODE_SESSION_ID= "$H" candidates       # -> stderr: no CLAUDE_CODE_SESSION_ID; exit 0
-CLAUDE_CODE_SESSION_ID=nosuch "$H" candidates # -> stderr: nothing switched on; exit 0
+# Overwriting is intended here, unlike the old fallback writer: nothing corrects this file, so
+# a second resolution of the same turn must reproduce it rather than preserve an edit.
+echo "tampered" > "$CLAUDE_PROJECT_DIR/.claude/guard/turns/s1/p1.md"
+CLAUDE_CODE_SESSION_ID=s1 "$H" inputs > /dev/null
+grep -c tampered "$CLAUDE_PROJECT_DIR/.claude/guard/turns/s1/p1.md"   # -> 0
 
-# Every entry point the roster names must resolve to a file that declares that same name.
-# This is the one assertion that does not need a session: run it from the plugin, and break it
-# deliberately once (point a `turn_entry` at a skill that does not exist) to confirm it is not
-# passing as a no-op.
-(cd "$CLAUDE_PLUGIN_ROOT" && uv run dev/check-entries.py)  # -> every entry resolves; exit 0
+# A named turn still works, and a turn with no user text still resolves — a slash-command turn
+# has no request, and the router is required to judge from the response alone.
+CLAUDE_CODE_SESSION_ID=s1 "$H" inputs p3     # -> turn: p3, answer file, NO request file line
+                                             #    (its content is not a person talking)
 
-# The CLI verbs must not depend on the cwd. `CLAUDE_PROJECT_DIR` is absent in Bash, so this
-# is the normal case, not an edge one: all three must agree from anywhere in the checkout.
-for d in . guard wiki/ref; do (cd "$CLAUDE_PROJECT_DIR/$d" 2>/dev/null && \
-  "$H" settings show --session s1 | head -2 && "$H" refs-dir); done
-#   -> identical settings and the same absolute refs dir from every cwd. Before the fix the
-#      subdirectory runs reported an all-off project and refs-dir printed nothing at all.
+# A turn id that is not in the transcript must print NO answer-file line. Every audit skill
+# branches on "printed no answer file" and stops; a path to a file that does not exist sends it
+# down the other branch, where it Reads nothing and returns a clean verdict on a turn nobody
+# looked at.
+CLAUDE_CODE_SESSION_ID=s1 "$H" inputs zzzz   # -> stderr only, exit 0. NOTHING on stdout.
 
-# The export, and its append-once rule. Run session-start three times (startup + two
-# compactions) against one env file: TWO lines, not six.
-EF=$(mktemp); CLAUDE_ENV_FILE="$EF"
-for i in 1 2 3; do echo '{"session_id":"s1"}' | CLAUDE_ENV_FILE="$EF" "$H" session-start >/dev/null; done
-cat "$EF"    # -> export GUARD_PROJECT_DIR=... and export GUARD_REFS_DIR=..., once each
-( . "$EF"; cd / && "$H" refs-dir )   # -> the project's refs dir, from outside the checkout
-find "$CLAUDE_PROJECT_DIR" -type d -name guard -path '*/.claude/*' -not -path "$CLAUDE_PROJECT_DIR/.claude/*"
-#   -> empty. Anything here is a state tree written outside the project root.
+# No transcript at all: the one missing field that stops the verb, because without it there is
+# no turn to reach. It must SAY so rather than print a path into nothing.
+CLAUDE_CODE_SESSION_ID=sz "$H" inputs; echo "exit=$?"   # -> stderr, exit=0 (fail-open)
 
-# The request file: written verbatim by `user-prompt`, and the ONLY thing the dispatch adds
-# for it is a `request file:` line — for the router, never for an audit agent's dispatch.
-# Without a `user-prompt` for the turn there is no such file and no such line, which is the
-# resumed-session / `!`-command case.
-echo '{"session_id":"s1","prompt_id":"pq","prompt":"korean-corrector는 켜줘"}' | "$H" user-prompt
-cat "$CLAUDE_PROJECT_DIR/.claude/guard/turns/s1/pq.request.md"   # -> header, then the prompt verbatim
-run pq "Turned it on."      # -> `turn dir:` once, then `{turn dir}/pq.md` and `{turn dir}/pq.request.md`
-run pnone "Turned it on."   # -> same shape MINUS `request file:` (no user-prompt ran)
-# There is no `verify` verb any more, and no per-agent command on Claude. The marker below is
-# still written because Codex reads it.
-"$H" verify claims-auditor < /dev/null   # -> no output, exit 0 (unknown verb, fails open)
+# --- The candidates roster --------------------------------------------------------------
+#
+# Per PATH, and `/guard:answer` depends on the flag. Bare gives the turn entries; a caller on
+# the answer path that omits `--doc` gets `audit-turn-*`, which resolve a turn that does not
+# exist — silently, since a turn id nobody passed resolves to the last one.
+CLAUDE_CODE_SESSION_ID=s1 "$H" candidates        # -> audit-turn-{claims,deferrals,clarity}
+CLAUDE_CODE_SESSION_ID=s1 "$H" candidates --doc  # -> audit-report-{claims,deferrals,clarity}
+                                                 #    plus korean-translator, which is not an
+                                                 #    audit — the answer skill skips it here
+                                                 #    and dispatches it after the corrections
 
-# The answer file is gated on the agents that READ it. With only `comment-corrector` on,
-# `user-prompt` says nothing and the dispatch carries no `answer file:` line — that agent
-# reads source files. On-demand audits still work: the record holds guard's verbatim
-# response section plus a note saying the turn was never told to write into it.
-"$H" settings set claims-auditor off --session s1
-"$H" settings set comment-corrector on --session s1
-echo '{"session_id":"s1","prompt_id":"pc","prompt":"rename a variable"}' | "$H" user-prompt   # -> nothing
-echo "{\"session_id\":\"s1\",\"prompt_id\":\"pc\",\"tool_input\":{\"file_path\":\"$CLAUDE_PROJECT_DIR/src/cache.py\"}}" | "$H" post-edit
-run pc "Renamed it."   # -> the direct block only: closeout and `files to audit` — and NO
-                       #    router block at all, so no `answer file:` and no `candidates:`
-"$H" settings set claims-auditor on --session s1     # both on -> the line is back
+# The roster must never offer a switched-off agent.
+"$H" settings set claims-auditor off > /dev/null
+CLAUDE_CODE_SESSION_ID=s1 "$H" candidates        # -> no `audit-turn-claims` line
+"$H" settings set claims-auditor on > /dev/null
 
-# comment-corrector needs a source file the turn actually WROTE, and the file must exist.
-echo 'x = 1' > "$CLAUDE_PROJECT_DIR/src/cache.py"
-"$H" settings set comment-corrector on --session s1
-for f in src/cache.py notes.md; do
-  echo "{\"session_id\":\"s1\",\"prompt_id\":\"p3\",\"tool_input\":{\"file_path\":\"$CLAUDE_PROJECT_DIR/$f\"}}" | "$H" post-edit
-done
-python3 -c "import json;print(json.load(open('$CLAUDE_PROJECT_DIR/.claude/guard/state/s1.json'))['edited_files'])"  # cache.py only
-run p3 "Refactored the cache."          # -> comment-corrector offered, "this turn wrote: cache.py"
-run p4 "Refactored the cache."          # -> claims-auditor only: p4 wrote nothing
-
-# The two edited lists must stay disjoint and must not cross-trigger. `notes.md` above lands
-# in NEITHER; `AGENTS.md` and `CLAUDE.md` land in the agent-doc list only. Three things to
-# check here, and the first is the one a per-bucket reset would break.
-"$H" settings set agents-md-auditor on --session s1
-printf '# x\n' > "$CLAUDE_PROJECT_DIR/AGENTS.md"
-buckets(){ python3 -c "import json;d=json.load(open('$CLAUDE_PROJECT_DIR/.claude/guard/state/s1.json'));print(d['edited_files'],d['edited_agent_docs'],d['edited_refs'])"; }
-edit(){ echo "{\"session_id\":\"s1\",\"prompt_id\":\"$1\",\"tool_input\":{\"file_path\":\"$CLAUDE_PROJECT_DIR/$2\"}}" | "$H" post-edit; }
-
-edit pa src/cache.py; edit pa notes.md; edit pa AGENTS.md; buckets
-#   -> [cache.py] [AGENTS.md] []: notes.md is in no bucket
-
-# The one collision the ORDER of the bucket tests exists to settle. Both of these are inside
-# the refs dir, and one is named AGENTS.md — it must NOT reach agents-md-auditor.
-# No `settings set` here: `ext-docs-auditor` has no switch, and the refs block is emitted off
-# `edited_refs` alone.
-mkdir -p "$CLAUDE_PROJECT_DIR/wiki/ref"
-printf '# refs\n\n| File | Subject | Source |\n| --- | --- | --- |\n| v.md | x | y |\n' \
-  > "$CLAUDE_PROJECT_DIR/wiki/ref/AGENTS.md"
-printf '# v\n' > "$CLAUDE_PROJECT_DIR/wiki/ref/v.md"
-edit pr wiki/ref/v.md; edit pr wiki/ref/AGENTS.md; edit pr AGENTS.md; buckets
-#   -> [] [AGENTS.md] [wiki/ref/v.md, wiki/ref/AGENTS.md]
-#      The project AGENTS.md is an agent doc; the refs index is a ref.
-run pr "Saved a reference."  # -> the refs block, ext-docs-auditor with only the two refs paths
-run pa "Did both."      # -> ONE direct block, comment-corrector then agents-md-auditor,
-                        #    each with only its own paths, and no `answer file:` line
-
-edit pb AGENTS.md; buckets
-#   -> [] [AGENTS.md]: a new turn resets BOTH lists, so cache.py does not ride along
-run pb "Docs only."     # -> agents-md-auditor alone
-
-# Off is off, even with a file waiting for it.
-"$H" settings set agents-md-auditor off --session s1
-edit pc AGENTS.md
-run pc "Docs only."     # -> empty: comment-corrector has no source file, the other is off
-
-# Once per turn: a second Stop on the same prompt_id is silent even with
-# stop_hook_active false.
-echo "{\"session_id\":\"s1\",\"prompt_id\":\"p4\",\"transcript_path\":\"$T\",\"last_assistant_message\":\"x\",\"stop_hook_active\":false}" | "$H" stop
-#   -> empty; trace: skip_already_recommended
-
-# Only a turn a person typed is recorded. A background agent's completion and a subagent's
-# SendMessage both open turns of their own, and both are turns guard's own dispatch caused —
-# recording either makes the next bare audit read guard's own machinery. A kind guard has never
-# seen must skip too; an absent kind must still be recorded, or guard goes silently dormant.
-anchor p5 task-notification '<task-notification>done</task-notification>'
-anchor p5b peer 'Another Claude session sent a message: <agent-message from="guard:claims-auditor">where is X?</agent-message>'
-anchor p5c cron 'scheduled'
-for p in p5 p5b p5c; do
-  echo "{\"session_id\":\"s1\",\"prompt_id\":\"$p\",\"transcript_path\":\"$T\",\"last_assistant_message\":\"the agent reported\",\"stop_hook_active\":false}" | "$H" stop
-done
-#   -> all three empty; trace: skip_nonhuman_turn with origin_kind naming which
-#   -> and no turn record written for any of them: `ls .claude/guard/turns/s1/` has no p5*
-
-# No `origin` at all is the fail-open direction and must still audit (`anchor` always writes
-# one, so this anchor is hand-rolled).
-printf '{"promptId":"p5d","message":{"role":"user","content":"q"}}\n' >> "$T"
-echo "{\"session_id\":\"s1\",\"prompt_id\":\"p5d\",\"transcript_path\":\"$T\",\"last_assistant_message\":\"Redis는 항상 빠릅니다.\",\"stop_hook_active\":false}" | "$H" stop
-#   -> the turn block, NOT empty
-
-# guard's own control turns are skipped by command name, and leave no record behind —
-# `pending_verify_prompt_id` must still name the turn BEFORE this one.
-anchor p6 human '/guard:settings show'
-echo "{\"session_id\":\"s1\",\"prompt_id\":\"p6\",\"transcript_path\":\"$T\",\"last_assistant_message\":\"guard on\",\"stop_hook_active\":false}" | "$H" stop
-#   -> empty; trace: skip_control_cmd; no .claude/guard/turns/s1/p6.md
-
-# A user `!` command opens a turn with no `origin` and no draft path, so it is skipped on the
-# `<bash-input>` anchor — and leaves no record, for the same reason p6 leaves none.
-printf '{"promptId":"p6b","message":{"role":"user","content":"<bash-input>env | grep CLAUDE</bash-input>"}}\n' >> "$T"
-echo "{\"session_id\":\"s1\",\"prompt_id\":\"p6b\",\"transcript_path\":\"$T\",\"last_assistant_message\":\"환경변수 확인만 하신 것으로 보입니다.\",\"stop_hook_active\":false}" | "$H" stop
-#   -> empty; trace: skip_bash_input; no .claude/guard/turns/s1/p6b.md
-
-# `reuse` is gone. The word must not be accepted as a mode, and neither must the two aliases
-# that used to mean it — silently resolving one to the on mode would answer a different question
-# than the user asked. Check all three, and check a config file that still holds the old value.
-"$H" settings set claims-auditor reuse --session s1   # -> error naming off/on
-"$H" settings set claims-auditor keep --session s1    # -> same
-"$H" settings set claims-auditor resume --session s1  # -> same
-# Then hand-edit `.claude/guard.local.json` to put `"claims-auditor": "reuse"` back, and:
-"$H" settings show --session s1
-#   -> claims-auditor: off. A stale `reuse` in the file is not a mode word, so it reads as
-#      off rather than as the agent being on — the safe direction.
-echo '{"session_id":"s1"}' | "$H" session-start
-#   -> NO instance line. There is no held-open agent left to announce.
-
-# The switch-free agents. The two Korean ones ride along and must never make guard speak on
-# their own; the two ext-docs ones may reach no switch-driven path at all, and the refs block
-# must survive a config with everything off — that is the point of them having no switch.
-"$H" settings set korean-translator on --session s1  # -> error: not a settable key
-"$H" settings set korean-corrector on --session s1   # -> same
-for k in claims-auditor deferrals-auditor clarity-auditor comment-corrector \
-         agents-md-auditor; do
-  "$H" settings set $k off --session s1
-done
-"$H" settings set docs-finder on --session s1
-#   -> error listing the settable keys: not a config key, and must stay refused
-"$H" settings set ext-docs-auditor on --session s1   # -> same
-"$H" settings list
-#   -> six agent lines and refs_dir. Neither `docs-finder` nor `ext-docs-auditor` appears,
-#      and there is no router_model line.
-echo '{"session_id":"s1"}' | "$H" session-start
-#   -> the refs rule only: no agent is on, so no closeout line.
-edit pr2 wiki/ref/v.md
-echo "{\"session_id\":\"s1\",\"prompt_id\":\"pr2\",\"transcript_path\":\"$T\",\"last_assistant_message\":\"done.\",\"stop_hook_active\":false}" | "$H" stop
-#   -> the refs block ALONE, naming ext-docs-auditor; trace outcome: refs. Every switch is
-#      off, which is exactly the case a switch in front of this agent would have silenced.
-echo '{"session_id":"s1","prompt_id":"pr2"}' | "$H" user-prompt
-#   -> nothing: `_reads_turn` is false with every turn-reading agent off, and the refs block
-#      carries file paths rather than the answer file.
-
-# The `verify` verb is gone, and so is every per-agent matcher. What must stay true is that
-# the manifest carries no matcher without a command file behind it — an orphan is inert and
-# silent, so nothing else would report it.
-python3 -c "
-import json
-h = json.load(open('guard/hooks/hooks.json'))['hooks']
-print(h.get('UserPromptExpansion'))   # -> None; guard registers no expansion matcher
-"
-
-# The two audit switches. Each one is BOTH a config key and a seed for the live session, and
-# the state key it seeds is inverted from it — so check the state, not only the printed line: a
-# `set audit-turn off` that wrote `audit_paused = False` would print exactly what was asked for
-# and do the opposite.
-"$H" settings set audit-turn off --session s1
-python3 -c "import json;print(json.load(open('$CLAUDE_PROJECT_DIR/.claude/guard/state/s1.json'))['audit_paused'])"
-#   -> True
-run pmute "Redis is always faster."     # -> (EMPTY); trace: skip_paused, NOT none_eligible
+# Muted: BOTH rosters must say so rather than print a roster. This is the only enforcement
+# point left for either router — no hook runs in front of them.
+CLAUDE_CODE_SESSION_ID=s1 "$H" toggle-cli off > /dev/null
+CLAUDE_CODE_SESSION_ID=s1 "$H" candidates        # -> says the session is muted
+CLAUDE_CODE_SESSION_ID=s1 "$H" candidates --doc  # -> the same
 CLAUDE_CODE_SESSION_ID=s1 "$H" toggle-cli on > /dev/null
-"$H" settings show --session s1
-#   -> `audit-turn: on (this session; project setting off)`. Both halves, because the toggle
-#      does not write the file and the file no longer describes the session.
-"$H" settings unset audit-turn --session s1     # -> back to the default ('off'), session too
-python3 -c "import json;print(json.load(open('$CLAUDE_PROJECT_DIR/.claude/guard/state/s1.json'))['audit_paused'])"
-#   -> True. The unset follows the DEFAULT, which is now muted — so re-arm before any later
-#      step that expects a recommendation.
+
+# --- Stop: the edited-file audits, and nothing else --------------------------------------
+#
+# `stop` must be SILENT for a turn that edited nothing, whatever the switches say. That is the
+# whole of v0.122.0 at this hook, and it is the assertion most likely to pass as a no-op — so
+# check the trace too, which distinguishes "no files" from "muted".
+run() { echo "{\"session_id\":\"s1\",\"prompt_id\":\"$1\",\"transcript_path\":\"$TR\",\"last_assistant_message\":\"$2\",\"stop_hook_active\":false}" | "$H" stop; }
+run pn "Redis는 항상 빠릅니다."      # -> (EMPTY). No turn block, no answer file, no closeout.
+                                     #    Before v0.122.0 this printed a turn block.
+tail -1 "$CLAUDE_PROJECT_DIR/.claude/guard/trace.log"   # -> outcome=none_eligible
+
+# With an edited source file it must name `comment-corrector` and nothing about the turn.
+echo '{"session_id":"s1","prompt_id":"pe","tool_name":"Edit","tool_input":{"file_path":"'$CLAUDE_PROJECT_DIR'/x.py"}}' | "$H" post-edit
+touch "$CLAUDE_PROJECT_DIR/x.py"
+run pe "Renamed it."
+#   -> one block: "this turn edited files in the repository. Audit them." plus the path.
+#      NO `answer file:` line, no closeout, and no `Dispatch these BEFORE you close the turn
+#      out` — that lead was for a turn block that no longer exists.
+
+# A refs file still blocks until it is indexed. This ignores every switch and the mute, and it
+# is the only `deny`-shaped thing guard does at this hook's sibling.
+CLAUDE_CODE_SESSION_ID=s1 "$H" toggle-cli off > /dev/null
+mkdir -p "$CLAUDE_PROJECT_DIR/wiki/ref"; touch "$CLAUDE_PROJECT_DIR/wiki/ref/new-doc.md"
+echo '{"session_id":"s1","prompt_id":"pr","tool_name":"Write","tool_input":{"file_path":"'$CLAUDE_PROJECT_DIR'/wiki/ref/new-doc.md"}}' | "$H" post-edit
+#   -> blocks, naming the index. A mute must not lift a prohibition.
 CLAUDE_CODE_SESSION_ID=s1 "$H" toggle-cli on > /dev/null
-"$H" settings set audit-plan false --session s1   # a JSON-style word is accepted, like `off`
-"$H" settings set audit-turn sometimes --session s1   # -> error naming on/off; nothing written
-"$H" settings unset audit-plan --session s1
-
-# Unknown keys and unknown values are both rejected outright rather than silently accepted.
-"$H" settings set audit_gate off --session s1   # -> error listing the settable keys;
-#   `audit_gate` was the old off/ask/auto gate in front of the switches and must stay rejected
-"$H" settings set claims-auditor maybe --session s1  # -> error naming off/on
-"$H" settings set claims-auditor fresh --session s1  # -> accepted; WRITTEN BACK as 'on'.
-#   The pre-v0.116.0 spelling. Every config file older than that release says it, so this must
-#   stay an accepted input and must never be what the file ends up holding.
-python3 -c "import json;print(json.load(open('$CLAUDE_PROJECT_DIR/.claude/guard.local.json'))['claims-auditor'])"
-#   -> on
-
-# `unset` is the only way a key leaves the file. It must handle the key that is not there,
-# the key guard does not honor, and the live switch whose instance has to stand down.
-"$H" settings unset nope --session s1            # -> "nothing to remove", lists keys present
-python3 -c "import json,pathlib;p=pathlib.Path('$CLAUDE_PROJECT_DIR/.claude/guard.local.json');d=json.loads(p.read_text());d['exempt_skills']=[];p.write_text(json.dumps(d))"
-"$H" settings unset exempt_skills --session s1   # -> "guard does not honor that key"
-"$H" settings unset korean-corrector --session s1
-#   -> "back to the default ('off')", then the settings, then the stand-down note for
-#      `guard-korean-corrector`. Reverting a switch is a change to what guard does, so it
-#      owes the same note a `settings set ... off` does.
-
-# The mutating CLI verbs refuse without the marker; reads still work.
-(unset GUARD_SETTINGS_SKILL; "$H" settings set claims-auditor off; "$H" settings unset refs_dir; "$H" settings show)
 
 # A HOOK must obey CLAUDE_PROJECT_DIR even when a stale GUARD_PROJECT_DIR is in the
 # environment. This is the nested-session case and it is not exotic: guard exports
@@ -2763,11 +2745,12 @@ python3 -c "import json,pathlib;p=pathlib.Path('$CLAUDE_PROJECT_DIR/.claude/guar
 # nested run, or `cd ../other-repo && claude` — inherits the first project's path.
 mkdir -p /tmp/guard-test/other/.claude
 cp "$CLAUDE_PROJECT_DIR/.claude/guard.local.json" /tmp/guard-test/other/.claude/   # else it is silent
-echo '{"session_id":"sx","prompt_id":"px","prompt":"q"}' \
-  | CLAUDE_PROJECT_DIR=/tmp/guard-test/other GUARD_PROJECT_DIR=/tmp/guard-test/proj "$H" user-prompt
-#   -> names a file under /tmp/guard-test/other. If it says /tmp/guard-test/proj, the
-#      precedence in `_project_dir` has been flipped back and one project is writing its
-#      turn records into another.
+echo '{"session_id":"sx","source":"startup","transcript_path":"'$TR'"}' \
+  | CLAUDE_PROJECT_DIR=/tmp/guard-test/other GUARD_PROJECT_DIR=/tmp/guard-test/proj "$H" session-start
+python3 -c "import json;print(json.load(open('/tmp/guard-test/other/.claude/guard/state/sx.json'))['transcript_path'])"
+#   -> $TR, written under /tmp/guard-test/other. A state file appearing under
+#      /tmp/guard-test/proj instead means the precedence in `_project_dir` has been flipped
+#      back and one project is writing another's state.
 ```
 
 ## What actually keeps a subagent conversation free of guard
@@ -2792,7 +2775,8 @@ exists for.
 Three results, and the second is the one the design rests on.
 
 **`UserPromptSubmit` does not fire for a message sent into a subagent's transcript.** Zero
-`user-prompt` trace records for all four, and the answer-file count did not move. So `cmd_turn`
+`user-prompt` trace records for all four, and the answer-file count did not move. So the
+`UserPromptSubmit` hook (removed in v0.122.0)
 never names a file, which is correct: there is no `Stop` coming to fill one.
 
 **`Stop` DOES fire in the main session when the exchange finishes, and guard's own origin test

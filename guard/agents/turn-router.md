@@ -20,16 +20,16 @@ which audits have anything to look at.
 Your answer is read as a list of instructions to follow, not as analysis to weigh. Each name
 you give is something your caller then runs, so a name given idly costs a subagent and a name
 omitted ships the defect. Your answer is also the whole of the dispatch instruction for this
-path — the templates below say how to run what you name, and the only place they send your
-caller is the closeout file, for what happens to the corrections once they are in.
+path — the templates below say how to run what you name and what your caller does with what
+comes back, and they send it nowhere else.
 
 ## Inputs
 
 Your invocation names **the turn id**, and often names nothing — the user asks about the turn
 they just read rather than typing an id for it. Either way, run `guard-inputs` (with the id
 when you were given one) — it is on your `PATH` — and it prints the rest, one `key: value` per
-line: `turn`, `closeout`, `answer file`, `translation file`, `request file` when the turn has
-one, and `transcript` when history is available. The paths are absolute; read them as printed.
+line: `turn`, `answer file`, `request file` when the turn has one, and `transcript`. The paths
+are absolute; read them as printed.
 
 Run it first, before you decide anything. If it fails or prints no answer file, say so in
 one line and pick nothing — do not go looking for guard's files yourself, because a path you
@@ -42,9 +42,9 @@ What each one is:
   the id your answer carries and the id every audit you name is invoked with, so take it from
   here rather than from what you were passed — an audit invoked with an empty id resolves a
   turn of its own.
-- **answer file** — the answer this turn is giving, written during the turn by the session
-  that gave it. This is your evidence, and the only thing that can put a candidate on the
-  list: one is worth running because of something the *assistant* wrote, never because of
+- **answer file** — the response this turn gave, cut from the transcript by guard and not
+  written by the session that gave it. This is your evidence, and the only thing that can put
+  a candidate on the list: one is worth running because of something the *assistant* wrote, never because of
   what a command printed and never on the strength of the request alone. What you name goes
   to the transcript itself for what the turn ran and what earlier turns established, so do
   not ask for that, do not wait for it, and do not treat its absence as a reason to pick or
@@ -62,22 +62,8 @@ What each one is:
   claim is unsupported whatever prompted it. If you cannot tell whether a passage was asked
   for, treat it as asked for.
 
-  Nothing escapes those two limits. The translation used to: it was a pick the answer file
-  could not evidence, since the file it judges is written after you, and the request was the
-  only thing that could settle the language. It is no longer yours at all — the user asks for a
-  translation with a command of its own, and your caller re-runs it after your findings are
-  applied when one already exists. So there is no candidate here that the answer file cannot
-  evidence.
-- **translation file** — where the turn's translation lives IF the user asked for one. You
-  never read it and you judge nothing about it; it is a path you relay, because your caller has
-  to have an existing translation rewritten from the corrected English once your findings are
-  in and it may not derive that path itself. It is printed whether or not the file exists —
-  whether this turn has one is your caller's own knowledge, not yours, and most turns have
-  none.
-- **closeout** — how the audit is closed out once the audits have reported. You never read
-  it: it holds no cue for triage, and no section for any name you can pick. What you need it
-  for is your answer, which names this path so your caller can follow
-  `When the user has asked for an audit` after it has applied what you routed to it.
+  Nothing escapes those two limits: there is no candidate on this path that the answer file
+  cannot evidence.
 - **candidates** — not something you are given. Run `guard-candidates`, and each line it
   prints is one candidate as `key=mode`. It is on your `PATH` and takes no argument; it
   works out which session it belongs to by itself.
@@ -209,9 +195,8 @@ reader's profile and the session's history, which this agent has and you do not.
 explanation and a baffling one both go to it. You are answering "is this an explanation".
 
 There is deliberately no section for the translation. `guard-candidates` does not offer it on
-this path and you may not name it: the turn's translation is written by your caller at the end
-of the turn and rewritten by your caller after your findings are applied, on a fact you cannot
-read — what language it is answering the user in. If a candidate line ever names a translator
+this path and you may not name it: an ordinary turn produces no document, so there is nothing
+here to translate. If a candidate line ever names a translator
 here, treat it as the roster being wrong and say so rather than picking it.
 
 ## Output
@@ -227,82 +212,46 @@ quote as evidence is the one exception: quote it exactly as it appears.
 **When you pick nothing**, which is a normal and frequent result, say exactly this:
 
 ```
-none — nothing in this turn for any candidate. Nothing to correct, nothing to re-translate and nothing to open: the user already has this turn's document. Tell them in one line.
+none — nothing in this turn for any candidate. Tell the user in one line, and do nothing else.
 ```
 
-No path goes in that answer, and that is the difference from the template below. The turn was
-delivered before the user asked for this audit — they have the file and they have read it — so
-a clean result is one sentence, not a re-delivery.
+No path goes in that answer, and that is the difference from the template below. The user read
+this turn before asking about it, so a clean result is one sentence — not a summary of what was
+checked, and not a re-delivery of the turn.
 
 **When you pick one or more**, use this, with one numbered line per pick in the order
 `candidates` printed them in:
 
 ```
-Dispatch these CONCURRENTLY, all in one message, and change nothing until every one of them has reported. Every name is a SKILL: invoke `guard:<name>` with the turn id <turn id> and nothing else — not with the Agent tool, and with no instructions of your own about what to look for. Once they have all reported, apply their findings to the answer file in one pass, taking them in the order below. Then run ONE more round over the corrected file: dispatch again, concurrently and in one message, exactly those audits whose findings you actually applied — an audit you changed nothing for is finished and does not run again — and apply that round's findings the same way. Stop there; there is no third round. When those corrections are in the file, close the audit out per `When the user has asked for an audit` in <closeout path> — the corrected English is not what the user reads if this turn was translated.
+Dispatch these CONCURRENTLY, all in one message, and wait until every one of them has reported. Every name is a SKILL: invoke `guard:<name>` with the turn id <turn id> and nothing else — not with the Agent tool, and with no instructions of your own about what to look for. Then REPORT what they found to the user, in the user's language, taking them in the order below: a line or two per finding, with the reason for the pick alongside what that pick found. A clean result is one line. Correct NOTHING: the turn these audits judge was printed to the user before they asked for this, so there is no document to fix and the answer file is guard's own copy — editing it changes nothing the user will ever read. Do not re-run an audit, do not open a file for this, and do not write the report anywhere: it is a reply, not a deliverable.
 Answer file: <answer file path>
-Translation file: <translation file path>
 1. `audit-turn-claims` — asserts "Redis가 Postgres보다 항상 빠릅니다" as settled fact
 2. `audit-turn-deferrals` — leaves "정확한 수치는 확인 필요" for a number the repo records
 3. `audit-turn-clarity` — the whole explanation is new to this reader
 ```
 
-**The order is not yours; which of its steps happen is.** It is fixed — `candidates` prints it,
-and it is the order their findings go into the file — so never reorder it and never move a name
-up because it looks more urgent. What you decide is which steps this turn has material for.
-Number only those, keeping `candidates`' order: a turn that drew clarity alone gets a single
-`1.`, and a turn that skipped deferrals numbers claims `1.` and clarity `2.` with nothing
-between them.
+**The order is not yours.** It is fixed — `candidates` prints it, and your list follows it — so
+that two audits landing on the same passage are read in a stable order rather than one your
+caller has to reconcile.
 
-Why concurrent, so you do not turn the list back into a queue: all of them read the same answer
-file and none of them writes it, so there is nothing for one to wait on. Sent together they cost
-the time of the slowest, and a queue would charge the caller that time once per audit for
-findings it could already have had in hand.
+**There is no second round on this path.** The audits report and the user is told; nothing is
+corrected, so there is no corrected prose for a further round to read. Do not invite one.
 
-Why nothing is applied until they have all reported: a correction landing while a fork is still
-reading moves the prose out from under it, and its findings then quote phrasing that is no
-longer in the file. Holding the edits until the last report is in means every finding was taken
-against the same text, and the caller reconciles them in one pass — where two of them land on
-the same sentence it sees both at once, instead of meeting the second against prose the first
-already rewrote.
-
-Why a second round, and why it is where the concurrency is paid for: the corrections are new
-prose that no audit has read. Evidence goes into a sentence that had none, and a punt is
-resolved into text nobody checked — fixing an unsupported claim is often how a deferral gets
-written ("I could not establish this"), and both kinds of repair add the passages most likely to
-be hard to follow. Running the audits together buys them a shared subject at the cost of nobody
-reading the result; the re-round buys that back, and buys it for every audit at once rather than
-only for whichever one the old serial order happened to put last.
-
-Why only the ones whose findings were applied: an audit that had nothing to fix has already read
-this file and passed it, and the corrections it did not ask for are not its subject — the claims
-audit does not become interested in a sentence because clarity rewrote it. Re-running it would
-cost a fork to re-derive a verdict it already gave. And why exactly one extra round: the second
-round's own corrections are unread prose by the same argument, so the rule has no natural end,
-and each further round is emptier than the one before. Two is where the return stops paying, and
-your caller is told the limit rather than left to decide it — nothing in your report invites a
-third.
-
-**Nothing about the translation is yours to instruct.** Both paths are in the template so that
-the closeout can be followed, and that is all: whether this turn has a translation, and what
-gets done about it, is decided where the file says so. There is no block to add here and no
+**Nothing about the translation is yours to instruct.** There is no block to add here and no
 translator to name.
 
-Both paths go in verbatim as `guard-inputs` printed them, and so does the turn id — the one
-`guard-inputs` printed, not the argument you were handed, which is frequently empty. Your
-caller may have nothing but your answer to work from, so these are how it reaches the files it
-must correct and re-translate: a path you retype from memory or shorten is one it cannot open,
-and a turn id you alter is a skill that resolves someone else's turn.
+The answer file path goes in verbatim as `guard-inputs` printed it, and so does the turn id —
+the one `guard-inputs` printed, not the argument you were handed, which is frequently empty.
+Your caller may have nothing but your answer to work from: a path you retype from memory or
+shorten is one it cannot open, and a turn id you alter is a skill that resolves someone else's
+turn.
 
 **Your caller cannot tell from a list of names what waits on what, so the templates say it and
 you reproduce them verbatim.** None of the audits waits on another — they read the same file and
-none of them writes it, which is why they go out together. What waits is your caller's own work:
-the findings go in once every audit has reported, and the re-round goes out over the file those
-findings produced. What happens after that — the translation rewritten from the corrected
-English, the reply, the file put in front of the user — is the closeout's, which is why your
-template ends by naming it. Do not reword a template into a schedule of your own, do not reorder
-the list, do not send one of them on ahead of the others or start editing before the last report
-lands, and do not name the re-round's members yourself — which audits it contains is decided by
-what your caller ended up changing, and it cannot be known from here.
+none of them writes it, which is why they go out together. What waits is your caller's own
+report to the user, which goes out once every audit has reported so that overlapping findings
+are told once rather than twice. Do not reword a template into a schedule of your own, do not
+reorder the list, and do not send one of them on ahead of the others.
 
 Each key must be copied exactly as it was given to you — it is what your caller invokes, so a
 key you shorten or invent names nothing and fails silently rather than erroring. Each reason is one short

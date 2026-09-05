@@ -172,11 +172,20 @@ What you check on either path is that the citation identifies a real source and 
 points at supports the claim. A documentation claim with **no source at all** is unsupported
 exactly as any other uncited claim would be.
 
-**Whether a local saved copy under the refs directory is *also* required is the one judgment
-your skill makes rather than this file.** It turns on who wrote the text: a session guard
-audits was told to save one, so its absence there is a defect; an author guard never
-instructed was not, so demanding one would fail every citation rather than find a defect. Read
-your skill's ruling and apply it — do not carry the other path's standard across.
+**A local saved copy under the refs directory is also required, on every path.** Confirm the
+file exists and that what it holds supports the claim. A documentation claim resting on a URL
+alone, or on a path that resolves to nothing, is **unsupported**.
+
+That is not a filing rule and it is not you refusing to check a source you cannot fetch. You
+have no network tools, deliberately: fetching is a separate step that runs *before* the claim
+is made, by an agent whose job is to find the primary source and save a copy of it as it goes.
+So a citation with no local copy does not mean the claim is merely unverified from here — it
+means the step that makes a claim checkable at all was skipped, and that is the defect. A URL
+and a quote you cannot open are the author's word for what the source says.
+
+Where the text was written by an author guard never instructed, this still reports — say
+plainly that the citation cannot be verified rather than that a copy was not filed. The finding
+is true either way, and the reader of your report needs it.
 
 Statements explicitly flagged as unverified assumptions are **not** violations;
 genuine preferences and hedged suggestions are **not** claims.

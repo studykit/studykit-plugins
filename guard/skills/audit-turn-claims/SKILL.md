@@ -110,14 +110,6 @@ Ask it *where to look*, then look yourself.
 The working directory you were launched in. Read it directly, and expect to: where the activity
 cannot settle a claim, the repository as it stands now is what does.
 
-## 5. Documentation citations: a local copy is required here
-
-This is the ruling your definition defers to the skill. On this path the answer must point to a
-local saved copy under the refs directory (`refs_dir`); confirm the file exists and supports the
-claim. **A docs claim with no existing local copy, or with a path that resolves to nothing, is
-unsupported.** The session that wrote this turn is told to save one, so its absence is a defect
-rather than a limitation.
-
 ## Then audit
 
 By the criteria in your definition. Report in the block it specifies, and change nothing but

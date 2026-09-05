@@ -38,10 +38,10 @@ count for each of the four.
 One thing matters: the **assistant response text** for the turn being audited. Stop only
 if you were given no response text at all, and say so.
 
-- **an answer file** — the answer this turn is giving, and the only thing you are handed.
-  **Correct it in place.** It is not a copy of something already delivered: the user is
-  shown this file after you and the other agents are done, which is why your rewrite goes
-  into the file itself rather than into a proposal for someone to relay. Rewrite only what
+- **a file of Korean prose** — the translation just written, and the only thing you are
+  handed. **Correct it in place.** It is not a copy of something already delivered: the user
+  is shown this file after you are done, which is why your rewrite goes into the file itself
+  rather than into a proposal for someone to relay. Rewrite only what
   needs rewriting; an edit per problem leaves a reviewable diff, where rewriting the whole
   file to fix two sentences does not.
 

@@ -26,7 +26,6 @@ that implements it — see ``guard_core/__init__.py`` for the layering.
 
 Subcommands
 -----------
-- user-prompt    UserPromptSubmit  — ``guard_core.cmd_turn``
 - post-edit      PostToolUse on the write tools — ``guard_core.cmd_edit``
 - pre-search     PreToolUse on the search tools — ``guard_core.cmd_search``
 - stop           Stop — ``guard_core.cmd_stop``
@@ -54,7 +53,6 @@ import sys
 
 from guard_core.paths import _project_dir, _trace
 from guard_core.transcript import cmd_transcript
-from guard_core.cmd_turn import cmd_user_prompt
 from guard_core.cmd_edit import cmd_post_edit
 from guard_core.cmd_search import cmd_pre_search
 from guard_core.cmd_stop import cmd_stop
@@ -69,7 +67,6 @@ from guard_core.cmd_status import cmd_status, cmd_toggle_cli
 
 
 SUBCOMMANDS = {
-    "user-prompt": cmd_user_prompt,
     "post-edit": cmd_post_edit,
     "pre-search": cmd_pre_search,
     "settings": cmd_settings,

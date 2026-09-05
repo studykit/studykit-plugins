@@ -33,16 +33,17 @@ def _read_state(project_dir: Path, session_id: str, config: dict[str, Any]) -> d
            for k, spec in AUDIT_AGENTS.items() if spec.fixed_mode is None},
         # Per-turn guards keyed by the transcript prompt_id (a turn == one promptId).
         "last_audited_prompt_id": "",
-        # The most recent auditable turn's prompt_id, recorded by every Stop, switches or
-        # not. Only the CODEX adapter reads it, for its `/guard:claims-auditor` prompt-prefix
-        # path; Claude's per-agent commands were removed. Kept written on both hosts because
-        # `cmd_stop` is shared core and because a marker maintained only from the day a host
-        # gains an on-demand path back is a marker that is wrong on that day.
+        # The most recent auditable turn's id. CODEX ONLY as of v0.122.0 — that adapter keeps
+        # its own turn record because its transcript is not a stable hook interface, so it has
+        # nowhere else to resolve "the turn just finished" from. Claude stopped writing it when
+        # the Stop hook stopped recording turns; there, `guard-inputs` walks the transcript
+        # instead. It stays in this shared module, and in the preserved-key list below, because
+        # `hook_codex` reads and writes it through these two functions: drop it and the Codex
+        # marker is silently erased on the next write.
         "pending_verify_prompt_id": "",
-        # The session's transcript, recorded at Stop. The Stop payload carries it and the
-        # `UserPromptSubmit` one does not, and it is a session-long fact, so remembering it
-        # here is cheaper than making an agent go looking for a file it has no reliable way
-        # to name.
+        # The session's transcript, recorded at SessionStart, whose payload carries it. It is
+        # the HOST's path and guard will not guess at the host's storage layout, so it has to
+        # be taken from a payload; it is a session-long fact, so once is enough.
         "transcript_path": "",
         # Files written during one turn, accumulated by PostToolUse and read back at Stop
         # to decide whether a file-reading agent has anything to look at. Stored WITH the
@@ -92,7 +93,6 @@ def _read_state(project_dir: Path, session_id: str, config: dict[str, Any]) -> d
         # supplies it and no later turn pays for it again. SessionStart fires on `compact` too
         # on both hosts, which is what makes this safe against a compaction dropping the line —
         # the event that re-states the path is the same event that re-sets the flag.
-        "closeout_stated": False,
         "updated_at": None,
     }
     path = _state_file(project_dir, session_id)
@@ -107,7 +107,7 @@ def _read_state(project_dir: Path, session_id: str, config: dict[str, Any]) -> d
     keys = (*AUDIT_AGENTS, "last_audited_prompt_id", "pending_verify_prompt_id",
             "transcript_path", "audit_paused", "plan_audit_paused", "plan_audited_hash",
             "handover_file", "edited_prompt_id", "edited_files",
-            "edited_agent_docs", "edited_refs", "closeout_stated", "updated_at")
+            "edited_agent_docs", "edited_refs", "updated_at")
     default.update({k: data[k] for k in keys if k in data})
     return default
 

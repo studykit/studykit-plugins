@@ -66,18 +66,6 @@ The working directory you were launched in. With no activity and no request, **t
 it stands now — plus any saved copy under the refs directory — is all that settles a claim.**
 Open it.
 
-## 5. Documentation citations: a URL and a quote, not a local copy
-
-This is the ruling your definition defers to the skill. Here the standard is a source that
-identifies itself — a URL plus a verbatim quote of the deciding passage — and a quote that
-actually supports the claim.
-
-A local saved copy under the refs directory is **better**: use it when one exists, and say so.
-But **its absence is not a finding on this path.** The parties who write the documents you audit
-here were never told to save one, so requiring it would fail every citation rather than find a
-defect. A documentation claim with no source at all is unsupported exactly as any other uncited
-claim would be.
-
 ## Then audit
 
 By the criteria in your definition. Report in the block it specifies, and change nothing but

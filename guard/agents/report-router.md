@@ -32,10 +32,8 @@ reads it, and unlike the turn router you get no request file — nobody typed a 
 produced this document. When the line is absent, the document is not being delivered to a
 reader in another language and there is nothing to translate.
 
-It prints no closeout file, and that is deliberate: guard's turn closeout is written around a
-turn — it routes findings into the answer file, then a translation of it, then how the turn is
-presented to the user. A document has none of that. Your Output section below is the whole of
-the dispatch instructions for this path, so do not send your caller anywhere else.
+It sends your caller to no other file, and that is deliberate: your Output section below is the
+whole of the dispatch instructions for this path.
 
 Run it first, before you decide anything. If it says there is no file at that path, say so in
 one line and pick nothing — do not go looking for the document elsewhere and do not audit the
@@ -51,7 +49,7 @@ offered — an audit with no document-side entry point simply does not appear.
 
 **A name beginning `audit-` is a SKILL your caller invokes**; anything else is an AGENT it
 dispatches with the Agent tool. You invoke nothing yourself, but your output has to say which it
-is, because there is no closeout file on this path to say it for you.
+is, because nothing else on this path says it for you.
 
 **You may name only the names it printed.** A name that is not printed is not available, so
 ignore its section below and never name it. If the command prints nothing, or fails, or says

@@ -4,10 +4,14 @@
 #   guard-inputs <turn-id>
 #
 # For an agent guard dispatched, and for nothing else. It exists so the dispatch can carry
-# the turn id alone: the playbook, the answer file, the request file and the transcript are
-# all derivable from it, and having the main agent spell them out made it relay four
-# absolute paths it never opens — text read by the wrong party, and a copy step that can
-# only lose fidelity.
+# the turn id alone — or nothing, since with no id it resolves the last turn a person opened.
+# The answer file, the request file and the transcript all follow from that, and having the
+# main agent spell them out made it relay absolute paths it never opens: text read by the
+# wrong party, and a copy step that can only lose fidelity.
+#
+# It also CUTS the turn out of the transcript, which is why it writes files rather than only
+# printing paths. Nothing records a turn per turn any more; this is where that happens, when
+# an audit has actually been asked for.
 #
 # Same PATH as `guard` and `guard-candidates`, put there by the SessionStart hook. A
 # subagent's Bash inherits it, and carries the PARENT session's CLAUDE_CODE_SESSION_ID,
