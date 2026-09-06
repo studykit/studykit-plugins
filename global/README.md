@@ -16,10 +16,23 @@ there is no reinstall step.
 ./global/install.sh
 ```
 
+On Windows, where that script has no shell to run in, use the PowerShell counterpart — same
+flags, same output, same exit codes:
+
+```powershell
+./global/install.ps1
+```
+
 Re-run it after adding a definition. It refuses to overwrite anything it did not create; pass
 `--force` to replace one anyway (a regular file is moved aside, never deleted). Use `--dry-run`
 to see what it would do and `--uninstall` to remove its links. `CLAUDE_AGENTS_DIR` overrides the
-agent destination.
+agent destination. `install.ps1` accepts those spellings as well as `-Force`, `-DryRun`,
+`-Uninstall`.
+
+Because the definitions are linked rather than copied, installing on Windows needs symlink
+creation to be permitted: turn on Developer Mode (Settings > System > For developers) and run
+`install.ps1` under PowerShell 7. Windows PowerShell 5.1 cannot create a symlink without an
+elevated shell even when Developer Mode is on.
 
 ## Agents
 

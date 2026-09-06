@@ -127,8 +127,8 @@ Contributor- and runtime-facing guidance lives in `AGENTS.md` files and under ea
 
 `global/` holds definitions that install into the user's own `~/.claude` rather than into a
 project or a plugin, and mirrors that directory's layout — `global/agents/` becomes
-`~/.claude/agents/`. `global/install.sh` links them into place instead of copying, so the
-checkout stays the single source of truth; see `global/README.md`.
+`~/.claude/agents/`. `global/install.sh` (or `install.ps1` on Windows) links them into place
+instead of copying, so the checkout stays the single source of truth; see `global/README.md`.
 
 Prefer a plugin when a definition belongs with commands, skills, or hooks that ship alongside
 it. `global/` is for one that stands alone and would gain nothing from a manifest — an agent
