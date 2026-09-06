@@ -6,10 +6,14 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/doc_audit.py",
-            "args": ["post-edit"],
-            "timeout": 10,
-            "description": "Record an AGENTS.md/CLAUDE.md or */agents/*.md file this turn wrote, for the turn-end audit dispatch. Records only; never blocks."
+            "command": "uv",
+            "args": [
+              "run",
+              "--script",
+              "${CLAUDE_PROJECT_DIR}/.claude/hooks/doc_audit.py",
+              "post-edit"
+            ],
+            "timeout": 10
           }
         ]
       }
@@ -19,17 +23,20 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/doc_audit.py",
-            "args": ["stop"],
-            "timeout": 10,
-            "description": "When the finished turn edited agent instruction files or plugin agent definitions, ask for contributor-docs-auditor / plugin-agent-doc-auditor over exactly those files."
+            "command": "uv",
+            "args": [
+              "run",
+              "--script",
+              "${CLAUDE_PROJECT_DIR}/.claude/hooks/doc_audit.py",
+              "stop"
+            ],
+            "timeout": 10
           }
         ]
       }
     ]
   },
   "enabledPlugins": {
-    "claude-code-setup@claude-plugins-official": true,
     "skill-creator@claude-plugins-official": false,
     "plugin-dev@claude-plugins-official": true,
     "hookify@claude-plugins-official": false,
