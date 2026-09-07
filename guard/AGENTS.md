@@ -100,7 +100,10 @@ caller that omits the flag gets entries pointing at a turn that does not exist.
 `handover` is the one skill here that is not about auditing anything. The user runs it to write
 a session handover, and its last step records the file's path (`guard-handover`) — which is why
 it lives in guard: the `/clear` handoff record is already the one thing that survives a cleared
-conversation, and the offer to read the handover rides in it.
+conversation, and the pointer to the handover rides in it. The replacing session names the file
+to the user (a `SessionStart` `systemMessage` — the only channel that reaches them) and reads it
+without asking; that it is a read rather than an offer is the user's call, recorded in
+`dev/design.md`.
 
 ## Hard requirements
 

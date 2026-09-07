@@ -86,9 +86,9 @@ def _read_state(project_dir: Path, session_id: str, config: dict[str, Any]) -> d
         # The handover file this session wrote, recorded by the `handover` skill through
         # `guard-handover`. Session-scoped like everything else here, and read by exactly one
         # event: `SessionEnd` on `/clear`, which copies it into the handoff record so the
-        # replacing session can be offered it. Nothing else reads it, and the session that
-        # inherits the record never carries this key — a second `/clear` with no new handover
-        # would otherwise re-offer a file the user has already been shown.
+        # replacing session reads it. Nothing else reads it, and the session that inherits the
+        # record never carries this key — a second `/clear` with no new handover would
+        # otherwise re-read a file the user has already worked through.
         "handover_file": "",
         # Has this session already been told where the turn closeout file is? The path is
         # static for the whole install, so the Stop block repeats it only until something has

@@ -3,19 +3,20 @@
 Run from the ``handover`` skill, through the ``guard-handover`` wrapper on ``PATH``, as its
 last step. It writes one path into ``state/<sid>.json``; everything that happens afterwards is
 ``cmd_session``'s — ``SessionEnd`` on ``/clear`` copies the path into the handoff record, and
-the ``SessionStart`` that replaces the session tells the model to offer it.
+the ``SessionStart`` that replaces the session names the file to the user and tells the model to
+read it.
 
 **Why the skill records it rather than the next session looking for it.** The alternative was
 scanning ``.handover/`` at session start for the newest untracked file, which needs no
 cooperation from the skill and answers a different question: it finds a handover, not *this
 session's* handover. A file left by a session two days ago, or by a colleague, or by the same
-session three clears ago, all look identical to that scan, and each one offered is a session
-told to resume work that is already done. The path recorded here is known to belong to the
-session the ``/clear`` is replacing, which is the only case the offer is right for.
+session three clears ago, all look identical to that scan, and each one picked up is a session
+resuming work that is already done. The path recorded here is known to belong to the session
+the ``/clear`` is replacing, which is the only case reading it unasked is right for.
 
 The cost is that a skill step can be skipped: a session that crashes between writing the file
-and running this leaves nothing to carry. That is the correct direction to fail — nothing is
-offered, and the user still has the file.
+and running this leaves nothing to carry. That is the correct direction to fail — the next
+session is told nothing, and the user still has the file.
 """
 
 from __future__ import annotations
@@ -44,8 +45,8 @@ def cmd_handover_written() -> int:
     what went wrong.
 
     Fail-open and quiet, like ``plan-audited``: a missing session id or an unwritable state
-    directory prints to stderr and exits 0. The cost is one un-offered handover, and the file
-    itself — the thing worth having — is already on disk.
+    directory prints to stderr and exits 0. The cost is one handover the next session is never
+    told about, and the file itself — the thing worth having — is already on disk.
     """
     session_id = os.environ.get("CLAUDE_CODE_SESSION_ID", "").strip()
     project_dir = _cli_project_dir()
@@ -76,7 +77,7 @@ def cmd_handover_written() -> int:
     # state, which outlives the conversation; `CLEAR_INHERIT_MAX_AGE_SECONDS` bounds the
     # `SessionEnd`-to-`SessionStart` handoff instead, and quoting it here read as a clock on
     # when to `/clear`. The boundary worth naming is single use.
-    print(f"guard: handover recorded — {path}. The session a /clear opens next is offered "
-          "this file, once.")
+    print(f"guard: handover recorded — {path}. The session a /clear opens next is told about "
+          "this file and reads it, once.")
     _trace(project_dir, session_id, "handover-written", "recorded")
     return 0

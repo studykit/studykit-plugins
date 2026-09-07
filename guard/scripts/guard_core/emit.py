@@ -1,4 +1,4 @@
-"""The three shapes guard writes to stdout.
+"""The four shapes guard writes to stdout.
 
 Every subcommand exits 0 regardless: blocking is expressed through a decision payload,
 never through an exit code.
@@ -62,3 +62,28 @@ def _emit_post_tool_block(reason: str) -> None:
     ``wiki/ref/claude-code-hook-enforcement-facts.md``.
     """
     json.dump({"decision": "block", "reason": reason}, sys.stdout)
+
+
+def _emit_session_start(context: str, system_message: str) -> None:
+    """Emit SessionStart's model context, and one line the USER sees when there is one.
+
+    Plain stdout would do for the context alone — SessionStart is one of the few events where
+    Claude Code adds it to the model's context rather than the debug log (official hooks docs,
+    https://code.claude.com/docs/en/hooks.md, "Exit code 0"; excerpt at
+    ``wiki/ref/claude-code-hooks-session-env.md``), and that is all this hook printed until the
+    `/clear` handoff had something to say to the PERSON rather than to the model.
+
+    ``systemMessage`` is the only channel that reaches them. On SessionStart it is prepended to
+    the assistant's next response as a system note, visible to Claude as well, and truncated at
+    4,000 characters (same page, "JSON output"). So it carries a path, never a document — a
+    preview is a promise that field cannot keep for a long file.
+
+    Note the cost, which is why this takes everything at once: stdout is read as JSON or as
+    plain text and never as both, so the moment one line has to reach the user, every context
+    line has to travel in the same object.
+    """
+    output: dict = {"hookSpecificOutput": {"hookEventName": "SessionStart",
+                                           "additionalContext": context}}
+    if system_message:
+        output["systemMessage"] = system_message
+    json.dump(output, sys.stdout)

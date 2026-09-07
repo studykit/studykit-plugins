@@ -77,12 +77,12 @@ beyond the state root.
 | (called via Bash, not a hook) | `settings` | `guard:settings` (a `context: fork` skill, so it runs in a forked `general-purpose` agent rather than in the main session) shows/sets/unsets guard.local.json settings; the agent modes also apply to the live session's `state/<sid>.json` (session id from `--session`/`CLAUDE_CODE_SESSION_ID`). `set` preserves every other key; `unset <key>` is the only way to delete one. |
 | `Stop` | `stop` | The edited-file audits and nothing else. Emits `additionalContext` naming `comment-corrector` / `agents-md-auditor` over the files this turn edited, and `ext-docs-auditor` over anything it wrote under the refs dir — in each case the file list is the whole condition, so no router weighs it and no user decides it. It records nothing about the turn, names no answer file and reads none of the response: as of v0.122.0 the turn audit resolves and cuts its own target (`inputs`). Silent while the session is muted, and silent for a turn that edited nothing.
 | `SessionEnd` (`clear`) | `session-end` | Hand this session's two switches, and the handover file it recorded, to the session `/clear` is about to open, then let it announce what it adopted. The two halves are independent: writes nothing only when both switches still match the pair a fresh session opens in — armed for the turn mute, this project's `audit-plan` for the gate — AND no handover was recorded. |
-| `SessionStart` | `session-start` | Sweep state and turn records past retention, export `GUARD_REFS_DIR` and `GUARD_TOGGLE_CLI`, state the refs rule as session context, say once — when any agent is on — either that the session opened muted (`guard on` arms it) or where the turn closeout is and which commands the USER invokes to audit. The commands are stated here and nowhere else in the standing context: `audit-turn` / `audit-report` are `disable-model-invocation: true`, so their own descriptions are never loaded. Also records this session's `transcript_path` from the payload — the one field guard cannot derive, and what every turn audit reaches its turn through. |
+| `SessionStart` | `session-start` | Sweep state and turn records past retention, export `GUARD_REFS_DIR` and `GUARD_TOGGLE_CLI`, state the refs rule as session context, say once — when any agent is on — either that the session opened muted (`guard on` arms it) or where the turn closeout is and which commands the USER invokes to audit. The commands are stated here and nowhere else in the standing context: `audit-turn` / `audit-report` are `disable-model-invocation: true`, so their own descriptions are never loaded. Also records this session's `transcript_path` from the payload — the one field guard cannot derive, and what every turn audit reaches its turn through. Everything it says goes out as ONE JSON object (`emit._emit_session_start`): `additionalContext` for the lines above, plus a `systemMessage` when a `/clear` carried a handover, which is the only field on this event the USER can see. Codex keeps the plain-text form. |
 | (called via Bash, not a hook) | `candidates` | The router's own roster: prints the turn-reading agents switched on for this session, one `agent=mode` per line, in `AUDIT_AGENTS` order, filtered by `routed` for the asking path — which is what keeps the Korean pair off the turn roster. `--doc` answers for the document path instead — the same eligibility, mapped through `report_entry`, so an audit with no document-side entry point drops out. It is where the mute is enforced for both routers, since neither has a hook in front of it. Session id from `CLAUDE_CODE_SESSION_ID`, which a subagent's Bash carries as its parent's. Read-only, and the only command the router runs. |
 | (called via Bash, not a hook) | `transcript` | `index` / `turn` / `find` over the session transcript, for the audit agents. Writes an extract file and prints only its path plus a one-line summary; `--since` / `--until` / `--last` bound which turns are scanned. |
 | (called via Bash, not a hook) | `toggle-cli` | Arm/mute guard for THIS session (`audit_paused`, session state only — never guard.local.json), from a shell prompt: `on` / `off` / `status` / empty flips. A session opens ARMED and no config key seeds it (`audit-turn` retired in v0.124.0), so `off` is the direction that needs typing. Session id from `CLAUDE_CODE_SESSION_ID`; project from `_cli_project_dir`. The ONE subcommand that does not fail open — see `_MUST_REPORT` in `guard_hook.py`. |
 | (called via Bash, not a hook) | `status` | Status-line segment: `guard <will run>/<switched on>` plus the plan gate's flag (`⚑` armed, `⚐` muted), green armed and dim muted on each half; nothing at all on any failure. Reads one state file; runs on every assistant message. |
-| (called via Bash, not a hook) | `handover-written` | Record `<path>` as the handover this session wrote, for the `guard:handover` skill to run as its last step. Writes one key into `state/<sid>.json`; the file must exist, so a path that was never written is refused while someone can still act on it. Session id from `CLAUDE_CODE_SESSION_ID`. Fails open — the handover file is the deliverable, and the record only decides whether the next session is offered it. |
+| (called via Bash, not a hook) | `handover-written` | Record `<path>` as the handover this session wrote, for the `guard:handover` skill to run as its last step. Writes one key into `state/<sid>.json`; the file must exist, so a path that was never written is refused while someone can still act on it. Session id from `CLAUDE_CODE_SESSION_ID`. Fails open — the handover file is the deliverable, and the record only decides whether the next session is told about it. |
 | (called via Bash, not a hook) | `refs-dir` | Print the resolved refs directory (auditor fallback; applies `refs_dir` validation). |
 
 ## The turn audit is invoked, not recommended (v0.118.0)
@@ -744,7 +744,12 @@ payloads, not memory.
   the closeout file pointer can be stated once per session instead of on every `UserPromptSubmit`. The
   same section confirms that plain stdout becomes model-visible context for exactly three
   events — `UserPromptSubmit`, `UserPromptExpansion`, `SessionStart` — which is how those
-  lines reach the model at all. Source: official hooks docs
+  lines used to reach the model. They now go through `hookSpecificOutput.additionalContext`
+  instead, for a reason that has nothing to do with the context: stdout is parsed as JSON or as
+  plain text and never as both, so the one field on this event the user can see
+  (`systemMessage`) costs every line its plain-text path. The plain-text guarantee still
+  matters as the Codex path and as the fallback if the JSON shape ever changes. Source: official
+  hooks docs
   (https://code.claude.com/docs/en/hooks), excerpt saved at
   `wiki/ref/claude-code-hooks-session-env.md`, fetched 2026-08-22 — docs-verified, not
   observed on a live compaction. If the policy line stops surviving a compact, re-check this
@@ -1926,7 +1931,7 @@ payloads, not memory.
   **The record's second half is the handover, and it is independent of the first.** The
   `guard:handover` skill writes a handover file and records its path (`guard-handover` →
   `handover_file`); `SessionEnd` copies the path into the same record, and the replacing
-  `SessionStart` tells the model to ask the user whether to read it. Nothing about the two
+  `SessionStart` names the file to the user and tells the model to read it. Nothing about the two
   halves is shared but the file they travel in: a session that wrote a handover and never
   touched a switch still hands the file over, and a session that muted guard and wrote no
   handover still hands the mute over. Collapsing them into one "is there anything to carry"
@@ -1940,26 +1945,43 @@ payloads, not memory.
 
   The inheriting session does **not** store `handover_file`. It is announced once, to the
   session replacing the one that wrote it; a session that carried the key would hand the same
-  file on again at its own `/clear`, offering a handover the user has already been shown.
+  file on again at its own `/clear`, announcing a handover the user has already worked through
+  and reading it a second time.
 
   **Why the skill records it rather than the next session going looking.** The alternative
   considered was scanning the handover directory at session start for the newest untracked
   file, which needs no cooperation from the skill and answers a different question: it finds
   *a* handover, not *this session's*. A file left by a session two days ago, by a colleague, or
-  by the same session three clears ago all look identical to that scan, and each one offered is
-  a session told to resume work that is already done. What it costs is that a skill step can be
+  by the same session three clears ago all look identical to that scan, and each one picked up
+  is a session resuming work that is already done. What it costs is that a skill step can be
   skipped — a session that crashes between writing the file and recording it hands over
   nothing. That is the right direction to fail: the user still has the file.
 
-  **It is an offer, not a read**, and it ignores the session mute and every agent switch. An
-  offer because the first prompt after a `/clear` frequently is not the work the handover
-  describes, and reading it unasked spends the context the clear just freed on a document the
-  user may have moved on from. Unmutable because it is not an audit and not an opinion about
-  the answer — it is the second half of something the user explicitly asked for by running the
-  skill, and a `guard off` that also swallowed the handover would make the mute a setting for
-  something it does not name. Note the asymmetry with the switch line beside it, which ends
-  "do not mention this unless the user asks": a switch the user set is already theirs, while a
-  handover is a document they wrote for this session and cannot see from inside it.
+  **It is a read, not an offer, and it goes out on two channels.** The path reaches the USER as
+  a `systemMessage`, which on this event is prepended to the assistant's next response as a
+  system note and truncated at 4,000 characters (official hooks docs, "JSON output"; excerpt at
+  `wiki/ref/claude-code-hooks-session-env.md`) — so that line carries a path and nothing else.
+  An excerpt of the handover was considered and dropped: a preview is a promise a 4,000-character
+  field cannot keep for a file of any length, and the field is not a place to spend the context
+  a `/clear` just freed. The instruction to read the file reaches the MODEL as context, where an
+  instruction belongs.
+
+  It was an offer until v0.126.0, on the reasoning that the first prompt after a `/clear` is
+  frequently not the work the handover describes, so reading it unasked spends the context just
+  freed. The user overruled that, and the reason it holds: they ran the skill one conversation
+  ago and are opening the session it was written for, so the question had already been answered
+  before it was asked. What replaces the ask is the line they can now see — the file is named,
+  so a handover they have moved on from is one they can say to drop, and the cost of being
+  wrong is one read rather than a document nobody opens. What the change gave up is a guarantee
+  the offer had: a first prompt on unrelated work now pays for the read.
+
+  Unmutable either way, ignoring the session mute and every agent switch, because it is not an
+  audit and not an opinion about the answer — it is the second half of something the user
+  explicitly asked for by running the skill, and a `guard off` that also swallowed the handover
+  would make the mute a setting for something it does not name. Note the asymmetry with the
+  switch line beside it, which ends "do not mention this unless the user asks": a switch the
+  user set is already theirs, while a handover is a document they wrote for a session that
+  cannot see it from inside.
 - **guard cannot install the status line it wants.** A plugin's `settings.json` honors only
   `agent` and `subagentStatusLine` (`wiki/ref/claude-code-statusline.md`), so the main status
   line stays the user's. `status` prints a segment for them to compose into their own and
@@ -2914,6 +2936,23 @@ grep -c 'export PATH=' "$ENVF"      # -> 1, not 3
 sh -c ". $ENVF; sh -c 'CLAUDE_CODE_SESSION_ID=s1 guard status'"   # -> one line
 python3 -c "import json;print(json.load(open('$CLAUDE_PROJECT_DIR/.claude/guard/state/s1.json'))['audit_paused'])"
 #   -> False. Every case below assumes it.
+
+# The `/clear` handoff, both halves — and the only place guard writes a line the USER sees.
+CLAUDE_CODE_SESSION_ID=s1 "$H" toggle-cli off > /dev/null    # one switch off its default
+mkdir -p "$CLAUDE_PROJECT_DIR/.handover"; echo x > "$CLAUDE_PROJECT_DIR/.handover/001-x.md"
+CLAUDE_CODE_SESSION_ID=s1 "$H" handover-written "$CLAUDE_PROJECT_DIR/.handover/001-x.md"
+echo '{"session_id":"s1","reason":"clear"}' | "$H" session-end
+echo '{"session_id":"s9","source":"clear"}' | "$H" session-start | python3 -c \
+  'import json,sys;d=json.load(sys.stdin);print(d.get("systemMessage","(NONE)"));print("--");print(d["hookSpecificOutput"]["additionalContext"])'
+#   -> systemMessage names .handover/001-x.md. `(NONE)` is the regression this hook exists to
+#      catch: the handover reaching the model with nothing said to the person who wrote it.
+#      additionalContext then carries "Read that file" AND the carried-switches line — the two
+#      halves are independent, so one arriving without the other is the other failure mode.
+# Single use. The record is consumed whether or not it was applied.
+echo '{"session_id":"s10","source":"clear"}' | "$H" session-start | python3 -c \
+  'import json,sys;print(json.load(sys.stdin).get("systemMessage","(NONE)"))'
+#   -> (NONE)
+CLAUDE_CODE_SESSION_ID=s1 "$H" toggle-cli on > /dev/null     # every case below assumes armed
 
 # --- The turn path (v0.122.0) -----------------------------------------------------------
 #

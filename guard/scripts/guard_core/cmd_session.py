@@ -33,6 +33,7 @@ from .payload import _read_payload, _session_id
 from .state import _audit_paused, _plan_audit_paused, _read_state, _write_state
 from .agents import SETTABLE_AGENTS
 from .dispatch import CLI_REL, _plugin_root
+from .emit import _emit_session_start
 
 
 def _session_muted(project_dir: Path, config: dict, payload: dict | None) -> bool:
@@ -328,8 +329,8 @@ def _consume_clear_handoff(project_dir: Path, config: dict, payload: dict | None
         handover = ""
     elif not Path(handover).is_file():
         # Written, recorded, and gone between the two sessions — deleted, moved, or renamed.
-        # Offering a path that cannot be read costs the next session a failed read and a
-        # question the user has no way to answer.
+        # Naming a path that cannot be read costs the next session a failed read, and costs the
+        # user a line announcing a document that is not there.
         _trace(project_dir, sid, "session-start", "clear_handoff_handover_missing")
         handover = ""
 
@@ -359,10 +360,10 @@ def _consume_clear_handoff(project_dir: Path, config: dict, payload: dict | None
         return None
     # The handover path is deliberately NOT written into this session's state. It is
     # announced once, to the session replacing the one that wrote it; a session that carried
-    # the key would hand the same file on again at its own `/clear`, offering the user a
-    # handover they have already been shown with nothing new behind it.
+    # the key would hand the same file on again at its own `/clear`, so the user would be told
+    # a handover they have already worked through is being read again.
     if handover:
-        _trace(project_dir, sid, "session-start", "clear_handoff_handover_offered")
+        _trace(project_dir, sid, "session-start", "clear_handoff_handover_carried")
     return {"switches": switches, "handover": handover}
 
 
@@ -411,6 +412,12 @@ def cmd_session_start() -> int:
     # Once, here: stdin is readable one time, and two things below need this payload — the
     # mute line and the `/clear` handoff, which keys off `source`.
     payload = _read_payload()
+    # Everything this hook says, collected and written once at the end. It used to print as it
+    # went, which stdout accepts as context on this event — but one `systemMessage` turns the
+    # whole of stdout into a JSON object (`emit._emit_session_start`), so the lines have to be
+    # in hand together before anything is written.
+    context: list[str] = []
+    system_message = ""
     # Before the sweep: the sweep can fail on a filesystem error, and this export is what
     # keeps the CLI verbs off their inferred fallback for the rest of the session.
     exported = _export_to_bash_env("GUARD_PROJECT_DIR", str(project_dir))
@@ -507,31 +514,49 @@ def cmd_session_start() -> int:
             "audits are " + ("OFF" if switches["audit_paused"] else "ON"),
             "plan audits are " + ("OFF" if switches["plan_audit_paused"] else "ON"),
         ]
-        print(
+        context.append(
             "guard: carried the previous session's switches across the /clear — "
             f"{' and '.join(parts)} for this session, whatever this project's settings say. "
             "`guard` / `guard-plan` in a shell change either. Do not mention this unless the "
             "user asks."
         )
     if carried and carried["handover"]:
-        # The opposite instruction to the line above, and deliberately so. A switch the user
-        # already set is theirs; a handover is a document they wrote for THIS session and
-        # cannot see from inside it, so silence about it wastes the whole point of writing it.
+        # Both channels, and the split between them is the whole design. The path goes to
+        # the USER, because a handover is a document they wrote for a session that cannot see
+        # it from inside — the one thing here that is theirs before it is the model's, and
+        # context alone would have reached only the model. The instruction to read it goes to
+        # the model, where an instruction belongs. Note the asymmetry with the switch line
+        # above, which ends "do not mention this unless the user asks": a switch the user set
+        # is already theirs to know about.
         #
-        # An offer rather than a read. The handover names an unfinished piece of work, and the
-        # first prompt after a `/clear` frequently is not that work — reading it unasked
-        # spends the context the clear just freed on a document the user may have moved on
-        # from. Asking costs one line and puts the choice where it belongs.
+        # A read, not an offer. It was an offer once, on the reasoning that the first prompt
+        # after a `/clear` is frequently not the work the handover describes, so reading it
+        # unasked spends the context the clear just freed. The user overruled that, and the
+        # reason it holds: they ran the skill one conversation ago and are opening the session
+        # it was written for, so the question had already been answered before it was asked.
+        # What replaces the ask is the line they can now SEE — the file is named, so a handover
+        # they have moved on from is one they can say to drop, and the cost of being wrong is
+        # one read rather than a lost document.
         #
         # This ignores the session mute and every agent switch, because it is not an audit and
         # not an opinion about the answer: it is the second half of something the user
         # explicitly asked for by running the skill. A `guard off` that also swallowed the
         # handover would make the mute a setting for something it does not name.
-        print(
+        context.append(
             "guard: the session this /clear replaced left a handover at "
-            f"{carried['handover']}. Open your first reply by asking the user, in one line "
-            "and in their language, whether to read it; read it only if they say yes. If "
-            "they say no or say nothing about it, drop the subject and do not ask again."
+            f"{carried['handover']}. Read that file before you answer, and take it as the "
+            "state this session starts from. Do not ask whether to read it — the user has "
+            "already been shown that it is being read. If their first prompt turns out to be "
+            "unrelated to the work it describes, say nothing about the handover and answer "
+            "what they asked."
+        )
+        # The path and nothing else. This line is read by the person who wrote the file, who
+        # needs to recognize WHICH handover it is; an excerpt was considered and dropped
+        # because `systemMessage` truncates at 4,000 characters, so a preview is a promise the
+        # field cannot keep for a handover of any length.
+        system_message = (
+            "guard: the session this /clear replaced left a handover — "
+            f"{carried['handover']} — and it is being read into this session."
         )
 
     # The injected contract states the general rule — a doc-based claim cites the source
@@ -541,7 +566,7 @@ def cmd_session_start() -> int:
     # https://code.claude.com/docs/en/hooks, "Exit code 0"). Without it the judge
     # would fail a docs claim for a missing refs copy that nothing told the model
     # where to write.
-    print(
+    context.append(
         "guard: when a claim rests on official documentation, save the cited content "
         f"to this project's refs directory — {refs} — and cite both the source URL "
         "and that local path. The same path is in $GUARD_REFS_DIR for Bash."
@@ -564,14 +589,14 @@ def cmd_session_start() -> int:
         # expensive: nothing later in the session contradicts it, so the model spends the
         # session expecting a recommendation that never comes.
         if _session_muted(project_dir, session_cfg, payload):
-            print(
+            context.append(
                 "guard: agents are configured for this project, but guard is OFF for this "
                 "session — nothing is said when a turn ends, and an audit invoked now would "
                 "report that the session is muted. Running `guard on` in a shell arms it for "
                 "this session only. Do not mention this unless the user asks."
             )
         else:
-            print(
+            context.append(
                 "guard: nothing here is automatic and none of it is yours to start. Answer "
                 "normally; guard writes no file for an ordinary turn. The user runs "
                 "`/guard:answer <question>` when they want the answer as an audited document, "
@@ -582,5 +607,13 @@ def cmd_session_start() -> int:
                 "them."
             )
 
+    # One write, last, for the reason given where `context` is declared. Codex keeps the
+    # plain-text form: its SessionStart has no documented `systemMessage`, and that host never
+    # carries a handover anyway — `_consume_clear_handoff` returns before reading the record.
+    if _HOST_IS_CODEX:
+        for line in context:
+            print(line)
+    elif context or system_message:
+        _emit_session_start("\n\n".join(context), system_message)
     _trace(project_dir, None, "session-start", "swept", exported_project_dir=exported)
     return 0

@@ -67,6 +67,51 @@ not zsh- or bash-specific syntax.
 | `watchPaths` | Array of paths to watch for FileChanged events |
 | `reloadSkills` | Boolean to reload skills after hook completes |
 
+The documented JSON example for this event:
+
+```json
+{
+  "hookSpecificOutput": {
+    "hookEventName": "SessionStart",
+    "additionalContext": "The user is working on a React migration project. ..."
+  }
+}
+```
+
+## `systemMessage` — the one field the USER sees
+
+Retrieved 2026-09-07 from the same page. From the JSON-output table:
+
+> `systemMessage` | Plain-text message to add to the transcript as a system note, visible to
+> Claude. Not all events keep it; see each event's section. If multiple hooks return
+> `systemMessage` for the same event, Claude Code concatenates them with newlines. A
+> `systemMessage` longer than 4,000 characters is truncated. On `UserPromptSubmit`,
+> `SessionStart`, and `PostModelSwitch`, the message is prepended to the assistant's next
+> response as a system note. On `PostToolUse` and `PostToolUseFailure`, it's shown in the
+> transcript after the tool result. On all other events that support it, it's appended to the
+> transcript as a standalone system note and Claude sees it on the next model call.
+
+And from the `SessionStart` event section's decision control:
+
+> `SystemMessage` is kept in the context where Claude can see it.
+
+Elsewhere on the page, on choosing between the two:
+
+> To surface a message to the user on any platform, return `systemMessage` in JSON output.
+> Some events discard it or deliver it elsewhere, and each event's section says so. To trigger
+> a desktop notification, set a window title, or ring the bell, return `terminalSequence`
+> instead.
+
+Two consequences worth stating, neither of them documented as such. The message arrives **with
+the assistant's next response**, not at the moment the session opens — there is no pre-prompt
+display channel on this event. And because stdout is parsed as JSON *or* as plain text and
+never as both, one `systemMessage` moves every plain-text context line into
+`additionalContext`; the two cannot be mixed on one hook.
+
+`terminalSequence` is the only other user-facing field here (supported on `UserPromptSubmit`,
+`SessionStart`, `PostModelSwitch` and `Stop`, silently ignored elsewhere) and it carries an
+ANSI escape — a bell, a window title, a desktop notification — not text for the transcript.
+
 ## SessionStart matcher / `source` values
 
 Retrieved 2026-08-22 from the same page (https://code.claude.com/docs/en/hooks.md).

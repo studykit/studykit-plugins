@@ -1,6 +1,6 @@
 ---
 name: handover
-description: "Create a session handover file a fresh session can resume the work from, and record it so the session that replaces this one is offered it. Use when the user asks to hand off, wrap up, or write a handover before clearing the conversation."
+description: "Create a session handover file a fresh session can resume the work from, and record it so the session that replaces this one reads it. Use when the user asks to hand off, wrap up, or write a handover before clearing the conversation."
 argument-hint: "[--commit] [additional requirements]"
 # The user's skill, never the model's. A handover is a decision about when this session ends,
 # and a model that reached for it on its own would be answering that question for them. The
@@ -41,11 +41,11 @@ If no fields appeared above, this runtime does not run injected commands in skil
   number until the path is unique.
 - Leave the handover file uncommitted as an untracked file.
 - Last, record it: `guard-handover <absolute path to the handover file>`. That is what lets the
-  session a `/clear` opens next offer to read it; without it the file is written and nothing
-  points the next session at it. Run it after the file exists — it checks the path.
-  If the command is missing, or it reports it has no session to record against, stop there
-  rather than working around it: the handover file is the deliverable, and the recording only
-  decides whether the next session is offered it.
+  session a `/clear` opens next name the file to the user and read it; without it the file is
+  written and nothing points the next session at it. Run it after the file exists — it checks
+  the path. If the command is missing, or it reports it has no session to record against, stop
+  there rather than working around it: the handover file is the deliverable, and the recording
+  only decides whether the next session is told about it.
 
 ## Writing the handover
 
