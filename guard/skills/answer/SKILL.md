@@ -125,10 +125,17 @@ The document is English and the user asked for a deliverable. If you are answeri
 another language, they cannot read what you just produced, so the translation is part of
 finishing this — not a separate request.
 
-Dispatch `guard:korean-translator` (subagent_type: `"guard:korean-translator"`) with two inputs
-and nothing else: the answer file as its source, and the same path with `.ko` before the
-extension as the file it writes. It may not derive its own target, so that path has to arrive
-from you. Give it no history, no repository paths, and no draft of your own to fix.
+Dispatch `korean-translator` (subagent_type: `"korean-translator"`) with two inputs and nothing
+else: the answer file as its source, and the same path with `.ko` before the extension as the
+file it writes. It may not derive its own target, so that path has to arrive from you. Give it
+no history, no repository paths, and no draft of your own to fix.
+
+**The name carries no `guard:` prefix because the agent is not guard's.** It is a user-level
+definition, installed once for every project on the machine, which is why the same two agents
+serve translations that have nothing to do with this skill. If no agent of that name exists in
+this session, stop here: hand over the English file and say in one line that the translator is
+not installed. Do not translate a document of this length yourself — that is the outcome step 2
+already refused, arrived at from the other end.
 
 Then do what its report tells you.
 

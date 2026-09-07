@@ -120,6 +120,14 @@ class AuditAgent(NamedTuple):
 # The direct path has no router, so `_agent_pointer`'s lead supplies it there — once, as
 # `guard:<name>`, not per agent. Building it per row here would put the namespace on every
 # line of a list whose reader already has it from the lead.
+#
+# Which is also why the Korean pair being USER-LEVEL costs nothing here. Since v0.125.0 their
+# definitions are not in `agents/` at all — they install into the user's own agent directory,
+# shared by every project on the machine — so their `subagent_type` is the bare name and a
+# `guard:` prefix would resolve to nothing. Nothing in this module has to know that: it prints
+# names, and the two places that write a dispatch (`report-router`'s template and the `answer`
+# skill) each name the pair explicitly and unprefixed. What DOES have to know is
+# `dev/check-entries.py`, which would otherwise look for a file the plugin no longer has.
 
 
 # Order here is the order the agents appear in a recommendation. On the routed path the audits
@@ -200,6 +208,10 @@ AUDIT_AGENTS: dict[str, AuditAgent] = {
     # worked out from the document (it is English by design, like the answer file) and there is
     # no request file on that path, so the caller states it in the dispatch: whoever pointed
     # the router at the file is the only party that knows who is going to read it.
+    #
+    # The entry name resolves OUTSIDE this plugin — see the note above the roster. The row
+    # stays because the roster is what decides whether a translation is offered at all, and
+    # that is guard's judgment even when the agent doing the work is not guard's.
     "korean-translator": AuditAgent(reads="turn", needs_history=False, fixed_mode="on",
                                     report_entry="korean-translator",
                                     routed=(REPORT_PATH,)),

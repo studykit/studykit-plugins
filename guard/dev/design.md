@@ -556,6 +556,79 @@ project able to write `audit-turn: off` and get back the refusal this section is
 edited-file audits unasked on every turn that edits a source file, and a user who wants that
 quiet for an hour needs a way to say so that is not editing the config.
 
+## The Korean pair leaves the plugin — v0.125.0
+
+`agents/korean-translator.md` and `agents/korean-corrector.md` are gone from guard.
+The same two definitions now live in this repository's `global/agents/`, which installs into
+the user's own agent directory, and guard dispatches them by the bare name. Nothing about when
+a translation happens changed: `/guard:answer` still decides it on the language it is answering
+in, `report-router` still names the translator for a document with a `- language:` line, and
+the corrector is still reached by the translator's own report.
+
+### Why they were the two that could leave
+
+Every other definition in `agents/` is guard: it reads guard's turn record, or a roster
+`guard-candidates` printed, or it applies a criterion the rest of this document argues for.
+These two read a file and write a file. The plugin's own copies said so in almost so many
+words — the corrector's input was "a file of Korean prose", and neither one was ever handed
+guard's state — so the coupling that kept them here was the wording around the input ("the
+answer file", "the main session", "guard dispatched you"), not the judgment either one makes.
+
+What made keeping them expensive is that the judgment has other callers. A commit message, an
+issue body, a PR description, a wiki page drafted in English — all of them want exactly this
+translator, and reaching it meant either installing guard in order to translate a paragraph or
+keeping a second copy that drifts. The generalisation is one edit per input sentence; the
+alternative was two definitions of one agent, which is the thing § "Split at the ENTRY, never
+at the agent" already refuses for a reason that applies with more force here: a memory
+directory is named after the AGENT, so two copies are two glossaries.
+
+### What that costs, and where it shows
+
+**guard can now name an agent that is not installed.** A dispatch to a `subagent_type` nothing
+matches finds nothing rather than raising — the same silent failure `dev/check-entries.py`
+exists for — and guard fails open, so the visible outcome would be an English document handed
+over as though it were finished.
+
+Two things answer it, and neither is a check guard can run:
+
+- The dispatch text says what to do when the name resolves to nothing: hand over the English
+  and say the translator is not installed. Both writers of a dispatch carry that line —
+  `report-router`'s template and `skills/answer/SKILL.md` § 6 — and § 6 adds the other half,
+  which is that the caller must not translate a document of that length itself. That is the
+  outcome § 2 already refuses, and a missing agent is the same refusal arrived at from the
+  other end.
+- `dev/check-entries.py` gained `EXTERNAL_ENTRIES`. It cannot see the user's agent directory,
+  so what it checks instead is that the definition exists in `global/agents/` to install FROM,
+  and that the plugin does not also ship a copy — a shadow copy is invisible at runtime, since
+  the bare name still resolves to the user-level one, and it would drift with nothing saying so.
+
+**Codex is unchanged, and it was already the honest answer there.** That host has one
+read-only named agent, so it never dispatched either of these; what it has is a scope sentence
+that includes `korean-corrector`'s question, and a check on how the Korean reads is something
+a read-only agent can answer. There is no user-level agent directory to install into on that
+host, so the note in `hook_codex._SCOPE` no longer says the agent set would fix the
+translator's absence — it would not.
+
+### The prefix is the part that fails silently
+
+`guard:korean-translator` resolves to nothing now. Nothing derives these two names — the
+roster prints the bare entry name, and the `guard:` prefix is supplied by whoever writes the
+dispatch, once per path (`agents.py`, above the roster, has the mechanics) — so the two places
+that name the pair spell it out unprefixed and say why. A prefix added back by reflex, to match
+the agent beside it in a template, is a dispatch that quietly does nothing.
+
+### What was considered and not done
+
+**Keeping the plugin copies as a fallback.** Two definitions of one agent, which buys a
+translation on a machine that never ran `global/install.sh` and pays for it with the drift this
+change exists to remove — plus a split glossary, since the memory directory follows the agent
+name and the plugin's copy would have its own.
+
+**Vendoring the definitions from `global/agents/` at build time.** There is no build step here
+any more, and § "No agent file is generated any more" is why: a generated definition is one a
+contributor edits in the wrong place, and the pressure that produced the last build step was
+exactly this — one body, two homes.
+
 ## Storage layout (`${CLAUDE_PROJECT_DIR}/.claude/guard/`)
 
 A **turn is the transcript's `promptId`**. guard keeps no copy of a turn's content: it

@@ -263,60 +263,12 @@ whether it is worth writing down.
 
 `model: opus`. `color: yellow` — this one edits the user's files.
 
-### `korean-translator`
+### The Korean pair — moved out of this plugin
 
-`tools: Read, Write, SendMessage`
-
-`Read` for the English answer file, `Write` for the translation file. No `Edit`, which shapes the
-agent rather than fencing it: it produces a new file rather than revising one, and the surgical
-change — a sentence improved in passing while translating — is the one it has no tool for. It is
-not a fence, because `Write` takes any path; what makes the English read-only is the body saying
-so twice. The reason either way is that a later audit of this turn reads that file, and an
-unaudited edit would be sitting in it.
-
-`SendMessage` for the one thing it may not decide alone. A sentence it cannot render without
-choosing what the author meant is a claim, not a phrasing, so it asks the session that wrote the
-English.
-
-No `Grep`, `Glob` or `Bash`: it translates prose and verifies nothing the answer asserts. Handing
-it the repository would invite exactly the failure the body forbids — noticing a defect in the
-English and translating a corrected version of it.
-
-**No `memory:`.** Tempting here, since glossary consistency is real: the same concept should keep
-the same Korean word across turns. But a store would fix a first-turn word choice for every turn
-after it, including the ones where it was wrong, and a translation is the one artifact nobody
-diffs against its predecessor. What consistency there is has to come from the source document
-in front of it, which is what the body tells it to use.
-
-`model: sonnet`, set by the maintainer's decision rather than by a head-to-head. The argument for
-`opus` still stands on paper and is worth knowing: the cheap failure mode of a weak translator is
-not a mistranslation but exactly the 직역 this agent was added to remove, which is fluent,
-grammatical, and invisible in review. What makes `sonnet` defensible is that this agent is not the
-last word — `korean-corrector` reads what it wrote and is dispatched by its own report, so 직역
-here has a reader downstream. If 직역 starts surviving to the user, this field is the first place
-to look, and a head-to-head belongs in design.md § "Picking a model for an agent" before it is
-changed back.
-
-### `korean-corrector`
-
-`tools: Read, Edit, Write, SendMessage`
-
-`Read` and `Edit` for the answer file. Its input is the answer the user is about to be shown, so a
-correction belongs in that file and not in a second one the reader would have to be talked into
-opening. It judges prose, so it needs no search or shell access. (See design.md on why the old
-`.ko-fix.md` rewrite file was removed and must not come back.)
-
-**No `memory:`.** A store here would accumulate rulings about which phrasings this project keeps,
-and a wrong one silently stops a whole class of correction from ever being raised again. Terms to
-leave alone are visible in the file being corrected; a preference worth keeping goes in the
-report, where the user can confirm it.
-
-`model: sonnet`, changed with `korean-translator` by the maintainer's decision and not measured.
-This one carries the more of the two risks, because nothing reads it afterwards: it is the last
-judgment made on the Korean the user is about to be shown. Korean prose the agent cannot hear as
-unnatural is a pass it will report, and a pass is indistinguishable from a clean file. The same
-note applies — a head-to-head before changing it back, and this field first if unnatural Korean
-starts reaching the user.
+`korean-translator` and `korean-corrector` are no longer guard's definitions. Since v0.125.0
+they are user-level agents, shipped from this repository's `global/agents/` and dispatched by
+the bare name; `../dev/design.md` § "The Korean pair leaves the plugin" has why, and the
+frontmatter reasoning moved with them to `../../global/dev/agent-frontmatter-rationale.md`.
 
 ## External-documentation agents
 

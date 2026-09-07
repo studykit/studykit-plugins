@@ -234,7 +234,14 @@ _AUDIT_TURN_RE = re.compile(r"^[/$]guard:audit-turn(-claims|-clarity|-deferrals)
 # `AUDIT_AGENTS` entry, so it can be eligible here, and the filter below is what drops it. It
 # does not audit — it writes the Korean the user reads — and Codex's one agent is read-only, so
 # there is nothing here to give the work to. Filtering it is therefore the honest answer, not an
-# omission to fix; what fixes it is the same agent set as above.
+# omission to fix — and unlike the two above, the agent set would NOT fix it. Since v0.125.0
+# that definition is not guard's at all: it installs into the user's own agent directory on
+# Claude, and this host has no such directory to install into. A Codex translation needs a
+# writing agent on this host first.
+#
+# `korean-corrector` is user-level in the same way, and its row below survives that because it
+# is not a dispatch: it contributes one clause to the sentence handed to Codex's own agent, and
+# reading whether Korean sounds translated is something a read-only agent can answer.
 _SCOPE = {"claims-auditor": "the response's claims",
           "deferrals-auditor": "deferrals the repository could resolve",
           "korean-corrector": "whether the Korean reads as translated English"}

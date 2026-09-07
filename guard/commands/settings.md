@@ -113,15 +113,20 @@ file-reading agents (`comment-corrector`, `agents-md-auditor`) skip the router e
 need a file of their own kind that the turn wrote, so they cost nothing on the many turns that
 write none.
 
-**Four agents have no setting here and cannot be given one.** `guard:korean-translator` writes
-the Korean the user reads and `guard:korean-corrector` checks what it wrote — one step, not an
-audit to opt into, and a switch on either half would mean a Korean answer the user reads in a
-quality that depends on a config key. They cost nothing where they are not needed, because
-they only run over a DOCUMENT: `/guard:answer` dispatches the translator when the reader reads
-another language, `report-router` names it for a file the user points at, and the corrector is
-reached by the translator's own report. An ordinary turn produces no document, so nothing is
-translated there at all. They never make a turn routed on their own — with every switch below
-`off`, they are dropped too.
+**Four agents have no setting here and cannot be given one.** `korean-translator` writes the
+Korean the user reads and `korean-corrector` checks what it wrote — one step, not an audit to
+opt into, and a switch on either half would mean a Korean answer the user reads in a quality
+that depends on a config key. They cost nothing where they are not needed, because they only
+run over a DOCUMENT: `/guard:answer` dispatches the translator when the reader reads another
+language, `report-router` names it for a file the user points at, and the corrector is reached
+by the translator's own report. An ordinary turn produces no document, so nothing is translated
+there at all. They never make a turn routed on their own — with every switch below `off`, they
+are dropped too.
+
+Those two are also the only pair here guard does not ship: they are **user-level** agents,
+installed once per machine rather than with this plugin, which is why their names carry no
+`guard:` prefix. A machine without them translates nothing — guard says so and hands over the
+English rather than translating it in the main session.
 
 `guard:docs-finder` is
 selected from its own description, the way any agent is — there is nothing said unasked for a

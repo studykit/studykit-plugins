@@ -74,7 +74,8 @@ answering anyone: the file already exists, in English by design, and whether it 
 a reader in another language is a fact only your caller holds, which is why it hands you
 `- language:` and why the translation is a pick you can make. `korean-corrector` is still not
 yours — the translator's own report reaches it — and `guard-candidates --doc` offers you
-exactly what you may name.
+exactly what you may name. Both are user-level agents rather than guard's, so their names carry
+no prefix; that changes nothing about which of them you may name.
 
 **A section that declares itself open is the strongest reason to name `audit-report-deferrals`, not
 a reason to skip it.** Written work often collects its unresolved questions under a heading
@@ -192,10 +193,12 @@ File: <resolved path>
 ```
 
 **If `korean-translator` is among your picks**, add this after the last one. It is an AGENT, not
-a skill, and it runs last — its source is the file after the final round's findings are in it:
+a skill, and it runs last — its source is the file after the final round's findings are in it.
+Its name takes no `guard:` prefix: it is a user-level agent rather than one of guard's, which is
+why the line below spells the name out the way it does. Copy it exactly:
 
 ```
-Last, once the final round's findings are in the file, dispatch `guard:korean-translator` (subagent_type: "guard:korean-translator") on its own, with two inputs and nothing else: the file above as its source, and <translation path> as the file it writes. Give it no history and no repository paths, and write no draft of your own for it to fix. Then do what its report tells you.
+Last, once the final round's findings are in the file, dispatch `korean-translator` (subagent_type: "korean-translator") on its own, with two inputs and nothing else: the file above as its source, and <translation path> as the file it writes. Give it no history and no repository paths, and write no draft of your own for it to fix. Then do what its report tells you. If no agent of that name is available, say so in one line and leave the file in English rather than translating it yourself.
 ```
 
 `<translation path>` is the file's path with `.md` replaced by `.<lang>.md` — `.ko.md` for

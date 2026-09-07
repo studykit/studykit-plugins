@@ -76,6 +76,14 @@ AFTER the audit, so the translation is made once, from the corrected English. Th
 translation on the turn path: an ordinary turn produces no document, so there is nothing to
 translate.
 
+**Those two are not guard's definitions.** Since v0.125.0 they are USER-LEVEL agents — this
+repository ships them from `global/agents/`, they install into the user's own agent directory,
+and guard dispatches them by the bare name with no `guard:` prefix. They read a file and write
+a file and were never handed guard's state, and the judgment they make has callers that have
+nothing to do with guard; `dev/design.md` has the argument and what it costs. What it costs is
+that guard can name an agent a machine has not installed, so both places that write the
+dispatch say what to do when the name resolves to nothing.
+
 Every agent switch ships `off`: guard installed is guard available, not guard running.
 `audit-plan` says what a session OPENS in for the plan gate — the one audit nobody invokes —
 and there is no counterpart for the turn side: a session opens armed there, because every
@@ -157,6 +165,12 @@ how the code here is organised.
   name the caller invokes, and the router's own report template says with which tool. A key must never be renamed to follow an agent —
   `_load_config` honours only keys it knows, so a configured audit would silently read as its
   default. Nothing else may derive a dispatchable identity from a key.
+- The Korean pair is dispatched UNPREFIXED. `guard:korean-translator` resolves to nothing —
+  the definitions are user-level — and a dispatch that matches no agent finds nothing rather
+  than raising. Nothing derives either name: the roster prints the bare entry and the `guard:`
+  prefix belongs to whoever writes the dispatch, so the two writers that name this pair
+  (`agents/report-router.md`'s template, `skills/answer/SKILL.md` § 6) spell it out and say
+  why. Adding the prefix back to match the agents beside it in a template is silent.
 - Nothing resolves a plugin path by counting `__file__` parents.
 - Where a piece of text lives is decided by how often it is paid for. Hook output is read on
   every turn that edits a file; `agents/turn-router.md` and `skills/answer/SKILL.md` once per
@@ -311,7 +325,9 @@ moment two definitions share a body.
 
 `uv run dev/check-entries.py` is the one thing close to a test: it fails if a roster entry
 point matches neither `agents/<name>.md` nor `skills/<name>/SKILL.md`, or if the file it does
-match declares a different `name:` in its frontmatter. That is the only place the Python roster
+match declares a different `name:` in its frontmatter. An entry listed in its `EXTERNAL_ENTRIES`
+is a user-level agent and is checked the other way round — the definition must exist to install
+from, and the plugin must NOT also ship a copy of it. That is the only place the Python roster
 and the markdown definitions can be compared at all, and both failures are silent at runtime —
 a dispatch or an invocation that matches nothing finds nothing rather than raising. Nothing
 runs it for you; put it in a local pre-commit hook.
