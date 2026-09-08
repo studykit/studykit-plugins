@@ -817,7 +817,7 @@ def test_session_start_injects_policy_for_configured_project(
     if runtime == "claude":
         assert "spectrack <script>" in context
     else:
-        assert f"\"{_PLUGIN_ROOT}/scripts/spectrack\" <script>.py" in context
+        assert f"\"{_PLUGIN_ROOT}/scripts/spectrack\" <script>`" in context
         assert "{{SPECTRACK_PLUGIN_ROOT}}" not in context
     assert "read-only" in context
     assert "spectrack mustread" in context
@@ -1017,7 +1017,7 @@ def test_session_start_discovers_config_from_nested_project_path(
     assert "<policy>" in context
     assert "<launcher>" in context
     assert "## workflow policy" not in context
-    assert f"\"{_PLUGIN_ROOT}/scripts/spectrack\" <script>.py" in context
+    assert f"\"{_PLUGIN_ROOT}/scripts/spectrack\" <script>`" in context
 
 
 def test_non_empty_hook_stdout_is_json_only(

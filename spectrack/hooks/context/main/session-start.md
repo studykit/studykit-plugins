@@ -29,8 +29,9 @@ An issue body is settled with the user, not drafted unilaterally. Before
 publishing one, discuss what it should say, present the draft, and
 publish only after the user confirms it. Where the scope, the acceptance
 criteria, or the type choice itself is ambiguous, ask before drafting —
-use the `AskUserQuestion` tool with selectable options when the choice is
-bounded, so the user need not type a reply. A published issue whose scope
+use the host's available question tool with selectable options when the
+choice is bounded and the tool supports them. If no question tool is
+available in the current mode, ask in plain text. A published issue whose scope
 was never agreed costs more to unwind than a question costs to ask.
 Publish without that exchange only when the user explicitly asked you to.
 </authoring-issues>
@@ -57,9 +58,9 @@ the body itself names — fetching those refs and reading their bodies and
 comments too. Also read any `wiki/` knowledge page the body or its
 `Context` points to, or that covers the code you will touch. Then settle
 the approach against the current code in plan mode (where the runtime
-provides it) and get the user's explicit approval of it. Then, with the
-`AskUserQuestion` tool (offer selectable options so the user need not type
-a reply), ask whether to validate the approved approach with a plan audit
+provides it) and get the user's explicit approval of it. Then, using the
+host's available question tool when it supports this request, or plain text
+otherwise, ask whether to validate the approved approach with a plan audit
 — the `resolution-auditor` agent in plan-audit mode, pointed at the
 settled approach. Dispatch that agent only if they agree; when it runs,
 implement only after it resolves. If the user declines the audit,

@@ -8,6 +8,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 _PLUGIN_ROOT = Path(__file__).resolve().parent.parent
 _SCRIPTS_DIR = _PLUGIN_ROOT / "scripts"
 if str(_SCRIPTS_DIR) not in sys.path:
@@ -330,3 +332,22 @@ def test_wrapper_terminal_defaults_use_launcher_plugin_root(tmp_path: Path) -> N
     assert payload["SPECTRACK"] == str(_SCRIPTS_DIR / "spectrack")
     assert payload["SPECTRACK_PLUGIN_ROOT"] == str(_PLUGIN_ROOT)
     assert payload["SPECTRACK_PROJECT_DIR"] == str(tmp_path / "project-from-env")
+
+
+@pytest.mark.parametrize("runtime", ["codex", "claude"])
+@pytest.mark.parametrize("command", ["issue", "issue.py", "mustread.py"])
+def test_wrapper_runs_package_and_script_commands(tmp_path: Path, runtime: str, command: str) -> None:
+    marker = "CODEX_THREAD_ID" if runtime == "codex" else "CLAUDE_CODE_SESSION_ID"
+    proc = subprocess.run(
+        [str(_SCRIPTS_DIR / "spectrack"), command, "--help"],
+        cwd=tmp_path,
+        env={
+            "PATH": os.environ.get("PATH", ""),
+            "UV_CACHE_DIR": str(tmp_path / "uv-cache"),
+            marker: "launcher-compatibility",
+        },
+        capture_output=True,
+        text=True,
+    )
+    assert proc.returncode == 0, proc.stderr
+    assert "usage:" in proc.stdout

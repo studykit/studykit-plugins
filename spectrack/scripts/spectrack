@@ -24,6 +24,9 @@ exec_workflow_command() {
       # Package-style command: run its `__main__.py` (carries PEP 723 deps and
       # bootstraps sys.path so its absolute `<pkg>.*` imports resolve).
       candidate="$SCRIPT_DIR/$command/__main__.py"
+    elif [[ "$command" == *.py && ! -f "$SCRIPT_DIR/$command" && -f "$SCRIPT_DIR/${command%.py}/__main__.py" ]]; then
+      # Older injected instructions append .py even to package commands.
+      candidate="$SCRIPT_DIR/${command%.py}/__main__.py"
     else
       candidate="$SCRIPT_DIR/$command"
     fi
