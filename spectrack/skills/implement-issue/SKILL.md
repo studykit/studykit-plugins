@@ -1,6 +1,6 @@
 ---
 name: implement-issue
-description: "Implement a workflow `task`, `bug`, or `spike` issue from its spec. Use when the user gives an issue ref and wants the work implemented. Settle the implementation approach against the current code, get user approval, run size and resolution audits, dispatch `issue-implementer` in an isolated worktree, then run `implementation-auditor` when implementation succeeds."
+description: "Implement a workflow `task`, `bug`, or `spike` issue from its spec. Use when the user gives an issue ref and wants the work implemented. Settle the implementation approach against the current code, get user approval, implement and verify it, then refresh the issue handoff."
 ---
 
 # Implement
@@ -9,11 +9,8 @@ Dispatcher for implementing a workflow issue from its **spec**. The issue body
 is `Context` / `Description` / `Acceptance Criteria` — a spec, not a stored
 plan: it records *what* and *done*, never *how*. The implementation approach is
 decided here, at implement time, against the current code — it is not read off
-the body. This skill settles and validates that approach with the user, then
-hands it to `issue-implementer` (which adopts the approach, derives the concrete
-steps against the current code, executes it in an isolated worktree, and pushes
-a topic branch), then to `implementation-auditor` (which cross-checks the
-result, read-only).
+the body. This skill settles that approach with the user, then implements and
+verifies it in the active session.
 
 ## Flow
 
@@ -42,37 +39,15 @@ result, read-only).
      facility (or a read-only planning subagent where available), grounded in the
      current code, and **get the user's explicit approval** of the approach
      before going further.
-   - **Audit.** Run the size and resolution audits and read the full audit
-     output paths they return before dispatching implementation.
-     - Size: dispatch `task-size-auditor` with a writable copy of the
-       fetched body. It surfaces decomposition when the work is not a
-       single task.
-     - Resolution: write the settled approach to a temp plan file and
-       dispatch `resolution-auditor` (plan-audit mode) with that path; it
-       validates the cause and the approach against the current code.
-     Resolve their findings — sharpening the approach, or on a size verdict
-     decomposing the work — before dispatching.
+3. **Implement.** Re-check the approved approach against the current code. If
+   it has materially drifted, stop and return to planning with the user.
+   Otherwise apply the approach, verify every Acceptance Criterion, and commit
+   the completed work on the current branch or an issue-named topic branch.
 
-   Carry the temp plan file you wrote (the settled, user-approved approach)
-   forward as the `plan` for step 3. The implementer's plan of record is that
-   approach; the body carries none and is never edited into a stored plan
-   here.
+4. **Refresh `Resume`.** Upsert the provider-backed `Resume` comment with
+   `spectrack issue comment resume`, recording what landed, any non-blocking
+   questions, and the next handoff step. Do not mark work implemented when a
+   required Acceptance Criterion remains incomplete.
 
-3. **Dispatch `issue-implementer`.** Use the host's subagent facility with the
-   registered `spectrack:issue-implementer` role and an isolated worktree when
-   the host supports it —
-   this skill always dispatches implementation in worktree mode. Pass the
-   issue ref, the extra requirements verbatim, and the settled approach
-   from step 2 as the `plan` (the implementer's plan of record — the body
-   carries none). It returns a `<report>` whose `state` is `implemented`,
-   `paused`, or `failed`.
-
-4. **Dispatch `implementation-auditor`** only when the implementer's
-   `state` is `implemented` — `paused` and `failed` leave no pushed
-   branch to audit. Use the host's subagent facility with the registered
-   `spectrack:implementation-auditor` role, passing the issue ref
-   and `report` (the implementer's `<report>` block, inline). It is
-   read-only and returns a `<report>` with a `verdict`.
-
-5. **Report.** Emit the implementer's `<report>`; when the audit ran, emit
-   the auditor's `<report>` directly after without adding new conclusions.
+5. **Report.** State the completed work, verification performed, commit, and
+   any remaining non-blocking follow-up.

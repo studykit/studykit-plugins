@@ -20,7 +20,7 @@ spectrack preview_context
 # One surface, one provider/runtime
 spectrack preview_context --surface session --provider jira
 spectrack preview_context --surface subagent --provider github \
-  --agent issue-implementer
+  --agent usecase-reviewer
 spectrack preview_context --surface commit
 
 # Enumerate per-agent block names

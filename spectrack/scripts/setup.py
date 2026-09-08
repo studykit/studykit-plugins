@@ -618,19 +618,22 @@ CODEX_DIRNAME = ".codex"
 CODEX_CONFIG_FILENAME = "config.toml"
 CODEX_CONFIG_RELATIVE_PATH = f"{CODEX_DIRNAME}/{CODEX_CONFIG_FILENAME}"
 CODEX_SPECTRACK_AGENT_DIR = f"{CODEX_DIRNAME}/agents"
+LEGACY_CODEX_SPECTRACK_AGENT_DIR = f"{CODEX_DIRNAME}/spectrack/agents"
 CODEX_HOOKS_RELATIVE_PATH = f"{CODEX_DIRNAME}/hooks.json"
 CODEX_AGENT_INSTALL_MARKER_BEGIN = "# BEGIN spectrack custom agents"
 CODEX_AGENT_INSTALL_MARKER_END = "# END spectrack custom agents"
 SPECTRACK_CODEX_AGENT_ROLES: Mapping[str, str] = {
-    "implementation-auditor": "SpecTrack auditor that verifies an issue-implementer report against the issue, branch, commits, and Resume comment.",
-    "issue-implementer": "SpecTrack implementer for an approved task, bug, or spike approach; implements, verifies Acceptance Criteria, commits, and refreshes Resume.",
     "jira-format-corrector": "SpecTrack corrector that rewrites a Jira issue or comment draft file into valid Jira wiki markup, correcting Markdown-only syntax in place.",
     "mock-html-generator": "SpecTrack mock generator for throwaway HTML/CSS screen mockups grounded in selected usecase issues.",
-    "resolution-auditor": "SpecTrack auditor that validates a recorded root cause and approach or fix against real code and git history.",
-    "task-size-auditor": "SpecTrack auditor that checks whether a task body is correctly sized or should be split, promoted, or decomposed.",
     "usecase-explorer": "SpecTrack explorer that finds candidate use cases missed by an existing set of workflow usecase issues.",
     "usecase-reviewer": "SpecTrack reviewer that publishes review issues for quality findings in workflow usecase issues.",
 }
+RETIRED_CODEX_AGENT_ROLES = frozenset({
+    "implementation-auditor",
+    "issue-implementer",
+    "resolution-auditor",
+    "task-size-auditor",
+})
 
 
 def _knowledge_root_section(repo_relative: str) -> str:
@@ -717,6 +720,22 @@ def install_codex_agents(project: Path) -> dict[str, Any]:
             }
         )
 
+    removed_roles: list[str] = []
+    for agent_name in sorted(RETIRED_CODEX_AGENT_ROLES):
+        for filename in (f"spectrack-{agent_name}.toml", f"{agent_name}.toml"):
+            role_path = role_dir / filename
+            if role_path.exists():
+                role_path.unlink()
+                removed_roles.append(str(role_path))
+
+    legacy_role_dir = project / LEGACY_CODEX_SPECTRACK_AGENT_DIR
+    for agent_name in sorted(set(SPECTRACK_CODEX_AGENT_ROLES) | RETIRED_CODEX_AGENT_ROLES):
+        for filename in (f"spectrack-{agent_name}.toml", f"{agent_name}.toml"):
+            role_path = legacy_role_dir / filename
+            if role_path.exists():
+                role_path.unlink()
+                removed_roles.append(str(role_path))
+
     config_path = codex_dir / CODEX_CONFIG_FILENAME
     existing_config = config_path.read_text(encoding="utf-8") if config_path.exists() else ""
     role_block = _codex_agent_config_block()
@@ -736,6 +755,7 @@ def install_codex_agents(project: Path) -> dict[str, Any]:
         "config_action": config_action,
         "agent_dir": str(role_dir),
         "agents": installed_roles,
+        "removed_agents": removed_roles,
         "hooks": hooks,
         "restart_required": True,
     }

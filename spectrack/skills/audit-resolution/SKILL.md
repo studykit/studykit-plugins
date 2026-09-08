@@ -5,7 +5,7 @@ description: "Validate the recorded root cause and proposed approach or fix of a
 
 # Audit Resolution
 
-Dispatcher for validating an issue's recorded diagnosis. The audit checks
+Workflow for validating an issue's recorded diagnosis. The audit checks
 whether the issue's recorded root cause is the actual cause, and whether the
 recorded approach or fix would actually resolve it — judged against the real
 code and its git history, not the issue's internal plausibility.
@@ -16,10 +16,10 @@ code and its git history, not the issue's internal plausibility.
    user's request.
    If there is no recognizable ref, abort with `Usage: <issue-ref>`.
 
-2. **Dispatch `resolution-auditor`.** Use the host's subagent facility with the
-   registered `spectrack:resolution-auditor` role, naming the published issue ref (published
-   mode). It fetches the issue, validates the recorded cause and approach
-   against the code read-only, appends a single verdict comment to the issue,
-   and returns a `<report>` with a `verdict`.
+2. **Audit directly.** Fetch the issue, read its body and comments, and inspect
+   the named code and relevant git history read-only. Check whether the recorded
+   cause explains the observed behavior and whether the approach or landed fix
+   resolves it without contradicting the Acceptance Criteria.
 
-3. **Report.** Emit the auditor's `<report>` without adding new conclusions.
+3. **Report.** Present the evidence-backed verdict. Draft an issue comment only
+   after agreeing its content with the user, then publish it on confirmation.

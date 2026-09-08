@@ -68,8 +68,8 @@ def test_session_commands_block_is_provider_agnostic() -> None:
 
 
 def test_subagent_agent_block_merges_one_commands() -> None:
-    text = _render("subagent", "github", agent="issue-implementer")
-    assert "<commit-prefix>" in text
+    text = _render("subagent", "github", agent="usecase-explorer")
+    assert "<commit-prefix>" not in text
     assert text.count("<commands>") == 1
 
 
@@ -93,8 +93,12 @@ def test_all_surface_includes_every_banner() -> None:
 
 def test_available_agents_lists_known_blocks() -> None:
     agents = available_agents()
-    assert "issue-implementer" in agents
-    assert agents == sorted(agents)
+    assert agents == [
+        "jira-format-corrector",
+        "mock-html-generator",
+        "usecase-explorer",
+        "usecase-reviewer",
+    ]
 
 
 def test_resolve_config_without_provider_or_config_errors(tmp_path, monkeypatch) -> None:
@@ -107,7 +111,8 @@ def test_resolve_config_without_provider_or_config_errors(tmp_path, monkeypatch)
 def test_main_list_agents(capsys) -> None:
     assert main(["--list-agents"]) == 0
     out = capsys.readouterr().out
-    assert "issue-implementer" in out
+    assert "usecase-explorer" in out
+    assert "issue-implementer" not in out
 
 
 def _render_no_mustread(surface: str, provider: str, *, agent: str | None = None) -> str:
@@ -124,7 +129,7 @@ def test_disabled_mustread_drops_authoring_resolver_on_session() -> None:
 
 
 def test_disabled_mustread_drops_authoring_resolver_on_subagent() -> None:
-    text = _render_no_mustread("subagent", "github", agent="issue-implementer")
+    text = _render_no_mustread("subagent", "github", agent="usecase-explorer")
     assert "<authoring-resolver>" not in text
     assert "spectrack mustread" not in text
 
@@ -164,8 +169,7 @@ def test_jira_format_block_is_absent_for_other_providers(provider: str) -> None:
 def test_jira_format_block_is_injected_for_jira_subagents() -> None:
     """Subagents publish bodies and comments too, so they need the directive.
 
-    A subagent cannot dispatch the auditor, so its block tells it to emit wiki
-    markup directly rather than to delegate the check.
+    A subagent emits wiki markup directly rather than delegating the check.
     """
 
     text = _render("subagent", "jira", agent="usecase-reviewer")

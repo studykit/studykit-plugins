@@ -152,10 +152,9 @@ def expected_subagent_start_context(
         rendered = _strip_jira_format(rendered)
     agent_name = (agent_type or "").rsplit(":", 1)[-1].strip().lower() if agent_type else ""
     agent_block = ""
-    if agent_name == "issue-implementer":
-        template = main_context_fragment("subagent/agents/issue-implementer.md")
-        agent_block = render_template(template, {
-            "SNIPPET_COMMIT_PREFIX": main_context_fragment("snippets/commit-prefix.md"),
+    agent_path = _PLUGIN_ROOT / "hooks" / "context" / "subagent" / "agents" / f"{agent_name}.md"
+    if agent_name and agent_path.exists():
+        agent_block = render_template(agent_path.read_text(encoding="utf-8"), {
             "SPECTRACK_ISSUE_PROVIDER": issue_kind,
         })
     merged = _merge_commands_blocks(rendered, agent_block)
@@ -681,7 +680,7 @@ def test_parse_codex_event_payload_builds_subagent_start_structure(
             "permission_mode": "default",
             "turn_id": "turn-1",
             "agent_id": "agent-123",
-            "agent_type": "spectrack:issue-implementer",
+            "agent_type": "spectrack:usecase-explorer",
         }
     )
 
@@ -692,7 +691,7 @@ def test_parse_codex_event_payload_builds_subagent_start_structure(
     assert subagent_event.cwd == str(tmp_path)
     assert subagent_event.turn_id == "turn-1"
     assert subagent_event.agent_id == "agent-123"
-    assert subagent_event.agent_type == "spectrack:issue-implementer"
+    assert subagent_event.agent_type == "spectrack:usecase-explorer"
 
 
 def test_session_start_clear_uses_documented_source_only(
@@ -1123,15 +1122,15 @@ def test_codex_subagent_start_injects_issue_implementer_agent_block(
     captured = io.StringIO()
     event_payload = parse_codex_event_payload(
         {
-            "session_id": "parent-thread-impl",
+            "session_id": "parent-thread-usecase",
             "transcript_path": None,
             "cwd": str(tmp_path),
             "hook_event_name": "SubagentStart",
             "model": "gpt-5-codex",
             "permission_mode": "default",
             "turn_id": "turn-1",
-            "agent_id": "codex-agent-impl",
-            "agent_type": "spectrack:issue-implementer",
+            "agent_id": "codex-agent-usecase",
+            "agent_type": "spectrack:usecase-explorer",
         }
     )
     assert isinstance(event_payload, CodexSubagentStartPayload)
@@ -1142,11 +1141,10 @@ def test_codex_subagent_start_injects_issue_implementer_agent_block(
     assert context == expected_subagent_start_context(
         runtime="codex",
         issue_kind="github",
-        agent_type="spectrack:issue-implementer",
+        agent_type="spectrack:usecase-explorer",
     )
-    assert "<commit-prefix>" in context
+    assert "<commit-prefix>" not in context
     assert "- `fetch`" in context
-    assert "- `comment resume`" in context
 
 
 def test_session_start_emits_commands_pointer_for_jira_config(
@@ -1219,7 +1217,7 @@ def test_claude_subagent_start_injects_workflow_context(
     )
 
 
-def test_claude_subagent_start_injects_issue_implementer_agent_block(
+def test_claude_subagent_start_injects_usecase_explorer_agent_block(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -1230,12 +1228,12 @@ def test_claude_subagent_start_injects_issue_implementer_agent_block(
     captured = io.StringIO()
     assert claude_main(
         payload={
-            "session_id": "claude-session-impl",
+            "session_id": "claude-session-usecase",
             "transcript_path": "/tmp/transcript.jsonl",
             "cwd": str(tmp_path),
             "hook_event_name": "SubagentStart",
-            "agent_id": "agent-impl",
-            "agent_type": "spectrack:issue-implementer",
+            "agent_id": "agent-usecase",
+            "agent_type": "spectrack:usecase-explorer",
         },
         stdout=captured,
     ) == 0
@@ -1243,15 +1241,14 @@ def test_claude_subagent_start_injects_issue_implementer_agent_block(
     payload = json.loads(captured.getvalue())
     context = payload["hookSpecificOutput"]["additionalContext"]
     assert context == expected_subagent_start_context(
-        issue_kind="github", agent_type="spectrack:issue-implementer"
+        issue_kind="github", agent_type="spectrack:usecase-explorer"
     )
-    assert "<commit-prefix>" in context
-    assert "## issue-implementer subagent context" not in context
+    assert "<commit-prefix>" not in context
+    assert "## usecase-explorer subagent context" not in context
     assert "- `fetch`" in context
-    assert "- `comment resume`" in context
 
 
-def test_subagent_start_emits_single_commands_for_issue_implementer(
+def test_subagent_start_emits_single_commands_for_usecase_explorer(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -1262,12 +1259,12 @@ def test_subagent_start_emits_single_commands_for_issue_implementer(
     captured = io.StringIO()
     assert claude_main(
         payload={
-            "session_id": "claude-session-impl-single-commands",
+            "session_id": "claude-session-usecase-single-commands",
             "transcript_path": "/tmp/transcript.jsonl",
             "cwd": str(tmp_path),
             "hook_event_name": "SubagentStart",
-            "agent_id": "agent-impl-single",
-            "agent_type": "spectrack:issue-implementer",
+            "agent_id": "agent-usecase-single",
+            "agent_type": "spectrack:usecase-explorer",
         },
         stdout=captured,
     ) == 0
@@ -1277,8 +1274,7 @@ def test_subagent_start_emits_single_commands_for_issue_implementer(
     assert context.count("<commands>") == 1
     assert context.count("</commands>") == 1
     # The base <commands> pointer is replaced by the agent's verb-scoped block.
-    for verb in ("fetch", "comment resume"):
-        assert f"- `{verb}`" in context
+    assert "- `fetch`" in context
 
 
 def test_subagent_start_emits_single_commands_for_generic_agent(

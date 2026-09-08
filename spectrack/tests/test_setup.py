@@ -29,6 +29,7 @@ from setup import (  # noqa: E402
     CODEX_CONFIG_RELATIVE_PATH,
     CODEX_HOOKS_RELATIVE_PATH,
     CODEX_SPECTRACK_AGENT_DIR,
+    LEGACY_CODEX_SPECTRACK_AGENT_DIR,
     CLAUDE_AGENTS_SHIM,
     CLAUDE_FILENAME,
     SPECTRACK_CODEX_AGENT_ROLES,
@@ -929,7 +930,7 @@ def test_write_creates_agents_md_with_knowledge_root(tmp_path: Path) -> None:
     }
     assert result["codex_agents"]["restart_required"] is True
     assert not (tmp_path / CODEX_CONFIG_RELATIVE_PATH).exists()
-    assert (tmp_path / CODEX_SPECTRACK_AGENT_DIR / "spectrack-issue-implementer.toml").exists()
+    assert (tmp_path / CODEX_SPECTRACK_AGENT_DIR / "spectrack-usecase-explorer.toml").exists()
 
 
 def test_write_appends_knowledge_root_when_agents_md_exists(tmp_path: Path) -> None:
@@ -987,18 +988,18 @@ def test_install_codex_agents_creates_project_roles(tmp_path: Path) -> None:
     result = install_codex_agents(tmp_path)
 
     config_path = tmp_path / CODEX_CONFIG_RELATIVE_PATH
-    role_path = tmp_path / CODEX_SPECTRACK_AGENT_DIR / "spectrack-issue-implementer.toml"
+    role_path = tmp_path / CODEX_SPECTRACK_AGENT_DIR / "spectrack-usecase-explorer.toml"
     role_text = role_path.read_text(encoding="utf-8")
 
     tomllib.loads(role_text)
     assert not config_path.exists()
     assert result["config_action"] == "skip"
     assert len(result["agents"]) == len(SPECTRACK_CODEX_AGENT_ROLES)
-    assert 'name = "spectrack:issue-implementer"' in role_text
-    assert 'description = "SpecTrack implementer for an approved task, bug, or spike approach; implements, verifies Acceptance Criteria, commits, and refreshes Resume."' in role_text
+    assert 'name = "spectrack:usecase-explorer"' in role_text
+    assert 'description = "SpecTrack explorer that finds candidate use cases missed by an existing set of workflow usecase issues."' in role_text
     assert "developer_instructions = '''" in role_text
-    assert "SpecTrack `spectrack:issue-implementer` custom agent in Codex" in role_text
-    assert "# Issue Implementer" in role_text
+    assert "SpecTrack `spectrack:usecase-explorer` custom agent in Codex" in role_text
+    assert "# Use Case Explorer" in role_text
     assert "[apps._default]" in role_text
     assert "enabled = false" in role_text
     hooks = json.loads((tmp_path / CODEX_HOOKS_RELATIVE_PATH).read_text(encoding="utf-8"))
@@ -1021,6 +1022,13 @@ def test_install_codex_agents_preserves_existing_project_hooks(tmp_path: Path) -
 def test_install_codex_agents_removes_legacy_managed_block_only(tmp_path: Path) -> None:
     codex_dir = tmp_path / ".codex"
     codex_dir.mkdir()
+    agent_dir = codex_dir / "agents"
+    agent_dir.mkdir()
+    retired_role = agent_dir / "issue-implementer.toml"
+    retired_role.write_text("stale role\n", encoding="utf-8")
+    legacy_role = tmp_path / LEGACY_CODEX_SPECTRACK_AGENT_DIR / "usecase-reviewer.toml"
+    legacy_role.parent.mkdir(parents=True)
+    legacy_role.write_text("stale role\n", encoding="utf-8")
     config_path = codex_dir / "config.toml"
     config_path.write_text(
         "\n".join(
@@ -1049,7 +1057,11 @@ def test_install_codex_agents_removes_legacy_managed_block_only(tmp_path: Path) 
     assert "[agents.old]" not in text
     assert CODEX_AGENT_INSTALL_MARKER_BEGIN not in text
     assert CODEX_AGENT_INSTALL_MARKER_END not in text
-    assert (tmp_path / CODEX_SPECTRACK_AGENT_DIR / "spectrack-resolution-auditor.toml").exists()
+    assert (tmp_path / CODEX_SPECTRACK_AGENT_DIR / "spectrack-resolution-auditor.toml").exists() is False
+    assert not retired_role.exists()
+    assert str(retired_role) in result["removed_agents"]
+    assert not legacy_role.exists()
+    assert str(legacy_role) in result["removed_agents"]
 
 
 def test_install_codex_agents_is_idempotent(tmp_path: Path) -> None:

@@ -22,7 +22,7 @@ syntax before showing you the draft for confirmation.
 
 Install from the studykit plugin marketplace inside Claude Code or Codex, or
 install the plugin directory as a Hermes plugin. The Claude and Codex runtimes
-receive the full hook, skill, slash-command, and agent surface. Hermes receives
+receive the full hook, skill, slash-command, and use-case/Jira agent surface. Hermes receives
 first-turn workflow policy injection for repositories with `.spectrack/config.yml`
 and bundled plugin skills such as `spectrack:handoff`.
 
@@ -49,9 +49,9 @@ root. The fastest way to create it is the bundled setup skill:
 ```
 
 The skill walks through provider selection, fills in the required fields,
-and writes `.spectrack/config.yml`. It also installs the Codex custom-agent
-roles used by SpecTrack subagent workflows; restart Codex after setup so the
-new `spectrack:*` roles are available.
+and writes `.spectrack/config.yml`. It also installs the Codex roles used for
+use-case exploration, review, screen mocks, and Jira markup correction; restart
+Codex after setup so the new `spectrack:*` roles are available.
 
 A minimal hand-written configuration looks like:
 
@@ -93,24 +93,14 @@ Once configured, the plugin exposes these slash commands:
   issues. At wrap-up the skill dispatches the explorer and reviewer
   subagents to find gaps and quality issues. Run with `iterate` (or an
   existing `usecase` ref) to resume an earlier discovery session.
-- `/implement-issue <issue-ref> [extra requirements]` — Execute the
-  plan recorded in a `task`, `bug`, or `spike` issue. The issue body
-  already carries the plan from when it was created in plan mode; refresh
-  it in plan mode only if it has drifted from the current code. The
-  command first checks the issue's recorded root cause and approach
-  against the current code (see `/audit-resolution`) and pauses if the
-  diagnosis looks wrong, then hands the issue (and any refreshed plan) to
-  an implementer subagent that implements, verifies the acceptance
-  criteria, commits, and pushes a topic branch for you to review and
-  merge, after which an auditor subagent cross-checks the result and
-  leaves an audit comment on the issue. Pass extra requirements after the
-  ref to steer execution.
+- `/implement-issue <issue-ref> [extra requirements]` — Settle an approach
+  for a `task`, `bug`, or `spike` against the current code, obtain your
+  approval, then implement, verify, commit, and refresh its handoff. Pass
+  extra requirements after the ref to steer execution.
 - `/audit-resolution <issue-ref>` — Validate a published `task` or `bug`
   issue's recorded root cause and proposed approach/fix against the
-  actual code and git history. Dispatches an auditor subagent that flags
-  when the named cause is not the real cause, or when the approach would
-  not actually resolve it, and leaves a single verdict comment on the
-  issue.
+  actual code and git history, then presents an evidence-backed verdict for
+  your review.
 - `/handoff` — Wrap up a session by refreshing the `Resume` comment of
   every in-flight issue and, if needed, publishing `review`-type issues
   for residual findings, gaps, or questions.

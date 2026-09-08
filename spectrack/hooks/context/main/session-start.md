@@ -58,13 +58,9 @@ the body itself names — fetching those refs and reading their bodies and
 comments too. Also read any `wiki/` knowledge page the body or its
 `Context` points to, or that covers the code you will touch. Then settle
 the approach against the current code in plan mode (where the runtime
-provides it) and get the user's explicit approval of it. Then, using the
-host's available question tool when it supports this request, or plain text
-otherwise, ask whether to validate the approved approach with a plan audit
-— the `resolution-auditor` agent in plan-audit mode, pointed at the
-settled approach. Dispatch that agent only if they agree; when it runs,
-implement only after it resolves. If the user declines the audit,
-implement the approved approach directly.
+provides it) and get the user's explicit approval of it. Re-check that
+approved approach against the code before implementing; if its premises
+have drifted, stop and re-plan with the user.
 </implementing-issues>
 
 <topic-branch>
