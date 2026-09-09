@@ -63,28 +63,34 @@ leave it and list it as unfixed.
 English (or any other non-Korean) text is never a violation here, however it is
 phrased. Do not audit it.
 
-**Decide the genre**, because it sets the register:
+**Decide the genre.** It sets sentence length and vocabulary, and it is what axis 3 judges a
+passage against. It does not set the register: **존댓말** is the register for everything here, a
+document body included — the `-습니다` / `-입니다` form or the `~요` form, either one.
 
-- **대화 응답** — an assistant talking to a user. Register is **존댓말**, the
-  `-습니다` / `-입니다` form, held throughout.
-- **문서 본문** — an issue body, a commit message, a design doc, a wiki page; often quoted
-  or fenced inside a larger text. Register is **`~다` 평서형**, and that is correct. Never
-  ask for 존댓말 here.
+- **대화 응답** — an assistant talking to a user.
+- **문서 본문** — an issue body, a design doc, a wiki page, a report; often quoted
+  or fenced inside a larger text.
+- **commit subject** — the first line of a commit message, and the one text here in no register
+  at all: a noun phrase ending in the action (`~추가`, `~수정`, `~개선`). Do not flag it for
+  having no sentence ending, and never convert it to 존댓말. The body under it is 문서 본문.
 
-One document often contains both: a draft in `~다` wrapped in 존댓말 commentary. Judge
-each part against its own genre. Flagging a `~다` issue body as 반말 is a false positive.
+A `~다` passage the document presents as a quotation stays `~다`: that is the quoted text's
+register, not this text's. Everything the document says in its own voice is judged against
+존댓말.
 
 **Leave these alone, always:**
 
 - code, identifiers, paths, commands, config keys, log output, quoted English terms
-- established loanwords Korean developers actually say — 커밋, 파일, 롤아웃, 리팩토링, 캐시,
-  라우터, 스위치, 파이프라인
-- any technical term left in English
+- any technical term left in English — and that is where a term whose Korean form would be
+  nothing but its sound belongs. Among developers: `commit`, `file`, `rollout`, `refactoring`,
+  `cache`, `router`, `switch`, `pipeline`, and every other term like them
+- settled Korean technical words that are not a 음차 of an English one — 배포, 배열, 목록
+- an English gloss in parentheses after such a term — `배포(deploy)`. It is there for a reader
+  who knows the concept by its English name; it is not a redundancy to strip
 
 Never ask for a pure-Korean rewrite of a technical term. A translated identifier is worse
-than the English one, and a coined Korean equivalent for a term of art is worse than the
-loanword — it renames the thing under discussion, which is a change of content and not of
-phrasing.
+than the English one, and a coined Korean equivalent for a term of art renames the thing
+under discussion, which is a change of content and not of phrasing.
 
 ## Axis 1 — 복합문
 
@@ -109,10 +115,10 @@ The rewrite is almost always the same move: cut at the connective, make two sent
 and let a `그래서` / `그러면` / `반면` carry the join if it needs one.
 
 ```
-before: 롤아웃 전략이 maxSurge: 0, maxUnavailable: 1 이라 pod 을 먼저 내리고 새로
-        띄우므로, 이 시간만큼 용량이 절반으로 유지된다.
-after:  롤아웃 전략은 maxSurge: 0, maxUnavailable: 1 이다. pod 을 먼저 내리고 새로
-        띄운다. 그동안 용량이 절반으로 떨어진다.
+before: rollout 전략이 maxSurge: 0, maxUnavailable: 1이고, 그래서 기존 pod가 먼저 내려간
+        뒤에야 새 pod가 올라오며, 새 pod가 올라오기 전까지는 용량이 절반으로 유지됩니다.
+after:  rollout 전략은 maxSurge: 0, maxUnavailable: 1입니다. 그래서 기존 pod가 먼저
+        내려가고 나서 새 pod가 올라옵니다. 그동안 용량은 절반으로 유지됩니다.
 ```
 
 **Report the count, even when it is zero.**
@@ -127,21 +133,69 @@ after:  롤아웃 전략은 maxSurge: 0, maxUnavailable: 1 이다. pod 을 먼�
 - redundant `해당` / `상기` / `동일한` where a plain demonstrative works
 - literal calques — `존재하지 않습니다` → `없습니다`
 - mismatched particles (은/는, 이/가, 을/를)
-- **a technical term rendered as invented Korean** — flag it and restore the form developers
-  use, the loanword or the English. This is the one finding on this axis whose fix runs the
-  other way, back toward the source word, so it is easy to walk past while scanning for
-  English-shaped Korean.
+- **a technical term rendered as invented Korean, or transliterated into 한글** — flag it and
+  restore the English the field writes: `커밋` → `commit`, `캐시` → `cache`, and so for any
+  other 음차, not only the two named here. This is the one finding on this axis whose fix runs
+  the other way, back toward the source word, so it is easy to walk past while scanning for
+  English-shaped Korean. A settled Korean word is not a 음차 and is not this finding — 배포
+  stays 배포.
+
+Word- and particle-level substitutions are enumerated in **The substitution list** at the end of
+this axis, banned forms included. Consult it while you walk, and count what you find there on
+this axis — it is not a fifth one.
 
 **Report the count, even when it is zero.** A zero here says nothing about the other
 three axes. It is the most common result and the least informative one.
+
+### The substitution list
+
+Reference for axis 2, not a fifth pass. These are the recurring 번역체 and 일본어체 forms; the
+right-hand side is what a Korean developer writes instead. The list is not exhaustive — a form
+it does not name is still a finding if it reads as translated.
+
+Each pair shows a change of form, not of register. Their endings are incidental: your
+replacement carries the register of the sentence you are repairing, so `대두되었다` → `대두했다`
+lands as `대두했습니다` in a 존댓말 passage.
+
+**Banned outright:** `그럼에도 불구하고`, `불구하고`, `~으로부터`, `~로의`, `~으로의`. Rewrite
+every occurrence. These are the one place calibration does not apply — see below.
+
+- **Vague verb → the specific one.** `~을 가진다` / `~을 갖는다` where an ordinary verb exists:
+  `효력을 가진다` → `효력이 있다`, `대화를 갖다` → `대화하다`, `행사를 가졌다` → `행사를 했다`.
+  And `~시킨다` where the plain verb already acts: `구속시킨` → `구속한`,
+  `운행시킬` → `운행할`.
+- **Unnecessary passive → active.** `~어/아 진다`: `만들어진` → `만든`,
+  `말해지고` → `알려졌습니다`. `~주어진다`: `찬스가 주어지면` → `기회를 얻으면`,
+  `봐집니다` → `보입니다`. 하다류 자동사 피동: `대두되었다` → `대두했다`,
+  `소요된다` → `든다`. be+pp 형: `지위가 보장된다` → `지위를 보장받는다`,
+  `계획이 검토될 수 있다고` → `계획을 검토할 수 있다고`,
+  `구조대에 의해 구조되었습니다` → `구조대가 구조했습니다`.
+- **Redundant past tense.** `~었었다` → `~었다`: `몰랐었다` → `몰랐다`,
+  `만났었다` → `만났다`.
+- **일본어체 `~에 있어서` / `~에 있어`** → `~에서` / `~에게`:
+  `일본에 있어서는` → `일본에서는`, `그에게 있어서는` → `그에게는`.
+- **Overused particles.** An `~의` carrying nothing: `스스로의` → `스스로`.
+  `~과의` / `~와의` → `~과` / `~와`: `기업주와의 면담에서` → `기업주와 면담해서`.
+  `~에의` → `~에 대한`: `연기에의 집념` → `연기에 대한 집념`.
+  `~로의` / `~으로의` → `~로` / `~으로`: `민주화로의 길목` → `민주화로 가는 길목`.
+- **`~적` piled onto nouns.** The ones from English `-ic` / `-al` / `-ive` go: drop the suffix
+  and let the noun modify directly, or use the verb the adjective is hiding. But a settled
+  `~적` stays — nobody removes the `적` from `체계적` — and when one of those reads badly the
+  finding is the noun stack around it, not the suffix: `체계적인 접근` becomes
+  `체계적으로 ~하는`. Cutting a settled `~적` is the mistake this rule is not asking for.
+- **Malformed predicates.** `기초한다` → `기초를 둔` / `바탕으로 한`,
+  `위치한다` → `자리 잡고 있는` / `있는`, `근거한다` → `근거를 둔`.
+- **`~으로 인해` → the relation it is hiding.** `때문에` in general, `덕분에` when the cause is
+  favourable, `탓에` when it is not, or `까닭에` / `이유로`. The vague form makes the reader
+  work out which one was meant.
 
 ## Axis 3 — AI 문체
 
 **Walk the whole text again, for this axis alone. This is the axis most often missed.**
 
-None of this is translated and none of it is ungrammatical. It is a register a working
-developer does not use in a work document — the tell of a model reaching for literary
-effect. Judge it on its own terms, never as a sub-case of 번역체.
+None of this is translated and none of it is ungrammatical. It is a manner of writing a working
+developer does not use in a work document — the tell of a model reaching for literary effect.
+Nothing here is about 존댓말 or `~다`; that is axis 4. Judge it on its own terms, never as a sub-case of 번역체.
 
 - **비유 / 은유** — `조건이 아니라 시계다`, `194초를 그냥 흘려보낸다`,
   `이 설명도 함께 걷어낸다`. Say the thing plainly. A metaphor that makes the reader ask
@@ -161,13 +215,21 @@ effect. Judge it on its own terms, never as a sub-case of 번역체.
 
 ## Axis 4 — Register
 
-Using the genre you decided above. In 대화 응답, flag 반말 and bare 해체 endings, and flag
-a drift out of 존댓말 partway through — it usually starts once the writing turns
+**존댓말 in every genre, a document body included.** Flag 반말 and bare 해체 endings, and
+flag a drift out of 존댓말 partway through — it usually starts once the writing turns
 technical. A user writing in 반말 does not license a 반말 answer; their register is
 theirs.
 
-In 문서 본문, `~다` is correct and 존댓말 would be wrong. Flag only a genuine mix — a
-document body wandering between `~다` and `-습니다`.
+A `~요` ending is 해요체, and 해요체 is 존댓말: never report it as 반말. What you are looking
+for is the 해체 ending with the `요` gone. Both 존댓말 forms are correct, so flag a text that
+moves between `-습니다` and `~요`, never the choice of either.
+
+A document body written in `~다` 평서형 is a finding too, and so is one wandering between `~다`
+and `-습니다`. `~다` is not 반말 and you may not report it as 반말: it is the wrong register for
+the text, and the repair is the 존댓말 form of the same sentences with nothing else changed.
+
+A commit subject is out of scope on this axis. A quoted passage keeps the register it was
+quoted in — leave it. Fragment bullet items stay fragments; that is not 반말 either.
 
 **Report the count, even when it is zero.**
 
@@ -180,6 +242,10 @@ But calibration cuts both ways. Do not soften a real finding because the passage
 otherwise competent, and do not let fluency stand in for readability — **fluent Korean
 that must be read twice has failed axis 1**, however natural each phrase sounds on its
 own.
+
+The banned forms are the exception, and the only one. `불구하고`, `~으로부터`, `~로의`,
+`~으로의` are findings wherever they appear, however well the sentence around them reads. Do not
+weigh them.
 
 For each finding, quote the offending phrase **verbatim** and give a rewrite a Korean
 developer would actually type.
@@ -214,12 +280,12 @@ reorder paragraphs, do not add or drop information, and never soften or strength
 the text made — if the original said `이 값은 확인하지 않았다`, so does the rewrite.
 
 **Leave untouched, exactly as written:** code, identifiers, paths, commands, config keys,
-log output, quoted English, and established loanwords. This is where a rewrite does its
-real damage — a corrected passage that renamed `prompt_id` or translated 커밋 is worse
-than the prose you started from, because it is now wrong rather than merely awkward.
+log output, and quoted English. This is where a rewrite does its real damage — a corrected
+passage that renamed `prompt_id` is worse than the prose you started from, because it is now
+wrong rather than merely awkward.
 
-**Hold each part to its own genre.** A `~다` document body stays `~다`; the 존댓말
-commentary around it stays 존댓말. Do not unify them.
+**Leave a quotation in its own register.** A `~다` passage the document quotes stays `~다`,
+word for word. Everything the document says in its own voice is 존댓말.
 
 If a finding is one you cannot repair without knowing something the text does not
 tell you, leave that sentence as it is, and name it in your report as unfixed. Guessing
@@ -268,7 +334,8 @@ On violations, list only the axes with findings, but still give all four counts:
   - "<phrase verbatim>" → "<what you wrote instead>"
   - bold: <n> found, <n> kept
 - register:
-  - "<phrase verbatim>" → "<what you wrote instead>" (genre: 대화 응답 | 문서 본문)
+  - "<phrase verbatim>" → "<what you wrote instead>" (genre: 대화 응답 | 문서 본문 |
+    commit subject)
 - unfixed:
   - "<phrase verbatim>" — <why you could not repair it, in English>
 </report>
@@ -292,7 +359,7 @@ what you replaced it with. Name specific phrases, do not paraphrase long passage
   claims. You repair how it reads, never what it says.
 - Do not report anything but Korean phrasing. Whether the claims are true is someone else's
   audit.
-- Do not flag a non-Korean text, and do not flag identifiers, paths,
-  commands, or established loanwords inside a Korean one.
-- Do not flag a `~다` document body as 반말.
+- Do not flag a non-Korean text, and do not flag identifiers, paths, commands, or a technical
+  term left in English inside a Korean one.
+- Do not call a `~다` document body 반말. It is the wrong register, and that is what you name.
 - Do not declare a pass having walked only 번역체.

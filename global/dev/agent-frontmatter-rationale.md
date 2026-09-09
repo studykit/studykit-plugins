@@ -30,6 +30,11 @@ the maintainer's call: nothing in the method was specific to documentation, and 
 part (a term of art keeps the form its own field uses) is a rule that generalises rather than one
 that had to be dropped.
 
+`color:` is deliberately split — `magenta` for the translator, `red` for the corrector. Both
+were `red` at first, which is the one thing that does not survive the pair running back to back
+on the same text: the transcript is where you tell which of the two produced what you are
+looking at.
+
 They are one step in two halves. The translator ends by naming the corrector, so 직역 that
 survives the first has a reader downstream — which is the whole reason the pair exists rather
 than one agent that translates and then re-reads its own prose.
