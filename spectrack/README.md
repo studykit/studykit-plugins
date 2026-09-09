@@ -93,14 +93,6 @@ Once configured, the plugin exposes these slash commands:
   issues. At wrap-up the skill dispatches the explorer and reviewer
   subagents to find gaps and quality issues. Run with `iterate` (or an
   existing `usecase` ref) to resume an earlier discovery session.
-- `/implement-issue <issue-ref> [extra requirements]` — Settle an approach
-  for a `task`, `bug`, or `spike` against the current code, obtain your
-  approval, then implement, verify, commit, and refresh its handoff. Pass
-  extra requirements after the ref to steer execution.
-- `/audit-resolution <issue-ref>` — Validate a published `task` or `bug`
-  issue's recorded root cause and proposed approach/fix against the
-  actual code and git history, then presents an evidence-backed verdict for
-  your review.
 - `/handoff` — Wrap up a session by refreshing the `Resume` comment of
   every in-flight issue and, if needed, publishing `review`-type issues
   for residual findings, gaps, or questions.
