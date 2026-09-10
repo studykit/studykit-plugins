@@ -36,9 +36,9 @@ If no fields appeared above, this runtime does not run injected commands in skil
   commits with specific messages, leave unrelated changes unstaged and note them in the
   handover, and skip entirely if there is nothing to commit. The handover file itself is never
   committed either way.
-- Write the handover to `<handover-dir>/<next-number>-<filename-timestamp>-<slug>.md`, using the
-  fields from Context plus a short kebab-case slug. Never overwrite an existing file; bump the
-  number until the path is unique.
+- Write the handover to `<handover-dir>/<filename-timestamp>-<slug>.md`, using the fields from
+  Context plus a short kebab-case slug. Never overwrite an existing file; if that path is
+  already taken, change the slug until it is unique.
 - Leave the handover file uncommitted as an untracked file.
 - Last, record it: `guard-handover <absolute path to the handover file>`. That is what lets the
   session a `/clear` opens next name the file to the user and read it; without it the file is

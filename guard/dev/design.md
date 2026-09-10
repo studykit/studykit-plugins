@@ -2939,13 +2939,14 @@ python3 -c "import json;print(json.load(open('$CLAUDE_PROJECT_DIR/.claude/guard/
 
 # The `/clear` handoff, both halves — and the only place guard writes a line the USER sees.
 CLAUDE_CODE_SESSION_ID=s1 "$H" toggle-cli off > /dev/null    # one switch off its default
-mkdir -p "$CLAUDE_PROJECT_DIR/.handover"; echo x > "$CLAUDE_PROJECT_DIR/.handover/001-x.md"
-CLAUDE_CODE_SESSION_ID=s1 "$H" handover-written "$CLAUDE_PROJECT_DIR/.handover/001-x.md"
+mkdir -p "$CLAUDE_PROJECT_DIR/.handover"; echo x > "$CLAUDE_PROJECT_DIR/.handover/20260101-0900-x.md"
+CLAUDE_CODE_SESSION_ID=s1 "$H" handover-written "$CLAUDE_PROJECT_DIR/.handover/20260101-0900-x.md"
 echo '{"session_id":"s1","reason":"clear"}' | "$H" session-end
 echo '{"session_id":"s9","source":"clear"}' | "$H" session-start | python3 -c \
   'import json,sys;d=json.load(sys.stdin);print(d.get("systemMessage","(NONE)"));print("--");print(d["hookSpecificOutput"]["additionalContext"])'
-#   -> systemMessage names .handover/001-x.md. `(NONE)` is the regression this hook exists to
-#      catch: the handover reaching the model with nothing said to the person who wrote it.
+#   -> systemMessage names .handover/20260101-0900-x.md. `(NONE)` is the regression this hook
+#      exists to catch: the handover reaching the model with nothing said to the person who
+#      wrote it.
 #      additionalContext then carries "Read that file" AND the carried-switches line — the two
 #      halves are independent, so one arriving without the other is the other failure mode.
 # Single use. The record is consumed whether or not it was applied.
