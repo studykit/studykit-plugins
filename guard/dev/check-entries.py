@@ -42,7 +42,7 @@ PLUGIN_ROOT = Path(__file__).resolve().parent.parent
 # runtime (the bare name still resolves to the user-level one) and would drift silently.
 #
 # Nothing here can verify the user actually installed them. That is why the dispatch text in
-# `agents/report-router.md` and `skills/answer/SKILL.md` says what to do when the name resolves
+# `skills/audit-report/SKILL.md` and `skills/answer/SKILL.md` says what to do when the name resolves
 # to nothing: hand over the English rather than translate in the main session.
 EXTERNAL_ENTRIES = frozenset({"korean-translator"})
 

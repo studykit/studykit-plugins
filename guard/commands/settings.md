@@ -118,7 +118,7 @@ Korean the user reads and `korean-corrector` checks what it wrote — one step, 
 opt into, and a switch on either half would mean a Korean answer the user reads in a quality
 that depends on a config key. They cost nothing where they are not needed, because they only
 run over a DOCUMENT: `/guard:answer` dispatches the translator when the reader reads another
-language, `report-router` names it for a file the user points at, and the corrector is reached
+language, the router names it for a file the user points at, and the corrector is reached
 by the translator's own report. An ordinary turn produces no document, so nothing is translated
 there at all. They never make a turn routed on their own — with every switch below `off`, they
 are dropped too.

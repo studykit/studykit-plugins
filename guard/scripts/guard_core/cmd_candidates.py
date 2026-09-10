@@ -40,8 +40,8 @@ from .state import _audit_paused, _read_state
 def cmd_candidates() -> int:
     """Print what the router may name, one ``entry=mode`` per line.
 
-        candidates            # the turn path, for `turn-router`
-        candidates --doc      # the document path, for `report-router`
+        candidates            # the turn path, for `audit-turn`
+        candidates --doc      # the document path, for `audit-report`
 
     Read-only: it touches no state and honors no write marker, because it answers a question
     the router is entitled to ask and changes nothing by asking. Prints in ``AUDIT_AGENTS``
@@ -54,7 +54,7 @@ def cmd_candidates() -> int:
 
     Three shapes that print no keys, and they must not look alike on stderr. No session id
     is an installation problem. A muted session is the user having switched guard off, which
-    is an answer. An empty list is a real answer too, and both routers can now see it — an
+    is an answer. An empty list is a real answer too, and the router can now see it — an
     audit the user asks for in a project with every switch off reaches this verb — so each is
     called out rather than left as silence the router would have to interpret.
 

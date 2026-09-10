@@ -164,7 +164,7 @@ _MODE_ALIASES = {
 
 
 DEFAULT_CONFIG: dict[str, Any] = {
-    # There is deliberately no key for the router's model. `agents/turn-router.md` pins `opus` and
+    # There is deliberately no key for the router's model. `agents/router.md` pins `opus` and
     # that is the whole decision: every other agent in the set is paid for by one the router
     # makes, so the direction a project would tune this in — cheaper — is the direction whose
     # failure is invisible. A router that stops naming an agent looks exactly like a turn with
@@ -189,7 +189,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
     # switches the one it wants.
     #
     # What `off` does NOT do is refuse an audit the user names. Only `cmd_candidates` reads
-    # these, and only three callers run it: the two routers and `/guard:answer`. The
+    # these, and only three callers run it: the router, on either path, and `/guard:answer`. The
     # `audit-{turn,report,plan}-*` skills are invoked by name and read no switch, so
     # `/guard:audit-turn-claims` runs in a project with `claims-auditor: off`. That is the
     # same rule that retired `audit-turn`: a setting written once does not overrule a command

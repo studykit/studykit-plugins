@@ -15,8 +15,8 @@ from .config import _switch_on
 
 
 # The dispatch paths an audit can run on. `"turn"` is a finished turn, audited when the user
-# asks for one; `"report"` is a standalone document the caller points `report-router` at.
-# Neither has a hook behind it any more — both routers run because somebody asked.
+# asks for one; `"report"` is a standalone document the caller points the router at.
+# Neither has a hook behind it any more — the router runs because somebody asked.
 TURN_PATH = "turn"
 REPORT_PATH = "report"
 
@@ -93,7 +93,7 @@ class AuditAgent(NamedTuple):
 
     An entry is a SKILL for every audit that runs on both paths and the agent's own name for
     the rest; the three shared audits are each one agent behind two `context: fork` skills.
-    Which tool the caller reaches for is said by whoever dispatches — each router's report
+    Which tool the caller reaches for is said by whoever dispatches — the router's report
     template, and ``_agent_pointer``'s lead on the direct path — not by this module; what this
     module guarantees is that the name it hands over is the name of a real entry point,
     checked by ``dev/check-entries.py`` against both ``agents/`` and ``skills/``.
@@ -125,7 +125,7 @@ class AuditAgent(NamedTuple):
 # definitions are not in `agents/` at all — they install into the user's own agent directory,
 # shared by every project on the machine — so their `subagent_type` is the bare name and a
 # `guard:` prefix would resolve to nothing. Nothing in this module has to know that: it prints
-# names, and the two places that write a dispatch (`report-router`'s template and the `answer`
+# names, and the two places that write a dispatch (`audit-report`'s template and the `answer`
 # skill) each name the pair explicitly and unprefixed. What DOES have to know is
 # `dev/check-entries.py`, which would otherwise look for a file the plugin no longer has.
 
@@ -322,7 +322,7 @@ def _edited_bucket(target: Path, refs_dir: Path | None = None) -> str | None:
 # answer was written to.
 #
 # The router still writes the dispatch rather than guard printing it, and that split is
-# unchanged: `agents/turn-router.md` carries everything that describes an agent and is read
+# unchanged: `agents/router.md` carries everything that describes an agent and is read
 # once per audit, while the hook carries only what nothing downstream can derive.
 #
 # That the router is an agent and not a `claude -p` child guard spawns itself is the
@@ -345,7 +345,7 @@ def _edited_bucket(target: Path, refs_dir: Path | None = None) -> str | None:
 # the edited-file list, the router's picks and its reason per pick. Routing a two-line
 # verdict through a file would only add a read.
 #
-# The roster is built HERE, not in `agents/turn-router.md`, because eligibility is per turn
+# The roster is built HERE, not in `agents/router.md`, because eligibility is per turn
 # and per project: which switches are on, and which files this turn wrote. The router's
 # definition holds everything that is the same every turn — the method, and the dispatch
 # template per agent. An agent absent from the roster cannot be picked, which beats

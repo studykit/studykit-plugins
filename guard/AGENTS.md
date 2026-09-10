@@ -19,12 +19,12 @@ one ends.** Everything it does is entered by the user, and there are three entri
   dispatches them, applies what they find, has the corrected English translated when the user
   reads another language, and hands over the finished file. The user's first sight of it is the
   audited version.
-- **`/guard:audit-turn`** — over a reply the user has already read. It forks `guard:turn-router`,
+- **`/guard:audit-turn`** — over a reply the user has already read. It forks `guard:router`,
   which names which audits would find something in the last turn a person opened; the caller
   runs them together and **reports**. It corrects nothing: that turn was printed before the
   audit was asked for, so there is no document a fix could reach.
-- **`/guard:audit-report <path>`** — a standalone document that already exists. `report-router`
-  triages it the way `turn-router` triages a turn.
+- **`/guard:audit-report <path>`** — a standalone document that already exists. It forks the
+  same `guard:router` with its own task file, which is what makes the two paths one agent.
 
 All three are `disable-model-invocation: true` — the user's and only the user's. An entry the
 model can reach is work that arrives unasked, and a description in every session's standing
@@ -125,21 +125,26 @@ carries the full set with the reasoning and the measurements; these are the ones
 how the code here is organised.
 
 - `guard_core.config` is the ONLY reader of `GUARD_HOST`, once, at import.
-- A definition that exists once per dispatch path is named `<path>-<what it does>` —
-  `turn-router` / `report-router`, and the plan critics `plan-coherence`, `plan-fit` and the
-  rest. An entry-point skill is the same rule with the verb in front: `audit-turn` /
-  `audit-report` for the path's own entry, `audit-turn-claims` / `audit-report-claims` /
-  `audit-plan-deferrals` for one audit on it. `answer` keeps a bare name: it is not a path's
-  audit entry but the thing that produces what one audits. A definition used on one path only,
-  or outside the routers, keeps its bare name; do not prefix one speculatively. The plan
+- A definition that exists once per dispatch path is named `<path>-<what it does>` — the plan
+  critics `plan-coherence`, `plan-fit` and the rest. An entry-point skill is the same rule
+  with the verb in front: `audit-turn` / `audit-report` for the path's own entry,
+  `audit-turn-claims` / `audit-report-claims` / `audit-plan-deferrals` for one audit on it.
+  `answer` keeps a bare name: it is not a path's audit entry but the thing that produces what
+  one audits. A definition used on one path only, or on every path, keeps its bare name; do
+  not prefix one speculatively. `router` was `turn-router` / `report-router` until v0.128.0
+  and lost the prefix when the two became one agent — a per-path prefix on a definition that
+  serves every path asserts a split that is not there. The plan
   critics were `design-*` until v0.123.0 and that prefix read as *visual* design, while the
   path is called plan everywhere else (`audit-plan`, `guard-plan`, the plan gate), so they
   follow it. Nothing derives these names — a rename is silent at runtime, so the whole set and
   `skills/audit-plan/SKILL.md` move together or not at all.
-- Split at the ENTRY, never at the agent. Every audit that runs on more than one dispatch path
-  — claims, deferrals, clarity — is ONE agent behind a `context: fork` skill per path, and the
-  reason is memory: a memory directory is named after the agent, so two definitions are two
-  memories and what one learns the other relearns. A judgment that genuinely differs by path
+- Split at the ENTRY, never at the agent. Every definition that runs on more than one dispatch
+  path — claims, deferrals, clarity, and since v0.128.0 the `router` — is ONE agent behind a
+  `context: fork` skill per path, and the reason is memory: a memory directory is named after
+  the agent, so two definitions are two memories and what one learns the other relearns.
+  **The router holds without that reason** — it has no `memory:` and must not get one — so do
+  not read the memory clause as the only qualifier: duplicated judgment is enough on its own
+  (`dev/agent-frontmatter-rationale.md` § `router`). A judgment that genuinely differs by path
   goes in the skill, with the agent saying which judgment that is rather than picking a side;
   the refs-copy rule for a documentation claim and what it takes for a deferral handed to a
   person to stand are the two that do, and on the plan path clarity adds a third: WHO the
@@ -172,11 +177,11 @@ how the code here is organised.
   the definitions are user-level — and a dispatch that matches no agent finds nothing rather
   than raising. Nothing derives either name: the roster prints the bare entry and the `guard:`
   prefix belongs to whoever writes the dispatch, so the two writers that name this pair
-  (`agents/report-router.md`'s template, `skills/answer/SKILL.md` § 6) spell it out and say
-  why. Adding the prefix back to match the agents beside it in a template is silent.
+  (`skills/audit-report/SKILL.md`'s template, `skills/answer/SKILL.md` § 6) spell it out and
+  say why. Adding the prefix back to match the agents beside it in a template is silent.
 - Nothing resolves a plugin path by counting `__file__` parents.
 - Where a piece of text lives is decided by how often it is paid for. Hook output is read on
-  every turn that edits a file; `agents/turn-router.md` and `skills/answer/SKILL.md` once per
+  every turn that edits a file; `agents/router.md` and `skills/answer/SKILL.md` once per
   time the user asks. Nobody re-types another home's text.
 - guard writes the turn's **response** file itself, cut from the transcript — it is the text
   being audited, so it must not pass through the author's hands. There is no longer a hook that

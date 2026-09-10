@@ -3,7 +3,7 @@
 Where each piece of text lives is decided by how often it is paid for, and that split must
 hold. What this module builds reaches the main agent on every turn that has an answer file,
 so it is one imperative plus a list of fields: paths, which agents are on, each one's mode.
-``agents/turn-router.md`` is read once per AUDIT — and an audit happens only when the user
+``agents/router.md`` is read once per AUDIT — and an audit happens only when the user
 asks for one — so it carries the triage method and the dispatch per candidate.
 Nobody re-types another home's text.
 """
@@ -87,7 +87,7 @@ def _plugin_root() -> Path:
 # existed, testing `is_file()` on each wrapper and adding the long `uv run --script <cli>
 # <verb>` form to the dispatch when it was absent. Measuring it found it caught nothing real:
 #
-# - A version mismatch cannot happen. `agents/turn-router.md` and `shell/bin/` install as one
+# - A version mismatch cannot happen. `agents/router.md` and `shell/bin/` install as one
 #   tree, so a version whose router names `guard-candidates` is a version that ships it.
 # - A lost exec bit, or a PATH the wrappers never reached, leaves the FILE in place — so
 #   `is_file()` passes and the fallback never fires, which is every realistic failure.

@@ -562,7 +562,7 @@ quiet for an hour needs a way to say so that is not editing the config.
 The same two definitions now live in this repository's `global/agents/`, which installs into
 the user's own agent directory, and guard dispatches them by the bare name. Nothing about when
 a translation happens changed: `/guard:answer` still decides it on the language it is answering
-in, `report-router` still names the translator for a document with a `- language:` line, and
+in, the router still names the translator for a document with a `- language:` line, and
 the corrector is still reached by the translator's own report.
 
 ### Why they were the two that could leave
@@ -593,7 +593,8 @@ Two things answer it, and neither is a check guard can run:
 
 - The dispatch text says what to do when the name resolves to nothing: hand over the English
   and say the translator is not installed. Both writers of a dispatch carry that line —
-  `report-router`'s template and `skills/answer/SKILL.md` § 6 — and § 6 adds the other half,
+  `skills/audit-report/SKILL.md`'s template and `skills/answer/SKILL.md` § 6 — and § 6 adds
+  the other half,
   which is that the caller must not translate a document of that length itself. That is the
   outcome § 2 already refuses, and a missing agent is the same refusal arrived at from the
   other end.
@@ -628,6 +629,61 @@ name and the plugin's copy would have its own.
 any more, and § "No agent file is generated any more" is why: a generated definition is one a
 contributor edits in the wrong place, and the pressure that produced the last build step was
 exactly this — one body, two homes.
+
+## The two routers become one — v0.128.0
+
+`turn-router` and `report-router` were merged into one `router` agent behind the two entry
+skills that already forked them. No behaviour changed: the same triage runs, the same
+templates are emitted, and `guard-candidates` is still what says which audits are on.
+
+**What was actually duplicated.** Not the frontmatter — that was identical and defensible.
+The bodies. `report-router.md` opened with "You are the same triage step as guard's turn
+router, pointed at a document instead of a turn" and then restated that step in its own
+words: materiality, the asymmetric cost of a name given versus a name omitted, the
+empty-answer paragraph, the rule that a reason must name what was detected rather than the
+audit's job. Four passages, one judgment, two wordings, drifting with nothing reporting the
+drift — which is the failure the entry split exists to prevent, arriving in the one place the
+rule had not been applied.
+
+**Why it had not been.** `dev/agent-frontmatter-rationale.md` argued for two agents, and the
+argument was that merging meant conditionals inside a body that was already the longest in the
+plugin. That premise was wrong by the time it was written: the alternative to two agents is not
+one agent with conditionals, it is the entry split — the agent is the system prompt, a skill
+per path is the task, and a judgment belonging to one path is simply absent from the other's
+file. Two of that section's three reasons were real path differences (no request file; a
+declared-open heading is a claim) and both are now sections in their skills. The third —
+`korean-corrector` can never be named on the document path — had been false since v0.121.0,
+when the turn path stopped producing a translation at all. It described an asymmetry that had
+not existed for four minor versions and nothing caught it, because a rationale file is not
+executed.
+
+**Which argument carries this one.** The entry-split rule in `AGENTS.md` is justified by
+memory: one agent, one memory directory. **That reason does not apply here.** The router has
+no `memory:` and must not get one — remembered triage habits are how a Korean turn goes
+unrouted at the step nothing else checks — so the merge consolidated no store. Duplicated
+judgment was the whole case. Worth keeping straight, because the next candidate for a merge
+will be assessed against the rule as written, and the rule as written would have passed over
+this one.
+
+**Where things moved.** `agents/router.md` holds the triage method, the materiality line, the
+three shared candidate cues (claims, deferrals, clarity) and the shared output discipline.
+Each entry skill holds what its path is pointed at, its rider on each cue, its roster keys, and
+its report templates:
+
+- `skills/audit-turn/SKILL.md` — the turn id, the answer and request files, materiality
+  relative to the request, the `@`-mention relay, the "this turn narrating itself" exclusion on
+  claims, and the report-only templates with no second round and no translation.
+- `skills/audit-report/SKILL.md` — the resolved path and `language`, the absence of a request,
+  the declared-open rule, the SKILL-versus-AGENT distinction, `korean-translator`, and the
+  apply-then-re-round templates.
+
+**What it costs.** The report templates are no longer in the agent, so the router cannot be
+read end to end to learn what it emits. A bad dispatch instruction is traced from the skill,
+not from `agents/router.md`.
+
+**The naming.** `router`, bare. The `<path>-<what it does>` convention applies to a definition
+that exists once per dispatch path, and this one no longer does; a per-path prefix on a
+definition serving every path asserts a split that is not there.
 
 ## Storage layout (`${CLAUDE_PROJECT_DIR}/.claude/guard/`)
 
@@ -880,7 +936,7 @@ payloads, not memory.
   is technically a statement; naming agents for it is the noise that makes the whole
   recommendation ignorable). Whether a claim is adequately backed, a deferral legitimate,
   or some Korean any good is the agent's call, and the agent reads the turn itself. This
-  line is stated in `agents/turn-router.md` per candidate, and it is the thing most easily lost
+  line is stated in `agents/router.md` per candidate, and it is the thing most easily lost
   in an edit: a router that starts judging quality stops naming the agent that would have
   judged it properly.
 - **The router routes on the answer AND the request; materiality needs both.** Triage used
@@ -1000,7 +1056,7 @@ payloads, not memory.
   and the router ran it. But printing the command was still the main agent relaying an
   instruction addressed to someone else: it never runs it, so every character was read by
   the wrong party. Shortening the string to a bare name made that cheaper without stopping
-  it. The fix is that a FIXED command needs no relay at all — `agents/turn-router.md` names
+  it. The fix is that a FIXED command needs no relay at all — `agents/router.md` names
   `guard-candidates` itself, read once by its only caller — so the hook now sends nothing
   about the roster, and the dispatch carries four fields: closeout, turn dir, answer file,
   history.
@@ -1014,7 +1070,7 @@ payloads, not memory.
   **There is no fallback for a missing wrapper, and one was removed rather than kept.** It
   tested `is_file()` on each wrapper and added the long `uv run --script <cli> <verb>` form
   when it was absent. Measuring all four present/absent combinations showed it caught
-  nothing that happens: a version mismatch is impossible because `agents/turn-router.md` and
+  nothing that happens: a version mismatch is impossible because `agents/router.md` and
   `shell/bin/` install as one tree; a lost exec bit or a PATH the wrappers never reached
   leaves the file in place, so `is_file()` passes and the fallback never fires — and that is
   every realistic failure; Codex never calls `_router_context` at all. The only state it
@@ -1167,7 +1223,7 @@ payloads, not memory.
   produced it was still there: two files each holding a per-agent list, one of them read by the
   party the other had just instructed. So the closeout file's per-agent sections are gone, and the
   turn router's report template carries the dispatch instruction the way `report-router`'s
-  already did — that path has shipped this design all along (`agents/report-router.md`: "Your
+  already did — that path has shipped this design all along (`agents/router.md`: "Your
   Output section below is the whole of the dispatch instructions for this path, so do not send
   your caller to the closeout file"), which is the counter-evidence to the objection recorded at
   `_agent_pointer` and the reason it is overturned here rather than argued with.
@@ -1632,7 +1688,8 @@ payloads, not memory.
 
   What answers it is the party that was in the conversation. The interviewer's handoff line now
   carries `- language: <the language the user wrote to me in>` beside the brief path, and
-  `report-router` treats that line as the one input it cannot derive: present, the document is
+  `skills/audit-report/SKILL.md` treats that line as the one input it cannot derive: present,
+  the document is
   being delivered in that language and the translator is nameable; absent, there is nothing to
   translate. The line is sent even when the answer is `English` — a stated language is a fact and
   an omitted one is a guess.
@@ -1697,7 +1754,7 @@ payloads, not memory.
   turn that has an answer file, so it is one imperative plus a list of fields — this turn's
   paths — and nothing that reads the same twice. `hooks/context/turn-closeout.md` is paid by
   that same turn when it delivers it, so it holds the delivery sequence and what to do once an
-  audit has reported. `agents/turn-router.md` is paid once per AUDIT, in the router's own
+  audit has reported. `agents/router.md` is paid once per AUDIT, in the router's own
   context, so it holds the triage method, the cue per candidate, and the shape of the report —
   and since v0.118.0 that is the rarest of the three rather than the middle one, because an
   audit happens only when the user asks for one.
@@ -2048,7 +2105,7 @@ payloads, not memory.
   file; it edits comments in source. It shares no input with the routed agents, so there is
   nothing for it to be ordered against and no round trip to pay.
 
-  Consequences worth keeping straight: `agents/turn-router.md` has no `comment-corrector` section
+  Consequences worth keeping straight: `agents/router.md` has no `comment-corrector` section
   and candidate lines carry no paths, which restores its "record missing → pick nothing" rule
   to always-correct (the router is now dispatched only when an answer file exists). And a
   dispatch of `comment-corrector` alone names no answer file at all, and since v0.94.0 it does
@@ -2179,7 +2236,7 @@ payloads, not memory.
   checks. Its question is about one turn; anything carrying the last five can answer it from
   the wrong one, silently, at the step nothing else checks. This is also why no agent may be
   held open across turns — see the `reuse` removal above.
-- **The router is not the place to save on model.** `agents/turn-router.md` defaults to `opus`.
+- **The router is not the place to save on model.** `agents/router.md` defaults to `opus`.
   Every other agent in the set is paid for by a decision this one makes, so a cheap router
   that misreads a turn saves nothing: it either omits the agent that would have caught the
   defect, or spends a whole subagent for each agent it named on material that was not
@@ -2333,7 +2390,7 @@ payloads, not memory.
   a key its caller opens no section for.
 
   The cost is `Bash` on an agent that had `Read` only, which was a real property worth
-  keeping: a pure triage step cannot wander into the repository. `agents/turn-router.md` now says
+  keeping: a pure triage step cannot wander into the repository. `agents/router.md` now says
   `Bash` is for this one command and that the answer and request files are the only files it
   reads. That is an instruction, not an enforcement — the honest trade is a weaker sandbox on
   the router in exchange for the roster never reaching the agent that could misuse it, and
@@ -2589,7 +2646,7 @@ plain `str`, and `isinstance("on", AgentMode)` is False, so the accepted type is
 to `str` for those keys. Without that widening every mode in the file is dropped and only
 the session state is ever honored — which is exactly the bug this shape introduced once.
 
-There is deliberately **no key for the router's model**. `agents/turn-router.md` pins `opus`, and a
+There is deliberately **no key for the router's model**. `agents/router.md` pins `opus`, and a
 config key could only ever be turned one way in practice — cheaper — which is the way whose
 failure cannot be seen: a router that stops naming an agent produces exactly the output of a
 turn with nothing in it, and the audit that never ran is the failure guard exists to prevent.
@@ -2665,7 +2722,7 @@ switch is a change to what guard does now, not just to the file.
 
 ## One audit, several paths: the entry splits, the agent does not
 
-`claims-auditor` was written for one caller. When `report-router` began routing standalone
+`claims-auditor` was written for one caller. When the router began routing standalone
 documents — then an `interviewer` brief, today whatever file the user points it at — it
 dispatched that same agent at a file, and every
 sentence in the body about "the turn", the transcript, the request and the extraction fallback
@@ -2675,6 +2732,10 @@ became a statement about an input that does not exist on that path. The same was
 The rule that came out of it: **split at the ENTRY, never at the agent.** All three shared
 audits are one agent behind one `context: fork` skill per path — two skills for claims and
 clarity, and three for deferrals, which since v0.123.0 also reads the approved plan.
+
+Since v0.128.0 the **router** is the fourth definition under this rule, and the one that shows
+the rule is broader than the reason given for it below: it has no memory to consolidate, and
+the merge was carried entirely by duplicated judgment. See § "The two routers become one".
 
 ### Why not two agents, which was built first
 
@@ -2832,7 +2893,8 @@ rule — nothing but `_path_entry` may derive a dispatchable identity from a key
 
 **`--doc` replaced a rule the document router had to remember.** `guard-candidates --doc` maps
 each eligible audit through `report_entry` and drops the ones that return `None`, so the Korean
-pair is simply never offered on that path. The paragraph telling `report-router` to refuse them
+pair is simply never offered on that path. The paragraph telling the document router to refuse
+them
 by name is now a note about why they are absent rather than an instruction it has to follow.
 
 **Checks, since this repository has no CI.** `uv run dev/check-entries.py` fails if a
@@ -2859,7 +2921,7 @@ nondeterminism and a 5-11s wait per turn. It is a subagent now, so the hook's wh
 eligibility plus text generation, and every case below is an exact assertion.
 
 What this recipe can no longer check is the routing itself — whether the router picks the
-right agents. That lives in `agents/turn-router.md` and is exercised by using guard, not by this
+right agents. That lives in `agents/router.md` and is exercised by using guard, not by this
 script. What it does check is that the router is *asked* correctly: the right candidates,
 the same turn-record path for every agent, and nothing offered that is set to `off`.
 

@@ -181,71 +181,82 @@ answer stored in this project?", answer no, and stop. The cost is real — a def
 an opus call — and a project that would rather trade the catch rate for it changes one word in
 the file.
 
-### `turn-router`
+### `router`
 
 `tools: Read, Bash`
 
-`Read` for the two files it is pointed at — the answer and the request. `Bash` for exactly two of
-guard's own commands: `guard-inputs`, which turns the turn id it is given into those paths, and
-`guard-candidates`, which tells it which agents it may name. Both are fetched by the router
+`Read` for the files it is pointed at. `Bash` for exactly two of guard's own commands:
+`guard-inputs`, which turns the turn id or path it is given into those files, and
+`guard-candidates`, which tells it which audits it may name. Both are fetched by the router
 rather than passed in, so each stays with its only reader.
 
 `Bash` is otherwise not for this agent's use. It routes from what it is given, so it needs no
-search and no web access: whatever needs the repository is the job of the agent it names, which
-has it. And no `Agent`: a router that could dispatch would be running the very agents it was
+search and no web access: whatever needs the repository is the job of the audit it names, which
+has it. And no `Agent`: a router that could dispatch would be running the very audits it was
 asked to merely nominate.
 
 **No `memory:`, deliberately.** Memory would inject this project's accumulated triage habits into
 every routing decision, and the one thing routing must not do is decide from a pattern instead of
 from this turn — a remembered "this project rarely writes Korean" is exactly how a Korean turn
-goes unrouted, silently, at the step nothing else checks. That is also why nothing here is held open across
-turns — see design.md on the removal of `reuse`.
+goes unrouted, silently, at the step nothing else checks. That is also why nothing here is held
+open across turns — see design.md on the removal of `reuse`.
 
 `model: opus`, not the cheapest model that fits the method. Every other agent here is paid for by
-a decision this one makes, so a router that misreads a turn does not save anything: it either
-omits the agent that would have caught the defect, or spends a full subagent for each agent it
+a decision this one makes, so a router that misreads a subject does not save anything: it either
+omits the audit that would have caught the defect, or spends a full subagent for each audit it
 named on material that was not there. The second failure is the one that compounds — it is what
 teaches the user to wave the recommendation through unread, and then the omissions stop being
 caught either. The triage itself is short, so the model is the cheap part of it.
 
-### `report-router`
-
-`tools: Read, Bash`
-
-Same frontmatter as `turn-router`, and for the same reasons; what differs is what it is pointed at.
-`turn-router` triages a TURN and gets there from a turn id. This one triages a DOCUMENT and gets
-there from a path — `guard-inputs --file <path>`, the second form of the same verb.
-
-**Why a second agent rather than a second mode of `turn-router`.** The two share the mechanism and
-disagree on three judgments, each of which would have to become a conditional inside a body that
-is already the longest in this plugin:
-
-- **No request file.** `turn-router`'s materiality call leans on what the user asked for. A document
-  had no user in front of it, so that whole section is inapplicable rather than merely empty.
-- **`korean-corrector` can never be named.** On the turn path the agent corrects a translation
-  the caller writes *after* routing, which is why the request is allowed to put it on the list.
-  A document is already written and is the deliverable; there is no later prose. A shared body
-  would carry a rule whose one job is to be switched off half the time.
-- **A declared-open section has to be read as a claim, not as a clearance.** A document that
-  carries `Open` or `Could not determine` headings — the interview brief this path was built
-  for did — got skipped by the first draft of this router, as the document doing its job. That
-  was backwards, and the maintainer caught it: the heading asserts that somebody decided to
-  leave these open, and an author is perfectly capable of parking a question it never asked
-  under it. An item nobody put to the user sits there indistinguishable from one the user
-  declined, with the heading making it look accounted for — which is `deferrals-auditor`'s
-  subject exactly. So the rule is the opposite of what it started as: that section is the
-  strongest reason to name the agent.
-
-It also carries its own dispatch instructions instead of pointing at the closeout file, which is
-why `inputs --file` prints no closeout path: the closeout routes findings into the answer file, then
-a translation, then the presentation of a turn, and a caller following that over a document would
-produce a Korean translation nobody asked for.
-
 **The mute is honored by `guard-candidates`, not by this agent.** There is no hook in front of
-this path to check it — the user points this router at a path — so the switch check lives in the
-command both routers already run. Since v0.118.0 that is true of the turn path as well: a turn
-audit is invoked rather than recommended, so this command is the only thing standing between
-`guard off` and an audit that runs anyway.
+either path to check it — the user asks for the audit — so the switch check lives in the command
+the router already runs. Since v0.118.0 that is true of the turn path as well: a turn audit is
+invoked rather than recommended, so this command is the only thing standing between `guard off`
+and an audit that runs anyway.
+
+#### It was two agents until v0.128.0, and the argument for splitting it was recorded here
+
+`turn-router` and `report-router` were separate definitions, and this file argued for that: the
+two share the mechanism and disagree on three judgments, each of which would have to become a
+conditional inside a body that was already the longest in this plugin. Three reasons were given.
+Two survived and one had gone stale, and the difference is what decided it.
+
+- **No request file.** `turn-router`'s materiality call leans on what the user asked for. A
+  document had no user in front of it, so that whole section is inapplicable rather than merely
+  empty. **Still true**, and it now lives in `skills/audit-turn/SKILL.md` § 2 — where it is not a
+  conditional at all, because the document path's task file simply does not contain it.
+- **A declared-open section has to be read as a claim, not as a clearance.** A document that
+  carries `Open` or `Could not determine` headings — the interview brief this path was built for
+  did — got skipped by the first draft of that router, as the document doing its job. That was
+  backwards: the heading asserts that somebody decided to leave these open, and an author is
+  perfectly capable of parking a question it never asked under it. **Still true**, and it lives
+  in `skills/audit-report/SKILL.md` § 2.
+- **`korean-corrector` can never be named on the document path**, because on the turn path the
+  caller writes a translation *after* routing. **This had been false since v0.121.0**, when the
+  turn path stopped producing a translation at all. By the time the merge was considered, neither
+  path could name the corrector, and the retired `turn-router.md` said so outright ("no section
+  for the translation"). It had sat here for four minor versions describing an asymmetry that no
+  longer existed.
+
+So the premise the split rested on was that the alternative meant conditionals in one body. It
+did not: the alternative is the entry split every shared audit here already uses — the agent is
+the system prompt and a skill per path is the task, so a judgment that belongs to one path is
+absent from the other rather than switched off in it. What the two definitions were actually
+carrying was one triage method written twice; `report-router.md` opened by calling itself "the
+same triage step as guard's turn router" and then restated it, and the two copies had already
+drifted (the materiality paragraph, the empty-answer paragraph and the reason-quality rule were
+each worded differently for no reason anyone recorded).
+
+Note which argument is doing the work, because it is not the usual one. The rule in `AGENTS.md`
+justifies the entry split by **memory** — one agent, one memory directory. The router has no
+memory and must not get one, per the paragraph above, so nothing was consolidated by merging it.
+The duplication was enough on its own.
+
+**What this costs.** The two paths' report templates are now in the skills rather than in the
+agent, so a change to what the caller does with a routing answer is a change to a task file and
+not to the router. That is the right home — what the caller does differs by path — but it means
+the router can no longer be read end to end to learn what it emits. Anyone tracing a bad dispatch
+instruction starts at `skills/audit-turn/SKILL.md` § 5 or `skills/audit-report/SKILL.md` § 4.
 
 ## Correctors
 
