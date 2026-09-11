@@ -97,14 +97,6 @@ agents' and never the user's. **`guard-candidates` takes the path it is answerin
 (`--doc` for the document roster); bare, it answers for the turn path, and an answer-path
 caller that omits the flag gets entries pointing at a turn that does not exist.
 
-`handover` is the one skill here that is not about auditing anything. The user runs it to write
-a session handover, and its last step records the file's path (`guard-handover`) — which is why
-it lives in guard: the `/clear` handoff record is already the one thing that survives a cleared
-conversation, and the pointer to the handover rides in it. The replacing session names the file
-to the user (a `SessionStart` `systemMessage` — the only channel that reaches them) and reads it
-without asking; that it is a read rather than an offer is the user's call, recorded in
-`dev/design.md`.
-
 ## Hard requirements
 
 guard has no Python dependencies but it does need **uv**. Both hook manifests and both
@@ -237,8 +229,7 @@ how the code here is organised.
   indicator ever becomes unshippable, drop the mute rather than let it go invisible. It is
   visible in two places — the status line and `settings show`'s first line — and neither is
   optional.
-- A `/clear` inherits both switches from the session it replaced, plus the handover file that
-  session recorded, and that is the ONLY boundary that inherits anything — every other start
+- A `/clear` inherits both switches from the session it replaced, and that is the ONLY boundary that inherits anything — every other start
   reads the settings. It carries a session that DIFFERS from the pair a fresh session lands on,
   in either direction. For the plan half that baseline is a config read, which is why the
   comparison is against the config rather than against a fixed idea of which state is
@@ -247,9 +238,6 @@ how the code here is organised.
   `SessionEnd` record rather than inferred from file times, the record is single-use and
   expiring, and the adoption is announced. Weaken any one of those four and this becomes the
   persistent gate wearing a different name; `dev/design.md` has the measurements.
-- The handoff record's two halves — the switches and the handover — are written and read
-  INDEPENDENTLY. Collapse them into one "is there anything to carry" test and the record is
-  still written, the checked half still survives, and the other half is simply absent.
 - guard always exits 0 and fails open.
 
 ## Deliberately not enforced

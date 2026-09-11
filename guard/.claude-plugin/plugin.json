@@ -1,7 +1,7 @@
 {
   "name": "guard",
-  "version": "0.128.0",
-  "description": "Nothing is written and nothing is audited until you ask. An ordinary turn is an ordinary turn — guard names no file and says nothing when it ends. `/guard:answer <question>` is the entry that produces a document: it writes the answer to `.claude/answers/`, decides which audits have material in it, runs them together, applies what they find, translates the corrected text when you do not read English, and hands you the finished file — so the first version you read is the audited one. `/guard:audit-turn` goes the other way, over a reply you already read: guard's router names which audits would find something in the turn just finished — unsupported claims, deferrals the repo could answer, explanation the reader cannot follow — and reports what they found. `/guard:audit-report <path>` audits a document that already exists. A claim about anything outside the repository has to rest on a saved local copy of the source, on every path; a documentation agent finds the primary source and saves one as you draft, and a saved reference the turn wrote is checked by an auditor of its own. When a turn edits files guard names the audits that read that kind of file — comments in the source, AGENTS.md/CLAUDE.md that drifted from a map into a payload — since a file list is not a judgment anyone has to make. One switch per agent, all off until you turn one on; `guard on` / `guard off` move just the session you are in. A `handover` skill writes a self-contained session handover before you clear the conversation; the session `/clear` opens next tells you which file it left and reads it, so the new conversation starts where the old one stopped. Claude Code and Codex. Requires Python 3.11+.",
+  "version": "0.129.0",
+  "description": "On-demand audits of answers and documents for unsupported claims, unclear explanations, and documentation drift.",
   "author": {
     "name": "studykit"
   },
@@ -17,7 +17,6 @@
     "router",
     "hooks",
     "subagents",
-    "handover",
     "claude-code",
     "codex"
   ]

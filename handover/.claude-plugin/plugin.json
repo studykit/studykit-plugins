@@ -1,0 +1,11 @@
+{
+  "name": "handover",
+  "version": "0.0.1",
+  "description": "Write a self-contained session handover that a later session can resume. Claude Code carries a recorded handover across /clear.",
+  "author": {
+    "name": "studykit"
+  },
+  "repository": "https://github.com/studykit/studykit-plugins",
+  "license": "MIT",
+  "keywords": ["handover", "session", "continuity", "claude-code"]
+}

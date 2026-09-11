@@ -167,23 +167,6 @@ def _default_paused(config: dict) -> tuple[bool, bool]:
     return (False, not _audit_on(config, AUDIT_PLAN_KEY))
 
 
-def _recorded_handover(state: dict) -> str:
-    """The handover file this session wrote, or ``""``. Checked for existence, not trusted.
-
-    Recorded by ``guard-handover`` (``cmd_handover``) and re-tested here because the two are
-    separated by the rest of the session: a handover written and then deleted, moved, or
-    renamed leaves a path that only looks valid. Offering it costs the next session a failed
-    read and a question it cannot answer, so an absent file is treated as no handover.
-    """
-    raw = state.get("handover_file")
-    if not isinstance(raw, str) or not raw.strip():
-        return ""
-    try:
-        return str(raw) if Path(raw).is_file() else ""
-    except OSError:
-        return ""
-
-
 def cmd_session_end() -> int:
     """SessionEnd, matched on ``clear`` — hand this session's switches to its replacement.
 
@@ -214,13 +197,6 @@ def cmd_session_end() -> int:
     A stale record from a previous clear is removed when there is nothing to carry, rather
     than left to be read later.
 
-    The record carries a SECOND, independent thing: the handover file this session wrote, if
-    the `handover` skill recorded one. Same boundary and the same reason — the conversation was
-    cleared, the work was not — but the two halves are written and read independently, so a
-    session that wrote a handover and never touched a switch still hands the file over, and a
-    session that muted guard and wrote no handover still hands the mute over. Combining them
-    into one "is there anything to carry" test is what would break that.
-
     NOT handed over: `plan_audited_hash`. The plan a cleared session had audited is gone from
     the conversation that approved it, so the gate should audit again rather than wave through
     a plan on the strength of a review nobody in this session saw.
@@ -248,8 +224,7 @@ def cmd_session_end() -> int:
     state = _read_state(project_dir, sid, config)
     audit_paused = _audit_paused(state)
     plan_paused = _plan_audit_paused(state)
-    handover = _recorded_handover(state)
-    if (audit_paused, plan_paused) == _default_paused(config) and not handover:
+    if (audit_paused, plan_paused) == _default_paused(config):
         try:
             handoff.unlink()
         except OSError:
@@ -261,7 +236,6 @@ def cmd_session_end() -> int:
         "from_session": sid,
         "audit_paused": audit_paused,
         "plan_audit_paused": plan_paused,
-        "handover_file": handover,
         "written_at": time.time(),
     }
     try:
@@ -272,8 +246,7 @@ def cmd_session_end() -> int:
     except OSError:
         return 0
     _trace(project_dir, sid, "session-end", "clear_handoff_written",
-           audit_paused=audit_paused, plan_audit_paused=plan_paused,
-           handover=bool(handover))
+           audit_paused=audit_paused, plan_audit_paused=plan_paused)
     return 0
 
 
@@ -321,19 +294,6 @@ def _consume_clear_handoff(project_dir: Path, config: dict, payload: dict | None
     if time.time() - written > CLEAR_INHERIT_MAX_AGE_SECONDS:
         _trace(project_dir, sid, "session-start", "clear_handoff_expired")
         return None
-    # The handover is read independently of the switches, and nothing below may make one
-    # depend on the other: a record written for a handover alone carries the switches at
-    # their defaults, and a record written for a mute alone carries no handover.
-    handover = record.get("handover_file")
-    if not isinstance(handover, str) or not handover.strip():
-        handover = ""
-    elif not Path(handover).is_file():
-        # Written, recorded, and gone between the two sessions — deleted, moved, or renamed.
-        # Naming a path that cannot be read costs the next session a failed read, and costs the
-        # user a line announcing a document that is not there.
-        _trace(project_dir, sid, "session-start", "clear_handoff_handover_missing")
-        handover = ""
-
     switches = None
     audit_paused = record.get("audit_paused")
     plan_paused = record.get("plan_audit_paused")
@@ -356,15 +316,9 @@ def _consume_clear_handoff(project_dir: Path, config: dict, payload: dict | None
         else:
             _trace(project_dir, sid, "session-start", "clear_handoff_write_failed")
 
-    if switches is None and not handover:
+    if switches is None:
         return None
-    # The handover path is deliberately NOT written into this session's state. It is
-    # announced once, to the session replacing the one that wrote it; a session that carried
-    # the key would hand the same file on again at its own `/clear`, so the user would be told
-    # a handover they have already worked through is being read again.
-    if handover:
-        _trace(project_dir, sid, "session-start", "clear_handoff_handover_carried")
-    return {"switches": switches, "handover": handover}
+    return {"switches": switches}
 
 
 def _record_transcript_path(project_dir: Path, payload: dict | None, config: dict) -> None:
@@ -520,45 +474,6 @@ def cmd_session_start() -> int:
             "`guard` / `guard-plan` in a shell change either. Do not mention this unless the "
             "user asks."
         )
-    if carried and carried["handover"]:
-        # Both channels, and the split between them is the whole design. The path goes to
-        # the USER, because a handover is a document they wrote for a session that cannot see
-        # it from inside — the one thing here that is theirs before it is the model's, and
-        # context alone would have reached only the model. The instruction to read it goes to
-        # the model, where an instruction belongs. Note the asymmetry with the switch line
-        # above, which ends "do not mention this unless the user asks": a switch the user set
-        # is already theirs to know about.
-        #
-        # A read, not an offer. It was an offer once, on the reasoning that the first prompt
-        # after a `/clear` is frequently not the work the handover describes, so reading it
-        # unasked spends the context the clear just freed. The user overruled that, and the
-        # reason it holds: they ran the skill one conversation ago and are opening the session
-        # it was written for, so the question had already been answered before it was asked.
-        # What replaces the ask is the line they can now SEE — the file is named, so a handover
-        # they have moved on from is one they can say to drop, and the cost of being wrong is
-        # one read rather than a lost document.
-        #
-        # This ignores the session mute and every agent switch, because it is not an audit and
-        # not an opinion about the answer: it is the second half of something the user
-        # explicitly asked for by running the skill. A `guard off` that also swallowed the
-        # handover would make the mute a setting for something it does not name.
-        context.append(
-            "guard: the session this /clear replaced left a handover at "
-            f"{carried['handover']}. Read that file before you answer, and take it as the "
-            "state this session starts from. Do not ask whether to read it — the user has "
-            "already been shown that it is being read. If their first prompt turns out to be "
-            "unrelated to the work it describes, say nothing about the handover and answer "
-            "what they asked."
-        )
-        # The path and nothing else. This line is read by the person who wrote the file, who
-        # needs to recognize WHICH handover it is; an excerpt was considered and dropped
-        # because `systemMessage` truncates at 4,000 characters, so a preview is a promise the
-        # field cannot keep for a handover of any length.
-        system_message = (
-            "guard: the session this /clear replaced left a handover — "
-            f"{carried['handover']} — and it is being read into this session."
-        )
-
     # The injected contract states the general rule — a doc-based claim cites the source
     # URL and a local saved copy — but not where this project keeps that copy, which
     # is per-project config (`refs_dir`). Inject the resolved path here instead: for
@@ -608,8 +523,7 @@ def cmd_session_start() -> int:
             )
 
     # One write, last, for the reason given where `context` is declared. Codex keeps the
-    # plain-text form: its SessionStart has no documented `systemMessage`, and that host never
-    # carries a handover anyway — `_consume_clear_handoff` returns before reading the record.
+    # plain-text form: its SessionStart has no documented `systemMessage`.
     if _HOST_IS_CODEX:
         for line in context:
             print(line)

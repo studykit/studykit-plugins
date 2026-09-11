@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ $# -ne 1 ]]; then
+  echo "handover-record: expected one handover-file path" >&2
+  exit 1
+fi
+
+if [[ ! -f "$1" ]]; then
+  echo "handover-record: handover file does not exist: $1" >&2
+  exit 1
+fi
+
+if [[ -z "${CLAUDE_CODE_SESSION_ID:-}" ]]; then
+  echo "handover-record: no Claude Code session" >&2
+  exit 1
+fi
+
+plugin_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+handover_file="$(cd "$(dirname "$1")" && pwd)/$(basename "$1")"
+cd "${HANDOVER_PROJECT_DIR:?handover SessionStart hook has not initialized the project}"
+exec uv run --script "$plugin_root/hooks/handover_hook.py" record "$CLAUDE_CODE_SESSION_ID" "$handover_file"

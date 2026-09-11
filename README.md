@@ -56,7 +56,8 @@ For compatibility and versioning rules, see `AGENTS.md`.
 - `plantuml` — PlantUML diagram reference, creation, and validation
 - `structurizr` — Structurizr DSL diagram composition, C4 model visualization, and architecture documentation
 - `d2` — D2 diagram composition, rendering, and visualization
-- `guard` — on-demand audit agents that review a finished turn, or a document, for unsupported claims, deferrals the repo could answer, unclear explanation, unnatural Korean, and drifted `AGENTS.md` / saved reference docs, plus a session `handover` skill
+- `guard` — on-demand audit agents that review a finished turn, or a document, for unsupported claims, deferrals the repo could answer, unclear explanation, unnatural Korean, and drifted `AGENTS.md` / saved reference docs
+- `handover` — create a self-contained session handover and load a recorded handover after a clear
 - `peers` — set up Claude Code sessions in other directories on this machine, delegate work to them, and introduce two of them so they settle a cross-repository question directly
 
-`structurizr`, `d2` and `peers` are Claude Code only; the rest run in both Claude Code and Codex.
+`structurizr`, `d2`, `handover` and `peers` are Claude Code only; the rest run in both Claude Code and Codex.

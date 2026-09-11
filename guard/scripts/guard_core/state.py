@@ -4,8 +4,8 @@ Holds the agent modes as of this session, the two audit mutes (``audit_paused``,
 armed, and ``plan_audit_paused``, seeded from the project's ``audit-plan``), the files this
 turn edited
 (``edited_prompt_id`` / ``edited_files`` / ``edited_agent_docs`` / ``edited_refs``),
-``last_audited_prompt_id``, ``pending_verify_prompt_id``, ``transcript_path``, the handover
-file this session wrote (``handover_file``) and ``updated_at``.
+``last_audited_prompt_id``, ``pending_verify_prompt_id``, ``transcript_path``, and
+``updated_at``.
 
 Both the ``default`` dict and the ``keys`` tuple in ``_read_state`` are the schema, and a new
 key must be added to BOTH. A key missing from ``keys`` is written by whoever set it and then
@@ -83,13 +83,6 @@ def _read_state(project_dir: Path, session_id: str, config: dict[str, Any]) -> d
         # so the next ExitPlanMode is blocked again and the audit runs against what the user
         # will actually see.
         "plan_audited_hash": None,
-        # The handover file this session wrote, recorded by the `handover` skill through
-        # `guard-handover`. Session-scoped like everything else here, and read by exactly one
-        # event: `SessionEnd` on `/clear`, which copies it into the handoff record so the
-        # replacing session reads it. Nothing else reads it, and the session that inherits the
-        # record never carries this key — a second `/clear` with no new handover would
-        # otherwise re-read a file the user has already worked through.
-        "handover_file": "",
         # Has this session already been told where the turn closeout file is? The path is
         # static for the whole install, so the Stop block repeats it only until something has
         # stated it once: `session-start` sets this when it names the file, and clears it when
@@ -110,7 +103,7 @@ def _read_state(project_dir: Path, session_id: str, config: dict[str, Any]) -> d
         return default
     keys = (*AUDIT_AGENTS, "last_audited_prompt_id", "pending_verify_prompt_id",
             "transcript_path", "audit_paused", "plan_audit_paused", "plan_audited_hash",
-            "handover_file", "edited_prompt_id", "edited_files",
+            "edited_prompt_id", "edited_files",
             "edited_agent_docs", "edited_refs", "updated_at")
     default.update({k: data[k] for k in keys if k in data})
     return default

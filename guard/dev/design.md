@@ -1,5 +1,9 @@
 # guard — design detail
 
+As of v0.129.0, handover skills, recording commands, and handover-file transfer
+belong to the standalone `handover` plugin. References to that former Guard
+behavior below are historical; Guard now transfers only its audit switches.
+
 Deep reference for `guard` contributors. Not auto-loaded; open it when working on the
 area it covers. `../AGENTS.md` is the always-loaded map and points here. The source
 (`scripts/guard_hook.py` and the `scripts/guard_core/` package it dispatches into) is the
