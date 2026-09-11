@@ -57,18 +57,6 @@
       "keywords": ["workflow", "github", "jira", "confluence", "wiki", "issues", "spec", "usecase", "authoring"]
     },
     {
-      "name": "obsidian",
-      "source": "./obsidian",
-      "description": "Generate query blocks, modify templates, and guide plugin usage for Obsidian knowledge management (Dataview, Tasks, Jira Issue, Templater, CLI)",
-      "author": {
-        "name": "studykit"
-      },
-      "repository": "https://github.com/studykit/studykit-plugins",
-      "license": "MIT",
-      "category": "development",
-      "keywords": ["obsidian", "dataview", "tasks", "dql", "query", "knowledge-management", "cli", "terminal", "automation"]
-    },
-    {
       "name": "plantuml",
       "source": "./plantuml",
       "description": "PlantUML diagram reference, creation, and validation plugin",

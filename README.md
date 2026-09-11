@@ -52,7 +52,6 @@ For compatibility and versioning rules, see `AGENTS.md`.
 - `korea-gov-data` — extract and organize Open API specifications from KOSIS (Korean Statistical Information Service)
 - `dom-analyzer` — HTML/XML DOM structure analysis toolkit with hierarchy visualization
 - `spectrack` — provider-backed workflow over GitHub Issues, Jira, GitHub repository wiki directory, and Confluence with issue and knowledge authoring contracts
-- `obsidian` — generate query blocks, modify templates, and run CLI commands for Obsidian knowledge management (Dataview, Tasks, Jira Issue, Templater, CLI)
 - `plantuml` — PlantUML diagram reference, creation, and validation
 - `structurizr` — Structurizr DSL diagram composition, C4 model visualization, and architecture documentation
 - `d2` — D2 diagram composition, rendering, and visualization
