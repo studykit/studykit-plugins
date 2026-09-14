@@ -5,5 +5,8 @@
   "clarity-auditor": "off",
   "comment-corrector": "off",
   "agents-md-auditor": "off",
+  "doc-auditor": "off",
+  "doc_dir": [],
+  "doc_exclude": [],
   "refs_dir": ""
 }

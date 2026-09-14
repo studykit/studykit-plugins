@@ -184,3 +184,33 @@ def _refs_context(refs: list[str]) -> str:
              "- saved reference files to audit:"]
     lines.extend(f"    {p}" for p in refs)
     return "\n".join(lines)
+
+
+# `doc-auditor`, and the one file-reading audit named as a SKILL rather than as an agent. The
+# other three have nothing to do around their agent: the report comes back, the main agent
+# applies what it may, done. This one arrives on a file the caller is mid-edit on, and what the
+# forked run has to be told — read the diff first but audit the whole file, drop an instruction
+# file if one is in the list, leave to the project's linter what the project already lints — is
+# a task, not a criterion. A task belongs in a skill, read once when there is something to
+# audit, rather than in this block, which is paid for on every turn that touches a document.
+#
+# Worded as what the turn did, like the other two leads: the criteria are the agent's own, and
+# a lead that previewed them would be the caller telling it what to find.
+_DOCS_LEAD = (
+    "guard: this turn edited documents in the repository. Run the `guard:{entry}` skill over "
+    "them, then act on what it reports — its findings say which are yours to apply, which "
+    "only to relay, and which are the user's call."
+)
+
+
+def _docs_context(entry: str, docs: list[str]) -> str:
+    """``additionalContext`` naming the document audit's skill for the docs this turn wrote.
+
+    ``entry`` comes from ``_path_entry(key, EDIT_PATH)`` rather than being spelled here, so
+    the skill's name lives in the roster with every other entry name and ``check-entries.py``
+    can hold it to a file that exists.
+    """
+    lines = [_DOCS_LEAD.format(entry=entry),
+             "- documents to audit:"]
+    lines.extend(f"    {p}" for p in docs)
+    return "\n".join(lines)

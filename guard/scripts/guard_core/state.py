@@ -3,7 +3,8 @@
 Holds the agent modes as of this session, the two audit mutes (``audit_paused``, which opens
 armed, and ``plan_audit_paused``, seeded from the project's ``audit-plan``), the files this
 turn edited
-(``edited_prompt_id`` / ``edited_files`` / ``edited_agent_docs`` / ``edited_refs``),
+(``edited_prompt_id`` / ``edited_files`` / ``edited_agent_docs`` / ``edited_refs`` /
+``edited_docs``),
 ``last_audited_prompt_id``, ``pending_verify_prompt_id``, ``transcript_path``, and
 ``updated_at``.
 
@@ -49,15 +50,16 @@ def _read_state(project_dir: Path, session_id: str, config: dict[str, Any]) -> d
         # Files written during one turn, accumulated by PostToolUse and read back at Stop
         # to decide whether a file-reading agent has anything to look at. Stored WITH the
         # prompt_id they belong to: a bare list would outlive its turn and point an agent
-        # at files the current turn never touched. Three lists, one marker — the split is by
+        # at files the current turn never touched. Four lists, one marker — the split is by
         # which agent can judge the file (source code for `comment-corrector`, instruction
-        # files for `agents-md-auditor`, saved references for `ext-docs-auditor`), while "which
-        # turn was this" is the same question for all of them and a second marker could only
-        # drift from the first.
+        # files for `agents-md-auditor`, saved references for `ext-docs-auditor`, ordinary
+        # documents for `doc-auditor`), while "which turn was this" is the same question for
+        # all of them and a second marker could only drift from the first.
         "edited_prompt_id": "",
         "edited_files": [],
         "edited_agent_docs": [],
         "edited_refs": [],
+        "edited_docs": [],
         # Session-only mute, flipped by the `guard` shell command. A session OPENS ARMED and
         # there is no config key seeding this one (the `audit-turn` setting was retired in
         # v0.124.0 — `config.RETIRED_KEYS`): every entry that could be muted is one the user
@@ -104,7 +106,7 @@ def _read_state(project_dir: Path, session_id: str, config: dict[str, Any]) -> d
     keys = (*AUDIT_AGENTS, "last_audited_prompt_id", "pending_verify_prompt_id",
             "transcript_path", "audit_paused", "plan_audit_paused", "plan_audited_hash",
             "edited_prompt_id", "edited_files",
-            "edited_agent_docs", "edited_refs", "updated_at")
+            "edited_agent_docs", "edited_refs", "edited_docs", "updated_at")
     default.update({k: data[k] for k in keys if k in data})
     return default
 

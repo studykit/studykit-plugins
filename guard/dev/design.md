@@ -77,7 +77,7 @@ beyond the state root.
 | Event | Subcommand | Role |
 | --- | --- | --- |
 | `PreToolUse` (`Bash\|Grep\|Glob`) | `pre-search` | Deny a search rooted at the filesystem root: `find /`, `grep -r /`, `rg /` (and `fd`/`ag`/`ack`/`locate`), a `/`-anchored glob like `/*`, or a `Grep`/`Glob` call whose `path` is `/`. Reads the tool ARGUMENT only — never the caller — which is why it survives where the removed `pre-write` hook could not. Ignores the agent switches and the mute. Silent for every other call, and fails open on a command `shlex` cannot parse. |
-| `PostToolUse` (`Write\|Edit\|MultiEdit\|NotebookEdit`) | `post-edit` | Record a source file, an agent instruction file, or a saved reference this turn wrote (the candidate lists for `comment-corrector`, `agents-md-auditor` and `ext-docs-auditor`), then block when a file saved in the refs dir is not listed in that dir's `AGENTS.md`. |
+| `PostToolUse` (`Write\|Edit\|MultiEdit\|NotebookEdit`) | `post-edit` | Record a source file, an agent instruction file, a saved reference or an ordinary document this turn wrote (the candidate lists for `comment-corrector`, `agents-md-auditor`, `ext-docs-auditor` and `doc-auditor`), then block when a file saved in the refs dir is not listed in that dir's `AGENTS.md`. |
 | (called via Bash, not a hook) | `settings` | `guard:settings` (a `context: fork` skill, so it runs in a forked `general-purpose` agent rather than in the main session) shows/sets/unsets guard.local.json settings; the agent modes also apply to the live session's `state/<sid>.json` (session id from `--session`/`CLAUDE_CODE_SESSION_ID`). `set` preserves every other key; `unset <key>` is the only way to delete one. |
 | `Stop` | `stop` | The edited-file audits and nothing else. Emits `additionalContext` naming `comment-corrector` / `agents-md-auditor` over the files this turn edited, and `ext-docs-auditor` over anything it wrote under the refs dir — in each case the file list is the whole condition, so no router weighs it and no user decides it. It records nothing about the turn, names no answer file and reads none of the response: as of v0.122.0 the turn audit resolves and cuts its own target (`inputs`). Silent while the session is muted, and silent for a turn that edited nothing.
 | `SessionEnd` (`clear`) | `session-end` | Hand this session's two switches, and the handover file it recorded, to the session `/clear` is about to open, then let it announce what it adopted. The two halves are independent: writes nothing only when both switches still match the pair a fresh session opens in — armed for the turn mute, this project's `audit-plan` for the gate — AND no handover was recorded. |
@@ -1246,7 +1246,7 @@ payloads, not memory.
     the file is now, and the Korean pair's inputs are stated at steps 2 and 3 where the caller
     already is rather than in sections of their own — which is also where their ordering rule
     lived, so the duplicate that caused v0.91.0 no longer has two homes to disagree between.
-  - *The agents the router never sees.* `comment-corrector`, `agents-md-auditor` and
+  - *The agents the router never sees.* `comment-corrector`, `agents-md-auditor`, `doc-auditor` and
     `ext-docs-auditor` are dispatched by the hook off the file lists, with no report to ride
     on. `_agent_pointer`'s lead now says the shape (`subagent_type: "guard:<name>"`), once, and
     their sections stay — because each is a judgment no report can make for the caller: a
@@ -2636,11 +2636,22 @@ keys are ignored and a missing or malformed file falls back to every default.
 
 Keys: one `AgentMode` per agent, named after that agent — `claims-auditor`,
 `deferrals-auditor`, `clarity-auditor`, `comment-corrector`, `agents-md-auditor`,
-**all default `off`** — which together
+`doc-auditor`, **all default `off`** — which together
 are the only control over whether guard says anything unasked. `docs-finder` and
 `ext-docs-auditor`, `korean-translator` and `korean-corrector` are shipped agents with no key
 here; the invariants above say why, and
-`settings set` refuses both names rather than writing a key nothing reads. See the
+`settings set` refuses both names rather than writing a key nothing reads.
+
+Two keys are not modes: `doc_dir` and `doc_exclude`, the directories `doc-auditor`'s bucket
+takes markdown from and the ones it subtracts (`paths._doc_scope`). An empty `doc_dir` means
+the whole project, which is the honest default — a project that turned the audit on meant its
+documents, and inferring which directories those are from their names would be guard deciding
+what counts as documentation for a repository it has never read. `doc_exclude` is the half
+that gets used: every repository keeps markdown that is not a document, and a project whose
+docs are already audited some other way in one corner has to be able to say so, or two audits
+fault one file for opposite reasons. Neither is `_safe_project_subdir` — that guards a key
+guard WRITES through, where a value pointing at guard's own state disarms it, and nothing is
+derived from these but a read-only audit's file list. See the
 invariants above for why the value is a mode rather than a boolean, why `reuse` was removed
 and what reviving it would cost, and why they all ship off. A value that is not a mode word reads as `off` — the safe
 direction, since the alternative is guard acting on a setting the user did not write.
@@ -2740,6 +2751,29 @@ clarity, and three for deferrals, which since v0.123.0 also reads the approved p
 Since v0.128.0 the **router** is the fourth definition under this rule, and the one that shows
 the rule is broader than the reason given for it below: it has no memory to consolidate, and
 the merge was carried entirely by duplicated judgment. See § "The two routers become one".
+
+### The third path, and the entry that is a skill for a different reason
+
+v0.130.0 adds `EDIT_PATH` — the files a turn wrote, named by the Stop hook — and with it
+`edit_entry`, carrying `doc-auditor`'s entry `audit-docs`. The path had existed since the
+edited-file audits did; what it had never had was an entry, because `comment-corrector`,
+`agents-md-auditor` and `ext-docs-auditor` are named as agents and that is the whole dispatch.
+
+So the split above is being reused for something the reason above does not cover. There is no
+second path here to disagree with a first — `doc-auditor` runs on this path and nowhere else,
+and one path cannot make one definition contradict itself. What makes it a skill is the other
+half of the same rule: **the agent definition is the criteria and the skill body is the task**,
+and this audit has a task the other three do not. It arrives on a file the caller is mid-edit
+on, so the forked run has to be told to read the diff first and audit the file anyway, to drop
+an instruction file if one is in its list, and to leave to the project's own linter what that
+linter already checks. None of that is a criterion — it does not change what makes a passage
+redundant — and none of it can go in the hook's context block, which is paid for on every turn
+that touches a document while the skill is read only when there is something to audit.
+
+The cost is one more concept in the roster, and the alternative was prose in `_DOCS_LEAD`
+growing every time the task did. `_path_entry` translates on this path too, so the skill's
+name lives in the roster with every other entry name and `check-entries.py` holds it to a file
+that exists — which is the whole reason entries are spelled out rather than derived.
 
 ### Why not two agents, which was built first
 

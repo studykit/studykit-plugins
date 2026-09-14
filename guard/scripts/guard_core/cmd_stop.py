@@ -10,13 +10,16 @@ transcript when the user asks for one (``transcript._last_auditable_prompt_id``)
 no marker to keep and no copy to make. The three skips that protected that marker — non-human
 origin, guard's own control commands, a user ``!`` command — moved with it.
 
-What is left is the file-reading agents, and none of them is a triage question. The eligible
+What is left is the file-reading audits, and none of them is a triage question. The eligible
 ones — ``comment-corrector`` (``reads="files"``) and ``agents-md-auditor``
-(``reads="agent-docs"``) — are dispatched over the files this turn actually edited, and
-``ext-docs-auditor`` over anything it wrote under the refs directory; in each case the
-condition is a file list rather than a judgment about the answer, so there is nothing for the
-user to decide and nothing for a router to weigh. guard runs no model itself and never blocks
-here.
+(``reads="agent-docs"``) — are dispatched over the files this turn actually edited,
+``ext-docs-auditor`` over anything it wrote under the refs directory, and ``doc-auditor`` over
+the ordinary documents it changed; in each case the condition is a file list rather than a
+judgment about the answer, so there is nothing for the user to decide and nothing for a router
+to weigh. guard runs no model itself and never blocks here.
+
+Three of the four are named as AGENTS and the fourth as a SKILL — see ``dispatch._DOCS_LEAD``
+for why that difference is in the document audit and not in the others.
 """
 
 from __future__ import annotations
@@ -25,9 +28,9 @@ from .config import _agent_mode, _load_config
 from .paths import _project_dir, _trace
 from .payload import _read_payload, _session_id
 from .emit import _emit_stop_context
-from .agents import AUDIT_AGENTS, _eligible_agents
+from .agents import AUDIT_AGENTS, EDIT_PATH, _eligible_agents, _path_entry
 from .state import _audit_paused, _edited_files, _read_state, _write_state
-from .dispatch import _DIRECT_LEAD, _dispatch_context, _refs_context
+from .dispatch import _DIRECT_LEAD, _dispatch_context, _docs_context, _refs_context
 
 
 def cmd_stop() -> int:
@@ -80,10 +83,17 @@ def cmd_stop() -> int:
     # Filtered to what reads FILES. `_eligible_agents` still answers for the whole roster,
     # and the turn-reading audits are in it — but nothing dispatches them from here any more,
     # so letting one through would put a turn audit back on the automatic path.
-    eligible = [k for k in _eligible_agents(state, edited, agent_docs)
-                if AUDIT_AGENTS[k].reads in ("files", "agent-docs")]
+    docs = _edited_files(state, prompt_id, "edited_docs")
+    passed = _eligible_agents(state, edited, agent_docs, docs)
+    eligible = [k for k in passed if AUDIT_AGENTS[k].reads in ("files", "agent-docs")]
+    # Split out of `eligible` because it is named as a SKILL, not dispatched as an agent:
+    # `_agent_pointer` builds one block for however many agents came through, and a skill
+    # cannot ride in it. Eligibility is still `_eligible_agents`' answer — the switch and a
+    # non-empty list, same two gates as the rest — so nothing about WHEN it runs is decided
+    # here.
+    docs_entry = _path_entry("doc-auditor", EDIT_PATH) if "doc-auditor" in passed else None
     modes = {k: _agent_mode(state, k) for k in eligible}
-    if not eligible and not refs:
+    if not eligible and not refs and docs_entry is None:
         _trace(project_dir, session_id, "stop", "none_eligible", prompt_id=prompt_id)
         return 0
 
@@ -93,9 +103,9 @@ def cmd_stop() -> int:
     state["last_audited_prompt_id"] = prompt_id
     _write_state(project_dir, session_id, state)
 
-    # The two blocks need no ordering between them. They need none among themselves either:
+    # The three blocks need no ordering between them. They need none among themselves either:
     # their file lists are disjoint by construction (`_edited_bucket`), so the one that edits
-    # cannot touch what the one that only reports is reading.
+    # cannot touch what the ones that only report are reading.
     blocks: list[str] = []
     if eligible:
         blocks.append(_dispatch_context(
@@ -103,8 +113,11 @@ def cmd_stop() -> int:
             {"files": edited, "agent-docs": agent_docs}, ""))
     if refs:
         blocks.append(_refs_context(refs))
+    if docs_entry is not None:
+        blocks.append(_docs_context(docs_entry, docs))
     context = "\n\n".join(blocks)
-    outcome = "+".join(n for n, on in (("direct", eligible), ("refs", refs)) if on)
+    outcome = "+".join(n for n, on in (("direct", eligible), ("refs", refs),
+                                       ("docs", docs_entry)) if on)
     # `additionalContext`, not `decision: "block"`. Per the official hooks docs
     # (https://code.claude.com/docs/en/hooks, "Stop decision control"; excerpt saved at
     # wiki/ref/claude-code-stop-hook-decision-control.md) the two continue the

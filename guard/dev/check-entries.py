@@ -75,7 +75,7 @@ def problems() -> list[str]:
 
     out = []
     for key, spec in AUDIT_AGENTS.items():
-        for field in ("turn_entry", "report_entry"):
+        for field in ("turn_entry", "report_entry", "edit_entry"):
             name = getattr(spec, field)
             if not name:
                 continue

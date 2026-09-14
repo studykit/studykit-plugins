@@ -240,6 +240,22 @@ DEFAULT_CONFIG: dict[str, Any] = {
     # only. Turning it on costs nothing on the many turns that touch no such file, since
     # eligibility needs one this turn actually wrote.
     "agents-md-auditor": AgentMode.OFF,
+    # The ordinary documents, on the same terms: eligibility needs one this turn wrote, so a
+    # project that turns it on pays nothing on the turns that touch none.
+    "doc-auditor": AgentMode.OFF,
+    # Which directories hold those documents, relative to the project dir. Empty (the
+    # default) means the whole project — a project that turned the audit on meant its
+    # documents, and guard picking a subset from directory names would be guessing at a
+    # repository it has never read. Set it where the non-document markdown outnumbers the
+    # documents.
+    "doc_dir": [],
+    # Directories whose markdown is NOT audited, subtracted after `doc_dir`. This is the
+    # half that gets used: a repository keeps scratch, vendored and generated markdown, and
+    # a project that already checks some corner of its docs another way must be able to say
+    # so — two audits faulting one file for opposite reasons is worse than neither running.
+    # `AGENTS.md`, `CLAUDE.md` and the refs directory need no entry here; they are other
+    # buckets before this one is reached.
+    "doc_exclude": [],
     # Where this project writes down what its DEPLOYED system looks like — topology,
     # environments, runbooks. Read by `plan-environment` and by nothing else; guard never
     # writes here. Empty (the default) means the project has none, which is a normal state:

@@ -30,6 +30,7 @@ from pathlib import Path
 from datetime import datetime, timezone
 from typing import Any
 
+from .agents import DocScope
 from .config import CONFIG_REL, STATE_DIR_REL, TRACE_FILE_NAME, _trace_enabled
 
 
@@ -182,6 +183,47 @@ def _knowledge_dirs(project_dir: Path, config: dict[str, Any] | None = None) -> 
         if resolved is not None and resolved not in out:
             out.append(resolved)
     return out
+
+
+def _doc_scope(project_dir: Path, config: dict[str, Any] | None = None) -> DocScope:
+    """Which directories `doc-auditor` audits, and which are subtracted. Both resolved.
+
+    Project-relative and confined to the project, unlike ``knowledge_dir``: this names the
+    repository's own documents, and a path outside it could never be recorded anyway —
+    ``cmd_edit`` drops a target that is not under the project before it asks.
+
+    Not ``_safe_project_subdir``, though, and the difference is worth stating. That guards a
+    key guard WRITES through, where a value pointing at guard's own state is a way to disarm
+    it. Nothing is derived from these two but a read-only audit's file list, so the rule here
+    is only containment, and the project root itself is a legal value — it is what an empty
+    ``doc_dir`` already means.
+
+    A path that does not exist is dropped, and dropped SILENTLY: this runs on every edit, and
+    a warning nothing is built to read is a warning nobody gets. The ``settings`` CLI is where
+    a typo is reported.
+    """
+    def resolve(key: str) -> tuple[Path, ...]:
+        raw = (config or {}).get(key, [])
+        if isinstance(raw, str):
+            raw = [raw]
+        if not isinstance(raw, list):
+            return ()
+        out: list[Path] = []
+        for entry in raw:
+            if not isinstance(entry, str) or not entry.strip():
+                continue
+            try:
+                candidate = (project_dir / entry.strip()).resolve()
+                project = project_dir.resolve()
+            except OSError:
+                continue
+            if candidate != project and project not in candidate.parents:
+                continue
+            if candidate.is_dir() and candidate not in out:
+                out.append(candidate)
+        return tuple(out)
+
+    return DocScope(include=resolve("doc_dir"), exclude=resolve("doc_exclude"))
 
 
 def _knowledge_dir_entries(project_dir: Path, config: dict[str, Any] | None = None

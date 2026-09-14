@@ -193,7 +193,7 @@ def _handle_post_tool(project_dir: Path, payload: dict[str, Any], session_id: st
     # Claude's `post-edit` hook, applied here because Codex routes every event through
     # this one adapter. Claude's other `post-edit` job — recording the files the turn
     # edited — is deliberately not mirrored: it exists only to point `comment-corrector`,
-    # `agents-md-auditor` at them, and Codex has none of those agents yet.
+    # `agents-md-auditor` and `doc-auditor` at them, and Codex has none of those agents yet.
     # So the index rule below is enforced on Codex while the audit of what was saved is not.
     config = core_config._load_config(project_dir)
     if core_edit._targets_refs_dir(project_dir, tool_input, config):

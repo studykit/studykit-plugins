@@ -14,11 +14,23 @@ from typing import Any, NamedTuple
 from .config import _switch_on
 
 
+class DocScope(NamedTuple):
+    """Which markdown files count as this project's documents. Both halves resolved."""
+
+    include: tuple[Path, ...]
+    exclude: tuple[Path, ...]
+
+
 # The dispatch paths an audit can run on. `"turn"` is a finished turn, audited when the user
 # asks for one; `"report"` is a standalone document the caller points the router at.
 # Neither has a hook behind it any more — the router runs because somebody asked.
+#
+# `"edit"` is the third and the odd one: the files this turn wrote, named by the Stop hook.
+# It is not routed and never was — the condition is a file list, not a judgment — so no
+# router chooses on it and `routed` says nothing about it.
 TURN_PATH = "turn"
 REPORT_PATH = "report"
+EDIT_PATH = "edit"
 
 
 class AuditAgent(NamedTuple):
@@ -112,6 +124,16 @@ class AuditAgent(NamedTuple):
     fixed_mode: str | None = None
     turn_entry: str | None = None
     report_entry: str | None = None
+    # The edited-file path's entry, and the only one that is a SKILL rather than the agent.
+    # The other file-reading audits have nothing to do around their agent — the main agent
+    # reads the report and applies what it may — so naming the agent is the whole dispatch.
+    # `doc-auditor` has a procedure after the report: which findings may be applied, which
+    # are only relayed, and whatever the project runs over a document it just changed. That
+    # is the same split `turn_entry` / `report_entry` already make — the agent judges, the
+    # skill carries everything around the judgment — so it is spelled the same way rather
+    # than as prose in the hook's context block, which would be paid for on every turn that
+    # edits a document instead of once when there is something to do.
+    edit_entry: str | None = None
     routed: tuple[str, ...] = (TURN_PATH, REPORT_PATH)
 
 
@@ -227,6 +249,19 @@ AUDIT_AGENTS: dict[str, AuditAgent] = {
                                    routed=()),
     "comment-corrector": AuditAgent(reads="files", needs_history=False),
     "agents-md-auditor": AuditAgent(reads="agent-docs", needs_history=False),
+    # The ordinary markdown an instruction file is not. `agents-md-auditor` judges a file
+    # loaded into every session, where a line is paid for by every turn whether or not that
+    # turn needed it; this one judges a file opened by someone who already decided they need
+    # the subject, which is allowed to be long and is not allowed to be a second copy. Two
+    # bars, so two agents — one definition holding both would have to pick which to apply
+    # per file, and the buckets already answer that.
+    #
+    # `routed=()`: neither router ever sees it. There is nothing to triage — the turn either
+    # wrote a document or it did not — and the document path the report router serves is
+    # about a text's claims and clarity, not about whether it duplicates the repository.
+    # The user's manual entry is the skill itself.
+    "doc-auditor": AuditAgent(reads="docs", needs_history=False,
+                              edit_entry="audit-docs", routed=()),
 }
 
 
@@ -252,6 +287,8 @@ def _path_entry(key: str, path: str) -> str | None:
     spec = AUDIT_AGENTS[key]
     if path == REPORT_PATH:
         return spec.report_entry
+    if path == EDIT_PATH:
+        return spec.edit_entry or key
     return spec.turn_entry or key
 
 
@@ -275,7 +312,35 @@ _SOURCE_SUFFIXES = frozenset({
 #
 # Lowercased before the lookup, since a repository may spell either one in any case and the
 # host resolves them case-insensitively on macOS and Windows regardless.
+#
+# Every other markdown file in a repository is prose nobody is instructed by, and auditing
+# one against what an instruction file may contain would flag an ordinary document for
+# having content. Those go to `doc-auditor` instead, on a bar of their own — which is why
+# this set stays exactly these two names and does not grow.
 _AGENT_DOC_NAMES = frozenset({"agents.md", "claude.md"})
+
+
+def _in_doc_scope(target: Path, doc_scope: DocScope | None) -> bool:
+    """Whether this markdown file is one of the project's documents.
+
+    Scope is CONFIGURED, and both halves are needed for different reasons. ``exclude`` is
+    the load-bearing one: a repository keeps markdown that is not a document — scratch
+    directories, vendored trees, a handover log — and a project that already audits some
+    corner of its docs another way has to be able to say so, or two audits fault the same
+    file for opposite reasons. ``include``, when set, narrows to those directories and is
+    the safer shape for a repository whose non-document markdown outnumbers its documents.
+
+    Empty ``include`` means the whole project, which is the honest default: a project that
+    turned this audit on meant its documents, and guessing which subset from directory names
+    would be guard deciding what counts as documentation for a repository it has never read.
+    """
+    if doc_scope is None:
+        return False
+    if any(d == target.parent or d in target.parents for d in doc_scope.exclude):
+        return False
+    if not doc_scope.include:
+        return True
+    return any(d == target.parent or d in target.parents for d in doc_scope.include)
 
 
 # Which state list a PostToolUse target belongs in, if any.
@@ -293,9 +358,17 @@ _AGENT_DOC_NAMES = frozenset({"agents.md", "claude.md"})
 # has no switch and is not routed, so nothing computes eligibility for it; the Stop hook reads
 # this list directly and names the agent when it is non-empty.
 #
-# `refs_dir` is passed in rather than resolved here so this stays a pure function of its
-# arguments; the caller already has the project dir and the config it takes to resolve it.
-def _edited_bucket(target: Path, refs_dir: Path | None = None) -> str | None:
+# `edited_docs` comes LAST, and it is the open-ended one: it takes whatever markdown the
+# three tests above left, inside the configured scope. Every bucket before it is closed —
+# a location, a suffix set, two filenames — so putting the open test last is what keeps
+# them disjoint without another exclusion list to maintain. A refs file and an `AGENTS.md`
+# are both markdown and both already spoken for by the time it is reached.
+#
+# `refs_dir` and `doc_scope` are passed in rather than resolved here so this stays a pure
+# function of its arguments; the caller already has the project dir and the config it takes
+# to resolve them.
+def _edited_bucket(target: Path, refs_dir: Path | None = None,
+                   doc_scope: DocScope | None = None) -> str | None:
     if refs_dir is not None and target.suffix.lower() == ".md" and (
             target.parent == refs_dir or refs_dir in target.parents):
         return "edited_refs"
@@ -303,6 +376,8 @@ def _edited_bucket(target: Path, refs_dir: Path | None = None) -> str | None:
         return "edited_files"
     if target.name.lower() in _AGENT_DOC_NAMES:
         return "edited_agent_docs"
+    if target.suffix.lower() == ".md" and _in_doc_scope(target, doc_scope):
+        return "edited_docs"
     return None
 
 
@@ -364,7 +439,8 @@ def _edited_bucket(target: Path, refs_dir: Path | None = None) -> str | None:
 
 
 def _eligible_agents(state: dict[str, Any], edited: list[str],
-                     agent_docs: list[str] | None = None) -> list[str]:
+                     agent_docs: list[str] | None = None,
+                     docs: list[str] | None = None) -> list[str]:
     """The agents the router may choose from, in ``AUDIT_AGENTS`` order.
 
     Two mechanical gates, and only mechanical ones — everything that needs judgment is
@@ -374,9 +450,10 @@ def _eligible_agents(state: dict[str, Any], edited: list[str],
     - for a file-reading agent, at least one file of its own kind this turn wrote,
       because that list is the agent's whole input and nobody downstream can invent one.
 
-    ``agent_docs`` defaults to none rather than being required, for the Codex adapter: it
-    shares this function but mirrors no edited-file recording of its own, so every
-    file-reading agent is ineligible there and passing empty lists is the honest answer.
+    ``agent_docs`` and ``docs`` default to none rather than being required, for the Codex
+    adapter: it shares this function but mirrors no edited-file recording of its own, so
+    every file-reading agent is ineligible there and passing empty lists is the honest
+    answer.
 
     A third gate, in the other direction: an agent with a ``fixed_mode`` has no switch and so
     passes the first one always — but it is dropped again unless some SWITCHABLE turn-reading
@@ -390,7 +467,7 @@ def _eligible_agents(state: dict[str, Any], edited: list[str],
     before it stops being Korean. ``korean-corrector`` needs no test at all — it is not
     routed, and the translator's report is what reaches it.
     """
-    inputs = {"files": edited, "agent-docs": agent_docs or []}
+    inputs = {"files": edited, "agent-docs": agent_docs or [], "docs": docs or []}
     out: list[str] = []
     carries_the_turn = False
     for key, spec in AUDIT_AGENTS.items():

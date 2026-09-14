@@ -1,10 +1,11 @@
 """``post-edit`` (PostToolUse on the write tools).
 
 Two independent jobs, both independent of the agent switches. It records a source file, an
-agent instruction file, or a saved reference written this turn — the lists the
-``comment-corrector``, ``agents-md-auditor`` and ``ext-docs-auditor`` recommendations are built
-from, kept in three buckets that must stay disjoint (``agents._edited_bucket``). And it requires a file saved inside the refs directory
-to be listed in that directory's ``AGENTS.md``, blocking until it is.
+agent instruction file, a saved reference or an ordinary document written this turn — the
+lists the ``comment-corrector``, ``agents-md-auditor``, ``ext-docs-auditor`` and
+``doc-auditor`` recommendations are built from, kept in four buckets that must stay disjoint
+(``agents._edited_bucket``). And it requires a file saved inside the refs directory to be
+listed in that directory's ``AGENTS.md``, blocking until it is.
 
 Both jobs see a subagent's writes as well as the main agent's, since tool events fire the
 same hooks inside a subagent (https://code.claude.com/docs/en/hooks). That matters for the
@@ -21,7 +22,8 @@ from pathlib import Path
 from typing import Any
 
 from .config import _load_config
-from .paths import _project_dir, _project_rel, _refs_dir, _state_root, _trace
+from .paths import (_doc_scope, _project_dir, _project_rel, _refs_dir, _state_root,
+                    _trace)
 from .payload import _read_payload, _session_id
 from .agents import _edited_bucket
 from .state import _read_state, _write_state
@@ -41,10 +43,10 @@ def _record_edited_source(project_dir: Path, payload: dict, tool_input: Any,
                           config: dict[str, Any]) -> None:
     """Note a file this turn wrote, for a later file-reading agent's recommendation.
 
-    Three lists, chosen by `_edited_bucket`: source files for `comment-corrector`, agent
-    instruction files for `agents-md-auditor`, saved references for `ext-docs-auditor`. Anything
-    else is not recorded — an agent handed a file its criteria say nothing about spends its
-    context proving that.
+    Four lists, chosen by `_edited_bucket`: source files for `comment-corrector`, agent
+    instruction files for `agents-md-auditor`, saved references for `ext-docs-auditor`, and the
+    project's ordinary documents for `doc-auditor`. Anything else is not recorded — an agent
+    handed a file its criteria say nothing about spends its context proving that.
 
     This fires for a SUBAGENT's write as well as the main agent's: tool events run the same
     configured hooks inside a subagent and the payload carries `agent_id` / `agent_type`
@@ -68,16 +70,17 @@ def _record_edited_source(project_dir: Path, payload: dict, tool_input: Any,
         project = project_dir.resolve()
         state_root = _state_root(project_dir).resolve()
         refs = _refs_dir(project_dir, config).resolve()
+        docs = _doc_scope(project_dir, config)
     except OSError:
         return
-    bucket = _edited_bucket(target, refs)
+    bucket = _edited_bucket(target, refs, docs)
     if bucket is None:
         return
     if project not in target.parents or state_root in target.parents:
         return
 
     state = _read_state(project_dir, session_id, config)
-    # A new turn resets ALL THREE lists off the one marker; without this, files from the
+    # A new turn resets ALL FOUR lists off the one marker; without this, files from the
     # previous turn would ride along into this turn's recommendation. Resetting only the
     # bucket being written would leave the others holding the previous turn's files under
     # this turn's id, which is the same bug with an extra step.
@@ -86,6 +89,7 @@ def _record_edited_source(project_dir: Path, payload: dict, tool_input: Any,
         state["edited_files"] = []
         state["edited_agent_docs"] = []
         state["edited_refs"] = []
+        state["edited_docs"] = []
     # `.get`, not `[]`: a state file written before a bucket existed reaches here with the
     # turn marker already matching, so the reset above does not run and the key is absent.
     files = state.get(bucket)
