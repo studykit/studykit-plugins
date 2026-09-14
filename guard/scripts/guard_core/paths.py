@@ -203,27 +203,48 @@ def _doc_scope(project_dir: Path, config: dict[str, Any] | None = None) -> DocSc
     a typo is reported.
     """
     def resolve(key: str) -> tuple[Path, ...]:
-        raw = (config or {}).get(key, [])
-        if isinstance(raw, str):
-            raw = [raw]
-        if not isinstance(raw, list):
-            return ()
         out: list[Path] = []
-        for entry in raw:
-            if not isinstance(entry, str) or not entry.strip():
-                continue
-            try:
-                candidate = (project_dir / entry.strip()).resolve()
-                project = project_dir.resolve()
-            except OSError:
-                continue
-            if candidate != project and project not in candidate.parents:
-                continue
-            if candidate.is_dir() and candidate not in out:
-                out.append(candidate)
+        for _, resolved in _doc_dir_entries(project_dir, key, config):
+            if resolved is not None and resolved not in out:
+                out.append(resolved)
         return tuple(out)
 
     return DocScope(include=resolve("doc_dir"), exclude=resolve("doc_exclude"))
+
+
+def _doc_dir_entries(project_dir: Path, key: str, config: dict[str, Any] | None = None
+                     ) -> list[tuple[str, Path | None]]:
+    """Each ``doc_dir`` / ``doc_exclude`` entry as written, paired with what it resolves to —
+    ``None`` when it names nothing usable.
+
+    Split out of ``_doc_scope`` for the same reason ``_knowledge_dir_entries`` is split out of
+    ``_knowledge_dirs``: the dispatch path drops a bad entry silently, and the ``settings`` CLI
+    is the one audience that can act on being told. Duplicating the normalization instead is
+    how the two would come to disagree about what a relative path means.
+
+    ``None`` covers both ways an entry fails — it resolves outside the project, or there is no
+    directory there — and the caller does not distinguish them: either way the entry does
+    nothing at use, which is the whole of what the user needs to see.
+    """
+    raw = (config or {}).get(key, [])
+    if isinstance(raw, str):
+        raw = [raw]
+    if not isinstance(raw, list):
+        return []
+    out: list[tuple[str, Path | None]] = []
+    for entry in raw:
+        if not isinstance(entry, str) or not entry.strip():
+            continue
+        text = entry.strip()
+        try:
+            candidate = (project_dir / text).resolve()
+            project = project_dir.resolve()
+        except OSError:
+            out.append((text, None))
+            continue
+        inside = candidate == project or project in candidate.parents
+        out.append((text, candidate if inside and candidate.is_dir() else None))
+    return out
 
 
 def _knowledge_dir_entries(project_dir: Path, config: dict[str, Any] | None = None

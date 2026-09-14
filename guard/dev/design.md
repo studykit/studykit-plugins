@@ -2651,7 +2651,14 @@ that gets used: every repository keeps markdown that is not a document, and a pr
 docs are already audited some other way in one corner has to be able to say so, or two audits
 fault one file for opposite reasons. Neither is `_safe_project_subdir` — that guards a key
 guard WRITES through, where a value pointing at guard's own state disarms it, and nothing is
-derived from these but a read-only audit's file list. See the
+derived from these but a read-only audit's file list.
+
+Both are settable (`settings set doc_dir a,b`, comma-separated, list replaced whole) and both
+appear in `settings show`, which is the ONLY place an entry that does nothing is reported —
+`_doc_scope` drops one silently because it runs on every edit, where nothing is built to read
+a warning, and a mistyped `doc_dir` would otherwise present as the audit never running.
+`doc_dir`'s empty case prints as "(all of the project)" rather than "(none configured)": empty
+is a real setting here and means the opposite of unset. See the
 invariants above for why the value is a mode rather than a boolean, why `reuse` was removed
 and what reviving it would cost, and why they all ship off. A value that is not a mode word reads as `off` — the safe
 direction, since the alternative is guard acting on a setting the user did not write.

@@ -31,7 +31,8 @@ from .config import (
     _audit_on, _cli_write_allowed, _load_config, _load_raw_config, _parse_mode, _parse_switch,
     _write_config
 )
-from .paths import _cli_project_dir, _knowledge_dir_entries, _refs_dir, _trace
+from .paths import (_cli_project_dir, _doc_dir_entries, _knowledge_dir_entries, _refs_dir,
+                    _trace)
 from .agents import AUDIT_AGENTS, SETTABLE_AGENTS
 from .state import _audit_paused, _plan_audit_paused, _read_state, _write_state
 
@@ -140,6 +141,29 @@ def _config_show_lines(project_dir: Path, session_id: str | None) -> list[str]:
             line += "  [no such directory, ignored at use: " + ", ".join(missing) + "]"
         return line
 
+    def doc_line(key: str) -> str:
+        """One `doc_dir` / `doc_exclude` line, naming any entry that does nothing.
+
+        Same job as `knowledge_line`, and needed for the same reason: `paths._doc_scope` drops
+        an entry that is outside the project or not a directory, and it drops it on every
+        edit, where nothing is built to read a warning. A mistyped `doc_dir` would otherwise
+        present as the audit quietly never running.
+
+        The empty case is not "(none configured)" — an empty `doc_dir` is a real setting that
+        means the whole project, and printing it the way an unset `knowledge_dir` prints would
+        tell the reader the opposite of what it does.
+        """
+        entries = _doc_dir_entries(project_dir, key, cfg)
+        if not entries:
+            return f"{key}: " + ("(all of the project)" if key == "doc_dir"
+                                 else "(nothing excluded)")
+        line = f"{key}: " + ", ".join(text for text, _ in entries)
+        missing = [text for text, resolved in entries if resolved is None]
+        if missing:
+            line += "  [not a directory in this project, ignored at use: " \
+                    + ", ".join(missing) + "]"
+        return line
+
     def mute_line() -> str:
         """This session's mute, which is state and not a setting.
 
@@ -176,6 +200,8 @@ def _config_show_lines(project_dir: Path, session_id: str | None) -> list[str]:
         *(switch_line(k) for k in SETTABLE_AGENTS),
         "refs_dir: " + (refs_rel if refs_rel else "(default wiki/ref/)"),
         knowledge_line(),
+        doc_line("doc_dir"),
+        doc_line("doc_exclude"),
         *retired_lines(),
     ]
 
@@ -321,6 +347,13 @@ def cmd_settings() -> int:
         # discard the setting with no way to see that it happened. The `show` lines below
         # name any entry that does not resolve.
         raw["knowledge_dir"] = [p.strip() for p in value.split(",") if p.strip()]
+    elif key in ("doc_dir", "doc_exclude"):
+        # Comma-separated and REPLACED whole, like `knowledge_dir`, and stored as given rather
+        # than filtered to what exists — a directory the user is about to create is a normal
+        # thing to configure. Unlike `knowledge_dir`, order carries nothing: both lists are
+        # membership tests. `""` writes the empty list, which for `doc_dir` means the whole
+        # project and for `doc_exclude` means nothing subtracted.
+        raw[key] = [p.strip() for p in value.split(",") if p.strip()]
     elif key in RETIRED_KEYS:
         # Told apart from an unknown key on purpose: a user typing this one is not guessing,
         # they are asking for something that used to work, and "unknown key" would read as a
@@ -331,7 +364,7 @@ def cmd_settings() -> int:
     else:
         print(f"guard settings: unknown or unsettable key {key!r}. Settable: "
               + ", ".join((*AUDIT_SWITCHES, *SETTABLE_AGENTS))
-              + ", refs_dir, knowledge_dir.",
+              + ", refs_dir, knowledge_dir, doc_dir, doc_exclude.",
               file=sys.stderr)
         return 0
 
