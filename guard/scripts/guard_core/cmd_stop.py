@@ -88,13 +88,13 @@ def cmd_stop() -> int:
     # list, same two gates as the rest — so nothing about WHEN it runs is decided here.
     docs_enabled = "doc-auditor" in passed
     docs_review_rules = _doc_review_rules(config)
-    # The most-specific matching per-file rule wins. An explicit skip or unmatched document
-    # has no dispatch; grouping keeps one action to one dispatch across several documents.
+    # The most-specific matching per-file rule wins. An unmatched document has no dispatch;
+    # grouping keeps one action to one dispatch across several documents.
     doc_groups: dict[tuple[str, str], list[str]] = {}
     if docs_enabled:
         for path in docs:
             rule = _doc_review_rule(_project_rel(project_dir, Path(path)), docs_review_rules)
-            if rule is None or rule.kind is None or rule.name is None:
+            if rule is None:
                 continue
             doc_groups.setdefault((rule.kind, rule.name), []).append(path)
     modes = {k: _agent_mode(state, k) for k in eligible}

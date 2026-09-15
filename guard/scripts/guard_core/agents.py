@@ -11,14 +11,16 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, NamedTuple
 
-from .config import _switch_on
+from .config import _doc_glob_matches, _switch_on
 
 
 class DocScope(NamedTuple):
-    """Which markdown files count as this project's documents. Both halves resolved."""
+    """Included document directories plus directory and glob exclusions."""
 
     include: tuple[Path, ...]
     exclude: tuple[Path, ...]
+    exclude_globs: tuple[str, ...] = ()
+    project_dir: Path | None = None
 
 
 # The dispatch paths an audit can run on. `"turn"` is a finished turn, audited when the user
@@ -324,13 +326,27 @@ def _in_doc_scope(target: Path, doc_scope: DocScope | None) -> bool:
     turned this audit on meant its documents, and guessing which subset from directory names
     would be guard deciding what counts as documentation for a repository it has never read.
     """
-    if doc_scope is None:
-        return False
-    if any(d == target.parent or d in target.parents for d in doc_scope.exclude):
+    if doc_scope is None or _excluded_document(target, doc_scope):
         return False
     if not doc_scope.include:
         return True
     return any(d == target.parent or d in target.parents for d in doc_scope.include)
+
+
+def _excluded_document(target: Path, doc_scope: DocScope | None) -> bool:
+    """Whether directory or glob exclusions remove this Markdown from every review bucket."""
+    if doc_scope is None:
+        return False
+    if any(d == target.parent or d in target.parents for d in doc_scope.exclude):
+        return True
+    if doc_scope.project_dir is not None:
+        try:
+            relative = target.relative_to(doc_scope.project_dir).as_posix()
+        except ValueError:
+            return True
+        if any(_doc_glob_matches(relative, pattern) for pattern in doc_scope.exclude_globs):
+            return True
+    return False
 
 
 # Which state list a PostToolUse target belongs in, if any.
@@ -359,6 +375,8 @@ def _in_doc_scope(target: Path, doc_scope: DocScope | None) -> bool:
 # to resolve them.
 def _edited_bucket(target: Path, refs_dir: Path | None = None,
                    doc_scope: DocScope | None = None) -> str | None:
+    if target.suffix.lower() == ".md" and _excluded_document(target, doc_scope):
+        return None
     if refs_dir is not None and target.suffix.lower() == ".md" and (
             target.parent == refs_dir or refs_dir in target.parents):
         return "edited_refs"

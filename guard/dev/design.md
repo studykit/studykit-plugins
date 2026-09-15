@@ -2642,7 +2642,8 @@ here; the invariants above say why, and
 `settings set` refuses both names rather than writing a key nothing reads.
 
 Three keys are not modes: `doc_dir` and `doc_exclude`, the directories `doc-auditor`'s bucket
-takes markdown from and the ones it subtracts (`paths._doc_scope`). An empty `doc_dir` means
+takes markdown from and the directories or project-relative globs it subtracts
+(`paths._doc_scope`). An empty `doc_dir` means
 the whole project, which is the honest default — a project that turned the audit on meant its
 documents, and inferring which directories those are from their names would be guard deciding
 what counts as documentation for a repository it has never read. `doc_exclude` is the half
@@ -2658,8 +2659,8 @@ appear in `settings show`, which is the ONLY place an entry that does nothing is
 a warning, and a mistyped `doc_dir` would otherwise present as the audit never running.
 `doc_dir`'s empty case prints as "(all of the project)" rather than "(none configured)": empty
 is a real setting here and means the opposite of unset. `doc_review_rules` is an ordered JSON list of `{ "glob": "...",
-"action": { "kind": "agent" | "skill", "name": "..." } }` entries. An `action: null`
-entry explicitly skips review. Its globs match project-relative paths (`*` stays in one directory
+"action": { "kind": "agent" | "skill", "name": "..." } }` entries. Exclusions are
+expressed only through `doc_exclude`. Its globs match project-relative paths (`*` stays in one directory
 and `**` may cross directories), including zero or more nested directories for `**/`. The most
 specific matching rule owns each document: greater literal directory depth wins, then literal
 detail and fewer wildcards; configuration order breaks an exact tie. A file is reviewed by one
@@ -2770,7 +2771,7 @@ the merge was carried entirely by duplicated judgment. See § "The two routers b
 
 `doc-auditor` remains the gate for ordinary Markdown files written during a turn, but does not
 have a built-in dispatch entry. `doc_review_rules` maps matching project-relative paths to an
-explicit agent or skill action, while `action: null` excludes a path. An unmatched document is
+explicit agent or skill action. `doc_exclude` removes paths before matching, and an unmatched document is
 intentionally silent: inferring a generic reviewer would make enabling a narrowly scoped rule
 audit unrelated files. The Stop hook groups files only by their selected action, and the rule
 matcher chooses the most-specific glob so a deeper project area can override a broad one.

@@ -186,7 +186,7 @@ def _knowledge_dirs(project_dir: Path, config: dict[str, Any] | None = None) -> 
 
 
 def _doc_scope(project_dir: Path, config: dict[str, Any] | None = None) -> DocScope:
-    """Which directories `doc-auditor` audits, and which are subtracted. Both resolved.
+    """Which directories `doc-auditor` audits, and which paths are subtracted.
 
     Project-relative and confined to the project, unlike ``knowledge_dir``: this names the
     repository's own documents, and a path outside it could never be recorded anyway —
@@ -209,12 +209,43 @@ def _doc_scope(project_dir: Path, config: dict[str, Any] | None = None) -> DocSc
                 out.append(resolved)
         return tuple(out)
 
-    return DocScope(include=resolve("doc_dir"), exclude=resolve("doc_exclude"))
+    excluded_dirs: list[Path] = []
+    excluded_globs: list[str] = []
+    for _, value in _doc_exclude_entries(project_dir, config):
+        if isinstance(value, Path) and value not in excluded_dirs:
+            excluded_dirs.append(value)
+        elif isinstance(value, str) and value not in excluded_globs:
+            excluded_globs.append(value)
+    return DocScope(include=resolve("doc_dir"), exclude=tuple(excluded_dirs),
+                    exclude_globs=tuple(excluded_globs), project_dir=project_dir.resolve())
+
+
+def _doc_exclude_entries(project_dir: Path, config: dict[str, Any] | None = None
+                         ) -> list[tuple[str, Path | str | None]]:
+    """Configured exclusions resolved as directories or validated project-relative globs."""
+    raw = (config or {}).get("doc_exclude", [])
+    if isinstance(raw, str):
+        raw = [raw]
+    if not isinstance(raw, list):
+        return []
+    out: list[tuple[str, Path | str | None]] = []
+    for entry in raw:
+        if not isinstance(entry, str) or not entry.strip():
+            continue
+        text = entry.strip().replace("\\", "/")
+        if "*" in text or "?" in text:
+            parts = text.split("/")
+            valid = not text.startswith("/") and ".." not in parts and "." not in parts
+            out.append((text, text if valid else None))
+            continue
+        resolved = _doc_dir_entries(project_dir, "doc_exclude", {"doc_exclude": [text]})
+        out.append(resolved[0] if resolved else (text, None))
+    return out
 
 
 def _doc_dir_entries(project_dir: Path, key: str, config: dict[str, Any] | None = None
                      ) -> list[tuple[str, Path | None]]:
-    """Each ``doc_dir`` / ``doc_exclude`` entry as written, paired with what it resolves to —
+    """Each directory entry as written, paired with what it resolves to —
     ``None`` when it names nothing usable.
 
     Split out of ``_doc_scope`` for the same reason ``_knowledge_dir_entries`` is split out of

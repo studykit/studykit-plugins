@@ -47,7 +47,6 @@ Explain the candidate rules in this form:
 
 ```json
 [
-  {"glob": "docs/generated/**", "action": null},
   {"glob": "**/AGENTS.md", "action": {"kind": "agent", "name": "guard:agents-md-auditor"}},
   {"glob": "wiki/ref/**", "action": {"kind": "agent", "name": "guard:ext-docs-auditor"}},
   {"glob": "docs/api/**", "action": {"kind": "skill", "name": "project:review-api-docs"}},
@@ -55,19 +54,27 @@ Explain the candidate rules in this form:
 ]
 ```
 
-An action is either an `agent`, dispatched as its exact `subagent_type`, a `skill`, run by its
-exact name, or `null` to exclude the matching files from review. Patterns are project-relative:
+Explain exclusions separately as a `doc_exclude` list, for example:
+
+```json
+["docs/generated/**", "**/draft-*.md"]
+```
+
+An action is either an `agent`, dispatched as its exact `subagent_type`, or a `skill`, run by
+its exact name. Exclusions belong in `doc_exclude`; `action: null` is invalid. Patterns in both
+settings are project-relative:
 `*` stays in one directory and `**` crosses directory depth. The most-specific matching rule
 wins — deeper literal directories first, then literal detail and fewer wildcards. A tie uses
 the earlier rule. A path that has no matching rule is not reviewed.
 
-Before changing anything, show the exact compact JSON value and ask the user to confirm it.
+Before changing anything, show the exact compact JSON values and ask the user to confirm them.
 A request that already gives exact rules counts as confirmation. On confirmation, enable
 `doc-auditor` unless the user explicitly asks only to save inactive rules, then set the rules
 through the CLI only:
 
 ```sh
 GUARD_SETTINGS_SKILL=1 "${CLAUDE_PLUGIN_ROOT}/scripts/guard_hook.py" settings set doc-auditor on --session ${CLAUDE_SESSION_ID}
+GUARD_SETTINGS_SKILL=1 "${CLAUDE_PLUGIN_ROOT}/scripts/guard_hook.py" settings set doc_exclude 'docs/generated/**,**/draft-*.md' --session ${CLAUDE_SESSION_ID}
 GUARD_SETTINGS_SKILL=1 "${CLAUDE_PLUGIN_ROOT}/scripts/guard_hook.py" settings set doc_review_rules '<compact-json-array>' --session ${CLAUDE_SESSION_ID}
 ```
 

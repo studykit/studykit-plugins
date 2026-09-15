@@ -57,8 +57,8 @@ file, an agent instruction file, a saved reference or an ordinary document, or i
 `PostToolUse` records source, agent-instruction, reference and ordinary-document lists,
 including Git-visible files changed through the shell. Stop
 names `comment-corrector` for the fixed source bucket, while all project Markdown is dispatched
-only when a document-review rule matches it; rules may name an agent, a skill, or an explicit
-skip.
+only when a document-review rule matches it; rules name an agent or skill, while
+`doc_exclude` owns explicit exclusions.
 Review dispatch is content-sensitive: unchanged continuation stops are suppressed, while a
 file changed after the first review can be dispatched again in the same turn.
 That is the whole of what Stop does now.

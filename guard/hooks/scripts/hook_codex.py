@@ -333,7 +333,7 @@ def _emit_document_reviews(project_dir: Path, session_id: str, turn_id: str,
     groups: dict[tuple[str, str], list[str]] = {}
     for path in docs:
         rule = core_config._doc_review_rule(core_paths._project_rel(project_dir, Path(path)), rules)
-        if rule is None or rule.kind is None or rule.name is None:
+        if rule is None:
             continue
         name = _CODEX_REVIEW_AGENTS.get(rule.name, rule.name) if rule.kind == "agent" else rule.name
         groups.setdefault((rule.kind, name), []).append(path)

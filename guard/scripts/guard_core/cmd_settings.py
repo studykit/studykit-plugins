@@ -33,8 +33,8 @@ from .config import (
     _audit_on, _cli_write_allowed, _doc_review_rules, _load_config, _load_raw_config,
     _parse_mode, _parse_switch, _write_config
 )
-from .paths import (_cli_project_dir, _doc_dir_entries, _knowledge_dir_entries, _refs_dir,
-                    _trace)
+from .paths import (_cli_project_dir, _doc_dir_entries, _doc_exclude_entries,
+                    _knowledge_dir_entries, _refs_dir, _trace)
 from .agents import AUDIT_AGENTS, SETTABLE_AGENTS
 from .state import _audit_paused, _plan_audit_paused, _read_state, _write_state
 
@@ -144,7 +144,7 @@ def _config_show_lines(project_dir: Path, session_id: str | None) -> list[str]:
         return line
 
     def doc_line(key: str) -> str:
-        """One `doc_dir` / `doc_exclude` line, naming any entry that does nothing.
+        """One document scope line, naming any entry that does nothing.
 
         Same job as `knowledge_line`, and needed for the same reason: `paths._doc_scope` drops
         an entry that is outside the project or not a directory, and it drops it on every
@@ -155,7 +155,8 @@ def _config_show_lines(project_dir: Path, session_id: str | None) -> list[str]:
         means the whole project, and printing it the way an unset `knowledge_dir` prints would
         tell the reader the opposite of what it does.
         """
-        entries = _doc_dir_entries(project_dir, key, cfg)
+        entries = (_doc_exclude_entries(project_dir, cfg) if key == "doc_exclude"
+                   else _doc_dir_entries(project_dir, key, cfg))
         if not entries:
             return f"{key}: " + ("(all of the project)" if key == "doc_dir"
                                  else "(nothing excluded)")
@@ -174,8 +175,7 @@ def _config_show_lines(project_dir: Path, session_id: str | None) -> list[str]:
         if not isinstance(raw_rules, list) or len(rules) != len(raw_rules):
             return "doc_review_rules: (invalid entries ignored)"
         return "doc_review_rules: " + ", ".join(
-            f"{rule.glob} -> " + ("(skip)" if rule.kind is None
-                                   else f"{rule.kind}:{rule.name}")
+            f"{rule.glob} -> {rule.kind}:{rule.name}"
             for rule in rules)
 
     def built_in_review_actions_line() -> str:
@@ -373,8 +373,9 @@ def cmd_settings() -> int:
         # Comma-separated and REPLACED whole, like `knowledge_dir`, and stored as given rather
         # than filtered to what exists — a directory the user is about to create is a normal
         # thing to configure. Unlike `knowledge_dir`, order carries nothing: both lists are
-        # membership tests. `""` writes the empty list, which for `doc_dir` means the whole
-        # project and for `doc_exclude` means nothing subtracted.
+        # membership tests. `doc_exclude` additionally accepts project-relative `*` / `**`
+        # globs. `""` writes the empty list, which for `doc_dir` means the whole project and
+        # for `doc_exclude` means nothing subtracted.
         raw[key] = [p.strip() for p in value.split(",") if p.strip()]
     elif key == "doc_review_rules":
         try:
@@ -385,7 +386,7 @@ def cmd_settings() -> int:
         if not isinstance(parsed, list) or len(_doc_review_rules(candidate)) != len(parsed):
             print("guard settings: doc_review_rules must be a JSON list of "
                   '{"glob": "...", "action": {"kind": "agent|skill", "name": "..."}} '
-                  "entries (use action: null to skip)",
+                  "entries; use doc_exclude for exclusions",
                   file=sys.stderr)
             return 0
         raw[key] = parsed

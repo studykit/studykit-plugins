@@ -251,12 +251,12 @@ DEFAULT_CONFIG: dict[str, Any] = {
     # repository it has never read. Set it where the non-document markdown outnumbers the
     # documents.
     "doc_dir": [],
-    # Directories whose markdown is NOT audited, subtracted after `doc_dir`. This is the
+    # Directories or project-relative globs whose markdown is NOT audited. This is the
     # half that gets used: a repository keeps scratch, vendored and generated markdown, and
     # a project that already checks some corner of its docs another way must be able to say
     # so — two audits faulting one file for opposite reasons is worse than neither running.
-    # `AGENTS.md`, `CLAUDE.md` and the refs directory need no entry here; they are other
-    # buckets before this one is reached.
+    # Unlike `doc_dir`, exclusions cover every Markdown review bucket, including agent
+    # instructions and references.
     "doc_exclude": [],
     # Where this project writes down what its DEPLOYED system looks like — topology,
     # environments, runbooks. Read by `plan-environment` and by nothing else; guard never
@@ -291,11 +291,11 @@ _ACTION_NAME_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9:_-]*")
 
 
 class DocReviewRule(NamedTuple):
-    """One project-relative document glob and its action, or an explicit skip."""
+    """One project-relative document glob and its agent or skill action."""
 
     glob: str
-    kind: str | None
-    name: str | None
+    kind: str
+    name: str
 
 
 def _review_action_name(value: Any) -> str | None:
@@ -308,11 +308,7 @@ def _review_action_name(value: Any) -> str | None:
 
 
 def _doc_review_rules(cfg: dict[str, Any]) -> tuple[DocReviewRule, ...]:
-    """Return only valid per-document reviewer rules, in declared order.
-
-    An ``action: null`` rule is valid and deliberately means that matching documents are not
-    reviewed. It is distinct from a malformed action, which is ignored.
-    """
+    """Return only valid per-document agent or skill rules, in declared order."""
 
     raw_rules = cfg.get("doc_review_rules", [])
     if not isinstance(raw_rules, list):
@@ -325,9 +321,6 @@ def _doc_review_rules(cfg: dict[str, Any]) -> tuple[DocReviewRule, ...]:
         if not isinstance(pattern, str) or not (pattern := pattern.strip()):
             continue
         if "action" not in raw_rule:
-            continue
-        if raw_rule["action"] is None:
-            rules.append(DocReviewRule(pattern, None, None))
             continue
         action = raw_rule["action"]
         if not isinstance(action, dict):
@@ -351,40 +344,55 @@ def _doc_review_rule(path: str, rules: tuple[DocReviewRule, ...]) -> DocReviewRu
     normalized = path.replace("\\", "/")
     matches: list[tuple[tuple[int, int, int, int, int, int], DocReviewRule]] = []
     for rule_index, rule in enumerate(rules):
-        regex_parts: list[str] = []
-        cursor = 0
         pattern = rule.glob.replace("\\", "/")
-        while cursor < len(pattern):
-            char = pattern[cursor]
-            if char == "*" and cursor + 1 < len(pattern) and pattern[cursor + 1] == "*":
-                cursor += 2
-                if cursor < len(pattern) and pattern[cursor] == "/":
-                    regex_parts.append("(?:.*/)?")
-                    cursor += 1
-                else:
-                    regex_parts.append(".*")
-                continue
-            if char == "*":
-                regex_parts.append("[^/]*")
-            elif char == "?":
-                regex_parts.append("[^/]")
-            else:
-                regex_parts.append(re.escape(char))
-            cursor += 1
-        if re.fullmatch("".join(regex_parts), normalized):
+        if _doc_glob_regex(pattern).fullmatch(normalized):
             segments = [segment for segment in pattern.split("/") if segment]
             prefix_depth = 0
             for segment in segments:
-                if "*" in segment or "?" in segment:
+                if "*" in segment or "?" in segment or "[" in segment:
                     break
                 prefix_depth += 1
-            literal_segments = sum("*" not in segment and "?" not in segment
-                                   for segment in segments)
-            literal_chars = sum(1 for char in pattern if char not in "*?/")
-            wildcard_count = pattern.count("*") + pattern.count("?")
+            literal_segments = sum(
+                not any(char in segment for char in "*?[") for segment in segments)
+            literal_chars = sum(1 for char in pattern if char not in "*?[]/")
+            wildcard_count = sum(pattern.count(char) for char in "*?[")
             matches.append(((prefix_depth, literal_segments, literal_chars, -wildcard_count,
                              len(segments), -rule_index), rule))
     return max(matches, key=lambda match: match[0])[1] if matches else None
+
+
+def _doc_glob_regex(pattern: str) -> re.Pattern[str]:
+    """Compile Guard's project-relative glob syntax (`*` one level, `**` any depth)."""
+    regex_parts: list[str] = []
+    cursor = 0
+    while cursor < len(pattern):
+        char = pattern[cursor]
+        if char == "*" and cursor + 1 < len(pattern) and pattern[cursor + 1] == "*":
+            cursor += 2
+            if cursor < len(pattern) and pattern[cursor] == "/":
+                regex_parts.append("(?:.*/)?")
+                cursor += 1
+            else:
+                regex_parts.append(".*")
+            continue
+        if char == "*":
+            regex_parts.append("[^/]*")
+        elif char == "?":
+            regex_parts.append("[^/]")
+        elif char == "[":
+            # Character classes are not part of Guard's small glob language. Treat `[` as
+            # literal so a malformed pattern cannot unexpectedly widen an exclusion.
+            regex_parts.append(re.escape(char))
+        else:
+            regex_parts.append(re.escape(char))
+        cursor += 1
+    return re.compile("".join(regex_parts))
+
+
+def _doc_glob_matches(path: str, pattern: str) -> bool:
+    """Whether a project-relative path matches the shared document glob syntax."""
+    return _doc_glob_regex(pattern.replace("\\", "/")).fullmatch(
+        path.replace("\\", "/")) is not None
 
 
 def _trace_enabled() -> bool:
