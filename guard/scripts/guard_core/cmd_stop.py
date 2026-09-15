@@ -29,8 +29,10 @@ from .paths import _project_dir, _project_rel, _trace
 from .payload import _read_payload, _session_id
 from .emit import _emit_stop_context
 from .agents import AUDIT_AGENTS, _eligible_agents
-from .state import _audit_paused, _edited_files, _read_state, _write_state
+from .state import (_audit_paused, _edited_files, _edited_fingerprint, _read_state,
+                    _write_state)
 from .dispatch import _DIRECT_LEAD, _dispatch_context, _docs_context
+from .cmd_edit import EDITED_FILES_MAX, recover_shell_writes
 
 
 def cmd_stop() -> int:
@@ -42,11 +44,6 @@ def cmd_stop() -> int:
     if session_id is None:
         return 0
 
-    # Recursion / re-entry guard: never continue twice in a row.
-    if payload.get("stop_hook_active") is True:
-        _trace(project_dir, session_id, "stop", "skip_active")
-        return 0
-
     # The turn is the transcript prompt_id, and here it is only the key `post-edit` filed
     # this turn's edits under. Without it there is nothing to look up — fail open.
     prompt_id = payload.get("prompt_id")
@@ -55,6 +52,9 @@ def cmd_stop() -> int:
         return 0
 
     config = _load_config(project_dir)
+    # A cancelled Bash call has no post-tool event. Its pre-snapshot still lets Stop
+    # recover any writes completed before the interruption.
+    recover_shell_writes(project_dir, payload, config)
     state = _read_state(project_dir, session_id, config)
 
     # Muted by `guard off`: guard says nothing unasked. `guard-candidates` keeps the other
@@ -64,11 +64,12 @@ def cmd_stop() -> int:
         _trace(project_dir, session_id, "stop", "skip_paused", prompt_id=prompt_id)
         return 0
 
-    # Once per turn. `stop_hook_active` already covers the normal path, but the block below
-    # asks the main agent to dispatch background agents, and each of those completions opens
-    # a transcript turn of its own; a marker keyed on the prompt_id does not depend on the
-    # payload flag surviving that.
-    if state.get("last_audited_prompt_id") == prompt_id:
+    fingerprint = _edited_fingerprint(state, prompt_id)
+    # Re-entry with identical contents is the ordinary Stop-hook continuation and is skipped.
+    # If applying review findings changed a retained file, its fingerprint differs and the
+    # corrected document gets one more pass in the same turn.
+    if (state.get("last_audited_prompt_id") == prompt_id
+            and state.get("last_audited_fingerprint") == fingerprint):
         _trace(project_dir, session_id, "stop", "skip_already_recommended",
                prompt_id=prompt_id)
         return 0
@@ -105,6 +106,7 @@ def cmd_stop() -> int:
     # whatever the main agent does with it: the alternative is a turn that gets its block
     # emitted twice because the first dispatch is still in flight.
     state["last_audited_prompt_id"] = prompt_id
+    state["last_audited_fingerprint"] = fingerprint
     _write_state(project_dir, session_id, state)
 
     # The three blocks need no ordering between them. They need none among themselves either:
@@ -119,6 +121,15 @@ def cmd_stop() -> int:
         for (action_kind, action_name), group in doc_groups.items():
             blocks.append(_docs_context(group, action_kind=action_kind,
                                         action_name=action_name))
+    truncated = state.get("edited_truncated")
+    if isinstance(truncated, dict) and truncated:
+        omitted = sum(v for v in truncated.values() if isinstance(v, int) and v > 0)
+        if omitted:
+            blocks.append(
+                f"guard: the per-turn review list reached its {EDITED_FILES_MAX}-file-per-category limit; "
+                f"{omitted} additional changed file(s) are not listed. Tell the user the "
+                "review was partial instead of implying that every changed file was checked."
+            )
     context = "\n\n".join(blocks)
     outcome = "+".join(n for n, on in (("direct", eligible), ("docs", doc_groups)) if on)
     # `additionalContext`, not `decision: "block"`. Per the official hooks docs

@@ -5,7 +5,8 @@ armed, and ``plan_audit_paused``, seeded from the project's ``audit-plan``), the
 turn edited
 (``edited_prompt_id`` / ``edited_files`` / ``edited_agent_docs`` / ``edited_refs`` /
 ``edited_docs``),
-``last_audited_prompt_id``, ``pending_verify_prompt_id``, ``transcript_path``, and
+``last_audited_prompt_id`` / ``last_audited_fingerprint``, ``pending_verify_prompt_id``,
+``transcript_path``, and
 ``updated_at``.
 
 Both the ``default`` dict and the ``keys`` tuple in ``_read_state`` are the schema, and a new
@@ -16,6 +17,7 @@ dropped on the very next read, which looks exactly like the writer never ran —
 
 from __future__ import annotations
 
+import hashlib
 import json
 
 from pathlib import Path
@@ -35,6 +37,7 @@ def _read_state(project_dir: Path, session_id: str, config: dict[str, Any]) -> d
            for k, spec in AUDIT_AGENTS.items() if spec.fixed_mode is None},
         # Per-turn guards keyed by the transcript prompt_id (a turn == one promptId).
         "last_audited_prompt_id": "",
+        "last_audited_fingerprint": "",
         # The most recent auditable turn's id. CODEX ONLY as of v0.122.0 — that adapter keeps
         # its own turn record because its transcript is not a stable hook interface, so it has
         # nowhere else to resolve "the turn just finished" from. Claude stopped writing it when
@@ -60,6 +63,7 @@ def _read_state(project_dir: Path, session_id: str, config: dict[str, Any]) -> d
         "edited_agent_docs": [],
         "edited_refs": [],
         "edited_docs": [],
+        "edited_truncated": {},
         # Session-only mute, flipped by the `guard` shell command. A session OPENS ARMED and
         # there is no config key seeding this one (the `audit-turn` setting was retired in
         # v0.124.0 — `config.RETIRED_KEYS`): every entry that could be muted is one the user
@@ -103,10 +107,12 @@ def _read_state(project_dir: Path, session_id: str, config: dict[str, Any]) -> d
         return default
     if not isinstance(data, dict):
         return default
-    keys = (*AUDIT_AGENTS, "last_audited_prompt_id", "pending_verify_prompt_id",
+    keys = (*AUDIT_AGENTS, "last_audited_prompt_id", "last_audited_fingerprint",
+            "pending_verify_prompt_id",
             "transcript_path", "audit_paused", "plan_audit_paused", "plan_audited_hash",
             "edited_prompt_id", "edited_files",
-            "edited_agent_docs", "edited_refs", "edited_docs", "updated_at")
+            "edited_agent_docs", "edited_refs", "edited_docs", "edited_truncated",
+            "updated_at")
     default.update({k: data[k] for k in keys if k in data})
     return default
 
@@ -136,6 +142,28 @@ def _edited_files(state: dict[str, Any], prompt_id: str, bucket: str) -> list[st
     if not isinstance(files, list):
         return []
     return [f for f in files if isinstance(f, str) and f and Path(f).is_file()]
+
+
+def _edited_fingerprint(state: dict[str, Any], prompt_id: str) -> str:
+    """Hash the current contents of this turn's retained edit set and overflow counts."""
+    digest = hashlib.sha256()
+    for bucket in ("edited_files", "edited_agent_docs", "edited_refs", "edited_docs"):
+        for raw in _edited_files(state, prompt_id, bucket):
+            path = Path(raw)
+            digest.update(bucket.encode())
+            digest.update(b"\0")
+            digest.update(raw.encode(errors="surrogateescape"))
+            digest.update(b"\0")
+            try:
+                with path.open("rb") as stream:
+                    for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+                        digest.update(chunk)
+            except OSError:
+                continue
+    truncated = state.get("edited_truncated")
+    if isinstance(truncated, dict):
+        digest.update(json.dumps(truncated, sort_keys=True).encode())
+    return digest.hexdigest()
 
 
 def _plan_audit_paused(state: dict[str, Any]) -> bool:

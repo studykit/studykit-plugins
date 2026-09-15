@@ -286,8 +286,6 @@ _SCOPE = {"claims-auditor": "the response's claims",
 
 
 def _handle_stop(project_dir: Path, payload: dict[str, Any], session_id: str, turn_id: str) -> None:
-    if payload.get("stop_hook_active") is True:
-        return
     turn = _load_turn(project_dir, session_id, turn_id)
     response = payload.get("last_assistant_message")
     response = response if isinstance(response, str) else ""
@@ -296,6 +294,10 @@ def _handle_stop(project_dir: Path, payload: dict[str, Any], session_id: str, tu
     turn["assistant"] = response
     _save_turn(project_dir, session_id, turn_id, turn)
     config = core_config._load_config(project_dir)
+    normalized = dict(payload)
+    normalized["prompt_id"] = turn_id
+    normalized["session_id"] = session_id
+    core_edit.recover_shell_writes(project_dir, normalized, config)
     state = core_state._read_state(project_dir, session_id, config)
     # Recorded whether or not a switch is on: it is what the audit prefix in `_handle_prompt`
     # is pointed at, and a project that keeps guard off is not a project whose user may not ask.
@@ -335,11 +337,22 @@ def _emit_document_reviews(project_dir: Path, session_id: str, turn_id: str,
             continue
         name = _CODEX_REVIEW_AGENTS.get(rule.name, rule.name) if rule.kind == "agent" else rule.name
         groups.setdefault((rule.kind, name), []).append(path)
-    if not groups or state.get("last_audited_prompt_id") == turn_id:
+    fingerprint = core_state._edited_fingerprint(state, turn_id)
+    if (not groups or (state.get("last_audited_prompt_id") == turn_id
+                       and state.get("last_audited_fingerprint") == fingerprint)):
         return
     state["last_audited_prompt_id"] = turn_id
+    state["last_audited_fingerprint"] = fingerprint
     blocks = [core_dispatch._docs_context(paths, action_kind=kind, action_name=name)
               for (kind, name), paths in groups.items()]
+    truncated = state.get("edited_truncated")
+    if isinstance(truncated, dict):
+        omitted = sum(v for v in truncated.values() if isinstance(v, int) and v > 0)
+        if omitted:
+            blocks.append(
+                "guard: the review file list was truncated; "
+                f"{omitted} additional changed file(s) are not listed. Report the review as partial."
+            )
     _emit({"hookSpecificOutput": {"hookEventName": "Stop",
                                    "additionalContext": "\n\n".join(blocks)}})
 

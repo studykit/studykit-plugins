@@ -59,6 +59,8 @@ including Git-visible files changed through the shell. Stop
 names `comment-corrector` for the fixed source bucket, while all project Markdown is dispatched
 only when a document-review rule matches it; rules may name an agent, a skill, or an explicit
 skip.
+Review dispatch is content-sensitive: unchanged continuation stops are suppressed, while a
+file changed after the first review can be dispatched again in the same turn.
 That is the whole of what Stop does now.
 
 Also on `PostToolUse`, and unrelated to auditing: the **refs index gate**, which blocks until a

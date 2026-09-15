@@ -55,8 +55,33 @@ def _bash_snapshot_path(project_dir: Path, session_id: str, tool_call_id: str) -
     return _state_root(project_dir) / "bash-snapshots" / f"{key}.json"
 
 
-def _git_worktree_snapshot(project_dir: Path, config: dict[str, Any]) -> dict[str, str] | None:
-    """Return content hashes for reviewable tracked and non-ignored untracked files."""
+def _bash_hash_cache_path(project_dir: Path) -> Path:
+    return _state_root(project_dir) / "bash-hash-cache.json"
+
+
+def _read_hash_cache(project_dir: Path) -> dict[str, dict[str, Any]]:
+    try:
+        value = json.loads(_bash_hash_cache_path(project_dir).read_text(encoding="utf-8"))
+    except (OSError, ValueError, json.JSONDecodeError):
+        return {}
+    return value if isinstance(value, dict) else {}
+
+
+def _write_hash_cache(project_dir: Path, snapshot: dict[str, dict[str, Any]]) -> None:
+    path = _bash_hash_cache_path(project_dir)
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_suffix(".json.tmp")
+        tmp.write_text(json.dumps(snapshot, separators=(",", ":")), encoding="utf-8")
+        tmp.replace(path)
+    except OSError:
+        pass
+
+
+def _git_worktree_snapshot(project_dir: Path, config: dict[str, Any],
+                           prior: dict[str, dict[str, Any]] | None = None
+                           ) -> dict[str, dict[str, Any]] | None:
+    """Return metadata and cached content hashes for reviewable Git-visible files."""
     try:
         result = subprocess.run(
             ["git", "-C", str(project_dir), "ls-files", "--cached", "--others",
@@ -72,7 +97,7 @@ def _git_worktree_snapshot(project_dir: Path, config: dict[str, Any]) -> dict[st
         state_root = _state_root(project_dir).resolve()
     except OSError:
         return None
-    snapshot: dict[str, str] = {}
+    snapshot: dict[str, dict[str, Any]] = {}
     for raw in result.stdout.split(b"\0"):
         if not raw:
             continue
@@ -80,20 +105,29 @@ def _git_worktree_snapshot(project_dir: Path, config: dict[str, Any]) -> dict[st
             rel = raw.decode("utf-8", errors="surrogateescape")
             target = project_dir / rel
             resolved = target.resolve()
+            stat = target.stat()
         except OSError:
             continue
         if (not target.is_file() or project not in resolved.parents
                 or state_root in resolved.parents
                 or _edited_bucket(resolved, refs, docs) is None):
             continue
-        try:
-            digest = hashlib.sha256()
-            with target.open("rb") as stream:
-                for chunk in iter(lambda: stream.read(1024 * 1024), b""):
-                    digest.update(chunk)
-            snapshot[rel] = digest.hexdigest()
-        except OSError:
-            continue
+        cached = (prior or {}).get(rel)
+        if (isinstance(cached, dict) and cached.get("mtime_ns") == stat.st_mtime_ns
+                and cached.get("size") == stat.st_size
+                and isinstance(cached.get("sha256"), str)):
+            digest_text = cached["sha256"]
+        else:
+            try:
+                digest = hashlib.sha256()
+                with target.open("rb") as stream:
+                    for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+                        digest.update(chunk)
+                digest_text = digest.hexdigest()
+            except OSError:
+                continue
+        snapshot[rel] = {"mtime_ns": stat.st_mtime_ns, "size": stat.st_size,
+                         "sha256": digest_text}
     return snapshot
 
 
@@ -103,13 +137,18 @@ def snapshot_shell_write_candidates(project_dir: Path, payload: dict[str, Any]) 
     tool_call_id = _tool_call_id(payload)
     if session_id is None or tool_call_id is None:
         return
-    snapshot = _git_worktree_snapshot(project_dir, _load_config(project_dir))
+    snapshot = _git_worktree_snapshot(project_dir, _load_config(project_dir),
+                                      _read_hash_cache(project_dir))
     if snapshot is None:
         return
     path = _bash_snapshot_path(project_dir, session_id, tool_call_id)
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(snapshot, separators=(",", ":")), encoding="utf-8")
+        value = {"session_id": session_id,
+                 "prompt_id": payload.get("prompt_id") or payload.get("turn_id"),
+                 "files": snapshot}
+        path.write_text(json.dumps(value, separators=(",", ":")), encoding="utf-8")
+        _write_hash_cache(project_dir, snapshot)
     except OSError:
         return
 
@@ -131,17 +170,26 @@ def record_shell_writes(project_dir: Path, payload: dict[str, Any],
             path.unlink()
         except OSError:
             pass
-    if not isinstance(before_value, dict):
+    if not isinstance(before_value, dict) or not isinstance(before_value.get("files"), dict):
         return []
-    after = _git_worktree_snapshot(project_dir, config)
+    before = before_value["files"]
+    after = _git_worktree_snapshot(project_dir, config, before)
     if after is None:
         return []
+    _write_hash_cache(project_dir, after)
+    def content_hash(value: Any) -> str | None:
+        return value.get("sha256") if isinstance(value, dict) else None
+
     changed = sorted(
-        rel for rel in set(before_value) | set(after)
-        if before_value.get(rel) != after.get(rel)
+        rel for rel in set(before) | set(after)
+        if content_hash(before.get(rel)) != content_hash(after.get(rel))
     )
     targets: list[Path] = []
     for rel in changed:
+        # A deletion leaves no file for a reviewer to read and must not trip the refs-index
+        # gate. A rename's destination is independently present in `after` and is recorded.
+        if rel not in after:
+            continue
         synthetic_input = {"file_path": rel}
         _record_edited_source(project_dir, payload, synthetic_input, config)
         target = _tool_target_path(project_dir, synthetic_input)
@@ -150,6 +198,41 @@ def record_shell_writes(project_dir: Path, payload: dict[str, Any],
     if changed:
         _trace(project_dir, session_id, "post-edit", "shell_changes_recorded",
                changed=len(changed))
+    return targets
+
+
+def recover_shell_writes(project_dir: Path, payload: dict[str, Any],
+                         config: dict[str, Any]) -> list[Path]:
+    """Consume unpaired shell snapshots for this session, as at Stop after an interrupt."""
+    session_id = _session_id(payload)
+    prompt_id = payload.get("prompt_id")
+    if session_id is None or not isinstance(prompt_id, str) or not prompt_id:
+        return []
+    root = _state_root(project_dir) / "bash-snapshots"
+    try:
+        candidates = list(root.glob("*.json"))
+    except OSError:
+        return []
+    targets: list[Path] = []
+    for path in candidates:
+        try:
+            value = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError, json.JSONDecodeError):
+            continue
+        if (not isinstance(value, dict) or value.get("session_id") != session_id
+                or value.get("prompt_id") != prompt_id):
+            continue
+        normalized = dict(payload)
+        normalized["prompt_id"] = prompt_id
+        synthetic_id = path.stem
+        normalized["tool_use_id"] = synthetic_id
+        expected = _bash_snapshot_path(project_dir, session_id, synthetic_id)
+        try:
+            expected.parent.mkdir(parents=True, exist_ok=True)
+            path.replace(expected)
+        except OSError:
+            continue
+        targets.extend(record_shell_writes(project_dir, normalized, config))
     return targets
 
 
@@ -204,13 +287,22 @@ def _record_edited_source(project_dir: Path, payload: dict, tool_input: Any,
         state["edited_agent_docs"] = []
         state["edited_refs"] = []
         state["edited_docs"] = []
+        state["edited_truncated"] = {}
     # `.get`, not `[]`: a state file written before a bucket existed reaches here with the
     # turn marker already matching, so the reset above does not run and the key is absent.
     files = state.get(bucket)
     if not isinstance(files, list):
         files = []
     path = str(target)
-    if path in files or len(files) >= EDITED_FILES_MAX:
+    if path in files:
+        return
+    if len(files) >= EDITED_FILES_MAX:
+        truncated = state.get("edited_truncated")
+        if not isinstance(truncated, dict):
+            truncated = {}
+        truncated[bucket] = int(truncated.get(bucket, 0)) + 1
+        state["edited_truncated"] = truncated
+        _write_state(project_dir, session_id, state)
         return
     files.append(path)
     state[bucket] = files
