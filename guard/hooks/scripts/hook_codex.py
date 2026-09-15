@@ -326,25 +326,27 @@ def _emit_document_reviews(project_dir: Path, session_id: str, turn_id: str,
 
     if core_config._agent_mode(state, "doc-auditor") == core_config.AgentMode.OFF:
         return
-    docs: list[str] = []
-    for bucket in ("edited_refs", "edited_agent_docs", "edited_docs"):
-        docs.extend(core_state._edited_files(state, turn_id, bucket))
+    buckets = ("edited_refs", "edited_agent_docs", "edited_docs")
+    docs = [path for bucket in buckets
+            for path in core_state._edited_files(state, turn_id, bucket)]
     rules = core_config._doc_review_rules(config)
-    groups: dict[tuple[str, str], list[str]] = {}
+    groups: dict[tuple[str, str, bool], list[str]] = {}
     for path in docs:
         rule = core_config._doc_review_rule(core_paths._project_rel(project_dir, Path(path)), rules)
         if rule is None:
             continue
         name = _CODEX_REVIEW_AGENTS.get(rule.name, rule.name) if rule.kind == "agent" else rule.name
-        groups.setdefault((rule.kind, name), []).append(path)
+        conditional = core_state._edit_source(state, path) != "native"
+        groups.setdefault((rule.kind, name, conditional), []).append(path)
     fingerprint = core_state._edited_fingerprint(state, turn_id)
     if (not groups or (state.get("last_audited_prompt_id") == turn_id
                        and state.get("last_audited_fingerprint") == fingerprint)):
         return
     state["last_audited_prompt_id"] = turn_id
     state["last_audited_fingerprint"] = fingerprint
-    blocks = [core_dispatch._docs_context(paths, action_kind=kind, action_name=name)
-              for (kind, name), paths in groups.items()]
+    blocks = [core_dispatch._docs_context(
+        paths, action_kind=kind, action_name=name, conditional=conditional)
+        for (kind, name, conditional), paths in groups.items()]
     truncated = state.get("edited_truncated")
     if isinstance(truncated, dict):
         omitted = sum(v for v in truncated.values() if isinstance(v, int) and v > 0)
@@ -353,8 +355,9 @@ def _emit_document_reviews(project_dir: Path, session_id: str, turn_id: str,
                 "guard: the review file list was truncated; "
                 f"{omitted} additional changed file(s) are not listed. Report the review as partial."
             )
+    context = "\n\n".join([core_dispatch._REVIEW_TIMING, *blocks])
     _emit({"hookSpecificOutput": {"hookEventName": "Stop",
-                                   "additionalContext": "\n\n".join(blocks)}})
+                                   "additionalContext": context}})
 
 
 def main() -> int:

@@ -1,4 +1,4 @@
-"""``post-edit`` (PostToolUse on the write tools).
+"""``post-edit`` (PostToolUse on file-writing tools and Bash).
 
 Two independent jobs, both independent of the agent switches. It records a source file, an
 agent instruction file, a saved reference or an ordinary document written this turn — the
@@ -11,6 +11,11 @@ Both jobs see a subagent's writes as well as the main agent's, since tool events
 same hooks inside a subagent (https://code.claude.com/docs/en/hooks). That matters for the
 index check in particular: the agent that saves a reference is usually a subagent, and a
 check that only saw the main agent's writes would miss exactly those files.
+
+Native file tools carry an exact target. Bash does not expose its write-set, so its targets
+come from the existing worktree snapshot/hash comparison and are marked as inferred. Stop
+states those candidates conditionally: the main session dispatches only paths it knows it
+actually modified from its own tool activity, and ignores another session's writes.
 """
 
 from __future__ import annotations
@@ -165,18 +170,24 @@ def record_shell_writes(project_dir: Path, payload: dict[str, Any],
         before_value = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError, json.JSONDecodeError):
         return []
-    finally:
+    if not isinstance(before_value, dict) or not isinstance(before_value.get("files"), dict):
         try:
             path.unlink()
         except OSError:
             pass
-    if not isinstance(before_value, dict) or not isinstance(before_value.get("files"), dict):
         return []
+
+    try:
+        path.unlink()
+    except OSError:
+        pass
+
     before = before_value["files"]
     after = _git_worktree_snapshot(project_dir, config, before)
     if after is None:
         return []
     _write_hash_cache(project_dir, after)
+
     def content_hash(value: Any) -> str | None:
         return value.get("sha256") if isinstance(value, dict) else None
 
@@ -191,7 +202,8 @@ def record_shell_writes(project_dir: Path, payload: dict[str, Any],
         if rel not in after:
             continue
         synthetic_input = {"file_path": rel}
-        _record_edited_source(project_dir, payload, synthetic_input, config)
+        _record_edited_source(project_dir, payload, synthetic_input, config,
+                              source="shell", content_hash=content_hash(after.get(rel)))
         target = _tool_target_path(project_dir, synthetic_input)
         if target is not None:
             targets.append(target)
@@ -237,7 +249,8 @@ def recover_shell_writes(project_dir: Path, payload: dict[str, Any],
 
 
 def _record_edited_source(project_dir: Path, payload: dict, tool_input: Any,
-                          config: dict[str, Any]) -> None:
+                          config: dict[str, Any], *, source: str = "native",
+                          content_hash: str | None = None) -> None:
     """Note a file this turn wrote, for a later file-reading agent's recommendation.
 
     Four lists, chosen by `_edited_bucket`: source files for `comment-corrector`, agent
@@ -276,6 +289,16 @@ def _record_edited_source(project_dir: Path, payload: dict, tool_input: Any,
     if project not in target.parents or state_root in target.parents:
         return
 
+    if content_hash is None:
+        try:
+            digest = hashlib.sha256()
+            with target.open("rb") as stream:
+                for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+                    digest.update(chunk)
+            content_hash = digest.hexdigest()
+        except OSError:
+            return
+
     state = _read_state(project_dir, session_id, config)
     # A new turn resets ALL FOUR lists off the one marker; without this, files from the
     # previous turn would ride along into this turn's recommendation. Resetting only the
@@ -288,13 +311,20 @@ def _record_edited_source(project_dir: Path, payload: dict, tool_input: Any,
         state["edited_refs"] = []
         state["edited_docs"] = []
         state["edited_truncated"] = {}
+        state["edited_provenance"] = {}
     # `.get`, not `[]`: a state file written before a bucket existed reaches here with the
     # turn marker already matching, so the reset above does not run and the key is absent.
     files = state.get(bucket)
     if not isinstance(files, list):
         files = []
     path = str(target)
+    provenance = state.get("edited_provenance")
+    if not isinstance(provenance, dict):
+        provenance = {}
+    provenance[path] = {"sha256": content_hash, "source": source}
+    state["edited_provenance"] = provenance
     if path in files:
+        _write_state(project_dir, session_id, state)
         return
     if len(files) >= EDITED_FILES_MAX:
         truncated = state.get("edited_truncated")

@@ -52,11 +52,15 @@ commands, a user `!` command), which moved out of `cmd_stop` and into
 
 ### What still runs on a hook
 
-The **edited-file audits**, and they are not a triage question: the turn either edited a source
-file, an agent instruction file, a saved reference or an ordinary document, or it did not.
-`PostToolUse` records source, agent-instruction, reference and ordinary-document lists,
-including Git-visible files changed through the shell. Stop
-names `comment-corrector` for the fixed source bucket, while all project Markdown is dispatched
+The **edited-file audits**. Native tools answer the trigger exactly: the turn either targeted a
+source file, an agent instruction file, a saved reference or an ordinary document, or it did
+not. Bash supplies only a shared-worktree difference, so its candidates carry the ownership
+condition below.
+`PostToolUse` records source, agent-instruction, reference and ordinary-document lists from
+native file targets and Bash snapshot/hash differences. Stop treats native targets as exact;
+for Bash-derived candidates it tells the main session to dispatch only paths that session
+actually modified according to its own tool activity, ignoring another session's writes. It
+then names `comment-corrector` for the fixed source bucket, while all project Markdown is dispatched
 only when a document-review rule matches it; rules name an agent or skill, while
 `doc_exclude` owns explicit exclusions.
 Review dispatch is content-sensitive: unchanged continuation stops are suppressed, while a

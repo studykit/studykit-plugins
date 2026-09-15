@@ -10,11 +10,12 @@ transcript when the user asks for one (``transcript._last_auditable_prompt_id``)
 no marker to keep and no copy to make. The three skips that protected that marker — non-human
 origin, guard's own control commands, a user ``!`` command — moved with it.
 
-What is left is the file-reading audits, and none of them is a triage question.
-``comment-corrector`` is dispatched over source files, while configured document-review actions
-cover ordinary, agent-instruction and reference Markdown files. Each condition is a file list
-rather than a judgment about the answer, so there is nothing for the user to decide and nothing
-for a router to weigh. guard runs no model itself and never blocks here.
+What is left is the file-reading audits. Native write targets are exact; Bash candidates are
+conditional because a shared-worktree diff may include another session's write. The Stop
+context tells the main session to use its own tool activity to discard those foreign paths
+before dispatch. ``comment-corrector`` covers source files, while configured document-review
+actions cover ordinary, agent-instruction and reference Markdown files. Nothing routes on the
+answer text, guard runs no model itself, and it never blocks here.
 
 The fixed source bucket names an AGENT. All project Markdown is matched against
 project-configured review actions, which may name either an agent or a skill.
@@ -29,9 +30,10 @@ from .paths import _project_dir, _project_rel, _trace
 from .payload import _read_payload, _session_id
 from .emit import _emit_stop_context
 from .agents import AUDIT_AGENTS, _eligible_agents
-from .state import (_audit_paused, _edited_files, _edited_fingerprint, _read_state,
-                    _write_state)
-from .dispatch import _DIRECT_LEAD, _dispatch_context, _docs_context
+from .state import (_audit_paused, _edit_source, _edited_files, _edited_fingerprint,
+                    _read_state, _write_state)
+from .dispatch import (_DIRECT_LEAD, _REVIEW_TIMING, _SHELL_DIRECT_LEAD,
+                       _dispatch_context, _docs_context)
 from .cmd_edit import EDITED_FILES_MAX, recover_shell_writes
 
 
@@ -90,13 +92,14 @@ def cmd_stop() -> int:
     docs_review_rules = _doc_review_rules(config)
     # The most-specific matching per-file rule wins. An unmatched document has no dispatch;
     # grouping keeps one action to one dispatch across several documents.
-    doc_groups: dict[tuple[str, str], list[str]] = {}
+    doc_groups: dict[tuple[str, str, bool], list[str]] = {}
     if docs_enabled:
         for path in docs:
             rule = _doc_review_rule(_project_rel(project_dir, Path(path)), docs_review_rules)
             if rule is None:
                 continue
-            doc_groups.setdefault((rule.kind, rule.name), []).append(path)
+            conditional = _edit_source(state, path) != "native"
+            doc_groups.setdefault((rule.kind, rule.name, conditional), []).append(path)
     modes = {k: _agent_mode(state, k) for k in eligible}
     if not eligible and not doc_groups:
         _trace(project_dir, session_id, "stop", "none_eligible", prompt_id=prompt_id)
@@ -114,13 +117,17 @@ def cmd_stop() -> int:
     # cannot touch what the ones that only report are reading.
     blocks: list[str] = []
     if eligible:
+        lead = (_SHELL_DIRECT_LEAD
+                if any(_edit_source(state, path) != "native" for path in edited)
+                else _DIRECT_LEAD)
         blocks.append(_dispatch_context(
-            project_dir, session_id, prompt_id, _DIRECT_LEAD, eligible, modes,
+            project_dir, session_id, prompt_id, lead, eligible, modes,
             {"files": edited}, ""))
     if doc_groups:
-        for (action_kind, action_name), group in doc_groups.items():
+        for (action_kind, action_name, conditional), group in doc_groups.items():
             blocks.append(_docs_context(group, action_kind=action_kind,
-                                        action_name=action_name))
+                                        action_name=action_name,
+                                        conditional=conditional))
     truncated = state.get("edited_truncated")
     if isinstance(truncated, dict) and truncated:
         omitted = sum(v for v in truncated.values() if isinstance(v, int) and v > 0)
@@ -130,7 +137,7 @@ def cmd_stop() -> int:
                 f"{omitted} additional changed file(s) are not listed. Tell the user the "
                 "review was partial instead of implying that every changed file was checked."
             )
-    context = "\n\n".join(blocks)
+    context = "\n\n".join([_REVIEW_TIMING, *blocks])
     outcome = "+".join(n for n, on in (("direct", eligible), ("docs", doc_groups)) if on)
     # `additionalContext`, not `decision: "block"`. Per the official hooks docs
     # (https://code.claude.com/docs/en/hooks, "Stop decision control"; excerpt saved at

@@ -4,7 +4,7 @@ Holds the agent modes as of this session, the two audit mutes (``audit_paused``,
 armed, and ``plan_audit_paused``, seeded from the project's ``audit-plan``), the files this
 turn edited
 (``edited_prompt_id`` / ``edited_files`` / ``edited_agent_docs`` / ``edited_refs`` /
-``edited_docs``),
+``edited_docs``), their per-path source evidence (``edited_provenance``),
 ``last_audited_prompt_id`` / ``last_audited_fingerprint``, ``pending_verify_prompt_id``,
 ``transcript_path``, and
 ``updated_at``.
@@ -64,6 +64,11 @@ def _read_state(project_dir: Path, session_id: str, config: dict[str, Any]) -> d
         "edited_refs": [],
         "edited_docs": [],
         "edited_truncated": {},
+        # Per-path evidence for the current edit lists. Native file tools name an exact
+        # target; shell detection infers targets from a worktree diff. The distinction lets
+        # Stop state Bash candidates conditionally instead of asserting that a worktree-wide
+        # diff proves this session wrote them.
+        "edited_provenance": {},
         # Session-only mute, flipped by the `guard` shell command. A session OPENS ARMED and
         # there is no config key seeding this one (the `audit-turn` setting was retired in
         # v0.124.0 — `config.RETIRED_KEYS`): every entry that could be muted is one the user
@@ -112,6 +117,7 @@ def _read_state(project_dir: Path, session_id: str, config: dict[str, Any]) -> d
             "transcript_path", "audit_paused", "plan_audit_paused", "plan_audited_hash",
             "edited_prompt_id", "edited_files",
             "edited_agent_docs", "edited_refs", "edited_docs", "edited_truncated",
+            "edited_provenance",
             "updated_at")
     default.update({k: data[k] for k in keys if k in data})
     return default
@@ -144,6 +150,18 @@ def _edited_files(state: dict[str, Any], prompt_id: str, bucket: str) -> list[st
     return [f for f in files if isinstance(f, str) and f and Path(f).is_file()]
 
 
+def _edit_source(state: dict[str, Any], path: str) -> str | None:
+    """Whether a recorded path came from an exact native target or a shell diff."""
+    provenance = state.get("edited_provenance")
+    if not isinstance(provenance, dict):
+        return None
+    evidence = provenance.get(path)
+    if not isinstance(evidence, dict):
+        return None
+    source = evidence.get("source")
+    return source if source in ("native", "shell") else None
+
+
 def _edited_fingerprint(state: dict[str, Any], prompt_id: str) -> str:
     """Hash the current contents of this turn's retained edit set and overflow counts."""
     digest = hashlib.sha256()
@@ -163,6 +181,9 @@ def _edited_fingerprint(state: dict[str, Any], prompt_id: str) -> str:
     truncated = state.get("edited_truncated")
     if isinstance(truncated, dict):
         digest.update(json.dumps(truncated, sort_keys=True).encode())
+    provenance = state.get("edited_provenance")
+    if isinstance(provenance, dict):
+        digest.update(json.dumps(provenance, sort_keys=True).encode())
     return digest.hexdigest()
 
 

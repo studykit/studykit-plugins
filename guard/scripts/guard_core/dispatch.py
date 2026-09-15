@@ -161,6 +161,23 @@ _DIRECT_LEAD = (
 )
 
 
+_SHELL_DIRECT_LEAD = (
+    "guard: the worktree changed during this session's shell calls, but that diff may include "
+    "another session's writes. For each path below, dispatch its audit only if this session "
+    "actually modified it; ignore paths changed only by another session. Decide from this "
+    "session's own tool activity, not from the current Git diff."
+)
+
+
+# Stop can arrive at an intermediate turn boundary while the user's larger request still has
+# useful work left. Keep this once per Stop payload rather than repeating it in every action
+# block, especially when several document-review rules selected different actions.
+_REVIEW_TIMING = (
+    "guard: reviews may wait for other work; complete them and act on reports before final "
+    "handoff."
+)
+
+
 # `ext-docs-auditor`, which has no switch and is not routed. It is named here rather than
 # through `AUDIT_AGENTS` because the condition for it is not a judgment and not a setting: the
 # turn either wrote a file under the refs directory or it did not, and `edited_refs` already
@@ -196,22 +213,20 @@ def _refs_context(refs: list[str]) -> str:
 #
 # Worded as what the turn did, like the other two leads: the criteria are the agent's own, and
 # a lead that previewed them would be the caller telling it what to find.
-def _docs_context(docs: list[str], *, action_kind: str, action_name: str) -> str:
-    """``additionalContext`` naming the document audit's skill for the docs this turn wrote.
+def _docs_context(docs: list[str], *, action_kind: str, action_name: str,
+                  conditional: bool = False) -> str:
+    """One compact action-and-path entry in the document-review context.
 
     Configured action names have already been syntax-validated by ``config._doc_review_rules``.
     """
     if action_kind == "agent":
-        lead = (
-            "guard: this turn edited documents in the repository. Dispatch the configured "
-            f"document review agent `{action_name}` with subagent_type: \"{action_name}\" over "
-            "them. Give it only the paths below, then act on what it reports."
-        )
+        lead = f"- Agent `{action_name}`, paths only:"
     else:  # action_kind == "skill"
-        lead = (
-            "guard: this turn edited documents in the repository. Run the configured "
-            f"document review skill `{action_name}` over them, then act on what it reports."
-        )
-    lines = [lead, "- documents to audit:"]
+        lead = f"- Skill `{action_name}`, paths only:"
+    if conditional:
+        lead += (" Run it only for paths this session actually modified; ignore paths changed "
+                 "only by another session. Decide from this session's own tool activity, not "
+                 "from the current Git diff.")
+    lines = [lead]
     lines.extend(f"    {p}" for p in docs)
     return "\n".join(lines)
