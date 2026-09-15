@@ -26,10 +26,11 @@ from __future__ import annotations
 
 import json
 import os
+import re
 
 from pathlib import Path
 from enum import StrEnum
-from typing import Any
+from typing import Any, NamedTuple
 
 
 
@@ -57,7 +58,7 @@ TRACE_ENV_VAR = "GUARD_TRACE"
 TRACE_TRUTHY = {"1", "true", "yes", "on"}
 
 
-# Marker the `guard:settings` skill sets on the config-mutating CLI verbs. See
+# Marker user-invoked Guard configuration skills set on config-mutating CLI verbs. See
 # _cli_write_allowed for what this does and does not buy.
 CLI_WRITE_ENV_VAR = "GUARD_SETTINGS_SKILL"
 
@@ -243,6 +244,9 @@ DEFAULT_CONFIG: dict[str, Any] = {
     # The ordinary documents, on the same terms: eligibility needs one this turn wrote, so a
     # project that turns it on pays nothing on the turns that touch none.
     "doc-auditor": AgentMode.OFF,
+    # Per-pattern document-review actions. The most specific matching rule owns a document;
+    # declaration order breaks a specificity tie. Unmatched documents are not reviewed.
+    "doc_review_rules": [],
     # Which directories hold those documents, relative to the project dir. Empty (the
     # default) means the whole project — a project that turned the audit on meant its
     # documents, and guard picking a subset from directory names would be guessing at a
@@ -285,6 +289,105 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "refs_dir": "",
 }
 
+_ACTION_NAME_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9:_-]*")
+
+
+class DocReviewRule(NamedTuple):
+    """One project-relative document glob and its action, or an explicit skip."""
+
+    glob: str
+    kind: str | None
+    name: str | None
+
+
+def _review_action_name(value: Any) -> str | None:
+    """Return a configured document-review action name, if it is safe to inject."""
+
+    if not isinstance(value, str):
+        return None
+    normalized = value.strip()
+    return normalized if _ACTION_NAME_RE.fullmatch(normalized) else None
+
+
+def _doc_review_rules(cfg: dict[str, Any]) -> tuple[DocReviewRule, ...]:
+    """Return only valid per-document reviewer rules, in declared order.
+
+    An ``action: null`` rule is valid and deliberately means that matching documents are not
+    reviewed. It is distinct from a malformed action, which is ignored.
+    """
+
+    raw_rules = cfg.get("doc_review_rules", [])
+    if not isinstance(raw_rules, list):
+        return ()
+    rules: list[DocReviewRule] = []
+    for raw_rule in raw_rules:
+        if not isinstance(raw_rule, dict):
+            continue
+        pattern = raw_rule.get("glob")
+        if not isinstance(pattern, str) or not (pattern := pattern.strip()):
+            continue
+        if "action" not in raw_rule:
+            continue
+        if raw_rule["action"] is None:
+            rules.append(DocReviewRule(pattern, None, None))
+            continue
+        action = raw_rule["action"]
+        if not isinstance(action, dict):
+            continue
+        kind = action.get("kind")
+        name = _review_action_name(action.get("name"))
+        if kind in ("agent", "skill") and name is not None:
+            rules.append(DocReviewRule(pattern, kind, name))
+    return tuple(rules)
+
+
+def _doc_review_rule(path: str, rules: tuple[DocReviewRule, ...]) -> DocReviewRule | None:
+    """Return the most-specific configured rule whose glob matches ``path``.
+
+    ``*`` stays within one directory, while ``**`` may cross directories. Paths are already
+    project-relative before reaching here, so a rule can never widen the document scope.
+    Literal directory depth wins first, then literal detail and fewer wildcards; configuration
+    order breaks an exact tie.
+    """
+
+    normalized = path.replace("\\", "/")
+    matches: list[tuple[tuple[int, int, int, int, int, int], DocReviewRule]] = []
+    for rule_index, rule in enumerate(rules):
+        regex_parts: list[str] = []
+        cursor = 0
+        pattern = rule.glob.replace("\\", "/")
+        while cursor < len(pattern):
+            char = pattern[cursor]
+            if char == "*" and cursor + 1 < len(pattern) and pattern[cursor + 1] == "*":
+                cursor += 2
+                if cursor < len(pattern) and pattern[cursor] == "/":
+                    regex_parts.append("(?:.*/)?")
+                    cursor += 1
+                else:
+                    regex_parts.append(".*")
+                continue
+            if char == "*":
+                regex_parts.append("[^/]*")
+            elif char == "?":
+                regex_parts.append("[^/]")
+            else:
+                regex_parts.append(re.escape(char))
+            cursor += 1
+        if re.fullmatch("".join(regex_parts), normalized):
+            segments = [segment for segment in pattern.split("/") if segment]
+            prefix_depth = 0
+            for segment in segments:
+                if "*" in segment or "?" in segment:
+                    break
+                prefix_depth += 1
+            literal_segments = sum("*" not in segment and "?" not in segment
+                                   for segment in segments)
+            literal_chars = sum(1 for char in pattern if char not in "*?/")
+            wildcard_count = pattern.count("*") + pattern.count("?")
+            matches.append(((prefix_depth, literal_segments, literal_chars, -wildcard_count,
+                             len(segments), -rule_index), rule))
+    return max(matches, key=lambda match: match[0])[1] if matches else None
+
 
 def _trace_enabled() -> bool:
     return os.environ.get(TRACE_ENV_VAR, "").strip().lower() in TRACE_TRUTHY
@@ -314,7 +417,8 @@ def _load_config(project_dir: Path) -> dict[str, Any]:
     """Load the JSON config at guard.local.json, if present. Fail-open to defaults.
 
     Only keys present in DEFAULT_CONFIG are honored, and only when the supplied value
-    matches the default's JSON type — a str for the agent modes and ``refs_dir``, a list
+    matches the default's JSON type — a str for the agent modes and ``refs_dir``, a list for
+    document-review rules,
     (or a bare str) for ``knowledge_dir`` — so a malformed value can never change a setting
     by accident.
     """
@@ -460,5 +564,3 @@ def _audit_on(cfg: dict[str, Any], key: str) -> bool:
     if parsed is None:
         return _parse_switch(str(DEFAULT_CONFIG[key])) is True
     return parsed
-
-

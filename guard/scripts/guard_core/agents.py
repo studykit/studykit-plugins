@@ -24,13 +24,8 @@ class DocScope(NamedTuple):
 # The dispatch paths an audit can run on. `"turn"` is a finished turn, audited when the user
 # asks for one; `"report"` is a standalone document the caller points the router at.
 # Neither has a hook behind it any more — the router runs because somebody asked.
-#
-# `"edit"` is the third and the odd one: the files this turn wrote, named by the Stop hook.
-# It is not routed and never was — the condition is a file list, not a judgment — so no
-# router chooses on it and `routed` says nothing about it.
 TURN_PATH = "turn"
 REPORT_PATH = "report"
-EDIT_PATH = "edit"
 
 
 class AuditAgent(NamedTuple):
@@ -133,7 +128,6 @@ class AuditAgent(NamedTuple):
     # skill carries everything around the judgment — so it is spelled the same way rather
     # than as prose in the hook's context block, which would be paid for on every turn that
     # edits a document instead of once when there is something to do.
-    edit_entry: str | None = None
     routed: tuple[str, ...] = (TURN_PATH, REPORT_PATH)
 
 
@@ -260,8 +254,7 @@ AUDIT_AGENTS: dict[str, AuditAgent] = {
     # wrote a document or it did not — and the document path the report router serves is
     # about a text's claims and clarity, not about whether it duplicates the repository.
     # The user's manual entry is the skill itself.
-    "doc-auditor": AuditAgent(reads="docs", needs_history=False,
-                              edit_entry="audit-docs", routed=()),
+    "doc-auditor": AuditAgent(reads="docs", needs_history=False, routed=()),
 }
 
 
@@ -287,8 +280,6 @@ def _path_entry(key: str, path: str) -> str | None:
     spec = AUDIT_AGENTS[key]
     if path == REPORT_PATH:
         return spec.report_entry
-    if path == EDIT_PATH:
-        return spec.edit_entry or key
     return spec.turn_entry or key
 
 

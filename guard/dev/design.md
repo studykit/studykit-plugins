@@ -2642,7 +2642,7 @@ are the only control over whether guard says anything unasked. `docs-finder` and
 here; the invariants above say why, and
 `settings set` refuses both names rather than writing a key nothing reads.
 
-Two keys are not modes: `doc_dir` and `doc_exclude`, the directories `doc-auditor`'s bucket
+Three keys are not modes: `doc_dir` and `doc_exclude`, the directories `doc-auditor`'s bucket
 takes markdown from and the ones it subtracts (`paths._doc_scope`). An empty `doc_dir` means
 the whole project, which is the honest default — a project that turned the audit on meant its
 documents, and inferring which directories those are from their names would be guard deciding
@@ -2658,7 +2658,14 @@ appear in `settings show`, which is the ONLY place an entry that does nothing is
 `_doc_scope` drops one silently because it runs on every edit, where nothing is built to read
 a warning, and a mistyped `doc_dir` would otherwise present as the audit never running.
 `doc_dir`'s empty case prints as "(all of the project)" rather than "(none configured)": empty
-is a real setting here and means the opposite of unset. See the
+is a real setting here and means the opposite of unset. `doc_review_rules` is an ordered JSON list of `{ "glob": "...",
+"action": { "kind": "agent" | "skill", "name": "..." } }` entries. An `action: null`
+entry explicitly skips review. Its globs match project-relative paths (`*` stays in one directory
+and `**` may cross directories), including zero or more nested directories for `**/`. The most
+specific matching rule owns each document: greater literal directory depth wins, then literal
+detail and fewer wildcards; configuration order breaks an exact tie. A file is reviewed by one
+action or skipped. The `doc-auditor` switch still controls whether any of these
+dispatches run. An unmatched document is not reviewed. The setting is not a Codex edited-document feature: Codex does not run that hook path yet. See the
 invariants above for why the value is a mode rather than a boolean, why `reuse` was removed
 and what reviving it would cost, and why they all ship off. A value that is not a mode word reads as `off` — the safe
 direction, since the alternative is guard acting on a setting the user did not write.
@@ -2759,28 +2766,14 @@ Since v0.128.0 the **router** is the fourth definition under this rule, and the 
 the rule is broader than the reason given for it below: it has no memory to consolidate, and
 the merge was carried entirely by duplicated judgment. See § "The two routers become one".
 
-### The third path, and the entry that is a skill for a different reason
+### The third path, and rule-driven document actions
 
-v0.130.0 adds `EDIT_PATH` — the files a turn wrote, named by the Stop hook — and with it
-`edit_entry`, carrying `doc-auditor`'s entry `audit-docs`. The path had existed since the
-edited-file audits did; what it had never had was an entry, because `comment-corrector`,
-`agents-md-auditor` and `ext-docs-auditor` are named as agents and that is the whole dispatch.
-
-So the split above is being reused for something the reason above does not cover. There is no
-second path here to disagree with a first — `doc-auditor` runs on this path and nowhere else,
-and one path cannot make one definition contradict itself. What makes it a skill is the other
-half of the same rule: **the agent definition is the criteria and the skill body is the task**,
-and this audit has a task the other three do not. It arrives on a file the caller is mid-edit
-on, so the forked run has to be told to read the diff first and audit the file anyway, to drop
-an instruction file if one is in its list, and to leave to the project's own linter what that
-linter already checks. None of that is a criterion — it does not change what makes a passage
-redundant — and none of it can go in the hook's context block, which is paid for on every turn
-that touches a document while the skill is read only when there is something to audit.
-
-The cost is one more concept in the roster, and the alternative was prose in `_DOCS_LEAD`
-growing every time the task did. `_path_entry` translates on this path too, so the skill's
-name lives in the roster with every other entry name and `check-entries.py` holds it to a file
-that exists — which is the whole reason entries are spelled out rather than derived.
+`doc-auditor` remains the gate for ordinary Markdown files written during a turn, but does not
+have a built-in dispatch entry. `doc_review_rules` maps matching project-relative paths to an
+explicit agent or skill action, while `action: null` excludes a path. An unmatched document is
+intentionally silent: inferring a generic reviewer would make enabling a narrowly scoped rule
+audit unrelated files. The Stop hook groups files only by their selected action, and the rule
+matcher chooses the most-specific glob so a deeper project area can override a broad one.
 
 ### Why not two agents, which was built first
 

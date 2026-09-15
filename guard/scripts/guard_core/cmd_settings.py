@@ -4,8 +4,9 @@
 current settings; ``set <key> <value>`` changes one of the per-agent settings — each named
 after the agent it controls, valued ``off``/``on`` (``fresh``, what pre-v0.116.0 wrote, is
 still accepted and rewritten as ``on``) — the audit
-switch (``audit-plan``, ``on``/``off``), ``refs_dir`` or ``knowledge_dir``
-(comma-separated, the whole list replaced); ``unset <key>`` removes a key from the file
+switch (``audit-plan``, ``on``/``off``), ``refs_dir``, ``knowledge_dir``,
+``doc_review_rules`` (the directory lists are comma-separated and
+``doc_review_rules`` is a JSON list, each replacing the whole value); ``unset <key>`` removes a key from the file
 entirely, back to its default. The
 agent settings and the audit switches also apply to the live session's ``state/<sid>.json``
 when a session id is
@@ -20,6 +21,7 @@ validation. Called via Bash by an audit agent's fallback and by the output style
 
 from __future__ import annotations
 
+import json
 import os
 import sys
 
@@ -28,8 +30,8 @@ from typing import Any
 
 from .config import (
     AUDIT_PLAN_KEY, AUDIT_SWITCHES, RETIRED_KEYS, AgentMode, DEFAULT_CONFIG, _agent_mode,
-    _audit_on, _cli_write_allowed, _load_config, _load_raw_config, _parse_mode, _parse_switch,
-    _write_config
+    _audit_on, _cli_write_allowed, _doc_review_rules, _load_config, _load_raw_config,
+    _parse_mode, _parse_switch, _write_config
 )
 from .paths import (_cli_project_dir, _doc_dir_entries, _knowledge_dir_entries, _refs_dir,
                     _trace)
@@ -164,6 +166,18 @@ def _config_show_lines(project_dir: Path, session_id: str | None) -> list[str]:
                     + ", ".join(missing) + "]"
         return line
 
+    def doc_review_rules_line() -> str:
+        raw_rules = raw.get("doc_review_rules")
+        rules = _doc_review_rules(cfg)
+        if not raw_rules:
+            return "doc_review_rules: (none)"
+        if not isinstance(raw_rules, list) or len(rules) != len(raw_rules):
+            return "doc_review_rules: (invalid entries ignored)"
+        return "doc_review_rules: " + ", ".join(
+            f"{rule.glob} -> " + ("(skip)" if rule.kind is None
+                                   else f"{rule.kind}:{rule.name}")
+            for rule in rules)
+
     def mute_line() -> str:
         """This session's mute, which is state and not a setting.
 
@@ -202,6 +216,7 @@ def _config_show_lines(project_dir: Path, session_id: str | None) -> list[str]:
         knowledge_line(),
         doc_line("doc_dir"),
         doc_line("doc_exclude"),
+        doc_review_rules_line(),
         *retired_lines(),
     ]
 
@@ -269,8 +284,8 @@ def cmd_settings() -> int:
         settings unset <key>                 — delete one key from the file
 
     Settable keys: the two audit switches (``AUDIT_SWITCHES``), the agent switches (the keys
-    of ``SETTABLE_AGENTS`` — each is the name of the agent it admits), ``refs_dir`` and
-    ``knowledge_dir``. The
+    of ``SETTABLE_AGENTS`` — each is the name of the agent it admits), ``refs_dir``,
+    ``knowledge_dir`` and ``doc_review_rules``. The
     switches
     also apply to the live session's ``state/<sid>.json`` when a session id is available
     (``--session <id>``, which the forked skill passes as ``${CLAUDE_SESSION_ID}``, else
@@ -299,8 +314,9 @@ def cmd_settings() -> int:
         return 0
 
     if not _cli_write_allowed():
-        print("guard settings: refusing to change settings outside /guard:settings. "
-              "Ask the user to run `/guard:settings` — only the user changes guard's "
+        print("guard settings: refusing to change settings outside a user-invoked Guard "
+              "configuration command. Ask the user to run `/guard:settings` or "
+              "`/guard:doc-review-rules` — only the user changes guard's "
               "own configuration.", file=sys.stderr)
         _trace(project_dir, session_id, "settings", "refused_no_skill_marker")
         return 0
@@ -354,6 +370,19 @@ def cmd_settings() -> int:
         # membership tests. `""` writes the empty list, which for `doc_dir` means the whole
         # project and for `doc_exclude` means nothing subtracted.
         raw[key] = [p.strip() for p in value.split(",") if p.strip()]
+    elif key == "doc_review_rules":
+        try:
+            parsed = json.loads(value)
+        except json.JSONDecodeError:
+            parsed = None
+        candidate = {"doc_review_rules": parsed}
+        if not isinstance(parsed, list) or len(_doc_review_rules(candidate)) != len(parsed):
+            print("guard settings: doc_review_rules must be a JSON list of "
+                  '{"glob": "...", "action": {"kind": "agent|skill", "name": "..."}} '
+                  "entries (use action: null to skip)",
+                  file=sys.stderr)
+            return 0
+        raw[key] = parsed
     elif key in RETIRED_KEYS:
         # Told apart from an unknown key on purpose: a user typing this one is not guessing,
         # they are asking for something that used to work, and "unknown key" would read as a
@@ -364,7 +393,7 @@ def cmd_settings() -> int:
     else:
         print(f"guard settings: unknown or unsettable key {key!r}. Settable: "
               + ", ".join((*AUDIT_SWITCHES, *SETTABLE_AGENTS))
-              + ", refs_dir, knowledge_dir, doc_dir, doc_exclude.",
+              + ", refs_dir, knowledge_dir, doc_dir, doc_exclude, doc_review_rules.",
               file=sys.stderr)
         return 0
 

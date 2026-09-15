@@ -45,7 +45,7 @@
             "type": "command",
             "command": "uv run --script \"${CLAUDE_PLUGIN_ROOT}/scripts/guard_hook.py\" stop",
             "timeout": 120,
-            "description": "Name the file-reading audits over what this turn edited: comment-corrector / agents-md-auditor over the source and agent-instruction files, ext-docs-auditor over anything written under the refs dir, and the audit-docs skill over the ordinary documents. Records nothing about the turn itself and reads none of the response — the turn audit is the user's to start (/guard:audit-turn), and it resolves its target from the transcript. Silent while the session is muted."
+            "description": "Name the file-reading audits over what this turn edited: comment-corrector / agents-md-auditor over the source and agent-instruction files, ext-docs-auditor over anything written under the refs dir, and configured document-review actions over matching ordinary documents. Records nothing about the turn itself and reads none of the response — the turn audit is the user's to start (/guard:audit-turn), and it resolves its target from the transcript. Silent while the session is muted."
           }
         ]
       }

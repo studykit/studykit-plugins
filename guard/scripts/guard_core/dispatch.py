@@ -196,21 +196,22 @@ def _refs_context(refs: list[str]) -> str:
 #
 # Worded as what the turn did, like the other two leads: the criteria are the agent's own, and
 # a lead that previewed them would be the caller telling it what to find.
-_DOCS_LEAD = (
-    "guard: this turn edited documents in the repository. Run the `guard:{entry}` skill over "
-    "them, then act on what it reports — its findings say which are yours to apply, which "
-    "only to relay, and which are the user's call."
-)
-
-
-def _docs_context(entry: str, docs: list[str]) -> str:
+def _docs_context(docs: list[str], *, action_kind: str, action_name: str) -> str:
     """``additionalContext`` naming the document audit's skill for the docs this turn wrote.
 
-    ``entry`` comes from ``_path_entry(key, EDIT_PATH)`` rather than being spelled here, so
-    the skill's name lives in the roster with every other entry name and ``check-entries.py``
-    can hold it to a file that exists.
+    Configured action names have already been syntax-validated by ``config._doc_review_rules``.
     """
-    lines = [_DOCS_LEAD.format(entry=entry),
-             "- documents to audit:"]
+    if action_kind == "agent":
+        lead = (
+            "guard: this turn edited documents in the repository. Dispatch the configured "
+            f"document review agent `{action_name}` with subagent_type: \"{action_name}\" over "
+            "them. Give it only the paths below, then act on what it reports."
+        )
+    else:  # action_kind == "skill"
+        lead = (
+            "guard: this turn edited documents in the repository. Run the configured "
+            f"document review skill `{action_name}` over them, then act on what it reports."
+        )
+    lines = [lead, "- documents to audit:"]
     lines.extend(f"    {p}" for p in docs)
     return "\n".join(lines)

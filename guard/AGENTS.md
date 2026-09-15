@@ -55,9 +55,9 @@ commands, a user `!` command), which moved out of `cmd_stop` and into
 The **edited-file audits**, and they are not a triage question: the turn either edited a source
 file, an agent instruction file, a saved reference or an ordinary document, or it did not.
 `PostToolUse` records the four lists and Stop names `comment-corrector`, `agents-md-auditor`
-and `ext-docs-auditor` over the first three — and, over the documents, the `audit-docs` SKILL
-rather than `doc-auditor` itself, because that one has a task around its agent and the others
-do not (`dispatch._DOCS_LEAD`). That is the whole of what Stop does now.
+and `ext-docs-auditor` over the first three. Ordinary documents are dispatched only when a
+project document-review rule matches them; rules may name an agent, a skill, or an explicit skip.
+That is the whole of what Stop does now.
 
 Also on `PostToolUse`, and unrelated to auditing: the **refs index gate**, which blocks until a
 file saved under the refs directory is listed in that directory's index. It is a prohibition,

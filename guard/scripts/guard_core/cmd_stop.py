@@ -18,17 +18,19 @@ the ordinary documents it changed; in each case the condition is a file list rat
 judgment about the answer, so there is nothing for the user to decide and nothing for a router
 to weigh. guard runs no model itself and never blocks here.
 
-Three of the four are named as AGENTS and the fourth as a SKILL — see ``dispatch._DOCS_LEAD``
-for why that difference is in the document audit and not in the others.
+The three fixed buckets name AGENTS. Ordinary documents are matched against project-configured
+review actions, which may name either an agent or a skill.
 """
 
 from __future__ import annotations
 
-from .config import _agent_mode, _load_config
-from .paths import _project_dir, _trace
+from pathlib import Path
+
+from .config import _agent_mode, _doc_review_rule, _doc_review_rules, _load_config
+from .paths import _project_dir, _project_rel, _trace
 from .payload import _read_payload, _session_id
 from .emit import _emit_stop_context
-from .agents import AUDIT_AGENTS, EDIT_PATH, _eligible_agents, _path_entry
+from .agents import AUDIT_AGENTS, _eligible_agents
 from .state import _audit_paused, _edited_files, _read_state, _write_state
 from .dispatch import _DIRECT_LEAD, _dispatch_context, _docs_context, _refs_context
 
@@ -86,14 +88,22 @@ def cmd_stop() -> int:
     docs = _edited_files(state, prompt_id, "edited_docs")
     passed = _eligible_agents(state, edited, agent_docs, docs)
     eligible = [k for k in passed if AUDIT_AGENTS[k].reads in ("files", "agent-docs")]
-    # Split out of `eligible` because it is named as a SKILL, not dispatched as an agent:
-    # `_agent_pointer` builds one block for however many agents came through, and a skill
-    # cannot ride in it. Eligibility is still `_eligible_agents`' answer — the switch and a
-    # non-empty list, same two gates as the rest — so nothing about WHEN it runs is decided
-    # here.
-    docs_entry = _path_entry("doc-auditor", EDIT_PATH) if "doc-auditor" in passed else None
+    # Split out of `eligible`: document review rules may name either a skill or a direct
+    # agent. Eligibility remains `_eligible_agents`' answer — the switch and a non-empty
+    # list, same two gates as the rest — so nothing about WHEN it runs is decided here.
+    docs_enabled = "doc-auditor" in passed
+    docs_review_rules = _doc_review_rules(config)
+    # The most-specific matching per-file rule wins. An explicit skip or unmatched document
+    # has no dispatch; grouping keeps one action to one dispatch across several documents.
+    doc_groups: dict[tuple[str, str], list[str]] = {}
+    if docs_enabled:
+        for path in docs:
+            rule = _doc_review_rule(_project_rel(project_dir, Path(path)), docs_review_rules)
+            if rule is None or rule.kind is None or rule.name is None:
+                continue
+            doc_groups.setdefault((rule.kind, rule.name), []).append(path)
     modes = {k: _agent_mode(state, k) for k in eligible}
-    if not eligible and not refs and docs_entry is None:
+    if not eligible and not refs and not doc_groups:
         _trace(project_dir, session_id, "stop", "none_eligible", prompt_id=prompt_id)
         return 0
 
@@ -113,11 +123,13 @@ def cmd_stop() -> int:
             {"files": edited, "agent-docs": agent_docs}, ""))
     if refs:
         blocks.append(_refs_context(refs))
-    if docs_entry is not None:
-        blocks.append(_docs_context(docs_entry, docs))
+    if doc_groups:
+        for (action_kind, action_name), group in doc_groups.items():
+            blocks.append(_docs_context(group, action_kind=action_kind,
+                                        action_name=action_name))
     context = "\n\n".join(blocks)
     outcome = "+".join(n for n, on in (("direct", eligible), ("refs", refs),
-                                       ("docs", docs_entry)) if on)
+                                       ("docs", doc_groups)) if on)
     # `additionalContext`, not `decision: "block"`. Per the official hooks docs
     # (https://code.claude.com/docs/en/hooks, "Stop decision control"; excerpt saved at
     # wiki/ref/claude-code-stop-hook-decision-control.md) the two continue the
