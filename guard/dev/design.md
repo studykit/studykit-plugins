@@ -2527,10 +2527,9 @@ payloads, not memory.
   collect a second. Codex spends its marker only after filtering to agents it actually has,
   since marking a turn audited for a message never sent burns the turn's one chance.
 - **Codex shares eligibility, not the router.** `core._eligible_agents` is common, so both
-  hosts agree on what an agent is *available* for. The router is not shared, and the reason
-  is no longer a missing binary: Codex ships **one** named agent (`guard_claims_auditor`,
-  installed by `$guard:setup`), and a router that can only forward to that same agent
-  decides nothing. So Codex recommends the whole eligible set, unrouted and correspondingly
+  hosts agree on what an agent is *available* for. The turn router is not shared: Codex uses
+  `guard_claims_auditor` for that path, while `$guard:setup` also installs the three named
+  file-review agents selected directly by `doc_review_rules`. So Codex recommends the whole eligible set, unrouted and correspondingly
   noisier, rendering the choice as a scope sentence via `_SCOPE` in the adapter. A key
   absent from `_SCOPE` is dropped, which is how `comment-corrector` stays Claude-only while
   the eligibility code stays host-agnostic. Codex also keeps its own turn record
@@ -2665,7 +2664,8 @@ and `**` may cross directories), including zero or more nested directories for `
 specific matching rule owns each document: greater literal directory depth wins, then literal
 detail and fewer wildcards; configuration order breaks an exact tie. A file is reviewed by one
 action or skipped. The `doc-auditor` switch still controls whether any of these
-dispatches run. An unmatched document is not reviewed. The setting is not a Codex edited-document feature: Codex does not run that hook path yet. See the
+dispatches run. An unmatched document is not reviewed. Claude and Codex share this selection;
+the Codex adapter maps Guard's portable colon-names to project-local underscore-named agents. See the
 invariants above for why the value is a mode rather than a boolean, why `reuse` was removed
 and what reviving it would cost, and why they all ship off. A value that is not a mode word reads as `off` — the safe
 direction, since the alternative is guard acting on a setting the user did not write.

@@ -1,17 +1,17 @@
 ---
 name: setup
-description: Install guard's read-only Codex claims-auditor agent in the current project's .codex/agents directory. Use when guard is installed in Codex and the on-demand evidence audit ($guard:audit-turn) needs its named subagent.
+description: Install Guard's read-only Codex audit agents in the current project's .codex/agents directory. Use when Guard is installed in Codex and turn or file review needs its named subagents.
 disable-model-invocation: true
 ---
 
 # Guard setup
 
-This setup is needed only for Codex. It installs a project-local custom agent
-named `guard_claims_auditor`; it does not change any user-level Codex
-configuration.
+This setup is needed only for Codex. It installs the project-local agents
+`guard_claims_auditor`, `guard_doc_auditor`, `guard_agents_md_auditor`, and
+`guard_ext_docs_auditor`; it does not change any user-level Codex configuration.
 
 First identify the current project's Git root. Explain that installation will
-create `.codex/agents/guard_claims_auditor.toml`, then obtain the user's
+create those four TOML files under `.codex/agents/`, then obtain the user's
 explicit confirmation before making that change. A direct request to install it
 counts as that confirmation.
 
@@ -26,6 +26,11 @@ If the destination already exists, leave it unchanged and report that fact.
 Replace it only when the user explicitly requests replacement, using `--force`.
 Tell the user to start a new Codex session after installation so the named agent
 is discovered.
+
+For file-review rules, users may keep the portable Guard action names
+`guard:doc-auditor`, `guard:agents-md-auditor`, and `guard:ext-docs-auditor`; the Codex hook
+maps them to the installed underscore-named agents. The `doc-auditor` switch and an explicit
+matching `doc_review_rules` entry are still required. Unmatched files are not reviewed.
 
 Also tell them that guard's hooks are separate from this, and that installing and
 enabling the plugin does not switch them on: Codex skips plugin-bundled hooks until

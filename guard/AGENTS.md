@@ -298,9 +298,9 @@ each one cost.
 ## Codex
 
 Different by necessity: its transcript is not a stable hook interface, so its adapter keeps
-its own turn record, and it has one named agent rather than a set — a router that can only
-forward to that same agent decides nothing, so there is no routing here: the whole eligible
-set becomes one scope sentence handed to that agent. The audit is on demand on this host too,
+its own turn record. Turn review has one named agent — a router that can only forward to that
+same agent decides nothing — while edited-file review dispatches the project agents installed
+by `guard:setup` through the shared review rules. The turn audit is on demand on this host too,
 and it has to be a prompt PREFIX (`$guard:audit-turn`, `/guard:audit-turn`) rather than a
 skill, because a Codex command hook cannot launch an agent. Projects run `$guard:setup` once
 to install the agent. State is host-specific, under `.claude/guard/` or `.codex/guard/`.

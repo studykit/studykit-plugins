@@ -48,6 +48,7 @@ from guard_core import cmd_edit as core_edit  # noqa: E402
 from guard_core import cmd_search as core_search  # noqa: E402
 from guard_core import cmd_session as core_session  # noqa: E402
 from guard_core import config as core_config  # noqa: E402
+from guard_core import dispatch as core_dispatch  # noqa: E402
 from guard_core import payload as core_payload  # noqa: E402
 from guard_core import paths as core_paths  # noqa: E402
 from guard_core import state as core_state  # noqa: E402
@@ -189,19 +190,45 @@ def _handle_post_tool(project_dir: Path, payload: dict[str, Any], session_id: st
     turn.setdefault("tools", []).append({"command": command[:TOOL_CONTEXT_MAX_CHARS], "output": output[:TOOL_RESULT_MAX_CHARS]})
     _save_turn(project_dir, session_id, turn_id, turn)
 
-    # A reference saved into the refs dir must be listed in the index; same rule as
-    # Claude's `post-edit` hook, applied here because Codex routes every event through
-    # this one adapter. Claude's other `post-edit` job — recording the files the turn
-    # edited — is deliberately not mirrored: it exists only to point `comment-corrector`,
-    # `agents-md-auditor` and `doc-auditor` at them, and Codex has none of those agents yet.
-    # So the index rule below is enforced on Codex while the audit of what was saved is not.
     config = core_config._load_config(project_dir)
-    if core_edit._targets_refs_dir(project_dir, tool_input, config):
-        target = core_edit._tool_target_path(project_dir, tool_input)
+    edited_paths = _edited_paths(payload)
+    for edited_path in edited_paths:
+        normalized = dict(payload)
+        normalized["prompt_id"] = turn_id
+        normalized["session_id"] = session_id
+        synthetic_input = {"file_path": edited_path}
+        core_edit._record_edited_source(project_dir, normalized, synthetic_input, config)
+
+        # The reference index remains an enforcement gate, independent of review rules.
+        if not core_edit._targets_refs_dir(project_dir, synthetic_input, config):
+            continue
+        target = core_edit._tool_target_path(project_dir, synthetic_input)
         if target is not None and target.name not in core_edit._REFS_INDEX_SKIP:
             reason = core_edit.refs_index_gap(project_dir, target, config)
             if reason is not None:
                 _emit({"decision": "block", "reason": reason})
+                return
+
+
+def _edited_paths(payload: dict[str, Any]) -> list[str]:
+    """Extract Codex write targets from a native file input or an apply_patch body."""
+
+    tool_input = payload.get("tool_input")
+    if isinstance(tool_input, dict):
+        direct = tool_input.get("file_path") or tool_input.get("notebook_path")
+        if isinstance(direct, str) and direct:
+            return [direct]
+        patch = tool_input.get("patch") or tool_input.get("input")
+    else:
+        patch = tool_input
+    if not isinstance(patch, str):
+        return []
+    out: list[str] = []
+    for match in re.finditer(r"^\*\*\* (?:Add|Update|Delete) File: (.+)$", patch, re.MULTILINE):
+        path = match.group(1).strip()
+        if path and path not in out:
+            out.append(path)
+    return out
 
 
 # What the user types to audit the turn just finished. A prefix on the prompt, matched at
@@ -224,12 +251,8 @@ _AUDIT_TURN_RE = re.compile(r"^[/$]guard:audit-turn(-claims|-clarity|-deferrals)
 # profile it calibrates against. Without either it would have nothing to audit against and
 # would report `profile: MISSING` on every turn.
 #
-# `docs-finder` and `ext-docs-auditor` are absent, and neither could reach this table:
-# they have no `AUDIT_AGENTS` entry, so `core_agents._eligible_agents` never offers them. On
-# Claude the fetcher is selected from its description and the auditor is named by the Stop hook
-# off the turn's refs edits; Codex ships one named agent from `$guard:setup` and this adapter
-# mirrors no edited-file recording (see `_handle_post_tool`), so neither route exists here.
-# Giving Codex the agent set is what unblocks both, same as above.
+# File-review agents are absent from this TURN-audit table because their dispatch comes from
+# edited-file rules in `_emit_document_reviews`, not from the response-audit scope.
 # `korean-translator` is absent for a different reason from the two above: it HAS an
 # `AUDIT_AGENTS` entry, so it can be eligible here, and the filter below is what drops it. It
 # does not audit — it writes the Korean the user reads — and Codex's one agent is read-only, so
@@ -262,6 +285,7 @@ def _handle_stop(project_dir: Path, payload: dict[str, Any], session_id: str, tu
     # Recorded whether or not a switch is on: it is what the audit prefix in `_handle_prompt`
     # is pointed at, and a project that keeps guard off is not a project whose user may not ask.
     state["pending_verify_prompt_id"] = turn_id
+    _emit_document_reviews(project_dir, session_id, turn_id, config, state)
     core_state._write_state(project_dir, session_id, state)
     # And that is all Stop does. It used to end every turn with a `decision: "block"` naming
     # the whole eligible set to Codex's single agent — unrouted, and so noisier than Claude's
@@ -270,6 +294,39 @@ def _handle_stop(project_dir: Path, payload: dict[str, Any], session_id: str, tu
     # retires the two things this handler needed only in order to recommend: the mute check,
     # since nothing is emitted for a mute to suppress, and the `last_audited_prompt_id`
     # once-guard, since a user who types the prefix twice is asking twice.
+
+
+_CODEX_REVIEW_AGENTS = {
+    "guard:doc-auditor": "guard_doc_auditor",
+    "guard:agents-md-auditor": "guard_agents_md_auditor",
+    "guard:ext-docs-auditor": "guard_ext_docs_auditor",
+}
+
+
+def _emit_document_reviews(project_dir: Path, session_id: str, turn_id: str,
+                           config: dict[str, Any], state: dict[str, Any]) -> None:
+    """Emit Codex Stop context for changed Markdown selected by review rules."""
+
+    if core_config._agent_mode(state, "doc-auditor") == core_config.AgentMode.OFF:
+        return
+    docs: list[str] = []
+    for bucket in ("edited_refs", "edited_agent_docs", "edited_docs"):
+        docs.extend(core_state._edited_files(state, turn_id, bucket))
+    rules = core_config._doc_review_rules(config)
+    groups: dict[tuple[str, str], list[str]] = {}
+    for path in docs:
+        rule = core_config._doc_review_rule(core_paths._project_rel(project_dir, Path(path)), rules)
+        if rule is None or rule.kind is None or rule.name is None:
+            continue
+        name = _CODEX_REVIEW_AGENTS.get(rule.name, rule.name) if rule.kind == "agent" else rule.name
+        groups.setdefault((rule.kind, name), []).append(path)
+    if not groups or state.get("last_audited_prompt_id") == turn_id:
+        return
+    state["last_audited_prompt_id"] = turn_id
+    blocks = [core_dispatch._docs_context(paths, action_kind=kind, action_name=name)
+              for (kind, name), paths in groups.items()]
+    _emit({"hookSpecificOutput": {"hookEventName": "Stop",
+                                   "additionalContext": "\n\n".join(blocks)}})
 
 
 def main() -> int:
