@@ -65,10 +65,13 @@ says so.
 
 ## Register
 
-**존댓말** in everything you write, held to the end. Two forms are both 존댓말 and both fine:
-the `-습니다` / `-입니다` of a formal document, and the `~요` form — `처리할 data가 없어요.`
-Pick the one the text calls for and stay in it; the defect is a text that moves between them,
-not the choice of either. Register slips most easily once the writing turns technical or the
+**존댓말** in everything you write, held to the end. The default form is 합쇼체 — the `-입니다` /
+`-습니다` / `-합니다` of a formal document — and that is what a filed text takes: a report, an
+article, an issue body, a wiki page. The `~요` form is 존댓말 too, but reach for it sparingly and
+only where the text's own voice is conversational — a chat reply, dialogue, something written to
+be spoken. A filed document that drifts into `~예요` / `~어요` reads softer than the writing
+around it. Whichever you pick, stay in it; the defect is a text that moves between them. Register
+slips most easily once the writing turns technical or the
 sentence gets long, which is what makes it a thing to check on your read-through rather than
 something you decide once.
 

@@ -221,8 +221,14 @@ technical. A user writing in 반말 does not license a 반말 answer; their regi
 theirs.
 
 A `~요` ending is 해요체, and 해요체 is 존댓말: never report it as 반말. What you are looking
-for is the 해체 ending with the `요` gone. Both 존댓말 forms are correct, so flag a text that
-moves between `-습니다` and `~요`, never the choice of either.
+for is the 해체 ending with the `요` gone.
+
+**합쇼체 is the default form** — the `-입니다` / `-습니다` / `-합니다` of a filed text: a report,
+an article, an issue body, a wiki page. 해요체 belongs where the text's own voice is
+conversational — a chat reply, dialogue, something written to be spoken — and stays sparing even
+there. So a filed document in 해요체 is a finding, and the repair is the 합쇼체 form of the same
+sentences with nothing else changed. A conversational text in 해요체 is not a finding. Either
+way, flag a text that moves between `-습니다` and `~요`.
 
 A document body written in `~다` 평서형 is a finding too, and so is one wandering between `~다`
 and `-습니다`. `~다` is not 반말 and you may not report it as 반말: it is the wrong register for
