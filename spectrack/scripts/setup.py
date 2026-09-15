@@ -498,6 +498,8 @@ def build_config(
     jira_relationship_mappings: Mapping[str, Any] | None = None,
     jira_state_transitions: Mapping[str, str] | None = None,
     jira_snapshot_hidden_comment_markers: Sequence[str] | None = None,
+    jira_task_review_agent: str | None = None,
+    jira_comment_review_agent: str | None = None,
     filesystem_issues_path: str | None = None,
     commit_ref_style: str = "provider-native",
     commit_refs_enabled: bool = True,
@@ -549,6 +551,8 @@ def build_config(
         jira_relationship_mappings=effective_relationship_mappings,
         jira_state_transitions=jira_state_transitions,
         jira_snapshot_hidden_comment_markers=jira_snapshot_hidden_comment_markers,
+        jira_task_review_agent=jira_task_review_agent,
+        jira_comment_review_agent=jira_comment_review_agent,
         filesystem_path=filesystem_issues_path,
     )
     try:
@@ -1240,6 +1244,14 @@ def _add_config_build_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--jira-project", help="Jira project key")
     parser.add_argument("--jira-issue-type", help="Jira issue type")
     parser.add_argument(
+        "--jira-task-review-agent",
+        help="custom agent name that reviews LLM-authored Jira task drafts before publish",
+    )
+    parser.add_argument(
+        "--jira-comment-review-agent",
+        help="custom agent name that reviews LLM-authored Jira comment drafts before publish",
+    )
+    parser.add_argument(
         "--jira-epic-issue-type",
         help="Jira Epic issue type name when it differs from the built-in default 'Epic'",
     )
@@ -1310,6 +1322,8 @@ def _config_from_args(args: argparse.Namespace) -> dict[str, Any]:
         jira_relationship_mappings=_relationship_mappings_from_args(args),
         jira_state_transitions=_jira_state_transitions_from_args(args),
         jira_snapshot_hidden_comment_markers=_jira_snapshot_hidden_comment_markers_from_args(args),
+        jira_task_review_agent=args.jira_task_review_agent,
+        jira_comment_review_agent=args.jira_comment_review_agent,
         filesystem_issues_path=args.filesystem_issues_path,
         commit_ref_style=args.commit_ref_style,
         commit_refs_enabled=not args.disable_commit_refs,
@@ -1362,6 +1376,8 @@ def _issue_provider_config(
     jira_relationship_mappings: Mapping[str, Any] | None,
     jira_state_transitions: Mapping[str, str] | None,
     jira_snapshot_hidden_comment_markers: Sequence[str] | None,
+    jira_task_review_agent: str | None,
+    jira_comment_review_agent: str | None,
     filesystem_path: str | None,
 ) -> dict[str, Any]:
     settings: dict[str, Any] = {"kind": provider}
@@ -1377,6 +1393,8 @@ def _issue_provider_config(
         _set_if_text(settings, "api_version", jira_api_version or "2")
         _set_if_text(settings, "project", jira_project.upper() if jira_project else None)
         _set_if_text(settings, "issue_type", jira_issue_type)
+        _set_if_text(settings, "task_review_agent", jira_task_review_agent)
+        _set_if_text(settings, "comment_review_agent", jira_comment_review_agent)
         if jira_epic_issue_type and jira_epic_issue_type != "Epic":
             settings["artifact_issue_types"] = {"epic": jira_epic_issue_type}
         if jira_epic_fields:

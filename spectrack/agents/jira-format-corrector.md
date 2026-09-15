@@ -1,7 +1,7 @@
 ---
 name: jira-format-corrector
 description: Validates a Jira issue or comment draft file against Jira wiki markup and fixes wrong syntax in place. Takes an absolute draft file path.
-tools: Read, Edit, Grep
+tools: Bash, Read, Edit, Grep
 model: sonnet
 color: yellow
 ---
@@ -192,17 +192,20 @@ Write `Korean text {{value}} Korean text`, not `Korean text{{value}}Korean text`
 
 ## How to run
 
-1. **Read** the draft file in full.
-2. **Scan** for every Markdown-only form in the conversion table, then for the
-   two traps above. Work through the whole file — do not stop at the first
-   finding.
-3. **Fix each finding** with `Edit`, applying the Jira form from the table.
+1. **Check mechanically first.** Use the workflow launcher from the injected `<launcher>` block to run `jira_format_check.py <absolute-draft-path>` and read its JSON output. Treat every `error` finding as a required conversion. Inspect every `warning` finding against the rules below; warnings flag rendering hazards rather than authoring decisions.
+2. **Read** the draft file in full.
+3. **Scan** for every Markdown-only form in the conversion table, then for the
+   two traps above. The script is a safety net, not a replacement for this
+   full scan — work through the whole file and do not stop at the first finding.
+4. **Fix each finding** with `Edit`, applying the Jira form from the table.
    Preserve the words, the line order, and the section structure exactly.
    Leave anything already in valid Jira markup untouched. When a line needs
    several fixes, apply them together. If you insert the CJK space, note it for
    the *Needs your decision* section — it is the one mandatory fix the author
    must still confirm.
-4. **Leave and report, do not force**, when a fix is not mechanical: a
+5. **Re-run the checker** after editing. Do not finish with any `error` finding.
+   Resolve or report each remaining warning under *Needs your decision*.
+6. **Leave and report, do not force**, when a fix is not mechanical: a
    construct with no Jira equivalent, a nested structure whose conversion is
    ambiguous, or a hyphen-strikethrough risk you cannot resolve without
    rewording. Report it as needing the author's decision.
@@ -242,7 +245,8 @@ its quality.
 
 - Do not edit any file other than the draft file the caller named.
 - Do not change wording, add or remove content, or reorder sections.
-- Do not publish, fetch, comment on, or otherwise touch the issue tracker —
-  you have no `Bash` tool and no issue-CLI role.
+- Do not publish, fetch, comment on, or otherwise touch the issue tracker.
+  `Bash` is permitted only to run `jira_format_check.py` through the injected
+  workflow launcher on the named draft; you have no issue-CLI role.
 - Do not evaluate the draft's completeness, sizing, type fit, or correctness.
 - Do not report on files you were not given.

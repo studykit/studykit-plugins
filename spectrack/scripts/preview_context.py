@@ -61,7 +61,13 @@ def available_agents() -> list[str]:
     return sorted(p.stem for p in _AGENTS_DIR.glob("*.md"))
 
 
-def synthesize_config(provider: str, *, mustread: bool = True) -> WorkflowConfig:
+def synthesize_config(
+    provider: str,
+    *,
+    mustread: bool = True,
+    jira_task_review_agent: str | None = None,
+    jira_comment_review_agent: str | None = None,
+) -> WorkflowConfig:
     """Build a minimal config carrying the fields the build functions read.
 
     Those are ``config.issues.kind`` (picks provider-keyed fragments) and
@@ -79,6 +85,8 @@ def synthesize_config(provider: str, *, mustread: bool = True) -> WorkflowConfig
         issue_id_format="",
         commit_refs=CommitRefsConfig(enabled=True),
         mustread=mustread,
+        jira_task_review_agent=jira_task_review_agent,
+        jira_comment_review_agent=jira_comment_review_agent,
         raw={},
     )
 

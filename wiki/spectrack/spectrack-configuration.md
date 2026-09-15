@@ -25,6 +25,7 @@ Schema version 1 supports:
 - Issue ID format.
 - Commit reference style.
 - Authoring contract enforcement (`mustread`).
+- Optional Jira task- and comment-draft review agents.
 
 Example:
 
@@ -101,6 +102,32 @@ Supported Jira relationship surfaces:
 - `remote_link`: requires an absolute `http` or `https` target reference.
 - `field`: requires `field`, `write_to` (`source` or `target`), and `value`
   (`key`, `key_object`, or `string`).
+
+### Jira Task and Comment Draft Review Agents
+
+To require an additional review of LLM-authored Jira `task` or comment drafts
+before presentation and publication, configure either custom agent name under
+the Jira issue provider:
+
+```yaml
+providers:
+  issues:
+    kind: jira
+    task_review_agent: project:jira-task-reviewer
+    comment_review_agent: project:jira-comment-reviewer
+```
+
+The name is resolved by the active host, so it must name an agent available in
+that project and runtime. SpecTrack passes the reviewer an absolute draft-file
+path and asks it to assess a task's scope, context, acceptance criteria, and
+internal consistency, or a comment's accuracy, relevance, and internal
+consistency. The two settings are independent: omit either one to leave that
+draft type on the normal publication flow. Each reviewer is advisory: it must
+not publish or modify the issue tracker. After actionable findings are
+addressed, the normal Jira markup check and user confirmation still happen
+before publication.
+
+These fields are Jira-only. Omit both to preserve the existing publication flow.
 
 ### Knowledge Provider
 

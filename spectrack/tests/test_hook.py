@@ -22,6 +22,7 @@ if str(_HOOK_SCRIPTS_DIR) not in sys.path:
 import hook  # noqa: E402
 from main_context import (  # noqa: E402
     _merge_commands_blocks,
+    _strip_unconfigured_jira_review_blocks,
     _strip_jira_format,
     render as render_template,
 )
@@ -114,6 +115,8 @@ def expected_session_start_context(
     *,
     runtime: str,
     issue_kind: str = "github",
+    jira_task_review_agent: str = "",
+    jira_comment_review_agent: str = "",
 ) -> str:
     text = main_context_fragment("main/session-start.md")
     launcher_block = main_context_fragment(f"snippets/launcher/{runtime}.md")
@@ -125,9 +128,18 @@ def expected_session_start_context(
         "SNIPPET_AUTHORING": main_context_fragment("snippets/authoring.md"),
         "SNIPPET_PRD_PATH": main_context_fragment("snippets/prd-path.md"),
         "SPECTRACK_ISSUE_PROVIDER": issue_kind,
+        "SPECTRACK_JIRA_TASK_REVIEW_AGENT": jira_task_review_agent,
+        "SPECTRACK_JIRA_COMMENT_REVIEW_AGENT": jira_comment_review_agent,
     })
     if issue_kind != "jira":
         rendered = _strip_jira_format(rendered)
+    rendered = _strip_unconfigured_jira_review_blocks(
+        rendered,
+        type("Config", (), {
+            "jira_task_review_agent": jira_task_review_agent,
+            "jira_comment_review_agent": jira_comment_review_agent,
+        })(),
+    )
     return _wrap_policy(rendered)
 
 
@@ -136,6 +148,8 @@ def expected_subagent_start_context(
     runtime: str = "claude",
     issue_kind: str = "github",
     agent_type: str | None = None,
+    jira_task_review_agent: str = "",
+    jira_comment_review_agent: str = "",
 ) -> str:
     text = main_context_fragment("subagent/session-start.md")
     launcher_block = main_context_fragment(f"snippets/launcher/{runtime}.md")
@@ -147,9 +161,18 @@ def expected_subagent_start_context(
         "SNIPPET_AUTHORING": main_context_fragment("snippets/authoring.md"),
         "SNIPPET_PRD_PATH": main_context_fragment("snippets/prd-path.md"),
         "SPECTRACK_ISSUE_PROVIDER": issue_kind,
+        "SPECTRACK_JIRA_TASK_REVIEW_AGENT": jira_task_review_agent,
+        "SPECTRACK_JIRA_COMMENT_REVIEW_AGENT": jira_comment_review_agent,
     })
     if issue_kind != "jira":
         rendered = _strip_jira_format(rendered)
+    rendered = _strip_unconfigured_jira_review_blocks(
+        rendered,
+        type("Config", (), {
+            "jira_task_review_agent": jira_task_review_agent,
+            "jira_comment_review_agent": jira_comment_review_agent,
+        })(),
+    )
     agent_name = (agent_type or "").rsplit(":", 1)[-1].strip().lower() if agent_type else ""
     agent_block = ""
     agent_path = _PLUGIN_ROOT / "hooks" / "context" / "subagent" / "agents" / f"{agent_name}.md"
@@ -299,9 +322,20 @@ commit_refs:
     )
 
 
-def _write_jira_config(project: Path) -> None:
+def _write_jira_config(
+    project: Path,
+    *,
+    task_review_agent: str | None = None,
+    comment_review_agent: str | None = None,
+) -> None:
     config_path = project / ".spectrack" / "config.yml"
     config_path.parent.mkdir(parents=True, exist_ok=True)
+    reviewer_lines = "".join(
+        line for line in (
+            f"    task_review_agent: {task_review_agent}\n" if task_review_agent else "",
+            f"    comment_review_agent: {comment_review_agent}\n" if comment_review_agent else "",
+        )
+    )
     config_path.write_text(
         """
 version: 1
@@ -313,13 +347,13 @@ providers:
     api_version: 2
     project: TEST
     issue_type: Task
-  knowledge:
+""".lstrip() + reviewer_lines + """  knowledge:
     kind: github
 issue_id_format: jira
 commit_refs:
   enabled: true
   style: provider-native
-""".lstrip(),
+""",
         encoding="utf-8",
     )
 

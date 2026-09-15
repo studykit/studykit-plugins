@@ -298,3 +298,58 @@ mustread: maybe
 
     with pytest.raises(WorkflowConfigError, match="mustread"):
         load_workflow_config(tmp_path)
+
+
+def test_loads_optional_jira_task_and_comment_review_agents(tmp_path: Path) -> None:
+    _config_path(tmp_path).write_text(
+        """
+version: 1
+providers:
+  issues:
+    kind: jira
+    task_review_agent: project:jira-task-reviewer
+    comment_review_agent: project:jira-comment-reviewer
+  knowledge:
+    kind: github
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    config = load_workflow_config(tmp_path)
+
+    assert config is not None
+    assert config.jira_task_review_agent == "project:jira-task-reviewer"
+    assert config.jira_comment_review_agent == "project:jira-comment-reviewer"
+    assert config.to_json()["jira_task_review_agent"] == "project:jira-task-reviewer"
+    assert config.to_json()["jira_comment_review_agent"] == "project:jira-comment-reviewer"
+
+
+@pytest.mark.parametrize("value", ["", "   ", 3, ["reviewer"]])
+def test_jira_review_agents_must_be_non_empty_strings(tmp_path: Path, value: object) -> None:
+    config = {
+        "providers": {
+            "issues": {"kind": "jira", "task_review_agent": value},
+            "knowledge": {"kind": "github"},
+        },
+    }
+    _config_path(tmp_path).write_text(yaml.safe_dump(config), encoding="utf-8")
+
+    with pytest.raises(WorkflowConfigError, match="task_review_agent must be a non-empty agent name"):
+        load_workflow_config(tmp_path)
+
+
+def test_jira_review_agents_are_rejected_for_non_jira_provider(tmp_path: Path) -> None:
+    _config_path(tmp_path).write_text(
+        """
+providers:
+  issues:
+    kind: github
+    comment_review_agent: project:jira-comment-reviewer
+  knowledge:
+    kind: github
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(WorkflowConfigError, match="only supported for the jira issue provider"):
+        load_workflow_config(tmp_path)

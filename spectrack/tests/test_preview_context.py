@@ -158,6 +158,42 @@ def test_jira_format_block_is_injected_for_jira_sessions() -> None:
     assert "jira-format-corrector" in text
 
 
+def test_configured_jira_reviewers_are_injected_on_both_authoring_surfaces() -> None:
+    config = synthesize_config(
+        "jira",
+        jira_task_review_agent="project:jira-task-reviewer",
+        jira_comment_review_agent="project:jira-comment-reviewer",
+    )
+
+    session = "\n\n".join(render_surface("session", config, runtime="codex", agent=None))
+    subagent = "\n\n".join(render_surface("subagent", config, runtime="codex", agent=None))
+
+    for text in (session, subagent):
+        assert "<jira-task-review>" in text
+        assert "<jira-comment-review>" in text
+        assert "project:jira-task-reviewer" in text
+        assert "project:jira-comment-reviewer" in text
+        assert "must not publish" in text
+
+
+def test_unconfigured_jira_reviewers_do_not_add_publish_gates() -> None:
+    text = _render("session", "jira")
+
+    assert "<jira-task-review>" not in text
+    assert "<jira-comment-review>" not in text
+
+
+def test_jira_task_and_comment_reviewers_are_independently_configurable() -> None:
+    config = synthesize_config(
+        "jira", jira_comment_review_agent="project:jira-comment-reviewer",
+    )
+    text = "\n\n".join(render_surface("session", config, runtime="claude", agent=None))
+
+    assert "<jira-task-review>" not in text
+    assert "<jira-comment-review>" in text
+    assert "project:jira-comment-reviewer" in text
+
+
 @pytest.mark.parametrize("provider", ["github", "filesystem"])
 def test_jira_format_block_is_absent_for_other_providers(provider: str) -> None:
     text = _render("session", provider)

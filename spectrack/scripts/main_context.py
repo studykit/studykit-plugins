@@ -55,6 +55,15 @@ _JIRA_FORMAT_BLOCK_RE = re.compile(
     re.DOTALL,
 )
 
+_JIRA_TASK_REVIEW_BLOCK_RE = re.compile(
+    r"\n?<jira-task-review>\s*\n?.*?\n?\s*</jira-task-review>\n?",
+    re.DOTALL,
+)
+_JIRA_COMMENT_REVIEW_BLOCK_RE = re.compile(
+    r"\n?<jira-comment-review>\s*\n?.*?\n?\s*</jira-comment-review>\n?",
+    re.DOTALL,
+)
+
 
 def render(text: str, ctx: dict[str, str]) -> str:
     """Substitute ``{{NAME}}`` placeholders against ``ctx``.
@@ -97,11 +106,14 @@ def build_session_policy_context(
         "SNIPPET_AUTHORING": _read_fragment("snippets/authoring.md").strip(),
         "SNIPPET_PRD_PATH": _read_fragment("snippets/prd-path.md").strip(),
         "SPECTRACK_ISSUE_PROVIDER": issue_provider,
+        "SPECTRACK_JIRA_TASK_REVIEW_AGENT": _jira_review_agent(config, "task"),
+        "SPECTRACK_JIRA_COMMENT_REVIEW_AGENT": _jira_review_agent(config, "comment"),
     })
     if not _mustread_enabled(config):
         rendered = _strip_authoring_resolver(rendered)
     if issue_provider != "jira":
         rendered = _strip_jira_format(rendered)
+    rendered = _strip_unconfigured_jira_review_blocks(rendered, config)
     return _wrap_policy(rendered)
 
 
@@ -124,11 +136,14 @@ def build_subagent_policy_context(
         "SNIPPET_AUTHORING": _read_fragment("snippets/authoring.md").strip(),
         "SNIPPET_PRD_PATH": _read_fragment("snippets/prd-path.md").strip(),
         "SPECTRACK_ISSUE_PROVIDER": issue_provider,
+        "SPECTRACK_JIRA_TASK_REVIEW_AGENT": _jira_review_agent(config, "task"),
+        "SPECTRACK_JIRA_COMMENT_REVIEW_AGENT": _jira_review_agent(config, "comment"),
     })
     if not _mustread_enabled(config):
         rendered = _strip_authoring_resolver(rendered)
     if issue_provider != "jira":
         rendered = _strip_jira_format(rendered)
+    rendered = _strip_unconfigured_jira_review_blocks(rendered, config)
     agent_block = _build_agent_context_block(agent_type, issue_provider)
     # An agent whose own block carries <jira-format> owns the markup rules in
     # full (the format corrector does), so the generic block would only repeat it.
@@ -206,6 +221,24 @@ def _strip_jira_format(text: str) -> str:
 
     stripped = _JIRA_FORMAT_BLOCK_RE.sub("\n\n", text, count=1)
     return re.sub(r"\n{3,}", "\n\n", stripped).strip()
+
+
+def _strip_unconfigured_jira_review_blocks(text: str, config: Any) -> str:
+    """Remove each opt-in Jira review gate whose agent is not configured."""
+
+    stripped = text
+    if not _jira_review_agent(config, "task"):
+        stripped = _JIRA_TASK_REVIEW_BLOCK_RE.sub("\n\n", stripped, count=1)
+    if not _jira_review_agent(config, "comment"):
+        stripped = _JIRA_COMMENT_REVIEW_BLOCK_RE.sub("\n\n", stripped, count=1)
+    return re.sub(r"\n{3,}", "\n\n", stripped).strip()
+
+
+def _jira_review_agent(config: Any, artifact: str) -> str:
+    """Return one configured Jira reviewer name, or an empty value."""
+
+    value = getattr(config, f"jira_{artifact}_review_agent", None)
+    return value.strip() if isinstance(value, str) else ""
 
 
 def _build_agent_context_block(

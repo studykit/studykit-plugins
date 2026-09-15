@@ -82,6 +82,10 @@ spectrack config.py --project <project-root> --require
    automation comments by body marker. If the user gives markers such as
    `!git-event`, pass each one with
    `--jira-snapshot-hidden-comment-marker`.
+   Also ask independently whether LLM-authored Jira `task` drafts and Jira
+   comment drafts should be reviewed by project custom agents before
+   publishing. Collect each exact host-resolvable agent name and pass it as
+   `--jira-task-review-agent` or `--jira-comment-review-agent` respectively.
 8. Ask whether artifact drafting should require `spectrack mustread` to be run
    first. By default, mustread is required and ensures contract information is
    loaded before drafting issues or creating artifacts. When disabled with

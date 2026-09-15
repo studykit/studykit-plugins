@@ -116,6 +116,20 @@ def test_build_config_records_commit_refs(tmp_path: Path) -> None:
     assert raw["commit_refs"] == {"enabled": False, "style": "disabled"}
 
 
+def test_build_config_records_jira_task_and_comment_review_agents(tmp_path: Path) -> None:
+    raw = build_config(
+        project=tmp_path,
+        issue_provider="jira",
+        knowledge_provider="github",
+        jira_relationship_mappings=_jira_relationship_mappings(),
+        jira_task_review_agent="project:jira-task-reviewer",
+        jira_comment_review_agent="project:jira-comment-reviewer",
+    )
+
+    assert raw["providers"]["issues"]["task_review_agent"] == "project:jira-task-reviewer"
+    assert raw["providers"]["issues"]["comment_review_agent"] == "project:jira-comment-reviewer"
+
+
 def test_build_config_includes_prd_path_when_provided(tmp_path: Path) -> None:
     raw = build_config(
         project=tmp_path,

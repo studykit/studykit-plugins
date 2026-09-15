@@ -49,6 +49,28 @@ confirm. This applies to every issue and comment body, whichever way you
 came to draft it.
 </jira-format>
 
+<jira-task-review>
+Before presenting or publishing an LLM-authored Jira `task` issue draft, write
+the complete candidate body to a draft file and dispatch the configured review
+agent `{{SPECTRACK_JIRA_TASK_REVIEW_AGENT}}` with that absolute path. Ask it
+to review scope, context, acceptance criteria, and internal consistency only;
+it must not publish or otherwise mutate the tracker. Address its actionable
+findings in the draft, then run the Jira markup check and present the reviewed
+draft to the user for confirmation. Do not publish until the review, markup
+check, and user confirmation are complete.
+</jira-task-review>
+
+<jira-comment-review>
+Before presenting or publishing any LLM-authored Jira comment draft, write the
+complete candidate text to a draft file and dispatch the configured review
+agent `{{SPECTRACK_JIRA_COMMENT_REVIEW_AGENT}}` with that absolute path. Ask
+it to review accuracy, relevance, and internal consistency only; it must not
+publish or otherwise mutate the tracker. Address its actionable findings in
+the draft, then run the Jira markup check and present the reviewed draft to the
+user for confirmation. Do not publish until the review, markup check, and user
+confirmation are complete.
+</jira-comment-review>
+
 <implementing-issues>
 A workflow `task` / `bug` / `spike` issue body is a spec — what / why /
 done — not a plan. Before settling the approach, read the issue's full

@@ -92,6 +92,10 @@ class WorkflowConfig:
     # drafting. Only gates the requirement, not the CLI: the command stays
     # runnable by hand so contracts remain inspectable while disabled.
     mustread: bool = True
+    # Optional project-local custom agents that independently review LLM-authored
+    # Jira task and comment drafts before presentation or publication.
+    jira_task_review_agent: str | None = None
+    jira_comment_review_agent: str | None = None
     raw: Mapping[str, Any] = field(default_factory=dict)
 
     def provider_for_role(self, role: str) -> str:
@@ -113,6 +117,8 @@ class WorkflowConfig:
             "issue_id_format": self.issue_id_format,
             "commit_refs": self.commit_refs.to_json(),
             "mustread": self.mustread,
+            "jira_task_review_agent": self.jira_task_review_agent,
+            "jira_comment_review_agent": self.jira_comment_review_agent,
         }
 
 
@@ -162,6 +168,8 @@ def parse_workflow_config(raw: Mapping[str, Any], *, path: Path) -> WorkflowConf
     )
     commit_refs = _parse_commit_refs(raw.get("commit_refs"), path=path)
     mustread = _parse_mustread(raw.get("mustread"), path=path)
+    jira_task_review_agent = _parse_jira_review_agent(issues, "task_review_agent", path=path)
+    jira_comment_review_agent = _parse_jira_review_agent(issues, "comment_review_agent", path=path)
 
     return WorkflowConfig(
         path=path.resolve(),
@@ -173,6 +181,8 @@ def parse_workflow_config(raw: Mapping[str, Any], *, path: Path) -> WorkflowConf
         issue_id_format=issue_id_format,
         commit_refs=commit_refs,
         mustread=mustread,
+        jira_task_review_agent=jira_task_review_agent,
+        jira_comment_review_agent=jira_comment_review_agent,
         raw=dict(raw),
     )
 
@@ -268,6 +278,29 @@ def _parse_mustread(value: Any, *, path: Path) -> bool:
     if value is None:
         return True
     return _parse_bool(value, path=path, field="mustread")
+
+
+def _parse_jira_review_agent(
+    issues: ProviderConfig,
+    field: str,
+    *,
+    path: Path,
+) -> str | None:
+    """Validate one optional pre-publish Jira reviewer reference."""
+
+    value = issues.settings.get(field)
+    if value is None:
+        return None
+    if issues.kind != "jira":
+        raise WorkflowConfigError(
+            f"providers.issues.{field} is only supported for the jira issue provider "
+            f"in {path}"
+        )
+    if not isinstance(value, str) or not value.strip():
+        raise WorkflowConfigError(
+            f"providers.issues.{field} must be a non-empty agent name in {path}"
+        )
+    return value.strip()
 
 
 def _normalize_commit_ref_style(value: str | None, *, path: Path) -> str:

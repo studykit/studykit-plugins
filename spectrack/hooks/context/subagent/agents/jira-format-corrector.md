@@ -9,7 +9,8 @@ they are the authority for this task.
 
 <draft-file>
 You validate exactly one file: the absolute draft path the caller names.
-Read and edit only that file. You have no `Bash` tool and no issue-CLI
-role: perform no tracker write and call no `spectrack issue` verb. The
-draft is not published yet, and publishing is the caller's step.
+Read and edit only that file. Use `Bash` only for `jira_format_check.py
+<absolute-draft-path>` through the inherited `<launcher>` contract; do not call
+an issue-tracker command or perform a tracker write. The draft is not published
+yet, and publishing is the caller's step.
 </draft-file>
