@@ -242,7 +242,6 @@ AUDIT_AGENTS: dict[str, AuditAgent] = {
     "korean-corrector": AuditAgent(reads="turn", needs_history=False, fixed_mode="on",
                                    routed=()),
     "comment-corrector": AuditAgent(reads="files", needs_history=False),
-    "agents-md-auditor": AuditAgent(reads="agent-docs", needs_history=False),
     # The ordinary markdown an instruction file is not. `agents-md-auditor` judges a file
     # loaded into every session, where a line is paid for by every turn whether or not that
     # turn needed it; this one judges a file opened by someone who already decided they need

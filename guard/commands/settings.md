@@ -98,23 +98,25 @@ made through the CLI, report that instead of working around it.
 | `deferrals-auditor` | `off` / `on` | Flags work punted as "TBD" / "확인 필요" that the repo could have answered. One switch, three entry points: `audit-turn-deferrals` on a finished turn, `audit-report-deferrals` on a saved document, `audit-plan-deferrals` on an approved plan — named by the matching router or by the plan review, or invoked by the user directly. All three fork the same `deferrals-auditor`. |
 | `clarity-auditor` | `off` / `on` | Flags terms used but never explained, mechanisms given with no concrete example, and explanation pitched wrong for this reader. One switch, one agent, three entry points: `audit-turn-clarity` on a finished turn, `audit-report-clarity` on a saved document, `audit-plan-clarity` on an approved plan — named by the matching router or by the plan review, or invoked by the user directly. It calibrates against a reader profile; without one it says so and checks less, so the `reader-profile` skill comes first if the user means to rely on it. |
 | `comment-corrector` | `off` / `on` | Admits `guard:comment-corrector`, for the source files the turn actually edited. This one **edits those files in place**, so its fixes land without being asked — say so when the user turns it on. |
-| `agents-md-auditor` | `off` / `on` | Admits `guard:agents-md-auditor`, for the `AGENTS.md` / `CLAUDE.md` files the turn actually edited, judged as instruction files. Reports only — but its findings often mean moving content into a doc that does not exist yet, which is the user's decision, not the agent's. |
-| `doc-auditor` | `off` / `on` | Enables automatic review actions for ordinary Markdown files changed in a turn. A file is acted on only when it matches a `doc_review_rules` entry. |
+| `doc-auditor` | `off` / `on` | Enables automatic review actions for changed project Markdown, including `AGENTS.md` and `CLAUDE.md`. A file is acted on only when it matches a `doc_review_rules` entry. |
 | `doc_dir` / `doc_exclude` | comma-separated project directories | Limits the ordinary Markdown documents eligible for review, then subtracts excluded directories. An empty `doc_dir` means the whole project. |
 | `doc_review_rules` | JSON array | Per-path actions. Each item is `{"glob":"...","action":{"kind":"agent" or "skill","name":"..."}}`; `{"glob":"...","action":null}` skips matching files. Unmatched files are not reviewed. Use `/guard:doc-review-rules` for guided setup. |
 | `refs_dir` | a project-relative path, or empty | Where guard saves cited-doc copies. Empty = the git-tracked default `wiki/ref/`, committed with the repo; a different tracked path (e.g. `docs/refs`) overrides it. |
 | `knowledge_dir` | comma-separated directories, or empty | Where this project writes down what its **deployed** system looks like — topology, environments, runbooks. Read by the plan audit's `plan-environment` and by nothing else; guard never writes here. Unlike `refs_dir` it is not confined to the project: an absolute path or a `~` is the expected shape, since this material usually lives in a knowledge base outside the repo. Order is precedence. Empty (the default) is a normal state — that agent then falls back to the repo's own deploy surface, a read-only probe, and finally asking the user. |
 
+When reporting `doc_review_rules`, tell the user that Guard already ships
+`agent:guard:doc-auditor`, `agent:guard:agents-md-auditor`,
+`agent:guard:ext-docs-auditor`, and `skill:guard:audit-docs`. Briefly describe the matching
+specialty; do not make a built-in action sound like something they must install separately.
+
 **Every agent setting ships off**, and with all of them off guard says almost nothing: a
-finished turn adds nothing to the main session's context and makes no model call. Two things
-are left, both below and neither switchable — a turn that writes a file under `refs_dir` is
-still named to `ext-docs-auditor`, and a reference saved without being indexed is still
-blocked. Turning one on only makes
+finished turn adds nothing to the main session's context and makes no model call. The refs
+index gate remains independent of review rules, so a reference saved without being indexed is
+still blocked. Turning one on only makes
 that agent *available* — the router still has to find something in the turn before it names
 it. The two
-file-reading agents (`comment-corrector`, `agents-md-auditor`) skip the router entirely and
-need a file of their own kind that the turn wrote, so they cost nothing on the many turns that
-write none.
+file-reading `comment-corrector` skips the router and needs a source file this turn wrote.
+Document review actions likewise need both `doc-auditor: on` and a matching rule.
 
 **Four agents have no setting here and cannot be given one.** `korean-translator` writes the
 Korean the user reads and `korean-corrector` checks what it wrote — one step, not an audit to

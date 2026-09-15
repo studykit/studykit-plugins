@@ -178,6 +178,11 @@ def _config_show_lines(project_dir: Path, session_id: str | None) -> list[str]:
                                    else f"{rule.kind}:{rule.name}")
             for rule in rules)
 
+    def built_in_review_actions_line() -> str:
+        return ("document review actions (built in): "
+                "agent:guard:doc-auditor, agent:guard:agents-md-auditor, "
+                "agent:guard:ext-docs-auditor, skill:guard:audit-docs")
+
     def mute_line() -> str:
         """This session's mute, which is state and not a setting.
 
@@ -217,6 +222,7 @@ def _config_show_lines(project_dir: Path, session_id: str | None) -> list[str]:
         doc_line("doc_dir"),
         doc_line("doc_exclude"),
         doc_review_rules_line(),
+        built_in_review_actions_line(),
         *retired_lines(),
     ]
 

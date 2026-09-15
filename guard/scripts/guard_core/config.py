@@ -3,7 +3,7 @@
 Configuration is optional: a JSON object at ``${CLAUDE_PROJECT_DIR}/.claude/guard.local.json``
 (``.codex/`` on Codex). One ``AgentMode`` per agent, keyed by that agent's own name —
 ``claims-auditor`` / ``deferrals-auditor`` / ``clarity-auditor`` / ``comment-corrector`` /
-``agents-md-auditor``, each
+``doc-auditor``, each
 ``"off"`` (the default) or ``"on"`` — which together are the only control
 over whether guard says anything unasked, and over which audits exist to be invoked. Plus
 ``audit-plan`` (``"on"`` by default, ``"on"`` or ``"off"``): the state each session's plan gate
@@ -240,9 +240,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
     # implementation detail, the spec, or the thing every model already knows. Reports
     # only. Turning it on costs nothing on the many turns that touch no such file, since
     # eligibility needs one this turn actually wrote.
-    "agents-md-auditor": AgentMode.OFF,
-    # The ordinary documents, on the same terms: eligibility needs one this turn wrote, so a
-    # project that turns it on pays nothing on the turns that touch none.
+    # All project Markdown eligible for rule-based review, including AGENTS.md and CLAUDE.md.
     "doc-auditor": AgentMode.OFF,
     # Per-pattern document-review actions. The most specific matching rule owns a document;
     # declaration order breaks a specificity tie. Unmatched documents are not reviewed.

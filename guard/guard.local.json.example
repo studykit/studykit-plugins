@@ -4,9 +4,9 @@
   "deferrals-auditor": "off",
   "clarity-auditor": "off",
   "comment-corrector": "off",
-  "agents-md-auditor": "off",
   "doc-auditor": "off",
   "doc_review_rules": [
+    {"glob": "wiki/ref/**", "action": {"kind": "agent", "name": "guard:ext-docs-auditor"}},
     {"glob": "docs/generated/**", "action": null},
     {"glob": "docs/korean/**/*.md", "action": {"kind": "agent", "name": "project:korean-doc-reviewer"}},
     {"glob": "docs/api/**/*.md", "action": {"kind": "skill", "name": "project:review-api-docs"}}

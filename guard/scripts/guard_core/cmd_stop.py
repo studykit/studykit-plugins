@@ -10,16 +10,14 @@ transcript when the user asks for one (``transcript._last_auditable_prompt_id``)
 no marker to keep and no copy to make. The three skips that protected that marker — non-human
 origin, guard's own control commands, a user ``!`` command — moved with it.
 
-What is left is the file-reading audits, and none of them is a triage question. The eligible
-ones — ``comment-corrector`` (``reads="files"``) and ``agents-md-auditor``
-(``reads="agent-docs"``) — are dispatched over the files this turn actually edited,
-``ext-docs-auditor`` over anything it wrote under the refs directory, and ``doc-auditor`` over
-the ordinary documents it changed; in each case the condition is a file list rather than a
-judgment about the answer, so there is nothing for the user to decide and nothing for a router
-to weigh. guard runs no model itself and never blocks here.
+What is left is the file-reading audits, and none of them is a triage question.
+``comment-corrector`` is dispatched over source files, while configured document-review actions
+cover ordinary, agent-instruction and reference Markdown files. Each condition is a file list
+rather than a judgment about the answer, so there is nothing for the user to decide and nothing
+for a router to weigh. guard runs no model itself and never blocks here.
 
-The three fixed buckets name AGENTS. Ordinary documents are matched against project-configured
-review actions, which may name either an agent or a skill.
+The fixed source bucket names an AGENT. All project Markdown is matched against
+project-configured review actions, which may name either an agent or a skill.
 """
 
 from __future__ import annotations
@@ -32,7 +30,7 @@ from .payload import _read_payload, _session_id
 from .emit import _emit_stop_context
 from .agents import AUDIT_AGENTS, _eligible_agents
 from .state import _audit_paused, _edited_files, _read_state, _write_state
-from .dispatch import _DIRECT_LEAD, _dispatch_context, _docs_context, _refs_context
+from .dispatch import _DIRECT_LEAD, _dispatch_context, _docs_context
 
 
 def cmd_stop() -> int:
@@ -77,17 +75,13 @@ def cmd_stop() -> int:
 
     edited = _edited_files(state, prompt_id, "edited_files")
     agent_docs = _edited_files(state, prompt_id, "edited_agent_docs")
-    # No switch and no eligibility computation: `ext-docs-auditor` is named whenever this turn
-    # wrote a file under the refs directory. That list is the whole condition, so this is
-    # independent of `_eligible_agents` and of every switch — a project can have all of them
-    # off and still be told to check a reference it just saved.
     refs = _edited_files(state, prompt_id, "edited_refs")
     # Filtered to what reads FILES. `_eligible_agents` still answers for the whole roster,
     # and the turn-reading audits are in it — but nothing dispatches them from here any more,
     # so letting one through would put a turn audit back on the automatic path.
-    docs = _edited_files(state, prompt_id, "edited_docs")
-    passed = _eligible_agents(state, edited, agent_docs, docs)
-    eligible = [k for k in passed if AUDIT_AGENTS[k].reads in ("files", "agent-docs")]
+    docs = [*refs, *agent_docs, *_edited_files(state, prompt_id, "edited_docs")]
+    passed = _eligible_agents(state, edited, [], docs)
+    eligible = [k for k in passed if AUDIT_AGENTS[k].reads == "files"]
     # Split out of `eligible`: document review rules may name either a skill or a direct
     # agent. Eligibility remains `_eligible_agents`' answer — the switch and a non-empty
     # list, same two gates as the rest — so nothing about WHEN it runs is decided here.
@@ -103,7 +97,7 @@ def cmd_stop() -> int:
                 continue
             doc_groups.setdefault((rule.kind, rule.name), []).append(path)
     modes = {k: _agent_mode(state, k) for k in eligible}
-    if not eligible and not refs and not doc_groups:
+    if not eligible and not doc_groups:
         _trace(project_dir, session_id, "stop", "none_eligible", prompt_id=prompt_id)
         return 0
 
@@ -120,16 +114,13 @@ def cmd_stop() -> int:
     if eligible:
         blocks.append(_dispatch_context(
             project_dir, session_id, prompt_id, _DIRECT_LEAD, eligible, modes,
-            {"files": edited, "agent-docs": agent_docs}, ""))
-    if refs:
-        blocks.append(_refs_context(refs))
+            {"files": edited}, ""))
     if doc_groups:
         for (action_kind, action_name), group in doc_groups.items():
             blocks.append(_docs_context(group, action_kind=action_kind,
                                         action_name=action_name))
     context = "\n\n".join(blocks)
-    outcome = "+".join(n for n, on in (("direct", eligible), ("refs", refs),
-                                       ("docs", doc_groups)) if on)
+    outcome = "+".join(n for n, on in (("direct", eligible), ("docs", doc_groups)) if on)
     # `additionalContext`, not `decision: "block"`. Per the official hooks docs
     # (https://code.claude.com/docs/en/hooks, "Stop decision control"; excerpt saved at
     # wiki/ref/claude-code-stop-hook-decision-control.md) the two continue the

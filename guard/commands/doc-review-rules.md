@@ -27,12 +27,29 @@ First run:
 "${CLAUDE_PLUGIN_ROOT}/scripts/guard_hook.py" settings show --session ${CLAUDE_SESSION_ID}
 ```
 
+Tell the user that Guard already provides these actions before asking them to invent or install
+one:
+
+- `agent:guard:doc-auditor` — checks ordinary project documentation for redundant or drifting content.
+- `agent:guard:agents-md-auditor` — checks `AGENTS.md` and `CLAUDE.md` as always-loaded instructions.
+- `agent:guard:ext-docs-auditor` — checks saved external references for source attribution and reference hygiene.
+- `skill:guard:audit-docs` — wraps `guard:doc-auditor` with the edited-document audit procedure; it deliberately drops instruction files.
+
+These names are ready to use when Guard is installed. Project or user actions remain valid
+alternatives when their exact agent or skill names resolve.
+
 Then inspect only the project's Markdown paths when that helps turn the request into globs.
+`AGENTS.md` and `CLAUDE.md` follow the same rules as ordinary documents; use a pattern such as
+`**/AGENTS.md` when they need a dedicated action.
+Reference Markdown follows the same rules too; use `wiki/ref/**` (or the configured refs path)
+with `guard:ext-docs-auditor` when the reference-specific review is wanted.
 Explain the candidate rules in this form:
 
 ```json
 [
   {"glob": "docs/generated/**", "action": null},
+  {"glob": "**/AGENTS.md", "action": {"kind": "agent", "name": "guard:agents-md-auditor"}},
+  {"glob": "wiki/ref/**", "action": {"kind": "agent", "name": "guard:ext-docs-auditor"}},
   {"glob": "docs/api/**", "action": {"kind": "skill", "name": "project:review-api-docs"}},
   {"glob": "docs/**", "action": {"kind": "agent", "name": "project:doc-reviewer"}}
 ]
