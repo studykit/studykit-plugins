@@ -15,7 +15,9 @@ check that only saw the main agent's writes would miss exactly those files.
 
 from __future__ import annotations
 
+import hashlib
 import json
+import subprocess
 import sys
 
 from pathlib import Path
@@ -37,6 +39,118 @@ from .state import _read_state, _write_state
 # rather than dropping the oldest entries — the earliest edits of a turn are as worth
 # auditing as the last, and a stable prefix keeps the recommendation reproducible.
 EDITED_FILES_MAX = 20
+
+
+def _tool_call_id(payload: dict[str, Any]) -> str | None:
+    """Stable identifier shared by a tool's pre- and post-use payloads."""
+    for key in ("tool_use_id", "call_id"):
+        value = payload.get(key)
+        if isinstance(value, str) and value:
+            return value
+    return None
+
+
+def _bash_snapshot_path(project_dir: Path, session_id: str, tool_call_id: str) -> Path:
+    key = hashlib.sha256(f"{session_id}\0{tool_call_id}".encode()).hexdigest()
+    return _state_root(project_dir) / "bash-snapshots" / f"{key}.json"
+
+
+def _git_worktree_snapshot(project_dir: Path, config: dict[str, Any]) -> dict[str, str] | None:
+    """Return content hashes for reviewable tracked and non-ignored untracked files."""
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(project_dir), "ls-files", "--cached", "--others",
+             "--exclude-standard", "-z"],
+            capture_output=True, check=True, timeout=8,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    try:
+        refs = _refs_dir(project_dir, config).resolve()
+        docs = _doc_scope(project_dir, config)
+        project = project_dir.resolve()
+        state_root = _state_root(project_dir).resolve()
+    except OSError:
+        return None
+    snapshot: dict[str, str] = {}
+    for raw in result.stdout.split(b"\0"):
+        if not raw:
+            continue
+        try:
+            rel = raw.decode("utf-8", errors="surrogateescape")
+            target = project_dir / rel
+            resolved = target.resolve()
+        except OSError:
+            continue
+        if (not target.is_file() or project not in resolved.parents
+                or state_root in resolved.parents
+                or _edited_bucket(resolved, refs, docs) is None):
+            continue
+        try:
+            digest = hashlib.sha256()
+            with target.open("rb") as stream:
+                for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+                    digest.update(chunk)
+            snapshot[rel] = digest.hexdigest()
+        except OSError:
+            continue
+    return snapshot
+
+
+def snapshot_shell_write_candidates(project_dir: Path, payload: dict[str, Any]) -> None:
+    """Save the pre-shell Git-visible file set for comparison at PostToolUse."""
+    session_id = _session_id(payload)
+    tool_call_id = _tool_call_id(payload)
+    if session_id is None or tool_call_id is None:
+        return
+    snapshot = _git_worktree_snapshot(project_dir, _load_config(project_dir))
+    if snapshot is None:
+        return
+    path = _bash_snapshot_path(project_dir, session_id, tool_call_id)
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(snapshot, separators=(",", ":")), encoding="utf-8")
+    except OSError:
+        return
+
+
+def record_shell_writes(project_dir: Path, payload: dict[str, Any],
+                        config: dict[str, Any]) -> list[Path]:
+    """Record files changed by one shell call and return their absolute paths."""
+    session_id = _session_id(payload)
+    tool_call_id = _tool_call_id(payload)
+    if session_id is None or tool_call_id is None:
+        return []
+    path = _bash_snapshot_path(project_dir, session_id, tool_call_id)
+    try:
+        before_value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError, json.JSONDecodeError):
+        return []
+    finally:
+        try:
+            path.unlink()
+        except OSError:
+            pass
+    if not isinstance(before_value, dict):
+        return []
+    after = _git_worktree_snapshot(project_dir, config)
+    if after is None:
+        return []
+    changed = sorted(
+        rel for rel in set(before_value) | set(after)
+        if before_value.get(rel) != after.get(rel)
+    )
+    targets: list[Path] = []
+    for rel in changed:
+        synthetic_input = {"file_path": rel}
+        _record_edited_source(project_dir, payload, synthetic_input, config)
+        target = _tool_target_path(project_dir, synthetic_input)
+        if target is not None:
+            targets.append(target)
+    if changed:
+        _trace(project_dir, session_id, "post-edit", "shell_changes_recorded",
+               changed=len(changed))
+    return targets
 
 
 def _record_edited_source(project_dir: Path, payload: dict, tool_input: Any,
@@ -170,6 +284,23 @@ def cmd_post_edit() -> int:
 
     config = _load_config(project_dir)
     tool_input = payload.get("tool_input")
+    if payload.get("tool_name") == "Bash":
+        targets = record_shell_writes(project_dir, payload, config)
+        try:
+            refs = _refs_dir(project_dir, config).resolve()
+        except OSError:
+            refs = None
+        for target in targets:
+            if refs is None or target.name in _REFS_INDEX_SKIP:
+                continue
+            if target != refs and refs not in target.parents:
+                continue
+            reason = refs_index_gap(project_dir, target, config)
+            if reason is not None:
+                json.dump({"decision": "block", "reason": reason}, sys.stdout)
+                _trace(project_dir, None, "post-edit", "refs_missing", file=target.name)
+                return 0
+        return 0
     _record_edited_source(project_dir, payload, tool_input, config)
     if not _targets_refs_dir(project_dir, tool_input, config):
         return 0

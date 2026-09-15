@@ -27,13 +27,26 @@
         ]
       },
       {
-        "matcher": "Write|Edit|MultiEdit|NotebookEdit",
+        "matcher": "Bash|Write|Edit|MultiEdit|NotebookEdit",
         "hooks": [
           {
             "type": "command",
             "command": "uv run --script \"${CLAUDE_PLUGIN_ROOT}/scripts/guard_hook.py\" post-edit",
             "timeout": 10,
-            "description": "Record a source file, an agent instruction file, a saved reference or an ordinary document written this turn (for a comment-corrector, agents-md-auditor, ext-docs-auditor or doc-auditor dispatch) — a subagent's writes included — and require a file saved inside the refs dir to be listed in the refs index (AGENTS.md)."
+            "description": "Record a source file, an agent instruction file, a saved reference or an ordinary document written this turn (including writes made by Bash and by subagents) for the applicable review dispatch, and require a file saved inside the refs dir to be listed in the refs index (AGENTS.md)."
+          }
+        ]
+      }
+    ],
+    "PostToolUseFailure": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "uv run --script \"${CLAUDE_PLUGIN_ROOT}/scripts/guard_hook.py\" post-edit",
+            "timeout": 10,
+            "description": "Record reviewable files changed before a failing Bash command exited. Shell failure does not imply that earlier writes in the command were rolled back."
           }
         ]
       }

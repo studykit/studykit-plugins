@@ -377,7 +377,7 @@ def cmd_session_start() -> int:
     exported = _export_to_bash_env("GUARD_PROJECT_DIR", str(project_dir))
     root = _state_root(project_dir)
     cutoff = time.time() - ORPHAN_MAX_AGE_SECONDS
-    for sub in ("state",):
+    for sub in ("state", "bash-snapshots"):
         d = root / sub
         if not d.is_dir():
             continue

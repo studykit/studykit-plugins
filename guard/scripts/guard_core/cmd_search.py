@@ -181,14 +181,15 @@ def _root_search_in_command(command: str) -> str | None:
     return None
 
 
-# Tools whose input is a shell command line. `Bash` is Claude Code's, verified against real
-# payloads. The rest are candidate spellings for Codex's shell tool, which is NOT confirmed:
-# `wiki/ref/openai-codex-pretooluse-payload.md` documents `tool_name` as a "Canonical hook
-# tool name" without ever naming that tool, and no saved reference names it either. Guessing
-# wide is the safe direction here — an extra name that no host sends costs nothing, while a
-# missing one silently drops the shell branch and the rule stops applying to Codex commands.
-# Confirm the real spelling next time the Codex docs are consulted and prune this.
-_SHELL_TOOLS = {"Bash", "shell", "Shell", "local_shell"}
+# Both hosts expose shell and unified-exec calls to hooks under the canonical name `Bash`.
+# Codex's `exec_command` transport is explicitly aliased this way; `write_stdin` does not
+# produce a second PreToolUse event, and the original call's PostToolUse fires on completion.
+_SHELL_TOOLS = {"Bash"}
+
+
+def is_shell_tool(tool_name: Any) -> bool:
+    """Whether a host tool executes a shell command string."""
+    return isinstance(tool_name, str) and tool_name in _SHELL_TOOLS
 
 
 # Tool inputs that name a search root directly, by tool name.
@@ -249,7 +250,7 @@ def cmd_pre_search_payload(payload: dict, project_dir: Path | None,
         return
 
     offender: str | None = None
-    if tool_name in _SHELL_TOOLS:
+    if is_shell_tool(tool_name):
         command = tool_input.get("command") if isinstance(tool_input, dict) else None
         if isinstance(command, str) and command.strip():
             offender = _root_search_in_command(command)
@@ -274,5 +275,9 @@ def cmd_pre_search() -> int:
     payload = _read_payload()
     if payload is None:
         return 0
-    cmd_pre_search_payload(payload, _project_dir(), _session_id(payload))
+    project_dir = _project_dir()
+    if project_dir is not None and is_shell_tool(payload.get("tool_name")):
+        from .cmd_edit import snapshot_shell_write_candidates
+        snapshot_shell_write_candidates(project_dir, payload)
+    cmd_pre_search_payload(payload, project_dir, _session_id(payload))
     return 0

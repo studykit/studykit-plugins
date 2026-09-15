@@ -54,7 +54,8 @@ commands, a user `!` command), which moved out of `cmd_stop` and into
 
 The **edited-file audits**, and they are not a triage question: the turn either edited a source
 file, an agent instruction file, a saved reference or an ordinary document, or it did not.
-`PostToolUse` records source, agent-instruction, reference and ordinary-document lists. Stop
+`PostToolUse` records source, agent-instruction, reference and ordinary-document lists,
+including Git-visible files changed through the shell. Stop
 names `comment-corrector` for the fixed source bucket, while all project Markdown is dispatched
 only when a document-review rule matches it; rules may name an agent, a skill, or an explicit
 skip.
