@@ -178,29 +178,11 @@ _REVIEW_TIMING = (
 )
 
 
-# `ext-docs-auditor`, which has no switch and is not routed. It is named here rather than
-# through `AUDIT_AGENTS` because the condition for it is not a judgment and not a setting: the
-# turn either wrote a file under the refs directory or it did not, and `edited_refs` already
-# answers that. Routing it could only restate what the file list says, and a switch in front
-# of it would be a way to save a saved reference from ever being checked.
-#
-# Worded as what the turn did, not as what to look for — the criteria are the agent's own, and
-# so is what its findings need: each one ends in a disposition saying whether the caller may
-# apply it, must only relay it, or has a decision to make. Nothing here names the closeout file;
-# a turn that only wrote refs files has no answer file and so no closeout to run.
-_REFS_LEAD = (
-    "guard: this turn wrote saved reference files. Dispatch `guard:ext-docs-auditor` "
-    "(subagent_type: \"guard:ext-docs-auditor\") over them, then act on what it reports — "
-    "its findings say which are yours to apply and which are the user's call."
-)
-
-
-def _refs_context(refs: list[str]) -> str:
-    """``additionalContext`` naming ``ext-docs-auditor`` for the refs files this turn wrote."""
-    lines = [_REFS_LEAD,
-             "- saved reference files to audit:"]
-    lines.extend(f"    {p}" for p in refs)
-    return "\n".join(lines)
+# There is no dedicated refs lead here any more. One existed, naming `ext-docs-auditor` for
+# the files a turn wrote under the refs directory, and it had no caller: since document review
+# became rule-driven, `cmd_stop` folds `edited_refs` into `docs` with the rest of the Markdown
+# and a project's own rule decides which action a refs path gets. A lead nothing emits is a
+# second, silently divergent statement of what the docs block already says.
 
 
 # The one rule the document path was missing. `_agent_pointer` states it for the direct agents

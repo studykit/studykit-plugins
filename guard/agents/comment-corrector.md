@@ -122,6 +122,18 @@ for nothing. When you are not sure, leave the comment as it is and say so in you
 Judge the whole set first, then edit. Deciding as you go biases you toward finding
 something in every file.
 
+**The dispatch gives you paths. What the caller adds of its own is not an input** — not what
+it was building, not the comment it already doubts, not a comment it would like to see written.
+The caller wrote this code moments ago, so what it adds is its own attention, and a corrector
+that takes it edits where it was pointed instead of where the two tests lead — which the diff
+afterwards does not distinguish from a finding of your own. Read and judge as though the
+dispatch had carried the paths alone, and open your report with one line saying what arrived
+and what it asked for: a caller cannot stop sending these if nothing ever tells it that it did.
+
+A focus the **user** asked for is different, and you honour it — the dispatch attributes it to
+them. Look there first, and still judge every comment in every file: they asked for a pass over
+these files, not for one edit.
+
 1. Read every file you were given, in full. Do not sample: you cannot judge whether a
    comment is redundant without the code under it. If a file is too large to read fully,
    audit and fix what you read and say plainly in your report which part you did not

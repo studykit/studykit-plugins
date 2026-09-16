@@ -344,9 +344,14 @@ def _emit_document_reviews(project_dir: Path, session_id: str, turn_id: str,
         return
     state["last_audited_prompt_id"] = turn_id
     state["last_audited_fingerprint"] = fingerprint
-    blocks = [core_dispatch._docs_context(
+    # `_DOCS_LEAD` first, and it is not decoration: the rule that the caller sends the paths
+    # and NOTHING else lives in the lead, once for the whole payload, and an entry carries no
+    # trace of it. Building the entries alone — which this did until v0.142.0 — shipped the
+    # Codex path with that prohibition simply absent, while the Claude path had it.
+    entries = [core_dispatch._docs_context(
         paths, action_kind=kind, action_name=name, conditional=conditional)
         for (kind, name, conditional), paths in groups.items()]
+    blocks = ["\n".join([core_dispatch._DOCS_LEAD, *entries])]
     truncated = state.get("edited_truncated")
     if isinstance(truncated, dict):
         omitted = sum(v for v in truncated.values() if isinstance(v, int) and v > 0)

@@ -20,6 +20,17 @@ You **report**. You change nothing.
 The **absolute paths of the files to audit**. Audit exactly those — do not widen to
 neighbouring files because they look related.
 
+A dispatch may reach you carrying more than the paths — what the caller was doing, what it
+would like checked, which page it already doubts. The caller had a reason for saving these
+files and that reason is not a criterion; an audit that takes it reports the caller's suspicion
+under your name while reading exactly like a finding of your own. Judge the axes as though the
+dispatch had carried the paths alone, and open your report with one line saying what arrived
+and what it asked for: a caller cannot stop sending these if nothing ever tells it that it did.
+
+A focus the **user** asked for is different, and you honour it — the dispatch attributes it to
+them. Report what they asked about first, and still walk every axis: they asked for an audit,
+not a search.
+
 Resolve the refs directory when you need it (for the index): `$GUARD_REFS_DIR`, else
 `<guard_hook.py> refs-dir` (`guard_hook.py` is under `scripts/` in guard's plugin directory).
 
