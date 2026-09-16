@@ -82,7 +82,7 @@ beyond the state root.
 | `Stop` | `stop` | The edited-file audits and nothing else. Emits `additionalContext` naming `comment-corrector` / `agents-md-auditor` over the files this turn edited, and `ext-docs-auditor` over anything it wrote under the refs dir — in each case the file list is the whole condition, so no router weighs it and no user decides it. The shared timing line lets the main agent finish other work in the current request first, but keeps the reviews ahead of its final completion claim or handoff. It records nothing about the turn, names no answer file and reads none of the response: as of v0.122.0 the turn audit resolves and cuts its own target (`inputs`). Silent while the session is muted, and silent for a turn that edited nothing.
 | `SessionEnd` (`clear`) | `session-end` | Hand this session's two switches, and the handover file it recorded, to the session `/clear` is about to open, then let it announce what it adopted. The two halves are independent: writes nothing only when both switches still match the pair a fresh session opens in — armed for the turn mute, this project's `audit-plan` for the gate — AND no handover was recorded. |
 | `SessionStart` | `session-start` | Sweep state and turn records past retention, export `GUARD_REFS_DIR` and `GUARD_TOGGLE_CLI`, state the refs rule as session context, say once — when any agent is on — either that the session opened muted (`guard on` arms it) or where the turn closeout is and which commands the USER invokes to audit. The commands are stated here and nowhere else in the standing context: `audit-turn` / `audit-report` are `disable-model-invocation: true`, so their own descriptions are never loaded. Also records this session's `transcript_path` from the payload — the one field guard cannot derive, and what every turn audit reaches its turn through. Everything it says goes out as ONE JSON object (`emit._emit_session_start`): `additionalContext` for the lines above, plus a `systemMessage` when a `/clear` carried a handover, which is the only field on this event the USER can see. Codex keeps the plain-text form. |
-| (called via Bash, not a hook) | `candidates` | The router's own roster: prints the turn-reading agents switched on for this session, one `agent=mode` per line, in `AUDIT_AGENTS` order, filtered by `routed` for the asking path — which is what keeps the Korean pair off the turn roster. `--doc` answers for the document path instead — the same eligibility, mapped through `report_entry`, so an audit with no document-side entry point drops out. It is where the mute is enforced for both routers, since neither has a hook in front of it. Session id from `CLAUDE_CODE_SESSION_ID`, which a subagent's Bash carries as its parent's. Read-only, and the only command the router runs. |
+| (called via Bash, not a hook) | `candidates` | The router's own roster: prints the turn-reading agents switched on for this session, one `agent=mode` per line, in `AUDIT_AGENTS` order, filtered by `routed` for the asking path — which is what keeps the Korean pair off the turn roster. `--doc` answers for the document path instead — the same eligibility, mapped through `report_entry`, so an audit with no document-side entry point drops out. It does NOT read the session mute: a roster is only ever fetched because a person typed an audit, so `guard off` leaves it untouched. Session id from `CLAUDE_CODE_SESSION_ID`, which a subagent's Bash carries as its parent's. Read-only, and the only command the router runs. |
 | (called via Bash, not a hook) | `transcript` | `index` / `turn` / `find` over the session transcript, for the audit agents. Writes an extract file and prints only its path plus a one-line summary; `--since` / `--until` / `--last` bound which turns are scanned. |
 | (called via Bash, not a hook) | `toggle-cli` | Arm/mute guard for THIS session (`audit_paused`, session state only — never guard.local.json), from a shell prompt: `on` / `off` / `status` / empty flips. A session opens ARMED and no config key seeds it (`audit-turn` retired in v0.124.0), so `off` is the direction that needs typing. Session id from `CLAUDE_CODE_SESSION_ID`; project from `_cli_project_dir`. The ONE subcommand that does not fail open — see `_MUST_REPORT` in `guard_hook.py`. |
 | (called via Bash, not a hook) | `status` | Status-line segment: `guard <will run>/<switched on>` plus the plan gate's flag (`⚑` armed, `⚐` muted), green armed and dim muted on each half; nothing at all on any failure. Reads one state file; runs on every assistant message. |
@@ -213,9 +213,13 @@ the session translates its own text, which is the arrangement that produced 직�
 - The pending marker and the verbatim response are written on **every** human turn, before the
   mute check. An audit the user asks for in a project that keeps everything off must still find
   the turn — that is the whole reason those two lines sit above `_audit_paused`.
-- `guard-candidates` enforces the mute for both routers. Nothing else does now: there is no
-  hook in front of either router, and the Codex adapter stopped enforcing it in v0.124.0 —
-  that host has no `guard` command, so with `audit-turn` retired nothing there can set a mute.
+- `guard-candidates` does NOT enforce the mute, and must not start. `cmd_stop` is the only
+  enforcement point there is: `guard off` governs what guard volunteers and nothing else.
+  Every caller of that verb — both routers, `/guard:answer` — is reached only by a person
+  typing, so a refusal there is a mute answering "no" to a request made out loud after it,
+  which is the `audit-turn` failure in a shorter time horizon. The Codex adapter has never
+  enforced it: that host has no `guard` command, so with `audit-turn` retired nothing there
+  can set a mute at all.
 - The Stop turn block stays four fields and one prohibition. It is paid on every turn that has
   an answer file, which is the same budget the router dispatch had, and the prohibition is the
   line that keeps a main agent from routing out of habit.
@@ -521,6 +525,17 @@ bit the project that had said what it wanted.
 rests on is **who is speaking and when**: a mute is typed now, by someone who wants quiet for
 this stretch of work; the setting was typed once, months ago, by someone who could not know
 what they would ask for today. The first is a switch. The second was a gate.
+
+**That distinction was not enough on its own, and the mute lost its half of it later.** While
+`cmd_candidates` read `audit_paused`, a `guard off` typed ten minutes ago still refused a
+`/guard:audit-report` typed now — the same shape as the key, on a shorter clock. "Typed now"
+is the right test; it just has to be applied to the LATER of the two utterances, and the later
+one is always the audit, because that is the one the user is waiting on. So the check came out
+of `cmd_candidates`: `guard off` governs what guard VOLUNTEERS, `cmd_stop` is the only place
+that reads it, and an audit the user names runs whatever the mute says. Nothing was lost by
+narrowing it — the mute's whole job was the Stop hook, and the entries it used to refuse are
+all `disable-model-invocation: true`, so no model could reach them to be refused in the first
+place.
 
 `audit-plan` keeps its key for the reason that makes it different in kind: **the plan gate is
 the one audit nobody invokes.** `exit-plan` fires on its own at approval, so whether it fires
@@ -917,6 +932,12 @@ payloads, not memory.
   non-zero exit. Any internal failure — an unreadable transcript, a state file that will
   not write — leaves state untouched and says nothing: guard must never harass the user
   because its own machinery broke.
+
+  One exception, added with `plan_review`: a `plan_review` the PROJECT wrote and guard cannot
+  read blocks the next plan approval instead of falling back. The distinction that makes it
+  an exception rather than a breach is whose failure it is — guard's own machinery breaking
+  is not the user's problem, but a setting the user typed reading as if it had taken effect
+  is. See the `plan_review` entry in the config reference.
 - **guard routes; the agents audit; guard runs no model.** No judgment about the *content*
   of a turn happens in the hook. Stop asks the main agent to dispatch one subagent — the
   router — which reads the turn and names which eligible agents would find something in it;
@@ -2701,6 +2722,41 @@ whether it fires. Every other audit is invoked by the user, and `audit-turn` —
 used to say what the turn side opened in — was retired in v0.124.0 for that reason. `guard` in
 a shell still mutes the session you are in; it just has nothing persisting it.
 
+`plan_review` (object, default `{}`) — WHO reviews a held plan, as one
+`{"kind": "agent" | "skill", "name": "..."}` action: the same shape `doc_review_rules` gives
+each glob, without the glob, because there is one plan under review at a time. It moves nothing
+else about the gate. Whether a plan is held at all stays `audit-plan`'s question and
+`guard-plan`'s; this answers only who is handed it once it is.
+
+`{}` is unset and is what ships, and the name of guard's own review is deliberately **not**
+written here as the default value. A default sitting in the config file is a value a project
+can come to disagree with silently; keeping the name in the one place that emits it
+(`cmd_plan_gate`) is what keeps "nothing configured" distinguishable from "configured to
+guard's own review" — which is the distinction the next paragraph turns on.
+
+**A value present but unusable BLOCKS, and this is the only place in guard a bad config is not
+absorbed.** `_plan_review_action` returns `(action, configured)` for exactly that reason: `(None,
+False)` is unset and names guard's review, while `(None, True)` is a value the project WROTE and
+guard cannot read, and the gate refuses the approval and names the setting. Falling back to
+`guard:audit-plan` there would run the reviewer the project had just replaced and say nothing —
+the project would read a passing gate as its setting working, which is the failure this key
+would otherwise introduce. It costs one approval, the block text says what to fix, and
+`guard-plan off` is still the way past it. The CLI validates by reparsing through the same
+accessor, so only a hand-edited file can reach that branch. A value of the wrong JSON *type*
+never does: `_load_config` drops it against the `{}` default and it lands in the unset case, so
+`settings show` reports that one separately rather than letting it read as configured.
+
+A configured reviewer is also told, in the block text, to run `guard-plan-audited <plan file
+path>` when it finishes — `skills/audit-plan/SKILL.md` does that in its own closeout and
+nothing else knows the verb exists, so without the line a project that set this key would be
+held by a gate nothing could release. The line is conditioned on the key being CONFIGURED, not
+on the name differing from guard's own: special-casing that name is the defaulting the key
+exists to avoid, and the cost of the broader rule is one redundant sentence.
+
+The hook never resolves the plan file path. It emits an instruction to the main session, which
+wrote the plan and already holds the path — the same reason `cmd_plan` has no verb for the plan
+itself.
+
 `refs_dir` (string, default `""`) — project-relative directory for guard's cited-doc
 copies; empty = the git-tracked default `wiki/ref/` (references committed with the repo), a
 different tracked path (e.g. `"docs/refs"`) overrides it; commits stay in the user's normal
@@ -3139,11 +3195,14 @@ CLAUDE_CODE_SESSION_ID=s1 "$H" candidates --doc  # -> audit-report-{claims,defer
 CLAUDE_CODE_SESSION_ID=s1 "$H" candidates        # -> no `audit-turn-claims` line
 "$H" settings set claims-auditor on > /dev/null
 
-# Muted: BOTH rosters must say so rather than print a roster. This is the only enforcement
-# point left for either router — no hook runs in front of them.
+# Muted: BOTH rosters must still print, unchanged. The mute governs what guard says unasked,
+# and a roster is only ever read because a person typed an audit — a refusal here would be the
+# mute overruling a request made after it. Assert the rosters are IDENTICAL muted and armed;
+# asserting only that they are non-empty would pass if the mute silently dropped a row.
+CLAUDE_CODE_SESSION_ID=s1 "$H" candidates > /tmp/guard-test/armed.txt
 CLAUDE_CODE_SESSION_ID=s1 "$H" toggle-cli off > /dev/null
-CLAUDE_CODE_SESSION_ID=s1 "$H" candidates        # -> says the session is muted
-CLAUDE_CODE_SESSION_ID=s1 "$H" candidates --doc  # -> the same
+CLAUDE_CODE_SESSION_ID=s1 "$H" candidates | diff - /tmp/guard-test/armed.txt && echo "roster unchanged while muted"
+CLAUDE_CODE_SESSION_ID=s1 "$H" candidates --doc  # -> the document roster, also unchanged
 CLAUDE_CODE_SESSION_ID=s1 "$H" toggle-cli on > /dev/null
 
 # --- Stop: the edited-file audits, and nothing else --------------------------------------
@@ -3184,6 +3243,74 @@ python3 -c "import json;print(json.load(open('/tmp/guard-test/other/.claude/guar
 #   -> $TR, written under /tmp/guard-test/other. A state file appearing under
 #      /tmp/guard-test/proj instead means the precedence in `_project_dir` has been flipped
 #      back and one project is writing another's state.
+
+# ---------------------------------------------------------------------------
+# The plan gate. Nothing above touches it — it fires at ExitPlanMode, on its own switch, and
+# reads a key nothing else reads.
+reason(){ python3 -c 'import json,sys;d=sys.stdin.read();print(json.loads(d)["reason"] if d.strip() else "(SILENT)")'; }
+approve(){ echo "{\"session_id\":\"s1\",\"tool_name\":\"ExitPlanMode\",\"tool_response\":{\"plan\":\"$1\"}}" | "$H" exit-plan | reason; }
+setrev(){ CLAUDE_CODE_SESSION_ID=s1 "$H" settings set plan_review "$1"; }
+
+CLAUDE_CODE_SESSION_ID=s1 "$H" plan-toggle-cli on > /dev/null   # armed is the default; be explicit
+CLAUDE_CODE_SESSION_ID=s1 "$H" settings unset plan_review > /dev/null
+approve "do the thing"
+#   -> blocks, names `guard:audit-plan` as a SKILL, and says NOTHING about plan-audited: the
+#      review guard ships stamps itself in its own closeout.
+
+setrev '{"kind":"skill","name":"project:plan-check"}'; approve "do the thing"
+#   -> blocks, names that skill, AND ends with the `guard-plan-audited` instruction. A
+#      configured reviewer that is never told to stamp leaves the gate holding forever.
+setrev '{"kind":"agent","name":"project:plan-reviewer"}'; approve "do the thing"
+#   -> same, phrased as an Agent dispatch with subagent_type.
+
+setrev '{"kind":"reviewer","name":"x"}'; echo "exit=$?"
+#   -> REFUSED on stderr, nothing written. The CLI reparses through the gate's own accessor,
+#      so a value it accepts is one the gate can use. Confirm the file still holds the agent:
+"$H" settings show --session s1 | grep plan_review
+
+# Only a hand-edit reaches the fail-CLOSED branch, which is the point of the line above.
+python3 - <<'PY'
+import json, os, pathlib
+f = pathlib.Path(os.environ["CLAUDE_PROJECT_DIR"]) / ".claude/guard.local.json"
+d = json.loads(f.read_text()); d["plan_review"] = {"kind": "reviewer", "name": "x"}
+f.write_text(json.dumps(d))
+PY
+approve "do the thing"
+#   -> blocks NAMING `plan_review` as the problem, and must NOT mention `guard:audit-plan`.
+#      A fallback here would run the reviewer the project just replaced, silently.
+"$H" settings show --session s1 | grep plan_review
+#   -> the INVALID line, which says approval is blocked. Not "(invalid entries ignored)" —
+#      nothing was ignored.
+
+# Wrong TYPE is a different outcome and must stay one: `_load_config` drops it, so the gate
+# behaves as if unset rather than blocking.
+python3 - <<'PY'
+import json, os, pathlib
+f = pathlib.Path(os.environ["CLAUDE_PROJECT_DIR"]) / ".claude/guard.local.json"
+d = json.loads(f.read_text()); d["plan_review"] = "guard:audit-plan"
+f.write_text(json.dumps(d))
+PY
+approve "do the thing"        # -> the unset text again, naming `guard:audit-plan`
+"$H" settings show --session s1 | grep plan_review   # -> "(not a JSON object, ignored at use)"
+
+# The stamp releases the gate whoever reviewed, and it is content-addressed.
+setrev '{"kind":"agent","name":"project:plan-reviewer"}' > /dev/null
+printf 'do the thing' > /tmp/guard-test/plan.md
+CLAUDE_CODE_SESSION_ID=s1 "$H" plan-audited /tmp/guard-test/plan.md > /dev/null
+approve "do the thing"        # -> (SILENT). The gate passes.
+approve "do the OTHER thing"  # -> blocks again, "has changed since it was audited"
+
+# The mute outranks all of it, including the invalid value — a session that is not holding
+# plans must not be nagged about who would have reviewed one.
+python3 - <<'PY'
+import json, os, pathlib
+f = pathlib.Path(os.environ["CLAUDE_PROJECT_DIR"]) / ".claude/guard.local.json"
+d = json.loads(f.read_text()); d["plan_review"] = {"kind": "reviewer", "name": "x"}
+f.write_text(json.dumps(d))
+PY
+CLAUDE_CODE_SESSION_ID=s1 "$H" plan-toggle-cli off > /dev/null
+approve "do the thing"        # -> (SILENT)
+CLAUDE_CODE_SESSION_ID=s1 "$H" plan-toggle-cli on > /dev/null
 ```
 
 ## What actually keeps a subagent conversation free of guard

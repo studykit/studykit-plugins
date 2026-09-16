@@ -94,6 +94,7 @@ made through the CLI, report that instead of working around it.
 | Key | Values | What it controls |
 | --- | --- | --- |
 | `audit-plan` | `on` (default) / `off` | Whether a session **starts** with the plan gate armed. It is the one audit the user does not invoke — the gate fires on its own at plan approval — which is why it is the only one a project answers for in advance. While armed, an approved plan is held before it is built until it has been through `/guard:audit-plan`, and revising the plan holds it again. This is the project's default, not the live session: `guard-plan on` / `guard-plan off` move the session you are in and leave this alone. |
+| `plan_review` | JSON object, or `{}` | **Who** reviews a held plan: `{"kind":"agent" or "skill","name":"..."}`. `{}` (the default) means Guard's own plan review, `skill:guard:audit-plan`. This does not decide whether a plan is held — `audit-plan` above does. |
 | `claims-auditor` | `off` / `on` | Flags statements asserted without adequate evidence. One switch, two entry points: `audit-turn-claims` on a finished turn, `audit-report-claims` on a saved document — named by the matching router, or invoked by the user directly. Both fork the same `claims-auditor`. |
 | `deferrals-auditor` | `off` / `on` | Flags work punted as "TBD" / "확인 필요" that the repo could have answered. One switch, three entry points: `audit-turn-deferrals` on a finished turn, `audit-report-deferrals` on a saved document, `audit-plan-deferrals` on an approved plan — named by the matching router or by the plan review, or invoked by the user directly. All three fork the same `deferrals-auditor`. |
 | `clarity-auditor` | `off` / `on` | Flags terms used but never explained, mechanisms given with no concrete example, and explanation pitched wrong for this reader. One switch, one agent, three entry points: `audit-turn-clarity` on a finished turn, `audit-report-clarity` on a saved document, `audit-plan-clarity` on an approved plan — named by the matching router or by the plan review, or invoked by the user directly. It calibrates against a reader profile; without one it says so and checks less, so the `reader-profile` skill comes first if the user means to rely on it. |
@@ -104,6 +105,14 @@ made through the CLI, report that instead of working around it.
 | `doc_review_rules` | JSON array | Per-path actions. Each item is `{"glob":"...","action":{"kind":"agent" or "skill","name":"..."}}`. Unmatched files are not reviewed; use `doc_exclude` for explicit exclusions. Use `/guard:doc-review-rules` for guided setup. |
 | `refs_dir` | a project-relative path, or empty | Where guard saves cited-doc copies. Empty = the git-tracked default `wiki/ref/`, committed with the repo; a different tracked path (e.g. `docs/refs`) overrides it. |
 | `knowledge_dir` | comma-separated directories, or empty | Where this project writes down what its **deployed** system looks like — topology, environments, runbooks. Read by the plan audit's `plan-environment` and by nothing else; guard never writes here. Unlike `refs_dir` it is not confined to the project: an absolute path or a `~` is the expected shape, since this material usually lives in a knowledge base outside the repo. Order is precedence. Empty (the default) is a normal state — that agent then falls back to the repo's own deploy surface, a read-only probe, and finally asking the user. |
+
+`plan_review` takes one JSON object as a single shell argument, and it **replaces the whole
+value**; `set plan_review '{}'` puts Guard's own review back. Two things to tell the user
+before changing it. A reviewer that is not `guard:audit-plan` has to run `guard-plan-audited
+<plan file path>` when it finishes, or the gate keeps holding the plan — the hook says so when
+it fires, but the reviewer they name has to be one that will act on it. And Guard does not
+check that the name resolves: if the agent or skill is not installed, the dispatch finds
+nothing and the plan stays held. Say so when the name is not one you can see in this project.
 
 When reporting `doc_review_rules`, tell the user that Guard already ships
 `agent:guard:doc-auditor`, `agent:guard:agents-md-auditor`,

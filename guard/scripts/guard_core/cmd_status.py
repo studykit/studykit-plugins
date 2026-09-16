@@ -5,10 +5,9 @@
 project does by default. A session opens ARMED and no setting seeds it
 (``state._read_state``), which makes ``off`` the direction that gets typed: one stretch of work
 that wants guard quiet, with nothing persisting it. An empty
-argument flips, and ``status`` reports without writing. While muted, ``stop`` says nothing,
-``user-prompt`` names no answer file, and ``candidates`` tells an invoked audit that the
-session is muted — but the pending target and the answer file are still recorded, so arming
-guard and asking still reaches the turn.
+argument flips, and ``status`` reports without writing. While muted, ``stop`` says nothing —
+and that is the whole reach of it. ``candidates`` does not read the mute, so an audit the user
+TYPES runs while muted; the mute governs what guard volunteers, not what it is asked for.
 
 The shell is the ONLY way in, through the ``guard`` wrapper the SessionStart hook puts on
 ``PATH``. There was a ``/guard:toggle`` slash command beside it and it was removed: flipping
@@ -116,7 +115,8 @@ def _mute_sentence(state: dict, paused: bool) -> str:
     ``SessionStart``, and this is a line printed at a shell prompt.
     """
     if paused:
-        return f"guard: audits OFF for this session. `{_shell_arm_hint()}` to arm."
+        return (f"guard: audits OFF for this session — nothing unasked. "
+                f"`{_shell_arm_hint()}` to arm; audits you invoke still run.")
     if any(_switch_on(state, k) for k in AUDIT_AGENTS):
         return "guard: audits ON for this session — `/guard:audit-turn` to audit a turn."
     # Not "nothing will run": `ext-docs-auditor` has no switch, so a turn that writes a

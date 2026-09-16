@@ -59,9 +59,9 @@ def cmd_stop() -> int:
     recover_shell_writes(project_dir, payload, config)
     state = _read_state(project_dir, session_id, config)
 
-    # Muted by `guard off`: guard says nothing unasked. `guard-candidates` keeps the other
-    # half of it, so an audit the user invokes while muted is told the session is muted
-    # rather than quietly running against switches they turned off.
+    # Muted by `guard off`: guard says nothing unasked. This is the ONLY reader of that mute
+    # — `guard-candidates` deliberately does not read it, so an audit the user types while
+    # muted still runs. The mute governs what guard volunteers, not what it is asked for.
     if _audit_paused(state):
         _trace(project_dir, session_id, "stop", "skip_paused", prompt_id=prompt_id)
         return 0

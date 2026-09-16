@@ -38,7 +38,7 @@ Subcommands
 - candidates     CLI (argv), run by the router — ``guard_core.cmd_candidates``
 - inputs         CLI (argv), run by a dispatched agent — ``guard_core.cmd_inputs``
 - knowledge-dirs CLI, prints the configured knowledge dirs — ``guard_core.cmd_plan``
-- exit-plan      PreToolUse/ExitPlanMode, gates an unaudited plan — ``guard_core.cmd_plan_gate``
+- exit-plan      PostToolUse/ExitPlanMode, gates an unaudited plan — ``guard_core.cmd_plan_gate``
 - plan-audited   CLI (argv), records the audited plan — ``guard_core.cmd_plan_gate``
 - plan-toggle-cli CLI (argv), the plan-audit session switch — ``guard_core.cmd_plan_gate``
 - transcript     CLI (argv), run by an audit agent — ``guard_core.transcript``

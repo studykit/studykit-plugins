@@ -215,12 +215,13 @@ how the code here is organised.
 - It names **agents**, never guard's own skills — those are the user's entry point, so a hook
   must not reach through them.
 - The three edited-file lists stay disjoint, and the refs test runs first, by location.
-- `guard-candidates` is where a switch and the mute are enforced for every entry — none has a
+- `guard-candidates` is where the per-agent switches are enforced for every entry — none has a
   hook in front of it — and `cmd_stop` enforces them for what guard says unasked. It answers
   per PATH: `--doc` for the document roster, bare for the turn's. `/guard:answer` must pass
   `--doc`; without it the roster names turn entries that resolve a turn that does not exist.
-  Neither is redundant: drop the check in the command and `guard off` silences the
-  hook while every audit the user can invoke keeps running. The PLAN review is outside this and must stay
+  **The session mute is not enforced there and must not be put back** — `cmd_stop` is its only
+  reader; `dev/design.md` § "What stays, and why the mute is not the key" has the argument, as
+  does `cmd_candidates.py`'s comment. The PLAN review is outside this and must stay
   outside: `audit-plan` invokes its critics by name and reads none of the per-agent switches,
   because a plan held for review is reviewed whole or not at all — half a review is worse than
   none, since what it passes over reads as checked. Whether a plan is held at all is
@@ -248,7 +249,11 @@ how the code here is organised.
   `SessionEnd` record rather than inferred from file times, the record is single-use and
   expiring, and the adoption is announced. Weaken any one of those four and this becomes the
   persistent gate wearing a different name; `dev/design.md` has the measurements.
-- guard always exits 0 and fails open.
+- The plan gate's reviewer is `plan_review`, the one bad config guard does not absorb: an
+  unusable value BLOCKS rather than falling back to the review guard ships, and the key must
+  stay without a default naming that review or the branch cannot exist. `dev/design.md`'s
+  config reference has the argument for both.
+- guard always exits 0 and fails open, with the one exception above.
 
 ## Deliberately not enforced
 
@@ -274,8 +279,9 @@ each one cost.
   screen. Keep those two and it is a switch; lose either and it is the gate again.
   `audit-turn`, the setting that seeded it, is now in the same list — retired in v0.124.0. A
   default that opened a session muted was the gate itself once every entry became one the user
-  types: `guard-candidates` reported the mute, so a typed `/guard:audit-turn` was refused by a
-  config file. Do not add a key for it again; a project that wants guard quiet has the agent
+  types: `guard-candidates` read the mute back then, so a typed `/guard:audit-turn` was refused
+  by a config file. That reader is gone now for the same reason the key is — a typed audit runs
+  whatever the mute says. Do not add a key for it again; a project that wants guard quiet has the agent
   switches, which already ship `off`. `dev/design.md` has both arguments.
 - A `reuse_agents` list separate from the per-agent mode, or an `exempt_skills` list.
 - The `reuse` mode itself — one named instance per session, resumed on later turns. Removed

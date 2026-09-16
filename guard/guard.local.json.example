@@ -1,5 +1,6 @@
 {
   "audit-plan": "on",
+  "plan_review": {"kind": "agent", "name": "project:plan-reviewer"},
   "claims-auditor": "off",
   "deferrals-auditor": "off",
   "clarity-auditor": "off",

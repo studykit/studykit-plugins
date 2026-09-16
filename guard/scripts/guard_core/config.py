@@ -9,7 +9,11 @@ over whether guard says anything unasked, and over which audits exist to be invo
 ``audit-plan`` (``"on"`` by default, ``"on"`` or ``"off"``): the state each session's plan gate
 opens in — the shell toggle moves the session only and never writes here. It is the only audit
 with a setting, because it is the only one the user does not invoke; the turn side had one,
-``audit-turn``, until v0.124.0 retired it (``RETIRED_KEYS``). And ``refs_dir``
+``audit-turn``, until v0.124.0 retired it (``RETIRED_KEYS``). Beside it, ``plan_review``
+(object, default ``{}``): WHO reviews a held plan, as one
+``{"kind": "agent"|"skill", "name": "..."}`` action. Unset means guard's own review; a value
+that is present but malformed is the one setting that does not fall back — see
+``_plan_review_action``. And ``refs_dir``
 (project-relative directory for saved copies of cited docs; empty
 means the git-tracked default ``wiki/ref/``, and an unsafe value falls back to it — see
 ``paths._refs_dir``). There is no model key: every agent, the router included, brings its own
@@ -223,6 +227,19 @@ DEFAULT_CONFIG: dict[str, Any] = {
     # only guarantee worth making here: a project that mistypes the switch gets the behaviour it
     # would have had without the key at all, rather than a third answer it never wrote.
     AUDIT_PLAN_KEY: "on",
+    # WHO reviews a held plan, as one `{"kind": "agent"|"skill", "name": "..."}` action —
+    # the same shape `doc_review_rules` uses per glob, without the glob, because there is
+    # exactly one plan under review at a time.
+    #
+    # Empty ({}) is UNSET and is the shipped state: the gate then names `guard:audit-plan`,
+    # the review this plugin ships. That name is deliberately NOT written here as a default
+    # value. A default in the config file is a value a project can end up disagreeing with
+    # silently; the name belongs in the one place that emits it (`cmd_plan_gate`), where
+    # "nothing configured" and "configured to guard's own review" stay distinguishable.
+    #
+    # A value present but malformed is the one place guard does NOT fall back — see
+    # `_plan_review_action` and `AGENTS.md`.
+    "plan_review": {},
     "claims-auditor": AgentMode.OFF,
     "deferrals-auditor": AgentMode.OFF,
     # Can the intended reader follow the answer? The only agent whose verdict depends on
@@ -298,6 +315,18 @@ class DocReviewRule(NamedTuple):
     name: str
 
 
+class ReviewAction(NamedTuple):
+    """An agent or skill a review is handed to, with no path condition in front of it.
+
+    Deliberately not a base class `DocReviewRule` inherits: the two share a validator
+    (``_review_action_name``) and nothing else. A document action is selected by matching a
+    glob and is one of many; this one is the whole answer to "who reviews the plan".
+    """
+
+    kind: str
+    name: str
+
+
 def _review_action_name(value: Any) -> str | None:
     """Return a configured document-review action name, if it is safe to inject."""
 
@@ -305,6 +334,34 @@ def _review_action_name(value: Any) -> str | None:
         return None
     normalized = value.strip()
     return normalized if _ACTION_NAME_RE.fullmatch(normalized) else None
+
+
+def _plan_review_action(cfg: dict[str, Any]) -> tuple[ReviewAction | None, bool]:
+    """Who reviews a held plan: ``(action, configured)``.
+
+    ``(None, False)`` is UNSET and is the common case — the caller names the review guard
+    ships. ``(None, True)`` is a value the project WROTE and guard cannot use, and the two
+    must stay distinguishable, which is why this returns the flag rather than an action the
+    caller cannot tell apart from a default.
+
+    That distinction is the whole point of the second element. Falling back to guard's own
+    review on a malformed value would run the reviewer the project just replaced, and say
+    nothing — the project would read the gate passing as its setting working. So
+    ``cmd_plan_gate`` blocks on ``(None, True)`` and names the setting. It is the one place
+    in this plugin a bad config is not absorbed; ``AGENTS.md`` records the exception.
+
+    A value of the wrong JSON TYPE never reaches here: ``_load_config`` compares against this
+    key's ``{}`` default and drops a non-object, which lands it in the unset case. Only an
+    object with an unusable ``kind`` or ``name`` is "configured but invalid".
+    """
+    raw = cfg.get("plan_review")
+    if not isinstance(raw, dict) or not raw:
+        return None, False
+    kind = raw.get("kind")
+    name = _review_action_name(raw.get("name"))
+    if kind not in ("agent", "skill") or name is None:
+        return None, True
+    return ReviewAction(kind, name), True
 
 
 def _doc_review_rules(cfg: dict[str, Any]) -> tuple[DocReviewRule, ...]:

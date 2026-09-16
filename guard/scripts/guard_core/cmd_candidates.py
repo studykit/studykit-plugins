@@ -34,7 +34,7 @@ from .config import _agent_mode, _load_config
 from .paths import _cli_project_dir, _trace
 from .agents import (AUDIT_AGENTS, REPORT_PATH, TURN_PATH, _eligible_agents,
                      _path_entry)
-from .state import _audit_paused, _read_state
+from .state import _read_state
 
 
 def cmd_candidates() -> int:
@@ -52,11 +52,11 @@ def cmd_candidates() -> int:
     directly — every dependency here runs through an edit the CALLER makes, which is why the
     ordering is stated in the router's template rather than left for an agent to notice.
 
-    Three shapes that print no keys, and they must not look alike on stderr. No session id
-    is an installation problem. A muted session is the user having switched guard off, which
-    is an answer. An empty list is a real answer too, and the router can now see it — an
-    audit the user asks for in a project with every switch off reaches this verb — so each is
-    called out rather than left as silence the router would have to interpret.
+    Two shapes that print no keys, and they must not look alike on stderr. No session id is
+    an installation problem. An empty list is a real answer — an audit the user asks for in a
+    project with every switch off reaches this verb — so each is called out rather than left
+    as silence the router would have to interpret. The session mute is not one of them: see
+    below.
 
     On the ``--continue`` / bare ``--resume`` carve-out in the reference above, the env var
     may carry the startup id while the hooks carry the resumed one. That surfaces here as an
@@ -76,16 +76,15 @@ def cmd_candidates() -> int:
 
     config = _load_config(project_dir)
     state = _read_state(project_dir, session_id, config)
-    # The mute, honored here as well as in `cmd_stop`, and load-bearing on BOTH paths now.
-    # Neither router has a hook in front of it: a document audit never did, and a turn audit
-    # is invoked by the user. So this is the only place a muted session is told so before an
-    # audit runs, and without it `guard off` would silence what guard says unasked while
-    # leaving every audit the user could still invoke running.
-    if _audit_paused(state):
-        print("guard candidates: this session is muted (`guard off`) — nothing is eligible.",
-              file=sys.stderr)
-        _trace(project_dir, session_id, "candidates", "paused")
-        return 0
+    # The mute is NOT read here, and that is the whole shape of `guard off`: it governs what
+    # guard says unasked (`cmd_stop`) and nothing else. Every caller of this verb is reached
+    # only by a person typing — both entry skills are `disable-model-invocation: true`, and
+    # `/guard:answer` is one too — so refusing here would be a mute answering "no" to a
+    # request made out loud after it. That is the same failure that retired `audit-turn` in
+    # v0.124.0 (`dev/design.md`); a shorter time horizon does not make it a different one.
+    #
+    # Do not add the check back. A user who types an audit while muted has said which of the
+    # two they meant by the act of typing it, and guard stays quiet the moment they stop.
     # The file lists are deliberately empty. Only the turn-reading agents are routed, and
     # `_eligible_agents` gates a file-reading one on having a file of its own kind — so
     # passing nothing is what makes those ineligible here, which is exactly the filter this

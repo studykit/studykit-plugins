@@ -18,6 +18,12 @@ middle of shaping — which is what plan mode is for. Gating on approval moves t
 that conversation has finished, and blocking after the tool ran is not too late: approval ends
 plan mode, it does not build anything.
 
+WHAT it names is configurable and WHEN it fires is not. ``plan_review`` holds one
+``{"kind": "agent"|"skill", "name": "..."}`` action — the reviewer a project wants in place of
+the one guard ships — and nothing else about the gate moves with it. A project reviews its
+plans its own way or guard's way; that it reviews them at all stays the ``audit-plan`` setting
+and ``guard-plan``'s question.
+
 The gate is content-addressed, not a flag. ``plan_audited_hash`` records the hash of the plan
 text that was audited, and an approval passes only while the plan still hashes to it. Revise the
 plan after its audit and the next approval is held again — which is the behaviour worth having,
@@ -39,7 +45,7 @@ import sys
 
 from pathlib import Path
 
-from .config import _load_config
+from .config import _load_config, _plan_review_action
 from .emit import _emit_post_tool_block
 from .paths import _cli_project_dir, _project_dir, _trace
 from .payload import _read_payload, _session_id
@@ -65,9 +71,13 @@ def cmd_exit_plan() -> int:
     to work with, or when the plan already hashes to the audited one. Blocks otherwise, with a
     reason that tells the model to audit the plan before building it.
 
-    Fail-OPEN in every failure branch. A hook that cannot read its own state must not be able
-    to wedge an approved plan — the audit is worth having, and it is not worth stalling a
-    session over.
+    WHO it names is the project's, through ``plan_review``. Unset — the shipped state — names
+    the ``guard:audit-plan`` skill this plugin ships.
+
+    Fail-OPEN in every failure branch but one. A hook that cannot read its own state must not
+    be able to wedge an approved plan — the audit is worth having, and it is not worth stalling
+    a session over. The exception is a ``plan_review`` the project wrote and guard cannot use:
+    see the branch below for why that one blocks instead.
     """
     payload = _read_payload()
     if payload is None:
@@ -101,16 +111,55 @@ def cmd_exit_plan() -> int:
         _trace(project_dir, session_id, "exit-plan", "audited")
         return 0
 
+    # WHO reviews it. The name below is injected into text the model acts on, so it is
+    # syntax-validated in `config._plan_review_action` before it gets here — the same
+    # guarantee `dispatch._docs_context` relies on for a document action.
+    action, configured = _plan_review_action(config)
+
+    if configured and action is None:
+        # The one place guard does not absorb a bad config. Falling back to the review it
+        # ships would run the reviewer this project explicitly replaced, and the passing
+        # gate would read as the setting working. Blocking costs one approval and says what
+        # to fix; `guard-plan off` is still the way out.
+        _emit_post_tool_block(
+            "This plan was approved, and guard cannot name a reviewer for it: the "
+            "`plan_review` setting in this project's guard config is not a usable "
+            '`{"kind": "agent" | "skill", "name": "..."}` action. Do not start building the '
+            "plan. Tell the user to fix that setting — the `guard:settings` skill writes it "
+            "— or to run `guard-plan off` in Bash if they would rather skip plan audits for "
+            "this session."
+        )
+        _trace(project_dir, session_id, "exit-plan", "invalid_plan_review")
+        return 0
+
+    if action is None:
+        lead = "Run the `guard:audit-plan` skill over the plan file first"
+    elif action.kind == "skill":
+        lead = f"Run the `{action.name}` skill over the plan file first"
+    else:
+        lead = (f"Dispatch the `{action.name}` agent over the plan file first "
+                f"(Agent tool, `subagent_type: \"{action.name}\"`)")
+    # Only a CONFIGURED reviewer is told to stamp. `guard:audit-plan` runs `plan-audited`
+    # itself in its closeout, and anything else has no reason to know the verb exists — so
+    # without this line a project that set the key would be held by a gate nothing can
+    # release. Conditioned on being configured rather than on the name not being guard's
+    # own: special-casing that name here is the default this key exists to avoid, and the
+    # cost of the broader rule is one redundant sentence for a project that configures it.
+    stamp = "" if action is None else (
+        " When the review is finished and its findings are in the plan file, run "
+        "`guard-plan-audited <plan file path>` in Bash — that is what releases this gate.")
+
     revised = state.get("plan_audited_hash") is not None
     what = ("This approved plan has changed since it was audited"
             if revised else "This plan was approved without being audited")
     _emit_post_tool_block(
-        f"{what}. Do not start building it. Run the `guard:audit-plan` skill over the plan "
-        "file first, then act on what comes back: fold in what the critics found, and put "
-        "anything that changes the approach to the user before you build it. "
+        f"{what}. Do not start building it. {lead}, then act on what comes back: fold in "
+        "what the critics found, and put anything that changes the approach to the user "
+        f"before you build it.{stamp} "
         "`guard-plan off` in Bash turns this off for the session if the user asks for it."
     )
-    _trace(project_dir, session_id, "exit-plan", "revised" if revised else "unaudited")
+    _trace(project_dir, session_id, "exit-plan", "revised" if revised else "unaudited",
+           review=(f"{action.kind}:{action.name}" if action else "default"))
     return 0
 
 

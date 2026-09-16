@@ -201,9 +201,12 @@ def _audit_paused(state: dict[str, Any]) -> bool:
     """Is guard muted for this session?
 
     The session's own answer and nobody else's: it opens armed and only `guard off` mutes it,
-    for the rest of that session. Muted means guard says nothing unasked AND an audit the user
-    invokes reports that the session is muted (`cmd_candidates`) — and nothing is lost by it,
-    since `guard-inputs` cuts the turn out of the transcript when an audit asks for one, so a
-    turn that went by while muted is still reachable after `guard on`.
+    for the rest of that session.
+
+    Muted means guard says nothing UNASKED, and that is the whole of it. An audit the user
+    types still runs — `cmd_candidates` does not read this, deliberately — because the typing
+    is a request made after the mute and outranks it. Nothing is lost either way: `guard-inputs`
+    cuts the turn out of the transcript when an audit asks for one, so a turn that went by while
+    muted is still reachable later.
     """
     return state.get("audit_paused") is True
