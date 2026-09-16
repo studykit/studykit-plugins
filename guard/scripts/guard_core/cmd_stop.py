@@ -32,7 +32,7 @@ from .emit import _emit_stop_context
 from .agents import AUDIT_AGENTS, _eligible_agents
 from .state import (_audit_paused, _edit_source, _edited_files, _edited_fingerprint,
                     _read_state, _write_state)
-from .dispatch import (_DIRECT_LEAD, _REVIEW_TIMING, _SHELL_DIRECT_LEAD,
+from .dispatch import (_DIRECT_LEAD, _DOCS_LEAD, _REVIEW_TIMING, _SHELL_DIRECT_LEAD,
                        _dispatch_context, _docs_context)
 from .cmd_edit import EDITED_FILES_MAX, recover_shell_writes
 
@@ -124,10 +124,12 @@ def cmd_stop() -> int:
             project_dir, session_id, prompt_id, lead, eligible, modes,
             {"files": edited}, ""))
     if doc_groups:
-        for (action_kind, action_name, conditional), group in doc_groups.items():
-            blocks.append(_docs_context(group, action_kind=action_kind,
-                                        action_name=action_name,
-                                        conditional=conditional))
+        # One block, not one per group: the lead's rule about what the caller may send governs
+        # every entry under it, and a lead repeated per action is the same sentence twice.
+        entries = [_docs_context(group, action_kind=action_kind, action_name=action_name,
+                                 conditional=conditional)
+                   for (action_kind, action_name, conditional), group in doc_groups.items()]
+        blocks.append("\n".join([_DOCS_LEAD, *entries]))
     truncated = state.get("edited_truncated")
     if isinstance(truncated, dict) and truncated:
         omitted = sum(v for v in truncated.values() if isinstance(v, int) and v > 0)

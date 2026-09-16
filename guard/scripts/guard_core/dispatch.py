@@ -203,6 +203,24 @@ def _refs_context(refs: list[str]) -> str:
     return "\n".join(lines)
 
 
+# The one rule the document path was missing. `_agent_pointer` states it for the direct agents
+# and every lead in this module is worded around it, but the doc-review blocks carried only
+# "paths only" — which reads as a label on the list rather than as a constraint on the caller.
+# And this caller is mid-edit on these very files, so it has something it wants looked at: it
+# adds a brief, and the brief is the caller telling the audit what to find. What the audit
+# reports then follows the caller's attention instead of the action's own criteria, which is
+# the one failure a cold fork exists to prevent, and nothing about the report says it happened.
+#
+# Emitted once per Stop payload rather than per entry: several rules may select several
+# actions, and the rule is the same for all of them.
+_DOCS_LEAD = (
+    "guard: this turn edited documents. Review each entry below by dispatching the agent or "
+    "skill it names with the paths listed under it and NOTHING else — not what you were "
+    "working on, not what you want checked, not what you think is weak. Its criteria are its "
+    "own. Then act on what each one reports."
+)
+
+
 # `doc-auditor`, and the one file-reading audit named as a SKILL rather than as an agent. The
 # other three have nothing to do around their agent: the report comes back, the main agent
 # applies what it may, done. This one arrives on a file the caller is mid-edit on, and what the
@@ -210,19 +228,19 @@ def _refs_context(refs: list[str]) -> str:
 # file if one is in the list, leave to the project's linter what the project already lints — is
 # a task, not a criterion. A task belongs in a skill, read once when there is something to
 # audit, rather than in this block, which is paid for on every turn that touches a document.
-#
-# Worded as what the turn did, like the other two leads: the criteria are the agent's own, and
-# a lead that previewed them would be the caller telling it what to find.
 def _docs_context(docs: list[str], *, action_kind: str, action_name: str,
                   conditional: bool = False) -> str:
     """One compact action-and-path entry in the document-review context.
 
+    An entry names an action and its paths and nothing else. What the caller may send with
+    them is ``_DOCS_LEAD``'s, once for the whole payload.
+
     Configured action names have already been syntax-validated by ``config._doc_review_rules``.
     """
     if action_kind == "agent":
-        lead = f"- Agent `{action_name}`, paths only:"
+        lead = f"- Agent `{action_name}`:"
     else:  # action_kind == "skill"
-        lead = f"- Skill `{action_name}`, paths only:"
+        lead = f"- Skill `{action_name}`:"
     if conditional:
         lead += (" Run it only for paths this session actually modified; ignore paths changed "
                  "only by another session. Decide from this session's own tool activity, not "

@@ -2834,6 +2834,15 @@ intentionally silent: inferring a generic reviewer would make enabling a narrowl
 audit unrelated files. The Stop hook groups files only by their selected action, and the rule
 matcher chooses the most-specific glob so a deeper project area can override a broad one.
 
+The block carries one lead for all of its entries, and what the lead is there for is the rule
+that **the caller sends the paths and nothing else.** `_agent_pointer` had always stated it for
+the direct agents; this path shipped without it and said only "paths only", which a caller reads
+as a label on the list. The caller is mid-edit on the files it is handing over, so it has a
+brief — and a brief is the caller telling a cold fork what to find, which is the failure the
+fork exists to prevent. Nothing in the report that comes back says the audit followed the
+caller's attention rather than its own criteria, which is why this is worded as a prohibition
+rather than left to the action's own definition to defend against.
+
 ### Why not two agents, which was built first
 
 The first fix was two agent definitions per audit, generated from a shared criteria partial.
