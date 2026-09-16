@@ -64,8 +64,11 @@ An action is either an `agent`, dispatched as its exact `subagent_type`, or a `s
 its exact name. Exclusions belong in `doc_exclude`; `action: null` is invalid. Patterns in both
 settings are project-relative:
 `*` stays in one directory and `**` crosses directory depth. The most-specific matching rule
-wins — deeper literal directories first, then literal detail and fewer wildcards. A tie uses
-the earlier rule. A path that has no matching rule is not reviewed.
+wins, and the filename decides first: a rule whose last segment names the file exactly
+(`**/AGENTS.md`) beats one whose last segment is a pattern (`Github/**/*.md`), which beats a
+bare wildcard (`Github/**/*`). Deeper literal directories break that tie, so
+`Github/AGENTS.md` still wins over `**/AGENTS.md`, then literal detail and fewer wildcards. An
+exact tie uses the earlier rule. A path that has no matching rule is not reviewed.
 
 Before changing anything, show the exact compact JSON values and ask the user to confirm them.
 A request that already gives exact rules counts as confirmation. On confirmation, enable

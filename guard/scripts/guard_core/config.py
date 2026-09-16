@@ -394,16 +394,34 @@ def _doc_review_rule(path: str, rules: tuple[DocReviewRule, ...]) -> DocReviewRu
 
     ``*`` stays within one directory, while ``**`` may cross directories. Paths are already
     project-relative before reaching here, so a rule can never widen the document scope.
-    Literal directory depth wins first, then literal detail and fewer wildcards; configuration
-    order breaks an exact tie.
+
+    **The FILENAME decides first, and that ordering is the fix for a real misroute.** Ranking
+    literal directory depth first — as this did until v0.141.1 — sent
+    `Github/ticket/AGENTS.md` to `Github/**/*.md`'s reviewer instead of to `**/AGENTS.md`'s,
+    because one literal directory segment outranked an exactly named file. A rule that names
+    the file is a rule about THAT file wherever it lives; a rule with a wildcard basename is a
+    rule about an area, and an area rule that captured a file named by another rule leaves no
+    trace — the wrong auditor reports on the document and its report looks like any other.
+    So: a fully literal last segment beats a partly literal one (`AGENTS.md` over `*.md`),
+    which beats a bare wildcard (`*.md` over `*`). Only then does literal directory depth
+    decide, so `Github/AGENTS.md` still wins over `**/AGENTS.md`. Literal detail and fewer
+    wildcards follow, and configuration order breaks an exact tie.
     """
 
     normalized = path.replace("\\", "/")
-    matches: list[tuple[tuple[int, int, int, int, int, int], DocReviewRule]] = []
+    matches: list[tuple[tuple[int, int, int, int, int, int, int], DocReviewRule]] = []
     for rule_index, rule in enumerate(rules):
         pattern = rule.glob.replace("\\", "/")
         if _doc_glob_regex(pattern).fullmatch(normalized):
             segments = [segment for segment in pattern.split("/") if segment]
+            basename = segments[-1] if segments else ""
+            basename_wildcards = sum(basename.count(char) for char in "*?[")
+            if not basename_wildcards:
+                basename_rank = 2
+            elif any(char not in "*?[]" for char in basename):
+                basename_rank = 1
+            else:
+                basename_rank = 0
             prefix_depth = 0
             for segment in segments:
                 if "*" in segment or "?" in segment or "[" in segment:
@@ -413,8 +431,8 @@ def _doc_review_rule(path: str, rules: tuple[DocReviewRule, ...]) -> DocReviewRu
                 not any(char in segment for char in "*?[") for segment in segments)
             literal_chars = sum(1 for char in pattern if char not in "*?[]/")
             wildcard_count = sum(pattern.count(char) for char in "*?[")
-            matches.append(((prefix_depth, literal_segments, literal_chars, -wildcard_count,
-                             len(segments), -rule_index), rule))
+            matches.append(((basename_rank, prefix_depth, literal_segments, literal_chars,
+                             -wildcard_count, len(segments), -rule_index), rule))
     return max(matches, key=lambda match: match[0])[1] if matches else None
 
 

@@ -2685,8 +2685,14 @@ is a real setting here and means the opposite of unset. `doc_review_rules` is an
 "action": { "kind": "agent" | "skill", "name": "..." } }` entries. Exclusions are
 expressed only through `doc_exclude`. Its globs match project-relative paths (`*` stays in one directory
 and `**` may cross directories), including zero or more nested directories for `**/`. The most
-specific matching rule owns each document: greater literal directory depth wins, then literal
-detail and fewer wildcards; configuration order breaks an exact tie. A file is reviewed by one
+specific matching rule owns each document, and **the filename ranks ahead of the directory**:
+a fully literal last segment wins, then a partly literal one, then a bare wildcard; only then
+greater literal directory depth, then literal detail and fewer wildcards, with configuration
+order breaking an exact tie. Depth used to rank first, and that sent `Github/ticket/AGENTS.md`
+to `Github/**/*.md`'s reviewer rather than to `**/AGENTS.md`'s — one literal directory segment
+outranked an exactly named file. A rule that names a file is about that file wherever it lives;
+a wildcard basename is about an area, and an area rule swallowing a named file is invisible in
+the report that comes back (see `config._doc_review_rule`). A file is reviewed by one
 action or skipped. The `doc-auditor` switch still controls whether any of these
 dispatches run. An unmatched document is not reviewed. Claude and Codex share this selection;
 the Codex adapter maps Guard's portable colon-names to project-local underscore-named agents. See the
@@ -2832,7 +2838,8 @@ have a built-in dispatch entry. `doc_review_rules` maps matching project-relativ
 explicit agent or skill action. `doc_exclude` removes paths before matching, and an unmatched document is
 intentionally silent: inferring a generic reviewer would make enabling a narrowly scoped rule
 audit unrelated files. The Stop hook groups files only by their selected action, and the rule
-matcher chooses the most-specific glob so a deeper project area can override a broad one.
+matcher chooses the most-specific glob so a named file, and then a deeper project area, can
+override a broad one.
 
 The block carries one lead for all of its entries, and what the lead is there for is the rule
 that **the caller sends the paths and nothing else.** `_agent_pointer` had always stated it for
