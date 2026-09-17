@@ -1,0 +1,26 @@
+id = "studykit.guard"
+name = "Guard checkpoints"
+version = "0.143.0"
+min_herdr_version = "0.9.0"
+description = "Show Guard's pending edited files and start an explicit audit checkpoint"
+platforms = ["linux", "macos"]
+
+[[actions]]
+id = "show-pending"
+title = "Guard: show pending files"
+description = "Open the pending edited-file queue for the focused agent"
+contexts = ["workspace", "tab", "pane"]
+command = ["./herdr/guard_herdr.py", "show-action"]
+
+[[actions]]
+id = "audit-pending"
+title = "Guard: audit pending files"
+description = "Ask the focused Claude Code or Codex agent to run Guard's file checkpoint"
+contexts = ["workspace", "tab", "pane"]
+command = ["./herdr/guard_herdr.py", "audit-action"]
+
+[[panes]]
+id = "pending-files"
+title = "Guard pending files"
+placement = "popup"
+command = ["./herdr/guard_herdr.py", "panel"]

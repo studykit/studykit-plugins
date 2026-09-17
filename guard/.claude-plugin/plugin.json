@@ -1,7 +1,7 @@
 {
   "name": "guard",
-  "version": "0.142.0",
-  "description": "On-demand audits of answers and documents for unsupported claims, unclear explanations, and documentation drift.",
+  "version": "0.143.0",
+  "description": "On-demand audits of answers, documents, plans, and checkpointed edited-file queues.",
   "author": {
     "name": "studykit"
   },

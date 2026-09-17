@@ -143,9 +143,9 @@ AUDIT_SWITCHES = (AUDIT_PLAN_KEY,)
 # is stated where the user is already looking at the file.
 RETIRED_KEYS: dict[str, str] = {
     "audit-turn": (
-        "retired in v0.124.0 — a session now opens armed, and `/guard:audit-turn`, "
-        "`/guard:answer` and `/guard:audit-report` run when you invoke them. `guard off` in a "
-        "shell still mutes the session you are in."
+        "retired in v0.124.0 — `/guard:audit-turn`, `/guard:answer` and "
+        "`/guard:audit-report` run when you invoke them. Edited-file audits now run only at "
+        "an explicit `/guard:audit-files` checkpoint."
     ),
 }
 
@@ -214,9 +214,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
     # `cmd_candidates` reports a muted session, so `/guard:audit-turn` and `/guard:answer` stopped
     # before doing anything in a project that had switched agents on. A default answering "no" to
     # a question the user just asked out loud is the `audit_gate` this design removed, wearing
-    # the switch's clothes. The session mute stays and is unaffected: `guard off` still silences
-    # what guard says unasked, and it is a decision made now rather than one a config file made
-    # months ago. `RETIRED_KEYS` carries what a project still holding the key is told.
+    # the switch's clothes. `RETIRED_KEYS` carries what a project still holding the key is told.
     #
     # This is the DEFAULT, not the live value: `guard-plan` moves `plan_audit_paused` in
     # `state/<sid>.json` for one session and never writes here, so a session muted at a shell
@@ -635,8 +633,8 @@ def _audit_on(cfg: dict[str, Any], key: str) -> bool:
     per-key, though ``audit-plan`` is currently the only key: the rule is about what a
     misspelling costs, not about how many switches there happen to be.
 
-    ``state._audit_paused`` has no key behind it any more and is not seeded from here — a
-    session opens armed and only ``guard off`` mutes it.
+    The retired automatic edited-file audit has no switch here; current file reviews begin at
+    an explicit checkpoint.
     """
     raw = cfg.get(key, DEFAULT_CONFIG[key])
     if isinstance(raw, bool):

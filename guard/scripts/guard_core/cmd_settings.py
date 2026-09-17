@@ -37,7 +37,7 @@ from .config import (
 from .paths import (_cli_project_dir, _doc_dir_entries, _doc_exclude_entries,
                     _knowledge_dir_entries, _refs_dir, _trace)
 from .agents import AUDIT_AGENTS, SETTABLE_AGENTS
-from .state import _audit_paused, _plan_audit_paused, _read_state, _write_state
+from .state import _plan_audit_paused, _read_state, _write_state
 
 
 # Which session-state key each audit switch seeds, and the shell command that moves it for one
@@ -205,21 +205,16 @@ def _config_show_lines(project_dir: Path, session_id: str | None) -> list[str]:
                 "agent:guard:doc-auditor, agent:guard:agents-md-auditor, "
                 "agent:guard:ext-docs-auditor, skill:guard:audit-docs")
 
-    def mute_line() -> str:
-        """This session's mute, which is state and not a setting.
-
-        It has no config key — a session opens armed — so nothing below reports it, and the
-        reader would otherwise have no answer here to "is guard actually on right now". That
-        answer must stay visible somewhere a person looks: the status line carries it, and so
-        does this. Printed whichever way it sits, because a line that appears only while muted
-        cannot be told from a guard that does not report mutes at all.
-        """
+    def checkpoint_line() -> str:
+        """This session's pending file-checkpoint count."""
         if session_id is None or state is None:
-            return "guard (session): unknown — no session id in this environment"
-        if _audit_paused(state):
-            return ("guard (session): OFF — guard says nothing unasked; `guard on` in a shell "
-                    "arms it. Audits you invoke yourself still run")
-        return "guard (session): ON — `guard off` in a shell mutes it for this session"
+            return "file checkpoint: unknown — no session id in this environment"
+        pending = {
+            path for bucket in ("edited_files", "edited_agent_docs", "edited_refs", "edited_docs")
+            for path in state.get(bucket, []) if isinstance(path, str) and path
+        }
+        return (f"file checkpoint: {len(pending)} pending — run `/guard:audit-files`; "
+                "Stop does not launch file audits")
 
     def retired_lines() -> list[str]:
         """One line per retired key still present in the file.
@@ -231,12 +226,10 @@ def _config_show_lines(project_dir: Path, session_id: str | None) -> list[str]:
         return [f"{k}: (retired) {RETIRED_KEYS[k]}" for k in RETIRED_KEYS if k in raw]
 
     refs_rel = raw.get("refs_dir") if isinstance(raw.get("refs_dir"), str) else ""
-    # The session mute and the audit switch are listed FIRST: each overrides every agent line
-    # below it, so a reader who sees the agent switches without them would read the wrong
-    # answer to "is guard running". Always listed, both of them — a state that is never
-    # printed is a state the reader has no way to tell from a guard that does not have it.
+    # The pending count and plan switch are listed first: they are the two live session facts
+    # that cannot be recovered from the project config alone.
     return [
-        mute_line(),
+        checkpoint_line(),
         *(audit_line(k) for k in AUDIT_SWITCHES),
         # Directly under the plan gate's own switch: the two answer "is a plan held" and
         # "by whom", and the second is unreadable apart from the first.

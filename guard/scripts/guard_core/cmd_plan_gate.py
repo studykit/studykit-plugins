@@ -113,7 +113,7 @@ def cmd_exit_plan() -> int:
 
     # WHO reviews it. The name below is injected into text the model acts on, so it is
     # syntax-validated in `config._plan_review_action` before it gets here — the same
-    # guarantee `dispatch._docs_context` relies on for a document action.
+    # guarantee the file-checkpoint planner relies on for a document action.
     action, configured = _plan_review_action(config)
 
     if configured and action is None:

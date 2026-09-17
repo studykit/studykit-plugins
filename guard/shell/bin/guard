@@ -1,5 +1,5 @@
 #!/bin/sh
-# guard — arm or mute guard's audit for the Claude Code session this shell belongs to.
+# guard — compatibility command for the retired automatic edited-file audit mute.
 #
 #   guard on | guard off | guard | guard status
 #

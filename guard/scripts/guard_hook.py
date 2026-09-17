@@ -31,7 +31,7 @@ Subcommands
 - stop           Stop — ``guard_core.cmd_stop``
 - session-start  SessionStart — ``guard_core.cmd_session``
 - session-end    SessionEnd on ``clear`` — ``guard_core.cmd_session``
-- toggle-cli     CLI (argv), the session mute — ``guard_core.cmd_status``
+- toggle-cli     CLI (argv), compatibility notice for retired auto-audit mute
 - status         CLI (stdin JSON), the status-line segment — ``guard_core.cmd_status``
 - settings       CLI (argv), run by the ``guard:settings`` skill — ``guard_core.cmd_settings``
 - refs-dir       CLI, prints the resolved refs directory — ``guard_core.cmd_settings``
@@ -42,6 +42,7 @@ Subcommands
 - plan-audited   CLI (argv), records the audited plan — ``guard_core.cmd_plan_gate``
 - plan-toggle-cli CLI (argv), the plan-audit session switch — ``guard_core.cmd_plan_gate``
 - transcript     CLI (argv), run by an audit agent — ``guard_core.transcript``
+- file-checkpoint CLI (argv), used by the explicit edited-file audit skill
 
 Requires Python 3.11+ (``enum.StrEnum``).
 """
@@ -62,6 +63,7 @@ from guard_core.cmd_plan import cmd_knowledge_dirs
 from guard_core.cmd_plan_gate import cmd_exit_plan, cmd_plan_audited, cmd_plan_toggle_cli
 from guard_core.cmd_settings import cmd_refs_dir, cmd_settings
 from guard_core.cmd_status import cmd_status, cmd_toggle_cli
+from guard_core.cmd_checkpoint import cmd_file_checkpoint
 
 
 SUBCOMMANDS = {
@@ -81,6 +83,7 @@ SUBCOMMANDS = {
     "transcript": cmd_transcript,
     "toggle-cli": cmd_toggle_cli,
     "status": cmd_status,
+    "file-checkpoint": cmd_file_checkpoint,
 }
 
 
@@ -91,7 +94,7 @@ SUBCOMMANDS = {
 # a missing argument in this verb's own call raised TypeError, was swallowed here, and
 # printed nothing while exiting 0, which is exactly what the user would have read as "guard
 # is off now".
-_MUST_REPORT = {"toggle-cli"}
+_MUST_REPORT = {"toggle-cli", "file-checkpoint"}
 
 
 def main() -> int:

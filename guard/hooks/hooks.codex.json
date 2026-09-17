@@ -1,5 +1,5 @@
 {
-  "description": "Codex lifecycle hooks for guard. The adapter records documented turn and edited-file payloads, then applies configured document-review rules without parsing transcripts.",
+  "description": "Codex lifecycle hooks for guard. The adapter records documented turn payloads and accumulates edited files for explicit audit checkpoints without parsing transcripts.",
   "hooks": {
     "SessionStart": [
       {

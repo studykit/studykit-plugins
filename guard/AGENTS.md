@@ -50,22 +50,13 @@ that decide what counts as a turn a person opened (non-human origin, guard's own
 commands, a user `!` command), which moved out of `cmd_stop` and into
 `transcript._last_auditable_prompt_id`. Same judgment, paid per audit instead of per turn.
 
-### What still runs on a hook
+### What still runs on hooks
 
-The **edited-file audits**. Native tools answer the trigger exactly: the turn either targeted a
-source file, an agent instruction file, a saved reference or an ordinary document, or it did
-not. Bash supplies only a shared-worktree difference, so its candidates carry the ownership
-condition below.
-`PostToolUse` records source, agent-instruction, reference and ordinary-document lists from
-native file targets and Bash snapshot/hash differences. Stop treats native targets as exact;
-for Bash-derived candidates it tells the main session to dispatch only paths that session
-actually modified according to its own tool activity, ignoring another session's writes. It
-then names `comment-corrector` for the fixed source bucket, while all project Markdown is dispatched
-only when a document-review rule matches it; rules name an agent or skill, while
-`doc_exclude` owns explicit exclusions.
-Review dispatch is content-sensitive: unchanged continuation stops are suppressed, while a
-file changed after the first review can be dispatched again in the same turn.
-That is the whole of what Stop does now.
+The **edited-file tracker**. `PostToolUse` accumulates reviewable native targets and Bash
+snapshot/hash differences across turns. `/guard:audit-files` is the explicit checkpoint: it
+snapshots that queue, dispatches the configured file reviews, and clears only revisions that
+did not change while review was running. Stop launches no audit; it remains only to recover
+writes from an interrupted Bash call. Claude and Codex share this checkpoint contract.
 
 Also on `PostToolUse`, and unrelated to auditing: the **refs index gate**, which blocks until a
 file saved under the refs directory is listed in that directory's index. It is a prohibition,
@@ -97,10 +88,10 @@ dispatch say what to do when the name resolves to nothing.
 Every agent switch ships `off`: guard installed is guard available, not guard running.
 `audit-plan` says what a session OPENS in for the plan gate — the one audit nobody invokes —
 and there is no counterpart for the turn side: a session opens armed there, because every
-entry on it is one the user types. `guard` / `guard-plan` then move that session alone, from a
-shell prompt, without entering the conversation — which is why neither is a slash command. SessionStart puts them on `PATH` through `$CLAUDE_ENV_FILE`, which
-is sourced rather than scanned for exports. `toggle-cli` is the one subcommand that must not
-fail open: a person is reading its output, so silence would read as success.
+entry on it is one the user types. `guard-plan` moves the automatic plan gate for that session
+alone. The old `guard on|off` command now only explains that its automatic Stop-audit mute was
+retired. SessionStart puts the shell helpers on `PATH` through `$CLAUDE_ENV_FILE`, which is
+sourced rather than scanned for exports.
 
 That same `PATH` carries `guard-candidates` and `guard-inputs`, which are the dispatched
 agents' and never the user's. **`guard-candidates` takes the path it is answering for**
@@ -215,34 +206,24 @@ how the code here is organised.
 - It names **agents**, never guard's own skills — those are the user's entry point, so a hook
   must not reach through them.
 - The three edited-file lists stay disjoint, and the refs test runs first, by location.
-- `guard-candidates` is where the per-agent switches are enforced for every entry — none has a
-  hook in front of it — and `cmd_stop` enforces them for what guard says unasked. It answers
+- `guard-candidates` is where the per-agent switches are enforced for the turn and report
+  entries. The file-checkpoint planner enforces them for the pending file queue. It answers
   per PATH: `--doc` for the document roster, bare for the turn's. `/guard:answer` must pass
   `--doc`; without it the roster names turn entries that resolve a turn that does not exist.
-  **The session mute is not enforced there and must not be put back** — `cmd_stop` is its only
-  reader; `dev/design.md` § "What stays, and why the mute is not the key" has the argument, as
-  does `cmd_candidates.py`'s comment. The PLAN review is outside this and must stay
-  outside: `audit-plan` invokes its critics by name and reads none of the per-agent switches,
+  The retired session mute is not enforced there and must not be put back: every audit on
+  these paths is explicitly invoked. The PLAN review is outside this and must stay outside:
+  `audit-plan` invokes its critics by name and reads none of the per-agent switches,
   because a plan held for review is reviewed whole or not at all — half a review is worse than
   none, since what it passes over reads as checked. Whether a plan is held at all is
   `audit-plan` / `guard-plan`'s question, answered before the review starts. Do not give the
-  plan entries a roster row. What the mute must NOT be is a
-  project default — that was `audit-turn`, and it refused commands the user had just typed;
-  the Codex adapter therefore checks no mute at all on its audit prefix, since that host has
-  no `guard` command and so nothing but a setting could ever have set one.
-- Two things ignore the agent switches AND the session mute, because both are prohibitions
-  rather than opinions: the refs-index check and the `/`-rooted search refusal. A mute that
-  could lift a prohibition would not be one.
-- The session mute is two-valued and visible, and the shell toggle writes session state only —
-  never the config. It has no setting behind it at all since v0.124.0: the persistence that is
-  left is `audit-plan`, which says what a session opens in for the gate and nothing else. Do
-  not let the toggle start writing it, do not give the turn mute a key again, and if the
-  indicator ever becomes unshippable, drop the mute rather than let it go invisible. It is
-  visible in two places — the status line and `settings show`'s first line — and neither is
-  optional.
-- A `/clear` inherits both switches from the session it replaced, and that is the ONLY boundary that inherits anything — every other start
-  reads the settings. It carries a session that DIFFERS from the pair a fresh session lands on,
-  in either direction. For the plan half that baseline is a config read, which is why the
+  plan entries a roster row.
+- The refs-index check and the `/`-rooted search refusal ignore every audit switch because
+  both are prohibitions rather than opinions.
+- The automatic file-audit session mute is retired. The status line and Herdr token show the
+  pending queue instead; `audit-plan` remains the only automatic audit switch.
+- A `/clear` inherits the plan switch from the session it replaced, and that is the ONLY boundary that inherits anything — every other start
+  reads the settings. It carries a session that differs from the state a fresh session lands on,
+  in either direction. That baseline is a config read, which is why the
   comparison is against the config rather than against a fixed idea of which state is
   noteworthy — a project setting `audit-plan: off` loses its `guard-plan on` the same way
   anyone else loses a `guard-plan off`. For the turn half the baseline is simply armed. The predecessor is named by the

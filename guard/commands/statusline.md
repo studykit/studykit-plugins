@@ -53,8 +53,8 @@ printf '{"session_id":"probe","workspace":{"project_dir":"<project root>"}}' \
   | "${CLAUDE_PLUGIN_ROOT}/scripts/guard_hook.py" status
 ```
 
-Expect one short field — `guard 3/3 · ⚐`, `guard 0/3 · ⚑`, `guard 0/0 · ⚐` and so on — or
-nothing. If it prints nothing for a project with agents switched on,
+Expect one short field — `guard 3 pending · ⚐`, `guard 0 pending · ⚑` and so on — or
+nothing. If it prints nothing,
 stop and say so rather than installing a segment that will stay blank.
 
 **Then check whether the line you found already carries guard's field** — by RUNNING it, not
@@ -154,22 +154,17 @@ right, not that the host can run them; the row itself, after the next assistant 
 
 Then tell the user four things and stop:
 
-- The fraction is *how many agents can run on the next finished turn* over *how many are
-  switched on*: `guard 3/3` with three switched on and the session armed, `guard 0/3` when the
-  session is muted, `guard 0/0` when nothing is switched on at all. So `guard on|off` moves
-  the numerator for this session and `/guard:settings` moves the denominator. A new session
-  opens armed, so it starts on `n/n`; nothing in the settings changes that, and `0/n` means
-  somebody ran `guard off` in this session.
+- The number is how many edited files are waiting in this session's checkpoint queue.
+  `/guard:audit-files` audits a snapshot and clears only revisions that did not change while
+  it ran. A nonzero count after completion means those files changed again and remain pending.
 - The flag is the plan gate, and it is always shown: filled `⚑` means plan audits are armed
   for this session, so an approved plan is held until it has been audited; outline `⚐` means
   they are off. Separate switch, own command — `guard-plan on|off` in a shell for this
   session, or the `audit-plan` setting for what every session starts as.
-- Green means armed, dim means muted, on each half independently: a green fraction beside a
-  dim flag is a session auditing turns with the plan gate off. Colour is the only difference
-  between the two `0/0` states, so a terminal that drops it loses the mute there.
+- Green means files are pending; dim means the file queue is empty. The plan flag has its own
+  colour and remains independent of the edited-file queue.
 - The row updates on assistant messages, session start, `/compact`, permission-mode changes,
-  vim-mode toggles, and a `refreshInterval` tick where one is set — not on the shell command
-  that flips a switch: after `guard on` or `guard-plan on`
-  the segment moves at the next message. If it ever goes blank, that is deliberate — the
+  vim-mode toggles, and a `refreshInterval` tick where one is set. After `guard-plan on|off`
+  the flag moves at the next update. If the segment ever goes blank, that is deliberate — the
   wrapper prints nothing rather than an error, because a status line is the wrong place to
   report a failure.

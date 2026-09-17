@@ -1,7 +1,8 @@
 """``post-edit`` (PostToolUse on file-writing tools and Bash).
 
 Two independent jobs, both independent of the agent switches. It records a source file, an
-agent instruction file, a saved reference or an ordinary document written this turn — the
+agent instruction file, a saved reference or an ordinary document written since the last
+file-audit checkpoint — the
 lists the ``comment-corrector``, ``agents-md-auditor``, ``ext-docs-auditor`` and
 ``doc-auditor`` recommendations are built from, kept in four buckets that must stay disjoint
 (``agents._edited_bucket``). And it requires a file saved inside the refs directory to be
@@ -13,9 +14,10 @@ index check in particular: the agent that saves a reference is usually a subagen
 check that only saw the main agent's writes would miss exactly those files.
 
 Native file tools carry an exact target. Bash does not expose its write-set, so its targets
-come from the existing worktree snapshot/hash comparison and are marked as inferred. Stop
-states those candidates conditionally: the main session dispatches only paths it knows it
-actually modified from its own tool activity, and ignores another session's writes.
+come from the existing worktree snapshot/hash comparison and are marked as inferred. The
+explicit checkpoint states those candidates conditionally: the main session dispatches only
+paths it knows it actually modified from its own tool activity, and ignores another session's
+writes.
 """
 
 from __future__ import annotations
@@ -33,17 +35,18 @@ from .paths import (_doc_scope, _project_dir, _project_rel, _refs_dir, _state_ro
                     _trace)
 from .payload import _read_payload, _session_id
 from .agents import _edited_bucket
+from .herdr import report_pending
 from .state import _read_state, _write_state
 
 
-# Cap on the files one turn may hand a file-reading agent. Past this the list stops
+# Cap on the files one checkpoint may hand a file-reading agent. Past this the list stops
 # being an audit target and becomes a sweep of the whole change: the agent must read
 # every file in full to judge it — a comment against the code under it, an instruction
 # file against what it points at — and the skills that dispatch these by hand ask the
 # user to narrow at roughly this size for the same reason. Recording stops at the cap
 # rather than dropping the oldest entries — the earliest edits of a turn are as worth
 # auditing as the last, and a stable prefix keeps the recommendation reproducible.
-EDITED_FILES_MAX = 20
+EDITED_FILES_MAX = 100
 
 
 def _tool_call_id(payload: dict[str, Any]) -> str | None:
@@ -251,7 +254,7 @@ def recover_shell_writes(project_dir: Path, payload: dict[str, Any],
 def _record_edited_source(project_dir: Path, payload: dict, tool_input: Any,
                           config: dict[str, Any], *, source: str = "native",
                           content_hash: str | None = None) -> None:
-    """Note a file this turn wrote, for a later file-reading agent's recommendation.
+    """Note a file this session wrote, for the next explicit file-audit checkpoint.
 
     Four lists, chosen by `_edited_bucket`: source files for `comment-corrector`, agent
     instruction files for `agents-md-auditor`, saved references for `ext-docs-auditor`, and the
@@ -300,20 +303,10 @@ def _record_edited_source(project_dir: Path, payload: dict, tool_input: Any,
             return
 
     state = _read_state(project_dir, session_id, config)
-    # A new turn resets ALL FOUR lists off the one marker; without this, files from the
-    # previous turn would ride along into this turn's recommendation. Resetting only the
-    # bucket being written would leave the others holding the previous turn's files under
-    # this turn's id, which is the same bug with an extra step.
-    if state.get("edited_prompt_id") != prompt_id:
-        state["edited_prompt_id"] = prompt_id
-        state["edited_files"] = []
-        state["edited_agent_docs"] = []
-        state["edited_refs"] = []
-        state["edited_docs"] = []
-        state["edited_truncated"] = {}
-        state["edited_provenance"] = {}
-    # `.get`, not `[]`: a state file written before a bucket existed reaches here with the
-    # turn marker already matching, so the reset above does not run and the key is absent.
+    # This marker is diagnostic only. The queue intentionally crosses turn boundaries and is
+    # cleared by checkpoint completion, not by the next prompt.
+    state["edited_prompt_id"] = prompt_id
+    # `.get`, not `[]`: a state file written before a bucket existed may lack the key.
     files = state.get(bucket)
     if not isinstance(files, list):
         files = []
@@ -325,6 +318,7 @@ def _record_edited_source(project_dir: Path, payload: dict, tool_input: Any,
     state["edited_provenance"] = provenance
     if path in files:
         _write_state(project_dir, session_id, state)
+        report_pending(state)
         return
     if len(files) >= EDITED_FILES_MAX:
         truncated = state.get("edited_truncated")
@@ -333,10 +327,12 @@ def _record_edited_source(project_dir: Path, payload: dict, tool_input: Any,
         truncated[bucket] = int(truncated.get(bucket, 0)) + 1
         state["edited_truncated"] = truncated
         _write_state(project_dir, session_id, state)
+        report_pending(state)
         return
     files.append(path)
     state[bucket] = files
     _write_state(project_dir, session_id, state)
+    report_pending(state)
     _trace(project_dir, session_id, "post-edit", "edited_recorded",
            prompt_id=prompt_id, bucket=bucket, file=target.name, count=len(files))
 

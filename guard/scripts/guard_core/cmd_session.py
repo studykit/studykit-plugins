@@ -30,36 +30,10 @@ from .paths import (
     _clear_handoff_file, _project_dir, _refs_dir, _state_root, _trace, _trace_file
 )
 from .payload import _read_payload, _session_id
-from .state import _audit_paused, _plan_audit_paused, _read_state, _write_state
+from .state import _plan_audit_paused, _read_state, _write_state
 from .agents import SETTABLE_AGENTS
 from .dispatch import CLI_REL, _plugin_root
 from .emit import _emit_session_start
-
-
-def _session_muted(project_dir: Path, config: dict, payload: dict | None) -> bool:
-    """Is the session this SessionStart opens muted? Claude only.
-
-    At `startup` the answer is no: a session opens armed and no config key seeds it any more
-    (`state._read_state`). It is not only that: SessionStart registers no matcher,
-    so it also fires on `resume`, `clear`, `compact` and `fork`, where the session may already
-    have been flipped by `guard` — or, on `clear`, by the handoff from the session it
-    replaced — and the state file says so. So this reads the state rather than assuming the
-    fresh answer, and the line below reports what it finds.
-
-    The payload is passed in rather than read here: stdin can be read once, and the clear
-    handoff needs the same payload's `source`. On Codex it is None (that adapter consumed
-    stdin before calling this module), which costs nothing — Codex has no mute command
-    and its Stop path never reads `audit_paused`, so a Codex session is never muted.
-    """
-    if _HOST_IS_CODEX:
-        return False
-    sid = _session_id(payload) if payload else None
-    if sid is None:
-        # No session id, no state file to read — so answer with what a session with no state
-        # of its own opens in, which is armed. This used to consult the project setting; the
-        # setting is gone and a fixed `False` is now the same answer.
-        return False
-    return _audit_paused(_read_state(project_dir, sid, config))
 
 
 def _add_shell_command_to_path() -> bool:
@@ -152,28 +126,17 @@ def _append_env_file(text: str, marker: str | None = None) -> bool:
     return True
 
 
-def _default_paused(config: dict) -> tuple[bool, bool]:
-    """The two mutes a session with no state of its own opens in, as ``(turn, plan)``.
-
-    The baseline the `/clear` handoff is judged against: a session sitting on exactly these
-    has nothing to hand over, because its replacement reads the same config and lands on the
-    same pair without being told.
-
-    The turn half is a constant now rather than a config read — a session opens armed and the
-    `audit-turn` setting that used to decide it is retired. It stays in the tuple because the
-    handoff still carries the pair: `guard off` moves the live value away from this baseline
-    just as a setting used to, and that difference is the whole trigger for the record.
-    """
-    return (False, not _audit_on(config, AUDIT_PLAN_KEY))
+def _default_plan_paused(config: dict) -> bool:
+    """The plan-gate state a session with no state of its own opens in."""
+    return not _audit_on(config, AUDIT_PLAN_KEY)
 
 
 def cmd_session_end() -> int:
-    """SessionEnd, matched on ``clear`` — hand this session's switches to its replacement.
+    """SessionEnd, matched on ``clear`` — hand the live plan gate to its replacement.
 
     `/clear` starts a NEW session with a new id, so `state/<sid>.json` no longer applies and
-    both switches would go back to their defaults — armed for the turn side, the project's
-    `audit-plan` for the gate: the user who muted guard a minute ago has to mute it again,
-    with nothing saying why. This is the one
+    the plan gate would go back to the project's `audit-plan` default: the user who changed
+    it a minute ago would have to change it again, with nothing saying why. This is the one
     boundary where that is worth fixing, because it is the one boundary where a new session is
     not a new intention — the conversation was cleared, the work was not.
 
@@ -186,14 +149,10 @@ def cmd_session_end() -> int:
     (measured 2026-08-26 in a live session; ordering is not documented, which is why it was
     measured and why this fails silent if it ever reverses).
 
-    Nothing is written unless a switch differs from what this project configures — a session
-    still sitting on its defaults has nothing to hand over, since the replacement reads the
-    same config and arrives at the same two values on its own. That comparison, not "is
-    anything armed", is what makes the record carry an ARMING as readily as it carries a mute.
-    Both switches now default armed, so what a `/clear` would lose is a `guard off` or a
-    `guard-plan off` — but the test stays a comparison against the baseline rather than "is
-    anything muted", because the baseline is a config read for the plan half and a project
-    that sets `audit-plan: off` then loses its `guard-plan on` in exactly the same way.
+    Nothing is written unless the live gate differs from what this project configures — a
+    session still sitting on its default has nothing to hand over. The comparison against the
+    configured baseline carries an arming as readily as a mute: a project with `audit-plan:
+    off` must not lose a later `guard-plan on` at `/clear`.
     A stale record from a previous clear is removed when there is nothing to carry, rather
     than left to be read later.
 
@@ -222,9 +181,8 @@ def cmd_session_end() -> int:
     handoff = _clear_handoff_file(project_dir)
     config = _load_config(project_dir)
     state = _read_state(project_dir, sid, config)
-    audit_paused = _audit_paused(state)
     plan_paused = _plan_audit_paused(state)
-    if (audit_paused, plan_paused) == _default_paused(config):
+    if plan_paused == _default_plan_paused(config):
         try:
             handoff.unlink()
         except OSError:
@@ -234,7 +192,6 @@ def cmd_session_end() -> int:
 
     record = {
         "from_session": sid,
-        "audit_paused": audit_paused,
         "plan_audit_paused": plan_paused,
         "written_at": time.time(),
     }
@@ -246,12 +203,12 @@ def cmd_session_end() -> int:
     except OSError:
         return 0
     _trace(project_dir, sid, "session-end", "clear_handoff_written",
-           audit_paused=audit_paused, plan_audit_paused=plan_paused)
+           plan_audit_paused=plan_paused)
     return 0
 
 
 def _consume_clear_handoff(project_dir: Path, config: dict, payload: dict | None) -> dict | None:
-    """On a `source: "clear"` SessionStart, adopt the ended session's switches. Once.
+    """On a `source: "clear"` SessionStart, adopt the ended session's plan gate. Once.
 
     Returns what was carried, for the line that says so out loud — an inheritance nobody is
     told about is the invisible gate, and being told is the whole difference. Returns None when
@@ -295,24 +252,22 @@ def _consume_clear_handoff(project_dir: Path, config: dict, payload: dict | None
         _trace(project_dir, sid, "session-start", "clear_handoff_expired")
         return None
     switches = None
-    audit_paused = record.get("audit_paused")
     plan_paused = record.get("plan_audit_paused")
-    if (isinstance(audit_paused, bool) and isinstance(plan_paused, bool)
-            and (audit_paused, plan_paused) != _default_paused(config)):
+    if (isinstance(plan_paused, bool)
+            and plan_paused != _default_plan_paused(config)):
         # Anything else leaves nothing to apply: either the record says exactly what this
         # session would have opened in anyway — the config changed between the two sessions,
         # or the writer's check and this one disagree — or it is malformed.
         state = _read_state(project_dir, sid, config)
-        state["audit_paused"] = audit_paused
         state["plan_audit_paused"] = plan_paused
         _write_state(project_dir, sid, state)
         # Confirm by reading back: `_write_state` swallows OSError by design, and a line
         # saying the switches were carried over a write that failed is worse than no line.
         check = _read_state(project_dir, sid, config)
-        if _audit_paused(check) == audit_paused and _plan_audit_paused(check) == plan_paused:
-            switches = {"audit_paused": audit_paused, "plan_audit_paused": plan_paused}
+        if _plan_audit_paused(check) == plan_paused:
+            switches = {"plan_audit_paused": plan_paused}
             _trace(project_dir, sid, "session-start", "clear_handoff_applied",
-                   audit_paused=audit_paused, plan_audit_paused=plan_paused)
+                   plan_audit_paused=plan_paused)
         else:
             _trace(project_dir, sid, "session-start", "clear_handoff_write_failed")
 
@@ -364,7 +319,7 @@ def cmd_session_start() -> int:
     if project_dir is None:
         return 0
     # Once, here: stdin is readable one time, and two things below need this payload — the
-    # mute line and the `/clear` handoff, which keys off `source`.
+    # `/clear` handoff, which keys off `source`.
     payload = _read_payload()
     # Everything this hook says, collected and written once at the end. It used to print as it
     # went, which stdout accepts as context on this event — but one `systemMessage` turns the
@@ -454,24 +409,18 @@ def cmd_session_start() -> int:
     _record_transcript_path(project_dir, payload, session_cfg)
 
     # A `/clear` is the one boundary where a new session is not a new intention, so the
-    # switches the ended session was carrying are adopted here — before the lines below,
+    # plan gate the ended session was carrying is adopted here — before the lines below,
     # which read the state this may have just written. Said out loud, because an inheritance
     # nobody is told about is the invisible gate that was deleted.
     carried = _consume_clear_handoff(project_dir, session_cfg, payload)
     if carried and carried["switches"]:
-        # Both switches, in both directions. The record only exists because one of them
-        # differs from this project's setting, and that difference can be either way now that
-        # the settings default to on — so a line naming only the armed ones would go silent on
-        # exactly the case it was added for, a mute carried across a `/clear`.
         switches = carried["switches"]
-        parts = [
-            "audits are " + ("OFF" if switches["audit_paused"] else "ON"),
-            "plan audits are " + ("OFF" if switches["plan_audit_paused"] else "ON"),
-        ]
+        parts = ["plan audits are " +
+                 ("OFF" if switches["plan_audit_paused"] else "ON")]
         context.append(
-            "guard: carried the previous session's switches across the /clear — "
+            "guard: carried the previous session's plan-audit switch across the /clear — "
             f"{' and '.join(parts)} for this session, whatever this project's settings say. "
-            "`guard` / `guard-plan` in a shell change either. Do not mention this unless the "
+            "`guard-plan` in a shell changes it. Do not mention this unless the "
             "user asks."
         )
     # The injected contract states the general rule — a doc-based claim cites the source
@@ -499,28 +448,16 @@ def cmd_session_start() -> int:
     # has never been told the name cannot answer a user who asks for an audit in prose. Once per
     # session, not once per turn — the Stop block repeats the prohibition, not the offer.
     if any(_switch_on(session_cfg, k) for k in SETTABLE_AGENTS):
-        # Which of the two lines goes out is the mute, not the switches. Saying "audits are
-        # on" to a muted session would be false in the one place a false line is most
-        # expensive: nothing later in the session contradicts it, so the model spends the
-        # session expecting a recommendation that never comes.
-        if _session_muted(project_dir, session_cfg, payload):
-            context.append(
-                "guard: agents are configured for this project, but guard is OFF for this "
-                "session — nothing is said when a turn ends, and an audit invoked now would "
-                "report that the session is muted. Running `guard on` in a shell arms it for "
-                "this session only. Do not mention this unless the user asks."
-            )
-        else:
-            context.append(
-                "guard: nothing here is automatic and none of it is yours to start. Answer "
-                "normally; guard writes no file for an ordinary turn. The user runs "
-                "`/guard:answer <question>` when they want the answer as an audited document, "
-                "`/guard:audit-turn` to have the turn just finished checked (or "
-                "`/guard:audit-turn-claims` / `-clarity` / `-deferrals` for a single audit), "
-                "and `/guard:audit-report <path>` for a document that already exists. If they "
-                "ask for any of it in prose, name the command — you cannot invoke these for "
-                "them."
-            )
+        context.append(
+            "guard: nothing here is automatic and none of it is yours to start. Answer "
+            "normally; guard writes no file for an ordinary turn. The user runs "
+            "`/guard:answer <question>` when they want the answer as an audited document, "
+            "`/guard:audit-turn` to have the turn just finished checked, "
+            "`/guard:audit-report <path>` for an existing document, and "
+            "`/guard:audit-files` to audit the edited files accumulated since the last "
+            "checkpoint. If they ask for any of it in prose, name the command — you cannot "
+            "invoke these for them."
+        )
 
     # One write, last, for the reason given where `context` is declared. Codex keeps the
     # plain-text form: its SessionStart has no documented `systemMessage`.

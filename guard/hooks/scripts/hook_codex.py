@@ -48,7 +48,6 @@ from guard_core import cmd_edit as core_edit  # noqa: E402
 from guard_core import cmd_search as core_search  # noqa: E402
 from guard_core import cmd_session as core_session  # noqa: E402
 from guard_core import config as core_config  # noqa: E402
-from guard_core import dispatch as core_dispatch  # noqa: E402
 from guard_core import payload as core_payload  # noqa: E402
 from guard_core import paths as core_paths  # noqa: E402
 from guard_core import state as core_state  # noqa: E402
@@ -155,12 +154,9 @@ def _handle_prompt(project_dir: Path, payload: dict[str, Any], session_id: str, 
     # and both prefixes are accepted because a user typing this has seen `$guard:setup` and
     # Claude's `/guard:audit-turn`.
     if _AUDIT_TURN_RE.match(prompt.strip()):
-        # No mute is consulted, and on this host there is nothing that could set one: Codex has
-        # no `guard` command, so `audit_paused` was only ever the project's `audit-turn`
-        # setting, and that key was retired in v0.124.0 (`config.RETIRED_KEYS`). The reason it
-        # went is the reason this check would be wrong anyway — the user typed the prefix, and a
-        # config file answering "no" to a request just made out loud is the gate this design
-        # removed. What still decides is the agent switches, through the scope sentence below.
+        # No mute is consulted. The user typed the prefix, and a stored gate answering "no" to
+        # a request just made out loud is the behavior `audit-turn` retirement removed. What
+        # still decides is the agent switches, through the scope sentence below.
         pending = state.get("pending_verify_prompt_id")
         if isinstance(pending, str) and pending and _turn_path(project_dir, session_id, pending).is_file():
             # The whole eligible set's scope, not just the claims half. On Claude a router
@@ -267,7 +263,7 @@ _AUDIT_TURN_RE = re.compile(r"^[/$]guard:audit-turn(-claims|-clarity|-deferrals)
 # would report `profile: MISSING` on every turn.
 #
 # File-review agents are absent from this TURN-audit table because their dispatch comes from
-# edited-file rules in `_emit_document_reviews`, not from the response-audit scope.
+# the explicit `audit-files` checkpoint, not from the response-audit scope.
 # `korean-translator` is absent for a different reason from the two above: it HAS an
 # `AUDIT_AGENTS` entry, so it can be eligible here, and the filter below is what drops it. It
 # does not audit — it writes the Korean the user reads — and Codex's one agent is read-only, so
@@ -299,70 +295,18 @@ def _handle_stop(project_dir: Path, payload: dict[str, Any], session_id: str, tu
     normalized["session_id"] = session_id
     core_edit.recover_shell_writes(project_dir, normalized, config)
     state = core_state._read_state(project_dir, session_id, config)
-    # Recorded whether or not a switch is on: it is what the audit prefix in `_handle_prompt`
-    # is pointed at, and a project that keeps guard off is not a project whose user may not ask.
+    # Recorded independently of file-checkpoint switches: it is what the explicit turn-audit
+    # prefix in `_handle_prompt` is pointed at.
     state["pending_verify_prompt_id"] = turn_id
-    _emit_document_reviews(project_dir, session_id, turn_id, config, state)
     core_state._write_state(project_dir, session_id, state)
-    # And that is all Stop does. It used to end every turn with a `decision: "block"` naming
+    # And that is all Stop does. Edited files remain in the session queue until the user runs
+    # the shared `audit-files` checkpoint. It used to end every turn with a `decision: "block"` naming
     # the whole eligible set to Codex's single agent — unrouted, and so noisier than Claude's
     # routed recommendation ever was, on turns that frequently had nothing in them. The audit
     # is now the user's to ask for on this host too (`_handle_prompt`), which is also what
     # retires the two things this handler needed only in order to recommend: the mute check,
     # since nothing is emitted for a mute to suppress, and the `last_audited_prompt_id`
     # once-guard, since a user who types the prefix twice is asking twice.
-
-
-_CODEX_REVIEW_AGENTS = {
-    "guard:doc-auditor": "guard_doc_auditor",
-    "guard:agents-md-auditor": "guard_agents_md_auditor",
-    "guard:ext-docs-auditor": "guard_ext_docs_auditor",
-}
-
-
-def _emit_document_reviews(project_dir: Path, session_id: str, turn_id: str,
-                           config: dict[str, Any], state: dict[str, Any]) -> None:
-    """Emit Codex Stop context for changed Markdown selected by review rules."""
-
-    if core_config._agent_mode(state, "doc-auditor") == core_config.AgentMode.OFF:
-        return
-    buckets = ("edited_refs", "edited_agent_docs", "edited_docs")
-    docs = [path for bucket in buckets
-            for path in core_state._edited_files(state, turn_id, bucket)]
-    rules = core_config._doc_review_rules(config)
-    groups: dict[tuple[str, str, bool], list[str]] = {}
-    for path in docs:
-        rule = core_config._doc_review_rule(core_paths._project_rel(project_dir, Path(path)), rules)
-        if rule is None:
-            continue
-        name = _CODEX_REVIEW_AGENTS.get(rule.name, rule.name) if rule.kind == "agent" else rule.name
-        conditional = core_state._edit_source(state, path) != "native"
-        groups.setdefault((rule.kind, name, conditional), []).append(path)
-    fingerprint = core_state._edited_fingerprint(state, turn_id)
-    if (not groups or (state.get("last_audited_prompt_id") == turn_id
-                       and state.get("last_audited_fingerprint") == fingerprint)):
-        return
-    state["last_audited_prompt_id"] = turn_id
-    state["last_audited_fingerprint"] = fingerprint
-    # `_DOCS_LEAD` first, and it is not decoration: the rule that the caller sends the paths
-    # and NOTHING else lives in the lead, once for the whole payload, and an entry carries no
-    # trace of it. Building the entries alone — which this did until v0.142.0 — shipped the
-    # Codex path with that prohibition simply absent, while the Claude path had it.
-    entries = [core_dispatch._docs_context(
-        paths, action_kind=kind, action_name=name, conditional=conditional)
-        for (kind, name, conditional), paths in groups.items()]
-    blocks = ["\n".join([core_dispatch._DOCS_LEAD, *entries])]
-    truncated = state.get("edited_truncated")
-    if isinstance(truncated, dict):
-        omitted = sum(v for v in truncated.values() if isinstance(v, int) and v > 0)
-        if omitted:
-            blocks.append(
-                "guard: the review file list was truncated; "
-                f"{omitted} additional changed file(s) are not listed. Report the review as partial."
-            )
-    context = "\n\n".join([core_dispatch._REVIEW_TIMING, *blocks])
-    _emit({"hookSpecificOutput": {"hookEventName": "Stop",
-                                   "additionalContext": context}})
 
 
 def main() -> int:

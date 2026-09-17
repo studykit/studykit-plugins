@@ -1,8 +1,7 @@
 """The per-session state file, ``state/<sid>.json``.
 
-Holds the agent modes as of this session, the two audit mutes (``audit_paused``, which opens
-armed, and ``plan_audit_paused``, seeded from the project's ``audit-plan``), the files this
-turn edited
+Holds the agent modes as of this session, the plan gate state, the files this
+session has edited since the last file-audit checkpoint
 (``edited_prompt_id`` / ``edited_files`` / ``edited_agent_docs`` / ``edited_refs`` /
 ``edited_docs``), their per-path source evidence (``edited_provenance``),
 ``last_audited_prompt_id`` / ``last_audited_fingerprint``, ``pending_verify_prompt_id``,
@@ -35,7 +34,12 @@ def _read_state(project_dir: Path, session_id: str, config: dict[str, Any]) -> d
         # Seeding one here would also make it look settable in `settings show`.
         **{k: str(_agent_mode(config, k))
            for k, spec in AUDIT_AGENTS.items() if spec.fixed_mode is None},
-        # Per-turn guards keyed by the transcript prompt_id (a turn == one promptId).
+        # The last file-checkpoint snapshot. The token is the hash printed to the checkpoint
+        # skill; the paths and hashes let completion remove only revisions that were actually
+        # reviewed. A file edited while reviews are running stays pending.
+        "file_checkpoints": {},
+        # Legacy once-per-turn fields retained while old state files age out. Stop no longer
+        # dispatches file audits, so these are not written by current code.
         "last_audited_prompt_id": "",
         "last_audited_fingerprint": "",
         # The most recent auditable turn's id. CODEX ONLY as of v0.122.0 — that adapter keeps
@@ -50,10 +54,9 @@ def _read_state(project_dir: Path, session_id: str, config: dict[str, Any]) -> d
         # the HOST's path and guard will not guess at the host's storage layout, so it has to
         # be taken from a payload; it is a session-long fact, so once is enough.
         "transcript_path": "",
-        # Files written during one turn, accumulated by PostToolUse and read back at Stop
-        # to decide whether a file-reading agent has anything to look at. Stored WITH the
-        # prompt_id they belong to: a bare list would outlive its turn and point an agent
-        # at files the current turn never touched. Four lists, one marker — the split is by
+        # Files written since the last checkpoint, accumulated by PostToolUse and read by the
+        # explicit `audit-files` entry. `edited_prompt_id` is diagnostic only: it records the
+        # most recent turn that added an edit and never scopes the queue. Four lists — the split is by
         # which agent can judge the file (source code for `comment-corrector`, instruction
         # files for `agents-md-auditor`, saved references for `ext-docs-auditor`, ordinary
         # documents for `doc-auditor`), while "which turn was this" is the same question for
@@ -69,19 +72,6 @@ def _read_state(project_dir: Path, session_id: str, config: dict[str, Any]) -> d
         # Stop state Bash candidates conditionally instead of asserting that a worktree-wide
         # diff proves this session wrote them.
         "edited_provenance": {},
-        # Session-only mute, flipped by the `guard` shell command. A session OPENS ARMED and
-        # there is no config key seeding this one (the `audit-turn` setting was retired in
-        # v0.124.0 — `config.RETIRED_KEYS`): every entry that could be muted is one the user
-        # types, so a project default in front of them refused a command that had just been
-        # asked for. From here on the key is the session's own, and the toggle never writes
-        # back to the config — muting the session you are in cannot change what the next one
-        # does.
-        # NOT a mode in front of the agent switches the way the removed `audit_gate` was:
-        # it is two-valued, and the `status` subcommand puts it in the user's status line so
-        # the muted state is visible rather than remembered. A hidden mute is the failure
-        # that killed the old gate, which is why `session-start` says which state the session
-        # opened in.
-        "audit_paused": False,
         # The plan audit keeps a config key and is a SEPARATE state key, because it is the
         # one audit that is NOT invoked by the user: `exit-plan` blocks an approved plan on
         # its own, so whether a session opens with that gate armed is a real question a
@@ -113,8 +103,8 @@ def _read_state(project_dir: Path, session_id: str, config: dict[str, Any]) -> d
     if not isinstance(data, dict):
         return default
     keys = (*AUDIT_AGENTS, "last_audited_prompt_id", "last_audited_fingerprint",
-            "pending_verify_prompt_id",
-            "transcript_path", "audit_paused", "plan_audit_paused", "plan_audited_hash",
+            "pending_verify_prompt_id", "file_checkpoints",
+            "transcript_path", "plan_audit_paused", "plan_audited_hash",
             "edited_prompt_id", "edited_files",
             "edited_agent_docs", "edited_refs", "edited_docs", "edited_truncated",
             "edited_provenance",
@@ -136,14 +126,13 @@ def _write_state(project_dir: Path, session_id: str, state: dict[str, Any]) -> N
 
 
 def _edited_files(state: dict[str, Any], prompt_id: str, bucket: str) -> list[str]:
-    """The files of one bucket THIS turn wrote, as recorded by PostToolUse.
+    """The pending files of one bucket, as recorded by PostToolUse.
 
-    Empty unless the recorded list belongs to this prompt_id and the files still exist:
-    a turn that edited a file and then deleted or moved it leaves nothing to audit, and
+    ``prompt_id`` remains in the signature for compatibility with callers on both host
+    adapters; it no longer scopes the result. A file that was later deleted or moved leaves
+    nothing to audit, and
     handing an agent a missing path would spend it on a read failure.
     """
-    if state.get("edited_prompt_id") != prompt_id:
-        return []
     files = state.get(bucket)
     if not isinstance(files, list):
         return []
@@ -163,7 +152,7 @@ def _edit_source(state: dict[str, Any], path: str) -> str | None:
 
 
 def _edited_fingerprint(state: dict[str, Any], prompt_id: str) -> str:
-    """Hash the current contents of this turn's retained edit set and overflow counts."""
+    """Hash the current contents of the retained pending edit set and overflow counts."""
     digest = hashlib.sha256()
     for bucket in ("edited_files", "edited_agent_docs", "edited_refs", "edited_docs"):
         for raw in _edited_files(state, prompt_id, bucket):
@@ -190,23 +179,8 @@ def _edited_fingerprint(state: dict[str, Any], prompt_id: str) -> str:
 def _plan_audit_paused(state: dict[str, Any]) -> bool:
     """Whether the plan audit is muted for this session.
 
-    Mirrors ``_audit_paused``, including the absent case: ``_read_state`` seeds both keys from
-    the config on every read, so a dict reaching here without one did not come from there, and
+    ``_read_state`` seeds this key from the config on every read, so a dict reaching here
+    without one did not come from there, and
     the honest answer for a missing key is the config default — armed.
     """
     return state.get("plan_audit_paused") is True
-
-
-def _audit_paused(state: dict[str, Any]) -> bool:
-    """Is guard muted for this session?
-
-    The session's own answer and nobody else's: it opens armed and only `guard off` mutes it,
-    for the rest of that session.
-
-    Muted means guard says nothing UNASKED, and that is the whole of it. An audit the user
-    types still runs — `cmd_candidates` does not read this, deliberately — because the typing
-    is a request made after the mute and outranks it. Nothing is lost either way: `guard-inputs`
-    cuts the turn out of the transcript when an audit asks for one, so a turn that went by while
-    muted is still reachable later.
-    """
-    return state.get("audit_paused") is True

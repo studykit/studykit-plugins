@@ -98,8 +98,8 @@ made through the CLI, report that instead of working around it.
 | `claims-auditor` | `off` / `on` | Flags statements asserted without adequate evidence. One switch, two entry points: `audit-turn-claims` on a finished turn, `audit-report-claims` on a saved document — named by the matching router, or invoked by the user directly. Both fork the same `claims-auditor`. |
 | `deferrals-auditor` | `off` / `on` | Flags work punted as "TBD" / "확인 필요" that the repo could have answered. One switch, three entry points: `audit-turn-deferrals` on a finished turn, `audit-report-deferrals` on a saved document, `audit-plan-deferrals` on an approved plan — named by the matching router or by the plan review, or invoked by the user directly. All three fork the same `deferrals-auditor`. |
 | `clarity-auditor` | `off` / `on` | Flags terms used but never explained, mechanisms given with no concrete example, and explanation pitched wrong for this reader. One switch, one agent, three entry points: `audit-turn-clarity` on a finished turn, `audit-report-clarity` on a saved document, `audit-plan-clarity` on an approved plan — named by the matching router or by the plan review, or invoked by the user directly. It calibrates against a reader profile; without one it says so and checks less, so the `reader-profile` skill comes first if the user means to rely on it. |
-| `comment-corrector` | `off` / `on` | Admits `guard:comment-corrector`, for the source files the turn actually edited. This one **edits those files in place**, so its fixes land without being asked — say so when the user turns it on. |
-| `doc-auditor` | `off` / `on` | Enables automatic review actions for changed project Markdown, including `AGENTS.md` and `CLAUDE.md`. A file is acted on only when it matches a `doc_review_rules` entry. |
+| `comment-corrector` | `off` / `on` | Selects `guard:comment-corrector` for pending source files when the user runs `/guard:audit-files`. This one **edits those files in place**, so say so when the user turns it on. |
+| `doc-auditor` | `off` / `on` | Enables review actions for pending project Markdown at `/guard:audit-files` checkpoints, including `AGENTS.md` and `CLAUDE.md`. A file is acted on only when it matches a `doc_review_rules` entry. |
 | `doc_dir` | comma-separated project directories | Limits the ordinary Markdown documents eligible for review. An empty value means the whole project. |
 | `doc_exclude` | comma-separated project directories or globs | Excludes matching Markdown—including agent instructions and references—from review. `*` stays in one directory and `**` crosses directory depth. |
 | `doc_review_rules` | JSON array | Per-path actions. Each item is `{"glob":"...","action":{"kind":"agent" or "skill","name":"..."}}`. Unmatched files are not reviewed; use `doc_exclude` for explicit exclusions. Use `/guard:doc-review-rules` for guided setup. |
@@ -143,12 +143,10 @@ installed once per machine rather than with this plugin, which is why their name
 `guard:` prefix. A machine without them translates nothing — guard says so and hands over the
 English rather than translating it in the main session.
 
-`guard:docs-finder` is
-selected from its own description, the way any agent is — there is nothing said unasked for a
-switch to govern. `guard:ext-docs-auditor` is named by the Stop hook whenever the turn wrote a
-file under `refs_dir`, whoever wrote it, and deliberately so: the party most likely to break
-the rule it enforces is the party that just saved the file. If a user asks to turn either one
-off, say that plainly rather than writing a key the CLI will refuse.
+`guard:docs-finder` is selected from its own description, the way any agent is — there is
+nothing said unasked for a switch to govern. `guard:ext-docs-auditor` may be selected by a
+document review rule at an explicit file checkpoint. If a user asks to turn either one off,
+say that plainly rather than writing a key the CLI will refuse.
 
 **The plan review ignores these keys entirely.** `/guard:audit-plan` invokes its seven
 critics by name, `audit-plan-deferrals` and `audit-plan-clarity` among them, and reads no
@@ -163,10 +161,9 @@ commands do not: `/guard:audit-turn-claims`, `/guard:audit-turn-clarity` and
 `/guard:audit-turn-deferrals` (and their `audit-report-` counterparts) are invoked by name
 and run whatever the switches say.
 
-So switching everything off is not switching guard off for this project. It means guard does
-nothing on its own and the routers find nothing to name — while a user who types a per-audit
-command still gets that audit. Say it that way if they ask; do not tell them the audit cannot
-happen.
+Switching everything off means the routers and file checkpoint find no configured audit to
+name — while a user who types a per-audit command still gets that audit. Say it that way if
+they ask; do not tell them the audit cannot happen.
 
 ### `on` is the only mode
 
@@ -188,13 +185,10 @@ Two older spellings turn up in config files, and they are not the same case:
 1. **Run `settings show`** and report the current settings. Do this first, every time,
    including on a follow-up — something may have changed since you last looked.
 
-   **The first two lines are reported every time, whatever they say.** `guard (session)` is
-   this session's mute and `audit-plan` is the gate's setting, and each overrides every agent
-   line under it: while the session is muted, an agent switched `on` below can be invoked and
-   will report that the session is muted. A user shown the agent lines alone gets the wrong
-   answer to "can I audit this turn". The mute line has no setting behind it — it is state, and
-   `settings show` is one of the two places it is visible at all — so there is nothing in the
-   file to remind you of it. Observed being omitted, which is why this is spelled out.
+   **The first two lines are reported every time, whatever they say.** `file checkpoint`
+   reports this session's pending path count and reminds the user that Stop does not launch
+   audits; `audit-plan` reports the independent plan gate. A user shown only the agent lines
+   cannot tell whether there is checkpoint work waiting.
 2. **If `$ARGUMENTS` names a key and a value**, apply it and report what changed. They told
    you; do not ask first.
 3. **Otherwise ask**, in your transcript, as plain prose the user can reply to. Name the
@@ -213,13 +207,11 @@ project carrying the key was getting behaviour it no longer gets.
 
 ## What is not yours
 
-- **Muting one session, and only that session,** is the `guard` / `guard-plan` shell command,
-  not a setting. `guard` has no key at all behind it: a session opens armed and the mute lives
-  only in that session, which is why `show` prints it as `guard (session)` rather than as a
-  setting. `audit-plan` does have a key, and it says what a session *starts* as — a session the
+- **Changing the live plan gate** is the `guard-plan` shell command, not a setting.
+  `audit-plan` has a key, and it says what a session *starts* as — a session the
   user has already flipped no longer matches it, and `show` reports that as
   `audit-plan: on (this session; project setting off)`. It is the session value, not the
-  setting, that answers "is guard running right now", so report both when they differ instead
+  setting, that answers whether the plan gate is running right now, so report both when they differ instead
   of reading out the setting alone. A `set audit-plan` does reach the live session (this is why
   `--session` matters), so it can also *undo* a `guard-plan off` the user ran a minute ago: if
   they asked only to change the project default, say that the session moved too.

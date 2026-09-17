@@ -95,7 +95,7 @@
     {
       "name": "guard",
       "source": "./guard",
-      "description": "On-demand audits of answers and documents for unsupported claims, unclear explanations, and documentation drift.",
+      "description": "On-demand audits of answers, documents, plans, and checkpointed edited-file queues.",
       "author": {
         "name": "studykit"
       },

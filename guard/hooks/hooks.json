@@ -33,7 +33,7 @@
             "type": "command",
             "command": "uv run --script \"${CLAUDE_PLUGIN_ROOT}/scripts/guard_hook.py\" post-edit",
             "timeout": 10,
-            "description": "Record a source file, an agent instruction file, a saved reference or an ordinary document written this turn (including writes made by Bash and by subagents) for the applicable review dispatch, and require a file saved inside the refs dir to be listed in the refs index (AGENTS.md)."
+            "description": "Add a source file, agent instruction file, saved reference or ordinary document to the session's pending checkpoint queue (including writes made by Bash and by subagents), and require a file saved inside the refs dir to be listed in the refs index (AGENTS.md)."
           }
         ]
       }
@@ -58,7 +58,7 @@
             "type": "command",
             "command": "uv run --script \"${CLAUDE_PLUGIN_ROOT}/scripts/guard_hook.py\" stop",
             "timeout": 120,
-            "description": "Name the file-reading audits over what this turn edited: comment-corrector over source files, and configured document-review actions over matching project Markdown, including agent instructions and references. Records nothing about the turn itself and reads none of the response — the turn audit is the user's to start (/guard:audit-turn), and it resolves its target from the transcript. Silent while the session is muted."
+            "description": "Recover reviewable files changed before an interrupted Bash command stopped. Emits no audit context; edited-file audits run only when the user invokes /guard:audit-files."
           }
         ]
       }

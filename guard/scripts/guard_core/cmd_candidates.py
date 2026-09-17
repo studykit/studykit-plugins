@@ -76,15 +76,10 @@ def cmd_candidates() -> int:
 
     config = _load_config(project_dir)
     state = _read_state(project_dir, session_id, config)
-    # The mute is NOT read here, and that is the whole shape of `guard off`: it governs what
-    # guard says unasked (`cmd_stop`) and nothing else. Every caller of this verb is reached
-    # only by a person typing — both entry skills are `disable-model-invocation: true`, and
-    # `/guard:answer` is one too — so refusing here would be a mute answering "no" to a
-    # request made out loud after it. That is the same failure that retired `audit-turn` in
-    # v0.124.0 (`dev/design.md`); a shorter time horizon does not make it a different one.
-    #
-    # Do not add the check back. A user who types an audit while muted has said which of the
-    # two they meant by the act of typing it, and guard stays quiet the moment they stop.
+    # The retired automatic file-audit mute is not read here. Every caller of this verb is
+    # reached only by a person typing — both entry skills are `disable-model-invocation:
+    # true`, and `/guard:answer` is one too — so a stored gate here would answer "no" to a
+    # request just made out loud.
     # The file lists are deliberately empty. Only the turn-reading agents are routed, and
     # `_eligible_agents` gates a file-reading one on having a file of its own kind — so
     # passing nothing is what makes those ineligible here, which is exactly the filter this
