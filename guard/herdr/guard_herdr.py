@@ -91,9 +91,10 @@ def show_action() -> int:
     cwd = pane.get("foreground_cwd") or pane.get("cwd")
     if not isinstance(pane_id, str) or not pane_id:
         return 1
+    # Popup placement and dimensions belong to the manifest. Herdr 0.9.1 rejects a popup
+    # override through this CLI and requires modal panes to target the active pane implicitly.
     args = ["plugin", "pane", "open", "--plugin", os.environ["HERDR_PLUGIN_ID"],
-            "--entrypoint", "pending-files", "--placement", "popup",
-            "--width", "80%", "--height", "70%", "--target-pane", pane_id,
+            "--entrypoint", "pending-files",
             "--env", f"GUARD_TARGET_PANE_ID={pane_id}", "--focus"]
     if isinstance(cwd, str) and cwd:
         args.extend(["--cwd", cwd])

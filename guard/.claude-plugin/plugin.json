@@ -1,6 +1,6 @@
 {
   "name": "guard",
-  "version": "0.144.0",
+  "version": "0.145.0",
   "description": "On-demand audits of answers, documents, plans, and checkpointed edited-file queues.",
   "author": {
     "name": "studykit"
