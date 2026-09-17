@@ -13,9 +13,10 @@ import sys
 
 from pathlib import Path
 
-from .config import _load_config, _parse_switch
+from .config import _HOST_IS_CODEX, _load_config, _parse_switch
+from .cmd_checkpoint import reconcile_queue
 from .payload import _session_id
-from .state import _edited_files, _plan_audit_paused, _read_state
+from .state import _plan_audit_paused, _read_state
 
 
 # Status-line colours. Green means pending work or an armed plan gate; dim means empty or
@@ -92,11 +93,8 @@ def cmd_status() -> int:
     except Exception:
         return 0
 
-    pending = {
-        path
-        for bucket in ("edited_files", "edited_agent_docs", "edited_refs", "edited_docs")
-        for path in _edited_files(state, str(state.get("edited_prompt_id") or ""), bucket)
-    }
+    pending, _ = reconcile_queue(project_dir, state,
+                                 "codex" if _HOST_IS_CODEX else "claude")
     # Always show one of the two same-width glyphs; absence would be indistinguishable from a
     # status integration that does not report the plan gate at all.
     if _plan_audit_paused(state):

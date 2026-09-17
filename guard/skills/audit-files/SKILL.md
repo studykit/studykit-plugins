@@ -31,9 +31,9 @@ else—not what was being changed, what seems risky, or what you want checked. I
 `conditional` is true, dispatch only paths this session actually changed according to this
 session's tool activity; a shared worktree diff alone is not ownership evidence.
 
-Wait for all reports, then apply only findings their own disposition permits. Report paths in
-`unreviewed` as tracked changes with no enabled matching audit rule; they still belong to the
-checkpoint. If `truncated` contains a positive count, say that the checkpoint is partial.
+Wait for all reports, then apply only findings their own disposition permits. Every listed
+file has an enabled matching audit rule. If `truncated` contains a positive count, say that
+the checkpoint is partial.
 
 ## Complete safely
 

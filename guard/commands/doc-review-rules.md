@@ -1,6 +1,6 @@
 ---
 name: doc-review-rules
-description: "Configure Guard's per-path document review rules: choose agent or skill actions for document globs, exclude paths, and enable the edited-document hook. Use when the user wants different document reviewers by folder or file pattern. Claude Code only."
+description: "Configure Guard's per-path document review rules: choose agent or skill actions for document globs, exclude paths, and enable checkpoint review. Use when the user wants different document reviewers by folder or file pattern. Claude Code only."
 argument-hint: '[desired document review coverage]'
 disable-model-invocation: true
 context: fork
@@ -33,7 +33,6 @@ one:
 - `agent:guard:doc-auditor` — checks ordinary project documentation for redundant or drifting content.
 - `agent:guard:agents-md-auditor` — checks `AGENTS.md` and `CLAUDE.md` as always-loaded instructions.
 - `agent:guard:ext-docs-auditor` — checks saved external references for source attribution and reference hygiene.
-- `skill:guard:audit-docs` — wraps `guard:doc-auditor` with the edited-document audit procedure; it deliberately drops instruction files.
 
 These names are ready to use when Guard is installed. Project or user actions remain valid
 alternatives when their exact agent or skill names resolve.

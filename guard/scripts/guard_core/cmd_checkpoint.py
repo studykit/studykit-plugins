@@ -77,6 +77,19 @@ def _prune_missing(state: dict[str, Any]) -> None:
         }
 
 
+def _retain_paths(state: dict[str, Any], retained: set[str]) -> None:
+    """Remove legacy queue entries that current settings no longer select."""
+    for bucket in _BUCKETS:
+        current = state.get(bucket)
+        if isinstance(current, list):
+            state[bucket] = [path for path in current if path in retained]
+    provenance = state.get("edited_provenance")
+    if isinstance(provenance, dict):
+        state["edited_provenance"] = {
+            path: value for path, value in provenance.items() if path in retained
+        }
+
+
 def _plan(project_dir: Path, state: dict[str, Any], host: str,
           snapshot: dict[str, dict[str, str]]) -> list[dict[str, Any]]:
     config = _load_config(project_dir)
@@ -98,11 +111,16 @@ def _plan(project_dir: Path, state: dict[str, Any], host: str,
             rule = _doc_review_rule(_project_rel(project_dir, Path(path)), rules)
             if rule is None:
                 continue
-            name = rule.name
-            if host == "codex" and rule.kind == "agent":
+            kind, name = rule.kind, rule.name
+            # v0.143.0 and earlier offered this wrapper as a built-in action. The checkpoint
+            # now supplies its path-only dispatch contract directly, so preserve existing
+            # project rules as an alias while no longer shipping or advertising the skill.
+            if (kind, name) == ("skill", "guard:audit-docs"):
+                kind, name = "agent", "guard:doc-auditor"
+            if host == "codex" and kind == "agent":
                 name = _CODEX_AGENTS.get(name, name)
             conditional = _edit_source(state, path) != "native"
-            groups.setdefault((rule.kind, name, conditional), []).append(path)
+            groups.setdefault((kind, name, conditional), []).append(path)
 
     return [
         {"kind": kind, "name": name, "conditional": conditional, "paths": paths}
@@ -110,15 +128,22 @@ def _plan(project_dir: Path, state: dict[str, Any], host: str,
     ]
 
 
+def reconcile_queue(project_dir: Path, state: dict[str, Any], host: str
+                    ) -> tuple[dict[str, dict[str, str]], list[dict[str, Any]]]:
+    """Keep only paths selected by current settings and return their dispatch plan."""
+    _prune_missing(state)
+    queued = _snapshot(state)
+    groups = _plan(project_dir, state, host, queued)
+    selected = {path for group in groups for path in group["paths"]}
+    _retain_paths(state, selected)
+    return ({path: item for path, item in queued.items() if path in selected}, groups)
+
+
 def _show(project_dir: Path, session_id: str, host: str) -> int:
     config = _load_config(project_dir)
     state = _read_state(project_dir, session_id, config)
-    _prune_missing(state)
-    snapshot = _snapshot(state)
-    groups = _plan(project_dir, state, host, snapshot)
-    reviewed = {path for group in groups for path in group["paths"]}
+    snapshot, groups = reconcile_queue(project_dir, state, host)
     payload = {"files": snapshot, "groups": groups,
-               "unreviewed": [path for path in snapshot if path not in reviewed],
                "truncated": state.get("edited_truncated", {})}
     token = hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()
     payload["token"] = token

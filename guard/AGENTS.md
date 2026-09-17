@@ -52,8 +52,9 @@ commands, a user `!` command), which moved out of `cmd_stop` and into
 
 ### What still runs on hooks
 
-The **edited-file tracker**. `PostToolUse` accumulates reviewable native targets and Bash
-snapshot/hash differences across turns. `/guard:audit-files` is the explicit checkpoint: it
+The **edited-file tracker**. `PostToolUse` accumulates only native targets and Bash
+snapshot/hash differences selected by the current audit settings and document-review rules.
+`/guard:audit-files` is the explicit checkpoint: it
 snapshots that queue, dispatches the configured file reviews, and clears only revisions that
 did not change while review was running. Stop launches no audit; it remains only to recover
 writes from an interrupted Bash call. Claude and Codex share this checkpoint contract.

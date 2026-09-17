@@ -116,19 +116,16 @@ def panel() -> int:
         else:
             project = Path(str(pane.get("foreground_cwd") or pane.get("cwd") or "."))
             files = pending.get("files", {})
-            groups = pending.get("groups", [])
             if not files:
                 print("No edited files are waiting for a checkpoint.")
             else:
-                reviewed = {path for group in groups for path in group.get("paths", [])}
                 for raw in files:
                     try:
                         label = Path(raw).relative_to(project).as_posix()
                     except ValueError:
                         label = raw
-                    marker = "audit" if raw in reviewed else "tracked"
-                    print(f"  [{marker:7}] {label}")
-                print(f"\n{len(files)} pending · {len(reviewed)} selected by audit rules")
+                    print(f"  {label}")
+                print(f"\n{len(files)} pending audit target(s)")
         if message:
             print(f"\n{message}")
         print("\n[a] audit checkpoint   [r] refresh   [q] close")

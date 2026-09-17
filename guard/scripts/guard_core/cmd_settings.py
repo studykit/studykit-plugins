@@ -30,7 +30,8 @@ from pathlib import Path
 from typing import Any
 
 from .config import (
-    AUDIT_PLAN_KEY, AUDIT_SWITCHES, RETIRED_KEYS, AgentMode, DEFAULT_CONFIG, _agent_mode,
+    AUDIT_PLAN_KEY, AUDIT_SWITCHES, RETIRED_KEYS, AgentMode, DEFAULT_CONFIG, _HOST_IS_CODEX,
+    _agent_mode,
     _audit_on, _cli_write_allowed, _doc_review_rules, _load_config, _load_raw_config,
     _parse_mode, _parse_switch, _plan_review_action, _write_config
 )
@@ -38,6 +39,8 @@ from .paths import (_cli_project_dir, _doc_dir_entries, _doc_exclude_entries,
                     _knowledge_dir_entries, _refs_dir, _trace)
 from .agents import AUDIT_AGENTS, SETTABLE_AGENTS
 from .state import _plan_audit_paused, _read_state, _write_state
+from .cmd_checkpoint import reconcile_queue
+from .herdr import report_pending
 
 
 # Which session-state key each audit switch seeds, and the shell command that moves it for one
@@ -54,6 +57,17 @@ _SWITCH_COMMAND = {AUDIT_PLAN_KEY: "guard-plan"}
 # And how it is read back out of a state dict, since the accessor is what holds the
 # "missing key means armed" rule.
 _SWITCH_PAUSED = {AUDIT_PLAN_KEY: _plan_audit_paused}
+
+
+def _reconcile_session_queue(project_dir: Path, session_id: str | None) -> None:
+    """Apply changed review settings to the live queue and its Herdr count."""
+    if session_id is None:
+        return
+    config = _load_config(project_dir)
+    state = _read_state(project_dir, session_id, config)
+    reconcile_queue(project_dir, state, "codex" if _HOST_IS_CODEX else "claude")
+    _write_state(project_dir, session_id, state)
+    report_pending(state)
 
 
 def _parse_settings_argv(argv: list[str]) -> tuple[list[str], str | None]:
@@ -203,7 +217,7 @@ def _config_show_lines(project_dir: Path, session_id: str | None) -> list[str]:
     def built_in_review_actions_line() -> str:
         return ("document review actions (built in): "
                 "agent:guard:doc-auditor, agent:guard:agents-md-auditor, "
-                "agent:guard:ext-docs-auditor, skill:guard:audit-docs")
+                "agent:guard:ext-docs-auditor")
 
     def checkpoint_line() -> str:
         """This session's pending file-checkpoint count."""
@@ -280,6 +294,8 @@ def _settings_unset(project_dir: Path, session_id: str | None,
     if not _write_config(project_dir, raw):
         print("guard settings: failed to write .claude/guard.local.json", file=sys.stderr)
         return 0
+
+    _reconcile_session_queue(project_dir, session_id)
 
     known = key in DEFAULT_CONFIG
     # `str()` first: an `AgentMode` default would otherwise print as `<AgentMode.OFF: 'off'>`.
@@ -449,6 +465,8 @@ def cmd_settings() -> int:
     if not _write_config(project_dir, raw):
         print("guard settings: failed to write .claude/guard.local.json", file=sys.stderr)
         return 0
+
+    _reconcile_session_queue(project_dir, session_id)
 
     for line in _config_show_lines(project_dir, session_id):
         print(line)

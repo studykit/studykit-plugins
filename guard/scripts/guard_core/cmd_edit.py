@@ -1,12 +1,10 @@
 """``post-edit`` (PostToolUse on file-writing tools and Bash).
 
-Two independent jobs, both independent of the agent switches. It records a source file, an
-agent instruction file, a saved reference or an ordinary document written since the last
-file-audit checkpoint — the
-lists the ``comment-corrector``, ``agents-md-auditor``, ``ext-docs-auditor`` and
-``doc-auditor`` recommendations are built from, kept in four buckets that must stay disjoint
-(``agents._edited_bucket``). And it requires a file saved inside the refs directory to be
-listed in that directory's ``AGENTS.md``, blocking until it is.
+Two independent jobs. It records a changed file only when the current agent switches and
+document-review rules select an audit for it, keeping the four audit buckets disjoint
+(``agents._edited_bucket``). Separately, it requires a file saved inside the refs directory
+to be listed in that directory's ``AGENTS.md``, blocking until it is; that prohibition is
+independent of audit settings.
 
 Both jobs see a subagent's writes as well as the main agent's, since tool events fire the
 same hooks inside a subagent (https://code.claude.com/docs/en/hooks). That matters for the
@@ -30,7 +28,8 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from .config import _load_config
+from .config import (AgentMode, _HOST_IS_CODEX, _agent_mode, _doc_review_rule,
+                     _doc_review_rules, _load_config)
 from .paths import (_doc_scope, _project_dir, _project_rel, _refs_dir, _state_root,
                     _trace)
 from .payload import _read_payload, _session_id
@@ -258,8 +257,8 @@ def _record_edited_source(project_dir: Path, payload: dict, tool_input: Any,
 
     Four lists, chosen by `_edited_bucket`: source files for `comment-corrector`, agent
     instruction files for `agents-md-auditor`, saved references for `ext-docs-auditor`, and the
-    project's ordinary documents for `doc-auditor`. Anything else is not recorded — an agent
-    handed a file its criteria say nothing about spends its context proving that.
+    project's ordinary documents for `doc-auditor`. A path is retained only when that audit
+    is enabled and, for documents, a review rule matches it. Anything else is not recorded.
 
     This fires for a SUBAGENT's write as well as the main agent's: tool events run the same
     configured hooks inside a subagent and the payload carries `agent_id` / `agent_type`
@@ -292,6 +291,28 @@ def _record_edited_source(project_dir: Path, payload: dict, tool_input: Any,
     if project not in target.parents or state_root in target.parents:
         return
 
+    state = _read_state(project_dir, session_id, config)
+    # Settings may have changed since older paths entered the queue. Reconcile before every
+    # new write so the Herdr token and status state never retain a path no current rule audits.
+    from .cmd_checkpoint import reconcile_queue
+    reconcile_queue(project_dir, state, "codex" if _HOST_IS_CODEX else "claude")
+    if bucket == "edited_files":
+        if (_HOST_IS_CODEX
+                or _agent_mode(state, "comment-corrector") == AgentMode.OFF):
+            _write_state(project_dir, session_id, state)
+            report_pending(state)
+            return
+    else:
+        if _agent_mode(state, "doc-auditor") == AgentMode.OFF:
+            _write_state(project_dir, session_id, state)
+            report_pending(state)
+            return
+        if _doc_review_rule(_project_rel(project_dir, target),
+                            _doc_review_rules(config)) is None:
+            _write_state(project_dir, session_id, state)
+            report_pending(state)
+            return
+
     if content_hash is None:
         try:
             digest = hashlib.sha256()
@@ -302,7 +323,6 @@ def _record_edited_source(project_dir: Path, payload: dict, tool_input: Any,
         except OSError:
             return
 
-    state = _read_state(project_dir, session_id, config)
     # This marker is diagnostic only. The queue intentionally crosses turn boundaries and is
     # cleared by checkpoint completion, not by the next prompt.
     state["edited_prompt_id"] = prompt_id

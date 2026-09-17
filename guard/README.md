@@ -5,9 +5,10 @@ configurable review actions for files changed by Claude Code or Codex.
 
 ## Edited-file checkpoints
 
-Guard records reviewable files as they are changed but does not audit them at every response
-boundary. Run `/guard:audit-files` in Claude Code or `$guard:audit-files` in Codex when the
-current batch of edits is ready for review. The checkpoint groups pending paths by the rules in
+Guard records changed files only when the enabled audit settings and document-review rules
+select them, but does not audit them at every response boundary. Run `/guard:audit-files` in
+Claude Code or `$guard:audit-files` in Codex when the current batch of edits is ready for review.
+The checkpoint groups pending paths by the rules in
 `.claude/guard.local.json` or `.codex/guard.local.json`, runs the selected audits, and removes
 only file revisions that did not change while review was running.
 

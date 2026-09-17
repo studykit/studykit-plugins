@@ -116,7 +116,7 @@ nothing and the plan stays held. Say so when the name is not one you can see in 
 
 When reporting `doc_review_rules`, tell the user that Guard already ships
 `agent:guard:doc-auditor`, `agent:guard:agents-md-auditor`,
-`agent:guard:ext-docs-auditor`, and `skill:guard:audit-docs`. Briefly describe the matching
+and `agent:guard:ext-docs-auditor`. Briefly describe the matching
 specialty; do not make a built-in action sound like something they must install separately.
 
 **Every agent setting ships off**, and with all of them off guard says almost nothing: a
