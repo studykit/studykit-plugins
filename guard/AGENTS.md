@@ -56,8 +56,11 @@ The **edited-file tracker**. `PostToolUse` accumulates only native targets and B
 snapshot/hash differences selected by the current audit settings and document-review rules.
 `/guard:audit-files` is the explicit checkpoint: it
 snapshots that queue, dispatches the configured file reviews, and clears only revisions that
-did not change while review was running. Stop launches no audit; it remains only to recover
-writes from an interrupted Bash call. Claude and Codex share this checkpoint contract.
+did not change while review was running. A Herdr selection creates an immutable subset token
+that the same skill reads, so both hosts keep one dispatch and completion contract. Stop launches
+no audit; it remains only to recover writes from an interrupted Bash call. An explicit full or
+path-scoped queue reset invalidates every live checkpoint, so a review already in flight cannot
+clear edits recorded after the reset. Claude and Codex share this checkpoint contract.
 
 Also on `PostToolUse`, and unrelated to auditing: the **refs index gate**, which blocks until a
 file saved under the refs directory is listed in that directory's index. It is a prohibition,

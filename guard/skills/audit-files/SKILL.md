@@ -11,17 +11,20 @@ This is an explicit checkpoint. It replaces automatic file audits at every Stop 
 ## Read the checkpoint
 
 Resolve `scripts/checkpoint.py` relative to this `SKILL.md` and run that concrete path with
-`show`, the current host, and the current session id. On Claude Code,
+`show`, the current host, and the current session id. If the invoking user message includes
+exactly `--token <token>`, add those two arguments to `show`; this identifies an immutable
+subset prepared by Guard's selection UI. Do not derive a scope from paths or other prose in the
+message. On Claude Code,
 `${CLAUDE_SKILL_DIR}/scripts/checkpoint.py` is already the concrete script path. Use
 `CLAUDE_CODE_SESSION_ID` on Claude Code and `CODEX_THREAD_ID` on Codex:
 
 ```text
-<checkpoint-script> show --host <claude|codex> --session <session-id>
+<checkpoint-script> show [--token <token>] --host <claude|codex> --session <session-id>
 ```
 
 Parse its one-line JSON result. If `files` is empty, report that there are no pending files
-and stop. Do not inspect the worktree for extra candidates: the queue is the checkpoint's
-scope.
+and stop. Do not inspect the worktree for extra candidates: the returned checkpoint is the
+complete scope, including when it contains only files selected in Herdr.
 
 ## Dispatch
 

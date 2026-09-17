@@ -49,6 +49,23 @@ def _host_arg() -> str:
     return "codex" if os.environ.get("CODEX_THREAD_ID") else "claude"
 
 
+def _paths_arg(args: list[str]) -> set[str] | None:
+    """Parse an optional JSON path list without making paths CLI option tokens."""
+    if "--paths-json" not in args:
+        return None
+    index = args.index("--paths-json")
+    if index + 1 >= len(args):
+        raise ValueError("`--paths-json` needs a JSON array of paths")
+    try:
+        value = json.loads(args[index + 1])
+    except (json.JSONDecodeError, TypeError, ValueError) as error:
+        raise ValueError("`--paths-json` must be valid JSON") from error
+    if not isinstance(value, list) or not all(
+            isinstance(path, str) and path for path in value):
+        raise ValueError("`--paths-json` must be a JSON array of non-empty paths")
+    return set(value)
+
+
 def _snapshot(state: dict[str, Any]) -> dict[str, dict[str, str]]:
     prompt_id = str(state.get("edited_prompt_id") or "checkpoint")
     result: dict[str, dict[str, str]] = {}
@@ -139,20 +156,29 @@ def reconcile_queue(project_dir: Path, state: dict[str, Any], host: str
     return ({path: item for path, item in queued.items() if path in selected}, groups)
 
 
-def _show(project_dir: Path, session_id: str, host: str) -> int:
+def _show(project_dir: Path, session_id: str, host: str,
+          selected: set[str] | None = None) -> int:
     config = _load_config(project_dir)
     state = _read_state(project_dir, session_id, config)
     snapshot, groups = reconcile_queue(project_dir, state, host)
+    if selected is not None:
+        snapshot = {path: item for path, item in snapshot.items() if path in selected}
+        groups = [
+            {**group, "paths": [path for path in group["paths"] if path in selected]}
+            for group in groups
+        ]
+        groups = [group for group in groups if group["paths"]]
+    truncated = state.get("edited_truncated", {}) if selected is None else {}
     payload = {"files": snapshot, "groups": groups,
-               "truncated": state.get("edited_truncated", {})}
+               "truncated": truncated}
     token = hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()
     payload["token"] = token
     checkpoints = state.get("file_checkpoints")
     if not isinstance(checkpoints, dict):
         checkpoints = {}
-    truncated = state.get("edited_truncated")
     checkpoints[token] = {
         "files": snapshot,
+        "groups": groups,
         "truncated": dict(truncated) if isinstance(truncated, dict) else {},
     }
     # Display refreshes also call `show`; keep several live tokens so a panel refresh cannot
@@ -160,6 +186,32 @@ def _show(project_dir: Path, session_id: str, host: str) -> int:
     state["file_checkpoints"] = dict(list(checkpoints.items())[-8:])
     _write_state(project_dir, session_id, state)
     report_pending(state)
+    print(json.dumps(payload, ensure_ascii=False))
+    return 0
+
+
+def _show_token(project_dir: Path, session_id: str, token: str) -> int:
+    """Read an immutable checkpoint prepared by the Herdr selection UI."""
+    config = _load_config(project_dir)
+    state = _read_state(project_dir, session_id, config)
+    checkpoints = state.get("file_checkpoints")
+    checkpoint = checkpoints.get(token) if isinstance(checkpoints, dict) else None
+    if not isinstance(checkpoint, dict):
+        print("guard: checkpoint token is stale; request a new audit.", file=sys.stderr)
+        return 1
+    files = checkpoint.get("files")
+    groups = checkpoint.get("groups")
+    truncated = checkpoint.get("truncated")
+    if not isinstance(files, dict) or not isinstance(groups, list):
+        print("guard: checkpoint token cannot be resumed; request a new audit.",
+              file=sys.stderr)
+        return 1
+    payload = {
+        "files": files,
+        "groups": groups,
+        "truncated": truncated if isinstance(truncated, dict) else {},
+        "token": token,
+    }
     print(json.dumps(payload, ensure_ascii=False))
     return 0
 
@@ -216,6 +268,48 @@ def _complete(project_dir: Path, session_id: str, token: str) -> int:
     return 0
 
 
+def _clear(project_dir: Path, session_id: str, selected: set[str] | None = None) -> int:
+    """Discard all or selected queue paths and invalidate in-flight checkpoints."""
+    config = _load_config(project_dir)
+    state = _read_state(project_dir, session_id, config)
+    queued = {
+        path
+        for bucket in _BUCKETS
+        for path in state.get(bucket, [])
+        if isinstance(path, str) and path
+    }
+    cleared = queued if selected is None else queued & selected
+    if selected is not None and not cleared:
+        print(json.dumps({"cleared": 0, "remaining": len(queued)}, ensure_ascii=False))
+        return 0
+    for bucket in _BUCKETS:
+        current = state.get(bucket)
+        state[bucket] = ([path for path in current if path not in cleared]
+                         if isinstance(current, list) else [])
+    provenance = state.get("edited_provenance")
+    state["edited_provenance"] = ({
+        path: value for path, value in provenance.items() if path not in cleared
+    } if isinstance(provenance, dict) else {})
+    if selected is None:
+        state["edited_truncated"] = {}
+    remaining = {
+        path
+        for bucket in _BUCKETS
+        for path in state.get(bucket, [])
+        if isinstance(path, str) and path
+    }
+    if not remaining and not state.get("edited_truncated"):
+        state["edited_prompt_id"] = ""
+    # An audit that started before this explicit reset must not complete against files
+    # recorded after it. Later edits create a fresh queue and require a fresh checkpoint.
+    state["file_checkpoints"] = {}
+    _write_state(project_dir, session_id, state)
+    report_pending(state)
+    print(json.dumps({"cleared": len(cleared), "remaining": len(remaining)},
+                     ensure_ascii=False))
+    return 0
+
+
 def cmd_file_checkpoint() -> int:
     project_dir = _cli_project_dir()
     session_id = _session_arg()
@@ -227,9 +321,30 @@ def cmd_file_checkpoint() -> int:
         args = args[1:]
     action = args[0] if args else "show"
     if action == "show":
-        return _show(project_dir, session_id, _host_arg())
+        if "--token" in args:
+            index = args.index("--token")
+            if index + 1 >= len(args):
+                print("guard: `--token` needs a checkpoint token.", file=sys.stderr)
+                return 1
+            return _show_token(project_dir, session_id, args[index + 1])
+        try:
+            selected = _paths_arg(args)
+        except ValueError as error:
+            print(f"guard: {error}.", file=sys.stderr)
+            return 1
+        return _show(project_dir, session_id, _host_arg(), selected)
+    if action == "clear":
+        try:
+            selected = _paths_arg(args)
+        except ValueError as error:
+            print(f"guard: {error}.", file=sys.stderr)
+            return 1
+        return _clear(project_dir, session_id, selected)
     if action == "complete" and len(args) > 1:
         return _complete(project_dir, session_id, args[1])
-    print("guard: use `file-checkpoint show` or `file-checkpoint complete <token>`.",
+    print("guard: use `file-checkpoint show [--paths-json <json-array> | "
+          "--token <token>]`, `file-checkpoint clear "
+          "[--paths-json <json-array>]`, or "
+          "`file-checkpoint complete <token>`.",
           file=sys.stderr)
     return 1

@@ -31,7 +31,12 @@ herdr plugin link /absolute/path/to/studykit-plugins/guard
 ```
 
 It provides two actions—show pending files and audit pending files—and a popup pane listing the
-queue for the focused Claude Code or Codex session.
+queue for the focused Claude Code or Codex session. In the popup, use the arrow keys or `j`/`k`
+to move the cursor, Space to select or deselect multiple files, and Enter to open the current
+file in `$VISUAL` or `$EDITOR`; Guard falls back to `nvim`, `vim`, then `vi`. Press `a` to start
+an audit for the selected files, or for the entire queue when nothing is selected. Press `c` to
+clear only the selected files after confirmation, `r` to refresh, or `q` to close. Clearing
+invalidates an audit already in progress; files edited afterward are added to a fresh queue.
 
 To display the pending count in the expanded Herdr Agent sidebar, add `$guard_pending` to an
 Agent row in `~/.config/herdr/config.toml`, for example:
