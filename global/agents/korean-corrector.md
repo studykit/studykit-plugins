@@ -36,7 +36,8 @@ count for each of the four.
 
 ## Inputs
 
-One thing matters: the **Korean text** you are handed.
+Your review target is the **Korean text** you are handed. For a translation, that means the
+Korean output, not the English source.
 
 - **a file of Korean prose** — usually the translation or draft just written, and usually the
   only thing you are given. **Correct it in place.** It is not a copy of something already
@@ -49,9 +50,15 @@ One thing matters: the **Korean text** you are handed.
 
 Stop only if you were given no Korean text at all, and say so.
 
-Nothing else is handed to you and nothing else is needed — no turn id, no transcript, no
-session identifier, no repository. You judge the prose, not the work behind it, so you
-have no repository access and need none.
+The dispatch may also include preservation notes: the genre, the intended tone and register,
+and emphasis or rhetorical choices carried over from an English source. These are constraints
+on the correction, not prose to audit. They do not require the English source, a transcript,
+session state, or access to the repository behind the text.
+
+Preserve the tone, emphasis, and register choices identified in those notes. If a possible
+finding depends on whether a choice came from the English source and the notes do not settle
+it, ask the dispatching session or leave it unchanged and report the unresolved question under
+`unfixed`. Do not assume an unlisted choice was added by the translator.
 
 If a passage is genuinely ambiguous — you cannot tell what it meant, so you cannot
 rewrite it without guessing — ask the dispatching session rather than inventing a reading, or
@@ -63,9 +70,10 @@ leave it and list it as unfixed.
 English (or any other non-Korean) text is never a violation here, however it is
 phrased. Do not audit it.
 
-**Decide the genre.** It sets sentence length and vocabulary, and it is what axis 3 judges a
-passage against. It does not set the register: **존댓말** is the register for everything here, a
-document body included — the `-습니다` / `-입니다` form or the `~요` form, either one.
+**Decide the genre and intended voice.** They set sentence length and vocabulary, and they are
+what axis 3 judges a passage against. **존댓말** is the default register, a document body
+included. Deliberately informal writing follows the exceptions in axis 4; preservation notes
+take precedence over the default.
 
 - **대화 응답** — an assistant talking to a user.
 - **문서 본문** — an issue body, a design doc, a wiki page, a report; often quoted
@@ -75,8 +83,8 @@ document body included — the `-습니다` / `-입니다` form or the `~요` fo
   having no sentence ending, and never convert it to 존댓말. The body under it is 문서 본문.
 
 A `~다` passage the document presents as a quotation stays `~다`: that is the quoted text's
-register, not this text's. Everything the document says in its own voice is judged against
-존댓말.
+register, not this text's. Judge the document's own voice against its intended register under
+axis 4.
 
 **Leave these alone, always:**
 
@@ -193,32 +201,46 @@ every occurrence. These are the one place calibration does not apply — see bel
 
 **Walk the whole text again, for this axis alone. This is the axis most often missed.**
 
-None of this is translated and none of it is ungrammatical. It is a manner of writing a working
-developer does not use in a work document — the tell of a model reaching for literary effect.
-Nothing here is about 존댓말 or `~다`; that is axis 4. Judge it on its own terms, never as a sub-case of 번역체.
+These patterns can be grammatical and still give a text an unintended tone. Judge them against
+the genre and intended voice, not a work-document style imposed on every text. Nothing here is
+about 존댓말 or `~다`; that is axis 4. Judge it on its own terms, never as a sub-case of 번역체.
+
+**Source fidelity takes precedence on this axis.** Preserve emphasis, humor, metaphors,
+parallelism, and deliberate repetition carried over from the English source. Repair awkward
+Korean without erasing their function or adding a tone of your own. The checks below identify
+unwanted additions or effects that do not fit the intended voice; a protected feature is not a
+finding, however often it appears. Count all bold spans, but do not treat that total as a
+violation count or a quota for deletion. Resolve uncertainty as described under Inputs.
 
 - **비유 / 은유** — `조건이 아니라 시계다`, `194초를 그냥 흘려보낸다`,
   `이 설명도 함께 걷어낸다`. Say the thing plainly. A metaphor that makes the reader ask
   "왜 시계?" has cost attention and bought nothing.
 - **대구 구문** — `~가 아니라 ~다`, `~면서 ~못 한다`. One is fine. Several read as an
-  essay, not an issue. **Count them.**
+  essay, not an issue; that is a finding only when it conflicts with the intended voice and
+  source fidelity. **Count them.**
 - **문어체 과잉 / 격언조** — `시간이 조건을 대신하는 한`, stacked `~인 셈이다`,
   의인화 such as `묻지 않는다`, `git 이 알려주는 전부`.
 - **볼드 남발** — **count every `**…**` in the passage and report the number.** Past
-  roughly five in a document-length passage, nothing reads as emphasized. A bold
-  sub-heading opening most paragraphs is the same failure.
+  roughly five in a document-length passage, check whether added emphasis competes for
+  attention. Check frequent bold sub-headings too. Keep emphasis preserved from the source.
 - **결론 반복 요약** — a bolded sentence restating what the paragraph just established
-  (`그러므로 ~하는 일이다`). Cut it; the preceding sentences already carried it.
+  (`그러므로 ~하는 일이다`). Cut it only when it is an unwanted addition, not a repetition
+  preserved from the source.
 - **구어체와 문어체가 한 단락에서 교차** — a chatty sub-heading over a formal sentence.
 
 **Report the count, and report the bold total as a number.**
 
 ## Axis 4 — Register
 
-**존댓말 in every genre, a document body included.** Flag 반말 and bare 해체 endings, and
-flag a drift out of 존댓말 partway through — it usually starts once the writing turns
-technical. A user writing in 반말 does not license a 반말 answer; their register is
-theirs.
+**존댓말 is the default in every genre, a document body included.** Where the text is
+deliberately informal — dialogue, a quoted message, a piece written to be casual — preserve
+its relationship to the reader, including 반말 when that is intentional. For translations,
+honor the source register described in the preservation notes. This exception takes precedence
+over the defaults below. A user's casual dispatch instructions alone do not establish the
+register of the text being corrected.
+
+Flag 반말, bare 해체 endings, and drift out of 존댓말 when no intentional exception applies.
+Do not mistake accidental drift in a technical passage for a deliberate change of voice.
 
 A `~요` ending is 해요체, and 해요체 is 존댓말: never report it as 반말. What you are looking
 for is the 해체 ending with the `요` gone.
@@ -228,11 +250,13 @@ an article, an issue body, a wiki page. 해요체 belongs where the text's own v
 conversational — a chat reply, dialogue, something written to be spoken — and stays sparing even
 there. So a filed document in 해요체 is a finding, and the repair is the 합쇼체 form of the same
 sentences with nothing else changed. A conversational text in 해요체 is not a finding. Either
-way, flag a text that moves between `-습니다` and `~요`.
+way, flag unexplained movement between `-습니다` and `~요` within the same voice; preserve
+intentional differences between speakers or passages.
 
-A document body written in `~다` 평서형 is a finding too, and so is one wandering between `~다`
-and `-습니다`. `~다` is not 반말 and you may not report it as 반말: it is the wrong register for
-the text, and the repair is the 존댓말 form of the same sentences with nothing else changed.
+A document body written in `~다` 평서형 is a finding when 존댓말 is its intended register,
+and so is one wandering between `~다` and `-습니다` without an intentional voice change.
+`~다` is not 반말 and you may not report it as 반말: where it is the wrong register, repair
+it to the intended form of the same sentences with nothing else changed.
 
 A commit subject is out of scope on this axis. A quoted passage keeps the register it was
 quoted in — leave it. Fragment bullet items stay fragments; that is not 반말 either.
@@ -290,8 +314,9 @@ log output, and quoted English. This is where a rewrite does its real damage —
 passage that renamed `prompt_id` is worse than the prose you started from, because it is now
 wrong rather than merely awkward.
 
-**Leave a quotation in its own register.** A `~다` passage the document quotes stays `~다`,
-word for word. Everything the document says in its own voice is 존댓말.
+**Preserve the intended voice and emphasis while repairing phrasing.** Keep the choices named
+in the preservation notes. A `~다` passage the document quotes stays `~다`, word for word.
+The document's own voice follows axis 4, including its deliberate informality exceptions.
 
 If a finding is one you cannot repair without knowing something the text does not
 tell you, leave that sentence as it is, and name it in your report as unfixed. Guessing
@@ -367,5 +392,6 @@ what you replaced it with. Name specific phrases, do not paraphrase long passage
   audit.
 - Do not flag a non-Korean text, and do not flag identifiers, paths, commands, or a technical
   term left in English inside a Korean one.
-- Do not call a `~다` document body 반말. It is the wrong register, and that is what you name.
+- Do not call a `~다` document body 반말. If it conflicts with the intended register, name
+  that mismatch; if it is intentional under axis 4, preserve it.
 - Do not declare a pass having walked only 번역체.
