@@ -39,11 +39,6 @@ from .emit import _emit_session_start
 def _add_shell_command_to_path() -> bool:
     """Put guard's shell commands on the session's ``PATH``. True if written.
 
-    Two of them share the directory and are reached the same way, by parties that never
-    meet: ``guard`` is the user's, typed at a shell prompt, and ``guard-candidates`` is the
-    router's, run from a subagent's Bash. Adding the directory serves both, which is why
-    this is one export rather than two.
-
     ``CLAUDE_ENV_FILE`` is not a list of ``export`` lines — it is a shell script Claude Code
     SOURCES before each Bash command, so it can prepend a directory as readily as it can set
     a variable. That is what makes ``guard on`` work with nothing to install: no startup
@@ -436,27 +431,27 @@ def cmd_session_start() -> int:
         "and that local path. The same path is in $GUARD_REFS_DIR for Bash."
     )
 
-    # Name the closeout file, and the audit command, once at the session's opening, when guard
-    # has anything switched on. Stating it here is what lets the Stop block's line stay a path
-    # instead of an explanation of what the file is for — and, since this event fires on
-    # `compact` as well as on startup, what lets that block stop repeating the path at all:
-    # the flag written below tells `cmd_stop` the session already has it, and a compaction
-    # that drops this line re-runs this same event.
-    #
-    # The command is stated here and nowhere else in the standing context: `audit-turn` is
-    # `disable-model-invocation: true`, so its own description is not loaded, and a session that
-    # has never been told the name cannot answer a user who asks for an audit in prose. Once per
-    # session, not once per turn — the Stop block repeats the prohibition, not the offer.
+    # Explicit-only skills are not offered through model-trigger descriptions. Name the
+    # available entry points once at session start when their configuration is present.
+    prefix = "$guard:" if _HOST_IS_CODEX else "/guard:"
     if any(_switch_on(session_cfg, k) for k in SETTABLE_AGENTS):
         context.append(
-            "guard: nothing here is automatic and none of it is yours to start. Answer "
-            "normally; guard writes no file for an ordinary turn. The user runs "
-            "`/guard:answer <question>` when they want the answer as an audited document, "
-            "`/guard:audit-turn` to have the turn just finished checked, "
-            "`/guard:audit-report <path>` for an existing document, and "
-            "`/guard:audit-files` to audit the edited files accumulated since the last "
-            "checkpoint. If they ask for any of it in prose, name the command — you cannot "
-            "invoke these for them."
+            f"guard: the user can run `{prefix}audit-files` to review pending edited files. "
+            "File reviews are explicit; do not start them automatically."
+        )
+    if session_cfg.get("answer_review"):
+        context.append(
+            f"guard: the user can run `{prefix}answer <question>` to request an answer "
+            "document reviewed by the agent or skill configured in answer_review. "
+            "Ordinary responses do not create answer documents or start this review."
+        )
+
+    if session_cfg.get("turn_review"):
+        entry = "$guard:audit-turn" if _HOST_IS_CODEX else "/guard:audit-turn"
+        context.append(
+            f"guard: the user can run `{entry}` to review a completed response with the "
+            "agent or skill configured in turn_review. This is explicit only; never "
+            "start a turn audit automatically or substitute a built-in reviewer."
         )
 
     # One write, last, for the reason given where `context` is declared. Codex keeps the

@@ -55,7 +55,7 @@ For compatibility and versioning rules, see `AGENTS.md`.
 - `plantuml` — PlantUML diagram reference, creation, and validation
 - `structurizr` — Structurizr DSL diagram composition, C4 model visualization, and architecture documentation
 - `d2` — D2 diagram composition, rendering, and visualization
-- `guard` — on-demand audit agents that review a finished turn, or a document, for unsupported claims, deferrals the repo could answer, unclear explanation, unnatural Korean, and drifted `AGENTS.md` / saved reference docs
+- `guard` — user-configured answer, turn, and plan reviews, plus rule-based checkpoints for changed files
 - `handover` — create a self-contained session handover and load a recorded handover after a clear
 - `file-nav` — Herdr file tree, root-specific saved views, filename search, Obsidian-style Markdown and source previews, and Git diffs for the focused pane's directory
 

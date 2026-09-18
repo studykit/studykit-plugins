@@ -3,12 +3,11 @@
 #
 #   guard-plan on | guard-plan off | guard-plan | guard-plan status
 #
-# Separate from `guard`, which is the turn audit. The two run at different moments on
-# different material — a finished answer versus a plan awaiting approval — and wanting one
-# is not wanting the other.
+# This switch affects only the configured plan reviewer. With no reviewer configured,
+# approved plans pass without a review.
 #
-# While ON, an APPROVED plan is held before it is built until it has been through the
-# `guard:audit-plan` skill; revise the plan afterwards and it is held again, because the gate
+# While ON and `plan_review` names a reviewer, an APPROVED plan is held for that review
+# before it is built; revise the plan afterwards and it is held again, because the gate
 # matches the plan's text rather than a flag. Answering the approval prompt with "tell Claude
 # what to change" is feedback, not approval, and is never held.
 #

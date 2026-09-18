@@ -3,7 +3,7 @@
 #
 #   guard-plan-audited <plan-file-path>
 #
-# For the `guard:audit-plan` skill, and for nothing else. It is what lets `ExitPlanMode`
+# Run after the reviewer configured in `plan_review` finishes. It lets `ExitPlanMode`
 # through: the gate compares the plan being presented against the text recorded here.
 #
 # Run it LAST, after the review's findings are written back into the plan file. It hashes

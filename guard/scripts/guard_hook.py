@@ -35,7 +35,7 @@ Subcommands
 - status         CLI (stdin JSON), the status-line segment — ``guard_core.cmd_status``
 - settings       CLI (argv), run by the ``guard:settings`` skill — ``guard_core.cmd_settings``
 - refs-dir       CLI, prints the resolved refs directory — ``guard_core.cmd_settings``
-- candidates     CLI (argv), run by the router — ``guard_core.cmd_candidates``
+- candidates     CLI compatibility notice for the retired roster — ``guard_core.cmd_candidates``
 - inputs         CLI (argv), run by a dispatched agent — ``guard_core.cmd_inputs``
 - knowledge-dirs CLI, prints the configured knowledge dirs — ``guard_core.cmd_plan``
 - exit-plan      PostToolUse/ExitPlanMode, gates an unaudited plan — ``guard_core.cmd_plan_gate``

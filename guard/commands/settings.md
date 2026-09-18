@@ -1,7 +1,7 @@
 ---
 name: settings
-description: "View and change Guard settings for this project, including edited-document review rules. Use when the user wants to configure audits, document review actions, reference paths, or deployment knowledge. Claude Code only."
-argument-hint: '[key] [value]'
+description: "View and change Guard settings for this project, including user-configured plan, turn, and answer reviewers and edited-document review rules. Use when the user wants to configure audits, document review actions, reference paths, or deployment knowledge. Claude Code only."
+argument-hint: '[setting or desired review coverage]'
 disable-model-invocation: true
 # Runs in a forked subagent, not in the main session. Changing a setting is a few CLI calls
 # and a short exchange, but a session late in its life carries a great deal of context and
@@ -37,7 +37,9 @@ disallowed-tools: Write Edit NotebookEdit
 # skill directory silently changes depth when it moves again.
 ---
 
-Show and change **guard's** settings for this project.
+Show and change **guard's** settings for this project. This includes choosing document
+reviewers by folder or file pattern. Configure existing reviewers; do not create or edit
+reviewer definitions or run reviews as part of changing settings.
 
 You are running in your own context because the main session's is expensive: it may be
 carrying a large conversation and re-pays for all of it on every turn. None of that happens
@@ -56,6 +58,8 @@ What the user asked for, verbatim and possibly empty: `$ARGUMENTS`
 
 ## The CLI
 
+Start with `settings show` to inspect the current configuration before proposing changes.
+
 Every call that **changes** a setting must be prefixed with `GUARD_SETTINGS_SKILL=1`. guard
 refuses config-mutating calls without it, so a settings change traces back to the user
 invoking `/guard:settings` rather than to an agent deciding on its own. `settings show` is
@@ -67,8 +71,9 @@ GUARD_SETTINGS_SKILL=1 "${CLAUDE_PLUGIN_ROOT}/scripts/guard_hook.py" settings se
 GUARD_SETTINGS_SKILL=1 "${CLAUDE_PLUGIN_ROOT}/scripts/guard_hook.py" settings unset <key> --session ${CLAUDE_SESSION_ID}
 ```
 
-Always pass `--session`. Without it a change lands in the config file but not in the live
-session, and the user watches the setting they just made appear to do nothing.
+Always pass `--session` so file-review switches and the automatic plan-gate switch also
+update the calling session. Reviewer settings are read from the project configuration at
+each invocation, so changing a reviewer does not require restarting the session.
 
 `knowledge_dir` takes a comma-separated list and **the whole list is replaced** on every
 `set` — order is precedence, so the user states it, and there is no append verb to reorder
@@ -85,146 +90,141 @@ default. Either way the command reports which of the two happened.
 
 **Never open or write `.claude/guard.local.json` yourself** — not with Write, not with Edit,
 not with a shell redirect or `sed` through Bash, and never as text for the user to paste.
-The CLI validates each value and mirrors the change into the live session; a hand-edit does
-neither, and guard treats the CLI as the file's only supported writer. If a change cannot be
+The CLI validates each value and mirrors switch changes into the live session. Use it for
+all configuration changes made by this command. If a change cannot be
 made through the CLI, report that instead of working around it.
 
 ## Settable keys
 
 | Key | Values | What it controls |
 | --- | --- | --- |
-| `audit-plan` | `on` (default) / `off` | Whether a session **starts** with the plan gate armed. It is the one audit the user does not invoke — the gate fires on its own at plan approval — which is why it is the only one a project answers for in advance. While armed, an approved plan is held before it is built until it has been through `/guard:audit-plan`, and revising the plan holds it again. This is the project's default, not the live session: `guard-plan on` / `guard-plan off` move the session you are in and leave this alone. |
-| `plan_review` | JSON object, or `{}` | **Who** reviews a held plan: `{"kind":"agent" or "skill","name":"..."}`. `{}` (the default) means Guard's own plan review, `skill:guard:audit-plan`. This does not decide whether a plan is held — `audit-plan` above does. |
-| `claims-auditor` | `off` / `on` | Flags statements asserted without adequate evidence. One switch, two entry points: `audit-turn-claims` on a finished turn, `audit-report-claims` on a saved document — named by the matching router, or invoked by the user directly. Both fork the same `claims-auditor`. |
-| `deferrals-auditor` | `off` / `on` | Flags work punted as "TBD" / "확인 필요" that the repo could have answered. One switch, three entry points: `audit-turn-deferrals` on a finished turn, `audit-report-deferrals` on a saved document, `audit-plan-deferrals` on an approved plan — named by the matching router or by the plan review, or invoked by the user directly. All three fork the same `deferrals-auditor`. |
-| `clarity-auditor` | `off` / `on` | Flags terms used but never explained, mechanisms given with no concrete example, and explanation pitched wrong for this reader. One switch, one agent, three entry points: `audit-turn-clarity` on a finished turn, `audit-report-clarity` on a saved document, `audit-plan-clarity` on an approved plan — named by the matching router or by the plan review, or invoked by the user directly. It calibrates against a reader profile; without one it says so and checks less, so the `reader-profile` skill comes first if the user means to rely on it. |
+| `audit-plan` | `on` (default) / `off` | Whether a session starts with the Claude Code plan gate armed. While armed, approved plans go to the reviewer configured in `plan_review`; without one, no review runs. Revising an audited plan holds it again at the next approval. `guard-plan on` / `guard-plan off` change the live session. |
+| `plan_review` | JSON object, or `{}` | The user-supplied reviewer: `{"kind":"agent" or "skill","name":"..."}`. `{}` (the default) or an absent key means no plan review. Guard supplies no review criteria. The automatic Claude gate also requires the `audit-plan` switch; explicit `audit-plan` skill invocations do not. |
+| `turn_review` | JSON object, or `{}` | The user-supplied turn reviewer: `{"kind":"agent" or "skill","name":"..."}`. Unset or `{}` means no turn review. `audit-turn` invokes only this reviewer, independently of the per-agent switches. |
+| `answer_review` | JSON object, or `{}` | The user-supplied answer reviewer: `{"kind":"agent" or "skill","name":"..."}`. `answer` stops before drafting when unset or `{}`. The reviewer owns the criteria. |
 | `comment-corrector` | `off` / `on` | Selects `guard:comment-corrector` for pending source files when the user runs `/guard:audit-files`. This one **edits those files in place**, so say so when the user turns it on. |
 | `doc-auditor` | `off` / `on` | Enables review actions for pending project Markdown at `/guard:audit-files` checkpoints, including `AGENTS.md` and `CLAUDE.md`. A file is acted on only when it matches a `doc_review_rules` entry. |
 | `doc_dir` | comma-separated project directories | Limits the ordinary Markdown documents eligible for review. An empty value means the whole project. |
 | `doc_exclude` | comma-separated project directories or globs | Excludes matching Markdown—including agent instructions and references—from review. `*` stays in one directory and `**` crosses directory depth. |
-| `doc_review_rules` | JSON array | Per-path actions. Each item is `{"glob":"...","action":{"kind":"agent" or "skill","name":"..."}}`. Unmatched files are not reviewed; use `doc_exclude` for explicit exclusions. Use `/guard:doc-review-rules` for guided setup. |
+| `doc_review_rules` | JSON array | Per-path actions. Each item is `{"glob":"...","action":{"kind":"agent" or "skill","name":"..."}}`. Unmatched files are not reviewed; use `doc_exclude` for explicit exclusions. Use the document-review setup below for guided configuration. |
 | `refs_dir` | a project-relative path, or empty | Where guard saves cited-doc copies. Empty = the git-tracked default `wiki/ref/`, committed with the repo; a different tracked path (e.g. `docs/refs`) overrides it. |
-| `knowledge_dir` | comma-separated directories, or empty | Where this project writes down what its **deployed** system looks like — topology, environments, runbooks. Read by the plan audit's `plan-environment` and by nothing else; guard never writes here. Unlike `refs_dir` it is not confined to the project: an absolute path or a `~` is the expected shape, since this material usually lives in a knowledge base outside the repo. Order is precedence. Empty (the default) is a normal state — that agent then falls back to the repo's own deploy surface, a read-only probe, and finally asking the user. |
+| `knowledge_dir` | comma-separated directories, or empty | Operational knowledge directories, such as topology, environments and runbooks. Available through audit inputs and `guard-knowledge-dirs`, including to user-supplied reviewers. Guard never writes here. Absolute and `~` paths are supported; order is precedence. Empty means none configured. |
 
-`plan_review` takes one JSON object as a single shell argument, and it **replaces the whole
-value**; `set plan_review '{}'` puts Guard's own review back. Two things to tell the user
-before changing it. A reviewer that is not `guard:audit-plan` has to run `guard-plan-audited
-<plan file path>` when it finishes, or the gate keeps holding the plan — the hook says so when
-it fires, but the reviewer they name has to be one that will act on it. And Guard does not
-check that the name resolves: if the agent or skill is not installed, the dispatch finds
-nothing and the plan stays held. Say so when the name is not one you can see in this project.
+## Registering a reviewer
 
-When reporting `doc_review_rules`, tell the user that Guard already ships
-`agent:guard:doc-auditor`, `agent:guard:agents-md-auditor`,
-and `agent:guard:ext-docs-auditor`. Briefly describe the matching
-specialty; do not make a built-in action sound like something they must install separately.
+For `plan_review`, `turn_review`, or `answer_review`, use the exact installed agent or skill
+name selected by the user. If the user has not specified its kind and name, ask for the
+missing information; do not choose a built-in auditor or invent a reviewer. Guard validates
+the object syntax, not whether the named reviewer is installed. Explain this distinction
+when reporting a successful setting change; it does not mean a review has run.
 
-**Every agent setting ships off**, and with all of them off guard says almost nothing: a
-finished turn adds nothing to the main session's context and makes no model call. The refs
-index gate remains independent of review rules, so a reference saved without being indexed is
-still blocked. Turning one on only makes
-that agent *available* — the router still has to find something in the turn before it names
-it. The two
-file-reading `comment-corrector` skips the router and needs a source file this turn wrote.
-Document review actions likewise need both `doc-auditor: on` and a matching rule.
+For example, after the user chooses the reviewer, pass its JSON object as one argument:
 
-**Four agents have no setting here and cannot be given one.** `korean-translator` writes the
-Korean the user reads and `korean-corrector` checks what it wrote — one step, not an audit to
-opt into, and a switch on either half would mean a Korean answer the user reads in a quality
-that depends on a config key. They cost nothing where they are not needed, because they only
-run over a DOCUMENT: `/guard:answer` dispatches the translator when the reader reads another
-language, the router names it for a file the user points at, and the corrector is reached
-by the translator's own report. An ordinary turn produces no document, so nothing is translated
-there at all. They never make a turn routed on their own — with every switch below `off`, they
-are dropped too.
+```sh
+GUARD_SETTINGS_SKILL=1 "${CLAUDE_PLUGIN_ROOT}/scripts/guard_hook.py" settings set turn_review '{"kind":"skill","name":"my-turn-reviewer"}' --session "${CLAUDE_SESSION_ID}"
+GUARD_SETTINGS_SKILL=1 "${CLAUDE_PLUGIN_ROOT}/scripts/guard_hook.py" settings set answer_review '{"kind":"agent","name":"my-answer-reviewer"}' --session "${CLAUDE_SESSION_ID}"
+```
 
-Those two are also the only pair here guard does not ship: they are **user-level** agents,
-installed once per machine rather than with this plugin, which is why their names carry no
-`guard:` prefix. A machine without them translates nothing — guard says so and hands over the
-English rather than translating it in the main session.
+These are examples, not default reviewers. The same object form applies to `plan_review`.
+If an existing setting names a removed Guard skill or plan agent, explain that it must be
+replaced with the user's installed reviewer or cleared. Do not silently rewrite the name,
+clear the setting, or substitute an auditor. Never register a dispatcher as its own reviewer.
 
-`guard:docs-finder` is selected from its own description, the way any agent is — there is
-nothing said unasked for a switch to govern. `guard:ext-docs-auditor` may be selected by a
-document review rule at an explicit file checkpoint. If a user asks to turn either one off,
-say that plainly rather than writing a key the CLI will refuse.
+`turn_review` takes one JSON object as a single shell argument and replaces the whole value.
+Use `set turn_review '{}'` or `unset turn_review` to disable it. The user must implement and
+install the named agent or skill; never select a fallback or register `guard:audit-turn` as
+its own reviewer. `/guard:audit-turn` in Claude Code and `$guard:audit-turn` in Codex use this
+setting and report findings without editing the response or project files. No Stop hook
+launches a review. The standalone `audit-report` skill has been removed.
 
-**The plan review ignores these keys entirely.** `/guard:audit-plan` invokes its seven
-critics by name, `audit-plan-deferrals` and `audit-plan-clarity` among them, and reads no
-switch. A user who approved a plan and had it held for review gets the whole review, in a
-project with every key below `off`. Do not offer to turn a plan critic off here; there is no
-key for one.
+`plan_review` takes one JSON object as a single shell argument and replaces the whole
+value. `set plan_review '{}'` or `unset plan_review` disables plan review without changing
+the gate switch. For Claude's automatic gate, after the configured review finishes and its
+findings are in the plan, the caller must run `guard-plan-audited <plan file path>`; the hook
+includes that instruction. The explicit `audit-plan` skill handles completion on either host.
+Guard validates the action syntax but does not check that the reviewer is installed. Tell
+the user when the name is not available in this session; do not substitute another reviewer.
+The automatic plan gate currently runs only in Claude Code. For an explicit review, use
+`/guard:audit-plan <path>` in Claude Code or `$guard:audit-plan <path>` in Codex. Do not
+register `guard:audit-plan` as its own reviewer.
 
-**What a switch decides is what happens WITHOUT being asked, and what the routers may
-offer — not what the user can run.** Only `guard-candidates` reads these keys, and only
-`/guard:audit-turn`, `/guard:audit-report` and `/guard:answer` run it. The per-audit
-commands do not: `/guard:audit-turn-claims`, `/guard:audit-turn-clarity` and
-`/guard:audit-turn-deferrals` (and their `audit-report-` counterparts) are invoked by name
-and run whatever the switches say.
+`answer_review` takes one JSON object and replaces the whole value. `set answer_review '{}'`
+or `unset answer_review` clears it. The `answer` workflow stops before drafting without a
+reviewer. Users must install the named reviewer; do not substitute another or register
+`guard:answer` as its own reviewer. The reviewer reads the answer document and returns
+findings; the caller applies corrections. Only this workflow creates an answer document.
 
-Switching everything off means the routers and file checkpoint find no configured audit to
-name — while a user who types a per-audit command still gets that audit. Say it that way if
-they ask; do not tell them the audit cannot happen.
+The three reviewer settings are independent: `answer` uses `answer_review`, `audit-turn`
+uses `turn_review`, and `audit-plan` uses `plan_review`. Guard supplies no fallback criteria.
+The `claims-auditor`, `deferrals-auditor`, and `clarity-auditor` switches are retired. Explain
+that users should configure their own reviewer, then remove obsolete keys with `unset` if
+requested. The `audit-report`, `audit-report-*`, and individual `audit-turn-*` skills no longer exist.
+Use `audit-turn` with a user-configured reviewer for turn audits.
 
-### `on` is the only mode
+`korean-translator` and `korean-corrector` are user-level delivery agents, without a `guard:`
+prefix or audit switch. `answer` uses the translator after review for Korean readers. If
+unavailable, deliver the reviewed English file and explain. `guard:docs-finder` remains
+available by its description; `guard:ext-docs-auditor` can be selected by a document rule.
 
-`on` spawns a new instance every time the agent is needed, and that is now the only way an
-agent runs. A `reuse` mode used to keep one named instance per session; it was removed along
-with the instruction in each agent's definition that told a resumed instance a turn it had not
-read was a new turn. A reused instance without that instruction carries an earlier verdict
-forward as settled, so the mode went with it.
+## Configure document-review rules
 
-Two older spellings turn up in config files, and they are not the same case:
+Use this flow when the user asks for document review by folder or file pattern. First show
+current settings, then explain the existing built-in actions before asking the user to
+supply a custom reviewer:
 
-- `"fresh"` is what `on` used to be called. It still means `on` and always will — say so if
-  the user asks, and there is nothing to fix. A `set` rewrites it as `on`.
-- `"reuse"` is the mode that no longer exists, so it reads as `off`. Say so if you see one,
-  and offer `unset` or a `set` to `on`.
+- `agent:guard:doc-auditor` checks ordinary project documentation for redundant or drifting content.
+- `agent:guard:agents-md-auditor` checks `AGENTS.md` and `CLAUDE.md` as always-loaded instructions.
+- `agent:guard:ext-docs-auditor` checks saved external references for attribution and reference hygiene.
 
-## What to do
+Project and user agents or skills are also valid choices. Use their exact installed names.
+If a requested action cannot be resolved, report that before changing anything and leave
+its rule unchanged unless the user explicitly wants to save the unresolved name.
 
-1. **Run `settings show`** and report the current settings. Do this first, every time,
-   including on a follow-up — something may have changed since you last looked.
+Inspect only the project's Markdown paths when needed to turn the request into patterns.
+Use the configured reference directory for reference rules; do not assume a directory
+layout. Instruction files and reference Markdown follow the same rule selection as ordinary
+documents. These examples illustrate the rule structure, not a default configuration:
 
-   **The first two lines are reported every time, whatever they say.** `file checkpoint`
-   reports this session's pending path count and reminds the user that Stop does not launch
-   audits; `audit-plan` reports the independent plan gate. A user shown only the agent lines
-   cannot tell whether there is checkpoint work waiting.
-2. **If `$ARGUMENTS` names a key and a value**, apply it and report what changed. They told
-   you; do not ask first.
-3. **Otherwise ask**, in your transcript, as plain prose the user can reply to. Name the
-   keys worth changing, their current values, and what the alternatives would do. For an
-   agent key say what the agent does, not just that it can be on or off. "Worth changing"
-   is about which keys you invite them to change; it is not licence to leave one out of the
-   report in step 1.
-4. **Report what changed** and show the settings the command printed, verbatim.
+```json
+[
+  {"glob":"**/AGENTS.md","action":{"kind":"agent","name":"guard:agents-md-auditor"}},
+  {"glob":"**/CLAUDE.md","action":{"kind":"agent","name":"guard:agents-md-auditor"}},
+  {"glob":"docs/references/**","action":{"kind":"agent","name":"guard:ext-docs-auditor"}},
+  {"glob":"docs/api/**","action":{"kind":"skill","name":"project:review-api-docs"}},
+  {"glob":"docs/**","action":{"kind":"agent","name":"guard:doc-auditor"}}
+]
+```
 
-If `show` and the file disagree — the file holds a key the listing never mentions — that key
-is one guard no longer honors. Say so and offer `unset`. Do not run it unprompted: the user
-may be keeping it for something else. A key guard *used* to honor is named in the listing
-itself, on a `(retired)` line that says what replaced it; `audit-turn` is one, retired in
-v0.124.0 now that every audit on that path is invoked by the user. Read that line out — a
-project carrying the key was getting behaviour it no longer gets.
+An action is an `agent` or `skill`, invoked by its exact name. Exclusions belong in
+`doc_exclude`, for example `["docs/generated/**", "**/draft-*.md"]`; `action: null` is invalid.
+Both rule patterns and exclusion globs are project-relative. `*` stays in one directory;
+`**` crosses directory depth. The most-specific matching rule wins: an exact filename such
+as `**/AGENTS.md` beats a filename pattern such as `docs/**/*.md`, which beats `docs/**/*`.
+Deeper literal directories break that tie, followed by literal detail and fewer wildcards.
+An exact tie uses the earlier rule. Unmatched paths are not reviewed. `doc_exclude` applies
+to all Markdown, including instruction files and saved references; `doc_dir` limits ordinary
+Markdown coverage.
 
-## What is not yours
+Each `set` replaces the whole list. Preserve existing rules, exclusions, and scope that the
+user did not ask to change; show the complete resulting values. Explain any enabled
+`doc_dir` restriction that would keep the requested ordinary documents out of review.
 
-- **Changing the live plan gate** is the `guard-plan` shell command, not a setting.
-  `audit-plan` has a key, and it says what a session *starts* as — a session the
-  user has already flipped no longer matches it, and `show` reports that as
-  `audit-plan: on (this session; project setting off)`. It is the session value, not the
-  setting, that answers whether the plan gate is running right now, so report both when they differ instead
-  of reading out the setting alone. A `set audit-plan` does reach the live session (this is why
-  `--session` matters), so it can also *undo* a `guard-plan off` the user ran a minute ago: if
-  they asked only to change the project default, say that the session moved too.
-- **The audits.** You configure them. You never dispatch one, never judge a turn, and never
-  volunteer an opinion on whether the project's current settings are the right ones unless
-  asked.
-- **Anything that is not a guard setting.** You were forked for this one job. A request that
-  drifts into editing the repository, running the test suite, or answering a question about
-  the code belongs in the main session; say so rather than doing it here, where the user
-  cannot see it in the main transcript.
+For rules you propose, show the exact compact JSON and ask for confirmation before saving.
+A request that already specifies the exact rules counts as confirmation. Save only the
+requested lists through the CLI, then enable `doc-auditor` unless the user asked only to save
+inactive rules. If a write fails, report which changes succeeded and stop. Example commands:
 
-## Your report back
+```sh
+GUARD_SETTINGS_SKILL=1 "${CLAUDE_PLUGIN_ROOT}/scripts/guard_hook.py" settings set doc_review_rules '<complete-compact-json-array>' --session "${CLAUDE_SESSION_ID}"
+GUARD_SETTINGS_SKILL=1 "${CLAUDE_PLUGIN_ROOT}/scripts/guard_hook.py" settings set doc_exclude 'docs/generated/**,**/draft-*.md' --session "${CLAUDE_SESSION_ID}"
+GUARD_SETTINGS_SKILL=1 "${CLAUDE_PLUGIN_ROOT}/scripts/guard_hook.py" settings set doc-auditor on --session "${CLAUDE_SESSION_ID}"
+```
 
-**One or two lines**: what changed, and that the rest is in your transcript. You were forked
-precisely so this would not land in the main context — a full settings table relayed back
-there undoes the whole point.
+Pass the JSON as one safely quoted shell argument without interpolation or shell evaluation.
+`doc_exclude` and `doc_dir` take comma-separated lists at the CLI, not JSON arrays. Re-run
+`settings show` and report the resulting configuration. Saving settings does not run reviews;
+the user runs `/guard:audit-files` when the pending edits are ready.
+
+The file-review switches default to `off`. `comment-corrector` requires pending source files;
+document review requires `doc-auditor: on` and a matching rule. The reference-index gate
+remains independent of these switches.

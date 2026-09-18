@@ -22,7 +22,7 @@
             "type": "command",
             "command": "uv run --script \"${CLAUDE_PLUGIN_ROOT}/scripts/guard_hook.py\" exit-plan",
             "timeout": 10,
-            "description": "When the user APPROVES a plan, hold it before it is built until it has been through the plan audit, and again whenever it is revised afterwards. Choosing \"tell Claude what to change\" runs no tool, so this never fires on feedback. A session opens with this armed; `guard-plan off` mutes it for that session. The reviewer it names is `plan_review` in the project config, or guard's own plan audit when that is unset."
+            "description": "When the user APPROVES a plan, hold it before it is built until it has been through the plan audit, and again whenever it is revised afterwards. Choosing \"tell Claude what to change\" runs no tool, so this never fires on feedback. A session opens with this armed; `guard-plan off` mutes it for that session. Only the user-supplied reviewer in `plan_review` runs; when unset, no plan review runs."
           }
         ]
       },

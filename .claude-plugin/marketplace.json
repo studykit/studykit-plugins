@@ -95,7 +95,7 @@
     {
       "name": "guard",
       "source": "./guard",
-      "description": "On-demand audits of answers, documents, plans, and checkpointed edited-file queues.",
+      "description": "User-configured answer, turn, and plan reviews, plus edited-file checkpoints.",
       "author": {
         "name": "studykit"
       },

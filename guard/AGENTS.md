@@ -1,339 +1,74 @@
-# guard — contributor notes
+# Guard contributor notes
 
-`guard` supports Claude Code and Codex. `scripts/guard_hook.py` is the entry point and only
-that — the subcommand table and `main()`; the implementation is the `scripts/guard_core/`
-package. Runtime payload parsing and hook output stay in host adapters.
+Guard supports Claude Code and Codex. Read [dev/design.md](dev/design.md) before changing
+runtime behavior; it owns the architecture, state contracts, runtime measurements and test
+recipes. Follow [the plugin guide](../guide/AGENTS.md) for runtime compatibility and metadata.
+Keep host payloads, environment variables and output shapes at adapter boundaries.
 
-**Open `dev/design.md` before changing anything here.** It is not auto-loaded, and it owns the
-mechanics: the module layering, the hook table, the storage schema, the runtime facts verified
-against the real CLI, the config reference, and the manual-testing recipe. Most of what
-follows is a pointer into it rather than a second copy.
+## Product boundaries
 
-## What guard is
+- Turn, plan, and answer reviewers belong to the user. `audit-turn` dispatches only `turn_review`;
+  `answer` uses only `answer_review`; `audit-plan` and Claude's post-approval gate use only
+  `plan_review`. Unset means no
+  review. Never introduce a fallback critic, built-in review criteria, or a generic agent
+  impersonating the configured reviewer.
+- Reviews are explicit, except for Claude's configured post-approval plan gate. Stop never
+  launches an audit. It may retain evidence and recover interrupted shell writes.
+- `audit-report`, `audit-report-*`, `audit-turn-*`, and the router are retired. `answer`
+  requires a configured reviewer before drafting; never deliver an unaudited draft as a
+  reviewed document.
+- `answer` audits its output as a document. This turn's tool activity cannot substitute for
+  evidence in a deliverable that someone will read outside the conversation.
+- An audit reports findings in the conversation. It does not create a findings document or
+  authorize implementation. Only `answer` produces the requested answer document.
+- File checkpoints follow their switches and review rules. The former claims, deferrals,
+  and clarity switches are retired; none of the explicit reviewer settings depend on them.
+- The refs-index gate and refusal of searches rooted at `/` ignore audit switches: they are
+  prohibitions, not optional review opinions.
 
-**guard makes no model call, writes no file for an ordinary turn, and asks for nothing when
-one ends.** Everything it does is entered by the user, and there are three entries:
+## Invariants
 
-- **`/guard:answer <question>`** — the only thing here that produces a document. The skill
-  writes the answer to `.claude/answers/`, decides itself which audits have material in it,
-  dispatches them, applies what they find, has the corrected English translated when the user
-  reads another language, and hands over the finished file. The user's first sight of it is the
-  audited version.
-- **`/guard:audit-turn`** — over a reply the user has already read. It forks `guard:router`,
-  which names which audits would find something in the last turn a person opened; the caller
-  runs them together and **reports**. It corrects nothing: that turn was printed before the
-  audit was asked for, so there is no document a fix could reach.
-- **`/guard:audit-report <path>`** — a standalone document that already exists. It forks the
-  same `guard:router` with its own task file, which is what makes the two paths one agent.
+- Evidence must come from recorded host activity, never a reconstruction by the assistant
+  whose answer is under review. Missing evidence is a failure to review, not a clean verdict.
+- Audit/control replies must not replace the previous auditable turn. In Claude transcripts,
+  skip non-human origins but continue accepting records with no origin field.
+- Keep calling-session state separate from reviewer-subagent state and from the other host.
+  `guard_core.config` reads `GUARD_HOST` once; adapters select it before importing core.
+- An invalid non-empty reviewer object must report the configuration error. Explicit helpers
+  must not report success when input preparation or completion persistence failed.
+- The plan completion hash covers the final agreed file contents. The gate is feedback to
+  the caller, not proof of reviewer execution or a blanket prohibition on later writes.
+- `/clear` carries only the plan-switch override, using the explicit predecessor record.
+  Other starts read project defaults. Preserve the single-use, expiring handoff and its
+  announcement; see the design notes before changing inheritance.
+- File checkpoints clear only reviewed revisions. Queue resets invalidate live checkpoints;
+  an old review must not clear later edits. Keep edited-file buckets disjoint.
+- The answer document stays outside swept session state so a user deliverable cannot expire.
+- Do not collect the full session history into every review. Supply the selected turn and
+  source location so a reviewer can obtain further context when needed.
+- The Korean translator and corrector are user-level agents invoked without a `guard:` prefix.
+  They are one delivery step, not switchable audits. Handle unavailable names explicitly.
+- Runtime scripts require `uv` and Python >=3.11. Locate plugin roots by their contents,
+  never by assuming a fixed number of parent directories.
 
-All three are `disable-model-invocation: true` — the user's and only the user's. An entry the
-model can reach is work that arrives unasked, and a description in every session's standing
-context is an invitation to reach for it. The `audit-turn-*` / `audit-report-*` skills stay
-model-invocable and must, since each router names them for its CALLER to invoke.
+## Constraints on future changes
 
-guard audits nothing itself, and every audit criterion lives in an agent definition under
-`agents/`.
+Do not restore automatic Stop auditing, a model call inside a hook, lexical reviewer
+selection, or a child `claude -p` router. Do not restore the retired `audit_gate`, turn mute,
+`reuse` mode, `reuse_agents`, or `exempt_skills`. The design notes retain the reasoning.
+The `fresh` mode spelling remains a supported alias for `on`; `keep` and `resume` do not.
 
-### Why the entries, and not a hook
+The removed write-refusal hook was deliberately removed, not abandoned because it failed.
+Read its rationale before adding enforcement around reviewer writes. Agent memory can widen
+available tools; a read-only instruction is not a host-enforced sandbox by itself.
 
-The trigger came off the Stop hook in v0.118.0, the translation in v0.121.0, and the answer
-file itself in v0.122.0 — three turns of one argument, each about hit rate. A router asked on
-every turn usually answered `none`; a translation written on every turn was usually unread; an
-answer file named on every turn turned "안녕" into a document. Work that arrives whether or not
-it is wanted is work the user learns to wave through. `dev/design.md` has each argument and
-what it gave up.
+Shipped agents, skills, commands and injected text must work in a stranger's repository.
+Repository-specific paths and measurements belong in `dev/`, not those definitions.
+Do not duplicate detailed mechanics here or in the end-user README.
 
-The v0.122.0 shape is what remains once that is applied all the way down: **`UserPromptSubmit`
-is gone**, and Stop no longer records anything about a turn. The turn's text is cut out of the
-transcript by `guard-inputs`, at the moment an audit is asked for — including the three skips
-that decide what counts as a turn a person opened (non-human origin, guard's own control
-commands, a user `!` command), which moved out of `cmd_stop` and into
-`transcript._last_auditable_prompt_id`. Same judgment, paid per audit instead of per turn.
+## Verification
 
-### What still runs on hooks
-
-The **edited-file tracker**. `PostToolUse` accumulates only native targets and Bash
-snapshot/hash differences selected by the current audit settings and document-review rules.
-`/guard:audit-files` is the explicit checkpoint: it
-snapshots that queue, dispatches the configured file reviews, and clears only revisions that
-did not change while review was running. A Herdr selection creates an immutable subset token
-that the same skill reads, so both hosts keep one dispatch and completion contract. Stop launches
-no audit; it remains only to recover writes from an interrupted Bash call. An explicit full or
-path-scoped queue reset invalidates every live checkpoint, so a review already in flight cannot
-clear edits recorded after the reset. Claude and Codex share this checkpoint contract.
-
-Also on `PostToolUse`, and unrelated to auditing: the **refs index gate**, which blocks until a
-file saved under the refs directory is listed in that directory's index. It is a prohibition,
-so it ignores every switch and the session mute.
-
-`docs-finder` sits outside all of it and has no switch: the main agent selects it from its own
-description, before stating how something behaves. It searches wider than it writes — saved
-references, the repository's own documentation, any configured knowledge directory — and goes
-to the network only when the subject is external and nothing local settles it. It reports WHERE
-a document is and never what it says, because a gist in its report is a second version of the
-document for the caller to disagree with.
-
-`korean-translator` and `korean-corrector` are one step rather than an audit, and neither has a
-switch: how well a translation reads must not depend on a config key. What is opted into is
-whether a translation happens at all. On the answer path the skill decides it, on the language
-it is answering in — a document the reader cannot read is not a deliverable — and it runs
-AFTER the audit, so the translation is made once, from the corrected English. There is no
-translation on the turn path: an ordinary turn produces no document, so there is nothing to
-translate.
-
-**Those two are not guard's definitions.** Since v0.125.0 they are USER-LEVEL agents — this
-repository ships them from `global/agents/`, they install into the user's own agent directory,
-and guard dispatches them by the bare name with no `guard:` prefix. They read a file and write
-a file and were never handed guard's state, and the judgment they make has callers that have
-nothing to do with guard; `dev/design.md` has the argument and what it costs. What it costs is
-that guard can name an agent a machine has not installed, so both places that write the
-dispatch say what to do when the name resolves to nothing.
-
-Every agent switch ships `off`: guard installed is guard available, not guard running.
-`audit-plan` says what a session OPENS in for the plan gate — the one audit nobody invokes —
-and there is no counterpart for the turn side: a session opens armed there, because every
-entry on it is one the user types. `guard-plan` moves the automatic plan gate for that session
-alone. The old `guard on|off` command now only explains that its automatic Stop-audit mute was
-retired. SessionStart puts the shell helpers on `PATH` through `$CLAUDE_ENV_FILE`, which is
-sourced rather than scanned for exports.
-
-That same `PATH` carries `guard-candidates` and `guard-inputs`, which are the dispatched
-agents' and never the user's. **`guard-candidates` takes the path it is answering for**
-(`--doc` for the document roster); bare, it answers for the turn path, and an answer-path
-caller that omits the flag gets entries pointing at a turn that does not exist.
-
-## Hard requirements
-
-guard has no Python dependencies but it does need **uv**. Both hook manifests and both
-scripts' shebangs go through `uv run --script`, as `guide/adapter-guide.md` requires, and the
-PEP 723 block pins `requires-python = ">=3.11"` (`enum.StrEnum`).
-
-That pin is the point, not paperwork. `#!/usr/bin/env python3` takes whatever is first on the
-PATH of the process the host launched the hook from, which on macOS is 3.9 in any context
-whose PATH comes from a login rather than an interactive shell — a tmux pane, for one. Every
-hook then died with an ImportError and, having printed nothing, left the model free to report
-a success it had not achieved. Measured in a real session; `dev/design.md` § "Why uv, and what
-it fixed" has it.
-
-## Invariants that fail silently
-
-Each of these broke once, and none of them raises an error when it breaks. `dev/design.md`
-carries the full set with the reasoning and the measurements; these are the ones that decide
-how the code here is organised.
-
-- `guard_core.config` is the ONLY reader of `GUARD_HOST`, once, at import.
-- A definition that exists once per dispatch path is named `<path>-<what it does>` — the plan
-  critics `plan-coherence`, `plan-fit` and the rest. An entry-point skill is the same rule
-  with the verb in front: `audit-turn` / `audit-report` for the path's own entry,
-  `audit-turn-claims` / `audit-report-claims` / `audit-plan-deferrals` for one audit on it.
-  `answer` keeps a bare name: it is not a path's audit entry but the thing that produces what
-  one audits. A definition used on one path only, or on every path, keeps its bare name; do
-  not prefix one speculatively. `router` was `turn-router` / `report-router` until v0.128.0
-  and lost the prefix when the two became one agent — a per-path prefix on a definition that
-  serves every path asserts a split that is not there. The plan
-  critics were `design-*` until v0.123.0 and that prefix read as *visual* design, while the
-  path is called plan everywhere else (`audit-plan`, `guard-plan`, the plan gate), so they
-  follow it. Nothing derives these names — a rename is silent at runtime, so the whole set and
-  `skills/audit-plan/SKILL.md` move together or not at all.
-- Split at the ENTRY, never at the agent. Every definition that runs on more than one dispatch
-  path — claims, deferrals, clarity, and since v0.128.0 the `router` — is ONE agent behind a
-  `context: fork` skill per path, and the reason is memory: a memory directory is named after
-  the agent, so two definitions are two memories and what one learns the other relearns.
-  **The router holds without that reason** — it has no `memory:` and must not get one — so do
-  not read the memory clause as the only qualifier: duplicated judgment is enough on its own
-  (`dev/agent-frontmatter-rationale.md` § `router`). A judgment that genuinely differs by path
-  goes in the skill, with the agent saying which judgment that is rather than picking a side;
-  the refs-copy rule for a documentation claim and what it takes for a deferral handed to a
-  person to stand are the two that do, and on the plan path clarity adds a third: WHO the
-  reader is — the person deciding whether to approve it. Deferrals and clarity both run on
-  three paths: the turn, a document, and — since v0.123.0 — the approved plan, through
-  `audit-plan-deferrals` and `audit-plan-clarity`. The first replaced a `design-deferrals`
-  agent asking the same question in almost the same words, which is exactly what this rule
-  exists to prevent. What the plan path gained is the half the
-  retired agent lacked — a deferral answerable by RUNNING the thing — and what it took on is
-  that agent's store, held back by prose alone (`dev/agent-frontmatter-rationale.md`). The
-  plan critics that ask a question nothing else asks are still agents of their own, so before
-  adding one, check whether `claims-auditor`, `deferrals-auditor` or `clarity-auditor` already
-  holds it.
-- A router-named skill's `description` is as short as it can be: the router names it and the
-  caller invokes it by name, so the line never has to attract an invocation, and it is loaded
-  into every session's context whether or not guard runs. The three ENTRY skills are the
-  opposite case and are handled by the opposite means — `disable-model-invocation: true`,
-  which keeps their descriptions out of that context entirely and leaves them free to say
-  plainly what the user is about to run. `session-start` is then the only place a session
-  learns those names, since a description it cannot see is a command it cannot name when the
-  user asks for one in prose.
-- A roster key names the AUDIT and is user-visible configuration; an ENTRY names what the
-  caller invokes for that audit on one path. `agents._path_entry` is the ONLY place one
-  becomes the other, and `cmd_candidates` is its only caller. An entry is an agent for some
-  rows and a skill for others — whichever it is, the name the router prints is the
-  name the caller invokes, and the router's own report template says with which tool. A key must never be renamed to follow an agent —
-  `_load_config` honours only keys it knows, so a configured audit would silently read as its
-  default. Nothing else may derive a dispatchable identity from a key.
-- The Korean pair is dispatched UNPREFIXED. `guard:korean-translator` resolves to nothing —
-  the definitions are user-level — and a dispatch that matches no agent finds nothing rather
-  than raising. Nothing derives either name: the roster prints the bare entry and the `guard:`
-  prefix belongs to whoever writes the dispatch, so the two writers that name this pair
-  (`skills/audit-report/SKILL.md`'s template, `skills/answer/SKILL.md` § 6) spell it out and
-  say why. Adding the prefix back to match the agents beside it in a template is silent.
-- Nothing resolves a plugin path by counting `__file__` parents.
-- Where a piece of text lives is decided by how often it is paid for. Hook output is read on
-  every turn that edits a file; `agents/router.md` and `skills/answer/SKILL.md` once per
-  time the user asks. Nobody re-types another home's text.
-- guard writes the turn's **response** file itself, cut from the transcript — it is the text
-  being audited, so it must not pass through the author's hands. There is no longer a hook that
-  does this: `guard-inputs` does it when an audit resolves a turn, and that is the only writer.
-- **`/guard:answer` audits its document as a DOCUMENT** (`audit-report-*`), never as a turn. It
-  reversed twice before settling, so the reasoning is worth keeping: crediting this turn's tool
-  activity as evidence would let a claim with no support *in the text* ship, and the text is
-  read later by someone who was not here. The turn's activity is not evidence for a deliverable.
-- **The answer document is not written where guard sweeps.** `.claude/answers/` is outside the
-  state root on purpose: `SessionStart` reaps `turns/` on a retention window, and a deliverable
-  the user asked for must not expire. It also falls into no edited-file bucket
-  (`agents._edited_bucket`), so it is never audited as a file the turn edited.
-- Nobody gathers the session's history. The agents that need more are handed a transcript path
-  and extract what they want themselves.
-- One user question gets at most one document, and only `/guard:answer` makes one. An audit
-  may never become a document — not a findings file, not a summary.
-- Only a turn a person opened is auditable, and the test lives in
-  `transcript._last_auditable_prompt_id`. A non-human origin guard has never seen must still
-  skip, while an *absent* origin must still qualify — guard noisy is recoverable, guard
-  silently finding nothing is not. guard's own control turns skip too, and that list must
-  include every entry whose turn is a RELAY: the audit entries, and `answer`, whose reply is a
-  path and whose substance is in a document the same turn already audited. An unmatched one
-  becomes what the next `/guard:audit-turn` resolves to, and the real turn behind it is then
-  unreachable.
-- Hook output is `additionalContext`; the refs-index gap is the one `decision: "block"`
-  that means unfinished work. The `/`-rooted search refusal is a `PreToolUse` `deny` and is
-  the only thing guard forbids outright rather than recommends — it gates a tool ARGUMENT,
-  never a caller's identity, which is what separates it from the removed hook below.
-- It names **agents**, never guard's own skills — those are the user's entry point, so a hook
-  must not reach through them.
-- The three edited-file lists stay disjoint, and the refs test runs first, by location.
-- `guard-candidates` is where the per-agent switches are enforced for the turn and report
-  entries. The file-checkpoint planner enforces them for the pending file queue. It answers
-  per PATH: `--doc` for the document roster, bare for the turn's. `/guard:answer` must pass
-  `--doc`; without it the roster names turn entries that resolve a turn that does not exist.
-  The retired session mute is not enforced there and must not be put back: every audit on
-  these paths is explicitly invoked. The PLAN review is outside this and must stay outside:
-  `audit-plan` invokes its critics by name and reads none of the per-agent switches,
-  because a plan held for review is reviewed whole or not at all — half a review is worse than
-  none, since what it passes over reads as checked. Whether a plan is held at all is
-  `audit-plan` / `guard-plan`'s question, answered before the review starts. Do not give the
-  plan entries a roster row.
-- The refs-index check and the `/`-rooted search refusal ignore every audit switch because
-  both are prohibitions rather than opinions.
-- The automatic file-audit session mute is retired. The status line and Herdr token show the
-  pending queue instead; `audit-plan` remains the only automatic audit switch.
-- A `/clear` inherits the plan switch from the session it replaced, and that is the ONLY boundary that inherits anything — every other start
-  reads the settings. It carries a session that differs from the state a fresh session lands on,
-  in either direction. That baseline is a config read, which is why the
-  comparison is against the config rather than against a fixed idea of which state is
-  noteworthy — a project setting `audit-plan: off` loses its `guard-plan on` the same way
-  anyone else loses a `guard-plan off`. For the turn half the baseline is simply armed. The predecessor is named by the
-  `SessionEnd` record rather than inferred from file times, the record is single-use and
-  expiring, and the adoption is announced. Weaken any one of those four and this becomes the
-  persistent gate wearing a different name; `dev/design.md` has the measurements.
-- The plan gate's reviewer is `plan_review`, the one bad config guard does not absorb: an
-  unusable value BLOCKS rather than falling back to the review guard ships, and the key must
-  stay without a default naming that review or the branch cannot exist. `dev/design.md`'s
-  config reference has the argument for both.
-- guard always exits 0 and fails open, with the one exception above.
-
-## Deliberately not enforced
-
-`memory:` grants Write and Edit silently and the host does not scope the grant, so an agent
-that reports and never edits *can* write anywhere; nothing refuses it. "Reports; edits
-nothing" is a promise in each agent's body.
-
-A `PreToolUse` hook that refused those writes was built and then removed on request. It is
-not in the list below, because it worked — it was not abandoned for failing. Read
-`dev/design.md` for what the removal gave up before adding one back.
-
-## Tried, and must not come back
-
-Listed so a rediscovered idea is recognised rather than rebuilt. `dev/design.md` records what
-each one cost.
-
-- The router as a `claude -p` child process.
-- Any hook that redirects by naming a replacement in a `PreToolUse` deny reason — a deny
-  reason is weighed as tool output, which was measured.
-- Judging inside the hook, or picking agents by lexical pattern.
-- `audit_gate` (`off`/`ask`/`auto`) in front of the per-agent switches. What is left in that
-  position is the session mute: a boolean, with no `ask` to reason about and both states on
-  screen. Keep those two and it is a switch; lose either and it is the gate again.
-  `audit-turn`, the setting that seeded it, is now in the same list — retired in v0.124.0. A
-  default that opened a session muted was the gate itself once every entry became one the user
-  types: `guard-candidates` read the mute back then, so a typed `/guard:audit-turn` was refused
-  by a config file. That reader is gone now for the same reason the key is — a typed audit runs
-  whatever the mute says. Do not add a key for it again; a project that wants guard quiet has the agent
-  switches, which already ship `off`. `dev/design.md` has both arguments.
-- A `reuse_agents` list separate from the per-agent mode, or an `exempt_skills` list.
-- The `reuse` mode itself — one named instance per session, resumed on later turns. Removed
-  once each agent's "If you are resumed" section was, since that section was the whole
-  mitigation for what reuse costs: a verdict the instance got wrong stays in its history as
-  settled. Reviving the mode means reviving those sections, and fixing what it took with it —
-  instance names derived from the roster KEY rather than the agent name, which made every
-  agent rename silently emit a stale name.
-- `keep` / `resume` as aliases pointing at the on mode. They meant `reuse`; a user typing one
-  is asking for what no longer exists, and answering with a different mode is worse than saying
-  the value is not a mode. `fresh` is the opposite case and stays: it is the on mode's own
-  former spelling, so every config file written before v0.116.0 says it, and dropping it would
-  read those projects as `off`.
-- A `.ko-fix.md` rewrite file beside the answer.
-- A `UserPromptExpansion` matcher with no command file of that name behind it: the host
-  answers `Unknown command` before the hook runs, silently, which is how every one of guard's
-  matchers ended up orphaned. guard registers none now — the session mute is a shell command
-  (`guard`), not a slash command, so nothing has to keep a matcher and a command file in
-  step, and the on-demand audit is a real skill rather than a matcher.
-- A slash command for the session mute. Flipping guard is not something to say to the model:
-  it cost a turn, and it cost a command file whose body never ran.
-- A command that launches an `@`-mentioned agent. Written and removed the same day for the one
-  guard used to ship: `@`-mention already guarantees the agent runs, so all the command added
-  was a copy of the agent's own description and a standing instruction placed in a file that
-  only speaks for one turn.
-
-## Codex
-
-Different by necessity: its transcript is not a stable hook interface, so its adapter keeps
-its own turn record. Turn review has one named agent — a router that can only forward to that
-same agent decides nothing — while edited-file review dispatches the project agents installed
-by `guard:setup` through the shared review rules. The turn audit is on demand on this host too,
-and it has to be a prompt PREFIX (`$guard:audit-turn`, `/guard:audit-turn`) rather than a
-skill, because a Codex command hook cannot launch an agent. Projects run `$guard:setup` once
-to install the agent. State is host-specific, under `.claude/guard/` or `.codex/guard/`.
-
-## Editing this plugin
-
-The source is the truth for control flow, and its comments carry the *why* next to the code.
-When editing, record what must not regress — do not restate function bodies here.
-
-`agents/*.md`, `skills/*/SKILL.md`, `commands/*.md` and every string the hooks inject at
-runtime are installed into repositories that are not this one, so they must not name this
-repo's paths, documents, or measurements. Those belong here or in `dev/`.
-
-**No agent file is generated any more.** There was a build step
-(`dev/agent-src/` + `dev/build-agents.py`) while the shared audits ran as two agents each and
-their criteria had to be inlined into both; the entry split removed the duplication it
-existed to manage. `dev/design.md` keeps the argument, because the same pressure returns the
-moment two definitions share a body.
-
-## Testing
-
-`uv run dev/check-entries.py` is the one thing close to a test: it fails if a roster entry
-point matches neither `agents/<name>.md` nor `skills/<name>/SKILL.md`, or if the file it does
-match declares a different `name:` in its frontmatter. An entry listed in its `EXTERNAL_ENTRIES`
-is a user-level agent and is checked the other way round — the definition must exist to install
-from, and the plugin must NOT also ship a copy of it. That is the only place the Python roster
-and the markdown definitions can be compared at all, and both failures are silent at runtime —
-a dispatch or an invocation that matches nothing finds nothing rather than raising. Nothing
-runs it for you; put it in a local pre-commit hook.
-
-Beyond that there is no automated suite. `dev/design.md` § "Manual testing" is the recipe — run it end to
-end after changing hook output, state, eligibility, or the dispatch text, and read its
-comments: several steps exist to stop the assertions from passing as silent no-ops.
-
-`dev/fixtures/` holds answers with known defects planted in them, for exercising an audit
-agent against a ground truth rather than against whatever the last turn happened to produce.
-`defective-brief.md` is the document-path counterpart — its planted defects are the ones that
-path gets wrong, and it lists two things the agent must NOT report.
+From the repository root, run `uv run guard/dev/check-entries.py` to validate shipped names and static agent references.
+Plan, turn, and answer regression commands and the working-tree real-session recipe are in
+[dev/design.md](dev/design.md), under "Explicit plan review", "Configured turn reviews", "Configured answer reviews" and
+"Manual testing". Script tests alone do not verify host hook delivery or native invocation.

@@ -21,7 +21,7 @@ from typing import Any
 
 # Before importing anything from guard_core: `config` reads GUARD_HOST once, at import, and
 # every path below it is chosen from that answer.
-os.environ.setdefault("GUARD_HOST", "codex")
+os.environ["GUARD_HOST"] = "codex"
 
 
 def _guard_core_dir() -> Path:
@@ -43,7 +43,6 @@ sys.path.insert(0, str(_guard_core_dir()))
 # or goes away breaks at import instead of at the call: the façade version of this file spent
 # releases calling two turn-record helpers that no longer existed, and every hook here fails
 # open, so it failed silently.
-from guard_core import agents as core_agents  # noqa: E402
 from guard_core import cmd_edit as core_edit  # noqa: E402
 from guard_core import cmd_search as core_search  # noqa: E402
 from guard_core import cmd_session as core_session  # noqa: E402
@@ -51,7 +50,8 @@ from guard_core import config as core_config  # noqa: E402
 from guard_core import payload as core_payload  # noqa: E402
 from guard_core import paths as core_paths  # noqa: E402
 from guard_core import state as core_state  # noqa: E402
-from guard_core import turnrec as core_turnrec  # noqa: E402
+from guard_core.codex_turns import _load_turn, _save_turn  # noqa: E402
+from guard_core.transcript import _is_control_command_name, _turn_command_name  # noqa: E402
 
 def _payload() -> dict[str, Any]:
     try:
@@ -86,47 +86,6 @@ def _turn_id(payload: dict[str, Any]) -> str:
     return value if isinstance(value, str) and core_payload._SESSION_ID_RE.match(value) and ".." not in value else ""
 
 
-# Codex's turn record is JSON — `{user, tools, assistant}` — and the adapter owns both the
-# format and these three accessors. Claude's side is a markdown file the main agent writes
-# and the agents correct in place; there is nothing shared to factor out but the state root,
-# and the two formats answer to different readers. Living in core once cost exactly this:
-# the Claude side moved to markdown, its JSON helpers went away, and the adapter kept
-# calling names that no longer existed — silently, because every hook here fails open.
-def _turn_path(project_dir: Path, session_id: str, turn_id: str) -> Path:
-    # Short ids, by the same rule as the Claude side (`turnrec._short`) and for the same
-    # reason: this path is printed into the model's context when the user asks for an audit,
-    # and two 36-char UUIDs in it are hex the tokenizer handles badly. The two hosts never
-    # share a tree — `STATE_DIR_REL` differs — so the shape is a convention here, not a
-    # coupling.
-    return (core_paths._state_root(project_dir) / "turns" / core_turnrec._short(session_id)
-            / f"{core_turnrec._short(turn_id)}.json")
-
-
-def _load_turn(project_dir: Path, session_id: str, turn_id: str) -> dict[str, Any]:
-    path = _turn_path(project_dir, session_id, turn_id)
-    try:
-        value = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError, json.JSONDecodeError):
-        value = {}
-    return value if isinstance(value, dict) else {}
-
-
-def _save_turn(project_dir: Path, session_id: str, turn_id: str, turn: dict[str, Any]) -> None:
-    """Write the turn record, atomically. Silent on failure — the caller fails open."""
-    path = _turn_path(project_dir, session_id, turn_id)
-    try:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        tmp = path.with_suffix(".json.tmp")
-        tmp.write_text(json.dumps(turn, ensure_ascii=False), encoding="utf-8")
-        tmp.replace(path)
-    except OSError:
-        core_paths._trace(project_dir, session_id, "codex", "turn_write_failed", turn_id=turn_id)
-
-
-def _emit(value: dict[str, Any]) -> None:
-    json.dump(value, sys.stdout)
-
-
 def _handle_session_start(project_dir: Path) -> None:
     # The shared maintenance logic writes no Codex-specific state beyond the
     # host-selected paths and emits useful policy context on stdout.
@@ -144,33 +103,8 @@ TOOL_RESULT_MAX_CHARS = 2000
 def _handle_prompt(project_dir: Path, payload: dict[str, Any], session_id: str, turn_id: str) -> None:
     prompt = payload.get("prompt")
     prompt = prompt if isinstance(prompt, str) else ""
-    config = core_config._load_config(project_dir)
-    state = core_state._read_state(project_dir, session_id, config)
     _save_turn(project_dir, session_id, turn_id, {"user": prompt, "tools": [], "assistant": ""})
-
-    # The user asking for an audit, and on this host that is the only thing that starts one:
-    # `_handle_stop` recommends nothing. The trigger is a prompt PREFIX rather than a real
-    # command — Codex command hooks cannot launch an agent, so there is nothing to install —
-    # and both prefixes are accepted because a user typing this has seen `$guard:setup` and
-    # Claude's `/guard:audit-turn`.
-    if _AUDIT_TURN_RE.match(prompt.strip()):
-        # No mute is consulted. The user typed the prefix, and a stored gate answering "no" to
-        # a request just made out loud is the behavior `audit-turn` retirement removed. What
-        # still decides is the agent switches, through the scope sentence below.
-        pending = state.get("pending_verify_prompt_id")
-        if isinstance(pending, str) and pending and _turn_path(project_dir, session_id, pending).is_file():
-            # The whole eligible set's scope, not just the claims half. On Claude a router
-            # picks from that set; Codex has one agent, so the set becomes one sentence saying
-            # what to check — the same sentence `_handle_stop` used to emit unasked.
-            keys = [k for k in core_agents._eligible_agents(state, []) if k in _SCOPE]
-            scope = ", ".join(_SCOPE[k] for k in keys) or "the response's claims"
-            _emit({"hookSpecificOutput": {"hookEventName": "UserPromptSubmit", "additionalContext": (
-                "guard: audit the saved turn before answering. Spawn the read-only "
-                "guard_claims_auditor named subagent in a fresh context, give it "
-                f"the turn file {_turn_path(project_dir, session_id, pending)}, and have it check "
-                f"{scope} against the repository; then address what it reports. If that agent is "
-                "unavailable, tell the user to run $guard:setup in this project."
-            )}})
+    # The explicit audit-turn skill owns dispatch; a hook must not launch a second review.
 
 
 def _handle_post_tool(project_dir: Path, payload: dict[str, Any], session_id: str, turn_id: str) -> None:
@@ -242,45 +176,6 @@ def _edited_paths(payload: dict[str, Any]) -> list[str]:
     return out
 
 
-# What the user types to audit the turn just finished. A prefix on the prompt, matched at
-# `UserPromptSubmit`, because Codex command hooks cannot launch an agent — there is no command
-# file behind this and nothing to install. Both prefixes are accepted: `$` is how Codex's own
-# skills are invoked and `/` is what Claude's `/guard:audit-turn` trains. The optional suffix
-# mirrors Claude's per-audit entries so the same thing typed on either host reaches an audit,
-# even though this host has one agent to give the work to.
-_AUDIT_TURN_RE = re.compile(r"^[/$]guard:audit-turn(-claims|-clarity|-deferrals)?(?=\s|$)",
-                            re.IGNORECASE)
-
-
-# How each shared recommendation key reads in the sentence handed to Codex's single
-# named agent. Keys absent here have no Codex agent and are dropped.
-#
-# `clarity-auditor` is absent on purpose, and this is not an omission to fix. It needs two
-# things Codex does not have: the session's transcript, to tell a term this session already
-# explained from one it never did (Codex's transcript is not a stable hook interface, which
-# is why this adapter keeps its own turn record), and agent memory, to hold the reader
-# profile it calibrates against. Without either it would have nothing to audit against and
-# would report `profile: MISSING` on every turn.
-#
-# File-review agents are absent from this TURN-audit table because their dispatch comes from
-# the explicit `audit-files` checkpoint, not from the response-audit scope.
-# `korean-translator` is absent for a different reason from the two above: it HAS an
-# `AUDIT_AGENTS` entry, so it can be eligible here, and the filter below is what drops it. It
-# does not audit — it writes the Korean the user reads — and Codex's one agent is read-only, so
-# there is nothing here to give the work to. Filtering it is therefore the honest answer, not an
-# omission to fix — and unlike the two above, the agent set would NOT fix it. Since v0.125.0
-# that definition is not guard's at all: it installs into the user's own agent directory on
-# Claude, and this host has no such directory to install into. A Codex translation needs a
-# writing agent on this host first.
-#
-# `korean-corrector` is user-level in the same way, and its row below survives that because it
-# is not a dispatch: it contributes one clause to the sentence handed to Codex's own agent, and
-# reading whether Korean sounds translated is something a read-only agent can answer.
-_SCOPE = {"claims-auditor": "the response's claims",
-          "deferrals-auditor": "deferrals the repository could resolve",
-          "korean-corrector": "whether the Korean reads as translated English"}
-
-
 def _handle_stop(project_dir: Path, payload: dict[str, Any], session_id: str, turn_id: str) -> None:
     turn = _load_turn(project_dir, session_id, turn_id)
     response = payload.get("last_assistant_message")
@@ -295,18 +190,12 @@ def _handle_stop(project_dir: Path, payload: dict[str, Any], session_id: str, tu
     normalized["session_id"] = session_id
     core_edit.recover_shell_writes(project_dir, normalized, config)
     state = core_state._read_state(project_dir, session_id, config)
-    # Recorded independently of file-checkpoint switches: it is what the explicit turn-audit
-    # prefix in `_handle_prompt` is pointed at.
-    state["pending_verify_prompt_id"] = turn_id
-    core_state._write_state(project_dir, session_id, state)
-    # And that is all Stop does. Edited files remain in the session queue until the user runs
-    # the shared `audit-files` checkpoint. It used to end every turn with a `decision: "block"` naming
-    # the whole eligible set to Codex's single agent — unrouted, and so noisier than Claude's
-    # routed recommendation ever was, on turns that frequently had nothing in them. The audit
-    # is now the user's to ask for on this host too (`_handle_prompt`), which is also what
-    # retires the two things this handler needed only in order to recommend: the mute check,
-    # since nothing is emitted for a mute to suppress, and the `last_audited_prompt_id`
-    # once-guard, since a user who types the prefix twice is asking twice.
+    # Audit/control replies must not replace the target of the next explicit review.
+    prompt = turn.get("user", "")
+    if isinstance(prompt, str) and not _is_control_command_name(_turn_command_name(prompt)):
+        state["pending_verify_prompt_id"] = turn_id
+        core_state._write_state(project_dir, session_id, state)
+    # Stop records evidence and recovers edits; it never requests a review.
 
 
 def main() -> int:

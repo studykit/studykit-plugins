@@ -5,8 +5,8 @@ current settings; ``set <key> <value>`` changes one of the per-agent settings �
 after the agent it controls, valued ``off``/``on`` (``fresh``, what pre-v0.116.0 wrote, is
 still accepted and rewritten as ``on``) — the audit
 switch (``audit-plan``, ``on``/``off``), ``refs_dir``, ``knowledge_dir``,
-``doc_review_rules``, ``plan_review`` (the directory lists are comma-separated,
-``doc_review_rules`` is a JSON list and ``plan_review`` a JSON object, each replacing the
+``doc_review_rules``, and the three reviewer settings (the directory lists are comma-separated,
+``doc_review_rules`` is a JSON list and each reviewer a JSON object, replacing the
 whole value); ``unset <key>`` removes a key from the file
 entirely, back to its default. The
 agent settings and the audit switches also apply to the live session's ``state/<sid>.json``
@@ -33,14 +33,17 @@ from .config import (
     AUDIT_PLAN_KEY, AUDIT_SWITCHES, RETIRED_KEYS, AgentMode, DEFAULT_CONFIG, _HOST_IS_CODEX,
     _agent_mode,
     _audit_on, _cli_write_allowed, _doc_review_rules, _load_config, _load_raw_config,
-    _parse_mode, _parse_switch, _plan_review_action, _write_config
+    _parse_mode, _parse_switch, _plan_review_action, _turn_review_action, _answer_review_action, _write_config
 )
 from .paths import (_cli_project_dir, _doc_dir_entries, _doc_exclude_entries,
                     _knowledge_dir_entries, _refs_dir, _trace)
-from .agents import AUDIT_AGENTS, SETTABLE_AGENTS
+from .agents import SETTABLE_AGENTS
 from .state import _plan_audit_paused, _read_state, _write_state
 from .cmd_checkpoint import reconcile_queue
 from .herdr import report_pending
+
+_REVIEW_ACCESSORS = {"plan_review": _plan_review_action, "turn_review": _turn_review_action,
+                     "answer_review": _answer_review_action}
 
 
 # Which session-state key each audit switch seeds, and the shell command that moves it for one
@@ -96,7 +99,7 @@ def _apply_session_scalar(project_dir: Path, session_id: str | None, key: str, v
     start); the rest are read from the config file at use, so writing the file is enough
     for them. No-op without a session id.
 
-    ``key`` is the STATE key, which for the two audit switches is not the config key and is
+    ``key`` is the STATE key, which for the plan-gate switch is not the config key and is
     inverted from it — see ``_SWITCH_STATE_KEY``."""
     if not session_id:
         return
@@ -193,26 +196,19 @@ def _config_show_lines(project_dir: Path, session_id: str | None) -> list[str]:
             f"{rule.glob} -> {rule.kind}:{rule.name}"
             for rule in rules)
 
-    def plan_review_line() -> str:
-        """Who reviews a held plan — and, when the answer is nobody, which kind of nobody.
-
-        Three outcomes, and they must not collapse into each other, because the gate treats
-        them differently. Unset and wrong-TYPE both mean guard's own review runs (the loader
-        drops a non-object against this key's ``{}`` default), while an object guard cannot
-        read BLOCKS the next approval. So this line never says "ignored" for that last case:
-        it is the one bad value in the file that stops something.
-        """
-        raw_action = raw.get("plan_review")
+    def reviewer_line(key: str) -> str:
+        raw_action = raw.get(key)
+        subject = key.removesuffix("_review")
         if raw_action is not None and not isinstance(raw_action, dict):
-            return ("plan_review: (not a JSON object, ignored at use) — guard's own plan "
-                    "audit, skill:guard:audit-plan")
-        action, configured = _plan_review_action(cfg)
+            return f"{key}: (not a JSON object, ignored at use) — no {subject} review"
+        accessor = _REVIEW_ACCESSORS[key]
+        action, configured = accessor(cfg)
         if not configured:
-            return "plan_review: (unset) — guard's own plan audit, skill:guard:audit-plan"
+            return f"{key}: (unset) — no {subject} review"
         if action is None:
-            return ('plan_review: INVALID — approving a plan is BLOCKED until this is fixed. '
+            return (f'{key}: INVALID — configured {subject} review cannot run until this is fixed. '
                     'Needs {"kind": "agent" | "skill", "name": "..."}')
-        return f"plan_review: {action.kind}:{action.name}"
+        return f"{key}: {action.kind}:{action.name}"
 
     def built_in_review_actions_line() -> str:
         return ("document review actions (built in): "
@@ -247,7 +243,9 @@ def _config_show_lines(project_dir: Path, session_id: str | None) -> list[str]:
         *(audit_line(k) for k in AUDIT_SWITCHES),
         # Directly under the plan gate's own switch: the two answer "is a plan held" and
         # "by whom", and the second is unreadable apart from the first.
-        plan_review_line(),
+        reviewer_line("plan_review"),
+        reviewer_line("turn_review"),
+        reviewer_line("answer_review"),
         *(switch_line(k) for k in SETTABLE_AGENTS),
         "refs_dir: " + (refs_rel if refs_rel else "(default wiki/ref/)"),
         knowledge_line(),
@@ -323,9 +321,9 @@ def cmd_settings() -> int:
         settings set <key> <value>           — change one setting
         settings unset <key>                 — delete one key from the file
 
-    Settable keys: the two audit switches (``AUDIT_SWITCHES``), the agent switches (the keys
+    Settable keys: the plan-gate switch (``AUDIT_SWITCHES``), the agent switches (the keys
     of ``SETTABLE_AGENTS`` — each is the name of the agent it admits), ``refs_dir``,
-    ``knowledge_dir``, ``doc_review_rules`` and ``plan_review``. The
+    ``knowledge_dir``, ``doc_review_rules``, ``plan_review``, ``turn_review`` and ``answer_review``. The
     switches
     also apply to the live session's ``state/<sid>.json`` when a session id is available
     (``--session <id>``, which the forked skill passes as ``${CLAUDE_SESSION_ID}``, else
@@ -355,8 +353,8 @@ def cmd_settings() -> int:
 
     if not _cli_write_allowed():
         print("guard settings: refusing to change settings outside a user-invoked Guard "
-              "configuration command. Ask the user to run `/guard:settings` or "
-              "`/guard:doc-review-rules` — only the user changes guard's "
+              "configuration command. Ask the user to run `/guard:settings` "
+              "— only the user changes guard's "
               "own configuration.", file=sys.stderr)
         _trace(project_dir, session_id, "settings", "refused_no_skill_marker")
         return 0
@@ -424,15 +422,9 @@ def cmd_settings() -> int:
                   file=sys.stderr)
             return 0
         raw[key] = parsed
-    elif key == "plan_review":
-        # Validated by REPARSE, like `doc_review_rules` above: the parsed value is wrapped in
-        # a config-shaped dict and handed to the accessor the gate itself uses, so the CLI and
-        # the runtime cannot come to disagree about what is usable. `{}` clears it back to
-        # unset, which is guard's own plan audit.
-        #
-        # Rejecting here is what keeps the gate's fail-CLOSED branch rare: a value this CLI
-        # refuses to write is one that can never block an approval. Only a hand-edited file
-        # reaches that branch.
+    elif key in _REVIEW_ACCESSORS:
+        # Use the same accessor as the dispatcher so settings and execution agree.
+        # An empty object clears the reviewer; no fallback is selected.
         try:
             parsed = json.loads(value)
         except json.JSONDecodeError:
@@ -440,11 +432,12 @@ def cmd_settings() -> int:
         if parsed == {}:
             raw[key] = {}
         else:
-            action, _ = _plan_review_action({"plan_review": parsed})
+            accessor = _REVIEW_ACCESSORS[key]
+            action, _ = accessor({key: parsed})
             if action is None:
-                print("guard settings: plan_review must be a JSON object "
-                      '{"kind": "agent|skill", "name": "..."}, or {} for guard\'s own plan '
-                      "audit", file=sys.stderr)
+                print(f"guard settings: {key} must be a JSON object "
+                      '{"kind": "agent|skill", "name": "..."}, or {} to disable review. '
+                      "The audit dispatcher cannot review itself.", file=sys.stderr)
                 return 0
             raw[key] = parsed
     elif key in RETIRED_KEYS:
@@ -458,7 +451,7 @@ def cmd_settings() -> int:
         print(f"guard settings: unknown or unsettable key {key!r}. Settable: "
               + ", ".join((*AUDIT_SWITCHES, *SETTABLE_AGENTS))
               + ", refs_dir, knowledge_dir, doc_dir, doc_exclude, doc_review_rules, "
-                "plan_review.",
+                "plan_review, turn_review, answer_review.",
               file=sys.stderr)
         return 0
 

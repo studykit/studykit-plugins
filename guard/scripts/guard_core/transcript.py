@@ -59,10 +59,11 @@ from .turnrec import _short
 # `reader-profile` is here for a different reason from the rest: its turn is an interview
 # about the user, so the "answer" is the user's own words read back to them, and auditing
 # that would have guard grading the user on how they described themselves.
+# Keep retired audit entry names: old review replies must remain control turns.
 _CONTROL_CMD_RE = re.compile(
-    r"^/(guard:)?(settings|reader-profile|answer"
+    r"^/(guard:)?(settings|reader-profile|answer|audit-plan"
     r"|audit-turn(-claims|-clarity|-deferrals)?"
-    r"|audit-report-(claims|clarity|deferrals)|audit-plan)(?=\s|$)",
+    r"|audit-files|audit-report(-claims|-clarity|-deferrals)?)(?=\s|$)",
     re.IGNORECASE)
 
 
@@ -90,17 +91,17 @@ def _turn_command_name(user_text: str) -> str:
     m = _COMMAND_NAME_RE.search(text)
     if m:
         name = m.group(1).strip()
-    elif text.startswith("/"):
+    elif text.startswith(("/", "$")):
         name = text.split()[0]
     else:
         return ""
-    return name.lstrip("/").lower()
+    return name.lstrip("/$").lower()
 
 
 def _is_control_command_name(name: str) -> bool:
     """True when a normalized command name is one of guard's own control commands
-    (``settings``, ``reader-profile``, ``answer``, ``audit-turn`` and the
-    ``audit-turn-*`` / ``audit-report-*`` entries, ``audit-plan`` — with or without the
+    (``settings``, ``reader-profile``, ``answer``, ``audit-plan``, ``audit-turn`` and the
+    retired ``audit-turn-*`` / ``audit-report-*`` entries — with or without the
     ``guard:`` prefix)."""
     return bool(name) and bool(_CONTROL_CMD_RE.match("/" + name))
 

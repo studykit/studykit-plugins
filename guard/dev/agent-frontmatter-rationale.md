@@ -1,5 +1,11 @@
 # Why each agent's frontmatter is the way it is
 
+The router agent was removed in v0.152.0 with the standalone `audit-report` entry.
+`audit-turn` now dispatches the user-configured reviewer. References below to the former
+shared turn/report router are historical. As of v0.153.0, `answer` also uses a configured
+reviewer. The standalone turn skills were removed in v0.154.0. Their auditor agents remain
+independently available, and reader-profile setup still uses the clarity auditor.
+
 Contributor notes for the people editing `guard/agents/*.md`. Not runtime context —
 the agents never read this file.
 
@@ -127,8 +133,8 @@ becomes a calibration fact for months. See design.md on the reader profile and `
 
 ### `deferrals-auditor`
 
-One agent for all three dispatch paths, entered through the `audit-turn-deferrals`,
-`audit-report-deferrals` and `audit-plan-deferrals` skills. Hand-written — nothing about it is
+One agent for both dispatch paths, entered through the `audit-turn-deferrals` and
+`audit-report-deferrals` skills. Hand-written — nothing about it is
 generated.
 
 `tools: Read, Grep, Glob, Bash, SendMessage`
@@ -162,16 +168,6 @@ never for the finding itself.
 failure recorded in the shared section above; it additionally carries the asymmetric rule in
 prose — never store a remembered `legitimate` — because that specific direction is the one that
 reproduces itself.
-
-That store is what the plan path took on when `design-deferrals` was retired into
-`audit-plan-deferrals` (v0.123.0), and it is the one thing the swap made worse rather than
-better: the retired agent had no store and so could not remember a ruling, while this one can
-and is held back only by prose. It was accepted because the prose is the mitigation that was
-already carrying the other two paths, and because two definitions of one audit is the failure
-this repository has measured — a memory directory is named after the AGENT, so the retired
-critic could never learn what this one already knows about the repository it audits. If the
-stored-`legitimate` failure ever reappears on the plan path, the fix is the same rule, not a
-second agent.
 
 `model: opus`, and here the reason is specific. This agent's whole job is noticing that a
 sentence claiming impossibility is actually a sentence about effort, which means holding the
@@ -327,190 +323,9 @@ rather than a suppressed finding.
 argued for `opus`, but on a run that predates the `curl` step now in the body — **re-run it before
 treating either tier as settled.** `color: yellow` — this one writes files.
 
-## Plan critics
+## Retired plan critics
 
-These are dispatched against a plan the user has approved rather than against a finished turn.
-All of them report and none of them writes, which the tool lists make a fact: no `Edit`, no
-`Write`, and no `memory:` (which would grant both).
-
-**They were named `design-*` until v0.123.0.** The prefix was read as *visual* design — a
-reviewer opening `agents/` could not tell whether `design-fit` judged a layout or an
-implementation plan — and every one of them takes a plan file as its subject. `plan-` is also
-what the rest of the path is already called: `audit-plan`, `guard-plan`, the plan gate,
-`plan_audited_hash`. Renaming an agent is silent at runtime, so the whole set moved at once and
-`skills/audit-plan/SKILL.md` moved with it; nothing derives these names from anything else.
-
-The shared reason none of them has a store: what a design critic would remember is a **verdict**
-about a design, and the next proposal will resemble the one that was cleared. Matching the stored
-verdict is cheaper than working the problem again, and the stored one is what suppresses the
-finding. Each entry below adds the agent-specific form of that.
-
-### `plan-adversary`
-
-`tools: Read, Grep, Glob, Bash`. A failure mode is only real if the code admits it: the proposal
-says what it intends, the repository says what it will actually do when the input is empty, the
-call is concurrent, or the dependency is down.
-
-No `memory:` — it would store verdicts about designs, and a design cleared once is exactly what a
-later proposal will resemble.
-
-`model: opus`.
-
-### `plan-alternatives`
-
-`tools: Read, Grep, Glob, Bash`. The strongest alternative is usually already in the repository —
-a mechanism that solves the same problem, which the proposal either did not find or did not say
-why it passed over. Finding it is a search task.
-
-No `memory:` — a store here would accumulate "this project prefers X", and the whole value of this
-agent is asking whether X was actually weighed THIS time.
-
-`model: opus`.
-
-### `plan-coherence`
-
-`tools: Read, Grep, Glob, Bash`. `Read` for the plan, which is most of the work — this agent's
-findings come from holding the whole plan in view at once, not from searching. `Grep`/`Glob`/`Bash`
-for the times a step's output has to be checked against what the next step consumes, which is a
-question about the code.
-
-No `memory:` — coherence is a property of THIS plan; there is nothing about a previous one worth
-carrying, and what would carry is a habit of expecting the shape the last plan had.
-
-`model: opus`.
-
-### the deferrals critic, which is no longer an agent
-
-There is no `plan-deferrals`. The sixth seat in stage 2 is the `audit-plan-deferrals` skill, a
-`context: fork` entry onto `deferrals-auditor` — the same agent that reads a finished turn and a
-standalone document.
-
-What it replaced was `design-deferrals`, and the two asked the same question in almost the same
-words: not "does the plan defer something", which is visible in the plan, but "does it defer
-something the REPOSITORY already answers". The shared agent asks it better — it carries the
-second half the retired one never had, that an answer obtainable by RUNNING the thing was also
-within reach — and asks it out of a store of what it has already learned about this repository.
-The plan-specific part is small enough to be a skill: what a plan may legitimately leave open,
-and the rule that a decision genuinely the user's has to be put to them AT approval rather than
-carried past it.
-
-Its `tools:` and `model:` are `deferrals-auditor`'s, not this seat's, which is the cost of the
-share and is recorded there along with what the store brings with it.
-
-### `plan-env-prober`
-
-`tools: Bash, Read, Grep, Glob`
-
-**`Bash` is the point of this agent and also its whole risk: it is the only agent guard ships that
-runs commands against infrastructure rather than against the repository.** The boundary is
-READ-ONLY, it is stated in the body rather than in the tool list, and it cannot be enforced by the
-tool list — `Bash` is `Bash`. What keeps it honest is that this agent is small, does one thing, and
-is dispatched only by `plan-environment`; a boundary in a general-purpose agent's prose would be
-one paragraph among many.
-
-No `Agent`: a prober that could dispatch could route around its own boundary. No
-`AskUserQuestion`: it reports what it observed. Interpreting a gap and deciding whether to trouble
-the user is the caller's job, and a prober that asks would be asking about a design it was
-deliberately not shown.
-
-No `memory:` — it would store observations of a live system, which is the class of fact with the
-shortest useful life. A remembered address or replica count read back next week is worse than no
-answer, because it looks like an answer. Omitting the field also leaves Write and Edit off, which
-matters more here than anywhere: this agent has shell access to infrastructure and nothing it does
-should produce a file.
-
-`model: sonnet`, `effort: medium`. `color: yellow` — it acts on things outside the repository.
-
-### `plan-environment`
-
-`tools: Read, Grep, Glob, Bash, Agent, AskUserQuestion`
-
-**`Agent` is the one thing that separates this agent's tool list from the other design critics, and
-it is deliberate:** the environment is the one input that is NOT in the repository, so when the
-knowledge directories are silent this agent has to send someone to look. It dispatches
-`guard:plan-env-prober` and nothing else — see the body's "When the files do not answer".
-
-`AskUserQuestion` is the last resort, and it is a real one: an environment fact that exists only in
-the user's head is still the fact the design will be judged by in production, and reporting
-`UNKNOWN` where a question would have settled it is how this agent produces a clean report about a
-design that cannot be deployed.
-
-No `memory:` — tempting here and wrong: the deployed environment is the input most likely to have
-changed since it was written down, and a remembered topology is indistinguishable from a current
-one at the moment it is read. Every run re-reads.
-
-`model: opus`.
-
-### `plan-feasibility`
-
-`tools: Read, Grep, Glob, Bash`. These are the whole job: this agent's verdict is a claim about
-THIS codebase, so every finding has to come from having gone and looked. `Bash` also runs the
-project's own checks where they are cheap and already documented — whether a dependency is actually
-present beats reasoning about whether it might be.
-
-No `memory:` — what it would store is this project's shape, which is exactly the thing that changes
-between the turn that stored it and the turn that reads it. A remembered "there is no async here"
-is how a proposal gets failed for a constraint that was lifted last month. Read the repository
-every time.
-
-`model: opus`.
-
-### `plan-fit`
-
-`tools: Read, Grep, Glob, Bash, SendMessage`
-
-`Read` for the plan file and the request. `Grep`/`Glob`/`Bash` because "does this solve the user's
-problem" often turns on what the problem actually is — which the repository and the session's
-history answer better than the proposal's own framing of it. `Bash` also reaches guard's transcript
-extractor, which is how the original ask is recovered when the proposal has drifted several turns
-away from it.
-
-No `memory:` — what the user wants is per-request, and a store here would carry one turn's reading
-of their intent into the next one, which is the exact error this agent detects.
-
-`model: opus`.
-
-### `plan-premises-lister`
-
-`tools: Read, Grep, Glob, Bash`
-
-`Read` for the plan. `Grep`/`Glob`/`Bash` are for **telling premises apart, never for checking
-them**: whether "the loader validates types" is one claim or three depends on what the code
-actually looks like, and a lister that cannot look splits and merges premises by guesswork.
-Checking is a different agent's job, run three times over.
-
-No `memory:` — a store would carry "this project always X" into the enumeration, and that is
-precisely how a premise stops being listed. The ones that go unlisted are never checked by anyone.
-
-`model: opus`.
-
-### `plan-premises-checker`
-
-`tools: Read, Grep, Glob, Bash` **and nothing else**, because a verdict here is worth exactly the
-evidence behind it: every CONFIRMED and every FALSE has to come from having opened the file or run
-the command.
-
-Three instances of this agent check the same premises independently, which only works if each one
-actually looks. **Hence no `SendMessage`:** an instance that could ask another is one that can
-inherit a verdict instead of reaching it, and three agents agreeing because they talked is worth
-less than one agent that read the code.
-
-No `memory:` — it would store verdicts, and matching a stored verdict is cheaper than checking
-again, which is the failure this agent exists to prevent, made permanent.
-
-`model: opus`.
-
-### `plan-premises-recheck`
-
-`tools: Read, Grep, Glob, Bash` for the one thing this agent does: go to the evidence the three
-checkers cited and see which of them actually read it right.
-
-**No `SendMessage`, and this is the load-bearing omission.** This agent settles a disagreement
-between three checkers WITHOUT talking to any of them: asking would make it a moderator of
-opinions, and it is a re-reader of files. The three reports are already in its dispatch; what is
-not in the dispatch is the file, and that is the only thing that decides.
-
-No `memory:` — same reason as the checkers, and stronger here: a stored ruling on a contested
-premise is the one most likely to be wrong.
-
-`model: opus`.
+The bundled plan critics and their dedicated review skills were removed in v0.150.0.
+The `audit-plan` entry now delegates without supplying review criteria. Guard invokes
+only the reviewer configured by the user in `plan_review`; see `dev/design.md` for the
+remaining gate and completion contract.

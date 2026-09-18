@@ -1,7 +1,7 @@
 {
   "name": "guard",
-  "version": "0.149.0",
-  "description": "On-demand audits of answers, documents, plans, and checkpointed edited-file queues.",
+  "version": "0.155.0",
+  "description": "User-configured answer, turn, and plan reviews, plus edited-file checkpoints.",
   "author": {
     "name": "studykit"
   },
@@ -14,7 +14,6 @@
     "hallucination-guard",
     "korean",
     "code-comments",
-    "router",
     "hooks",
     "subagents",
     "claude-code",

@@ -1,29 +1,8 @@
-"""Host split, agent modes, and the project's configuration file.
+"""Host-specific configuration, explicit reviewers, and file/plan switches.
 
-Configuration is optional: a JSON object at ``${CLAUDE_PROJECT_DIR}/.claude/guard.local.json``
-(``.codex/`` on Codex). One ``AgentMode`` per agent, keyed by that agent's own name —
-``claims-auditor`` / ``deferrals-auditor`` / ``clarity-auditor`` / ``comment-corrector`` /
-``doc-auditor``, each
-``"off"`` (the default) or ``"on"`` — which together are the only control
-over whether guard says anything unasked, and over which audits exist to be invoked. Plus
-``audit-plan`` (``"on"`` by default, ``"on"`` or ``"off"``): the state each session's plan gate
-opens in — the shell toggle moves the session only and never writes here. It is the only audit
-with a setting, because it is the only one the user does not invoke; the turn side had one,
-``audit-turn``, until v0.124.0 retired it (``RETIRED_KEYS``). Beside it, ``plan_review``
-(object, default ``{}``): WHO reviews a held plan, as one
-``{"kind": "agent"|"skill", "name": "..."}`` action. Unset means guard's own review; a value
-that is present but malformed is the one setting that does not fall back — see
-``_plan_review_action``. And ``refs_dir``
-(project-relative directory for saved copies of cited docs; empty
-means the git-tracked default ``wiki/ref/``, and an unsafe value falls back to it — see
-``paths._refs_dir``). There is no model key: every agent, the router included, brings its own
-model from its own definition under ``agents/``.
-
-Unknown keys are ignored; a missing or malformed file falls back to all defaults. The
-``guard:settings`` skill changes these through the ``settings`` CLI, which writes this file
-and, for the switches, the live session's state.
-
-Requires Python 3.11+ (``enum.StrEnum``).
+Reviewer objects select a user-installed agent or skill. Missing configuration uses
+defaults; invalid non-empty reviewer objects are reported by their dispatchers.
+Settings preserves unknown and retired keys until the user explicitly removes them.
 """
 
 from __future__ import annotations
@@ -81,35 +60,7 @@ CLEAR_INHERIT_MAX_AGE_SECONDS = 5 * 60
 
 
 class AgentMode(StrEnum):
-    """How one audit agent runs. The value of that agent's config key.
-
-    ``OFF`` — not offered to either router, and not runnable: the audit does not exist for
-    this project. ``ON`` — a new instance per dispatch, which
-    is the shape every agent definition is written for: judged in a fresh context, by a
-    reader rather than the author.
-
-    ``ON`` was spelled ``fresh`` until v0.116.0, when the one surviving mode stopped needing
-    a name that only made sense beside a second one. ``fresh`` is still parsed, and never
-    stops being: it is written into every config file this plugin has already touched, and a
-    value that silently reads as its default is exactly the failure this file is careful
-    about elsewhere. What changed is what gets WRITTEN and DISPLAYED.
-
-    There used to be a third, ``REUSE``: one named instance per session, resumed on later
-    turns with its full history. It bought continuity and cost independence — a verdict it
-    got wrong sat in its own history as settled, and every later turn inherited that error
-    where a fresh instance would have looked again. What made the trade survivable was one
-    section in each agent's definition telling a resumed instance that a turn record it has
-    not read is a NEW turn and that a remembered verdict is not a checked one. Those sections
-    were removed, and a hazard whose only mitigation is gone is not a mode worth keeping. Do
-    not add it back without them.
-
-    Two things it took with it, both worth knowing before reviving it. Instance names were
-    derived from the ROSTER KEY rather than from the agent name, so a renamed agent kept
-    emitting its old instance name with nothing failing — a trap for every future rename,
-    and one that is live again the moment anything derives a dispatchable identity from a
-    key (see ``agents._path_entry``, which is now the only translation). And its two mode-transition notices existed only because guard
-    cannot see or stop a running instance; that asymmetry comes back with it.
-    """
+    """Whether a file-review action is enabled; legacy ``fresh`` means ``on``."""
 
     OFF = "off"
     ON = "on"
@@ -142,9 +93,12 @@ AUDIT_SWITCHES = (AUDIT_PLAN_KEY,)
 # opens armed from now on with nothing saying why. `cmd_settings` reads this map so the change
 # is stated where the user is already looking at the file.
 RETIRED_KEYS: dict[str, str] = {
+    "claims-auditor": "retired in v0.153.0 — configure answer_review or turn_review instead.",
+    "deferrals-auditor": "retired in v0.153.0 — configure answer_review or turn_review instead.",
+    "clarity-auditor": "retired in v0.153.0 — configure answer_review or turn_review instead.",
     "audit-turn": (
-        "retired in v0.124.0 — `/guard:audit-turn`, `/guard:answer` and "
-        "`/guard:audit-report` run when you invoke them. Edited-file audits now run only at "
+        "retired in v0.124.0 — `/guard:audit-turn` uses turn_review when invoked; "
+        "`/guard:answer` runs when invoked. Edited-file audits now run only at "
         "an explicit `/guard:audit-files` checkpoint."
     ),
 }
@@ -169,86 +123,17 @@ _MODE_ALIASES = {
 
 
 DEFAULT_CONFIG: dict[str, Any] = {
-    # There is deliberately no key for the router's model. `agents/router.md` pins `opus` and
-    # that is the whole decision: every other agent in the set is paid for by one the router
-    # makes, so the direction a project would tune this in — cheaper — is the direction whose
-    # failure is invisible. A router that stops naming an agent looks exactly like a turn with
-    # nothing in it, and the audit that never happened is the failure guard exists to prevent.
-    #
-    # One key per AUDIT, named after what it audits. For most of these the key is also the
-    # agent's own name, so `settings set deferrals-auditor on` and
-    # `guard:deferrals-auditor` are the same string and there is no second vocabulary. Where
-    # one audit is reached through two entry points — `claims-auditor` through the
-    # `audit-turn-claims` and `audit-report-claims` skills — the key stays the audit's,
-    # because it is what a project has already written in its config file;
-    # `agents._path_entry` is the one place it becomes an entry-point name, and the user
-    # never types either of those. The value is
-    # an `AgentMode`, so how the agent runs is the same setting as whether it runs: there
-    # is no separate list of any kind that could name an agent that is off.
-    #
-    # These are the ONLY control over what guard does UNASKED and over what the routers may
-    # offer. All of them off (the default) is guard silent at Stop and an empty roster for
-    # every router: nothing added to the main agent's context. There is
-    # deliberately no separate mode setting in front of them — switching one on IS switching
-    # guard on, and a project that wants the claim check without the deferral check just
-    # switches the one it wants.
-    #
-    # What `off` does NOT do is refuse an audit the user names. Only `cmd_candidates` reads
-    # these, and only three callers run it: the router, on either path, and `/guard:answer`. The
-    # `audit-{turn,report,plan}-*` skills are invoked by name and read no switch, so
-    # `/guard:audit-turn-claims` runs in a project with `claims-auditor: off`. That is the
-    # same rule that retired `audit-turn`: a setting written once does not overrule a command
-    # typed now. `off` means guard is not running on its own, not that guard is unavailable.
-    #
-    # Every switch ships off: guard installed is guard available, not guard running.
-    # See `AGENTS.md`.
-    # The state each session's plan gate OPENS in — the project's answer to "hold an approved
-    # plan by default?". It ships ARMED: the gate fires only at `ExitPlanMode`, which is rare,
-    # and at the one moment where letting a deferral through is paid for by the whole
-    # implementation that follows.
-    #
-    # A second key sat here until v0.124.0, `audit-turn`, seeding the turn side the same way and
-    # shipping OFF. What it was buying went away in v0.122.0. It opened a session muted because
-    # the turn audit used to cost a router call on EVERY finished turn; once nothing ran unasked,
-    # the only thing that default still did was refuse the commands the user typed —
-    # `cmd_candidates` reports a muted session, so `/guard:audit-turn` and `/guard:answer` stopped
-    # before doing anything in a project that had switched agents on. A default answering "no" to
-    # a question the user just asked out loud is the `audit_gate` this design removed, wearing
-    # the switch's clothes. `RETIRED_KEYS` carries what a project still holding the key is told.
-    #
-    # This is the DEFAULT, not the live value: `guard-plan` moves `plan_audit_paused` in
-    # `state/<sid>.json` for one session and never writes here, so a session muted at a shell
-    # prompt stays muted without changing what the next session does.
-    #
-    # A value that is neither an on-word nor an off-word falls back to this key's own default
-    # (`_audit_on`), so an unreadable value lands wherever an absent one would. That is the
-    # only guarantee worth making here: a project that mistypes the switch gets the behaviour it
-    # would have had without the key at all, rather than a third answer it never wrote.
+    # Only the Claude post-approval gate can start a review automatically.
     AUDIT_PLAN_KEY: "on",
     # WHO reviews a held plan, as one `{"kind": "agent"|"skill", "name": "..."}` action —
     # the same shape `doc_review_rules` uses per glob, without the glob, because there is
     # exactly one plan under review at a time.
     #
-    # Empty ({}) is UNSET and is the shipped state: the gate then names `guard:audit-plan`,
-    # the review this plugin ships. That name is deliberately NOT written here as a default
-    # value. A default in the config file is a value a project can end up disagreeing with
-    # silently; the name belongs in the one place that emits it (`cmd_plan_gate`), where
-    # "nothing configured" and "configured to guard's own review" stay distinguishable.
-    #
-    # A value present but malformed is the one place guard does NOT fall back — see
-    # `_plan_review_action` and `AGENTS.md`.
+    # Empty means no plan review. An invalid non-empty object blocks rather than
+    # silently dropping the review the user requested; see `_plan_review_action`.
     "plan_review": {},
-    "claims-auditor": AgentMode.OFF,
-    "deferrals-auditor": AgentMode.OFF,
-    # Can the intended reader follow the answer? The only agent whose verdict depends on
-    # who is reading, which is why it carries `memory: user` rather than `local` and why
-    # it degrades loudly — with no reader profile it says so and checks less, instead of
-    # guessing a level and flagging either every technical term or none of them.
-    "clarity-auditor": AgentMode.OFF,
-    # Comments in the source files THIS TURN edited. Unlike the three above it is not
-    # an audit of the response: it points a corrector at real files and that corrector
-    # EDITS them, unattended, in the turn the user is still reading. That is why it is
-    # the one switch whose cost is a diff rather than a report.
+    "turn_review": {},
+    "answer_review": {},
     "comment-corrector": AgentMode.OFF,
     # The `AGENTS.md` / `CLAUDE.md` files THIS TURN edited, judged as instruction files:
     # a map pointing at the deeper docs, plus what a model gets wrong here — never the
@@ -274,10 +159,8 @@ DEFAULT_CONFIG: dict[str, Any] = {
     # instructions and references.
     "doc_exclude": [],
     # Where this project writes down what its DEPLOYED system looks like — topology,
-    # environments, runbooks. Read by `plan-environment` and by nothing else; guard never
-    # writes here. Empty (the default) means the project has none, which is a normal state:
-    # that agent then falls back to the repository's own deploy surface, to a read-only
-    # probe, and finally to asking the user.
+    # environments, runbooks. Exposed to audit inputs and user-supplied reviewers;
+    # guard never writes here. Empty means the project has none.
     #
     # Unlike `refs_dir` this is NOT confined to the project. The material it points at is
     # frequently a knowledge base kept outside the repository, and since nothing derives a
@@ -337,27 +220,36 @@ def _review_action_name(value: Any) -> str | None:
 def _plan_review_action(cfg: dict[str, Any]) -> tuple[ReviewAction | None, bool]:
     """Who reviews a held plan: ``(action, configured)``.
 
-    ``(None, False)`` is UNSET and is the common case — the caller names the review guard
-    ships. ``(None, True)`` is a value the project WROTE and guard cannot use, and the two
-    must stay distinguishable, which is why this returns the flag rather than an action the
-    caller cannot tell apart from a default.
-
-    That distinction is the whole point of the second element. Falling back to guard's own
-    review on a malformed value would run the reviewer the project just replaced, and say
-    nothing — the project would read the gate passing as its setting working. So
-    ``cmd_plan_gate`` blocks on ``(None, True)`` and names the setting. It is the one place
-    in this plugin a bad config is not absorbed; ``AGENTS.md`` records the exception.
+    ``(None, False)`` is unset and skips plan review. ``(None, True)`` is an invalid
+    configured action and blocks approval: silently ignoring it would drop a requested
+    review. The flag keeps those outcomes distinct.
 
     A value of the wrong JSON TYPE never reaches here: ``_load_config`` compares against this
     key's ``{}`` default and drops a non-object, which lands it in the unset case. Only an
     object with an unusable ``kind`` or ``name`` is "configured but invalid".
     """
-    raw = cfg.get("plan_review")
+    return _single_review_action(cfg.get("plan_review"), "audit-plan")
+
+
+def _turn_review_action(cfg: dict[str, Any]) -> tuple[ReviewAction | None, bool]:
+    """User-configured turn reviewer; unset skips, malformed objects report an error."""
+    return _single_review_action(cfg.get("turn_review"), "audit-turn")
+
+
+def _answer_review_action(cfg: dict[str, Any]) -> tuple[ReviewAction | None, bool]:
+    """User-configured answer reviewer, excluding the answer dispatcher itself."""
+    return _single_review_action(cfg.get("answer_review"), "answer")
+
+
+def _single_review_action(raw: Any, dispatcher: str) -> tuple[ReviewAction | None, bool]:
     if not isinstance(raw, dict) or not raw:
         return None, False
     kind = raw.get("kind")
     name = _review_action_name(raw.get("name"))
     if kind not in ("agent", "skill") or name is None:
+        return None, True
+    # A dispatcher cannot act as its own reviewer.
+    if kind == "skill" and name in {f"guard:{dispatcher}", dispatcher}:
         return None, True
     return ReviewAction(kind, name), True
 
@@ -476,8 +368,8 @@ def _cli_write_allowed() -> bool:
     """True when a config-mutating CLI verb may write.
 
     guard never gates Bash, so the model can invoke this script directly — and the
-    config-mutating verbs can weaken guard itself: `settings set claims-auditor off`
-    stops the automatic audit. The `guard:settings` skill is
+    config-mutating verbs can weaken guard itself: `settings set audit-plan off`
+    disables the automatic plan gate by default. The `guard:settings` skill is
     `disable-model-invocation: true` (user-invoked only) and sets this marker; a bare
     model-issued Bash call does not have it.
 

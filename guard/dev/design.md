@@ -1,5 +1,35 @@
 # guard — design detail
 
+As of v0.155.0, the Claude `doc-review-rules` command is merged into `settings`. Its rule
+selection guidance, exclusions, and checkpoint enablement live in that one configuration
+entry. The `doc_review_rules` schema and CLI remain unchanged; existing configuration needs
+no migration.
+
+As of v0.154.0, the individual `audit-turn-claims`, `audit-turn-deferrals`, and
+`audit-turn-clarity` skills are removed. `audit-turn` continues to use only `turn_review`.
+References to these individual skills below are historical. Their underlying agent
+definitions remain independently available; removing the skills does not remove agents.
+Legacy command names remain in the transcript control filter so old review replies do not
+become the next auditable response.
+
+As of v0.153.0, `answer` uses only the user-configured `answer_review`. The three
+`audit-report-*` skills and the built-in candidate roster are removed. The claims, deferrals,
+and clarity switches are retired. Earlier descriptions of answer routing, candidate lists,
+and their manual tests below are historical; use "Configured answer reviews" for the current
+contract and regression command.
+
+As of v0.152.0, `audit-turn` delegates only to the user-configured `turn_review` agent or
+skill on either host. The standalone `audit-report` skill and its now-unused router agent
+are removed. Earlier routed-turn/report workflows and the Codex claims fallback below are
+historical. The individual document-audit skills and switches served `answer` until v0.153.0.
+See "Configured turn reviews" below for the current contract.
+
+As of v0.151.0, `audit-plan` is an explicit entry for Claude Code and Codex that dispatches
+only the user-supplied `plan_review` action. An absent key or `{}` skips review. The bundled
+plan critics and their multi-stage review procedure were removed in v0.150.0; sections about
+that procedure below are historical. Claude's post-approval automatic gate, its `audit-plan`
+configuration switch, session toggle and content-hash completion contract remain.
+
 As of v0.129.0, handover skills, recording commands, and handover-file transfer
 belong to the standalone `handover` plugin. References to that former Guard
 behavior below are historical; Guard now transfers only its audit switches.
@@ -9,6 +39,74 @@ area it covers. `../AGENTS.md` is the always-loaded map and points here. The sou
 (`scripts/guard_hook.py` and the `scripts/guard_core/` package it dispatches into) is the
 truth for control flow — this file records *why* the design is shaped this way and the
 runtime facts verified against the real CLI, not a line-by-line walkthrough.
+
+## Configured answer reviews
+
+`answer_review` has the same agent-or-skill object contract as `turn_review` and `plan_review`.
+Guard does not supply review criteria or select fallback reviewers. The dispatcher cannot
+name itself. Missing configuration stops `answer` before drafting; this avoids silently
+turning a request for a reviewed deliverable into an unaudited one.
+
+A read-only preparation helper selects the host's configuration and returns its answer
+output directory, outside swept session state. It creates neither documents nor state.
+A subsequent call with a document path verifies that the file exists and is nonempty. The
+caller dispatches the exact installed reviewer using the host's named invocation mechanism.
+An unavailable reviewer is an error, never permission to impersonate it in a generic agent.
+
+The reviewer returns findings without editing the document. The caller applies in-scope
+corrections, returning user decisions to the user. Applied findings trigger one further
+review by the same reviewer, with a maximum of two rounds. Failed or interrupted reviews
+leave an explicitly unreviewed draft. Translation follows review through the existing
+user-level Korean delivery agent; no separate findings document is generated.
+
+Retired switch keys remain untouched in raw configuration until explicitly unset. Settings
+shows migration guidance and rejects new writes to them. Old session switch fields are
+ignored; file switches, pending files, plan completion, and turn evidence remain intact.
+The legacy `candidates` CLI and shell wrapper only print a retirement notice, with no roster.
+The standalone `audit-turn-*` skills were removed in v0.154.0; their agent definitions remain.
+
+Run `uv run --script guard/dev/test_answer_review.py` from the repository root. These tests
+cover configuration, host isolation, read-only preparation, migration, and retained file
+review behavior. They do not verify native reviewer invocation; the live-host limitation
+recorded under "Configured turn reviews" still applies.
+
+## Configured turn reviews
+
+`turn_review` has the same `{ "kind": "agent" | "skill", "name": "..." }` shape as
+`plan_review`. There is no default reviewer. Unset or `{}` skips; invalid non-empty objects
+report an error. Wrong JSON types follow the existing config loader's defaulting behavior
+and are reported separately by settings. The dispatcher cannot name itself as its reviewer.
+
+The explicit skill runs in the calling session and resolves evidence before delegating.
+Claude uses the transcript path recorded at SessionStart and the existing transcript parser.
+Codex keeps its documented prompt, tool and Stop payload records through the hook adapter;
+its transcript is never parsed. The Codex prompt hook no longer interprets audit prefixes or
+requests dispatch, preventing a second review alongside the skill. Stop records completed
+turns but keeps audit/control replies out of the next default target.
+
+Both adapters hand the shared implementation a concrete turn and source path. Each request
+writes a separate JSON evidence snapshot with `turn_id`, `user`, `assistant`, `tools`, and
+`source_path`, in the existing retained turn directory. Only the caller supplies this path to
+the configured reviewer. Reviewers must not reconstruct evidence, impersonate an unavailable
+named reviewer, modify the evidence, or implement changes. There is no completion stamp or
+once-per-turn suppression; explicitly asking again requests another review.
+
+The former Claude `audit-turn-*` primitives were removed in v0.154.0. There is no
+fallback roster for `audit-turn`. The claims, deferrals, and clarity switches were retired
+in v0.153.0 and do not govern any configured reviewer. Codex setup now installs file-review agents only. Existing user agent
+files are not removed during upgrades.
+
+Run `uv run --script guard/dev/test_turn_review.py` from the repository root. The isolated
+CLI tests cover exact reviewer selection, evidence fidelity, missing/invalid configuration,
+host/session isolation, repeated review, explicit targets, and the Codex lifecycle's absence
+of dispatch. They do not establish that a real host delivered hooks or loaded a named reviewer.
+Use the real-session recipe below for that boundary.
+
+A 2026-09-18 Claude working-tree probe ran in a separate Herdr pane and throwaway project,
+with inherited Guard/Claude/Codex session variables cleared and `--plugin-dir` pointing at
+this checkout. It stopped before the first response because the host reported an expired
+OAuth session that could not be refreshed. Native skill dispatch was therefore not verified;
+fixture-based CLI results must not be represented as a successful live-host test.
 
 ## Module layout (`scripts/`)
 
@@ -388,7 +486,7 @@ deferral the session then went and settled empirically against three interpreter
   running.** Nothing in this design reads them — the audits are document-flavoured on purpose —
   so the answer does not matter yet. It would if a later change wanted them.
 
-## The plan critics get their own prefix, and lose one of their number — v0.123.0
+## Historical: the plan critics get their own prefix — v0.123.0
 
 Two changes to the plan path, both of them about a set that had grown up beside guard rather
 than inside it. Nothing about when the plan audit runs changed: `ExitPlanMode` still holds an
@@ -709,7 +807,7 @@ definition serving every path asserts a split that is not there.
 
 Every dispatch guard writes says it: hand the audit its inputs and **no instructions of your
 own** (`_agent_pointer`), the paths and **NOTHING else** (`_DOCS_LEAD`), send no instructions
-(`skills/audit-plan/SKILL.md`). All of it addressed to the caller, and none of it to the party
+(the former multi-critic workflow in `skills/audit-plan/SKILL.md`). All of it addressed to the caller, and none of it to the party
 that receives the brief. In practice the caller sends one anyway, and the reason is structural
 rather than disobedience: the Agent tool has a mandatory `prompt`, a skill has `$ARGUMENTS`,
 and the main agent filling either one is a model that has just spent a turn inside these files
@@ -2782,40 +2880,70 @@ whether it fires. Every other audit is invoked by the user, and `audit-turn` —
 used to say what the turn side opened in — was retired in v0.124.0 for that reason. `guard` in
 a shell still mutes the session you are in; it just has nothing persisting it.
 
-`plan_review` (object, default `{}`) — WHO reviews a held plan, as one
-`{"kind": "agent" | "skill", "name": "..."}` action: the same shape `doc_review_rules` gives
-each glob, without the glob, because there is one plan under review at a time. It moves nothing
-else about the gate. Whether a plan is held at all stays `audit-plan`'s question and
-`guard-plan`'s; this answers only who is handed it once it is.
+`plan_review` (object, default `{}`) names the user-supplied reviewer as one
+`{"kind": "agent" | "skill", "name": "..."}` action. Guard provides the approval hook and
+completion contract, not a review procedure. There is no built-in reviewer or fallback.
+An absent key or `{}` makes `exit-plan` silent even when `audit-plan` is on. An existing
+configuration that names a removed Guard reviewer must be changed to an installed reviewer
+or cleared; the gate validates syntax, not whether that name resolves in the host.
 
-`{}` is unset and is what ships, and the name of guard's own review is deliberately **not**
-written here as the default value. A default sitting in the config file is a value a project
-can come to disagree with silently; keeping the name in the one place that emits it
-(`cmd_plan_gate`) is what keeps "nothing configured" distinguishable from "configured to
-guard's own review" — which is the distinction the next paragraph turns on.
+An invalid non-empty object still blocks and names the bad setting. Silently skipping it
+would hide the requested review's failure. The settings CLI rejects such objects before
+writing. Wrong JSON types retain the loader's existing behavior: they are dropped against
+the `{}` default, so review is skipped; `settings show` reports that separately. The session
+mute takes precedence over both valid and invalid configured actions.
 
-**A value present but unusable BLOCKS, and this is the only place in guard a bad config is not
-absorbed.** `_plan_review_action` returns `(action, configured)` for exactly that reason: `(None,
-False)` is unset and names guard's review, while `(None, True)` is a value the project WROTE and
-guard cannot read, and the gate refuses the approval and names the setting. Falling back to
-`guard:audit-plan` there would run the reviewer the project had just replaced and say nothing —
-the project would read a passing gate as its setting working, which is the failure this key
-would otherwise introduce. It costs one approval, the block text says what to fix, and
-`guard-plan off` is still the way past it. The CLI validates by reparsing through the same
-accessor, so only a hand-edited file can reach that branch. A value of the wrong JSON *type*
-never does: `_load_config` drops it against the `{}` default and it lands in the unset case, so
-`settings show` reports that one separately rather than letting it read as configured.
+Every automatically dispatched Claude review includes the completion instruction: finish the review, fold its
+findings into the plan, and run `guard-plan-audited <plan file path>` last. Approach changes
+must go back to the user before implementation. The stamp records the final plan's content
+hash; changed contents trigger review again at the next approval. The gate neither verifies
+reviewer execution nor blocks all later write tools; it delivers PostToolUse feedback to the
+main agent. It does not resolve the plan file path, which that agent already knows.
 
-A configured reviewer is also told, in the block text, to run `guard-plan-audited <plan file
-path>` when it finishes — `skills/audit-plan/SKILL.md` does that in its own closeout and
-nothing else knows the verb exists, so without the line a project that set this key would be
-held by a gate nothing could release. The line is conditioned on the key being CONFIGURED, not
-on the name differing from guard's own: special-casing that name is the defaulting the key
-exists to avoid, and the cost of the broader rule is one redundant sentence.
+The automatic gate is connected only in Claude Code. Codex has no documented equivalent
+approval event, so neither `update_plan` nor Stop is treated as approval. Both hosts expose
+an explicit `audit-plan` skill over a supplied plan file. `knowledge-dirs` remains available
+to user-supplied reviewers and audit inputs.
 
-The hook never resolves the plan file path. It emits an instruction to the main session, which
-wrote the plan and already holds the path — the same reason `cmd_plan` has no verb for the plan
-itself.
+### Explicit plan review
+
+The explicit skill shares reviewer selection and content hashing with the Claude gate through
+`guard_core.plan_review`. Its script adapter receives host and project explicitly, and uses
+only the selected host's session id (or an explicit calling-session id). State stays under
+`.claude/guard/` or `.codex/guard/`; it is not shared across hosts or reviewer subagents.
+
+An explicit request always performs a fresh review, ignoring the automatic switch and an
+existing completion hash. Prepare is read-only: it resolves a non-empty plan file and returns
+the configured action. The caller invokes that exact agent or skill with the host's native
+mechanism. There is no name translation, substitute reviewer, or built-in critique. Registering
+`guard:audit-plan` or `audit-plan` as a skill reviewer is rejected to prevent recursion.
+
+The caller waits for the review and saves agreed revisions before completing. Unavailable
+reviewers, failed reviews and unresolved blocking questions leave completion unrecorded. The
+completion command hashes the final file and verifies that the stamp was saved before reporting
+success. As with the automatic gate, the stamp relies on the caller following the instructions;
+it is not proof that a reviewer executed and is not a global prohibition on write tools.
+
+From the repository root, run:
+
+```sh
+uv run --script guard/dev/test_plan_gate.py
+uv run --script guard/dev/test_review_plan.py
+```
+
+These isolated CLI regressions cover reviewer selection, completion, changed plans, switches,
+explicit review despite automatic muting, host/session isolation, and persistence failures.
+They do not verify host hook delivery or native agent invocation; real-session testing follows
+the working-tree recipe below.
+
+A Codex CLI 0.154.0 probe on 2026-09-18 used a clean environment and a throwaway project,
+with the skill linked to the working tree. Plain `codex exec` text naming `$audit-plan` did
+not resolve the explicit-only skill in that probe. Supplying its concrete `SKILL.md` path
+reached prepare and returned the configured reviewer using the host-provided thread id.
+The exposed spawn tool did not establish named reviewer selection; a generic spawn with a
+guessed mention is not evidence that the registered definition ran. End-to-end native
+reviewer dispatch and plugin-qualified skill discovery remain unverified in that environment.
+The skill therefore explicitly forbids emulating a named reviewer through a generic agent.
 
 `refs_dir` (string, default `""`) — project-relative directory for guard's cited-doc
 copies; empty = the git-tracked default `wiki/ref/` (references committed with the repo), a
@@ -2832,9 +2960,9 @@ mark *resolves*, never to grade its form.
 
 `knowledge_dir` (list of strings, default `[]`; a bare string is accepted as one entry) —
 where the project records what its **deployed** system looks like: topology, environments,
-runbooks. Read by `paths._knowledge_dirs` for `plan-environment` and by nothing else, and
-nothing derives a write path from it, which is why it is deliberately NOT confined to the
-project the way `refs_dir` is: this material routinely lives in a knowledge base outside the
+runbooks. Exposed through `paths._knowledge_dirs` to audit inputs and `knowledge-dirs` for
+user-supplied reviewers. Nothing derives a write path from it, which is why it is deliberately
+NOT confined to the project the way `refs_dir` is: this material routinely lives in a knowledge base outside the
 repository, so an absolute path and a `~` are the expected shapes. Order is precedence. A list
 because the knowledge is normally split — one directory per system, per team, or per source.
 
@@ -2976,9 +3104,8 @@ description is loaded into every session's context whether or not guard ever run
 is paid on every turn of every project that installs the plugin. What it normally buys is the
 model recognising when to invoke the skill — and none of guard's audit skills need that. Every
 one of them is named, verbatim, by whatever summons it: the router prints `audit-turn-claims`
-and the caller invokes that name from its closeout section, and the plan gate prints "Run the
-`guard:audit-plan` skill over the plan" (`cmd_plan_gate.py`). A user typing
-`/guard:audit-plan` is matching the name too, not the description. So the line has exactly one
+and the caller invokes that name. Before v0.150.0, the plan gate similarly named the former multi-critic
+`guard:audit-plan` workflow. So the line has exactly one
 job left — keeping the model from choosing the skill for itself — and it does that in four
 words.
 
@@ -3326,8 +3453,7 @@ setrev(){ CLAUDE_CODE_SESSION_ID=s1 "$H" settings set plan_review "$1"; }
 CLAUDE_CODE_SESSION_ID=s1 "$H" plan-toggle-cli on > /dev/null   # armed is the default; be explicit
 CLAUDE_CODE_SESSION_ID=s1 "$H" settings unset plan_review > /dev/null
 approve "do the thing"
-#   -> blocks, names `guard:audit-plan` as a SKILL, and says NOTHING about plan-audited: the
-#      review guard ships stamps itself in its own closeout.
+#   -> (SILENT). Guard runs no reviewer when none is configured.
 
 setrev '{"kind":"skill","name":"project:plan-check"}'; approve "do the thing"
 #   -> blocks, names that skill, AND ends with the `guard-plan-audited` instruction. A
@@ -3349,7 +3475,7 @@ f.write_text(json.dumps(d))
 PY
 approve "do the thing"
 #   -> blocks NAMING `plan_review` as the problem, and must NOT mention `guard:audit-plan`.
-#      A fallback here would run the reviewer the project just replaced, silently.
+#      Ignoring this error would silently drop the requested review.
 "$H" settings show --session s1 | grep plan_review
 #   -> the INVALID line, which says approval is blocked. Not "(invalid entries ignored)" —
 #      nothing was ignored.
@@ -3359,10 +3485,10 @@ approve "do the thing"
 python3 - <<'PY'
 import json, os, pathlib
 f = pathlib.Path(os.environ["CLAUDE_PROJECT_DIR"]) / ".claude/guard.local.json"
-d = json.loads(f.read_text()); d["plan_review"] = "guard:audit-plan"
+d = json.loads(f.read_text()); d["plan_review"] = "project:plan-reviewer"
 f.write_text(json.dumps(d))
 PY
-approve "do the thing"        # -> the unset text again, naming `guard:audit-plan`
+approve "do the thing"        # -> (SILENT), the same behavior as unset
 "$H" settings show --session s1 | grep plan_review   # -> "(not a JSON object, ignored at use)"
 
 # The stamp releases the gate whoever reviewed, and it is content-addressed.

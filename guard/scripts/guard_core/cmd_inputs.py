@@ -15,7 +15,7 @@ last auditable turn is found by walking the transcript
 (``transcript._last_auditable_prompt_id``) and its text is written out here, at the moment an
 audit was asked for.
 
-Like ``candidates``, it takes the session from ``CLAUDE_CODE_SESSION_ID``, which a
+It takes the session from ``CLAUDE_CODE_SESSION_ID``, which a
 subagent's Bash carries as its PARENT session's id (`wiki/ref/claude-code-session-id-env.md`).
 
 The transcript is the one field guard cannot derive: it is the host's path, handed to hooks

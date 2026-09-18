@@ -160,8 +160,8 @@ def _clear_handoff_file(project_dir: Path) -> Path:
 def _knowledge_dirs(project_dir: Path, config: dict[str, Any] | None = None) -> list[Path]:
     """The directories holding this project's operational knowledge. Empty when unset.
 
-    Read by `plan-environment`, which audits a proposal against the system as actually
-    deployed — topology, environments, runbooks. That material routinely lives OUTSIDE the
+    Exposed through audit inputs and `knowledge-dirs` for readers that need deployment
+    topology, environments or runbooks. That material routinely lives OUTSIDE the
     repository (a personal or team knowledge base), which is why this is not
     ``_safe_project_subdir``: an absolute path and a ``~`` are the expected shapes here, and
     confining it to the project would exclude the case the key exists for.

@@ -24,16 +24,12 @@ from typing import Any
 
 from .config import AUDIT_PLAN_KEY, _agent_mode, _audit_on
 from .paths import _now_iso, _state_file
-from .agents import AUDIT_AGENTS
+from .agents import SETTABLE_AGENTS
 
 
 def _read_state(project_dir: Path, session_id: str, config: dict[str, Any]) -> dict[str, Any]:
     default = {
-        # Switchable agents only. A `fixed_mode` agent has no config key, so there is no
-        # mode to seed and nothing the session could move it to — its mode is the roster's.
-        # Seeding one here would also make it look settable in `settings show`.
-        **{k: str(_agent_mode(config, k))
-           for k, spec in AUDIT_AGENTS.items() if spec.fixed_mode is None},
+        **{key: str(_agent_mode(config, key)) for key in SETTABLE_AGENTS},
         # The last file-checkpoint snapshot. The token is the hash printed to the checkpoint
         # skill; the paths and hashes let completion remove only revisions that were actually
         # reviewed. A file edited while reviews are running stays pending.
@@ -102,7 +98,7 @@ def _read_state(project_dir: Path, session_id: str, config: dict[str, Any]) -> d
         return default
     if not isinstance(data, dict):
         return default
-    keys = (*AUDIT_AGENTS, "last_audited_prompt_id", "last_audited_fingerprint",
+    keys = (*SETTABLE_AGENTS, "last_audited_prompt_id", "last_audited_fingerprint",
             "pending_verify_prompt_id", "file_checkpoints",
             "transcript_path", "plan_audit_paused", "plan_audited_hash",
             "edited_prompt_id", "edited_files",

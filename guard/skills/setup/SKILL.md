@@ -1,17 +1,20 @@
 ---
 name: setup
-description: Install Guard's read-only Codex audit agents in the current project's .codex/agents directory. Use when Guard is installed in Codex and turn or file review needs its named subagents.
+description: Install Guard's read-only Codex audit agents in the current project's .codex/agents directory. Use when Guard is installed in Codex and file review needs its named subagents.
 disable-model-invocation: true
 ---
 
 # Guard setup
 
+Turn reviews use the user's own agent or skill registered in `turn_review`; this setup does
+not install a turn reviewer. Existing user files are left in place.
+
 This setup is needed only for Codex. It installs the project-local agents
-`guard_claims_auditor`, `guard_doc_auditor`, `guard_agents_md_auditor`, and
+`guard_doc_auditor`, `guard_agents_md_auditor`, and
 `guard_ext_docs_auditor`; it does not change any user-level Codex configuration.
 
 First identify the current project's Git root. Explain that installation will
-create those four TOML files under `.codex/agents/`, then obtain the user's
+create those three TOML files under `.codex/agents/`, then obtain the user's
 explicit confirmation before making that change. A direct request to install it
 counts as that confirmation.
 

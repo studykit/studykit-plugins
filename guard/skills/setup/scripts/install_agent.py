@@ -9,7 +9,6 @@ from __future__ import annotations
 import argparse
 import json
 import re
-import shutil
 from pathlib import Path
 
 
@@ -27,9 +26,7 @@ def main() -> int:
     target_dir = project / ".codex" / "agents"
     target_dir.mkdir(parents=True, exist_ok=True)
 
-    claims_template = skill_dir / "templates" / "claims-auditor.toml"
     specs = (
-        ("guard_claims_auditor", claims_template, None),
         ("guard_doc_auditor", plugin_dir / "agents" / "doc-auditor.md",
          "Review ordinary project documentation changed in this turn."),
         ("guard_agents_md_auditor", plugin_dir / "agents" / "agents-md-auditor.md",
@@ -42,16 +39,13 @@ def main() -> int:
         if target.exists() and not args.force:
             print(f"left existing agent unchanged: {target}")
             continue
-        if description is None:
-            shutil.copyfile(source, target)
-        else:
-            body = source.read_text(encoding="utf-8")
-            body = re.sub(r"\A---\n.*?\n---\n", "", body, count=1, flags=re.DOTALL)
-            rendered = (f"name = {json.dumps(name)}\n"
-                        f"description = {json.dumps(description)}\n"
-                        'sandbox_mode = "read-only"\n\n'
-                        f"developer_instructions = {json.dumps(body)}\n")
-            target.write_text(rendered, encoding="utf-8")
+        body = source.read_text(encoding="utf-8")
+        body = re.sub(r"\A---\n.*?\n---\n", "", body, count=1, flags=re.DOTALL)
+        rendered = (f"name = {json.dumps(name)}\n"
+                    f"description = {json.dumps(description)}\n"
+                    'sandbox_mode = "read-only"\n\n'
+                    f"developer_instructions = {json.dumps(body)}\n")
+        target.write_text(rendered, encoding="utf-8")
         print(f"installed guard agent: {target}")
     return 0
 

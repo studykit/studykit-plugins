@@ -1,7 +1,7 @@
 {
   "name": "guard",
-  "version": "0.149.0",
-  "description": "On-demand audits of answers, documents, plans, and checkpointed edited-file queues.",
+  "version": "0.155.0",
+  "description": "User-configured answer, turn, and plan reviews, plus edited-file checkpoints.",
   "author": {
     "name": "studykit"
   },
@@ -18,7 +18,7 @@
   ],
   "interface": {
     "displayName": "Guard",
-    "shortDescription": "Audit turns, documents, and pending edited files",
+    "shortDescription": "Review turns, plans, answers, and changed files",
     "developerName": "studykit",
     "category": "Coding",
     "capabilities": [
