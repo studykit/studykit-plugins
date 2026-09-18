@@ -1,6 +1,6 @@
 # Enable project-local Codex hooks for this repository.
 # Hook definitions live in .codex/hooks.json.
-model = "gpt-5.6-sol"
+model = "gpt-6-astra"
 sandbox_mode = "workspace-write"
 
 [sandbox_workspace_write]
