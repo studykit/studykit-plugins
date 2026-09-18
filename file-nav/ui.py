@@ -96,7 +96,7 @@ def theme(palette=None, folder_style=None) -> dict[str, int]:
 class Navigator:
     def __init__(self, root: Path, pane_id: str, changes: bool, editor: str,
                  size: PopupSize = PopupSize(), on_resize=None, theme_loader=None,
-                 folder_style=None, on_state=None):
+                 folder_style=None, on_state=None, layout_loader=None, on_layout=None):
         self.root, self.pane_id, self.editor = root, pane_id, editor
         self.changes = changes
         self.include_ignored = False
@@ -133,6 +133,10 @@ class Navigator:
         self.size = size
         self.size_draft = None
         self.on_resize = on_resize
+        self.layout_loader = layout_loader
+        self.on_layout = on_layout
+        self.layout = "popup"
+        self.layout_dialog = False
         self.on_state = on_state
         self.saved_state = None
         self.message = ""
@@ -316,13 +320,54 @@ class Navigator:
         self.scroll = min(state["scroll"], self.selected)
         if self.previewable:
             # Markdown offsets are rendered-line offsets; clamp on the first
-            # draw, after rendering at the actual new popup width.
+            # draw, after rendering at the actual new surface width.
             self.preview_scroll = state["preview_scroll"]
             self.horizontal = state["horizontal"]
             self.restore_horizontal = True
             self.preview_focus = state["preview_focus"]
         self.message = self.index.note or "Restored previous view"
         return True
+
+    def begin_layout(self):
+        try:
+            if self.layout_loader:
+                self.layout = self.layout_loader()
+            self.layout_dialog = True
+        except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as error:
+            self.message = f"Could not read layout: {error}"
+
+    def layout_key(self, key):
+        if key == "\x1b":
+            self.layout_dialog = False
+        elif key in ("1", "2"):
+            chosen = {"1": "popup", "2": "overlay"}[key]
+            self.layout_dialog = False
+            if chosen == self.layout:
+                return True
+            if self.on_layout is None:
+                self.message = "Layout switching requires Herdr"
+            else:
+                try:
+                    if self.on_layout(chosen, self.size, self.export_state()):
+                        return False
+                    self.layout = chosen
+                    self.message = f"Layout: {chosen.title()}"
+                except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as error:
+                    self.message = f"Could not switch layout: {error}"
+        return True
+
+    def draw_layout(self, screen):
+        height, width = screen.getmaxyx()
+        box_width = min(62, width - 2)
+        x, top = (width - box_width) // 2, max(0, (height - 8) // 2)
+        for y in range(top, min(height, top + 8)):
+            band(screen, y, x, "", box_width, self.style("surface"))
+        band(screen, top, x, "  LAYOUT", box_width, self.style("header") | curses.A_BOLD)
+        lines = [f"  Current: {self.layout.title()}", "",
+                 "  1 Popup    Open a floating window",
+                 "  2 Overlay  Expand the navigator", "  Esc Cancel"]
+        for offset, line in enumerate(lines, 1):
+            put(screen, top + offset, x, line, box_width, self.style("base"))
 
     def size_key(self, key):
         if key == "\x1b":
@@ -603,7 +648,9 @@ class Navigator:
         screen.erase()
         height, width = screen.getmaxyx()
         if height < 15 or width < 36:
-            put(screen, 0, 0, "Enlarge terminal (36 × 15 minimum)", width, curses.A_BOLD)
+            put(screen, 0, 0, "^W Layout (36 × 15 minimum)", width, curses.A_BOLD)
+            if self.layout_dialog:
+                self.draw_layout(screen)
             if self.size_draft:
                 self.draw_size(screen)
             if self.root_draft is not None:
@@ -634,12 +681,12 @@ class Navigator:
         band(screen, 0, max(19, width - len(badge) - 2), badge, len(badge), self.style("header") | curses.A_BOLD)
         put(screen, 1, 2, "[..]", 4, self.style("active"))
         put(screen, 1, 8, str(self.root), width - 10, self.style("muted"))
-        hint = "Type filename…  Enter Apply · Esc Cancel" if self.searching else "Ctrl+S to search files"
+        hint = "Type filename…  Enter Apply · Esc Cancel" if self.searching else "/ to search files"
         band(screen, 2, 1, f" ⌕  {self.query or hint}" + (" ▏" if self.searching and self.query else ""), width - 3,
              self.style("selected" if self.searching else "surface"))
         mode = "CHANGES" if self.changes else "PROJECT"
         visibility = "shown" if self.include_ignored else "hidden"
-        put(screen, 3, 2, f"{mode} · Ignored: {visibility} (^V)", width - 4, self.style("active"))
+        put(screen, 3, 2, f"{mode} · Ignored: {visibility} (^H)", width - 4, self.style("active"))
         if self.narrow:
             if self.preview_focus:
                 self.draw_content(screen, 0, width - 1, bottom)
@@ -651,13 +698,15 @@ class Navigator:
         position = f"{self.preview_scroll + 1}/{self.preview_length()}" if self.preview_focus else f"{self.selected + 1 if self.items else 0}/{len(self.items)}"
         band(screen, height - 3, 0, f" {focus}  {position}  ·  {self.message}", width - 1, self.style("surface"))
         enter_hint = "Enter Scroll" if self.preview_focus else "Enter Open"
-        put(screen, height - 2, 1, f"Tab Focus  ^W Size  {enter_hint}  ^D Vimdiff  ^E Edit  Esc Back", width - 2, self.style("active"))
-        help_text = "SEARCH: Type filter  ^U Clear  Enter Apply  Esc Cancel" if self.searching else "^N/P Preview line  ^F/B Preview page  h/j/k/l Move  Space Preview  ^S Search  ^O Root  Backspace Up"
+        put(screen, height - 2, 1, f"^W Layout  Tab Focus  {enter_hint}  ^Y Popup size  ^D Vimdiff  ^E Edit  Esc Back", width - 2, self.style("active"))
+        help_text = "SEARCH: Type filter  ^U Clear  Enter Apply  Esc Cancel" if self.searching else "^N/P Preview line  ^F/B Preview page  h/j/k/l Move  Space Preview  / Search  ^O Root  Backspace Up"
         if self.preview_focus and not self.searching:
-            help_text = "j/k Line  Space/f/b Page  d/u Half  g/G Top/End  ^S Search  ^O Root  ^T Git root"
+            help_text = "j/k Line  Space/f/b Page  d/u Half  g/G Top/End  / Search  ^O Root  ^T Git root"
         put(screen, height - 1, 1, help_text, width - 2, self.style("muted"))
         if self.size_draft:
             self.draw_size(screen)
+        if self.layout_dialog:
+            self.draw_layout(screen)
         if self.root_draft is not None:
             self.draw_root(screen)
         screen.refresh()
@@ -708,7 +757,7 @@ class Navigator:
             self.handle_mouse(terminal_input.Mouse(x, y, "click"), screen)
 
     def handle_mouse(self, event, screen=None):
-        if self.root_draft is not None or self.size_draft:
+        if self.root_draft is not None or self.size_draft or self.layout_dialog:
             return
         x, y = event.x, event.y
         if y == 1 and event.action == "click" and not self.searching:
@@ -744,6 +793,8 @@ class Navigator:
             return True
         if key == "\x03":
             return False
+        if self.layout_dialog:
+            return self.layout_key(key)
         if self.size_draft:
             return self.size_key(key)
         if self.root_draft is not None:
@@ -751,7 +802,7 @@ class Navigator:
         if not self.preview_focus and not self.searching:
             key = {"h": curses.KEY_LEFT, "j": curses.KEY_DOWN,
                    "k": curses.KEY_UP, "l": curses.KEY_RIGHT}.get(key, key)
-        if key == "\x13":
+        if key == "/" and not self.searching:
             if not self.searching:
                 self.search_before = self.query
             self.searching = True
@@ -777,16 +828,26 @@ class Navigator:
             self.begin_root()
         elif key == "\x14":
             self.repository_root()
-        elif key == "\x16":
+        elif key == "\x08":
             self.toggle_ignored()
-        elif key in ("\b", "\x7f", curses.KEY_BACKSPACE) and not self.preview_focus and not self.query:
+        elif key in ("\x7f", curses.KEY_BACKSPACE) and not self.preview_focus and not self.query:
             self.parent_root()
         elif self.preview_key(key):
             pass
         elif key == " " and not self.preview_focus:
             self.preview_selected(focus=False)
         elif key == "\x17":
-            self.size_draft = self.size
+            self.begin_layout()
+        elif key == "\x19":
+            try:
+                if self.layout_loader:
+                    self.layout = self.layout_loader()
+                if self.layout == "popup":
+                    self.size_draft = self.size
+                else:
+                    self.message = "Choose Popup with Ctrl+W, then Ctrl+Y to set its size"
+            except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as error:
+                self.message = f"Could not read layout: {error}"
         elif key == "\x1b":
             if self.preview_focus:
                 self.preview_focus = False
@@ -849,15 +910,17 @@ class Navigator:
         terminal_input.enable(screen)
         try:
             while True:
+                terminal_input.sync_size(screen)
                 if applied_palette != self.palette:
                     self.styles = theme(self.palette, self.folder_style)
                     self.color_pairs.clear()
                     applied_palette = self.palette
                 self.draw(screen)
                 # Checkpoint the last displayed view before blocking for input;
-                # host-driven popup closure may terminate without a Python exit.
+                # host-driven closure may terminate without a Python exit.
                 self.checkpoint()
                 try:
+                    screen.timeout(250)
                     key = terminal_input.read(screen)
                 except curses.error:
                     continue

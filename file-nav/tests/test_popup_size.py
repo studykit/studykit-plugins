@@ -44,7 +44,7 @@ class NavigatorResizeTests(unittest.TestCase):
         self.nav.activate()
         self.nav.preview_scroll = 30
         self.nav.horizontal = 8
-        self.nav.key("\x17", None)
+        self.nav.key("\x19", None)
         self.nav.key("2", None)
         self.assertFalse(self.nav.key("\n", None))
         size, state = self.callback.call_args.args
@@ -59,7 +59,7 @@ class NavigatorResizeTests(unittest.TestCase):
 
     def test_cancel_does_not_change_size_or_query(self):
         self.nav.query = "file"
-        self.nav.key("\x17", None)
+        self.nav.key("\x19", None)
         self.nav.key(curses.KEY_LEFT, None)
         self.nav.key("\x1b", None)
         self.assertEqual(self.nav.size, PopupSize())
@@ -68,13 +68,13 @@ class NavigatorResizeTests(unittest.TestCase):
 
     def test_resize_failure_keeps_navigator_open(self):
         self.callback.side_effect = OSError("disk full")
-        self.nav.key("\x17", None)
+        self.nav.key("\x19", None)
         self.nav.key("1", None)
         self.assertTrue(self.nav.key("\n", None))
         self.assertIn("disk full", self.nav.message)
 
     def test_arrow_keys_adjust_dimensions_without_moving_selection(self):
-        self.nav.key("\x17", None)
+        self.nav.key("\x19", None)
         self.nav.key(curses.KEY_LEFT, None)
         self.nav.key(curses.KEY_DOWN, None)
         self.assertEqual(self.nav.size_draft, PopupSize(91, 87))
@@ -97,7 +97,7 @@ class ResizeAdapterTests(unittest.TestCase):
     def test_open_passes_dimensions_and_resume_file(self):
         with patch("herdr_main.call") as call:
             herdr_main.open_panel(self.env, "herdr", "source", self.directory, False,
-                                  PopupSize(85, 80), self.path)
+                                  PopupSize(85, 80), self.path, placement="popup")
         args = call.call_args.args
         self.assertEqual(args[args.index("--width") + 1], "85%")
         self.assertEqual(args[args.index("--height") + 1], "80%")

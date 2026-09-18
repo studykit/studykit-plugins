@@ -68,7 +68,7 @@ class RootNavigationTests(unittest.TestCase):
         self.assertEqual(self.nav.index.files, ["nested.txt"])
 
     def test_parent_shortcuts_and_click_keep_previous_folder_selected(self):
-        for key in ("\b", "\x7f", curses.KEY_BACKSPACE, Mouse(3, 1, "click")):
+        for key in ("\x7f", curses.KEY_BACKSPACE, Mouse(3, 1, "click")):
             with self.subTest(key=key):
                 self.nav.change_root(self.first / "child")
                 self.nav.key(key, None)
@@ -107,7 +107,7 @@ class RootNavigationTests(unittest.TestCase):
         self.assertIsNone(self.nav.root_draft)
 
     def test_search_and_preview_backspace_keep_their_existing_meaning(self):
-        self.nav.key("\x13", None)
+        self.nav.key("/", None)
         for key in ("a", "b", "\x7f", "\x0f", "\x14"):
             self.nav.key(key, None)
         self.assertEqual(self.nav.query, "a")

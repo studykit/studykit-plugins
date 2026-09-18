@@ -16,6 +16,7 @@ import time
 import tomllib
 
 from popup_size import PopupSize, load_size, save_size
+from layout_mode import MODES, load_layout, save_layout
 from ls_colors import directory_style
 from view_state import load_view, save_view
 
@@ -55,15 +56,18 @@ def source(env: dict, binary: str) -> tuple[str, Path]:
     return pane_id, Path(cwd).resolve()
 
 
-def open_panel(env, binary, pane_id, root, changes, size, resume=None):
-    # Herdr 0.9.1 takes popup placement from the manifest, but accepts size overrides.
+def open_panel(env, binary, pane_id, root, changes, size, resume=None, placement="popup"):
+    if placement not in MODES:
+        raise ValueError("Unknown navigator layout")
+    # Herdr 0.9.1 needs a manifest entrypoint for popup placement.
     args = ["plugin", "pane", "open", "--plugin", env["HERDR_PLUGIN_ID"],
-            "--entrypoint", "navigator", "--cwd", str(root),
-            "--width", f"{size.width}%", "--height", f"{size.height}%",
+            "--entrypoint", "popup" if placement == "popup" else "navigator", "--cwd", str(root),
             "--env", f"FILE_NAV_SOURCE_PANE={pane_id}",
             "--env", f"FILE_NAV_CHANGES={int(changes)}",
             "--env", f"FILE_NAV_WIDTH={size.width}",
             "--env", f"FILE_NAV_HEIGHT={size.height}", "--focus"]
+    if placement == "popup":
+        args.extend(["--width", f"{size.width}%", "--height", f"{size.height}%"])
     if resume:
         args.extend(["--env", f"FILE_NAV_RESUME={resume}"])
     return call(binary, *args)
@@ -77,19 +81,35 @@ def resume_path(env, raw):
     return path
 
 
-def prepare_resize(env, pane_id, size, view):
+def current_layout(env):
+    return "overlay" if env.get("HERDR_PANE_ID") else "popup"
+
+
+def change_layout(env, pane_id, placement, size, view):
+    if placement not in MODES:
+        raise ValueError("Unknown navigator layout")
+    prepare_resize(env, pane_id, size, view, placement)
+    return True
+
+
+def prepare_resize(env, pane_id, size, view, placement="popup"):
     directory = Path(env["HERDR_PLUGIN_STATE_DIR"])
     directory.mkdir(parents=True, exist_ok=True)
     fd, name = tempfile.mkstemp(prefix="resize-", suffix=".json", dir=directory)
     path = Path(name)
     try:
         with os.fdopen(fd, "w") as stream:
-            json.dump({"pane_id": pane_id, "size": size.as_dict(), "view": view}, stream)
-        # The popup process exits after this returns. A separate process survives
-        # its terminal and retries only until Herdr releases the modal surface.
+            json.dump({"pane_id": pane_id, "size": size.as_dict(), "view": view,
+                       "placement": placement, "previous_pane": env.get("HERDR_PANE_ID"),
+                       "previous_pid": os.getpid()}, stream)
+        # The navigator exits after this returns. The helper waits for its surface
+        # to close before opening the replacement with the saved view.
+        helper_env = dict(env)
+        # `pane current` otherwise resolves the now-closed navigator from its env.
+        helper_env.pop("HERDR_PANE_ID", None)
         with (directory / "resize.log").open("ab") as log:
             subprocess.Popen([sys.executable, str(Path(__file__).resolve()), "reopen", str(path)],
-                             env=env, stdin=subprocess.DEVNULL, stdout=log, stderr=log,
+                             env=helper_env, stdin=subprocess.DEVNULL, stdout=log, stderr=log,
                              start_new_session=True, close_fds=True)
     except BaseException:
         path.unlink(missing_ok=True)
@@ -101,21 +121,47 @@ def reopen(env, raw):
     payload = json.loads(path.read_text())
     size = PopupSize(**payload["size"])
     view, pane_id = payload["view"], payload["pane_id"]
+    placement = payload.get("placement", "popup")
+    previous_pane = payload.get("previous_pane")
     binary = env.get("HERDR_BIN_PATH") or "herdr"
     deadline = time.monotonic() + 5
     try:
+        previous_pid = payload.get("previous_pid")
+        while previous_pid:
+            try:
+                os.kill(previous_pid, 0)
+            except ProcessLookupError:
+                break
+            if time.monotonic() >= deadline:
+                raise RuntimeError("The previous navigator process did not exit")
+            time.sleep(0.05)
         while True:
+            if previous_pane:
+                try:
+                    call(binary, "pane", "get", previous_pane)
+                except RuntimeError as error:
+                    if "pane_not_found" not in str(error):
+                        raise
+                    previous_pane = None
+                else:
+                    if time.monotonic() >= deadline:
+                        raise RuntimeError("The previous navigator pane did not close")
+                    time.sleep(0.05)
+                    continue
             current = call(binary, "pane", "current")["pane"]
             if current["pane_id"] != pane_id:
-                raise RuntimeError("Resize cancelled because focus moved to another source pane")
+                raise RuntimeError("Layout change cancelled because focus moved to another source pane")
             try:
-                open_panel(env, binary, pane_id, Path(view["root"]), view["changes"], size, path)
+                open_panel(env, binary, pane_id, Path(view["root"]), view["changes"], size, path,
+                           placement=placement)
                 break
             except RuntimeError as error:
                 if "ui_busy" not in str(error) or time.monotonic() >= deadline:
                     raise
                 time.sleep(0.05)
-        save_size(Path(env["HERDR_PLUGIN_CONFIG_DIR"]), size)
+        if env.get("HERDR_PLUGIN_CONFIG_DIR"):
+            save_size(Path(env["HERDR_PLUGIN_CONFIG_DIR"]), size)
+            save_layout(Path(env["HERDR_PLUGIN_CONFIG_DIR"]), placement)
     except BaseException:
         path.unlink(missing_ok=True)
         raise
@@ -129,7 +175,8 @@ def main(env: dict, operation: str) -> int:
     pane_id, root = source(env, binary)
     if operation in ("browse", "changes"):
         config_dir = Path(env["HERDR_PLUGIN_CONFIG_DIR"]) if env.get("HERDR_PLUGIN_CONFIG_DIR") else None
-        open_panel(env, binary, pane_id, root, operation == "changes", load_size(config_dir))
+        open_panel(env, binary, pane_id, root, operation == "changes", load_size(config_dir),
+                   placement=load_layout(config_dir))
     elif operation == "panel":
         import curses
         from ui import Navigator
@@ -153,11 +200,14 @@ def main(env: dict, operation: str) -> int:
                               env.get("VISUAL") or env.get("EDITOR") or "", size, on_resize,
                               theme_loader=lambda: theme_config(env),
                               folder_style=directory_style(env, sys.platform),
-                              on_state=(lambda view: save_view(state_dir, view)) if state_dir else None)
+                              on_state=(lambda view: save_view(state_dir, view)) if state_dir else None,
+                              layout_loader=lambda: current_layout(env),
+                              on_layout=lambda placement, chosen, view:
+                                  change_layout(env, pane_id, placement, chosen, view))
         if restored is not None:
             navigator.restore_state(restored)
             if env.get("FILE_NAV_RESUME"):
-                navigator.message = f"Popup resized to {size.width}% × {size.height}%"
+                navigator.message = "Restored view after layout change"
         try:
             curses.wrapper(navigator.run)
         finally:

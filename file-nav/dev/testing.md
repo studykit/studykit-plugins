@@ -1,6 +1,6 @@
 # Development and verification
 
-The plugin targets Herdr's terminal popup API. It intentionally has no Claude Code
+The plugin targets Herdr's terminal pane and popup APIs. It intentionally has no Claude Code
 or Codex manifests: neither agent runtime owns this UI, and the navigator works
 with either agent inside Herdr.
 
@@ -30,7 +30,8 @@ pane receives no command input. Test a linked working tree rather than an older
 installed checkout.
 
 Herdr 0.9.1 supports manifest `placement = "popup"` but its CLI rejects an explicit
-`--placement popup` override. Popup actions therefore use the manifest default.
+`--placement popup` override. Popup launches therefore use the dedicated popup
+manifest entrypoint. Overlay launches use the native overlay manifest entrypoint.
 Popups do not have pane IDs or receive `HERDR_PANE_ID`; the action forwards the
 source pane ID explicitly. Direct pane entrypoints use the focused pane in the
 plugin context. The source folder remains fixed during a popup invocation.
@@ -66,7 +67,7 @@ malformed preferences, modal-release retry, and focus-change cancellation.
 ## Popup resizing
 
 Herdr 0.9.1 exposes dimensions at popup launch but no popup resize method.
-Ctrl+W prepares a size change; Enter saves a one-use resume record under the
+Ctrl+Y prepares a size change; Enter saves a one-use resume record under the
 plugin state directory and starts a detached helper before the popup exits.
 The helper waits up to five seconds for Herdr to release the old modal, opens
 the new popup, and saves `popup-size.json` under the plugin config directory.
@@ -381,3 +382,57 @@ does not depend on a user vimrc and uses broadly supported `diffopt` values.
 Herdr discovery uses `herdr-plugin.toml` in the public repository and the
 repository's `herdr-plugin` GitHub topic. Publishing or modifying repository
 topics is a separate release operation.
+
+
+## 0.16: popup and overlay modes
+
+Ctrl+W opens a two-mode chooser: 1 Popup, 2 Overlay. Both are native Herdr
+surfaces, selected through separate manifest entrypoints. The plugin has no
+split mode, pane-zoom controls, or split target/direction overrides. The host
+restores the previous focus and zoom state when its native overlay closes.
+
+Mode transitions reuse the one-use resume mechanism used by popup resizing.
+Wait for the old Python process and any old overlay pane to disappear before
+opening the replacement. Remove `HERDR_PANE_ID` from the helper environment:
+Herdr 0.9.1's `pane current` defaults to that caller ID, which is stale after
+pane closure. The focus guard cancels transitions if the user moves to another
+source. Popup launches omit the placement override because the installed 0.9.1
+CLI rejects `--placement popup` while accepting manifest popup placement.
+
+Save the last successfully selected mode atomically in the plugin config
+`layout.json`. Both actions load it. Missing, invalid, or legacy `split`
+preferences fall back to Popup. Popup dimensions remain in `popup-size.json`.
+Ctrl+Y opens the popup-size dialog. Slash is the only search-entry shortcut; Ctrl+S is no longer bound. In search
+input, slash remains an ordinary path separator.
+
+The ignored-file visibility shortcut is Ctrl+H instead of Ctrl+V; its scan,
+filter, and saved-view behavior are unchanged. Ctrl+H is the ASCII Backspace byte,
+so normal navigation handles it before parent-root navigation. DEL and
+`KEY_BACKSPACE` retain parent-root behavior; search and path input still accept
+Ctrl+H for deleting text.
+
+The input loop reconciles curses dimensions with the PTY and uses a short input
+timeout so an early resize during initialization can recover without a keystroke.
+
+Automated coverage checks both supported modes, legacy preference fallback,
+rejected split requests, snapshots across mode changes, process/pane release
+ordering, focus-change cancellation, unchanged preferences after failed opens,
+modal input priority, and popup-only sizing.
+
+Official runtime references checked for this change:
+
+- https://herdr.dev/docs/cli-reference/#plugins
+- https://github.com/herdrdev/herdr/blob/v0.9.1/src/app/api/plugins/panes.rs
+- https://github.com/herdrdev/herdr/blob/v0.9.1/src/cli/pane.rs
+- https://code.claude.com/docs/en/plugins
+- https://developers.openai.com/codex/plugins
+
+Claude/Codex plugin registration is unchanged: Herdr owns the display surface.
+
+Validation: 184 automated tests passed. A separate Herdr 0.9.1 session on macOS
+used isolated XDG directories, a throwaway project, and the linked working tree.
+Real client keyboard input verified legacy Split preferences opening Popup,
+Popup → Overlay → Popup, both saved modes on fresh launches, unchanged saved
+search/preview/scroll state, popup resizing, slash-only search, Ctrl+H visibility,
+and restoration of the source layout after overlay closure. Linux was not
+exercised in a live host session.

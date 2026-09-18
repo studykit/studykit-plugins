@@ -137,7 +137,7 @@ class ProjectTests(unittest.TestCase):
         self.write("nested/README.md", "known preview\n")
         nav = Navigator(self.root, "source-pane", False, "")
         self.assertTrue(nav.items[0].directory)
-        nav.key("\x13", None)
+        nav.key("/", None)
         for char in "rdm":
             nav.key(char, None)
         self.assertEqual(nav.items[0].path, "nested/README.md")
@@ -149,7 +149,7 @@ class ProjectTests(unittest.TestCase):
         with patch.object(nav, "show_diff") as show:
             nav.key("\x04", None)
             show.assert_called_once_with(None)
-        nav.key("\x13", None)
+        nav.key("/", None)
         nav.key("\x15", None)
         nav.key("\n", None)
         self.assertEqual(nav.query, "")
@@ -298,15 +298,18 @@ class AdapterTests(unittest.TestCase):
             self.assertEqual(root, Path(directory).resolve())
             call.assert_called_once_with("herdr-binary", "pane", "get", "focused")
 
-    def test_action_forwards_source_and_uses_manifest_popup(self):
+    def test_action_defaults_to_popup_and_forwards_source(self):
         env = {"HERDR_ENV": "1", "HERDR_PLUGIN_ID": "studykit.file-nav"}
         with patch("herdr_main.source", return_value=("w1:p9", Path("/tmp/project"))), patch("herdr_main.call") as call:
             herdr_main.main(env, "changes")
         argv = call.call_args.args
         self.assertIn("FILE_NAV_SOURCE_PANE=w1:p9", argv)
         self.assertIn("FILE_NAV_CHANGES=1", argv)
+        self.assertEqual(argv[argv.index("--entrypoint") + 1], "popup")
         self.assertNotIn("--placement", argv)
         self.assertNotIn("--target-pane", argv)
+        self.assertIn("--width", argv)
+        self.assertIn("--height", argv)
 
     def test_missing_or_invalid_context_does_not_browse_plugin_directory(self):
         for env in ({}, {"HERDR_PLUGIN_CONTEXT_JSON": "[]"}, {"HERDR_PLUGIN_CONTEXT_JSON": "bad"}):

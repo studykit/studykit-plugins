@@ -1,6 +1,6 @@
 # File Navigator
 
-Browse the focused Herdr pane's working directory in a popup with a project tree,
+Browse the focused Herdr pane's working directory in a popup or overlay with a project tree,
 filename search, file previews, and side-by-side Git comparisons in vimdiff. Works alongside any shell or agent,
 including Claude Code and Codex, on macOS and Linux.
 
@@ -26,16 +26,36 @@ herdr plugin action invoke studykit.file-nav.browse
 herdr plugin action invoke studykit.file-nav.changes
 ```
 
-The popup uses the pane that was focused when you invoked the action. Its root is
+The navigator uses the pane that was focused when you invoked the action. Its root is
 that pane's foreground working directory, falling back to the pane's directory.
-Opening the navigator in another pane uses that pane's directory. The popup keeps
+Opening the navigator in another pane uses that pane's directory. The navigator keeps
 its source directory until you explicitly change the navigation root.
+
+## Display modes
+
+The first launch opens in a **Popup**. Later launches use your last selected
+layout. Press **Ctrl+W**, then choose a display mode:
+
+| Key | Mode | Behavior |
+| --- | --- | --- |
+| 1 | Popup | Show a floating window above your work |
+| 2 | Overlay | Expand the navigator across the tab's pane area |
+| Escape | Cancel | Keep the current display mode |
+
+Switching modes briefly reopens the navigator and restores the navigation root,
+filter, selected file, expanded folders, preview, scroll position, and focus.
+Scroll positions may adjust to fit the new dimensions. Finish search or a root/size
+dialog before opening the layout menu.
+
+**Ctrl+Y** adjusts the popup's size while Popup is active. Layout and popup
+dimensions are remembered across launches and shared across roots. Closing an
+overlay restores the previous focus and zoom state.
 
 ## Navigation
 
 | Input | Action |
 | --- | --- |
-| Ctrl+S | Enter filename/path search, including inside collapsed folders |
+| `/` | Enter filename/path search, including inside collapsed folders |
 | Ctrl+O | Change the navigation root by entering a directory path |
 | Enter / click on the tree's `..` row | Move the navigation root to its parent |
 | Backspace (tree focused) / click `[..]` | Move the navigation root to its parent |
@@ -57,9 +77,10 @@ its source directory until you explicitly change the navigation root.
 | Ctrl+D | Open a side-by-side HEAD / working-tree comparison in vimdiff |
 | Ctrl+E | Open the selected file in an editor |
 | Ctrl+G | Toggle changed files only |
-| Ctrl+V | Show / hide Git-ignored files; enabling switches to the full project view |
+| Ctrl+H | Show / hide Git-ignored files; enabling switches to the full project view |
 | Ctrl+R | Refresh the file list and preview |
-| Ctrl+W | Adjust popup size and remember it for future launches |
+| Ctrl+W, then 1 / 2 | Switch to Popup / Overlay |
+| Ctrl+Y (Popup) | Adjust popup size and remember it for future launches |
 | Ctrl+U in search | Clear the search text |
 | Escape | Return to files from content; clear search when in files; otherwise close |
 | Ctrl+C | Close immediately, retaining the current view for the next launch |
@@ -70,7 +91,7 @@ files and untracked files that are not ignored. Without Git, common dependency
 directories are excluded. Hidden files are included. Git status uses the usual
 two-column codes, including `??` for new files and `D` for deleted files.
 
-Git-ignored files are hidden by default. Ctrl+V includes excluded directories,
+Git-ignored files are hidden by default. Ctrl+H includes excluded directories,
 their files, empty folders, and nested repositories in the tree and file search.
 The header shows `Ignored: shown` or `Ignored: hidden`. Git metadata (`.git`,
 `.hg`, `.svn`) remains hidden, and directory symlinks are not followed. Outside
@@ -104,32 +125,32 @@ Changing roots clears the filename filter, expanded folders, and old preview,
 then focuses the new tree. The changes-only mode stays as selected. Invalid or
 unreadable destinations leave the previous tree intact. The source pane's working
 directory is never changed. Resizing preserves the chosen root; closing and
-opening a fresh popup starts from the invoking pane's directory again.
+opening a fresh navigator starts from the invoking pane's directory again.
 
 Reopening the same root automatically restores its last view: expanded folders,
 selected file, filename filter, tree position, preview file and scroll offsets,
 file/content focus, changed-files mode, and ignored-file visibility. Views are
 shared across panes that use the same canonical directory; different roots keep
-separate views. A new popup still starts at the invoking pane's directory, never
+separate views. A new navigator still starts at the invoking pane's directory, never
 at an unrelated previously visited root. Opening the explicit changes action
 always enables changed-files mode, even if that root's saved view showed all files.
 
 Use Ctrl+C to close immediately without first changing focus or clearing the
 filter. Escape retains its existing back/clear/close behavior; those changes are
-remembered too. Search-entry mode and unfinished root/size dialogs are not
-reopened. When changing roots inside a popup, the departing root's view is saved
+remembered too. Search-entry mode and unfinished layout/root/size dialogs are not
+reopened. When changing roots inside the navigator, the departing root's view is saved
 for later launches, while the destination opens with the normal fresh tree.
 
 Saved views contain navigation metadata, not file contents. Files are read again
 on reopening; missing previews are cleared, stale expanded folders are discarded,
-and scroll positions adjust to the new content and popup dimensions. Corrupt or
+and scroll positions adjust to the new content and window dimensions. Corrupt or
 unavailable saved state does not prevent browsing. Popup dimensions remain a
 shared preference rather than a per-root setting.
 
-Typing only changes the filter after Ctrl+S. Enter leaves search and focuses the
+Typing only changes the filter after `/`. Enter leaves search and focuses the
 file list; press Enter again to open the selected result. Ordinary character keys
-outside search do not change the filter. Ctrl+S works directly inside the popup,
-even when it is also your Herdr prefix key.
+outside search do not change the filter. Within search, `/` is an ordinary path
+separator.
 In the tree, `l` expands a collapsed folder; press it again to select its first
 child. `h` collapses an expanded folder or selects the parent. Space does nothing
 on a folder or an empty list. Space updates the preview without moving focus,
@@ -147,15 +168,15 @@ The comparison uses a bundled Vim theme and key mappings, independent of your vi
 
 The active panel has a bright header, a double border, and an explicit
 `FOCUS: FILES`, `FOCUS: CONTENT`, or `FOCUS: SEARCH` badge. Opening a file moves focus
-to content; Tab, Escape, or clicking the file panel brings it back. Ctrl+S activates
+to content; Tab, Escape, or clicking the file panel brings it back. `/` activates
 the highlighted search field. Narrow terminals show one panel at a time.
 
-The popup follows your Herdr theme: background, text, selection, borders, and
+The navigator follows your Herdr theme: background, text, selection, borders, and
 Markdown/code colors come from the selected built-in palette and `[theme.custom]`
-overrides. Reopen the popup or press Ctrl+R to reread theme settings. The `terminal`
+overrides. Reopen the navigator or press Ctrl+R to reread theme settings. The `terminal`
 theme preserves terminal-default colors. RGB values are approximated using the
 terminal's 256-color palette (or available basic colors). With `auto_switch`, the
-popup uses the host appearance reported when it opens; without a report it uses
+navigator uses the host appearance reported when it opens; without a report it uses
 Herdr's dark fallback. Vimdiff keeps its separate comparison theme.
 
 Folder names and icons use the ordinary directory color from `ls`: an exported
@@ -163,7 +184,7 @@ Folder names and icons use the ordinary directory color from `ls`: an exported
 Without either setting, the default is blue on macOS/BSD and bold blue on Linux.
 Invalid settings fall back to the Herdr text color. Selection highlights and the
 panel background remain themed, except for an explicitly configured directory
-background. Restart the popup after changing the inherited environment. Shell
+background. Restart the navigator after changing the inherited environment. Shell
 aliases, extension rules, and special directory-permission colors are not read.
 
 With the tree focused, use Ctrl+N / Ctrl+P to scroll the current preview down / up
@@ -178,7 +199,7 @@ Other familiar `man`/`less` scrolling keys work only while content is focused.
 Additional aliases are `e` / `y` for down / up one line, Ctrl+U for up half a screen, and
 `<` / `>` for the beginning / end. Ctrl+D and Ctrl+E retain their navigator
 actions (vimdiff and editor); use plain `d` and `j` for scrolling. Search input
-and the root/popup-size dialogs take priority, so these letters remain ordinary text
+and the layout/root/popup-size dialogs take priority, so these letters remain ordinary text
 in search. Markdown scrolling follows rendered lines, not source lines.
 
 Markdown files (`.md` and `.markdown`) are rendered with Rich inside the navigator.
@@ -219,7 +240,7 @@ scrolls long lines horizontally. Files are displayed, never executed.
 Unknown extensions and plain text use the normal numbered preview. Highlighting
 errors also fall back to plain text. Binary files remain excluded.
 
-Press **Ctrl+W** in the navigator to adjust the popup size. Left/Right changes
+In Popup mode, press **Ctrl+Y** to adjust the popup size. Left/Right changes
 width, Down/Up changes height, in five-percentage-point steps. Keys `1` through
 `4` select Small, Medium, Large, or Maximum. Enter applies and remembers the size;
 Escape cancels. Width and height can each range from 40% to 100% of Herdr's

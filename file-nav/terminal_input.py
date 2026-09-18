@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import curses
 from dataclasses import dataclass
+import os
 import re
 import sys
 
@@ -78,13 +79,25 @@ def read(screen):
 
 
 def enable(screen):
-    # Ctrl+S is an application key, not the terminal's XOFF flow-control byte.
+    # Deliver control keys to the navigator instead of terminal signal handling.
     curses.raw()
     # keypad(False) prevents older ncurses from swallowing button-five reports.
     screen.keypad(False)
     curses.mousemask(0)
     sys.stdout.write("\x1b[?1000h\x1b[?1006h\x1b[?996n")
     sys.stdout.flush()
+
+
+def sync_size(screen):
+    # A terminal surface can settle to its final size while curses is still initializing.
+    # Consult the PTY as well as SIGWINCH so a missed early resize can recover.
+    try:
+        columns, lines = os.get_terminal_size()
+        if lines > 0 and columns > 0 and screen.getmaxyx() != (lines, columns):
+            curses.resizeterm(lines, columns)
+            screen.clearok(True)
+    except (OSError, curses.error):
+        pass
 
 
 def disable():

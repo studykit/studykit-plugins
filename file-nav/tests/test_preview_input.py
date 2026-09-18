@@ -46,11 +46,11 @@ class PreviewTests(unittest.TestCase):
         (self.root / "plain.txt").write_text("\n".join(str(i) for i in range(60)))
         self.nav = Navigator(self.root, "pane", False, "")
 
-    def test_search_requires_ctrl_s_and_enter_only_applies(self):
-        for char in "random":
+    def test_search_requires_slash_and_enter_only_applies(self):
+        for char in "random\x13":
             self.nav.key(char, None)
         self.assertEqual(self.nav.query, "")
-        self.nav.key("\x13", None)
+        self.nav.key("/", None)
         for char in "readme":
             self.nav.key(char, None)
         self.assertTrue(self.nav.searching)
@@ -66,7 +66,7 @@ class PreviewTests(unittest.TestCase):
 
     def test_search_cancel_restores_filter_and_does_not_close(self):
         self.nav.query = "readme"
-        self.nav.key("\x13", None)
+        self.nav.key("/", None)
         self.nav.key("\x15", None)
         self.nav.key("x", None)
         self.assertTrue(self.nav.key("\x1b", None))
@@ -127,7 +127,7 @@ class PreviewTests(unittest.TestCase):
     def test_shared_preview_keys_do_not_override_input_modes(self):
         self.nav.load("plain.txt")
         self.nav.body = 10
-        for mode in ("\x13", "\x0f", "\x17"):
+        for mode in ("/", "\x0f", "\x17"):
             self.nav.key(mode, None)
             self.nav.preview_scroll = 20
             for key in ("\x0e", "\x10", "\x06", "\x02"):
@@ -156,7 +156,7 @@ class PreviewTests(unittest.TestCase):
     def test_wheel_keeps_search_input_and_is_ignored_in_dialogs(self):
         self.nav.load("plain.txt")
         self.nav.divider, self.nav.body = 30, 10
-        self.nav.key("\x13", None)
+        self.nav.key("/", None)
         self.nav.key("p", None)
         self.nav.key(terminal.Mouse(40, 10, "down"), None)
         self.assertTrue(self.nav.searching)
@@ -249,7 +249,7 @@ class PreviewTests(unittest.TestCase):
         self.assertEqual(self.nav.selected, 0)
         self.assertEqual(self.nav.preview_scroll, 10)
         self.assertEqual(self.nav.query, "")
-        self.nav.key("\x13", None)
+        self.nav.key("/", None)
         for key in keys:
             self.nav.key(key, None)
         self.assertEqual(self.nav.query, keys)
@@ -363,13 +363,13 @@ class PreviewTests(unittest.TestCase):
             self.assertTrue(any("↑  .." in line for line in output))
 
     def test_tree_keys_are_text_in_search_and_ignored_in_resize_dialog(self):
-        self.nav.key("\x17", None)
+        self.nav.key("\x19", None)
         for key in "hjkl ":
             self.nav.key(key, None)
         self.assertEqual(self.nav.selected, 0)
         self.assertEqual(self.nav.active, "")
         self.nav.key("\x1b", None)
-        self.nav.key("\x13", None)
+        self.nav.key("/", None)
         for key in "hjkl ":
             self.nav.key(key, None)
         self.assertEqual(self.nav.query, "hjkl ")
@@ -393,7 +393,7 @@ class PreviewTests(unittest.TestCase):
     def test_preview_less_keys_leave_modal_and_action_shortcuts_intact(self):
         self.nav.load("plain.txt")
         self.nav.preview_focus = True
-        self.nav.key("\x17", None)
+        self.nav.key("\x19", None)
         self.nav.key("G", None)
         self.assertEqual(self.nav.preview_scroll, 0)
         self.nav.key("\x1b", None)

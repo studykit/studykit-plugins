@@ -66,7 +66,7 @@ class IgnoredFileTests(unittest.TestCase):
     def test_toggle_search_preview_and_hide_clear_stale_content(self):
         nav = self.navigator()
         self.assertNotIn("sources", [row.path for row in nav.items])
-        nav.key("\x16", None)
+        nav.key("\x08", None)
         self.assertTrue(nav.include_ignored)
         self.assertIn("sources", [row.path for row in nav.items])
         nav.query = "ignored.py"
@@ -75,17 +75,44 @@ class IgnoredFileTests(unittest.TestCase):
         self.assertEqual(nav.active, "sources/repo/ignored.py")
         self.assertIn("preview only", nav.source_text)
         nav.preview_focus = True
-        nav.key("\x16", None)
+        nav.key("\x08", None)
         self.assertFalse(nav.include_ignored)
         self.assertEqual(nav.active, "")
         self.assertEqual(nav.source_text, "")
         self.assertFalse(nav.preview_focus)
         self.assertEqual(nav.items, [])
 
+    def test_control_h_replaces_control_v_without_changing_root(self):
+        nav = self.navigator()
+        nav.key("\x16", None)
+        self.assertFalse(nav.include_ignored)
+        nav.key("\x08", None)
+        self.assertTrue(nav.include_ignored)
+        self.assertEqual(nav.root, self.root)
+        nav.key("\x16", None)
+        self.assertTrue(nav.include_ignored)
+        nav.key("\x08", None)
+        self.assertFalse(nav.include_ignored)
+        self.assertEqual(nav.root, self.root)
+
+    def test_control_h_still_deletes_text_in_search_and_path_input(self):
+        nav = self.navigator()
+        nav.key("/", None)
+        nav.key("a", None)
+        nav.key("\x08", None)
+        self.assertEqual(nav.query, "")
+        self.assertFalse(nav.include_ignored)
+        nav.key("\x1b", None)
+        nav.key("\x0f", None)
+        path = nav.root_draft
+        nav.key("\x08", None)
+        self.assertEqual(nav.root_draft, path[:-1])
+        self.assertFalse(nav.include_ignored)
+
     def test_enable_leaves_changes_mode_but_ignored_files_are_not_changes(self):
         nav = self.navigator()
         nav.changes = True
-        nav.key("\x16", None)
+        nav.key("\x08", None)
         self.assertFalse(nav.changes)
         nav.key("\x07", None)
         self.assertTrue(nav.changes)
@@ -96,14 +123,14 @@ class IgnoredFileTests(unittest.TestCase):
         before = nav.export_state()
         index = nav.index
         with patch("ui.scan", side_effect=OSError("unreadable")):
-            nav.key("\x16", None)
+            nav.key("\x08", None)
         self.assertEqual(nav.export_state(), before)
         self.assertIs(nav.index, index)
         self.assertIn("unreadable", nav.message)
 
     def test_resize_refresh_and_root_changes_preserve_toggle(self):
         nav = self.navigator()
-        nav.key("\x16", None)
+        nav.key("\x08", None)
         nav.load("sources/repo/ignored.py")
         nav.refresh()
         self.assertIn("sources/repo/ignored.py", nav.index.files)
@@ -117,10 +144,10 @@ class IgnoredFileTests(unittest.TestCase):
         self.assertIn("repo/ignored.py", nav.index.files)
 
     def test_toggle_does_not_override_input_modals(self):
-        for start, finish in (("\x13", "\x1b"), ("\x0f", "\x1b"), ("\x17", "\x1b")):
+        for start, finish in (("/", "\x1b"), ("\x0f", "\x1b"), ("\x17", "\x1b")):
             nav = self.navigator()
             nav.key(start, None)
-            nav.key("\x16", None)
+            nav.key("\x08", None)
             self.assertFalse(nav.include_ignored)
             nav.key(finish, None)
 
@@ -144,9 +171,9 @@ class IgnoredFileTests(unittest.TestCase):
         for state in ("hidden", "shown"):
             screen.reset_mock()
             nav.draw(screen)
-            self.assertTrue(any(f"Ignored: {state} (^V)" in call.args[2]
+            self.assertTrue(any(f"Ignored: {state} (^H)" in call.args[2]
                                 for call in screen.addstr.call_args_list))
-            nav.key("\x16", None)
+            nav.key("\x08", None)
 
     def test_budget_visits_sibling_sources_before_deep_cache(self):
         root = self.base / "breadth"
