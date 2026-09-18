@@ -1,0 +1,28 @@
+id = "studykit.file-nav"
+name = "File Navigator"
+version = "0.13.0"
+min_herdr_version = "0.9.0"
+description = "Browse the focused pane's files with search, Obsidian-style Markdown previews and Git diffs"
+platforms = ["linux", "macos"]
+
+[[actions]]
+id = "browse"
+title = "Files: browse project"
+description = "Open a file tree rooted at the focused pane's working directory"
+contexts = ["workspace", "tab", "pane"]
+command = ["./herdr_main.py", "browse"]
+
+[[actions]]
+id = "changes"
+title = "Files: browse changes"
+description = "Search changed files and preview their Git diff"
+contexts = ["workspace", "tab", "pane"]
+command = ["./herdr_main.py", "changes"]
+
+[[panes]]
+id = "navigator"
+title = "File Navigator"
+placement = "popup"
+width = "96%"
+height = "92%"
+command = ["./herdr_main.py", "panel"]

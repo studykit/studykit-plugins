@@ -1,0 +1,239 @@
+# File Navigator
+
+Browse the focused Herdr pane's working directory in a popup with a project tree,
+filename search, file previews, and side-by-side Git comparisons in vimdiff. Works alongside any shell or agent,
+including Claude Code and Codex, on macOS and Linux.
+
+Requires Herdr 0.9.0 or later, `uv` on Herdr's `PATH`, and Python 3.11 or later
+with curses. `uv` manages the Python dependencies automatically; the first launch
+requires network access to download any missing dependencies. Git is optional
+for browsing and required for change indicators and diffs. Comparing files also
+requires `vimdiff` or Vim compiled with diff support.
+Markdown rendering uses the Python `Rich` library and source highlighting uses
+`Pygments`; both dependencies are managed automatically. Glow is not required.
+
+## Install
+
+```sh
+herdr plugin install studykit/studykit-plugins/file-nav
+```
+
+Open **Files: browse project** or **Files: browse changes** from Herdr's plugin
+actions. You can also invoke either action from the CLI:
+
+```sh
+herdr plugin action invoke studykit.file-nav.browse
+herdr plugin action invoke studykit.file-nav.changes
+```
+
+The popup uses the pane that was focused when you invoked the action. Its root is
+that pane's foreground working directory, falling back to the pane's directory.
+Opening the navigator in another pane uses that pane's directory. The popup keeps
+its source directory until you explicitly change the navigation root.
+
+## Navigation
+
+| Input | Action |
+| --- | --- |
+| Ctrl+S | Enter filename/path search, including inside collapsed folders |
+| Ctrl+O | Change the navigation root by entering a directory path |
+| Enter / click on the tree's `..` row | Move the navigation root to its parent |
+| Backspace (tree focused) / click `[..]` | Move the navigation root to its parent |
+| Ctrl+T | Move to the current Git repository root |
+| Enter / Escape in search | Apply the filter / cancel and restore the previous filter |
+| Click or Enter | Expand a folder or open the file; in changed-files mode, open vimdiff |
+| h / j / k / l (tree focused) | Collapse or move to parent / down / up / expand or enter a folder |
+| Space (tree focused) | Preview the selected file while keeping tree focus, including in changed-files mode |
+| Left / Right | Collapse / expand folders; scroll horizontally in preview |
+| Up / Down, Page Up / Down | Move through files or scroll preview |
+| Ctrl+N / Ctrl+P | Scroll preview down / up one line without changing focus |
+| Ctrl+F / Ctrl+B | Scroll preview down / up one screen without changing focus |
+| j / k, Enter (preview focused) | Scroll down / up one line; Enter scrolls down |
+| Space / f / b (preview focused) | Scroll down / down / up one screen |
+| d / u (preview focused) | Scroll down / up half a screen |
+| g / G (preview focused) | Jump to the beginning / end |
+| Mouse wheel | Scroll the panel under the pointer without changing keyboard focus |
+| Tab / Shift+Tab | Switch focus between files and preview |
+| Ctrl+D | Open a side-by-side HEAD / working-tree comparison in vimdiff |
+| Ctrl+E | Open the selected file in an editor |
+| Ctrl+G | Toggle changed files only |
+| Ctrl+V | Show / hide Git-ignored files; enabling switches to the full project view |
+| Ctrl+R | Refresh the file list and preview |
+| Ctrl+W | Adjust popup size and remember it for future launches |
+| Ctrl+U in search | Clear the search text |
+| Escape | Return to files from content; clear search when in files; otherwise close |
+
+Search is case-insensitive, ranks filename matches ahead of path matches, and
+accepts fuzzy abbreviations such as `rdm` for `README.md`. Git projects show tracked
+files and untracked files that are not ignored. Without Git, common dependency
+directories are excluded. Hidden files are included. Git status uses the usual
+two-column codes, including `??` for new files and `D` for deleted files.
+
+Git-ignored files are hidden by default. Ctrl+V includes excluded directories,
+their files, empty folders, and nested repositories in the tree and file search.
+The header shows `Ignored: shown` or `Ignored: hidden`. Git metadata (`.git`,
+`.hg`, `.svn`) remains hidden, and directory symlinks are not followed. Outside
+Git, this toggle also includes normally skipped dependency/cache directories.
+Ignored files are not treated as Git changes; Ctrl+G still shows only changes
+reported by the current repository. Switch the root to a nested repository to
+use that repository's own Git status and diff base.
+
+The toggle is preserved while changing roots, refreshing, or resizing; a new
+popup starts with excluded files hidden. Hiding an excluded file also clears its
+open preview. Extra filesystem traversal is bounded at 50,000 combined entries;
+if the limit is reached, change the root to a smaller folder. No ignore rules or
+Git tracking settings are modified.
+
+To change projects, press Ctrl+O, clear the prefilled path with Ctrl+U, enter a
+directory, and press Enter. Absolute paths, `~`, spaces, and paths relative to
+the current navigation root (including `..`) are supported; no shell expansion
+or commands are executed. Escape cancels. When a folder is selected in the tree,
+Ctrl+O prefills that folder, so Enter makes it the new root. Clicking the displayed
+root path also opens this dialog. Ctrl+T jumps to the Git root when available.
+The tree always starts with a `..` entry, including empty directories and
+changes-only mode. Enter or click it to go up; at the filesystem root it does
+nothing. Filename search results omit this entry. Backspace moves up only in
+the unfiltered tree, and remains a text-editing key during search.
+Closed folders display `▸ `, expanded folders display `▾ `, and the parent
+entry displays `↑  ..`. Files have no folder icon. Use a Nerd Font in your
+terminal to display these folder glyphs.
+
+Changing roots clears the filename filter, expanded folders, and old preview,
+then focuses the new tree. The changes-only mode stays as selected. Invalid or
+unreadable destinations leave the previous tree intact. The source pane's working
+directory is never changed. Resizing preserves the chosen root; closing and
+opening a fresh popup starts from the invoking pane's directory again.
+
+Typing only changes the filter after Ctrl+S. Enter leaves search and focuses the
+file list; press Enter again to open the selected result. Ordinary character keys
+outside search do not change the filter. Ctrl+S works directly inside the popup,
+even when it is also your Herdr prefix key.
+In the tree, `l` expands a collapsed folder; press it again to select its first
+child. `h` collapses an expanded folder or selects the parent. Space does nothing
+on a folder or an empty list. Space updates the preview without moving focus,
+so `j` / `k` continue moving through files. Press Tab to focus and scroll the
+preview, or use Ctrl+N/P and Ctrl+F/B to scroll while staying in the tree.
+Enter and clicking a file still transfer focus to content. In filename
+search, `h`, `j`, `k`, `l`, and Space remain text.
+
+Vimdiff compares HEAD on the left with the working tree on the right, including
+staged and unstaged changes together. New files have an empty left side; deleted
+files have an empty right side. Staged renames use the original file as the base.
+Within vimdiff, `Tab` switches sides, `]c` / `[c` jump between changes, and `q` or
+`:qa!` returns to the navigator. Both sides are read-only temporary snapshots.
+The comparison uses a bundled Vim theme and key mappings, independent of your vimrc.
+
+The active panel has a bright header, a double border, and an explicit
+`FOCUS: FILES`, `FOCUS: CONTENT`, or `FOCUS: SEARCH` badge. Opening a file moves focus
+to content; Tab, Escape, or clicking the file panel brings it back. Ctrl+S activates
+the highlighted search field. Narrow terminals show one panel at a time.
+
+The popup follows your Herdr theme: background, text, selection, borders, and
+Markdown/code colors come from the selected built-in palette and `[theme.custom]`
+overrides. Reopen the popup or press Ctrl+R to reread theme settings. The `terminal`
+theme preserves terminal-default colors. RGB values are approximated using the
+terminal's 256-color palette (or available basic colors). With `auto_switch`, the
+popup uses the host appearance reported when it opens; without a report it uses
+Herdr's dark fallback. Vimdiff keeps its separate comparison theme.
+
+Folder names and icons use the ordinary directory color from `ls`: an exported
+`LS_COLORS` `di` entry takes priority, followed by the first pair in `LSCOLORS`.
+Without either setting, the default is blue on macOS/BSD and bold blue on Linux.
+Invalid settings fall back to the Herdr text color. Selection highlights and the
+panel background remain themed, except for an explicitly configured directory
+background. Restart the popup after changing the inherited environment. Shell
+aliases, extension rules, and special directory-permission colors are not read.
+
+With the tree focused, use Ctrl+N / Ctrl+P to scroll the current preview down / up
+one line, or Ctrl+F / Ctrl+B to scroll one screen. These keys preserve tree
+selection and focus; they do not load the selected file. Press Space first to
+preview a file. On narrow layouts, use Tab to reveal the content panel.
+Mouse-wheel scrolling also preserves keyboard focus and search mode: the panel
+under the pointer scrolls, while clicks still change focus. On narrow layouts,
+the wheel scrolls the currently visible panel.
+
+Other familiar `man`/`less` scrolling keys work only while content is focused.
+Additional aliases are `e` / `y` for down / up one line, Ctrl+U for up half a screen, and
+`<` / `>` for the beginning / end. Ctrl+D and Ctrl+E retain their navigator
+actions (vimdiff and editor); use plain `d` and `j` for scrolling. Search input
+and the root/popup-size dialogs take priority, so these letters remain ordinary text
+in search. Markdown scrolling follows rendered lines, not source lines.
+
+Markdown files (`.md` and `.markdown`) are rendered with Rich inside the navigator.
+The preview styles headings, emphasis, lists, tables, and code blocks and wraps to the
+panel width. Rendered Markdown omits source line numbers; the position indicator
+counts rendered lines. Footnote definitions (`[^label]: ...`) remain visible in
+their original location, with each reference starting on a separate line.
+
+Obsidian-style previews also support:
+
+- Wiki links (`[[Note]]`, `[[Note#Heading]]`, `[[Note#^block]]`) and display aliases
+  (`[[Note|Label]]`), styled with the theme's link color. Links are display-only.
+- Callouts (`> [!note]`, `> [!warning]`, and other standard types) with colored
+  borders and titles, Markdown bodies, and nesting. Unknown types use the note
+  color. Fold markers (`+` / `-`) are accepted, but preview always shows the body;
+  interactive folding is not supported.
+- Highlights (`==text==`) and task-list checkboxes (`- [ ]`, `- [x]`).
+- YAML frontmatter in a syntax-highlighted **Properties** panel. Values are
+  displayed as source, not evaluated.
+- Visible embed placeholders (`![[Note]]`, `![[image.png|300]]`) that retain the
+  target name. Linked files are not loaded and images are not decoded.
+- `<br>` line breaks, including inside table cells. Escape alias separators in
+  tables as `[[Note\|Label]]`, following Obsidian's table syntax.
+
+Code blocks, inline code, and backslash-escaped examples remain literal. This is
+a subset of Obsidian rendering: vault link navigation, transclusion, comment
+hiding, MathJax, Mermaid diagrams, and Dataview execution are not implemented.
+If rendering fails, the preview shows the Markdown source.
+
+Code and configuration files use Pygments syntax highlighting based on their
+extension or recognized filename (such as `Dockerfile` and `Makefile`). Supported
+formats include Python, JavaScript/TypeScript/TSX, Java, Kotlin, Go, Rust, C,
+shell scripts, JSON, YAML, TOML, INI, SQL, HTML, XML, and CSS. The content header
+shows the detected language. Colors follow the Herdr theme, including in Markdown
+code blocks. Code previews retain source line numbers and do not wrap; Left/Right
+scrolls long lines horizontally. Files are displayed, never executed.
+
+Unknown extensions and plain text use the normal numbered preview. Highlighting
+errors also fall back to plain text. Binary files remain excluded.
+
+Press **Ctrl+W** in the navigator to adjust the popup size. Left/Right changes
+width, Down/Up changes height, in five-percentage-point steps. Keys `1` through
+`4` select Small, Medium, Large, or Maximum. Enter applies and remembers the size;
+Escape cancels. Width and height can each range from 40% to 100% of Herdr's
+available area; Herdr clamps small dimensions to its minimum popup size.
+
+Herdr 0.9 does not expose an API to resize an existing popup. Applying a size
+briefly closes and reopens it, preserving the source folder, search, expanded
+folders, selected file, preview position, and focus. Adjust the size before
+opening an editor or vimdiff. The preference is shared across Herdr sessions.
+
+File previews are limited to 256 KiB, comparisons to 8 MiB per side, and file lists
+to 50,000 entries. Binary content and symlinks outside the selected directory are
+not previewed or compared.
+
+The editor comes from `VISUAL`, then `EDITOR`, then an installed `nvim`, `vim`, or
+`vi`. Configure these in the environment used to launch Herdr. Editor arguments
+are supported, for example `EDITOR='code --wait'`. Closing the editor returns to
+the navigator. Browsing and diff previews do not modify project files.
+
+## Optional keyboard shortcuts
+
+Add bindings to your Herdr configuration, choosing unused keys:
+
+```toml
+[[keys.command]]
+key = "prefix+t"
+type = "plugin_action"
+command = "studykit.file-nav.browse"
+description = "browse project files"
+
+[[keys.command]]
+key = "prefix+d"
+type = "plugin_action"
+command = "studykit.file-nav.changes"
+description = "browse changed files"
+```
+
+This is a Herdr UI plugin, installed through Herdr. It does not require a separate
+Claude Code or Codex marketplace installation.

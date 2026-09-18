@@ -1,0 +1,225 @@
+"""Filesystem and Git operations independent of the terminal host."""
+from __future__ import annotations
+
+import os
+from pathlib import Path
+import shlex
+import shutil
+import stat
+import subprocess
+from collections import deque
+from dataclasses import dataclass, field
+
+PREVIEW_BYTES = 256 * 1024
+MAX_FILES = 50000
+SKIP_DIRS = {".git", ".hg", ".svn", "node_modules", ".venv", "venv", "__pycache__"}
+VCS_DIRS = {".git", ".hg", ".svn"}
+
+
+def breadth_first_walk(root, onerror):
+    # Large ignored caches must not consume the budget before sibling source
+    # folders are even visited. Never follow directory symlinks.
+    pending = deque([root])
+    while pending:
+        directory = pending.popleft()
+        dirs, names = [], []
+        try:
+            with os.scandir(directory) as entries:
+                for entry in entries:
+                    if entry.name in VCS_DIRS:
+                        continue
+                    if entry.is_dir():
+                        if not entry.is_symlink():
+                            dirs.append(entry.name)
+                    else:
+                        names.append(entry.name)
+        except OSError as error:
+            onerror(error)
+            continue
+        dirs.sort()
+        names.sort()
+        yield directory, dirs, names
+        pending.extend(directory / name for name in dirs)
+
+
+def git(root: Path, *args: str) -> subprocess.CompletedProcess:
+    return subprocess.run(
+        ["git", "--literal-pathspecs", "-C", str(root), *args],
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=15,
+    )
+
+
+def parse_status(data: bytes) -> dict[str, str]:
+    result = {}
+    records = iter(data.split(b"\0"))
+    for record in records:
+        if len(record) < 4:
+            continue
+        status = record[:2].decode("ascii", "replace")
+        result[os.fsdecode(record[3:])] = status
+        if "R" in status or "C" in status:
+            next(records, None)  # -z reports destination before the original path.
+    return result
+
+
+@dataclass
+class Index:
+    root: Path
+    files: list[str]
+    status: dict[str, str]
+    repository: Path | None
+    note: str = ""
+    directories: list[str] = field(default_factory=list)
+
+
+def scan(root: Path, include_ignored: bool = False) -> Index:
+    root = root.resolve(strict=True)
+    if not root.is_dir():
+        raise ValueError(f"Not a directory: {root}")
+    repository = None
+    status = {}
+    notes = []
+    directories = set()
+    files = set()
+    try:
+        probe = git(root, "rev-parse", "--show-toplevel")
+        if probe.returncode == 0:
+            repository = Path(os.fsdecode(probe.stdout).rstrip("\n"))
+    except FileNotFoundError:
+        notes.append("Git unavailable; using filesystem listing")
+    if repository:
+        listing = git(root, "ls-files", "--cached", "--others", "--exclude-standard", "-z", "--", ".")
+        if listing.returncode:
+            raise RuntimeError(listing.stderr.decode(errors="replace"))
+        files = {os.fsdecode(name) for name in listing.stdout.split(b"\0") if name}
+        changes = git(repository, "status", "--porcelain=v1", "-z", "--untracked-files=all", "--", str(root))
+        if changes.returncode:
+            raise RuntimeError(changes.stderr.decode(errors="replace"))
+        for name, code in parse_status(changes.stdout).items():
+            try:
+                relative = (repository / name).relative_to(root).as_posix()
+            except ValueError:
+                continue
+            status[relative] = code
+            files.add(relative)
+    if not repository or include_ignored:
+        def walk_error(error):
+            notes.append(str(error))
+        excluded = VCS_DIRS if include_ignored else SKIP_DIRS
+        walk = breadth_first_walk(root, walk_error) if include_ignored else os.walk(root, followlinks=False, onerror=walk_error)
+        for directory, dirs, names in walk:
+            dirs[:] = sorted(d for d in dirs if d not in excluded and not (Path(directory) / d).is_symlink())
+            if include_ignored:
+                for name in dirs:
+                    if len(files) + len(directories) >= MAX_FILES:
+                        break
+                    relative = (Path(directory) / name).relative_to(root).as_posix()
+                    directories.add(relative)
+                    # Git may list nested repositories as directory entries.
+                    files.discard(relative)
+                    files.discard(relative + "/")
+            for name in names:
+                if name in VCS_DIRS:
+                    continue  # Worktrees can have a .git file instead of a directory.
+                if len(files) + len(directories) >= MAX_FILES:
+                    break
+                files.add((Path(directory) / name).relative_to(root).as_posix())
+            if len(files) + len(directories) >= MAX_FILES:
+                break
+    names = sorted(files, key=lambda name: (name.casefold(), name))
+    if len(names) + len(directories) >= MAX_FILES:
+        notes.append(f"Listing limited to {MAX_FILES:,} entries; change root to a subfolder to see more")
+    return Index(root, names[:MAX_FILES], status, repository, "; ".join(notes), sorted(directories))
+
+
+def search(files: list[str], query: str) -> list[str]:
+    """Rank filename matches ahead of path matches; allow subsequence searches."""
+    needle = query.casefold().strip()
+    if not needle:
+        return files
+    ranked = []
+    for name in files:
+        path = name.casefold()
+        base = path.rsplit("/", 1)[-1]
+        if needle == base:
+            score = 0
+        elif base.startswith(needle):
+            score = 1
+        elif needle in base:
+            score = 2
+        elif needle in path:
+            score = 3
+        else:
+            letters = iter(path if "/" in needle else base)
+            if not all(char in letters for char in needle):
+                continue
+            score = 4
+        ranked.append((score, len(name), path, name))
+    return [row[-1] for row in sorted(ranked)]
+
+
+@dataclass(frozen=True)
+class Row:
+    path: str
+    directory: bool = False
+    depth: int = 0
+
+
+def rows(files: list[str], expanded: set[str], query: str = "", directories=()) -> list[Row]:
+    if query:
+        return [Row(name) for name in search(files, query)]
+    children: dict[str, dict[str, bool]] = {"": {}}
+    for name, is_directory in [(name, False) for name in files] + [(name, True) for name in directories]:
+        parts = name.split("/")
+        for i in range(len(parts)):
+            parent = "/".join(parts[:i])
+            path = "/".join(parts[:i + 1])
+            siblings = children.setdefault(parent, {})
+            siblings[path] = siblings.get(path, False) or is_directory or i < len(parts) - 1
+    result = []
+    def visit(parent: str, depth: int):
+        for name, directory in sorted(children.get(parent, {}).items(), key=lambda item: (not item[1], item[0].casefold())):
+            result.append(Row(name, directory, depth))
+            if directory and name in expanded:
+                visit(name, depth + 1)
+    visit("", 0)
+    return result
+
+
+def checked_path(root: Path, name: str) -> Path:
+    path = root / name
+    if Path(name).is_absolute() or ".." in Path(name).parts:
+        raise ValueError("File must be inside the project directory")
+    if not path.resolve().is_relative_to(root.resolve()):
+        raise ValueError("Symlink points outside the project directory")
+    return path
+
+
+def read_text(root: Path, name: str) -> tuple[str, bool]:
+    path = checked_path(root, name)
+    # O_NONBLOCK prevents a replaced file/FIFO from hanging the UI.
+    fd = os.open(path, os.O_RDONLY | os.O_NONBLOCK)
+    with os.fdopen(fd, "rb") as stream:
+        if not stat.S_ISREG(os.fstat(stream.fileno()).st_mode):
+            raise ValueError("Only regular files can be previewed")
+        data = stream.read(PREVIEW_BYTES + 1)
+    if b"\0" in data:
+        raise ValueError("Binary file; use an external application to open it")
+    return data[:PREVIEW_BYTES].decode("utf-8", "replace"), len(data) > PREVIEW_BYTES
+
+
+def preview(index: Index, name: str) -> str:
+    text, truncated = read_text(index.root, name)
+    return text + ("\n[Preview truncated at 256 KiB]" if truncated else "")
+
+
+def editor_command(configured: str, path: Path) -> list[str]:
+    if configured:
+        command = shlex.split(configured)
+        if not command or not shutil.which(command[0]):
+            raise ValueError("Configured editor was not found on PATH")
+    else:
+        command = next(([name] for name in ("nvim", "vim", "vi") if shutil.which(name)), [])
+        if not command:
+            raise ValueError("Set VISUAL or EDITOR to an installed editor")
+    return [*command, str(path.absolute())]
