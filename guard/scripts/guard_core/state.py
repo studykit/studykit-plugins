@@ -1,6 +1,6 @@
 """The per-session state file, ``state/<sid>.json``.
 
-Holds the agent modes as of this session, the plan gate state, the files this
+Holds the plan gate state and the files this
 session has edited since the last file-audit checkpoint
 (``edited_prompt_id`` / ``edited_files`` / ``edited_agent_docs`` / ``edited_refs`` /
 ``edited_docs``), their per-path source evidence (``edited_provenance``),
@@ -22,14 +22,12 @@ import json
 from pathlib import Path
 from typing import Any
 
-from .config import AUDIT_PLAN_KEY, _agent_mode, _audit_on
+from .config import AUDIT_PLAN_KEY, _audit_on
 from .paths import _now_iso, _state_file
-from .agents import SETTABLE_AGENTS
 
 
 def _read_state(project_dir: Path, session_id: str, config: dict[str, Any]) -> dict[str, Any]:
     default = {
-        **{key: str(_agent_mode(config, key)) for key in SETTABLE_AGENTS},
         # The last file-checkpoint snapshot. The token is the hash printed to the checkpoint
         # skill; the paths and hashes let completion remove only revisions that were actually
         # reviewed. A file edited while reviews are running stays pending.
@@ -52,11 +50,8 @@ def _read_state(project_dir: Path, session_id: str, config: dict[str, Any]) -> d
         "transcript_path": "",
         # Files written since the last checkpoint, accumulated by PostToolUse and read by the
         # explicit `audit-files` entry. `edited_prompt_id` is diagnostic only: it records the
-        # most recent turn that added an edit and never scopes the queue. Four lists — the split is by
-        # which agent can judge the file (source code for `comment-corrector`, instruction
-        # files for `agents-md-auditor`, saved references for `ext-docs-auditor`, ordinary
-        # documents for `doc-auditor`), while "which turn was this" is the same question for
-        # all of them and a second marker could only drift from the first.
+        # most recent turn that added an edit and never scopes the queue. The four lists
+        # preserve existing queue storage; rules, not buckets, choose the reviewer.
         "edited_prompt_id": "",
         "edited_files": [],
         "edited_agent_docs": [],
@@ -98,7 +93,7 @@ def _read_state(project_dir: Path, session_id: str, config: dict[str, Any]) -> d
         return default
     if not isinstance(data, dict):
         return default
-    keys = (*SETTABLE_AGENTS, "last_audited_prompt_id", "last_audited_fingerprint",
+    keys = ("last_audited_prompt_id", "last_audited_fingerprint",
             "pending_verify_prompt_id", "file_checkpoints",
             "transcript_path", "plan_audit_paused", "plan_audited_hash",
             "edited_prompt_id", "edited_files",

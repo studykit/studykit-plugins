@@ -3,9 +3,8 @@
 Sweeps state files, ``trace.log``, and turns/ and extracts/ dirs older than retention;
 exports ``GUARD_PROJECT_DIR`` and ``GUARD_REFS_DIR`` via ``$CLAUDE_ENV_FILE`` (append-once,
 since this event also fires on every compaction); and states as session context the refs rule
-always, and the turn closeout's path when any agent is on. Each is said ONCE here rather
-than in every Stop, which is the
-whole reason this hook prints anything.
+always, plus explicit review entry points when their configuration is present.
+This context is stated once at session start rather than repeated at every Stop.
 
 There is deliberately no line naming ``docs-finder``. That agent has no switch to
 announce and nothing here forbids the session's own fetching; it is selected the way any agent
@@ -24,14 +23,13 @@ from pathlib import Path
 
 from .config import (
     AUDIT_PLAN_KEY, CLEAR_INHERIT_MAX_AGE_SECONDS,
-    ORPHAN_MAX_AGE_SECONDS, _HOST_IS_CODEX, _audit_on, _load_config, _switch_on
+    ORPHAN_MAX_AGE_SECONDS, _HOST_IS_CODEX, _audit_on, _load_config, _file_review_rules
 )
 from .paths import (
     _clear_handoff_file, _project_dir, _refs_dir, _state_root, _trace, _trace_file
 )
 from .payload import _read_payload, _session_id
 from .state import _plan_audit_paused, _read_state, _write_state
-from .agents import SETTABLE_AGENTS
 from .dispatch import CLI_REL, _plugin_root
 from .emit import _emit_session_start
 
@@ -434,7 +432,7 @@ def cmd_session_start() -> int:
     # Explicit-only skills are not offered through model-trigger descriptions. Name the
     # available entry points once at session start when their configuration is present.
     prefix = "$guard:" if _HOST_IS_CODEX else "/guard:"
-    if any(_switch_on(session_cfg, k) for k in SETTABLE_AGENTS):
+    if _file_review_rules(session_cfg):
         context.append(
             f"guard: the user can run `{prefix}audit-files` to review pending edited files. "
             "File reviews are explicit; do not start them automatically."

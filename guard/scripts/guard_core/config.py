@@ -12,7 +12,6 @@ import os
 import re
 
 from pathlib import Path
-from enum import StrEnum
 from typing import Any, NamedTuple
 
 
@@ -59,13 +58,6 @@ ORPHAN_MAX_AGE_SECONDS = 7 * 24 * 60 * 60
 CLEAR_INHERIT_MAX_AGE_SECONDS = 5 * 60
 
 
-class AgentMode(StrEnum):
-    """Whether a file-review action is enabled; legacy ``fresh`` means ``on``."""
-
-    OFF = "off"
-    ON = "on"
-
-
 # The words that mean armed and muted, for BOTH ways a two-valued switch is written: the
 # `audit-plan` value in guard.local.json and the argument to the `guard` /
 # `guard-plan` shell commands. One vocabulary, because a word the config file accepts and the
@@ -104,29 +96,11 @@ RETIRED_KEYS: dict[str, str] = {
 }
 
 
-# Spellings accepted for a mode, beyond the member values themselves. `fresh` heads the list
-# because it is not a convenience: it is the value v0.115.0 and earlier WROTE into
-# guard.local.json, so every config file already on disk says it. Drop it and those projects
-# read as `off` — an agent switched on a year ago silently stops being recommended, which is
-# the one failure shape this plugin must not have. It is an alias rather than a member so that
-# nothing writes or prints it again.
-#
-# `keep` and `resume` used to alias the removed REUSE mode. They are NOT re-pointed at
-# ON: a user who types one is asking for the thing that no longer exists, and silently
-# giving them a fresh instance per turn would answer a different question. `_parse_mode`
-# returns None and the CLI says the value is not a mode, which is the honest reply.
-_MODE_ALIASES = {
-    "fresh": AgentMode.ON,
-    "true": AgentMode.ON, "yes": AgentMode.ON, "1": AgentMode.ON, "new": AgentMode.ON,
-    "false": AgentMode.OFF, "no": AgentMode.OFF, "0": AgentMode.OFF,
-}
-
-
 DEFAULT_CONFIG: dict[str, Any] = {
     # Only the Claude post-approval gate can start a review automatically.
     AUDIT_PLAN_KEY: "on",
     # WHO reviews a held plan, as one `{"kind": "agent"|"skill", "name": "..."}` action —
-    # the same shape `doc_review_rules` uses per glob, without the glob, because there is
+    # the same shape `file_review_rules` uses per glob, without the glob, because there is
     # exactly one plan under review at a time.
     #
     # Empty means no plan review. An invalid non-empty object blocks rather than
@@ -134,30 +108,15 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "plan_review": {},
     "turn_review": {},
     "answer_review": {},
-    "comment-corrector": AgentMode.OFF,
-    # The `AGENTS.md` / `CLAUDE.md` files THIS TURN edited, judged as instruction files:
-    # a map pointing at the deeper docs, plus what a model gets wrong here — never the
-    # implementation detail, the spec, or the thing every model already knows. Reports
-    # only. Turning it on costs nothing on the many turns that touch no such file, since
-    # eligibility needs one this turn actually wrote.
-    # All project Markdown eligible for rule-based review, including AGENTS.md and CLAUDE.md.
-    "doc-auditor": AgentMode.OFF,
-    # Per-pattern document-review actions. The most specific matching rule owns a document;
-    # declaration order breaks a specificity tie. Unmatched documents are not reviewed.
-    "doc_review_rules": [],
+    # A matching rule is the only opt-in for an explicit file checkpoint.
+    "file_review_rules": [],
+    "files_exclude": [],
     # Which directories hold those documents, relative to the project dir. Empty (the
     # default) means the whole project — a project that turned the audit on meant its
     # documents, and guard picking a subset from directory names would be guessing at a
     # repository it has never read. Set it where the non-document markdown outnumbers the
     # documents.
     "doc_dir": [],
-    # Directories or project-relative globs whose markdown is NOT audited. This is the
-    # half that gets used: a repository keeps scratch, vendored and generated markdown, and
-    # a project that already checks some corner of its docs another way must be able to say
-    # so — two audits faulting one file for opposite reasons is worse than neither running.
-    # Unlike `doc_dir`, exclusions cover every Markdown review bucket, including agent
-    # instructions and references.
-    "doc_exclude": [],
     # Where this project writes down what its DEPLOYED system looks like — topology,
     # environments, runbooks. Exposed to audit inputs and user-supplied reviewers;
     # guard never writes here. Empty means the project has none.
@@ -188,8 +147,8 @@ DEFAULT_CONFIG: dict[str, Any] = {
 _ACTION_NAME_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9:_-]*")
 
 
-class DocReviewRule(NamedTuple):
-    """One project-relative document glob and its agent or skill action."""
+class FileReviewRule(NamedTuple):
+    """One project-relative file glob and its agent or skill action."""
 
     glob: str
     kind: str
@@ -199,7 +158,7 @@ class DocReviewRule(NamedTuple):
 class ReviewAction(NamedTuple):
     """An agent or skill a review is handed to, with no path condition in front of it.
 
-    Deliberately not a base class `DocReviewRule` inherits: the two share a validator
+    Deliberately not a base class `FileReviewRule` inherits: the two share a validator
     (``_review_action_name``) and nothing else. A document action is selected by matching a
     glob and is one of many; this one is the whole answer to "who reviews the plan".
     """
@@ -209,7 +168,7 @@ class ReviewAction(NamedTuple):
 
 
 def _review_action_name(value: Any) -> str | None:
-    """Return a configured document-review action name, if it is safe to inject."""
+    """Return a configured review action name, if it is safe to inject."""
 
     if not isinstance(value, str):
         return None
@@ -254,13 +213,13 @@ def _single_review_action(raw: Any, dispatcher: str) -> tuple[ReviewAction | Non
     return ReviewAction(kind, name), True
 
 
-def _doc_review_rules(cfg: dict[str, Any]) -> tuple[DocReviewRule, ...]:
-    """Return only valid per-document agent or skill rules, in declared order."""
+def _file_review_rules(cfg: dict[str, Any]) -> tuple[FileReviewRule, ...]:
+    """Return only valid per-file agent or skill rules, in declared order."""
 
-    raw_rules = cfg.get("doc_review_rules", [])
+    raw_rules = cfg.get("file_review_rules", [])
     if not isinstance(raw_rules, list):
         return ()
-    rules: list[DocReviewRule] = []
+    rules: list[FileReviewRule] = []
     for raw_rule in raw_rules:
         if not isinstance(raw_rule, dict):
             continue
@@ -275,11 +234,13 @@ def _doc_review_rules(cfg: dict[str, Any]) -> tuple[DocReviewRule, ...]:
         kind = action.get("kind")
         name = _review_action_name(action.get("name"))
         if kind in ("agent", "skill") and name is not None:
-            rules.append(DocReviewRule(pattern, kind, name))
+            if kind == "skill" and name in {"guard:audit-files", "audit-files"}:
+                continue
+            rules.append(FileReviewRule(pattern, kind, name))
     return tuple(rules)
 
 
-def _doc_review_rule(path: str, rules: tuple[DocReviewRule, ...]) -> DocReviewRule | None:
+def _file_review_rule(path: str, rules: tuple[FileReviewRule, ...]) -> FileReviewRule | None:
     """Return the most-specific configured rule whose glob matches ``path``.
 
     ``*`` stays within one directory, while ``**`` may cross directories. Paths are already
@@ -299,7 +260,7 @@ def _doc_review_rule(path: str, rules: tuple[DocReviewRule, ...]) -> DocReviewRu
     """
 
     normalized = path.replace("\\", "/")
-    matches: list[tuple[tuple[int, int, int, int, int, int, int], DocReviewRule]] = []
+    matches: list[tuple[tuple[int, int, int, int, int, int, int], FileReviewRule]] = []
     for rule_index, rule in enumerate(rules):
         pattern = rule.glob.replace("\\", "/")
         if _doc_glob_regex(pattern).fullmatch(normalized):
@@ -360,6 +321,24 @@ def _doc_glob_matches(path: str, pattern: str) -> bool:
         path.replace("\\", "/")) is not None
 
 
+def _file_excluded(path: str, patterns: Any) -> bool:
+    """Apply ordered exclusion globs; ! restores a file and the last match wins."""
+    if isinstance(patterns, str):
+        patterns = [patterns]
+    if not isinstance(patterns, list):
+        return False
+    excluded = False
+    for pattern in patterns:
+        if not isinstance(pattern, str) or not (pattern := pattern.strip()):
+            continue
+        restore = pattern.startswith("!")
+        if restore or pattern.startswith("\\!"):
+            pattern = pattern[1:]
+        if pattern and _doc_glob_matches(path, pattern):
+            excluded = not restore
+    return excluded
+
+
 def _trace_enabled() -> bool:
     return os.environ.get(TRACE_ENV_VAR, "").strip().lower() in TRACE_TRUTHY
 
@@ -388,8 +367,8 @@ def _load_config(project_dir: Path) -> dict[str, Any]:
     """Load the JSON config at guard.local.json, if present. Fail-open to defaults.
 
     Only keys present in DEFAULT_CONFIG are honored, and only when the supplied value
-    matches the default's JSON type — a str for the agent modes and ``refs_dir``, a list for
-    document-review rules,
+    matches the default's JSON type — a str for ``refs_dir``, a list for
+    file-review rules,
     (or a bare str) for ``knowledge_dir`` — so a malformed value can never change a setting
     by accident.
     """
@@ -404,11 +383,6 @@ def _load_config(project_dir: Path) -> dict[str, Any]:
     if not isinstance(data, dict):
         return config
     for key, default in DEFAULT_CONFIG.items():
-        # An ``AgentMode`` default round-trips through JSON as a plain str, and
-        # ``isinstance("on", AgentMode)`` is False — so the accepted type has to be
-        # widened for those keys or every mode in the file is silently dropped and only
-        # the session state is ever honored. The accessor (``_agent_mode``) validates the
-        # value; this only checks the shape.
         want: type | tuple[type, ...]
         if key in AUDIT_SWITCHES:
             # `"off"` and `false` are the same instruction written two ways, and a two-valued
@@ -416,8 +390,6 @@ def _load_config(project_dir: Path) -> dict[str, Any]:
             # one of the two spellings would silently ignore an intention that is not
             # ambiguous; `_audit_on` reads both.
             want = (str, bool)
-        elif isinstance(default, StrEnum):
-            want = str
         elif isinstance(default, list):
             # A list default accepts a bare string too — `knowledge_dir` takes one
             # directory written plainly. The resolver normalizes; this only checks shape.
@@ -454,49 +426,6 @@ def _write_config(project_dir: Path, data: dict[str, Any]) -> bool:
         return True
     except OSError:
         return False
-
-
-def _parse_mode(value: str) -> AgentMode | None:
-    """Parse a CLI mode word; None when the spelling is not recognized (the caller
-    reports the error rather than guessing, since guessing here could silently turn an
-    agent off or leave a stale instance in charge)."""
-    v = value.strip().lower()
-    if v in _MODE_ALIASES:
-        return _MODE_ALIASES[v]
-    try:
-        return AgentMode(v)
-    except ValueError:
-        return None
-
-
-def _agent_mode(cfg: dict[str, Any], key: str) -> AgentMode:
-    """One agent's mode from a config or session-state dict, coerced to a valid member.
-
-    Anything unrecognized lands on the default rather than raising: a hand-edited config
-    must not be able to break the hook, and the ``settings`` CLI is where a bad value
-    gets rejected out loud. A stringy value that is not a mode word therefore reads as
-    ``off`` — the safe direction, since the alternative is guard acting on a setting the
-    user did not write.
-
-    It reads through ``_parse_mode``, so the aliases apply HERE and not only at the CLI. That
-    is what makes a config file written before v0.116.0 — every one of which spells the on
-    mode ``fresh`` — keep working: the hooks read this function, never the CLI, so an alias
-    the CLI alone honoured would leave those projects silently unaudited.
-    """
-    # A key with no default is an agent with no switch (`AuditAgent.fixed_mode`). Callers
-    # are meant to consult the roster for those, so reaching here is a bug — but it must not
-    # be a crash: this runs inside hooks, and an exception here took `settings show` down to
-    # silent-and-exit-0 once, which is the shape guard must never fail into.
-    default = DEFAULT_CONFIG.get(key, AgentMode.OFF)
-    parsed = _parse_mode(str(cfg.get(key, default)))
-    if parsed is not None:
-        return parsed
-    return _parse_mode(str(default)) or AgentMode.OFF
-
-
-def _switch_on(cfg: dict[str, Any], key: str) -> bool:
-    """Whether this agent may be recommended at all."""
-    return _agent_mode(cfg, key) is not AgentMode.OFF
 
 
 def _parse_switch(value: str) -> bool | None:

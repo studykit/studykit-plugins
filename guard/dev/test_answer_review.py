@@ -132,8 +132,10 @@ class AnswerReviewTests(unittest.TestCase):
         source.write_text("# Comment\n")
         for host in ("claude", "codex"):
             self.config(host, {}, **{"doc-auditor": "on", "comment-corrector": "on",
-                "doc_review_rules": [{"glob": "*.md", "action": {
-                    "kind": "skill", "name": "my-doc-review"}}]})
+                "file_review_rules": [{"glob": "*.md", "action": {
+                    "kind": "skill", "name": "my-doc-review"}},
+                    {"glob": "**/*.py", "action": {
+                        "kind": "agent", "name": "my-source-review"}}]})
             path = self.project / f".{host}/guard/state/session.json"
             path.parent.mkdir(parents=True)
             path.write_text(json.dumps({**{key: "on" for key in RETIRED},
@@ -144,8 +146,7 @@ class AnswerReviewTests(unittest.TestCase):
                                         "--session", "session", "--host", host).stdout)
             self.assertIn("my-doc-review", [group["name"] for group in result["groups"]])
             self.assertIn(str(document), result["files"])
-            if host == "claude":
-                self.assertIn("guard:comment-corrector", [g["name"] for g in result["groups"]])
+            self.assertIn("my-source-review", [g["name"] for g in result["groups"]])
             state = json.loads(path.read_text())
             self.assertFalse(any(key in state for key in RETIRED))
             self.assertEqual(state["plan_audited_hash"], "preserve-plan")

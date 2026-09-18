@@ -10,9 +10,11 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from .config import AgentMode, _agent_mode, _doc_review_rule, _doc_review_rules, _load_config
+from .config import (FileReviewRule, _file_review_rule, _file_review_rules,
+                     _load_config, _file_excluded)
 from .herdr import report_pending
-from .paths import _cli_project_dir, _project_rel
+from .paths import _cli_project_dir, _project_rel, _doc_scope, _refs_dir, _state_root
+from .agents import _edited_bucket
 from .state import _edit_source, _edited_files, _read_state, _write_state
 
 
@@ -107,38 +109,37 @@ def _retain_paths(state: dict[str, Any], retained: set[str]) -> None:
         }
 
 
+def review_rule(project_dir: Path, target: Path, config: dict[str, Any]) -> FileReviewRule | None:
+    """Apply the same path policy when recording and dispatching a file."""
+    project = project_dir.resolve()
+    target = target.resolve()
+    if (project not in target.parents or _state_root(project_dir).resolve() in target.parents
+            or not target.is_file()):
+        return None
+    relative = _project_rel(project_dir, target)
+    if _file_excluded(relative, config.get("files_exclude", [])):
+        return None
+    if _edited_bucket(target, _refs_dir(project_dir, config).resolve(),
+                      _doc_scope(project_dir, config)) is None:
+        return None
+    return _file_review_rule(relative, _file_review_rules(config))
+
+
 def _plan(project_dir: Path, state: dict[str, Any], host: str,
           snapshot: dict[str, dict[str, str]]) -> list[dict[str, Any]]:
     config = _load_config(project_dir)
     groups: dict[tuple[str, str, bool], list[str]] = {}
-
-    source_paths = [path for path, item in snapshot.items()
-                    if item["bucket"] == "edited_files"]
-    if (host == "claude" and source_paths
-            and _agent_mode(state, "comment-corrector") != AgentMode.OFF):
-        for path in source_paths:
-            conditional = _edit_source(state, path) != "native"
-            groups.setdefault(("agent", "guard:comment-corrector", conditional), []).append(path)
-
-    if _agent_mode(state, "doc-auditor") != AgentMode.OFF:
-        rules = _doc_review_rules(config)
-        for path, item in snapshot.items():
-            if item["bucket"] == "edited_files":
-                continue
-            rule = _doc_review_rule(_project_rel(project_dir, Path(path)), rules)
-            if rule is None:
-                continue
-            kind, name = rule.kind, rule.name
-            # v0.143.0 and earlier offered this wrapper as a built-in action. The checkpoint
-            # now supplies its path-only dispatch contract directly, so preserve existing
-            # project rules as an alias while no longer shipping or advertising the skill.
-            if (kind, name) == ("skill", "guard:audit-docs"):
-                kind, name = "agent", "guard:doc-auditor"
-            if host == "codex" and kind == "agent":
-                name = _CODEX_AGENTS.get(name, name)
-            conditional = _edit_source(state, path) != "native"
-            groups.setdefault((kind, name, conditional), []).append(path)
-
+    for path in snapshot:
+        rule = review_rule(project_dir, Path(path), config)
+        if rule is None:
+            continue
+        kind, name = rule.kind, rule.name
+        if (kind, name) == ("skill", "guard:audit-docs"):
+            kind, name = "agent", "guard:doc-auditor"
+        if host == "codex" and kind == "agent":
+            name = _CODEX_AGENTS.get(name, name)
+        conditional = _edit_source(state, path) != "native"
+        groups.setdefault((kind, name, conditional), []).append(path)
     return [
         {"kind": kind, "name": name, "conditional": conditional, "paths": paths}
         for (kind, name, conditional), paths in groups.items()

@@ -9,7 +9,7 @@ Imports run one way only, and a cycle here is a design error rather than a techn
     config -> paths -> turnrec / payload / emit -> transcript
                     -> agents -> state -> dispatch -> cmd_* -> guard_hook
 
-- ``config``     the host split, ``AgentMode``, the config schema and its file I/O
+- ``config``     the host split, the config schema and its file I/O
 - ``paths``      project root resolution, the state tree's paths, the debug trace
 - ``turnrec``    the answer file and the request file beside it
 - ``payload``    hook payload on stdin, and the session id in it

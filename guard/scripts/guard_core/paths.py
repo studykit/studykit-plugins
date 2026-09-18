@@ -186,61 +186,12 @@ def _knowledge_dirs(project_dir: Path, config: dict[str, Any] | None = None) -> 
 
 
 def _doc_scope(project_dir: Path, config: dict[str, Any] | None = None) -> DocScope:
-    """Which directories `doc-auditor` audits, and which paths are subtracted.
-
-    Project-relative and confined to the project, unlike ``knowledge_dir``: this names the
-    repository's own documents, and a path outside it could never be recorded anyway —
-    ``cmd_edit`` drops a target that is not under the project before it asks.
-
-    Not ``_safe_project_subdir``, though, and the difference is worth stating. That guards a
-    key guard WRITES through, where a value pointing at guard's own state is a way to disarm
-    it. Nothing is derived from these two but a read-only audit's file list, so the rule here
-    is only containment, and the project root itself is a legal value — it is what an empty
-    ``doc_dir`` already means.
-
-    A path that does not exist is dropped, and dropped SILENTLY: this runs on every edit, and
-    a warning nothing is built to read is a warning nobody gets. The ``settings`` CLI is where
-    a typo is reported.
-    """
-    def resolve(key: str) -> tuple[Path, ...]:
-        out: list[Path] = []
-        for _, resolved in _doc_dir_entries(project_dir, key, config):
-            if resolved is not None and resolved not in out:
-                out.append(resolved)
-        return tuple(out)
-
-    excluded_dirs: list[Path] = []
-    excluded_globs: list[str] = []
-    for _, value in _doc_exclude_entries(project_dir, config):
-        if isinstance(value, Path) and value not in excluded_dirs:
-            excluded_dirs.append(value)
-        elif isinstance(value, str) and value not in excluded_globs:
-            excluded_globs.append(value)
-    return DocScope(include=resolve("doc_dir"), exclude=tuple(excluded_dirs),
-                    exclude_globs=tuple(excluded_globs), project_dir=project_dir.resolve())
-
-
-def _doc_exclude_entries(project_dir: Path, config: dict[str, Any] | None = None
-                         ) -> list[tuple[str, Path | str | None]]:
-    """Configured exclusions resolved as directories or validated project-relative globs."""
-    raw = (config or {}).get("doc_exclude", [])
-    if isinstance(raw, str):
-        raw = [raw]
-    if not isinstance(raw, list):
-        return []
-    out: list[tuple[str, Path | str | None]] = []
-    for entry in raw:
-        if not isinstance(entry, str) or not entry.strip():
-            continue
-        text = entry.strip().replace("\\", "/")
-        if "*" in text or "?" in text:
-            parts = text.split("/")
-            valid = not text.startswith("/") and ".." not in parts and "." not in parts
-            out.append((text, text if valid else None))
-            continue
-        resolved = _doc_dir_entries(project_dir, "doc_exclude", {"doc_exclude": [text]})
-        out.append(resolved[0] if resolved else (text, None))
-    return out
+    """Resolve ordinary Markdown inclusion directories inside the project."""
+    included: list[Path] = []
+    for _, resolved in _doc_dir_entries(project_dir, "doc_dir", config):
+        if resolved is not None and resolved not in included:
+            included.append(resolved)
+    return DocScope(include=tuple(included))
 
 
 def _doc_dir_entries(project_dir: Path, key: str, config: dict[str, Any] | None = None

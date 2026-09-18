@@ -21,8 +21,8 @@ Keep host payloads, environment variables and output shapes at adapter boundarie
   evidence in a deliverable that someone will read outside the conversation.
 - An audit reports findings in the conversation. It does not create a findings document or
   authorize implementation. Only `answer` produces the requested answer document.
-- File checkpoints follow their switches and review rules. The former claims, deferrals,
-  and clarity switches are retired; none of the explicit reviewer settings depend on them.
+- File checkpoints select reviewers only through glob rules; there are no per-agent switches.
+  The former claims, deferrals, and clarity switches are retired; none of the explicit reviewer settings depend on them.
 - The refs-index gate and refusal of searches rooted at `/` ignore audit switches: they are
   prohibitions, not optional review opinions.
 
@@ -56,7 +56,7 @@ Keep host payloads, environment variables and output shapes at adapter boundarie
 Do not restore automatic Stop auditing, a model call inside a hook, lexical reviewer
 selection, or a child `claude -p` router. Do not restore the retired `audit_gate`, turn mute,
 `reuse` mode, `reuse_agents`, or `exempt_skills`. The design notes retain the reasoning.
-The `fresh` mode spelling remains a supported alias for `on`; `keep` and `resume` do not.
+File-review mode aliases are retired along with their switches.
 
 The removed write-refusal hook was deliberately removed, not abandoned because it failed.
 Read its rationale before adding enforcement around reviewer writes. Agent memory can widen

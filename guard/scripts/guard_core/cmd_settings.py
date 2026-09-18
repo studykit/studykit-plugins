@@ -1,23 +1,7 @@
-"""``settings`` and ``refs-dir`` — the CLI verbs, not hook events.
+"""Validated project configuration and the refs-dir query.
 
-``settings`` is run by the ``guard:settings`` skill via Bash, in-session. ``show`` prints the
-current settings; ``set <key> <value>`` changes one of the per-agent settings — each named
-after the agent it controls, valued ``off``/``on`` (``fresh``, what pre-v0.116.0 wrote, is
-still accepted and rewritten as ``on``) — the audit
-switch (``audit-plan``, ``on``/``off``), ``refs_dir``, ``knowledge_dir``,
-``doc_review_rules``, and the three reviewer settings (the directory lists are comma-separated,
-``doc_review_rules`` is a JSON list and each reviewer a JSON object, replacing the
-whole value); ``unset <key>`` removes a key from the file
-entirely, back to its default. The
-agent settings and the audit switches also apply to the live session's ``state/<sid>.json``
-when a session id is
-available (``--session``, which the skill passes as ``${CLAUDE_SESSION_ID}``, else the
-inherited ``CLAUDE_CODE_SESSION_ID``); the rest are read from the config file at use. Every
-other key is preserved. Mutating verbs require the settings-skill marker — see
-``config._cli_write_allowed``.
-
-``refs-dir`` prints the resolved refs directory, absolute, applying the ``refs_dir``
-validation. Called via Bash by an audit agent's fallback and by the output style.
+File rules are read at each checkpoint; only the automatic plan gate has a session switch.
+Mutating verbs require the user-invoked configuration marker.
 """
 
 from __future__ import annotations
@@ -30,14 +14,12 @@ from pathlib import Path
 from typing import Any
 
 from .config import (
-    AUDIT_PLAN_KEY, AUDIT_SWITCHES, RETIRED_KEYS, AgentMode, DEFAULT_CONFIG, _HOST_IS_CODEX,
-    _agent_mode,
-    _audit_on, _cli_write_allowed, _doc_review_rules, _load_config, _load_raw_config,
-    _parse_mode, _parse_switch, _plan_review_action, _turn_review_action, _answer_review_action, _write_config
+    AUDIT_PLAN_KEY, AUDIT_SWITCHES, RETIRED_KEYS, DEFAULT_CONFIG, _HOST_IS_CODEX,
+    _audit_on, _cli_write_allowed, _file_review_rules, _load_config, _load_raw_config,
+    _parse_switch, _plan_review_action, _turn_review_action, _answer_review_action, _write_config
 )
-from .paths import (_cli_project_dir, _doc_dir_entries, _doc_exclude_entries,
+from .paths import (_cli_project_dir, _doc_dir_entries,
                     _knowledge_dir_entries, _refs_dir, _trace)
-from .agents import SETTABLE_AGENTS
 from .state import _plan_audit_paused, _read_state, _write_state
 from .cmd_checkpoint import reconcile_queue
 from .herdr import report_pending
@@ -122,13 +104,6 @@ def _config_show_lines(project_dir: Path, session_id: str | None) -> list[str]:
     # report no session value at all.
     state = _read_state(project_dir, session_id, cfg) if session_id else None
 
-    def switch_line(key: str) -> str:
-        default = _agent_mode(cfg, key)
-        live = _agent_mode(state, key) if state is not None else default
-        if live != default:
-            return f"{key}: {live} (this session; default {default})"
-        return f"{key}: {default}"
-
     def audit_line(key: str) -> str:
         """One audit switch: the project's setting, and the live session's value when it
         differs. Both halves are needed and neither substitutes for the other — the setting is
@@ -173,11 +148,9 @@ def _config_show_lines(project_dir: Path, session_id: str | None) -> list[str]:
         means the whole project, and printing it the way an unset `knowledge_dir` prints would
         tell the reader the opposite of what it does.
         """
-        entries = (_doc_exclude_entries(project_dir, cfg) if key == "doc_exclude"
-                   else _doc_dir_entries(project_dir, key, cfg))
+        entries = _doc_dir_entries(project_dir, key, cfg)
         if not entries:
-            return f"{key}: " + ("(all of the project)" if key == "doc_dir"
-                                 else "(nothing excluded)")
+            return f"{key}: (all of the project)"
         line = f"{key}: " + ", ".join(text for text, _ in entries)
         missing = [text for text, resolved in entries if resolved is None]
         if missing:
@@ -185,16 +158,15 @@ def _config_show_lines(project_dir: Path, session_id: str | None) -> list[str]:
                     + ", ".join(missing) + "]"
         return line
 
-    def doc_review_rules_line() -> str:
-        raw_rules = raw.get("doc_review_rules")
-        rules = _doc_review_rules(cfg)
+    def file_review_rules_line() -> str:
+        raw_rules = raw.get("file_review_rules")
+        rules = _file_review_rules(cfg)
         if not raw_rules:
-            return "doc_review_rules: (none)"
+            return "file_review_rules: (none)"
         if not isinstance(raw_rules, list) or len(rules) != len(raw_rules):
-            return "doc_review_rules: (invalid entries ignored)"
-        return "doc_review_rules: " + ", ".join(
-            f"{rule.glob} -> {rule.kind}:{rule.name}"
-            for rule in rules)
+            return "file_review_rules: (invalid entries ignored)"
+        return "file_review_rules: " + ", ".join(
+            f"{rule.glob} -> {rule.kind}:{rule.name}" for rule in rules)
 
     def reviewer_line(key: str) -> str:
         raw_action = raw.get(key)
@@ -211,7 +183,8 @@ def _config_show_lines(project_dir: Path, session_id: str | None) -> list[str]:
         return f"{key}: {action.kind}:{action.name}"
 
     def built_in_review_actions_line() -> str:
-        return ("document review actions (built in): "
+        return ("file review actions (built in): "
+                "agent:guard:comment-corrector (Claude Code only), "
                 "agent:guard:doc-auditor, agent:guard:agents-md-auditor, "
                 "agent:guard:ext-docs-auditor")
 
@@ -246,12 +219,11 @@ def _config_show_lines(project_dir: Path, session_id: str | None) -> list[str]:
         reviewer_line("plan_review"),
         reviewer_line("turn_review"),
         reviewer_line("answer_review"),
-        *(switch_line(k) for k in SETTABLE_AGENTS),
         "refs_dir: " + (refs_rel if refs_rel else "(default wiki/ref/)"),
         knowledge_line(),
         doc_line("doc_dir"),
-        doc_line("doc_exclude"),
-        doc_review_rules_line(),
+        "files_exclude: " + json.dumps(cfg.get("files_exclude", [])),
+        file_review_rules_line(),
         built_in_review_actions_line(),
         *retired_lines(),
     ]
@@ -261,9 +233,7 @@ def _settings_unset(project_dir: Path, session_id: str | None,
                     positional: list[str]) -> int:
     """``settings unset <key>`` — delete one key from guard.local.json.
 
-    Deleting an agent switch is a change to what guard does, not just to the file, so it
-    goes through the same step a ``set`` does: the session's cached mode is reset to the
-    default. Deleting a key guard does not honor touches neither.
+    The plan switch also resets the live session; file rules are read at use.
     """
     if not positional:
         print("guard settings: usage: settings unset <key>", file=sys.stderr)
@@ -279,10 +249,7 @@ def _settings_unset(project_dir: Path, session_id: str | None,
         _trace(project_dir, session_id, "settings", "unset_absent", key=key)
         return 0
 
-    if key in SETTABLE_AGENTS:
-        after = AgentMode(DEFAULT_CONFIG[key])
-        _apply_session_scalar(project_dir, session_id, key, after.value)
-    elif key in AUDIT_SWITCHES:
+    if key in AUDIT_SWITCHES:
         # Same as a `set` to the default: removing the key changes what guard does now, not
         # only what the next session opens in, so the live session follows it back.
         on = _parse_switch(str(DEFAULT_CONFIG[key])) is True
@@ -296,7 +263,6 @@ def _settings_unset(project_dir: Path, session_id: str | None,
     _reconcile_session_queue(project_dir, session_id)
 
     known = key in DEFAULT_CONFIG
-    # `str()` first: an `AgentMode` default would otherwise print as `<AgentMode.OFF: 'off'>`.
     # A retired key gets its own sentence: "guard does not honor that key" is true of it and
     # useless, since the user is clearing a key that used to work and wants to know what
     # replaced it.
@@ -321,14 +287,8 @@ def cmd_settings() -> int:
         settings set <key> <value>           — change one setting
         settings unset <key>                 — delete one key from the file
 
-    Settable keys: the plan-gate switch (``AUDIT_SWITCHES``), the agent switches (the keys
-    of ``SETTABLE_AGENTS`` — each is the name of the agent it admits), ``refs_dir``,
-    ``knowledge_dir``, ``doc_review_rules``, ``plan_review``, ``turn_review`` and ``answer_review``. The
-    switches
-    also apply to the live session's ``state/<sid>.json`` when a session id is available
-    (``--session <id>``, which the forked skill passes as ``${CLAUDE_SESSION_ID}``, else
-    the inherited ``CLAUDE_CODE_SESSION_ID``) so the change takes effect at once and
-    persists as the new default; the rest are read from the config file at use.
+    Only the plan-gate switch updates a live session scalar. File rules, exclusions,
+    directories, and configured reviewers are read from the project configuration at use.
     ``set`` preserves every other key in the file. ``unset`` is the one way to remove a
     key, and it exists because that preservation has no other exit: a key guard stopped
     honoring (``exempt_skills``, ``audit_gate``) is invisible to ``show`` and survives
@@ -370,15 +330,7 @@ def cmd_settings() -> int:
 
     raw = _load_raw_config(project_dir)
 
-    if key in SETTABLE_AGENTS:
-        v = _parse_mode(value)
-        if v is None:
-            print(f"guard settings: {key} must be one of "
-                  f"{[m.value for m in AgentMode]} (got {value!r})", file=sys.stderr)
-            return 0
-        raw[key] = v.value
-        _apply_session_scalar(project_dir, session_id, key, v.value)
-    elif key in AUDIT_SWITCHES:
+    if key in AUDIT_SWITCHES:
         on = _parse_switch(value)
         if on is None:
             print(f"guard settings: {key} must be `on` or `off` (got {value!r})",
@@ -401,24 +353,19 @@ def cmd_settings() -> int:
         # discard the setting with no way to see that it happened. The `show` lines below
         # name any entry that does not resolve.
         raw["knowledge_dir"] = [p.strip() for p in value.split(",") if p.strip()]
-    elif key in ("doc_dir", "doc_exclude"):
-        # Comma-separated and REPLACED whole, like `knowledge_dir`, and stored as given rather
-        # than filtered to what exists — a directory the user is about to create is a normal
-        # thing to configure. Unlike `knowledge_dir`, order carries nothing: both lists are
-        # membership tests. `doc_exclude` additionally accepts project-relative `*` / `**`
-        # globs. `""` writes the empty list, which for `doc_dir` means the whole project and
-        # for `doc_exclude` means nothing subtracted.
+    elif key in ("doc_dir", "files_exclude"):
+        # Preserve patterns even before their matching files or directories exist.
         raw[key] = [p.strip() for p in value.split(",") if p.strip()]
-    elif key == "doc_review_rules":
+    elif key == "file_review_rules":
         try:
             parsed = json.loads(value)
         except json.JSONDecodeError:
             parsed = None
-        candidate = {"doc_review_rules": parsed}
-        if not isinstance(parsed, list) or len(_doc_review_rules(candidate)) != len(parsed):
-            print("guard settings: doc_review_rules must be a JSON list of "
+        candidate = {key: parsed}
+        if not isinstance(parsed, list) or len(_file_review_rules(candidate)) != len(parsed):
+            print(f"guard settings: {key} must be a JSON list of "
                   '{"glob": "...", "action": {"kind": "agent|skill", "name": "..."}} '
-                  "entries; use doc_exclude for exclusions",
+                  "entries; use files_exclude for exclusions; audit-files cannot review itself",
                   file=sys.stderr)
             return 0
         raw[key] = parsed
@@ -449,8 +396,8 @@ def cmd_settings() -> int:
         return 0
     else:
         print(f"guard settings: unknown or unsettable key {key!r}. Settable: "
-              + ", ".join((*AUDIT_SWITCHES, *SETTABLE_AGENTS))
-              + ", refs_dir, knowledge_dir, doc_dir, doc_exclude, doc_review_rules, "
+              + ", ".join(AUDIT_SWITCHES)
+              + ", refs_dir, knowledge_dir, doc_dir, files_exclude, file_review_rules, "
                 "plan_review, turn_review, answer_review.",
               file=sys.stderr)
         return 0

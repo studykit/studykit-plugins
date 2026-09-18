@@ -1,7 +1,7 @@
 """``post-edit`` (PostToolUse on file-writing tools and Bash).
 
-Two independent jobs. It records a changed file only when the current agent switches and
-document-review rules select an audit for it, keeping the four audit buckets disjoint
+Two independent jobs. It records a changed file only when the current file-review rules
+select an audit for it, keeping the four audit buckets disjoint
 (``agents._edited_bucket``). Separately, it requires a file saved inside the refs directory
 to be listed in that directory's ``AGENTS.md``, blocking until it is; that prohibition is
 independent of audit settings.
@@ -28,8 +28,8 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from .config import (AgentMode, _HOST_IS_CODEX, _agent_mode, _doc_review_rule,
-                     _doc_review_rules, _load_config)
+from .config import _HOST_IS_CODEX, _load_config
+from .cmd_checkpoint import review_rule
 from .paths import (_doc_scope, _project_dir, _project_rel, _refs_dir, _state_root,
                     _trace)
 from .payload import _read_payload, _session_id
@@ -99,7 +99,6 @@ def _git_worktree_snapshot(project_dir: Path, config: dict[str, Any],
         return None
     try:
         refs = _refs_dir(project_dir, config).resolve()
-        docs = _doc_scope(project_dir, config)
         project = project_dir.resolve()
         state_root = _state_root(project_dir).resolve()
     except OSError:
@@ -117,7 +116,8 @@ def _git_worktree_snapshot(project_dir: Path, config: dict[str, Any],
             continue
         if (not target.is_file() or project not in resolved.parents
                 or state_root in resolved.parents
-                or _edited_bucket(resolved, refs, docs) is None):
+                or (review_rule(project_dir, resolved, config) is None
+                    and not (resolved.suffix.lower() == ".md" and refs in resolved.parents))):
             continue
         cached = (prior or {}).get(rel)
         if (isinstance(cached, dict) and cached.get("mtime_ns") == stat.st_mtime_ns
@@ -255,10 +255,8 @@ def _record_edited_source(project_dir: Path, payload: dict, tool_input: Any,
                           content_hash: str | None = None) -> None:
     """Note a file this session wrote, for the next explicit file-audit checkpoint.
 
-    Four lists, chosen by `_edited_bucket`: source files for `comment-corrector`, agent
-    instruction files for `agents-md-auditor`, saved references for `ext-docs-auditor`, and the
-    project's ordinary documents for `doc-auditor`. A path is retained only when that audit
-    is enabled and, for documents, a review rule matches it. Anything else is not recorded.
+    A path is retained only when a file-review rule matches it. Storage buckets do not
+    select reviewers; the checkpoint resolves every path through the same rules.
 
     This fires for a SUBAGENT's write as well as the main agent's: tool events run the same
     configured hooks inside a subagent and the payload carries `agent_id` / `agent_type`
@@ -296,22 +294,10 @@ def _record_edited_source(project_dir: Path, payload: dict, tool_input: Any,
     # new write so the Herdr token and status state never retain a path no current rule audits.
     from .cmd_checkpoint import reconcile_queue
     reconcile_queue(project_dir, state, "codex" if _HOST_IS_CODEX else "claude")
-    if bucket == "edited_files":
-        if (_HOST_IS_CODEX
-                or _agent_mode(state, "comment-corrector") == AgentMode.OFF):
-            _write_state(project_dir, session_id, state)
-            report_pending(state)
-            return
-    else:
-        if _agent_mode(state, "doc-auditor") == AgentMode.OFF:
-            _write_state(project_dir, session_id, state)
-            report_pending(state)
-            return
-        if _doc_review_rule(_project_rel(project_dir, target),
-                            _doc_review_rules(config)) is None:
-            _write_state(project_dir, session_id, state)
-            report_pending(state)
-            return
+    if review_rule(project_dir, target, config) is None:
+        _write_state(project_dir, session_id, state)
+        report_pending(state)
+        return
 
     if content_hash is None:
         try:
@@ -402,7 +388,7 @@ def cmd_post_edit() -> int:
     """PostToolUse on the file-writing tools. Two jobs on the one payload.
 
     1. Record the source file, if that is what was written, against this turn — the
-       list `comment-corrector` is pointed at when Stop recommends it. This is the event
+       list consumed by an explicit file checkpoint. This is the event
        that actually sees the path, so nothing has to be reconstructed from a transcript
        later; Stop only reads back what accumulated here.
     2. Require a file saved inside the refs dir to be listed in the refs index

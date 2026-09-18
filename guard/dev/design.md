@@ -1,5 +1,54 @@
 # guard — design detail
 
+## File review rules (v0.156.0)
+
+`file_review_rules` is the only file-action configuration. Each project-relative glob
+selects an agent or skill; no per-agent enable switch or source-extension allowlist is
+consulted. The user invokes `audit-files` to dispatch pending paths. Empty rules select
+nothing. `files_exclude` is the only exclusion setting and applies to every file type.
+`doc_dir` retains its ordinary Markdown inclusion scope. Neither `doc_exclude` nor the
+singular `file_exclude` is read or offered as an alias. Rule specificity and declaration-order
+ties are unchanged. Exclusions use list order instead: `!pattern` restores matching files,
+a later exclusion can remove them again, and the last match wins. A restored path still
+needs a review rule. A leading escaped bang matches a literal bang in the filename.
+This follows the negation and ordering convention in the [Git ignore reference](https://git-scm.com/docs/gitignore),
+while retaining Guard's project-relative file globs. It does not implement directory pruning
+or the full Git ignore syntax; a child path can be restored directly inside an excluded tree.
+
+The old `doc_review_rules`, `comment-corrector`, and `doc-auditor` keys are ignored without
+compatibility conversion or migration notices. Existing queue buckets remain readable,
+but current rules decide what is retained and who reviews it. Earlier descriptions below
+of document rules, switches, and mode aliases are historical.
+
+Both native writes and shell snapshots use the same selection policy. Reference Markdown
+is still snapshotted even without an audit rule or when excluded from review: the refs-index
+gate is independent. A regression exercising that path also exposed and fixed undefined
+`_emit` calls in the Codex adapter; missing-index feedback now serializes directly.
+
+Run `uv run --python 3.11 python -m unittest discover -s guard/dev -p 'test_*.py'` and
+`uv run guard/dev/check-entries.py`. These cover script contracts, not live host delivery.
+The runtime verification recipe is under "Testing against the real CLI" below.
+
+Validation on 2026-09-18: all 45 regression tests and `check-entries.py` passed; both
+manifests are 0.156.0 and both marketplace registrations omit versions. The generic
+skill-creator validator rejects the pre-existing, documented Claude field
+`disable-model-invocation`; YAML parsing and repository definition checks passed while
+preserving that explicit-invocation behavior.
+
+A live Claude test used a separate Herdr pane and a throwaway project at
+`/private/tmp/guard-file-rules-live-2vxt74ij`, with `--plugin-dir` pointing at this working
+tree. Before launch, Guard project/ref variables and the Claude session id were absent.
+Both attempts stopped with `Failed to authenticate: OAuth session expired and could not
+be refreshed` before any model-driven writes or audit dispatch. SessionStart created state,
+but native edit delivery and agent/skill invocation remain unverified in this run.
+
+Official runtime references checked on 2026-09-18: [Claude skills](https://code.claude.com/docs/en/skills),
+[Claude subagents](https://code.claude.com/docs/en/sub-agents),
+[Codex hooks](https://learn.chatgpt.com/docs/hooks),
+[Codex skills](https://learn.chatgpt.com/docs/build-skills), and
+[Codex subagents](https://learn.chatgpt.com/docs/agent-configuration/subagents).
+
+
 As of v0.155.0, the Claude `doc-review-rules` command is merged into `settings`. Its rule
 selection guidance, exclusions, and checkpoint enablement live in that one configuration
 entry. The `doc_review_rules` schema and CLI remain unchanged; existing configuration needs

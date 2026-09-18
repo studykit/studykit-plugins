@@ -32,8 +32,10 @@ is discovered.
 
 For file-review rules, users may keep the portable Guard action names
 `guard:doc-auditor`, `guard:agents-md-auditor`, and `guard:ext-docs-auditor`; the Codex hook
-maps them to the installed underscore-named agents. The `doc-auditor` switch and an explicit
-matching `doc_review_rules` entry are still required. Unmatched files are not reviewed.
+maps them to the installed underscore-named agents. A matching `file_review_rules` entry
+selects the file; no agent switch is required. Unmatched files are not reviewed.
+For source review, choose an installed Codex agent or
+skill; the bundled `guard:comment-corrector` remains Claude Code only.
 
 Also tell them that guard's hooks are separate from this, and that installing and
 enabling the plugin does not switch them on: Codex skips plugin-bundled hooks until

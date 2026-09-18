@@ -1,18 +1,42 @@
 {
   "audit-plan": "on",
-  "plan_review": {"kind": "agent", "name": "project:plan-reviewer"},
-  "claims-auditor": "off",
-  "deferrals-auditor": "off",
-  "clarity-auditor": "off",
-  "comment-corrector": "off",
-  "doc-auditor": "off",
-  "doc_review_rules": [
-    {"glob": "wiki/ref/**", "action": {"kind": "agent", "name": "guard:ext-docs-auditor"}},
-    {"glob": "docs/generated/**", "action": null},
-    {"glob": "docs/korean/**/*.md", "action": {"kind": "agent", "name": "project:korean-doc-reviewer"}},
-    {"glob": "docs/api/**/*.md", "action": {"kind": "skill", "name": "project:review-api-docs"}}
+  "plan_review": {
+    "kind": "agent",
+    "name": "project:plan-reviewer"
+  },
+  "file_review_rules": [
+    {
+      "glob": "**/*.py",
+      "action": {
+        "kind": "agent",
+        "name": "guard:comment-corrector"
+      }
+    },
+    {
+      "glob": "wiki/ref/**/*.md",
+      "action": {
+        "kind": "agent",
+        "name": "guard:ext-docs-auditor"
+      }
+    },
+    {
+      "glob": "docs/**/*.md",
+      "action": {
+        "kind": "agent",
+        "name": "guard:doc-auditor"
+      }
+    },
+    {
+      "glob": "docs/api/**/*.md",
+      "action": {
+        "kind": "skill",
+        "name": "project:review-api-docs"
+      }
+    }
   ],
-  "doc_dir": [],
-  "doc_exclude": [],
+  "files_exclude": [
+    "docs/generated/**",
+    "!docs/generated/README.md"
+  ],
   "refs_dir": ""
 }

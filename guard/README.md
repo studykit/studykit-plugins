@@ -55,7 +55,7 @@ Guard delivers the reviewed English file and explains the missing translation.
 The `audit-report` and `audit-report-*` skills have been removed. The `claims-auditor`,
 `deferrals-auditor`, and `clarity-auditor` switches are retired and have no effect. Replace
 those settings with `answer_review` or `turn_review`; use `audit-files` and
-`doc_review_rules` for reviews of changed files. Claude's settings command identifies
+`file_review_rules` for reviews of changed files. Claude's settings command identifies
 retired keys and can remove them with `unset`.
 
 ## Plan reviews
@@ -90,16 +90,46 @@ Do not register `guard:audit-plan` as the reviewer: it is the dispatcher itself.
 
 ## Edited-file checkpoints
 
-In Claude Code, use `/guard:settings` to configure document reviewers by folder or file
-pattern, exclusions, and review switches. The former `/guard:doc-review-rules` command has
-been merged into settings; existing `doc_review_rules` configuration remains valid.
+Configure `file_review_rules` in `.claude/guard.local.json` or `.codex/guard.local.json`.
+In Claude Code, `/guard:settings` helps choose rules and exclusions. Each rule maps a
+project-relative glob to an installed agent or skill:
 
-Guard records changed files only when the enabled audit settings and document-review rules
-select them, but does not audit them at every response boundary. Run `/guard:audit-files` in
-Claude Code or `$guard:audit-files` in Codex when the current batch of edits is ready for review.
-The checkpoint groups pending paths by the rules in
-`.claude/guard.local.json` or `.codex/guard.local.json`, runs the selected audits, and removes
-only file revisions that did not change while review was running.
+```json
+{
+  "file_review_rules": [
+    {"glob": "**/*.py", "action": {"kind": "agent", "name": "guard:comment-corrector"}},
+    {"glob": "**/*.md", "action": {"kind": "agent", "name": "guard:doc-auditor"}},
+    {"glob": "**/AGENTS.md", "action": {"kind": "agent", "name": "guard:agents-md-auditor"}},
+    {"glob": "config/**/*.json", "action": {"kind": "skill", "name": "my-config-review"}}
+  ],
+  "files_exclude": ["generated/**", "!generated/handwritten.py", "vendor/**"]
+}
+```
+
+These are examples, not defaults. The bundled `guard:comment-corrector` edits source comments
+in place and is available in Claude Code. For Codex source review, select your own installed
+agent or skill. `$guard:setup` installs the bundled Codex document reviewers.
+
+`*` matches within one directory; `**` crosses directories, including zero levels.
+The most specific rule wins: an exact filename beats a filename pattern, then literal
+directory depth and detail decide; an exact tie uses the first rule. Unmatched and excluded
+files are not reviewed. All file types, including extensionless files, can match a rule.
+
+Guard records matching edits without running a review automatically. Run `/guard:audit-files`
+in Claude Code or `$guard:audit-files` in Codex when ready. The checkpoint groups pending
+paths by the selected agent or skill and retains revisions changed during review.
+
+A matching rule is the only opt-in; there is no additional agent switch. An empty
+`file_review_rules` list selects no files. `files_exclude` uses globs for every file type.
+`doc_dir` limits ordinary Markdown directories. Exclusions apply equally to Markdown, source
+code, configuration files, and extensionless files.
+
+Exclusions run in list order: `!pattern` restores matching files, and the last matching
+pattern wins. In the example, `generated/handwritten.py` is restored after `generated/**`
+excludes the tree. Restored files still need a matching `file_review_rules` entry.
+Use `\\!name.py` in JSON to exclude a filename beginning with a literal `!`.
+These are Guard's project-relative file globs with negation, not the full `.gitignore`
+syntax; an exception can restore a file inside an excluded tree directly.
 
 The reference-index requirement remains immediate: a new saved reference must still be added
 to the reference directory's index before work continues.

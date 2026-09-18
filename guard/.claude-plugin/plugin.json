@@ -1,7 +1,7 @@
 {
   "name": "guard",
-  "version": "0.155.0",
-  "description": "User-configured answer, turn, and plan reviews, plus edited-file checkpoints.",
+  "version": "0.156.0",
+  "description": "User-configured answer, turn, and plan reviews, plus glob-based agent or skill file reviews.",
   "author": {
     "name": "studykit"
   },

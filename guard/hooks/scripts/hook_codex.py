@@ -142,7 +142,7 @@ def _handle_post_tool(project_dir: Path, payload: dict[str, Any], session_id: st
         if target is not None and target.name not in core_edit._REFS_INDEX_SKIP:
             reason = core_edit.refs_index_gap(project_dir, target, config)
             if reason is not None:
-                _emit({"decision": "block", "reason": reason})
+                json.dump({"decision": "block", "reason": reason}, sys.stdout)
                 return
     for target in shell_targets:
         synthetic_input = {"file_path": str(target)}
@@ -151,7 +151,7 @@ def _handle_post_tool(project_dir: Path, payload: dict[str, Any], session_id: st
         if target.name not in core_edit._REFS_INDEX_SKIP:
             reason = core_edit.refs_index_gap(project_dir, target, config)
             if reason is not None:
-                _emit({"decision": "block", "reason": reason})
+                json.dump({"decision": "block", "reason": reason}, sys.stdout)
                 return
 
 

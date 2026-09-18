@@ -7,6 +7,8 @@ disable-model-invocation: true
 # Audit pending edited files
 
 This is an explicit checkpoint. It replaces automatic file audits at every Stop event.
+`file_review_rules` maps project-relative globs to agents or skills for any file type.
+Matching rules need no per-agent switch. Do not add reviewers for unmatched files.
 
 ## Read the checkpoint
 
@@ -34,8 +36,11 @@ else—not what was being changed, what seems risky, or what you want checked. I
 `conditional` is true, dispatch only paths this session actually changed according to this
 session's tool activity; a shared worktree diff alone is not ownership evidence.
 
+If an action is unavailable or fails, report it and stop without completing the checkpoint.
+Do not substitute another reviewer or claim those paths were reviewed.
+
 Wait for all reports, then apply only findings their own disposition permits. Every listed
-file has an enabled matching audit rule. If `truncated` contains a positive count, say that
+file has a matching audit rule. If `truncated` contains a positive count, say that
 the checkpoint is partial.
 
 ## Complete safely
