@@ -17,6 +17,7 @@ import tomllib
 
 from popup_size import PopupSize, load_size, save_size
 from ls_colors import directory_style
+from view_state import load_view, save_view
 
 
 def theme_config(env):
@@ -132,12 +133,18 @@ def main(env: dict, operation: str) -> int:
     elif operation == "panel":
         import curses
         from ui import Navigator
+        state_dir = Path(env["HERDR_PLUGIN_STATE_DIR"]) if env.get("HERDR_PLUGIN_STATE_DIR") else None
         restored = None
         if env.get("FILE_NAV_RESUME"):
             path = resume_path(env, env["FILE_NAV_RESUME"])
             restored = json.loads(path.read_text())["view"]
             root = Path(restored["root"]).resolve(strict=True)
             path.unlink()
+        else:
+            restored = load_view(state_dir, root)
+            # An explicit changes action must still open the changes view.
+            if restored is not None and env.get("FILE_NAV_CHANGES") == "1":
+                restored["changes"] = True
         size = PopupSize(int(env.get("FILE_NAV_WIDTH", 96)), int(env.get("FILE_NAV_HEIGHT", 92)))
         on_resize = None
         if env.get("HERDR_PLUGIN_STATE_DIR") and env.get("HERDR_PLUGIN_CONFIG_DIR"):
@@ -145,10 +152,16 @@ def main(env: dict, operation: str) -> int:
         navigator = Navigator(root, pane_id, env.get("FILE_NAV_CHANGES") == "1",
                               env.get("VISUAL") or env.get("EDITOR") or "", size, on_resize,
                               theme_loader=lambda: theme_config(env),
-                              folder_style=directory_style(env, sys.platform))
+                              folder_style=directory_style(env, sys.platform),
+                              on_state=(lambda view: save_view(state_dir, view)) if state_dir else None)
         if restored is not None:
             navigator.restore_state(restored)
-        curses.wrapper(navigator.run)
+            if env.get("FILE_NAV_RESUME"):
+                navigator.message = f"Popup resized to {size.width}% × {size.height}%"
+        try:
+            curses.wrapper(navigator.run)
+        finally:
+            navigator.checkpoint()
     else:
         raise ValueError(f"Unknown operation: {operation}")
     return 0

@@ -62,6 +62,7 @@ its source directory until you explicitly change the navigation root.
 | Ctrl+W | Adjust popup size and remember it for future launches |
 | Ctrl+U in search | Clear the search text |
 | Escape | Return to files from content; clear search when in files; otherwise close |
+| Ctrl+C | Close immediately, retaining the current view for the next launch |
 
 Search is case-insensitive, ranks filename matches ahead of path matches, and
 accepts fuzzy abbreviations such as `rdm` for `README.md`. Git projects show tracked
@@ -78,8 +79,9 @@ Ignored files are not treated as Git changes; Ctrl+G still shows only changes
 reported by the current repository. Switch the root to a nested repository to
 use that repository's own Git status and diff base.
 
-The toggle is preserved while changing roots, refreshing, or resizing; a new
-popup starts with excluded files hidden. Hiding an excluded file also clears its
+The toggle is preserved while changing roots, refreshing, or resizing, and is
+restored when reopening the same root. Roots without a saved view start with
+excluded files hidden. Hiding an excluded file also clears its
 open preview. Extra filesystem traversal is bounded at 50,000 combined entries;
 if the limit is reached, change the root to a smaller folder. No ignore rules or
 Git tracking settings are modified.
@@ -103,6 +105,26 @@ then focuses the new tree. The changes-only mode stays as selected. Invalid or
 unreadable destinations leave the previous tree intact. The source pane's working
 directory is never changed. Resizing preserves the chosen root; closing and
 opening a fresh popup starts from the invoking pane's directory again.
+
+Reopening the same root automatically restores its last view: expanded folders,
+selected file, filename filter, tree position, preview file and scroll offsets,
+file/content focus, changed-files mode, and ignored-file visibility. Views are
+shared across panes that use the same canonical directory; different roots keep
+separate views. A new popup still starts at the invoking pane's directory, never
+at an unrelated previously visited root. Opening the explicit changes action
+always enables changed-files mode, even if that root's saved view showed all files.
+
+Use Ctrl+C to close immediately without first changing focus or clearing the
+filter. Escape retains its existing back/clear/close behavior; those changes are
+remembered too. Search-entry mode and unfinished root/size dialogs are not
+reopened. When changing roots inside a popup, the departing root's view is saved
+for later launches, while the destination opens with the normal fresh tree.
+
+Saved views contain navigation metadata, not file contents. Files are read again
+on reopening; missing previews are cleared, stale expanded folders are discarded,
+and scroll positions adjust to the new content and popup dimensions. Corrupt or
+unavailable saved state does not prevent browsing. Popup dimensions remain a
+shared preference rather than a per-root setting.
 
 Typing only changes the filter after Ctrl+S. Enter leaves search and focuses the
 file list; press Enter again to open the selected result. Ordinary character keys

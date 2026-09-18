@@ -223,6 +223,38 @@ row. A throwaway Herdr session verified Enter and mouse activation of `..`, the
 root dialog, selected-folder entry, Git-root navigation, previewing a file in a
 second root, and cancelling an invalid destination without losing the old view.
 
+## Root-specific saved views
+
+Version 0.14 stores one versioned JSON view per canonical root under the plugin's
+runtime state directory. The adapter resolves `HERDR_PLUGIN_STATE_DIR`; shared
+storage and UI code receive paths/callbacks, never host environment variables.
+SHA-256 filenames isolate roots and avoid embedding project paths in filenames.
+Writes use mode-0600 temporary files and atomic replacement. Reads and writes
+are bounded at 4 MiB, and schema/path validation rejects malformed views. No
+project files or preview contents are stored. Without a state directory, the
+navigator remains usable without persistence.
+
+The UI checkpoints changed views before waiting for input, before leaving a
+root, and on exit. This retains the last displayed state even when the host
+terminates the popup without running exit handlers; identical snapshots do not
+cause repeated writes. Save errors are reported without terminating navigation.
+Normal launches load only the invoking root's state, while one-shot resize
+snapshots take precedence. The explicit changes action overrides saved browse
+mode. Deleted/unreadable previews are cleared, stale expanded folders are pruned,
+and offsets are clamped after the first render, not against Markdown source-line
+counts. Search-entry and unfinished modal state are intentionally transient.
+
+The 164-test suite includes 19 persistence regressions covering atomic/private
+writes, root isolation, symlink aliases, bounded/corrupt/schema-invalid snapshots,
+write failures, full restoration across panes, filters, deleted/changed files,
+rendered Markdown offsets, checkpoint deduplication, root departure, the input
+loop, adapter close/reopen, explicit changes, resize precedence, and exceptional
+exit. Tests use throwaway directories. Adapter tests stub the host/curses boundary;
+they do not claim a fresh live Herdr popup integration test.
+
+Official runtime contract checked:
+https://github.com/herdrdev/herdr/blob/master/docs/next/website/src/content/docs/plugins.mdx
+
 ## Focus-preserving preview scrolling
 
 Version 0.13 adds Ctrl+N/P (one line) and Ctrl+F/B (one screen) for scrolling the

@@ -10,6 +10,7 @@ import unicodedata
 from core import Row, checked_path, editor_command, preview, rows, scan
 from diff_tool import comparison
 from popup_size import PopupSize, PRESETS
+from view_state import normalize as normalize_view
 import markdown_preview
 import syntax_preview
 import terminal_input
@@ -95,7 +96,7 @@ def theme(palette=None, folder_style=None) -> dict[str, int]:
 class Navigator:
     def __init__(self, root: Path, pane_id: str, changes: bool, editor: str,
                  size: PopupSize = PopupSize(), on_resize=None, theme_loader=None,
-                 folder_style=None):
+                 folder_style=None, on_state=None):
         self.root, self.pane_id, self.editor = root, pane_id, editor
         self.changes = changes
         self.include_ignored = False
@@ -117,6 +118,7 @@ class Navigator:
         self.syntax = None
         self.language = ""
         self.render_width = None
+        self.restore_horizontal = False
         self.color_pairs = {}
         self.theme_loader = theme_loader
         self.folder_style = folder_style
@@ -131,6 +133,8 @@ class Navigator:
         self.size = size
         self.size_draft = None
         self.on_resize = on_resize
+        self.on_state = on_state
+        self.saved_state = None
         self.message = ""
         self.index = None
         self.items = []
@@ -143,6 +147,18 @@ class Navigator:
                 "selected": self.items[self.selected].path if self.items else "",
                 "scroll": self.scroll, "preview_scroll": self.preview_scroll,
                 "horizontal": self.horizontal, "preview_focus": self.preview_focus}
+
+    def checkpoint(self):
+        if self.on_state is None or self.index is None:
+            return
+        state = self.export_state()
+        if state == self.saved_state:
+            return
+        try:
+            self.on_state(state)
+            self.saved_state = state
+        except (OSError, ValueError, RuntimeError) as error:
+            self.message = f"Could not save navigator state: {error}"
 
     def change_root(self, raw):
         try:
@@ -161,6 +177,7 @@ class Navigator:
             self.root_error = self.message = f"Could not change root: {error}"
             return False
         previous = self.root
+        self.checkpoint()
         self.root, self.index = index.root, index
         self.query = self.search_before = ""
         self.searching = self.preview_focus = False
@@ -181,6 +198,7 @@ class Navigator:
         self.content = ["Select a file and press Enter, or click it, to open it here."]
         self.previewable = self.markdown = self.preview_focus = False
         self.rendered = self.syntax = self.render_width = None
+        self.restore_horizontal = False
         self.preview_scroll = self.horizontal = 0
 
     def toggle_ignored(self):
@@ -267,22 +285,44 @@ class Navigator:
         put(screen, top + 7, x + 2, self.root_error, box_width - 4, self.style("removed"))
 
     def restore_state(self, state):
-        include_ignored = bool(state.get("include_ignored", False))
+        state = normalize_view(state, self.root)
+        if state is None or self.index is None:
+            return False
+        include_ignored = state["include_ignored"]
         if include_ignored != self.include_ignored:
-            self.index = scan(self.root, include_ignored=include_ignored)
+            try:
+                self.index = scan(self.root, include_ignored=include_ignored)
+            except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as error:
+                self.message = f"Could not restore navigator state: {error}"
+                return False
             self.include_ignored = include_ignored
-        self.changes = bool(state.get("changes", False))
-        self.query = state.get("query", "")
-        self.expanded = set(state.get("expanded", []))
+        self.changes = state["changes"]
+        self.query = state["query"]
+        directories = set(self.index.directories)
+        for name in self.index.files:
+            parent = name.rpartition("/")[0]
+            while parent:
+                directories.add(parent)
+                parent = parent.rpartition("/")[0]
+        self.expanded = set(state["expanded"]) & directories
+        self.searching = False
+        self.clear_preview()
         self.rebuild()
-        self.selected = next((i for i, row in enumerate(self.items) if row.path == state.get("selected")), 0)
-        if state.get("active"):
+        self.selected = next((i for i, row in enumerate(self.items) if row.path == state["selected"]), 0)
+        if state["active"] in self.index.files:
             self.load(state["active"])
-        self.scroll = max(0, int(state.get("scroll", 0)))
-        self.preview_scroll = max(0, int(state.get("preview_scroll", 0)))
-        self.horizontal = max(0, int(state.get("horizontal", 0)))
-        self.preview_focus = bool(state.get("preview_focus", False))
-        self.message = f"Popup resized to {self.size.width}% × {self.size.height}%"
+            if not self.previewable:
+                self.clear_preview()
+        self.scroll = min(state["scroll"], self.selected)
+        if self.previewable:
+            # Markdown offsets are rendered-line offsets; clamp on the first
+            # draw, after rendering at the actual new popup width.
+            self.preview_scroll = state["preview_scroll"]
+            self.horizontal = state["horizontal"]
+            self.restore_horizontal = True
+            self.preview_focus = state["preview_focus"]
+        self.message = self.index.note or "Restored previous view"
+        return True
 
     def size_key(self, key):
         if key == "\x1b":
@@ -577,6 +617,13 @@ class Navigator:
         self.narrow = width < 90
         content_width = width - 1 if self.narrow else width - self.divider - 2
         self.prepare_preview(content_width - 4)
+        if self.restore_horizontal:
+            longest = max((sum(0 if unicodedata.combining(char) else
+                               2 if unicodedata.east_asian_width(char) in "WF" else 1
+                               for char in clean(line)) for line in self.content), default=0)
+            available = content_width - (4 if self.rendered is not None else 10)
+            self.horizontal = min(self.horizontal, max(0, longest - available))
+            self.restore_horizontal = False
         self.scroll = max(0, min(self.scroll, self.selected))
         if self.selected >= self.scroll + self.tree_body:
             self.scroll = self.selected - self.tree_body + 1
@@ -807,6 +854,9 @@ class Navigator:
                     self.color_pairs.clear()
                     applied_palette = self.palette
                 self.draw(screen)
+                # Checkpoint the last displayed view before blocking for input;
+                # host-driven popup closure may terminate without a Python exit.
+                self.checkpoint()
                 try:
                     key = terminal_input.read(screen)
                 except curses.error:
@@ -814,4 +864,5 @@ class Navigator:
                 if not self.key(key, screen):
                     break
         finally:
+            self.checkpoint()
             terminal_input.disable()

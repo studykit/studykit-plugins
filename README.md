@@ -57,6 +57,6 @@ For compatibility and versioning rules, see `AGENTS.md`.
 - `d2` — D2 diagram composition, rendering, and visualization
 - `guard` — on-demand audit agents that review a finished turn, or a document, for unsupported claims, deferrals the repo could answer, unclear explanation, unnatural Korean, and drifted `AGENTS.md` / saved reference docs
 - `handover` — create a self-contained session handover and load a recorded handover after a clear
-- `file-nav` — Herdr file tree, filename search, Obsidian-style Markdown and source previews, and Git diffs for the focused pane's directory
+- `file-nav` — Herdr file tree, root-specific saved views, filename search, Obsidian-style Markdown and source previews, and Git diffs for the focused pane's directory
 
 `structurizr`, `d2` and `handover` are Claude Code only. `file-nav` installs through Herdr and works alongside any agent. The remaining plugins run in both Claude Code and Codex.
