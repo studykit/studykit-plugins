@@ -143,16 +143,16 @@ repository:
 herdr plugin install studykit/studykit-plugins/guard
 ```
 
-During local development, link the working tree instead:
-
-```sh
-herdr plugin link /absolute/path/to/studykit-plugins/guard
-```
-
 It provides two actions—show pending files and audit pending files—and a popup pane listing the
 queue for the focused Claude Code or Codex session. In the popup, use the arrow keys or `j`/`k`
 to move the cursor, Space to select or deselect multiple files, and Enter to open the current
-file in `$VISUAL` or `$EDITOR`; Guard falls back to `nvim`, `vim`, then `vi`. Press `a` to start
+file in `$VISUAL` or `$EDITOR`; Guard falls back to `nvim`, `vim`, then `vi`.
+Press `d` or `Ctrl+D` to compare the current file's Git `HEAD` version with its working-tree
+contents in a read-only, side-by-side vimdiff view, including staged and unstaged changes.
+New files compare against an empty `HEAD` side. This requires `vimdiff` or Vim with diff
+support and a Git repository; binary files and files over 8 MiB per side are not supported.
+Press `Tab` to switch sides and `q` to return to the pending list with your selections intact.
+Press `a` to start
 an audit for the selected files, or for the entire queue when nothing is selected. Press `c` to
 clear only the selected files after confirmation, `r` to refresh, or `q` to close. Clearing
 invalidates an audit already in progress; files edited afterward are added to a fresh queue.

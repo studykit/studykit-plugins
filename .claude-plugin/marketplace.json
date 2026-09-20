@@ -95,7 +95,7 @@
     {
       "name": "guard",
       "source": "./guard",
-      "description": "User-configured answer, turn, and plan reviews, plus glob-based agent or skill file reviews.",
+      "description": "User-configured answer, turn, and plan reviews, glob-based file reviews, and Git diffs in Herdr.",
       "author": {
         "name": "studykit"
       },

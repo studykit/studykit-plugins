@@ -1,5 +1,47 @@
 # guard — design detail
 
+## Herdr file diffs (v0.157.0)
+
+The pending-files popup now opens a HEAD/working-tree comparison with `d` or `Ctrl+D`.
+The baseline deliberately matches File Navigator, not the last audit checkpoint: Guard
+retains revision fingerprints rather than historical file contents. Staged changes and
+later edits appear together. Opening a diff does not clear or audit pending files.
+
+Both sides are disposable byte snapshots. Vim receives no project file to save, disables
+user configuration and modelines, and opens two non-modifiable, read-only windows.
+The bundled Vim configuration follows File Navigator's controls and colors. Guard ships
+its own viewer so either plugin can be installed independently. Exiting with `q` restores
+the curses panel and its cursor, scroll position, and multi-selection.
+
+New files and unborn HEADs use an empty baseline; staged renames locate the original blob.
+Binary files, symlinks, non-regular files, and snapshots over 8 MiB per side are rejected
+with a panel message. Deleted files can be compared if removed after the queue was loaded;
+the checkpoint queue itself continues to prune missing files.
+
+Run `uv run --python 3.11 python -m unittest discover -s guard/dev -p 'test_herdr_diff.py'`.
+These tests cover Git fixtures, actual Vim window options, snapshot isolation, key routing,
+selection retention, and terminal restoration after a failed child launch.
+For local Herdr checks, link the working tree with
+`herdr plugin link /absolute/path/to/studykit-plugins/guard`, then use a throwaway project
+and a separate pane. Direct script tests do not verify native popup launch or hook delivery.
+
+Validation on 2026-09-19: all 60 Guard regression tests and `check-entries.py` passed.
+A native Herdr plugin pane loaded this working tree in a throwaway Git project, using
+`--placement split --no-focus` to avoid interrupting the user's active popup. Its target
+pane had clean Guard/agent environment variables and a synthetic Codex session with a
+fixture checkpoint queue; this was a UI check, not a host hook-delivery test. Raw terminal
+output confirmed `d` and `Ctrl+D` opened HEAD/WORKTREE windows, `Tab` switched sides,
+and `q` restored the selected pending row. The popup placement itself was not retested.
+
+Claude, Codex, and Herdr manifests use 0.157.0. The Claude marketplace description includes
+the new surface; the existing Codex registration still points to `./guard` with no version.
+Official references checked on 2026-09-19:
+[Herdr plugins](https://herdr.dev/docs/plugins/),
+[Vim diff](https://vimhelp.org/diff.txt.html),
+[Vim startup](https://vimhelp.org/starting.txt.html),
+[Claude plugin manifests](https://code.claude.com/docs/en/plugins-reference), and
+[Codex plugins](https://learn.chatgpt.com/docs/plugins).
+
 ## File review rules (v0.156.0)
 
 `file_review_rules` is the only file-action configuration. Each project-relative glob

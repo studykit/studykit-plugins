@@ -1,14 +1,14 @@
 id = "studykit.guard"
 name = "Guard checkpoints"
-version = "0.149.0"
+version = "0.157.0"
 min_herdr_version = "0.9.0"
-description = "Show Guard's pending edited files and start an explicit audit checkpoint"
+description = "Browse Guard's pending files, view Git diffs with vimdiff, and start an audit checkpoint"
 platforms = ["linux", "macos"]
 
 [[actions]]
 id = "show-pending"
 title = "Guard: show pending files"
-description = "Open the pending edited-file queue for the focused agent"
+description = "Open the focused agent's pending files with read-only Git diffs"
 contexts = ["workspace", "tab", "pane"]
 command = ["./herdr/guard_herdr.py", "show-action"]
 

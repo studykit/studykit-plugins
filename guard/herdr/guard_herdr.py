@@ -16,6 +16,8 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from guard_diff import comparison
+
 
 def _context() -> dict[str, Any]:
     try:
@@ -170,20 +172,11 @@ def _put(screen: Any, y: int, x: int, text: str, style: int = 0) -> None:
         pass
 
 
-def _open_editor(screen: Any, path: str) -> str:
-    command = _editor_command(path)
-    if command is None:
-        return "No terminal editor found. Set $VISUAL or $EDITOR."
-    if not Path(path).is_file():
-        return "That file no longer exists; refresh the queue."
+def _run_terminal(screen: Any, command: list[str], cwd: Path) -> int:
     try:
         curses.def_prog_mode()
         curses.endwin()
-        result = subprocess.run(command, cwd=str(Path(path).parent), check=False)
-        message = ("Returned from editor." if result.returncode == 0 else
-                   f"Editor exited with status {result.returncode}.")
-    except OSError as error:
-        message = f"Could not start editor: {error}."
+        return subprocess.run(command, cwd=str(cwd), check=False).returncode
     finally:
         try:
             curses.reset_prog_mode()
@@ -193,7 +186,30 @@ def _open_editor(screen: Any, path: str) -> str:
             screen.refresh()
         except curses.error:
             pass
-    return message
+
+
+def _open_editor(screen: Any, path: str) -> str:
+    command = _editor_command(path)
+    if command is None:
+        return "No terminal editor found. Set $VISUAL or $EDITOR."
+    if not Path(path).is_file():
+        return "That file no longer exists; refresh the queue."
+    try:
+        status = _run_terminal(screen, command, Path(path).parent)
+        return ("Returned from editor." if status == 0 else
+                f"Editor exited with status {status}.")
+    except OSError as error:
+        return f"Could not start editor: {error}."
+
+
+def _open_diff(screen: Any, project: Path, path: str) -> str:
+    try:
+        with comparison(project, Path(path)) as (command, cwd):
+            status = _run_terminal(screen, command, cwd)
+        return ("Returned from vimdiff." if status == 0 else
+                f"vimdiff exited with status {status}.")
+    except (OSError, ValueError, subprocess.SubprocessError) as error:
+        return str(error)
 
 
 def _confirm_clear(screen: Any, count: int) -> bool:
@@ -270,7 +286,7 @@ def _panel(screen: Any) -> int:
 
         if message:
             _put(screen, height - 2, 2, message, curses.color_pair(3))
-        footer = " ↑/↓ move   Space select   Enter open   a audit selected/all   c clear selected   r refresh   q close "
+        footer = " ↑/↓ move  Space select  Enter edit  d/Ctrl+D diff  a audit  c clear  r refresh  q close "
         _put(screen, height - 1, 0, footer.ljust(max(0, width - 1)), curses.A_REVERSE)
         screen.refresh()
 
@@ -302,6 +318,8 @@ def _panel(screen: Any) -> int:
         elif key in (curses.KEY_ENTER, "\n", "\r") and rows:
             message = _open_editor(screen, rows[selected][0])
             pane, pending = _pending()
+        elif key in ("d", "D", "\x04") and rows:
+            message = _open_diff(screen, project, rows[selected][0])
         elif key in ("a", "A"):
             token: str | None = None
             audit_count = len(rows)
