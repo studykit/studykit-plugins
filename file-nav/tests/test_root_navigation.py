@@ -188,7 +188,7 @@ class RootNavigationTests(unittest.TestCase):
         self.assertTrue(any("CHANGE ROOT" in str(call) for call in screen.addstr.call_args_list))
 
     def test_parent_entry_enter_click_and_changes_mode(self):
-        for key in ("\n", Mouse(10, 8, "click")):
+        for key in ("\n", Mouse(10, self.nav.content_top, "click")):
             for changes in (False, True):
                 self.nav.change_root(self.first / "child")
                 self.nav.changes = changes

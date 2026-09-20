@@ -28,7 +28,7 @@ herdr plugin action invoke studykit.file-nav.changes
 
 The navigator uses the pane that was focused when you invoked the action. Its root is
 that pane's foreground working directory, falling back to the pane's directory.
-Opening the navigator in another pane uses that pane's directory. The navigator keeps
+A new navigator opened from another pane uses that pane's directory. The navigator keeps
 its source directory until you explicitly change the navigation root.
 
 ## Display modes
@@ -50,6 +50,13 @@ dialog before opening the layout menu.
 **Ctrl+Y** adjusts the popup's size while Popup is active. Layout and popup
 dimensions are remembered across launches and shared across roots. Closing an
 overlay restores the previous focus and zoom state.
+
+In Overlay mode, invoking either file action again in the same tab focuses the
+existing navigator and restores its zoom instead of creating another pane.
+Its root, filter, preview, and current mode remain intact; use Ctrl+G to switch
+between the project and changed-files views. Each tab can have its own
+navigator. Close the overlay before opening a fresh view from another source
+pane in that tab.
 
 ## Navigation
 
@@ -78,7 +85,7 @@ overlay restores the previous focus and zoom state.
 | Ctrl+E | Open the selected file in an editor |
 | Ctrl+G | Toggle changed files only |
 | Ctrl+H | Show / hide Git-ignored files; enabling switches to the full project view |
-| Ctrl+R | Refresh the file list and preview |
+| Ctrl+R | Refresh the file list and preview, then reload Git status |
 | Ctrl+W, then 1 / 2 | Switch to Popup / Overlay |
 | Ctrl+Y (Popup) | Adjust popup size and remember it for future launches |
 | Ctrl+U in search | Clear the search text |
@@ -90,6 +97,18 @@ accepts fuzzy abbreviations such as `rdm` for `README.md`. Git projects show tra
 files and untracked files that are not ignored. Without Git, common dependency
 directories are excluded. Hidden files are included. Git status uses the usual
 two-column codes, including `??` for new files and `D` for deleted files.
+
+The file list and saved preview appear before Git status finishes loading.
+You can navigate, search, and close the navigator while `Git: loading…` is shown;
+change indicators appear when ready. The changes-only view shows its loading
+state first, then fills with changed files. If status lookup fails, the file
+browser remains usable; press Ctrl+R to retry.
+
+Changes made outside the navigator are not watched automatically. Press Ctrl+R
+to discover new files and update modified-file indicators, or close and reopen
+the navigator. Returning from its Ctrl+E editor also refreshes the view. Existing
+search filters, collapsed folders, and ignored-file visibility still apply;
+use Ctrl+H to include files excluded by Git ignore rules.
 
 Git-ignored files are hidden by default. Ctrl+H includes excluded directories,
 their files, empty folders, and nested repositories in the tree and file search.
@@ -132,8 +151,9 @@ selected file, filename filter, tree position, preview file and scroll offsets,
 file/content focus, changed-files mode, and ignored-file visibility. Views are
 shared across panes that use the same canonical directory; different roots keep
 separate views. A new navigator still starts at the invoking pane's directory, never
-at an unrelated previously visited root. Opening the explicit changes action
-always enables changed-files mode, even if that root's saved view showed all files.
+at an unrelated previously visited root. Opening a fresh navigator with the
+explicit changes action enables changed-files mode, even if that root's saved
+view showed all files. Refocusing an existing overlay preserves its current view.
 
 Use Ctrl+C to close immediately without first changing focus or clearing the
 filter. Escape retains its existing back/clear/close behavior; those changes are

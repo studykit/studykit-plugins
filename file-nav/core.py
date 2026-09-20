@@ -19,7 +19,7 @@ VCS_DIRS = {".git", ".hg", ".svn"}
 def breadth_first_walk(root, onerror):
     # Large ignored caches must not consume the budget before sibling source
     # folders are even visited. Never follow directory symlinks.
-    pending = deque([root])
+    pending = deque([os.fspath(root)])
     while pending:
         directory = pending.popleft()
         dirs, names = [], []
@@ -39,7 +39,7 @@ def breadth_first_walk(root, onerror):
         dirs.sort()
         names.sort()
         yield directory, dirs, names
-        pending.extend(directory / name for name in dirs)
+        pending.extend(os.path.join(directory, name) for name in dirs)
 
 
 def git(root: Path, *args: str) -> subprocess.CompletedProcess:
@@ -70,9 +70,37 @@ class Index:
     repository: Path | None
     note: str = ""
     directories: list[str] = field(default_factory=list)
+    status_pending: bool = False
+    status_error: str = ""
 
 
-def scan(root: Path, include_ignored: bool = False) -> Index:
+def read_status(root: Path, repository: Path) -> dict[str, str]:
+    changes = git(repository, "status", "--porcelain=v1", "-z", "--untracked-files=all", "--", str(root))
+    if changes.returncode:
+        raise RuntimeError(changes.stderr.decode(errors="replace"))
+    status = {}
+    for name, code in parse_status(changes.stdout).items():
+        try:
+            relative = (repository / name).relative_to(root).as_posix()
+        except ValueError:
+            continue
+        status[relative] = code
+    return status
+
+
+def apply_status(index: Index, status: dict[str, str]):
+    # Staged deletions are absent from ls-files but still belong in the tree.
+    files = (set(index.files) | status.keys()) - set(index.directories)
+    limit = max(0, MAX_FILES - len(index.directories))
+    index.files = sorted(files, key=lambda name: (name.casefold(), name))[:limit]
+    if len(files) > limit and "Listing limited" not in index.note:
+        index.note = (index.note + "; " if index.note else "") + f"Listing limited to {MAX_FILES:,} entries; change root to a subfolder to see more"
+    index.status = status
+    index.status_pending = False
+    index.status_error = ""
+
+
+def scan(root: Path, include_ignored: bool = False, *, include_status: bool = True) -> Index:
     root = root.resolve(strict=True)
     if not root.is_dir():
         raise ValueError(f"Not a directory: {root}")
@@ -92,28 +120,26 @@ def scan(root: Path, include_ignored: bool = False) -> Index:
         if listing.returncode:
             raise RuntimeError(listing.stderr.decode(errors="replace"))
         files = {os.fsdecode(name) for name in listing.stdout.split(b"\0") if name}
-        changes = git(repository, "status", "--porcelain=v1", "-z", "--untracked-files=all", "--", str(root))
-        if changes.returncode:
-            raise RuntimeError(changes.stderr.decode(errors="replace"))
-        for name, code in parse_status(changes.stdout).items():
-            try:
-                relative = (repository / name).relative_to(root).as_posix()
-            except ValueError:
-                continue
-            status[relative] = code
-            files.add(relative)
+        if include_status:
+            status = read_status(root, repository)
+            files.update(status)
     if not repository or include_ignored:
         def walk_error(error):
             notes.append(str(error))
         excluded = VCS_DIRS if include_ignored else SKIP_DIRS
         walk = breadth_first_walk(root, walk_error) if include_ignored else os.walk(root, followlinks=False, onerror=walk_error)
         for directory, dirs, names in walk:
-            dirs[:] = sorted(d for d in dirs if d not in excluded and not (Path(directory) / d).is_symlink())
+            if not include_ignored:
+                dirs[:] = sorted(d for d in dirs if d not in excluded and not os.path.islink(os.path.join(directory, d)))
+            # Walkers already constrain entries to this root. Compute the prefix
+            # once per directory, not a pathlib ancestry search for every entry.
+            relative_dir = os.path.relpath(directory, root)
+            prefix = "" if relative_dir == "." else relative_dir + "/"
             if include_ignored:
                 for name in dirs:
                     if len(files) + len(directories) >= MAX_FILES:
                         break
-                    relative = (Path(directory) / name).relative_to(root).as_posix()
+                    relative = prefix + name
                     directories.add(relative)
                     # Git may list nested repositories as directory entries.
                     files.discard(relative)
@@ -123,13 +149,14 @@ def scan(root: Path, include_ignored: bool = False) -> Index:
                     continue  # Worktrees can have a .git file instead of a directory.
                 if len(files) + len(directories) >= MAX_FILES:
                     break
-                files.add((Path(directory) / name).relative_to(root).as_posix())
+                files.add(prefix + name)
             if len(files) + len(directories) >= MAX_FILES:
                 break
     names = sorted(files, key=lambda name: (name.casefold(), name))
     if len(names) + len(directories) >= MAX_FILES:
         notes.append(f"Listing limited to {MAX_FILES:,} entries; change root to a subfolder to see more")
-    return Index(root, names[:MAX_FILES], status, repository, "; ".join(notes), sorted(directories))
+    return Index(root, names[:MAX_FILES], status, repository, "; ".join(notes), sorted(directories),
+                 status_pending=bool(repository and not include_status))
 
 
 def search(files: list[str], query: str) -> list[str]:

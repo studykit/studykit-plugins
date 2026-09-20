@@ -2,12 +2,14 @@
 from __future__ import annotations
 
 import curses
+from concurrent.futures import Future
 import os
 from pathlib import Path
 import subprocess
+from threading import Thread
 import unicodedata
 
-from core import Row, checked_path, editor_command, preview, rows, scan
+from core import Row, apply_status, checked_path, editor_command, preview, read_status, rows, scan
 from diff_tool import comparison
 from popup_size import PopupSize, PRESETS
 from view_state import normalize as normalize_view
@@ -96,10 +98,12 @@ def theme(palette=None, folder_style=None) -> dict[str, int]:
 class Navigator:
     def __init__(self, root: Path, pane_id: str, changes: bool, editor: str,
                  size: PopupSize = PopupSize(), on_resize=None, theme_loader=None,
-                 folder_style=None, on_state=None, layout_loader=None, on_layout=None):
+                 folder_style=None, on_state=None, layout_loader=None, on_layout=None,
+                 initial_state=None, defer_status=False):
+        initial_state = normalize_view(initial_state, root)
         self.root, self.pane_id, self.editor = root, pane_id, editor
         self.changes = changes
-        self.include_ignored = False
+        self.include_ignored = initial_state["include_ignored"] if initial_state else False
         self.query = ""
         self.searching = False
         self.search_before = ""
@@ -127,7 +131,7 @@ class Navigator:
         self.palette = resolve_theme()
         self.styles = {}
         self.body = self.tree_body = 10
-        self.content_top = 8
+        self.content_top = 7
         self.divider = 26
         self.narrow = False
         self.size = size
@@ -139,17 +143,24 @@ class Navigator:
         self.layout_dialog = False
         self.on_state = on_state
         self.saved_state = None
+        self.defer_status = defer_status
+        self.status_job = None
+        self.pending_selection = ""
+        self.pending_scroll = 0
         self.message = ""
         self.index = None
         self.items = []
         self.refresh()
+        if initial_state is not None:
+            self.restore_state(initial_state)
 
     def export_state(self):
         return {"root": str(self.root), "changes": self.changes, "query": self.query,
                 "include_ignored": self.include_ignored,
                 "expanded": sorted(self.expanded), "active": self.active,
-                "selected": self.items[self.selected].path if self.items else "",
-                "scroll": self.scroll, "preview_scroll": self.preview_scroll,
+                "selected": self.pending_selection or (self.items[self.selected].path if self.items else ""),
+                "scroll": self.pending_scroll if self.pending_selection else self.scroll,
+                "preview_scroll": self.preview_scroll,
                 "horizontal": self.horizontal, "preview_focus": self.preview_focus}
 
     def checkpoint(self):
@@ -176,13 +187,14 @@ class Navigator:
             # before replacing a usable tree with a misleading empty project.
             with os.scandir(target) as entries:
                 next(entries, None)
-            index = scan(target, include_ignored=self.include_ignored)
+            index = self.scan_index(target, self.include_ignored)
         except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as error:
             self.root_error = self.message = f"Could not change root: {error}"
             return False
         previous = self.root
         self.checkpoint()
         self.root, self.index = index.root, index
+        self.pending_selection = ""
         self.query = self.search_before = ""
         self.searching = self.preview_focus = False
         self.expanded.clear()
@@ -208,12 +220,13 @@ class Navigator:
     def toggle_ignored(self):
         enabled = not self.include_ignored
         try:
-            index = scan(self.root, include_ignored=enabled)
+            index = self.scan_index(self.root, enabled)
         except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as error:
             self.message = f"Could not change ignored-file visibility: {error}"
             return
         selected = self.items[self.selected].path if self.items else ""
         self.index, self.include_ignored = index, enabled
+        self.pending_selection = ""
         if enabled:
             self.changes = False
         if self.active and self.active not in self.index.files:
@@ -295,7 +308,7 @@ class Navigator:
         include_ignored = state["include_ignored"]
         if include_ignored != self.include_ignored:
             try:
-                self.index = scan(self.root, include_ignored=include_ignored)
+                self.index = self.scan_index(self.root, include_ignored)
             except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as error:
                 self.message = f"Could not restore navigator state: {error}"
                 return False
@@ -313,6 +326,9 @@ class Navigator:
         self.clear_preview()
         self.rebuild()
         self.selected = next((i for i, row in enumerate(self.items) if row.path == state["selected"]), 0)
+        self.pending_selection = (state["selected"] if self.index.status_pending
+                                  and not any(row.path == state["selected"] for row in self.items) else "")
+        self.pending_scroll = state["scroll"]
         if state["active"] in self.index.files:
             self.load(state["active"])
             if not self.previewable:
@@ -415,13 +431,64 @@ class Navigator:
             self.theme_config = self.theme_loader()
             self.update_theme()
         try:
-            self.index = scan(self.root, include_ignored=self.include_ignored)
+            selected = self.pending_selection or (self.items[self.selected].path if self.items else "")
+            scroll = self.pending_scroll if self.pending_selection else self.scroll
+            self.index = self.scan_index(self.root, self.include_ignored)
+            self.pending_selection = ""
             self.message = self.index.note or "Refreshed"
             self.rebuild()
+            match = next((i for i, row in enumerate(self.items) if row.path == selected), None)
+            if match is not None:
+                self.selected = match
+            elif self.index.status_pending:
+                self.pending_selection, self.pending_scroll = selected, scroll
             if self.active:
                 self.load(self.active)
         except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as error:
             self.message = str(error)
+
+    def scan_index(self, root, include_ignored):
+        if self.defer_status:
+            return scan(root, include_ignored=include_ignored, include_status=False)
+        return scan(root, include_ignored=include_ignored)
+
+    def start_status(self):
+        if self.status_job is not None or self.index is None or not self.index.status_pending:
+            return
+        index, result = self.index, Future()
+        self.status_job = (index, result)
+
+        def work():
+            try:
+                result.set_result(read_status(index.root, index.repository))
+            except Exception as error:
+                result.set_exception(error)
+
+        # Only one query runs at a time. Leaving the UI never joins a slow Git
+        # process; its normal subprocess timeout still bounds the query.
+        Thread(target=work, name="file-nav-status", daemon=True).start()
+
+    def poll_status(self):
+        if self.status_job is None or not self.status_job[1].done():
+            return
+        index, result = self.status_job
+        self.status_job = None
+        if index is not self.index:
+            return  # Root changes and refreshes invalidate in-flight results.
+        selected = self.pending_selection or (self.items[self.selected].path if self.items else "")
+        try:
+            previous_files = index.files
+            apply_status(index, result.result())
+            if self.changes or index.files != previous_files:
+                self.rebuild()
+                self.selected = next((i for i, row in enumerate(self.items) if row.path == selected), self.selected)
+                if self.pending_selection:
+                    self.scroll = min(self.pending_scroll, self.selected)
+        except Exception as error:
+            index.status_pending = False
+            index.status_error = str(error)
+            self.message = f"Could not load Git status: {error}"
+        self.pending_selection = ""
 
     def update_theme(self):
         palette = resolve_theme(self.theme_config, self.appearance)
@@ -588,7 +655,7 @@ class Navigator:
     def style(self, name):
         return self.styles.get(name, 0)
 
-    def panel(self, screen, x, width, bottom, title, focused):
+    def panel(self, screen, x, width, bottom, focused):
         border = self.style("active" if focused else "gutter")
         corner = ("╔", "═", "╗", "║", "╚", "╝") if focused else ("┌", "─", "┐", "│", "└", "┘")
         a, horizontal, b, vertical, c, d = corner
@@ -597,16 +664,16 @@ class Navigator:
         for y in range(5, bottom):
             put(screen, y, x, vertical, 1, border)
             put(screen, y, x + width - 1, vertical, 1, border)
-        label = f" {'●' if focused else '○'} {title}" + (" · ACTIVE" if focused else "")
-        band(screen, 5, x + 1, label, width - 2,
-             self.style("header" if focused else "inactive") | curses.A_BOLD)
 
     def draw_tree(self, screen, x, width, bottom):
-        self.panel(screen, x, width, bottom, "FILES", not self.preview_focus and not self.searching)
-        band(screen, 6, x + 1, " CHANGED FILES" if self.changes else " PROJECT FILES", width - 2, self.style("surface"))
-        put(screen, 7, x + 2, f"{len(self.items)} rows · Space preview", width - 4, self.style("muted"))
+        focused = not self.preview_focus and not self.searching
+        self.panel(screen, x, width, bottom, focused)
+        band(screen, 5, x + 1, " CHANGED FILES" if self.changes else " PROJECT FILES", width - 2,
+             self.style("header" if focused else "surface"))
+        put(screen, 6, x + 2, f"{len(self.items)} rows · Space preview", width - 4, self.style("muted"))
         if not self.items:
-            put(screen, self.content_top, x + 2, "No matching files", width - 4, self.style("muted"))
+            empty = "Loading Git status…" if self.index and self.index.status_pending else "Git status unavailable" if self.index and self.index.status_error else "No matching files"
+            put(screen, self.content_top, x + 2, empty, width - 4, self.style("muted"))
         for offset, row in enumerate(self.items[self.scroll:self.scroll + self.tree_body]):
             selected = self.selected == self.scroll + offset
             style = self.style("folder" if row.directory else "base")
@@ -621,12 +688,13 @@ class Navigator:
             band(screen, self.content_top + offset, x + 1, text, width - 2, style)
 
     def draw_content(self, screen, x, width, bottom):
-        self.panel(screen, x, width, bottom, "CONTENT", self.preview_focus)
-        band(screen, 6, x + 1, " " + (self.active or "No file selected"), width - 2, self.style("surface"))
-        label = "MARKDOWN · Rich" if self.rendered is not None else "FILE PREVIEW · ^D vimdiff"
+        self.panel(screen, x, width, bottom, self.preview_focus)
+        band(screen, 5, x + 1, " " + (self.active or "No file selected"), width - 2,
+             self.style("header" if self.preview_focus else "surface"))
+        label = "MARKDOWN" if self.rendered is not None else "FILE PREVIEW · ^D vimdiff"
         if self.syntax is not None:
-            label = f"{self.language} · Pygments"
-        put(screen, 7, x + 2, label if self.active else "OPEN A FILE TO BEGIN", width - 4, self.style("muted"))
+            label = self.language
+        put(screen, 6, x + 2, label if self.active else "OPEN A FILE TO BEGIN", width - 4, self.style("muted"))
         for offset, line in enumerate(self.content[self.preview_scroll:self.preview_scroll + self.body]):
             y = self.content_top + offset
             if self.rendered is not None:
@@ -658,7 +726,7 @@ class Navigator:
             screen.refresh()
             return
         bottom = height - 4
-        self.content_top = 8
+        self.content_top = 7
         self.body = self.tree_body = bottom - self.content_top
         self.divider = max(26, min(width // 4, 38))
         self.narrow = width < 90
@@ -686,7 +754,8 @@ class Navigator:
              self.style("selected" if self.searching else "surface"))
         mode = "CHANGES" if self.changes else "PROJECT"
         visibility = "shown" if self.include_ignored else "hidden"
-        put(screen, 3, 2, f"{mode} · Ignored: {visibility} (^H)", width - 4, self.style("active"))
+        status_hint = " · Git: loading…" if self.index and self.index.status_pending else " · Git: unavailable" if self.index and self.index.status_error else ""
+        put(screen, 3, 2, f"{mode} · Ignored: {visibility} (^H){status_hint}", width - 4, self.style("active"))
         if self.narrow:
             if self.preview_focus:
                 self.draw_content(screen, 0, width - 1, bottom)
@@ -802,6 +871,11 @@ class Navigator:
         if not self.preview_focus and not self.searching:
             key = {"h": curses.KEY_LEFT, "j": curses.KEY_DOWN,
                    "k": curses.KEY_UP, "l": curses.KEY_RIGHT}.get(key, key)
+        navigation = (curses.KEY_UP, curses.KEY_DOWN, curses.KEY_LEFT, curses.KEY_RIGHT,
+                      curses.KEY_PPAGE, curses.KEY_NPAGE, curses.KEY_HOME, curses.KEY_END)
+        if (self.searching or key in ("/", "\x07") or isinstance(key, terminal_input.Mouse)
+                or (not self.preview_focus and key in navigation)):
+            self.pending_selection = ""
         if key == "/" and not self.searching:
             if not self.searching:
                 self.search_before = self.query
@@ -910,17 +984,19 @@ class Navigator:
         terminal_input.enable(screen)
         try:
             while True:
+                self.poll_status()
                 terminal_input.sync_size(screen)
                 if applied_palette != self.palette:
                     self.styles = theme(self.palette, self.folder_style)
                     self.color_pairs.clear()
                     applied_palette = self.palette
                 self.draw(screen)
+                self.start_status()
                 # Checkpoint the last displayed view before blocking for input;
                 # host-driven closure may terminate without a Python exit.
                 self.checkpoint()
                 try:
-                    screen.timeout(250)
+                    screen.timeout(50 if self.status_job is not None else 250)
                     key = terminal_input.read(screen)
                 except curses.error:
                     continue

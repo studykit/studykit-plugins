@@ -143,6 +143,25 @@ class IgnoredFileTests(unittest.TestCase):
         self.assertTrue(nav.include_ignored)
         self.assertIn("repo/ignored.py", nav.index.files)
 
+    def test_initial_view_scans_once_with_saved_visibility(self):
+        nav = self.navigator()
+        nav.toggle_ignored()
+        nav.load("sources/repo/ignored.py")
+        state = nav.export_state()
+        (self.root / "sources" / "repo" / "new.py").write_text("new file")
+        with patch("ui.scan", wraps=core.scan) as scan:
+            restored = Navigator(self.root, "pane", False, "", initial_state=state)
+        scan.assert_called_once_with(self.root, include_ignored=True)
+        self.assertEqual(restored.export_state(), state)
+        self.assertIn("sources/repo/new.py", restored.index.files)
+        self.assertEqual(restored.source_text, nav.source_text)
+
+    def test_invalid_initial_view_cannot_enable_ignored_files(self):
+        state = {**self.navigator().export_state(), "root": str(self.base), "include_ignored": True}
+        restored = Navigator(self.root, "pane", False, "", initial_state=state)
+        self.assertFalse(restored.include_ignored)
+        self.assertNotIn("sources/repo/ignored.py", restored.index.files)
+
     def test_toggle_does_not_override_input_modals(self):
         for start, finish in (("/", "\x1b"), ("\x0f", "\x1b"), ("\x17", "\x1b")):
             nav = self.navigator()

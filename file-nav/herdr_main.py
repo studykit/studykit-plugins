@@ -6,6 +6,8 @@
 """Translate Herdr invocation context into explicit navigator inputs."""
 from __future__ import annotations
 
+import fcntl
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -70,7 +72,77 @@ def open_panel(env, binary, pane_id, root, changes, size, resume=None, placement
         args.extend(["--width", f"{size.width}%", "--height", f"{size.height}%"])
     if resume:
         args.extend(["--env", f"FILE_NAV_RESUME={resume}"])
-    return call(binary, *args)
+    if placement != "overlay":
+        return call(binary, *args)
+    return open_overlay(env, binary, pane_id, args, resume)
+
+
+def overlay_slot(env, binary, source_pane):
+    directory, socket = env.get("HERDR_PLUGIN_STATE_DIR"), env.get("HERDR_SOCKET_PATH")
+    if not directory or not socket:
+        return None
+    context = json.loads(env.get("HERDR_PLUGIN_CONTEXT_JSON") or "{}")
+    tab_id = context.get("tab_id") if isinstance(context, dict) else None
+    if not tab_id:
+        tab_id = call(binary, "pane", "get", source_pane)["pane"]["tab_id"]
+    key = hashlib.sha256(json.dumps([socket, tab_id]).encode()).hexdigest()
+    return Path(directory) / "overlays" / f"{key}.json", tab_id
+
+
+def focus_overlay(env, binary, pane_id, tab_id, terminal_id=None):
+    try:
+        # Pane IDs can be reused after a host restart or moved to another tab.
+        # Check the live terminal identity before focusing a recorded pane.
+        if terminal_id is not None:
+            pane = call(binary, "pane", "get", pane_id)["pane"]
+            if pane.get("terminal_id") != terminal_id or pane.get("tab_id") != tab_id:
+                return None
+        result = call(binary, "plugin", "pane", "focus", pane_id)
+    except RuntimeError as error:
+        if "pane_not_found" in str(error):
+            return None
+        raise
+    plugin_pane = result["plugin_pane"]
+    if (plugin_pane["plugin_id"] != env["HERDR_PLUGIN_ID"]
+            or plugin_pane["entrypoint"] != "navigator"):
+        return None
+    call(binary, "pane", "zoom", pane_id, "--on")
+    return result
+
+
+def open_overlay(env, binary, source_pane, args, resume=None):
+    slot = overlay_slot(env, binary, source_pane)
+    if slot is None:
+        return call(binary, *args)
+    path, tab_id = slot
+    path.parent.mkdir(parents=True, exist_ok=True)
+    # Keep this inode in place: replacing/unlinking a flock file allows two
+    # actions to lock different inodes and both create a pane.
+    with path.open("a+") as stream:
+        fcntl.flock(stream, fcntl.LOCK_EX)
+        stream.seek(0)
+        try:
+            record = json.loads(stream.read(8192))
+        except ValueError:
+            record = None
+        result = None
+        if (isinstance(record, dict) and isinstance(record.get("pane_id"), str)
+                and isinstance(record.get("terminal_id"), str)):
+            result = focus_overlay(env, binary, record["pane_id"], tab_id, record["terminal_id"])
+        if result is None:
+            # Also adopt a focused navigator launched before instance tracking
+            # existed. A regular source pane is rejected by the plugin API.
+            result = focus_overlay(env, binary, source_pane, tab_id)
+        if result is None:
+            result = call(binary, *args)
+        elif resume:
+            Path(resume).unlink(missing_ok=True)
+        pane = result["plugin_pane"]["pane"]
+        stream.seek(0)
+        stream.truncate()
+        json.dump({"pane_id": pane["pane_id"], "terminal_id": pane["terminal_id"]}, stream)
+        stream.flush()
+        return result
 
 
 def resume_path(env, raw):
@@ -203,11 +275,10 @@ def main(env: dict, operation: str) -> int:
                               on_state=(lambda view: save_view(state_dir, view)) if state_dir else None,
                               layout_loader=lambda: current_layout(env),
                               on_layout=lambda placement, chosen, view:
-                                  change_layout(env, pane_id, placement, chosen, view))
-        if restored is not None:
-            navigator.restore_state(restored)
-            if env.get("FILE_NAV_RESUME"):
-                navigator.message = "Restored view after layout change"
+                                  change_layout(env, pane_id, placement, chosen, view),
+                              initial_state=restored, defer_status=True)
+        if restored is not None and env.get("FILE_NAV_RESUME"):
+            navigator.message = "Restored view after layout change"
         try:
             curses.wrapper(navigator.run)
         finally:

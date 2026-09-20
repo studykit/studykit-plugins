@@ -1,5 +1,41 @@
 # Development and verification
 
+For startup measurements and the repeatable component benchmark, see
+[Startup performance](performance.md).
+
+## Repeated overlay actions
+
+Herdr 0.9.1 creates a new overlay for every `plugin pane open` request; it does
+not deduplicate by plugin or entrypoint. Actions therefore serialize overlay
+lookup and creation with a file lock keyed by host socket path and tab ID.
+The record stores the live pane and terminal IDs. A recorded pane must still
+have the same terminal and tab before it can be focused. A missing pane permits
+a fresh open; other host errors propagate instead of causing a second open.
+Do not replace or unlink the lock file: contenders must lock the same inode.
+
+The adapter can also adopt an already-focused navigator from before instance
+tracking was installed, using the host's `plugin pane focus` response to check
+its plugin ID and entrypoint. It never sends keystrokes into the source pane.
+Refocusing preserves the running navigator's view, including its current
+project/changes mode, and re-enables zoom. Closed overlays leave harmless stale
+records that are validated on the next invocation. Popup launches keep the
+host's existing modal behavior.
+
+Validation for 0.17.2: 211 tests passed. A separate Herdr 0.9.1 session, isolated
+XDG directories, and a throwaway project reproduced two navigator panes before
+the fix and one afterward. Real keyboard input verified repeated shortcuts,
+preserved terminal identity and search text, unzooming without duplication,
+refocusing from the source pane, and Overlay → Popup → Overlay. Two bursts of
+six concurrent action invocations, including one after closing the navigator,
+also produced exactly one navigator. All 15 test action invocations succeeded.
+
+Runtime details were checked against the installed API schema and
+[Herdr's plugin pane handlers](https://github.com/herdrdev/herdr/blob/v0.9.1/src/app/api/plugins/mod.rs).
+The session socket environment contract is defined in
+[Herdr's API module](https://github.com/herdrdev/herdr/blob/v0.9.1/src/api/mod.rs).
+
+## General verification
+
 The plugin targets Herdr's terminal pane and popup APIs. It intentionally has no Claude Code
 or Codex manifests: neither agent runtime owns this UI, and the navigator works
 with either agent inside Herdr.

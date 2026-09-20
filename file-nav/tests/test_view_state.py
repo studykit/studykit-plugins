@@ -8,6 +8,7 @@ import unittest
 from unittest.mock import Mock, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import core
 import herdr_main
 import view_state as store
 from ui import Navigator
@@ -233,6 +234,13 @@ class AdapterStateTests(StateFixture):
     def test_explicit_changes_action_overrides_saved_browse_mode(self):
         self.nav.checkpoint()
         self.panel(lambda nav: self.assertTrue(nav.changes), {"FILE_NAV_CHANGES": "1"})
+
+    def test_panel_restores_ignored_view_without_default_scan(self):
+        self.nav.toggle_ignored()
+        self.nav.checkpoint()
+        with patch("ui.scan", wraps=core.scan) as scan:
+            self.panel(lambda nav: self.assertTrue(nav.include_ignored))
+        scan.assert_called_once_with(self.root, include_ignored=True, include_status=False)
 
     def test_resize_snapshot_has_precedence_over_saved_view(self):
         self.nav.checkpoint()
