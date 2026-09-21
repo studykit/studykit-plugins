@@ -3,6 +3,9 @@
 Guard provides user-configured turn, plan, and answer reviews, and configurable
 review actions for files changed by Claude Code or Codex.
 
+The `guard:docs-finder` agent was removed in v0.158.0. Use your host's documentation
+search tools or an independently installed agent to find sources.
+
 ## Turn reviews
 
 Implement and install your reviewer, then set `turn_review` in `.claude/guard.local.json`

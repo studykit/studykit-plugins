@@ -57,10 +57,10 @@ restrictions: the host injects a standing instruction to route work through `Bas
 can do the job, so a rule here confining `Bash` to a purpose list would be contradicted on
 every turn. Use it for anything else it does well.
 
-**`model: opus` is argued from the failure mode, except twice.** Only `docs-finder` (under its
-former name `ext-docs-fetcher`) and `ext-docs-auditor` were run head-to-head on `sonnet` and `opus` before the field was set;
-design.md § "Picking a model for an agent" records what those runs showed and what to re-run
-before changing either field. Every other `opus` in this directory is a claim about the job,
+**`model: opus` is argued from the failure mode, except for `ext-docs-auditor`.** It was run
+head-to-head on `sonnet` and `opus` before the field was set; design.md § "Picking a model for
+an agent" records that run and a historical comparison for the documentation finder removed
+in v0.158.0. Every other `opus` in this directory is a claim about the job,
 not a measurement — and so is the `sonnet` on the Korean pair, which was set by decision rather
 than by a run.
 
@@ -294,34 +294,7 @@ when taken.
 **No `memory:`.** It would store VERDICTS, and matching a stored one is cheaper than re-reading
 the file — a wrong stored verdict then suppresses the finding that would expose it.
 
-`model: opus` — one of the two fields set by measurement; see design.md.
-
-### `docs-finder`
-
-`tools: WebSearch, WebFetch, Read, Write, Edit, Grep, Glob, Bash`
-
-`WebSearch` finds the primary source, `WebFetch` reads it, `Bash` covers the five commands the
-body names (`refs-dir`, `knowledge-dirs`, `date +%F`, `curl`, the MarkItDown one-liner),
-`Write`/`Edit` save the file and its index row, and `Read`/`Grep`/`Glob` do the local search that
-comes first.
-
-The read tools now reach the repository as well as the refs directory, and the write tools
-still do not: the body carries "write nothing outside the refs directory", which is a promise
-rather than a grant the host scopes — the same arrangement as every "reports; edits nothing"
-agent here.
-
-No `Agent` and no `SendMessage`: it cannot delegate the reading, and it cannot ask the caller to
-narrow a vague question — hence the instruction in the body to report what it took the question to
-mean.
-
-`memory: project`, and **this is the exception to the no-stores rule**: nothing here is a VERDICT.
-What accumulates is operational — which vendors serve raw markdown, which pages `WebFetch`
-summarizes, this project's naming conventions — so a stale entry costs a visible wasted fetch
-rather than a suppressed finding.
-
-`model: sonnet`, `effort: medium`. The head-to-head in design.md § "Picking a model for an agent"
-argued for `opus`, but on a run that predates the `curl` step now in the body — **re-run it before
-treating either tier as settled.** `color: yellow` — this one writes files.
+`model: opus` — set by measurement; see design.md.
 
 ## Retired plan critics
 

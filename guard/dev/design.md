@@ -1,5 +1,22 @@
 # guard — design detail
 
+## Docs finder removal (v0.158.0)
+
+The bundled `docs-finder` agent is no longer needed and has been removed, along with its
+settings-command guidance and obsolete runtime comments. It had no dedicated configuration
+key, hook dispatch, or Codex setup entry. Documentation lookup now belongs to the caller's
+tools or independently installed agents.
+
+Saved-reference indexing, `ext-docs-auditor`, and knowledge-directory access remain in use by
+other reviews. References to `docs-finder` and its former name `ext-docs-fetcher` below are
+historical design notes and measurements, not instructions to invoke an available agent.
+
+Claude, Codex, and Herdr manifests use 0.158.0. Marketplace registrations and descriptions
+already describe the remaining features and need no change.
+Official packaging references checked on 2026-09-21:
+[Claude plugin reference](https://code.claude.com/docs/en/plugins-reference) and
+[OpenAI plugin packaging](https://developers.openai.com/plugins/build/plugins).
+
 ## Herdr file diffs (v0.157.0)
 
 The pending-files popup now opens a HEAD/working-tree comparison with `d` or `Ctrl+D`.

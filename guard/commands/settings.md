@@ -161,8 +161,8 @@ Use `audit-turn` with a user-configured reviewer for turn audits.
 
 `korean-translator` and `korean-corrector` are user-level delivery agents, without a `guard:`
 prefix or audit switch. `answer` uses the translator after review for Korean readers. If
-unavailable, deliver the reviewed English file and explain. `guard:docs-finder` remains
-available by its description; `guard:ext-docs-auditor` can be selected by a document rule.
+unavailable, deliver the reviewed English file and explain.
+`guard:ext-docs-auditor` can be selected by a document rule.
 
 ## Configure file-review rules
 

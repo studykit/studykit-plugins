@@ -130,11 +130,6 @@ DEFAULT_CONFIG: dict[str, Any] = {
     # and order is precedence. A bare string is still accepted (one directory), since that
     # is what a user with one will write.
     "knowledge_dir": [],
-    # No key for `docs-finder`, deliberately. It is not one of guard's recommended
-    # agents any more: nothing routes it and no hook forces the session into it, so there is
-    # no "says something unasked" for a switch to govern. The main agent picks it the way it
-    # picks any agent — from its description — and an off-by-default switch in front of that
-    # would only be a way to make a listed agent silently unusable.
     # Where guard saves local copies of cited docs, relative to
     # the project dir. Empty = the default git-tracked `wiki/ref/`, so the collected
     # references are committed with the repo. Point it at a different tracked path

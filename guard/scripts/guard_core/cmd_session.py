@@ -5,11 +5,6 @@ exports ``GUARD_PROJECT_DIR`` and ``GUARD_REFS_DIR`` via ``$CLAUDE_ENV_FILE`` (a
 since this event also fires on every compaction); and states as session context the refs rule
 always, plus explicit review entry points when their configuration is present.
 This context is stated once at session start rather than repeated at every Stop.
-
-There is deliberately no line naming ``docs-finder``. That agent has no switch to
-announce and nothing here forbids the session's own fetching; it is selected the way any agent
-is, from its description, and the refs rule below is what tells the session that a cited page
-has to end up saved.
 """
 
 from __future__ import annotations
