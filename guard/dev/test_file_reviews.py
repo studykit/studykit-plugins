@@ -234,6 +234,36 @@ class FileReviewTests(unittest.TestCase):
             self.assertTrue(groups[0]["conditional"])
             (self.project / "wiki/ref/page.md").unlink()
 
+    def test_refs_index_is_searched_from_the_file_up_to_the_refs_root(self):
+        """A refs tree split into subdirectories indexes itself per directory."""
+        for host in ("claude", "codex"):
+            self.configure(host, [], refs_dir="refs")
+            saved = self.write("refs/upstream/rfc9110.md", "External page\n")
+            self.write("refs/AGENTS.md", "Folder guide. Each folder indexes itself.\n")
+
+            # Neither index names the file: blocked, and the row is asked for at the only
+            # index that exists.
+            result = self.record(host, saved)
+            blocked = json.loads(result.stdout)
+            self.assertEqual(blocked["decision"], "block")
+            self.assertIn("refs/AGENTS.md", blocked["reason"])
+
+            # A folder index that exists but omits the file moves the ask down to it,
+            # rather than sending the row back to the root guide.
+            self.write("refs/upstream/AGENTS.md", "| File | Covers |\n")
+            blocked = json.loads(self.record(host, saved).stdout)
+            self.assertEqual(blocked["decision"], "block")
+            self.assertIn("refs/upstream/AGENTS.md", blocked["reason"])
+
+            # Listed in its own folder's index: cleared, without a row at the root.
+            self.write("refs/upstream/AGENTS.md", "| `rfc9110.md` | Accept-Encoding |\n")
+            self.assertEqual(self.record(host, saved).stdout, "")
+
+            # A project that kept every row in the root index still clears.
+            (self.project / "refs/upstream/AGENTS.md").unlink()
+            self.write("refs/AGENTS.md", "| `rfc9110.md` | Accept-Encoding |\n")
+            self.assertEqual(self.record(host, saved).stdout, "")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -135,7 +135,10 @@ These are Guard's project-relative file globs with negation, not the full `.giti
 syntax; an exception can restore a file inside an excluded tree directly.
 
 The reference-index requirement remains immediate: a new saved reference must still be added
-to the reference directory's index before work continues.
+to an index before work continues. Guard looks for the file name in the `AGENTS.md` of the
+file's own directory and then in each directory above it up to the reference directory, so a
+reference tree split into subdirectories can index itself per directory instead of keeping one
+flat list at the root.
 
 ## Herdr integration
 

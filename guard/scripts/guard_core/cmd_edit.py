@@ -391,9 +391,10 @@ def cmd_post_edit() -> int:
        list consumed by an explicit file checkpoint. This is the event
        that actually sees the path, so nothing has to be reconstructed from a transcript
        later; Stop only reads back what accumulated here.
-    2. Require a file saved inside the refs dir to be listed in the refs index
-       (``AGENTS.md``). A saved reference nothing points at is a file the next reader
-       never finds, so the index is the deliverable, not a courtesy. This fires *after*
+    2. Require a file saved inside the refs dir to be listed in a refs index — the
+       nearest ``AGENTS.md`` at or above it, so a refs tree split into subdirectories can
+       index itself per directory. A saved reference nothing points at is a file the next
+       reader never finds, so the index is the deliverable, not a courtesy. This fires *after*
        the write rather than blocking it: the natural order is save-then-index, and
        blocking the save would force an index entry for a file that does not exist yet.
 
@@ -442,6 +443,22 @@ def cmd_post_edit() -> int:
     return 0
 
 
+def _refs_index_chain(refs: Path, target: Path) -> list[Path]:
+    """Candidate indexes for ``target``, nearest first: its own directory, then each
+    directory up to and including the refs root.
+
+    Callers have already established that ``target`` is inside ``refs``; the containment
+    test in the loop is there so a caller that has not cannot walk out of the project.
+    """
+    chain: list[Path] = []
+    current = target.parent
+    while True:
+        chain.append(current / REFS_INDEX_NAME)
+        if current == refs or refs not in current.parents:
+            return chain
+        current = current.parent
+
+
 def refs_index_gap(project_dir: Path, target: Path, config: dict[str, Any]) -> str | None:
     """The block reason when ``target`` is missing from the refs index, else None.
 
@@ -449,13 +466,28 @@ def refs_index_gap(project_dir: Path, target: Path, config: dict[str, Any]) -> s
     in the index text rather than by table structure: the index is prose a human
     maintains, and pinning the check to a column layout would fail the moment someone
     reformats it.
+
+    A refs tree big enough to be split into subdirectories indexes itself per directory,
+    so any index from the file's own directory up to the refs root settles it. A flat
+    refs dir is the same single read as before, and a split one is satisfied whether the
+    rows stayed in the root index or moved down beside the files — neither layout has to
+    be declared anywhere. The row is then asked for at the nearest index that EXISTS,
+    since that is where the maintainer put the rows for this file's neighbours; naming the
+    root index instead would send every row back to the file the split was meant to empty.
     """
-    index = _refs_dir(project_dir, config) / REFS_INDEX_NAME
     try:
-        if target.name in index.read_text(encoding="utf-8"):
-            return None
+        refs = _refs_dir(project_dir, config).resolve()
+        chain = _refs_index_chain(refs, target.resolve())
     except OSError:
-        pass  # No index yet: the first saved reference is what creates it.
+        return None
+    for index in chain:
+        try:
+            if target.name in index.read_text(encoding="utf-8"):
+                return None
+        except OSError:
+            continue  # No index at this level, or unreadable: try the one above.
+    # No index yet anywhere: the first saved reference is what creates it, at the root.
+    index = next((path for path in chain if path.exists()), chain[-1])
     return (
         f"guard: `{target.name}` is saved but not listed in the reference index. "
         f"Add a row for it to `{_project_rel(project_dir, index)}` — file name, what "

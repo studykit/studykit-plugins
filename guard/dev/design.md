@@ -2141,7 +2141,7 @@ payloads, not memory.
   cwd; there is nothing better to offer, and `status` is unaffected either way because its
   root arrives in the status-line payload.
 - **A saved reference must be indexed.** The `post-edit` hook (PostToolUse) blocks when a
-  file written inside the refs dir is not named in that directory's `AGENTS.md`. A
+  file written inside the refs dir is not named in an `AGENTS.md` at or above it. A
   reference nothing points at is one the next reader never finds, so the index is part of
   the save, not a courtesy. It runs *after* the write, not as a PreToolUse gate: the
   natural order is save-then-index, and blocking the save would demand an index row for a
@@ -2149,6 +2149,17 @@ payloads, not memory.
   in the index — the index is prose a human maintains, so pinning the check to a table
   layout would fail the first time someone reformats it. `AGENTS.md` and its `CLAUDE.md`
   shim are skipped (`_REFS_INDEX_SKIP`) or writing the index would trip its own hook.
+
+  The search is a chain, not one file (`_refs_index_chain`): the file's own directory
+  first, then each directory up to the refs root. A refs collection outgrows a single flat
+  list, and the projects that split it put an index in each subdirectory; reading only the
+  root index made that layout unusable, because every save under it blocked and told the
+  author to write the row into the one file the split existed to empty. Any index in the
+  chain settles the check, so a project that kept all its rows at the root is unaffected
+  and one that moved them down works without declaring anything. When the row really is
+  missing, the block names the nearest index that *exists* — where the rows for this
+  file's neighbours already are — falling back to the root index when the tree has none
+  yet.
   The check itself is `refs_index_gap`, shared by both hosts: Claude reaches it through
   `post-edit`, Codex from its single PostToolUse adapter. This one stays a
   `decision: "block"` rather than `additionalContext`: it is unfinished work, not
