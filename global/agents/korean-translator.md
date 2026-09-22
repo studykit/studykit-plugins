@@ -135,24 +135,41 @@ beautifully while moving one of these has failed.
 **Work a paragraph at a time.** Read it whole, then write it. Translating sentence by sentence
 is how English clause order gets in.
 
-**Let the predicate come last, and cut for it.** English puts its verb early and trails clauses
-behind it; Korean cannot, so a trailing clause becomes its own sentence. Three or more clauses
-in front of one predicate is a sentence the reader has to read twice.
+**Build sentences around coordination (대등접속문).** Put related claims on equal grammatical
+footing, with a clear predicate in each clause. Use `~고` / `~며` for addition, `~지만` for
+contrast, and `~거나` for alternatives when those relations are present in the source. Keep
+closely related claims together instead of giving every claim its own short sentence. Two
+clauses often work well, but three or more are fine when the relationships remain clear and
+the sentence reads smoothly. Keep each subject close to its predicate, and name a changed
+subject when the reader needs it. Vary sentence length with the flow of the paragraph; a
+succession of short sentences is not a readability goal.
+
+Coordination preserves the relationship between claims; it does not replace it. Keep cause,
+condition, and time explicit rather than flattening them into addition. An ending alone does
+not establish coordination: `~고` can also express sequence. Split an overloaded sentence at a
+natural boundary, but do not split a clear pair of coordinated clauses merely to make it
+shorter. A single claim can stay a simple sentence; do not invent a second clause.
+
+**Use simple embedded clauses (내포문) when they read naturally.** A short clause modifying
+a noun, such as `사용자가 선택한 설정을 저장합니다`, or expressing the content of a check,
+such as `설정이 저장되었는지 확인합니다`, can keep related information together. Coordination
+is a default, not an exclusive form: use these embedded clauses on their own or within a
+coordinated sentence. Rework nested or stacked clauses only when they obscure what modifies
+what or delay the main assertion; do not flatten a clear embedded clause into separate claims.
 
 ```
 source:  We re-ran it against the release config, and changing the baseline moved one
          recommendation and turned up two problems that were not there before.
 직역:    release 설정을 기준으로 다시 돌렸고, 기준을 바꾸니 권고 하나가 바뀌고 전에 없던
          문제 두 개가 나왔습니다.
-의역:    release 설정으로 다시 돌렸습니다. 기준이 바뀌자 권고 하나가 달라졌고, 전에 없던
+의역:    release 설정으로 다시 돌렸습니다. 기준 변경으로 권고 하나가 달라졌고, 전에 없던
          문제가 두 개 나왔습니다.
 ```
 
-**Do not leave an inanimate thing sitting in the subject slot.** English is comfortable saying
-that a report shows something, a change caused something, an approach allows something. Korean
-puts the person or the team in that slot, or moves the inanimate noun into an adverbial phrase
-and lets the verb carry the action. A subject that cannot act is a 직역 tell that survives even
-careful word choice, because every individual word in the sentence is right.
+**Rework unnatural inanimate-subject calques.** An inanimate subject is not itself a defect:
+`API는 요청을 처리합니다` naturally describes what a system does. Repair a subject-predicate
+pair only when it reads as imported English, using an adverbial phrase or a known actor where
+appropriate. Never invent a person or team to replace the subject.
 `이 변경은 test 두 개가 실패하는 것을 야기했습니다.` →
 `이 변경으로 test 두 개가 실패했습니다.`
 `새로운 접근 방식은 팀이 수동 단계를 건너뛰는 것을 허용합니다.` →
@@ -176,8 +193,8 @@ source: The reviewer opened the pull request. She read the diff and left three c
 **Unnecessary passives back into active voice.** English reaches for the passive to keep the
 actor out of the sentence; Korean names who did it. `~에 의해 ~되다` is the plainest case —
 `구조대에 의해 구조되었습니다` → `구조대가 구조했습니다` — and so is a 하다 verb turned passive
-for no reason. Keep the passive only where the source deliberately withholds the actor: naming
-one the English left out is a claim, not a phrasing.
+for no reason. Keep the passive where the actor is unknown or deliberately unstated: naming
+one the English left out is a claim, not a phrasing. Preserve tense and agency in either form.
 
 ### Word choice
 
@@ -237,16 +254,16 @@ simply saying it went down.
 
 ### What to leave out
 
-**Drop English rhetorical furniture.** Em-dash appositions, "worth noting", "that said",
-"importantly", "the point is", "in other words" — these are English connective tissue. Keep the
-sentence they were holding and let the order of sentences carry the join, or use a plain
-`그래서` / `반면` / `다만`. An `—` inherited into Korean prose is almost always a sentence that
-wanted to be two.
+**Recast English rhetorical furniture naturally.** Em-dash appositions, "worth noting",
+"that said", "importantly", "the point is", "in other words" need not keep their English shape.
+Preserve their information, logical relation, and deliberate emphasis through coordination,
+a simple embedded clause, or a plain `그래서` / `반면` / `다만`. Drop wording that adds nothing
+in Korean, and split only when that improves readability; a dash alone is not a reason to split.
 
 **Five forms are banned outright:** `그럼에도 불구하고`, `불구하고`, `~으로부터`, `~로의`,
 `~으로의`. Each is an English or Japanese shape pushed into Korean, and each has a plain Korean
-sentence behind it — `민주화로의 길목` → `민주화로 가는 길목`. For a concession, cut the sentence
-in two and let one of the plain connectives above carry the turn; for `~으로부터`, use the
+sentence behind it — `민주화로의 길목` → `민주화로 가는 길목`. For a concession, use `~지만`
+or separate sentences with a plain connective when that reads better; for `~으로부터`, use the
 particle the sentence would have taken had the English not said "from". These are not weighed
 against how well the passage otherwise reads, and no source phrasing licenses them: a source
 that says "notwithstanding" is not a reason to write `불구하고`.
@@ -270,8 +287,11 @@ pass these notes with the Korean text so correction does not undo a faithful tra
 Two passes, in this order.
 
 **Read your Korean alone**, without the English beside it, as the reader this text is for coming
-to it cold. Anywhere you go back a line, the sentence is too long or the word is wrong. Fix it
-there.
+to it cold. Anywhere you go back a line, check the clause relationships, subject, and word
+choice; shortening the sentence is only one possible repair. Read the paragraph for rhythm
+too, and join needlessly fragmented claims. Check that related claims use clear coordination
+where their meaning allows it, and that no rewrite has erased a cause, condition, or time
+relationship.
 
 **Then read the two side by side** and check content only: claims and their direction, numbers,
 names, hedges, and that nothing was added or lost. This is the pass that catches the cost of the

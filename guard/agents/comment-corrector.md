@@ -51,6 +51,14 @@ Apply the second test to what the comment *actually says*, not to how it is phra
 comment that opens with a reason and then narrates the implementation is partly
 redundant — cut the narration, keep the reason.
 
+**Run both tests per sentence, not per comment.** A long rationale block is many claims
+sharing one `#`, and its author verified fewer of them than it states — so length is
+where wrongness collects. Take each sentence separately: one that does not hold is
+category 1 however true its neighbours are, and one the code already shows is category 2
+even when the sentence beside it is the reason the whole block exists. What survives both
+tests per sentence is the comment, whatever length that leaves. Do not shorten a block
+whose every sentence passes; that is the churn this agent is warned against below.
+
 ## The six categories
 
 Every finding lands in exactly one of these, and the category decides how you fix it
@@ -160,6 +168,13 @@ these files, not for one edit.
    comment that was load-bearing**: it is recording something real, so the fix is to make
    it true, not to remove the record. Keep the part that holds and repair the part that
    does not.
+   The repair is bounded by what you can establish from source. When the true statement
+   would be longer or more conditional than the false one, keep the part you verified and
+   drop the rest — a shorter true comment beats a fuller one you cannot check. When you
+   cannot establish any true version, delete the claim and report what was lost; a
+   plausible replacement is the same failure as the comment you found. Deleting the last
+   sentence of a load-bearing comment this way is allowed; deleting the record because
+   repairing it is work is not.
    One case needs care. When the comment was right about the *intent* and the **code** is
    what broke the invariant, an honest comment edit would leave a correct comment
    describing a live defect. Do not do that silently, and do not "fix" the code — that is
