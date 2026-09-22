@@ -1,6 +1,6 @@
 {
   "name": "guard",
-  "version": "0.159.0",
+  "version": "0.159.1",
   "description": "User-configured answer, turn, and plan reviews, glob-based file reviews, and Git diffs in Herdr.",
   "author": {
     "name": "studykit"

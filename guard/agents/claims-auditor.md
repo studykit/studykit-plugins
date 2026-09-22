@@ -2,7 +2,6 @@
 name: claims-auditor
 description: Unevidenced-claims auditor.
 tools: Read, Grep, Glob, Bash, SendMessage
-memory: project
 model: opus
 color: red
 ---

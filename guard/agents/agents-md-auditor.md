@@ -2,7 +2,6 @@
 name: agents-md-auditor
 description: "`AGENTS.md` auditor."
 tools: Read, Grep, Glob, Bash
-memory: project
 model: opus
 color: red
 ---

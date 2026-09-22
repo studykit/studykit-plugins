@@ -2,7 +2,6 @@
 name: deferrals-auditor
 description: Deferrals auditor.
 tools: Read, Grep, Glob, Bash, SendMessage
-memory: project
 model: opus
 color: red
 ---
