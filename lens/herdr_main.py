@@ -49,6 +49,41 @@ def kitty_graphics(env):
     return True
 
 
+def chord(spec):
+    """One Herdr key chord ("ctrl+s", "alt+x", "shift+a", "a") as curses input."""
+    *mods, name = spec.lower().split("+") if spec != "+" else ["+"]
+    name = {"space": " ", "tab": "\t", "enter": "\n"}.get(name, name)
+    if len(name) != 1 or not set(mods) <= {"ctrl", "alt", "shift"}:
+        return None
+    if "shift" in mods:
+        name = name.upper()
+    if "ctrl" in mods:
+        if not "a" <= name.lower() <= "z":
+            return None
+        name = chr(ord(name.lower()) - 96)
+    return "\x1b" + name if "alt" in mods else name
+
+
+def toggle_keys(env):
+    """Key sequences bound to the toggle action. A popup receives all input, so
+    Lens closes itself on them; Herdr runs the action for an overlay."""
+    keys = host_config(env).get("keys", {})
+    if not isinstance(keys, dict) or not env.get("HERDR_PLUGIN_ID"):
+        return []
+    prefix = keys.get("prefix", "ctrl+b")
+    found = []
+    for binding in keys.get("command", []) if isinstance(keys.get("command"), list) else []:
+        if not isinstance(binding, dict) or binding.get("command") != env["HERDR_PLUGIN_ID"] + ".toggle":
+            continue
+        spec = str(binding.get("key", ""))
+        parts = [prefix, spec[len("prefix+"):]] if spec.startswith("prefix+") else [spec]
+        sequence = tuple(chord(part) for part in parts if isinstance(part, str))
+        # A bare printable key would close Lens while typing a search.
+        if sequence and None not in sequence and not (len(sequence) == 1 and sequence[0].isprintable()):
+            found.append(sequence)
+    return found
+
+
 def cell_size(env, pane_id):
     # Popups get no pixel size from their pty, but every pane of the attached
     # client shares one cell size, so ask about the source pane instead.
@@ -182,6 +217,37 @@ def open_overlay(env, binary, source_pane, args, resume=None):
         return result
 
 
+def navigator_pane(env, binary, pane_id):
+    try:
+        plugin_pane = call(binary, "plugin", "pane", "focus", pane_id)["plugin_pane"]
+    except RuntimeError as error:
+        if "not_found" in str(error):
+            return False
+        raise
+    return plugin_pane["plugin_id"] == env["HERDR_PLUGIN_ID"] and plugin_pane["entrypoint"] == "navigator"
+
+
+def close_navigator(env, binary):
+    """Close this tab's Lens overlay if one is open. Returns whether it was."""
+    context = json.loads(env.get("HERDR_PLUGIN_CONTEXT_JSON") or "{}")
+    focused = context.get("focused_pane_id") if isinstance(context, dict) else None
+    candidates = [focused] if focused else []
+    slot = overlay_slot(env, binary, focused) if focused else None
+    if slot is not None and slot[0].exists():
+        try:
+            record = json.loads(slot[0].read_text()[:8192])
+            pane = call(binary, "pane", "get", record["pane_id"])["pane"]
+            if pane.get("terminal_id") == record["terminal_id"] and pane.get("tab_id") == slot[1]:
+                candidates.append(record["pane_id"])
+        except (OSError, ValueError, KeyError, TypeError, RuntimeError):
+            pass
+    for pane_id in dict.fromkeys(candidates):
+        if navigator_pane(env, binary, pane_id):
+            call(binary, "plugin", "pane", "close", pane_id)
+            return True
+    return False
+
+
 def resume_path(env, raw):
     path = Path(raw).resolve()
     directory = Path(env["HERDR_PLUGIN_STATE_DIR"]).resolve()
@@ -281,6 +347,10 @@ def main(env: dict, operation: str) -> int:
     if env.get("HERDR_ENV") != "1":
         raise ValueError("Run Lens from inside Herdr")
     binary = env.get("HERDR_BIN_PATH") or "herdr"
+    if operation == "toggle":
+        if close_navigator(env, binary):
+            return 0
+        operation = "browse"
     pane_id, root = source(env, binary)
     if operation in ("browse", "changes"):
         config_dir = Path(env["HERDR_PLUGIN_CONFIG_DIR"]) if env.get("HERDR_PLUGIN_CONFIG_DIR") else None
@@ -319,6 +389,7 @@ def main(env: dict, operation: str) -> int:
                               graphics=diagram_preview.write if kitty_graphics(env) else None,
                               cell_size=lambda: cell_size(env, pane_id),
                               alignment=diagram_preview.load_alignment(config_dir),
+                              close_keys=toggle_keys(env),
                               on_alignment=(lambda chosen: diagram_preview.save_alignment(config_dir, chosen))
                                   if config_dir else None)
         if restored is not None and env.get("LENS_RESUME"):

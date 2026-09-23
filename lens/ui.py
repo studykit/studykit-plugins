@@ -13,6 +13,7 @@ from core import Row, apply_status, checked_path, editor_command, preview, read_
 from diff_tool import comparison
 from popup_size import PopupSize, PRESETS
 from view_state import normalize as normalize_view
+import command_line
 import markdown_preview
 import diagram_preview
 import syntax_preview
@@ -44,6 +45,11 @@ def put(screen, y: int, x: int, text: str, width: int, style: int = 0):
         screen.addstr(y, x, "".join(clipped), style)
     except curses.error:
         pass  # Resizes can race the draw, particularly at the bottom right.
+
+
+def cells(text: str) -> int:
+    return sum(0 if unicodedata.combining(char) else 2 if unicodedata.east_asian_width(char) in "WF" else 1
+               for char in text)
 
 
 def band(screen, y, x, text, width, style=0):
@@ -101,7 +107,7 @@ class Navigator:
                  size: PopupSize = PopupSize(), on_resize=None, theme_loader=None,
                  folder_style=None, on_state=None, layout_loader=None, on_layout=None,
                  initial_state=None, defer_status=False, diagram_tools=None, graphics=None,
-                 cell_size=None, alignment="center", on_alignment=None):
+                 cell_size=None, alignment="center", on_alignment=None, close_keys=()):
         initial_state = normalize_view(initial_state, root)
         self.root, self.pane_id, self.editor = root, pane_id, editor
         self.changes = changes
@@ -171,6 +177,18 @@ class Navigator:
         self.images_sent, self.images_stale = set(), set()
         self.image_placed = self.cell = None
         self.screen_size = None
+        # Find in preview: typed text, matches as (line, start, end) over clean(line).
+        self.finding = False
+        self.find_query = self.find_before = ""
+        self.find_matches, self.find_content, self.find_for = [], None, None
+        self.find_index = -1
+        self.find_origin = (0, 0)
+        self.text_width = 60
+        # Command line (":" or Alt+X): the draft while open, else None.
+        self.command = None
+        self.command_history, self.command_recall = [], 0
+        # Key sequences that close Lens, such as the host's toggle binding.
+        self.close_keys, self.close_typed = [tuple(keys) for keys in close_keys], ()
         self.index = None
         self.items = []
         self.refresh()
@@ -989,6 +1007,8 @@ class Navigator:
         if self.diagram_view():
             self.draw_diagram(screen, x, width)
             return
+        self.text_width = width - (4 if self.rendered is not None else 10)
+        highlight = bool(self.find_query) and bool(self.matches())
         for offset, line in enumerate(self.content[self.preview_scroll:self.preview_scroll + self.body]):
             y = self.content_top + offset
             if self.rendered is not None:
@@ -1001,6 +1021,10 @@ class Navigator:
                     put(screen, y, x + 8, clean(line)[self.horizontal:], width - 10, self.style("base"))
             else:
                 put(screen, y + 1, x + 3, line, width - 6, self.style("muted"))
+            if highlight and self.active:
+                # Drawn over the line so the highlight wins.
+                left = x + 2 if self.rendered is not None else x + 8
+                self.draw_matches(screen, y, left, self.text_width, self.preview_scroll + offset)
         if self.rendered is not None and self.markdown_diagrams:
             self.place_markdown(screen, x + 2)
 
@@ -1043,15 +1067,23 @@ class Navigator:
         if self.selected >= self.scroll + self.tree_body:
             self.scroll = self.selected - self.tree_body + 1
         self.preview_scroll = min(self.preview_scroll, max(0, self.preview_length() - self.body))
-        focus = "ROOT" if self.root_draft is not None else "SEARCH" if self.searching else "CONTENT" if self.preview_focus else "FILES"
+        focus = ("ROOT" if self.root_draft is not None else "COMMAND" if self.command is not None
+                 else "SEARCH" if self.searching else "FIND" if self.finding
+                 else "CONTENT" if self.preview_focus else "FILES")
         band(screen, 0, 0, "  LENS", width - 1, self.style("surface") | curses.A_BOLD)
         badge = f" FOCUS: {focus} "
         band(screen, 0, max(19, width - len(badge) - 2), badge, len(badge), self.style("header") | curses.A_BOLD)
         put(screen, 1, 2, "[..]", 4, self.style("active"))
         put(screen, 1, 8, str(self.root), width - 10, self.style("muted"))
-        hint = "Type filename…  Enter Apply · Esc Cancel" if self.searching else "/ to search files"
-        band(screen, 2, 1, f" ⌕  {self.query or hint}" + (" ▏" if self.searching and self.query else ""), width - 3,
-             self.style("selected" if self.searching else "surface"))
+        if self.command is not None:
+            band(screen, 2, 1, f" :{self.command}▏", width - 3, self.style("selected"))
+        elif self.finding or (self.preview_focus and self.find_query and not self.searching):
+            text = f" ⌕  Find in preview: {self.find_query}" + (" ▏" if self.finding else "  ·  n N Next/Prev")
+            band(screen, 2, 1, text, width - 3, self.style("selected" if self.finding else "surface"))
+        else:
+            hint = "Type filename…  Enter Apply · Esc Cancel" if self.searching else "/ to search files"
+            band(screen, 2, 1, f" ⌕  {self.query or hint}" + (" ▏" if self.searching and self.query else ""), width - 3,
+                 self.style("selected" if self.searching else "surface"))
         mode = "CHANGES" if self.changes else "PROJECT"
         visibility = "shown" if self.include_ignored else "hidden"
         status_hint = " · Git: loading…" if self.index and self.index.status_pending else " · Git: unavailable" if self.index and self.index.status_error else ""
@@ -1068,13 +1100,17 @@ class Navigator:
         band(screen, height - 3, 0, f" {focus}  {position}  ·  {self.message}", width - 1, self.style("surface"))
         enter_hint = "Enter Scroll" if self.preview_focus else "Enter Open"
         put(screen, height - 2, 1, f"^W Layout  Tab Focus  {enter_hint}  ^Y Popup size  ^D Vimdiff  ^E Edit  Esc Back", width - 2, self.style("active"))
-        help_text = "SEARCH: Type filter  ^U Clear  Enter Apply  Esc Cancel" if self.searching else "^N/P Preview line  ^F/B Preview page  h/j/k/l Move  Space Preview  / Search  ^O Root  Backspace Up"
+        help_text = "SEARCH: Type filter  ^U Clear  Enter Apply  Esc Cancel" if self.searching else "^N/P Preview line  ^F/B Preview page  h/j/k/l Move  Space Preview  / Search  : Command  ^O Root  Backspace Up"
         if self.preview_focus and not self.searching:
-            help_text = "j/k Line  Space/f/b Page  d/u Half  g/G Top/End  / Search  ^O Root  ^T Git root"
+            help_text = "j/k Line  Space/f/b Page  d/u Half  g/G Top/End  / Find  n N Next/Prev  : Command  ^O Root"
             if self.diagram_list:
                 # "/" opens search, so these key pairs are not joined with a slash.
                 help_text = ("+ - Zoom  0 Fit  a Align  " + ("[ ] Prev/Next diagram  " if self.markdown else "")
                              + "v Diagram/Source  " + help_text)
+        if self.command is not None:
+            help_text = "COMMAND: Tab Complete  ↑/↓ History  Enter Run  Esc Cancel  ·  help Lists commands"
+        elif self.finding:
+            help_text = "FIND: Type text (lowercase ignores case)  ^U Clear  Enter Keep  Esc Cancel"
         put(screen, height - 1, 1, help_text, width - 2, self.style("muted"))
         if self.size_draft:
             self.draw_size(screen)
@@ -1083,6 +1119,290 @@ class Navigator:
         if self.root_draft is not None:
             self.draw_root(screen)
         screen.refresh()
+
+    def command_key(self, key, screen):
+        if key == "\x1b":
+            self.command = None
+        elif key in ("\n", "\r", curses.KEY_ENTER):
+            text, self.command = self.command.strip(), None
+            if text:
+                if text in self.command_history:
+                    self.command_history.remove(text)
+                self.command_history.append(text)
+                del self.command_history[:-50]
+                return self.run_command(text, screen)
+        elif key == "\t":
+            self.command, options = command_line.complete(self.command, self.root, self.index.files if self.index else [])
+            self.message = "  ".join(options) if len(options) > 1 else "" if options else "No completions"
+        elif key in (curses.KEY_UP, curses.KEY_DOWN, "\x10", "\x0e"):
+            step = -1 if key in (curses.KEY_UP, "\x10") else 1
+            self.command_recall = max(0, min(len(self.command_history), self.command_recall + step))
+            self.command = (self.command_history[self.command_recall]
+                            if self.command_recall < len(self.command_history) else "")
+        elif key == "\x15":
+            self.command = ""
+        elif key in ("\b", "\x7f", curses.KEY_BACKSPACE):
+            # Backspace on an empty line closes it, as in Vim.
+            self.command = self.command[:-1] if self.command else None
+        elif isinstance(key, str) and key.isprintable():
+            self.command += key
+        return True
+
+    def run_command(self, text, screen):
+        """Run one command line. Returns False when it closes Lens."""
+        word, _, argument = text.partition(" ")
+        argument = argument.strip()
+        if word.isdigit() or (word.startswith(":") and word[1:].isdigit()):
+            word, argument = "goto", word.lstrip(":")
+        command = command_line.lookup(word)
+        if command is None:
+            self.message = f"Unknown command: {word}  ·  :help lists commands"
+            return True
+        name = command.name
+        # Fixed arguments may be abbreviated too: ":align l".
+        chosen = [choice for choice in command.choices if choice.startswith(argument)]
+        if argument and argument not in command.choices and len(chosen) == 1:
+            argument = chosen[0]
+        needs = {"open": "a file", "goto": "a line number", "find": "text", "cd": "a directory",
+                 "zoom": "in, out, fit or a percent", "align": "left, center or right",
+                 "layout": "popup or overlay"}
+        if name in needs and not argument:
+            self.message = f":{command.usage} needs {needs[name]}"
+            return True
+        if name == "quit":
+            return False
+        if name == "help":
+            self.message = command_line.describe(argument)
+        elif name == "open":
+            self.open_file(argument)
+        elif name in ("goto", "top", "bottom"):
+            if not self.active:
+                self.message = "Open a file first"
+                return True
+            if name == "goto":
+                try:
+                    line = int(argument)
+                except ValueError:
+                    self.message = f"Not a line number: {argument}"
+                    return True
+            else:
+                line = 1 if name == "top" else self.preview_length()
+            self.preview_focus = True
+            self.preview_scroll = max(0, min(line - 1, max(0, self.preview_length() - self.body)))
+            self.message = f"Line {max(1, min(line, self.preview_length()))}/{self.preview_length()}"
+        elif name == "find":
+            if not self.active:
+                self.message = "Open a file first"
+                return True
+            self.preview_focus = True
+            self.find_query, self.find_index = argument, -1
+            self.find_next(1, origin=self.preview_scroll)
+        elif name == "cd":
+            self.change_root(argument)
+        elif name in ("zoom", "align", "source", "diagram"):
+            self.diagram_command(name, argument)
+        elif name in ("changes", "project"):
+            want = name == "changes"
+            if self.changes != want:
+                self.changes = want
+                self.preview_focus = False
+                self.selected = self.scroll = 0
+                self.rebuild()
+            self.message = "Changed files only" if want else "All project files"
+        elif name == "ignored":
+            if argument not in ("", "on", "off"):
+                self.message = f":{command.usage}"
+            elif argument == "" or (argument == "on") != self.include_ignored:
+                self.toggle_ignored()
+        elif name == "refresh":
+            self.refresh()
+            self.message = "Refreshed"
+        elif name == "editor":
+            self.edit(screen)
+        elif name == "diff":
+            self.show_diff(screen)
+        elif name == "layout":
+            if argument not in ("popup", "overlay"):
+                self.message = f":{command.usage}"
+                return True
+            self.begin_layout()
+            if self.layout_dialog:
+                return self.layout_key("1" if argument == "popup" else "2")
+        return True
+
+    def open_file(self, argument):
+        target = Path(argument).expanduser()
+        if target.is_absolute():
+            try:
+                argument = target.resolve().relative_to(self.root.resolve()).as_posix()
+            except (OSError, ValueError):
+                self.message = f"Outside the current root: {argument}"
+                return
+        name = argument.strip("/")
+        if not self.index or name not in self.index.files:
+            self.message = f"No such file in the tree: {argument}"
+            return
+        # Reveal the file in the tree so the selection follows the preview.
+        parent = name.rpartition("/")[0]
+        while parent:
+            self.expanded.add(parent)
+            parent = parent.rpartition("/")[0]
+        self.rebuild()
+        self.selected = next((i for i, row in enumerate(self.items) if row.path == name), self.selected)
+        self.load(name)
+        self.preview_focus = True
+        self.message = f"Opened {name}"
+
+    def diagram_command(self, name, argument):
+        if not self.diagram_list:
+            self.message = "No diagram in this preview"
+            return
+        if name in ("source", "diagram"):
+            if self.diagram_source != (name == "source"):
+                self.preview_key("v")
+            self.message = "Diagram source" if self.diagram_source else "Diagram images"
+            return
+        if self.diagram_source:
+            self.preview_key("v")
+        if name == "align":
+            if argument not in diagram_preview.ALIGNMENTS:
+                self.message = "Use :align left, center or right"
+                return
+            alignments = diagram_preview.ALIGNMENTS
+            # align_diagrams steps forward and saves; start one before the target.
+            self.alignment = alignments[alignments.index(argument) - 1]
+            self.align_diagrams()
+            return
+        keys = {"in": "+", "out": "-", "fit": "0"}
+        if argument in keys:
+            self.zoom_diagram(keys[argument])
+            return
+        try:
+            zoom = float(argument.rstrip("%")) / 100
+        except ValueError:
+            zoom = None
+        if zoom not in diagram_preview.ZOOMS:
+            self.message = "Zoom steps: " + " ".join(f"{round(z * 100)}" for z in diagram_preview.ZOOMS)
+            return
+        target = self.current_diagram()
+        if target is None:
+            self.message = "Scroll a diagram into view to zoom it"
+            return
+        # zoom_diagram("0") resets to fit and rescales; then apply the exact step.
+        self.zoom_diagram("0")
+        self.zooms[target] = zoom
+        self.message = f"{diagram_preview.LANGUAGES[target[0]].title} zoom {round(zoom * 100)}%"
+
+    def matches(self):
+        if self.find_content is not self.content or self.find_for != self.find_query:
+            self.find_content, self.find_for, self.find_matches = self.content, self.find_query, []
+            self.find_index = -1
+            needle = self.find_query
+            # Smart case: an all-lowercase query ignores case.
+            fold = needle == needle.lower()
+            if needle and not self.diagram_view():
+                needle = needle.lower() if fold else needle
+                for number, line in enumerate(self.content):
+                    text = clean(line)
+                    haystack = text.lower() if fold and len(text.lower()) == len(text) else text
+                    start = haystack.find(needle)
+                    while start >= 0:
+                        self.find_matches.append((number, start, start + len(needle)))
+                        start = haystack.find(needle, start + len(needle))
+        return self.find_matches
+
+    def begin_find(self):
+        self.finding = True
+        self.find_before, self.find_query = self.find_query, ""
+        self.find_origin = (self.preview_scroll, self.horizontal)
+
+    def find_key(self, key, screen):
+        if key == "\x1b":
+            self.finding = False
+            self.find_query = self.find_before
+            self.preview_scroll, self.horizontal = self.find_origin
+            return True
+        if key in ("\n", "\r", curses.KEY_ENTER):
+            self.finding = False
+            if not self.find_query and self.find_before:
+                self.find_query = self.find_before  # Enter alone repeats the last search.
+                self.find_next(1, origin=self.find_origin[0])
+            elif self.find_query and not self.matches():
+                self.message = f"Not found: {self.find_query}"
+            return True
+        if key == "\x15":
+            self.find_query = ""
+        elif key in ("\b", "\x7f", curses.KEY_BACKSPACE):
+            self.find_query = self.find_query[:-1]
+        elif isinstance(key, str) and key.isprintable():
+            self.find_query += key
+        elif isinstance(key, terminal_input.Mouse):
+            if key.action in ("up", "down"):
+                self.handle_mouse(key, screen)
+            return True
+        else:
+            return True
+        # Incremental: show the first match at or below where the search began.
+        self.preview_scroll, self.horizontal = self.find_origin
+        if self.find_query:
+            self.find_next(1, origin=self.find_origin[0])
+        else:
+            self.message = ""
+        return True
+
+    def find_next(self, step, origin=None):
+        matches = self.matches()
+        if not matches:
+            self.message = (f"Not found: {self.find_query}" if not self.diagram_view()
+                            else "Press v to search the diagram source")
+            return
+        wrapped = False
+        if origin is not None:
+            index = next((i for i, match in enumerate(matches) if match[0] >= origin), None)
+            if index is None:
+                index, wrapped = 0, True
+        elif self.find_index < 0:
+            top = self.preview_scroll
+            index = next((i for i, match in enumerate(matches) if match[0] >= top), 0)
+            if step < 0:
+                index = next((i for i in range(len(matches) - 1, -1, -1) if matches[i][0] < top), len(matches) - 1)
+        else:
+            index = self.find_index + step
+            wrapped = not 0 <= index < len(matches)
+            index %= len(matches)
+        self.find_index = index
+        self.reveal(matches[index])
+        self.message = f"Match {index + 1}/{len(matches)}" + (" (wrapped)" if wrapped else "")
+
+    def reveal(self, match):
+        line, start, end = match
+        if not self.preview_scroll <= line < self.preview_scroll + self.body:
+            self.preview_scroll = max(0, min(line - self.body // 3, max(0, len(self.content) - self.body)))
+        if self.rendered is None:
+            # Code and plain text do not wrap: bring the match into the visible columns.
+            text = clean(self.content[line])
+            if self.syntax is not None:
+                first, last = cells(text[:start]), cells(text[:end])
+            else:
+                first, last = start, end  # Plain text scrolls by characters.
+            if first < self.horizontal or last > self.horizontal + self.text_width:
+                self.horizontal = max(0, first - self.text_width // 3)
+
+    def draw_matches(self, screen, y, x, width, number):
+        line = clean(self.content[number])
+        for index, (row, start, end) in enumerate(self.find_matches):
+            if row != number:
+                continue
+            if self.rendered is not None or self.syntax is not None:
+                column = cells(line[:start]) - self.horizontal
+            else:
+                if start < self.horizontal:
+                    continue
+                column = cells(line[self.horizontal:start])
+            if column < 0 or column >= width:
+                continue
+            style = self.style("header" if index == self.find_index else "selected") | curses.A_BOLD
+            put(screen, y, x + column, line[start:end], width - column, style)
 
     def move(self, amount: int):
         if self.preview_focus:
@@ -1115,6 +1435,9 @@ class Navigator:
             return True
         if not self.preview_focus:
             return False
+        if key in ("n", "N") and self.find_query:
+            self.find_next(1 if key == "n" else -1)
+            return True
         half = max(1, page // 2)
         movements = {
             "j": 1, "e": 1, "\n": 1, "\r": 1, curses.KEY_ENTER: 1,
@@ -1180,12 +1503,30 @@ class Navigator:
             return True
         if key == "\x03":
             return False
+        if self.close_keys:
+            typed = self.close_typed + (key,)
+            if typed in self.close_keys:
+                return False
+            if any(keys[:len(typed)] == typed for keys in self.close_keys):
+                self.close_typed = typed  # Wait for the rest of the binding.
+                return True
+            self.close_typed = ()
         if self.layout_dialog:
             return self.layout_key(key)
         if self.size_draft:
             return self.size_key(key)
         if self.root_draft is not None:
             return self.root_key(key)
+        if self.finding:
+            return self.find_key(key, screen)
+        if self.command is not None:
+            return self.command_key(key, screen)
+        if (key == ":" or key == "\x1bx") and not self.searching:
+            self.command, self.command_recall = "", len(self.command_history)
+            return True
+        if key == "/" and self.preview_focus and not self.searching and self.active:
+            self.begin_find()
+            return True
         if not self.preview_focus and not self.searching:
             key = {"h": curses.KEY_LEFT, "j": curses.KEY_DOWN,
                    "k": curses.KEY_UP, "l": curses.KEY_RIGHT}.get(key, key)

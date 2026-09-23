@@ -149,6 +149,7 @@ class ProjectTests(unittest.TestCase):
         with patch.object(nav, "show_diff") as show:
             nav.key("\x04", None)
             show.assert_called_once_with(None)
+        nav.key("\t", None)
         nav.key("/", None)
         nav.key("\x15", None)
         nav.key("\n", None)

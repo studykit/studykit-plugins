@@ -65,7 +65,10 @@ pane in that tab.
 
 | Input | Action |
 | --- | --- |
-| `/` | Enter filename/path search, including inside collapsed folders |
+| `/` (tree focused) | Enter filename/path search, including inside collapsed folders |
+| `/` (preview focused) | Find text in the preview |
+| n / N (preview focused) | Jump to the next / previous match |
+| `:` or Alt+X | Open the command line (see below) |
 | Ctrl+O | Change the navigation root by entering a directory path |
 | Enter / click on the tree's `..` row | Move the navigation root to its parent |
 | Backspace (tree focused) / click `[..]` | Move the navigation root to its parent |
@@ -178,6 +181,18 @@ Typing only changes the filter after `/`. Enter leaves search and focuses the
 file list; press Enter again to open the selected result. Ordinary character keys
 outside search do not change the filter. Within search, `/` is an ordinary path
 separator.
+
+With the preview focused, `/` finds text in the preview instead; press Tab first
+to search filenames. The preview jumps to the first match at or below the current
+position as you type, and every visible match is highlighted, the current one
+more strongly. Enter keeps the search and Escape cancels it, returning to where
+the search began. An all-lowercase query ignores case; any capital letter makes
+it case-sensitive. `n` and `N` move to the next and previous match, wrapping at
+the ends, and Enter on an empty query repeats the last search. Markdown is
+searched as rendered, code and plain text as shown, and long lines scroll
+sideways to reveal a match. Diagram images are not searchable; press `v` to
+search their source.
+
 In the tree, `l` expands a collapsed folder; press it again to select its first
 child. `h` collapses an expanded folder or selects the parent. Space does nothing
 on a folder or an empty list. Space updates the preview without moving focus,
@@ -263,6 +278,32 @@ shell scripts, JSON, YAML, TOML, INI, SQL, HTML, XML, and CSS. The content heade
 shows the detected language. Colors follow the Herdr theme, including in Markdown
 code blocks. Code previews retain source line numbers and do not wrap; Left/Right
 scrolls long lines horizontally. Files are displayed, never executed.
+
+### Command line
+
+Press `:` (as in Vim) or Alt+X (as in Emacs) to type a command, then Enter to run
+it. Tab completes command names, file paths, directories, and fixed arguments,
+listing the candidates when more than one fits; Up / Down recall earlier commands;
+Escape, or Backspace on an empty line, cancels. Commands may be shortened to any
+unambiguous prefix. While filtering filenames, `:` is ordinary text.
+
+| Command | Action |
+| --- | --- |
+| `open FILE` (`e`, `find-file`) | Preview a file and reveal it in the tree |
+| `goto LINE` (`goto-line`), or just the number | Jump to a preview line |
+| `top` / `bottom` | Jump to the start / end of the preview |
+| `find TEXT` | Find text in the preview; `n` / `N` continue |
+| `cd DIR` (`root`) | Change the navigation root; relative to the current root, `~`, or absolute |
+| `zoom in\|out\|fit\|PERCENT` | Zoom the current diagram |
+| `align left\|center\|right` | Align diagrams |
+| `source` / `diagram` | Show diagram source / images |
+| `changes` / `project` | List changed files only / every file |
+| `ignored [on\|off]` | Show or hide Git-ignored files |
+| `refresh` | Reload the file list and preview |
+| `editor` / `diff` | Open the current file in an editor / vimdiff |
+| `layout popup\|overlay` | Switch display mode |
+| `help [COMMAND]` | List commands or describe one |
+| `quit` (`q`, `exit`) | Close Lens |
 
 ### Diagrams
 
@@ -352,8 +393,8 @@ Add bindings to your Herdr configuration, choosing unused keys:
 [[keys.command]]
 key = "prefix+t"
 type = "plugin_action"
-command = "studykit.lens.browse"
-description = "browse project files"
+command = "studykit.lens.toggle"
+description = "open or close Lens"
 
 [[keys.command]]
 key = "prefix+d"
@@ -361,6 +402,10 @@ type = "plugin_action"
 command = "studykit.lens.changes"
 description = "browse changed files"
 ```
+
+`studykit.lens.toggle` opens Lens, and pressing the same key while it is open
+closes it, in either display mode. `studykit.lens.browse` always opens (or focuses)
+Lens.
 
 This is a Herdr UI plugin, installed through Herdr. It does not require a separate
 Claude Code or Codex marketplace installation.

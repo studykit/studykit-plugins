@@ -13,6 +13,13 @@ contexts = ["workspace", "tab", "pane"]
 command = ["./herdr_main.py", "browse"]
 
 [[actions]]
+id = "toggle"
+title = "Files: toggle Lens"
+description = "Open Lens, or close it when it is already open"
+contexts = ["workspace", "tab", "pane"]
+command = ["./herdr_main.py", "toggle"]
+
+[[actions]]
 id = "changes"
 title = "Files: browse changes"
 description = "Search changed files and preview their Git diff"

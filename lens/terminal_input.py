@@ -67,7 +67,7 @@ def read(screen):
                 return char
             sequence += char
             if len(sequence) == 2 and char not in "[O":
-                return None
+                return sequence  # Alt+key arrives as Escape then the key.
             if sequence.startswith("\x1b[M"):
                 if len(sequence) == 6:
                     return decode(sequence)

@@ -62,6 +62,7 @@ class LayoutTests(unittest.TestCase):
             self.nav.key(key, None)
         self.assertEqual(self.nav.export_state(), view)
         self.nav.key("\x1b", None)
+        self.nav.key("\t", None)  # In the preview, "/" finds text instead.
         self.nav.key("/", None)
         self.nav.key("\x17", None)
         self.assertFalse(self.nav.layout_dialog)
@@ -78,6 +79,7 @@ class LayoutTests(unittest.TestCase):
 
     def test_slash_starts_search_and_remains_a_path_separator_in_search(self):
         self.nav.query = ""
+        self.nav.key("\t", None)
         self.nav.key("/", None)
         self.nav.key("/", None)
         self.assertTrue(self.nav.searching)
