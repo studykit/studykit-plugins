@@ -1,6 +1,6 @@
 {
   "name": "diagram",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "PlantUML, D2, and Structurizr DSL diagram creation, syntax reference, validation, and rendering",
   "author": {
     "name": "studykit"

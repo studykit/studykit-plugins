@@ -65,7 +65,10 @@ check_source() {
       fi
       local abs
       abs="$(cd "$(dirname "$file")" && pwd)/$(basename "$file")"
-      out=$(structurizr validate -workspace "$abs" 2>&1) || { remap_paths "$out" "$abs" "$offset" "$shown"; return 1; }
+      out=$(structurizr validate -workspace "$abs" 2>&1) || {
+        structurizr_errors "$out" "$abs" "$offset" "$shown"
+        return 1
+      }
       ;;
   esac
 }
@@ -91,6 +94,25 @@ remap_paths() {
       if (match(rest, /^[0-9]+/)) {
         line = line s ":" (substr(rest, 1, RLENGTH) + o); rest = substr(rest, RLENGTH + 1)
       } else line = line s ":"
+    }
+    print line rest
+  }'
+}
+
+# Keeps only the ERROR lines of Structurizr's log output, without the logger prefix, and
+# rewrites "at line <n> of <file>" to "at line <n + offset> of <shown>".
+structurizr_errors() {
+  local out="$1" file="$2" offset="$3" shown="$4" errs
+  errs=$(printf '%s\n' "$out" | sed -n -E 's/^.*\] ERROR [^ ]+ -- //p')
+  [ -n "$errs" ] || errs="$out"
+  printf '%s\n' "$errs" | awk -v f="$file" -v o="$offset" -v s="$shown" '{
+    key = " of " f; line = ""; rest = $0
+    while ((i = index(rest, key)) > 0) {
+      head = substr(rest, 1, i - 1); rest = substr(rest, i + length(key))
+      if (match(head, /line [0-9]+$/)) {
+        n = substr(head, RSTART + 5) + o; head = substr(head, 1, RSTART - 1) "line " n
+      }
+      line = line head " of " s
     }
     print line rest
   }'

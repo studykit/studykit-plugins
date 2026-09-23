@@ -149,19 +149,26 @@ styles {
 
 ## Themes
 
-Apply predefined themes:
+A theme is a JSON file of tag-based styles; styles defined in the workspace override it.
 
 ```
 views {
-    theme default
-    theme https://static.structurizr.com/themes/amazon-web-services-2023.01.31/theme.json
+    theme <name|url|file>
+    themes <name|url|file> [name|url|file] ...
 }
 ```
 
-Multiple themes:
+The hosted themes under `https://static.structurizr.com/themes/...`, and `theme default`,
+come from the Structurizr cloud service, which reaches end of life on 30 September 2026.
+The CLI already warns about them. Do not add them to new workspaces:
+
+- For colours, define the styles inline instead (see `themes.md`).
+- For cloud icon sets (AWS, Azure, GCP, OCI, Kubernetes), copy the theme directory from
+  https://github.com/structurizr/structurizr/tree/main/structurizr-themes into the project
+  and reference its `theme.json` by a path relative to the workspace file:
 
 ```
 views {
-    themes default https://static.structurizr.com/themes/amazon-web-services-2023.01.31/theme.json
+    theme themes/amazon-web-services-2025.07/theme.json
 }
 ```
