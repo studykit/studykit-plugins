@@ -133,11 +133,11 @@ def theme(palette=None, folder_style=None) -> dict[str, int]:
 
 # Every key, by where it applies, for the ? popup.
 KEY_GROUPS = (
-    ("General", (("Tab", "Switch focus"), (":", "Command line"), ("?", "This list"), ("⌃E", "Edit file"),
+    ("General", (("Tab", "Switch focus"), (":", "Command line"), ("?", "This list"), ("⌃E e", "Edit file or folder"),
                  ("⌃D", "Diff with HEAD"), ("o / O", "Open / open with"), ("c", "Changed files only"),
                  ("⌃H", "Ignored files"), ("⌃R", "Refresh"), ("⌃O", "Change root"), ("t", "Repository root"),
                  ("⌃W", "Layout"), ("⌃Y", "Popup size"), ("Esc", "Back / close"), ("⌃G", "Cancel, never close"), ("⌃C", "Quit"))),
-    ("Files", (("j k", "Move"), ("e", "Edit file or folder"), ("h l", "Fold / unfold"), ("Enter", "Open / enter folder"), ("Space", "Preview / fold"),
+    ("Files", (("j k", "Move"), ("h l", "Fold / unfold"), ("Enter", "Open / enter folder"), ("Space", "Preview / fold"),
                ("/", "Filter names"), ("⌫", "Parent folder"), ("⌃N ⌃P", "Scroll preview"),
                ("⌃F ⌃B", "Page preview"))),
     ("Preview", (("j k", "Line"), ("Space b", "Page"), ("d u", "Half page"), ("g G", "Top / end"),
@@ -1900,7 +1900,7 @@ class Navigator:
             return True
         half = max(1, page // 2)
         movements = {
-            "j": 1, "e": 1, "\n": 1, "\r": 1, curses.KEY_ENTER: 1,
+            "j": 1, "\n": 1, "\r": 1, curses.KEY_ENTER: 1,
             "k": -1, "y": -1,
             " ": page, "f": page,
             "b": -page,
@@ -2128,7 +2128,7 @@ class Navigator:
             self.preview_focus = not self.preview_focus
         elif key == "\x04":
             self.show_diff(screen)
-        elif key == "\x05" or (key == "e" and not self.preview_focus):
+        elif key in ("\x05", "e"):
             self.edit(screen)
         elif key == "o":
             self.launch()

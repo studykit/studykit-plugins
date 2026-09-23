@@ -84,7 +84,7 @@ These keys work outside text fields. Letters in a text field are just text.
 | Escape | Go back one step: leave the preview, clear the filter, then close Lens |
 | Ctrl+G | Cancel like Escape, but never close Lens |
 | Ctrl+C | Close Lens right away |
-| Ctrl+E | Open the selected file or folder in your editor |
+| Ctrl+E, `e` | Open the selected file or folder in your editor; in the preview, the file it shows |
 | Ctrl+D | Compare the file with Git HEAD |
 | `o` | Open the file or folder in the application your OS assigns to it, such as Finder for a folder |
 | `O` | Pick an application to open it with. Type to filter; recent choices come first. |
@@ -106,7 +106,6 @@ These keys work outside text fields. Letters in a text field are just text.
 | Space | Preview the file and stay in the tree; on a folder, fold or unfold it |
 | `l` / Right | Unfold a folder; press again to go to its first entry |
 | `h` / Left | Fold a folder, or go to the parent |
-| `e` | Edit the selected file or folder |
 | Backspace, or Enter on `..` | Move the root up one folder |
 | Ctrl+N / Ctrl+P | Scroll the preview one line without leaving the tree |
 | Ctrl+F / Ctrl+B | Scroll the preview one screen without leaving the tree |
@@ -118,7 +117,7 @@ The tree always starts with `..` (the parent folder) and `.` (the root itself). 
 
 | Key | Action |
 | --- | --- |
-| `j` / `k`, Enter, `e` / `y` | Scroll one line |
+| `j` or Enter / `k` or `y` | Scroll one line down / up |
 | Space / `f`, `b` | Scroll one screen down / up |
 | `d` / `u`, Ctrl+U | Scroll half a screen down / up |
 | `g` / `G`, `<` / `>` | Go to the start / end |
@@ -404,7 +403,7 @@ You can write a key in `[keys]` as:
 | --- | --- |
 | `focus`, `back`, `quit` | Tab, Escape, Ctrl+C |
 | `search`, `command`, `next-match`, `prev-match` | `/`, `:`, `n`, `N` |
-| `preview`, `edit`, `diff` | Space, Ctrl+E (and `e` in the tree), Ctrl+D |
+| `preview`, `edit`, `diff` | Space, Ctrl+E (and `e`), Ctrl+D |
 | `changes`, `ignored`, `refresh` | `c`, Ctrl+H, Ctrl+R |
 | `root`, `git-root`, `parent` | Ctrl+O, `t`, Backspace |
 | `layout`, `popup-size` | Ctrl+W, Ctrl+Y |

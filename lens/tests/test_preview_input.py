@@ -241,7 +241,7 @@ class PreviewTests(unittest.TestCase):
         self.nav.load("plain.txt")
         self.nav.preview_focus = True
         self.nav.body = 10
-        for keys, amount in ((["j", "e", "\x0e", "\n", "\r", curses.KEY_ENTER], 1),
+        for keys, amount in ((["j", "\x0e", "\n", "\r", curses.KEY_ENTER], 1),
                              (["k", "y", "\x10"], -1),
                              ([" ", "f", "\x06"], 10), (["b", "\x02"], -10),
                              (["d"], 5), (["u", "\x15"], -5)):

@@ -45,9 +45,11 @@ class RootNavigationTests(unittest.TestCase):
             self.assertEqual(opened[-1], ["vim", str(expected.absolute())])
         self.nav.key("e", None)  # e edits from the files panel, like Ctrl+E.
         self.assertEqual(len(opened), 4)
+        self.nav.load("file.md")
         self.nav.preview_focus = True
-        self.nav.key("e", None)  # In the preview, e scrolls.
-        self.assertEqual(len(opened), 4)
+        self.nav.key("e", None)  # And from the preview, on the previewed file.
+        self.assertEqual(opened[-1][-1], str((self.first / "file.md").absolute()))
+        self.assertEqual(len(opened), 5)
 
     def test_relative_root_resets_stale_file_state_and_leaves_cwd_unchanged(self):
         cwd = Path.cwd()
