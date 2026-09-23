@@ -4,11 +4,13 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 import io
 import re
+import secrets
 from theme_colors import resolve as resolve_theme
 
 
 MAX_RENDER_BYTES = 8 * 1024 * 1024
 FOOTNOTE_DEFINITION = re.compile(r"\[\^[^\]\s]+\]:")
+DIAGRAM_LANGUAGES = ("plantuml", "puml")
 
 
 @dataclass(frozen=True)
@@ -131,7 +133,46 @@ def preview_tokens(text: str):
     return tokens
 
 
+def clean_source(text: str) -> str:
+    # Do not interpret file-supplied terminal escapes as renderer output.
+    text = ESCAPES.sub("", text)
+    return "".join(char for char in text if char.isprintable() or char in "\n\t")
+
+
+def diagram_fence(token) -> bool:
+    words = token.info.split()
+    return token.type == "fence" and bool(words) and words[0].lower() in DIAGRAM_LANGUAGES
+
+
+def plantuml_blocks(text: str) -> list[str]:
+    return [token.content for token in preview_tokens(clean_source(text)) if diagram_fence(token)]
+
+
+def replace_diagrams(tokens, diagrams, marker):
+    # Swap each rendered PlantUML fence for a one-word paragraph; its rendered
+    # line is later replaced by blank rows the image is drawn over.
+    from markdown_it.token import Token
+    result, found = [], []
+    for token in tokens:
+        if not diagram_fence(token) or token.content not in diagrams:
+            result.append(token)
+            continue
+        word = f"{marker}{len(found)}"
+        found.append(token.content)
+        inline = Token("inline", "", 0, content=word, map=token.map, level=token.level + 1, block=True,
+                       children=[Token("text", "", 0, content=word)])
+        result += [Token("paragraph_open", "p", 1, map=token.map, level=token.level, block=True), inline,
+                   Token("paragraph_close", "p", -1, level=token.level, block=True)]
+    return result, found
+
+
 def render(text: str, width: int, colors=None) -> list[list[Span]]:
+    return render_diagrams(text, width, colors)[0]
+
+
+def render_diagrams(text: str, width: int, colors=None, diagrams=None):
+    """Render Markdown; PlantUML fences whose source maps to a row count in
+    `diagrams` become that many blank lines, reported as (line, source, rows)."""
     # Import lazily so a broken/missing dependency can fall back to source text.
     from rich.console import Console
     from obsidian_markdown import markdown_type
@@ -184,9 +225,10 @@ def render(text: str, width: int, colors=None) -> list[list[Span]]:
             style = token_style(token_type, colors)
             foreground = "default" if style.foreground < 0 else f"color({style.foreground})"
             return RichStyle(color=foreground, bold=style.bold, italic=style.italic, underline=style.underline)
-    # Do not interpret file-supplied terminal escapes as renderer output.
-    text = ESCAPES.sub("", text)
-    text = "".join(char for char in text if char.isprintable() or char in "\n\t")
+    text = clean_source(text)
+    marker = "LD" + secrets.token_hex(3)
+    while marker in text:
+        marker = "LD" + secrets.token_hex(3)
     with BoundedOutput() as output:
         console = Console(file=output, width=max(10, width), color_system="256",
                           force_terminal=True, force_jupyter=False, legacy_windows=False,
@@ -194,6 +236,18 @@ def render(text: str, width: int, colors=None) -> list[list[Span]]:
                           theme=palette)
         markdown = markdown_type()("", code_theme=CodeTheme(), hyperlinks=False)
         markdown.markup = text
-        markdown.parsed = preview_tokens(text)
+        markdown.parsed, found = replace_diagrams(preview_tokens(text), diagrams or {}, marker)
         console.print(markdown)
-        return parse_ansi(output.getvalue())
+        lines = parse_ansi(output.getvalue())
+    if not found:
+        return lines, []
+    result, placements = [], []
+    for line in lines:
+        match = re.search(re.escape(marker) + r"(\d+)", "".join(span.text for span in line))
+        if match and int(match[1]) < len(found):
+            source = found[int(match[1])]
+            placements.append((len(result), source, diagrams[source]))
+            result += [[] for _ in range(diagrams[source])]
+        else:
+            result.append(line)
+    return result, placements

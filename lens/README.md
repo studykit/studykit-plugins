@@ -1,7 +1,7 @@
 # Lens
 
 Browse the focused Herdr pane's working directory in a popup or overlay with a project tree,
-filename search, file previews, and side-by-side Git comparisons in vimdiff. Works alongside any shell or agent,
+filename search, file previews, PlantUML diagrams, and side-by-side Git comparisons in vimdiff. Works alongside any shell or agent,
 including Claude Code and Codex, on macOS and Linux.
 
 Requires Herdr 0.9.0 or later, `uv` on Herdr's `PATH`, and Python 3.11 or later
@@ -11,6 +11,9 @@ for browsing and required for change indicators and diffs. Comparing files also
 requires `vimdiff` or Vim compiled with diff support.
 Markdown rendering uses the Python `Rich` library and source highlighting uses
 `Pygments`; both dependencies are managed automatically. Glow is not required.
+PlantUML diagram previews need `plantuml` on Herdr's `PATH` (or `PLANTUML_JAR`
+pointing at a PlantUML jar, with Java installed) and an outer terminal that
+supports the Kitty graphics protocol, such as Ghostty, kitty, or WezTerm.
 
 ## Install
 
@@ -81,6 +84,7 @@ pane in that tab.
 | g / G (preview focused) | Jump to the beginning / end |
 | Mouse wheel | Scroll the panel under the pointer without changing keyboard focus |
 | Tab / Shift+Tab | Switch focus between files and preview |
+| v | Switch PlantUML previews (files and Markdown blocks) between diagrams and source |
 | Ctrl+D | Open a side-by-side HEAD / working-tree comparison in vimdiff |
 | Ctrl+E | Open the selected file in an editor |
 | Ctrl+G | Toggle changed files only |
@@ -256,6 +260,26 @@ shell scripts, JSON, YAML, TOML, INI, SQL, HTML, XML, and CSS. The content heade
 shows the detected language. Colors follow the Herdr theme, including in Markdown
 code blocks. Code previews retain source line numbers and do not wrap; Left/Right
 scrolls long lines horizontally. Files are displayed, never executed.
+
+PlantUML files (`.puml`, `.plantuml`, `.pu`, `.iuml`, and `.wsd`) are rendered as
+a diagram image scaled to fit the preview panel. Rendering runs in the background;
+the preview shows *Rendering PlantUML…* until the image is ready, and an error
+message if PlantUML cannot produce one. Syntax errors show PlantUML's own error
+image. Only the first diagram of a file with several `@startuml` blocks is shown.
+`!include` paths resolve relative to the file's folder. Press `v` to switch
+between the diagram and its source.
+
+In Markdown, fenced code blocks tagged `plantuml` or `puml` are drawn as images in
+place of the code, scaled to the panel width and at most one panel tall, and scroll
+with the text; an image partly scrolled out of view is cropped. `@startuml` /
+`@enduml` may be omitted inside a fence. Blocks render one after another in the
+background and show as code until their image is ready, so the text below them
+shifts once as each image appears. A block PlantUML cannot render stays as code,
+and the status line reports the error. Press `v` to show every block as code. Diagrams are hidden while a Lens dialog is
+open and redrawn after an editor or vimdiff exits; press Ctrl+R if a Herdr menu or
+screen clear removes one. Without PlantUML, or with `[terminal].kitty_graphics = false`
+in Herdr's configuration, these files use the normal source preview. In a terminal
+without Kitty graphics the diagram area stays empty; press `v` to read the source.
 
 Unknown extensions and plain text use the normal numbered preview. Highlighting
 errors also fall back to plain text. Binary files remain excluded.

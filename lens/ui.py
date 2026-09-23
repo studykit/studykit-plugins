@@ -14,6 +14,7 @@ from diff_tool import comparison
 from popup_size import PopupSize, PRESETS
 from view_state import normalize as normalize_view
 import markdown_preview
+import plantuml_preview
 import syntax_preview
 import terminal_input
 from theme_colors import resolve as resolve_theme, terminal_color
@@ -99,7 +100,8 @@ class Navigator:
     def __init__(self, root: Path, pane_id: str, changes: bool, editor: str,
                  size: PopupSize = PopupSize(), on_resize=None, theme_loader=None,
                  folder_style=None, on_state=None, layout_loader=None, on_layout=None,
-                 initial_state=None, defer_status=False):
+                 initial_state=None, defer_status=False, plantuml=None, graphics=None,
+                 cell_size=None):
         initial_state = normalize_view(initial_state, root)
         self.root, self.pane_id, self.editor = root, pane_id, editor
         self.changes = changes
@@ -148,6 +150,19 @@ class Navigator:
         self.pending_selection = ""
         self.pending_scroll = 0
         self.message = ""
+        # PlantUML diagrams need a renderer command and a Kitty graphics writer.
+        self.plantuml = plantuml
+        self.graphics = graphics
+        self.cell_size = cell_size
+        self.diagrams = {}  # PlantUML source -> ("ok", image ID, PNG) or ("error", message)
+        self.diagram_list, self.diagram_queue, self.diagram_job = [], [], None
+        self.diagram_source = False
+        self.markdown_diagrams = []
+        self.render_body = None
+        self.image_id = 0
+        self.placements = []
+        self.images_sent, self.images_stale = set(), set()
+        self.image_placed = self.cell = None
         self.index = None
         self.items = []
         self.refresh()
@@ -216,6 +231,8 @@ class Navigator:
         self.rendered = self.syntax = self.render_width = None
         self.restore_horizontal = False
         self.preview_scroll = self.horizontal = 0
+        self.markdown_diagrams = []
+        self.start_diagrams()
 
     def toggle_ignored(self):
         enabled = not self.include_ignored
@@ -427,6 +444,7 @@ class Navigator:
             put(screen, top + offset, x, line, box_width, self.style("base"))
 
     def refresh(self):
+        self.image_placed = None
         if self.theme_loader:
             self.theme_config = self.theme_loader()
             self.update_theme()
@@ -523,14 +541,173 @@ class Navigator:
             self.markdown = Path(name).suffix.lower() in (".md", ".markdown")
         except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as error:
             self.content = [str(error)]
+        self.start_diagrams()
+
+    def diagram_file(self):
+        """A standalone PlantUML file, shown as one image filling the panel."""
+        return bool(self.diagram_list) and plantuml_preview.supported(self.active)
+
+    def diagram_sources(self):
+        if not self.previewable or self.plantuml is None or self.graphics is None:
+            return []
+        if plantuml_preview.supported(self.active):
+            return [self.source_text]
+        if self.markdown:
+            try:
+                return list(dict.fromkeys(markdown_preview.plantuml_blocks(self.source_text)))
+            except Exception:
+                return []  # Markdown parsing failures fall back in prepare_preview.
+        return []
+
+    def start_diagrams(self):
+        self.diagram_list = self.diagram_sources()
+        # Refreshing unchanged sources keeps their images; others are freed.
+        for source in [source for source in self.diagrams if source not in self.diagram_list]:
+            entry = self.diagrams.pop(source)
+            if entry[0] == "ok":
+                self.images_stale.add(entry[1])
+        self.diagram_queue = [source for source in self.diagram_list if source not in self.diagrams]
+        self.next_diagram()
+
+    def next_diagram(self):
+        running = self.diagram_job[0] if self.diagram_job else None
+        if running in self.diagram_queue:
+            self.diagram_queue.remove(running)
+        if self.diagram_job is not None or not self.diagram_queue:
+            return
+        # One PlantUML process at a time: each JVM start is heavy.
+        source = self.diagram_queue.pop(0)
+        cwd, argv, result = (self.root / self.active).parent, self.plantuml, Future()
+        self.diagram_job = (source, result)
+        text = source if "@start" in source else f"@startuml\n{source}@enduml\n"
+
+        def work():
+            try:
+                result.set_result(plantuml_preview.render(text, cwd, argv))
+            except Exception as error:
+                result.set_exception(error)
+
+        Thread(target=work, name="lens-plantuml", daemon=True).start()
+
+    def poll_diagram(self):
+        if self.diagram_job is None or not self.diagram_job[1].done():
+            return
+        source, result = self.diagram_job
+        self.diagram_job = None
+        if source in self.diagram_list:
+            try:
+                png = result.result()
+                plantuml_preview.image_size(png)
+                self.image_id += 1
+                self.diagrams[source] = ("ok", self.image_id, png)
+            except Exception as error:
+                self.diagrams[source] = ("error", f"Could not render PlantUML: {error}")
+                if self.markdown:
+                    self.message = self.diagrams[source][1]
+            self.render_width = None  # Markdown reserves rows for the new image.
+        self.next_diagram()
+
+    def diagram_view(self):
+        return self.diagram_file() and not self.diagram_source
+
+    def cell_pixels(self):
+        if self.cell is None:
+            self.cell = (self.cell_size() if self.cell_size else None) or (10, 20)
+        return self.cell
+
+    def draw_diagram(self, screen, x, width):
+        entry = self.diagrams.get(self.source_text)
+        if entry is None or entry[0] == "error":
+            put(screen, self.content_top, x + 2, entry[1] if entry else "Rendering PlantUML…", width - 4,
+                self.style("removed" if entry else "muted"))
+            return
+        cols, rows = plantuml_preview.fit(plantuml_preview.image_size(entry[2]), width - 4,
+                                          self.body, self.cell_pixels())
+        self.placements.append((entry[1], 1, self.content_top, x + 2, cols, rows, None))
+
+    def markdown_rows(self, width):
+        rows = {}
+        if self.diagram_source:
+            return rows
+        for source in self.diagram_list:
+            entry = self.diagrams.get(source)
+            if entry and entry[0] == "ok":
+                size = plantuml_preview.image_size(entry[2])
+                rows[source] = plantuml_preview.fit(size, width, self.body, self.cell_pixels())
+        return rows
+
+    def place_markdown(self, x):
+        # Images partly scrolled out of the panel are cropped to their visible rows.
+        for number, (line, source, (cols, rows)) in enumerate(self.markdown_diagrams, 1):
+            top, bottom = max(line, self.preview_scroll), min(line + rows, self.preview_scroll + self.body)
+            entry = self.diagrams.get(source)
+            if top >= bottom or not entry or entry[0] != "ok":
+                continue
+            crop = None
+            if top > line or bottom < line + rows:
+                width, height = plantuml_preview.image_size(entry[2])
+                start, stop = round((top - line) * height / rows), round((bottom - line) * height / rows)
+                crop = (0, start, width, max(1, stop - start))
+            self.placements.append((entry[1], number, self.content_top + top - self.preview_scroll,
+                                    x, cols, bottom - top, crop))
+
+    def sync_image(self):
+        if self.graphics is None:
+            return
+        wanted = ()
+        if self.root_draft is None and not self.size_draft and not self.layout_dialog:
+            wanted = tuple(self.placements)
+        data = b""
+        for image_id in sorted(self.images_stale & self.images_sent):
+            data += plantuml_preview.delete(image_id)
+        self.images_sent -= self.images_stale
+        self.images_stale.clear()
+        if wanted != self.image_placed:
+            if self.image_placed is None:
+                # Unknown screen state: drop every placement before redrawing.
+                previous = ()
+                data += b"".join(plantuml_preview.hide(image_id) for image_id in sorted(self.images_sent))
+            else:
+                previous = self.image_placed
+            keep = {placement[:2] for placement in wanted}
+            for placement in previous:
+                if placement[:2] not in keep and placement[0] in self.images_sent:
+                    data += plantuml_preview.hide(*placement[:2])
+            images = {entry[1]: entry[2] for entry in self.diagrams.values() if entry[0] == "ok"}
+            for placement in wanted:
+                if placement[0] not in self.images_sent:
+                    data += plantuml_preview.transmit(placement[0], images[placement[0]])
+                    self.images_sent.add(placement[0])
+                if placement not in previous:
+                    # The same image and placement ID replaces its old position.
+                    data += plantuml_preview.place(*placement)
+            self.image_placed = wanted
+        if data:
+            self.graphics(data)
+
+    def release_image(self):
+        if self.graphics is not None and self.images_sent:
+            self.graphics(b"".join(plantuml_preview.delete(image_id) for image_id in sorted(self.images_sent)))
+        self.images_sent.clear()
+        self.images_stale.clear()
+        self.image_placed = None
 
     def prepare_preview(self, width):
-        if not self.previewable or self.render_width == width:
+        # Diagram rows depend on the panel height as well as its width.
+        body = self.body if self.markdown and self.diagram_list else None
+        if not self.previewable or (self.render_width == width and self.render_body == body):
             return
-        self.render_width = width
+        self.render_width, self.render_body = width, body
+        self.markdown_diagrams = []
         try:
             if self.markdown:
-                self.rendered = markdown_preview.render(self.source_text, width, self.palette)
+                sizes = self.markdown_rows(width)
+                if sizes:
+                    self.rendered, found = markdown_preview.render_diagrams(
+                        self.source_text, width, self.palette, {source: rows for source, (_, rows) in sizes.items()})
+                    self.markdown_diagrams = [(line, source, sizes[source]) for line, source, _ in found]
+                else:
+                    self.rendered = markdown_preview.render(self.source_text, width, self.palette)
                 self.content = ["".join(span.text for span in line) for line in self.rendered]
             else:
                 highlighted = syntax_preview.render(self.source_text, self.active, self.palette)
@@ -542,6 +719,7 @@ class Navigator:
             self.rendered = None
             self.syntax = None
             self.language = ""
+            self.markdown_diagrams = []
             self.content = self.source_text.splitlines() or ["(Empty file)"]
             self.message = "Preview styling unavailable; showing source"
 
@@ -626,6 +804,7 @@ class Navigator:
             self.message = str(error)
 
     def run_terminal(self, screen, command, cwd):
+        self.release_image()
         terminal_input.disable()
         curses.def_prog_mode()
         curses.endwin()
@@ -694,7 +873,14 @@ class Navigator:
         label = "MARKDOWN" if self.rendered is not None else "FILE PREVIEW · ^D vimdiff"
         if self.syntax is not None:
             label = self.language
+        if self.diagram_file():
+            label = "PLANTUML · v Source" if not self.diagram_source else f"{label} · v Diagram"
+        elif self.markdown and self.diagram_list and self.rendered is not None:
+            label += " · v PlantUML source" if not self.diagram_source else " · v PlantUML diagrams"
         put(screen, 6, x + 2, label if self.active else "OPEN A FILE TO BEGIN", width - 4, self.style("muted"))
+        if self.diagram_view():
+            self.draw_diagram(screen, x, width)
+            return
         for offset, line in enumerate(self.content[self.preview_scroll:self.preview_scroll + self.body]):
             y = self.content_top + offset
             if self.rendered is not None:
@@ -707,13 +893,16 @@ class Navigator:
                     put(screen, y, x + 8, clean(line)[self.horizontal:], width - 10, self.style("base"))
             else:
                 put(screen, y + 1, x + 3, line, width - 6, self.style("muted"))
+        if self.rendered is not None and self.markdown_diagrams:
+            self.place_markdown(x + 2)
 
     def preview_length(self):
-        return len(self.content)
+        return 1 if self.diagram_view() else len(self.content)
 
     def draw(self, screen):
         screen.bkgd(" ", self.style("base"))
         screen.erase()
+        self.placements = []
         height, width = screen.getmaxyx()
         if height < 15 or width < 36:
             put(screen, 0, 0, "^W Layout (36 × 15 minimum)", width, curses.A_BOLD)
@@ -771,6 +960,8 @@ class Navigator:
         help_text = "SEARCH: Type filter  ^U Clear  Enter Apply  Esc Cancel" if self.searching else "^N/P Preview line  ^F/B Preview page  h/j/k/l Move  Space Preview  / Search  ^O Root  Backspace Up"
         if self.preview_focus and not self.searching:
             help_text = "j/k Line  Space/f/b Page  d/u Half  g/G Top/End  / Search  ^O Root  ^T Git root"
+            if self.diagram_list:
+                help_text = "v Diagram/Source  " + help_text
         put(screen, height - 1, 1, help_text, width - 2, self.style("muted"))
         if self.size_draft:
             self.draw_size(screen)
@@ -794,6 +985,11 @@ class Navigator:
         shared = {"\x0e": 1, "\x10": -1, "\x06": page, "\x02": -page}
         if key in shared:
             self.scroll_preview(shared[key])
+            return True
+        if key == "v" and self.diagram_list:
+            self.diagram_source = not self.diagram_source
+            self.preview_scroll = self.horizontal = 0
+            self.render_width = None
             return True
         if not self.preview_focus:
             return False
@@ -985,23 +1181,27 @@ class Navigator:
         try:
             while True:
                 self.poll_status()
+                self.poll_diagram()
                 terminal_input.sync_size(screen)
                 if applied_palette != self.palette:
                     self.styles = theme(self.palette, self.folder_style)
                     self.color_pairs.clear()
                     applied_palette = self.palette
                 self.draw(screen)
+                self.sync_image()
                 self.start_status()
                 # Checkpoint the last displayed view before blocking for input;
                 # host-driven closure may terminate without a Python exit.
                 self.checkpoint()
                 try:
-                    screen.timeout(50 if self.status_job is not None else 250)
+                    busy = self.status_job is not None or self.diagram_job is not None
+                    screen.timeout(50 if busy else 250)
                     key = terminal_input.read(screen)
                 except curses.error:
                     continue
                 if not self.key(key, screen):
                     break
         finally:
+            self.release_image()
             self.checkpoint()
             terminal_input.disable()

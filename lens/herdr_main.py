@@ -11,6 +11,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import socket
 import subprocess
 import sys
 import tempfile
@@ -20,18 +21,54 @@ import tomllib
 from popup_size import PopupSize, load_size, save_size
 from layout_mode import MODES, load_layout, save_layout
 from ls_colors import directory_style
+import plantuml_preview
 from view_state import load_view, save_view
 
 
-def theme_config(env):
+def host_config(env):
     directory = Path(env.get("XDG_CONFIG_HOME") or Path.home() / ".config") / "herdr"
     path = Path(env.get("HERDR_CONFIG_PATH") or directory / "config.toml")
     try:
         with path.open("rb") as stream:
-            config = tomllib.load(stream)
-        return {key: config[key] for key in ("theme", "ui") if key in config}
+            return tomllib.load(stream)
     except (OSError, ValueError):
         return {}
+
+
+def theme_config(env):
+    config = host_config(env)
+    return {key: config[key] for key in ("theme", "ui") if key in config}
+
+
+def kitty_graphics(env):
+    config = host_config(env)
+    for section in ("terminal", "experimental"):
+        value = config.get(section, {}).get("kitty_graphics") if isinstance(config.get(section), dict) else None
+        if isinstance(value, bool):
+            return value
+    return True
+
+
+def cell_size(env, pane_id):
+    # Popups get no pixel size from their pty, but every pane of the attached
+    # client shares one cell size, so ask about the source pane instead.
+    try:
+        with socket.socket(socket.AF_UNIX) as connection:
+            connection.settimeout(2)
+            connection.connect(env["HERDR_SOCKET_PATH"])
+            request = {"id": "lens-cell", "method": "pane.graphics.info", "params": {"pane_id": pane_id}}
+            connection.sendall(json.dumps(request).encode() + b"\n")
+            reply = b""
+            while not reply.endswith(b"\n"):
+                chunk = connection.recv(65536)
+                if not chunk:
+                    break
+                reply += chunk
+        result = json.loads(reply)["result"]
+        size = int(result["cell_width_px"]), int(result["cell_height_px"])
+        return size if min(size) > 0 else None
+    except (OSError, KeyError, TypeError, ValueError):
+        return None
 
 
 def call(binary: str, *args: str) -> dict:
@@ -276,7 +313,10 @@ def main(env: dict, operation: str) -> int:
                               layout_loader=lambda: current_layout(env),
                               on_layout=lambda placement, chosen, view:
                                   change_layout(env, pane_id, placement, chosen, view),
-                              initial_state=restored, defer_status=True)
+                              initial_state=restored, defer_status=True,
+                              plantuml=plantuml_preview.command(env),
+                              graphics=plantuml_preview.write if kitty_graphics(env) else None,
+                              cell_size=lambda: cell_size(env, pane_id))
         if restored is not None and env.get("LENS_RESUME"):
             navigator.message = "Restored view after layout change"
         try:
