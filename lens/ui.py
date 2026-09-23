@@ -14,6 +14,7 @@ from diff_tool import comparison
 from popup_size import PopupSize, PRESETS
 from view_state import normalize as normalize_view
 import command_line
+import settings
 import markdown_preview
 import diagram_preview
 import syntax_preview
@@ -117,9 +118,13 @@ class Navigator:
                  folder_style=None, on_state=None, layout_loader=None, on_layout=None,
                  initial_state=None, defer_status=False, diagram_tools=None, graphics=None,
                  cell_size=None, alignment="center", on_alignment=None, close_keys=(),
-                 icons="plain", on_icons=None):
+                 icons="plain", on_icons=None, settings_loader=None, settings_file=None):
         initial_state = normalize_view(initial_state, root)
         self.root, self.pane_id, self.editor = root, pane_id, editor
+        self.environment_editor = editor
+        self.settings_loader, self.settings_file = settings_loader, settings_file
+        self.bindings = {}  # From config.toml [keys]: key -> action name or ":command".
+        self.settings_errors = ""
         self.changes = changes
         self.include_ignored = initial_state["include_ignored"] if initial_state else False
         self.query = ""
@@ -203,9 +208,38 @@ class Navigator:
         self.close_keys, self.close_typed = [tuple(keys) for keys in close_keys], ()
         self.index = None
         self.items = []
+        self.apply_settings()
         self.refresh()
         if initial_state is not None:
             self.restore_state(initial_state)
+        if self.settings_errors:
+            self.message = self.settings_errors  # Config mistakes outrank the restore note.
+
+    def apply_settings(self):
+        if self.settings_loader is None:
+            return
+        chosen = self.settings_loader()
+        self.editor = chosen.editor or self.environment_editor
+        if chosen.icons:
+            self.icons = chosen.icons
+        if chosen.align:
+            self.alignment = chosen.align
+        self.bindings = chosen.keys
+        self.message = self.settings_errors = "; ".join(chosen.errors)
+
+    def edit_settings(self, screen):
+        if self.settings_file is None:
+            self.message = "Settings need Herdr's plugin config directory"
+            return
+        try:
+            path = self.settings_file()
+            result = self.run_terminal(screen, editor_command(self.editor, path), path.parent)
+        except (OSError, ValueError, subprocess.SubprocessError) as error:
+            self.message = str(error)
+            return
+        self.apply_settings()
+        if not self.message:
+            self.message = "Settings reloaded" if result.returncode == 0 else f"Editor exited with status {result.returncode}"
 
     def export_state(self):
         return {"root": str(self.root), "changes": self.changes, "query": self.query,
@@ -926,7 +960,9 @@ class Navigator:
             path = checked_path(self.root, name)
             if not path.is_file():
                 raise ValueError("File no longer exists; use diff to inspect deletions")
-            command = editor_command(self.editor, path)
+            # Code and plain text previews show source lines; start the editor there.
+            line = self.preview_scroll + 1 if self.preview_focus and name == self.active and self.rendered is None else 1
+            command = editor_command(self.editor, path, line)
             result = self.run_terminal(screen, command, self.root)
             self.refresh()
             self.message = f"Editor exited with status {result.returncode}"
@@ -1244,6 +1280,8 @@ class Navigator:
         elif name == "refresh":
             self.refresh()
             self.message = "Refreshed"
+        elif name == "config":
+            self.edit_settings(screen)
         elif name == "editor":
             self.edit(screen)
         elif name == "diff":
@@ -1528,6 +1566,13 @@ class Navigator:
             self.appearance = key.mode
             self.update_theme()
             return True
+        typing = (self.layout_dialog or self.size_draft or self.root_draft is not None
+                  or self.finding or self.searching or self.command is not None)
+        if key in self.bindings and not typing:
+            target = self.bindings[key]
+            if target.startswith(":"):
+                return self.run_command(target[1:].strip(), screen)
+            key = settings.ACTIONS[target]
         if key == "\x03":
             return False
         if self.close_keys:

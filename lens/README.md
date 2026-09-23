@@ -303,6 +303,7 @@ unambiguous prefix. While filtering filenames, `:` is ordinary text.
 | `editor` / `diff` | Open the current file in an editor / vimdiff |
 | `layout popup\|overlay` | Switch display mode |
 | `icons nerd\|plain` | Use [Nerd Font](https://www.nerdfonts.com) icons or plain text in the file tree; remembered |
+| `config` (`settings`) | Edit the settings file and reload it |
 | `help [COMMAND]` | List commands or describe one |
 | `quit` (`q`, `exit`) | Close Lens |
 
@@ -381,10 +382,53 @@ File previews are limited to 256 KiB, comparisons to 8 MiB per side, and file li
 to 50,000 entries. Binary content and symlinks outside the selected directory are
 not previewed or compared.
 
-The editor comes from `VISUAL`, then `EDITOR`, then an installed `nvim`, `vim`, or
-`vi`. Configure these in the environment used to launch Herdr. Editor arguments
-are supported, for example `EDITOR='code --wait'`. Closing the editor returns to
-the navigator. Browsing and diff previews do not modify project files.
+The editor comes from `editor.command` in the settings file (below), then `VISUAL`,
+then `EDITOR`, then an installed `nvim`, `vim`, or `vi`. Configure the variables in
+the environment used to launch Herdr. Editor arguments are supported, for example
+`EDITOR='code --wait'`. Closing the editor returns to the navigator. Browsing and
+diff previews do not modify project files.
+
+## Settings
+
+Lens reads `config.toml` from its Herdr plugin config directory (print it with
+`herdr plugin config-dir studykit.lens`). Run `:config` inside Lens to open the
+file in your editor; it is created with commented examples the first time, and
+the settings reload when the editor exits. Otherwise changes apply the next time
+Lens opens. Mistakes are reported in the status line and the rest still applies.
+
+```toml
+[editor]
+# {file} and {line} are replaced; without {file}, the path is appended.
+# {line} is the first line shown in a code or text preview, otherwise 1.
+command = "nvim +{line} {file}"
+
+[ui]
+icons = "nerd"     # or "plain"; overrides :icons at startup
+align = "center"   # diagram alignment: left, center, right
+
+[keys]
+# A key, then an action name or a ":" command line. These add to the
+# built-in keys and apply only when you are not typing into a prompt.
+"ctrl+f" = "search"
+"alt+z" = ":zoom fit"
+"F" = ":find TODO"
+```
+
+Keys are written as a character (`"q"`, `"N"`, `"+"`), `ctrl+`, `alt+`, or `shift+`
+with a letter, or one of `space`, `tab`, `enter`, `escape`, `backspace`, `delete`,
+`up`, `down`, `left`, `right`, `home`, `end`, `pageup`, `pagedown`.
+
+| Action | Built-in key |
+| --- | --- |
+| `focus`, `back`, `quit` | Tab, Escape, Ctrl+C |
+| `search`, `command`, `next-match`, `prev-match` | `/`, `:`, `n`, `N` |
+| `preview`, `edit`, `diff` | Space, Ctrl+E, Ctrl+D |
+| `changes`, `ignored`, `refresh` | Ctrl+G, Ctrl+H, Ctrl+R |
+| `root`, `git-root`, `parent` | Ctrl+O, Ctrl+T, Backspace |
+| `layout`, `popup-size` | Ctrl+W, Ctrl+Y |
+| `top`, `bottom` | `g`, `G` |
+| `zoom-in`, `zoom-out`, `zoom-fit`, `align` | `+`, `-`, `0`, `a` |
+| `prev-diagram`, `next-diagram`, `source` | `[`, `]`, `v` |
 
 ## Optional keyboard shortcuts
 

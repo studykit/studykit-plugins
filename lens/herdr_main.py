@@ -22,6 +22,7 @@ from popup_size import PopupSize, load_size, save_size
 from layout_mode import MODES, load_layout, save_layout
 from ls_colors import directory_style
 import diagram_preview
+import settings as lens_settings
 from view_state import load_view, save_view
 
 
@@ -69,21 +70,6 @@ def save_icons(config_dir, icons):
         Path(temporary).unlink(missing_ok=True)
 
 
-def chord(spec):
-    """One Herdr key chord ("ctrl+s", "alt+x", "shift+a", "a") as curses input."""
-    *mods, name = spec.lower().split("+") if spec != "+" else ["+"]
-    name = {"space": " ", "tab": "\t", "enter": "\n"}.get(name, name)
-    if len(name) != 1 or not set(mods) <= {"ctrl", "alt", "shift"}:
-        return None
-    if "shift" in mods:
-        name = name.upper()
-    if "ctrl" in mods:
-        if not "a" <= name.lower() <= "z":
-            return None
-        name = chr(ord(name.lower()) - 96)
-    return "\x1b" + name if "alt" in mods else name
-
-
 def toggle_keys(env):
     """Key sequences bound to the toggle action. A popup receives all input, so
     Lens closes itself on them; Herdr runs the action for an overlay."""
@@ -97,7 +83,7 @@ def toggle_keys(env):
             continue
         spec = str(binding.get("key", ""))
         parts = [prefix, spec[len("prefix+"):]] if spec.startswith("prefix+") else [spec]
-        sequence = tuple(chord(part) for part in parts if isinstance(part, str))
+        sequence = tuple(lens_settings.chord(part) for part in parts if isinstance(part, str))
         # A bare printable key would close Lens while typing a search.
         if sequence and None not in sequence and not (len(sequence) == 1 and sequence[0].isprintable()):
             found.append(sequence)
@@ -396,8 +382,9 @@ def main(env: dict, operation: str) -> int:
         on_resize = None
         if env.get("HERDR_PLUGIN_STATE_DIR") and env.get("HERDR_PLUGIN_CONFIG_DIR"):
             on_resize = lambda chosen, view: prepare_resize(env, pane_id, chosen, view)
+        environment_editor = env.get("VISUAL") or env.get("EDITOR") or ""
         navigator = Navigator(root, pane_id, env.get("LENS_CHANGES") == "1",
-                              env.get("VISUAL") or env.get("EDITOR") or "", size, on_resize,
+                              environment_editor, size, on_resize,
                               theme_loader=lambda: theme_config(env),
                               folder_style=directory_style(env, sys.platform),
                               on_state=(lambda view: save_view(state_dir, view)) if state_dir else None,
@@ -412,6 +399,8 @@ def main(env: dict, operation: str) -> int:
                               close_keys=toggle_keys(env),
                               icons=load_icons(config_dir) if config_dir else "plain",
                               on_icons=(lambda chosen: save_icons(config_dir, chosen)) if config_dir else None,
+                              settings_loader=(lambda: lens_settings.load(config_dir)) if config_dir else None,
+                              settings_file=(lambda: lens_settings.ensure(config_dir)) if config_dir else None,
                               on_alignment=(lambda chosen: diagram_preview.save_alignment(config_dir, chosen))
                                   if config_dir else None)
         if restored is not None and env.get("LENS_RESUME"):

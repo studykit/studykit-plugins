@@ -36,6 +36,7 @@ COMMANDS = (
     Command("icons", (), "icons nerd|plain", "Use Nerd Font icons or plain text in the tree",
             ("nerd", "plain")),
     Command("layout", (), "layout popup|overlay", "Switch display mode", ("popup", "overlay")),
+    Command("config", ("settings",), "config", "Edit Lens settings (config.toml) and reload them"),
     Command("help", ("?",), "help [COMMAND]", "List commands or describe one"),
     Command("quit", ("q", "exit", "kill-emacs"), "quit", "Close Lens"),
 )

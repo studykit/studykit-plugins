@@ -18,13 +18,6 @@ class ToggleKeyTests(unittest.TestCase):
         path.write_text(text)
         return {"HERDR_CONFIG_PATH": str(path), "HERDR_PLUGIN_ID": "studykit.lens"}
 
-    def test_chords(self):
-        self.assertEqual(herdr_main.chord("ctrl+a"), "\x01")
-        self.assertEqual(herdr_main.chord("alt+x"), "\x1bx")
-        self.assertEqual(herdr_main.chord("shift+a"), "A")
-        self.assertEqual(herdr_main.chord("l"), "l")
-        self.assertIsNone(herdr_main.chord("ctrl+f5"))
-
     def test_toggle_bindings_expand_the_prefix(self):
         env = self.config('''[keys]
 prefix = "ctrl+s"

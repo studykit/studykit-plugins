@@ -240,7 +240,7 @@ def preview(index: Index, name: str) -> str:
     return text + ("\n[Preview truncated at 256 KiB]" if truncated else "")
 
 
-def editor_command(configured: str, path: Path) -> list[str]:
+def editor_command(configured: str, path: Path, line: int = 1) -> list[str]:
     if configured:
         command = shlex.split(configured)
         if not command or not shutil.which(command[0]):
@@ -249,4 +249,9 @@ def editor_command(configured: str, path: Path) -> list[str]:
         command = next(([name] for name in ("nvim", "vim", "vi") if shutil.which(name)), [])
         if not command:
             raise ValueError("Set VISUAL or EDITOR to an installed editor")
-    return [*command, str(path.absolute())]
+    # Placeholders are substituted per argument, after splitting, so a path
+    # with spaces or shell characters stays one literal argument.
+    target = str(path.absolute())
+    if any("{file}" in part for part in command):
+        return [part.replace("{file}", target).replace("{line}", str(line)) for part in command]
+    return [*(part.replace("{line}", str(line)) for part in command), target]
