@@ -191,7 +191,7 @@ class IgnoredFileTests(unittest.TestCase):
         for flag in ("\U000f0209", "\U000f0208"):
             screen.reset_mock()
             nav.draw(screen)
-            self.assertTrue(any(call.args[2] == flag
+            self.assertTrue(any(call.args[2] == f" {flag} "  # Set into the top border.
                                 for call in screen.addstr.call_args_list))
             nav.key("\x08", None)
 

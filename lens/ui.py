@@ -9,7 +9,7 @@ import subprocess
 from threading import Thread
 import unicodedata
 
-from core import Row, apply_status, application_command, checked_path, editor_command, opener_command, preview, read_status, rows, scan
+from core import Row, apply_status, application_command, checked_path, editor_command, highlights, opener_command, preview, read_status, rows, scan
 from diff_tool import comparison
 from popup_size import PopupSize, PRESETS
 from view_state import normalize as normalize_view
@@ -57,6 +57,10 @@ def band(screen, y, x, text, width, style=0):
     put(screen, y, x, " " * max(0, width), width, style)
     put(screen, y, x, text, width, style)
 
+
+# The two boxes start right under the root line; each box's first row holds its
+# summary, or the filename filter / preview find while one is in use.
+BOX_TOP = 2
 
 # Tree status marks. Nerd Font glyphs need a patched font, so plain text is the default.
 ICONS = {
@@ -162,7 +166,7 @@ class Navigator:
         self.palette = resolve_theme()
         self.styles = {}
         self.body = self.tree_body = 10
-        self.content_top = 7
+        self.content_top = BOX_TOP + 2
         self.divider = 26
         self.narrow = False
         self.size = size
@@ -1128,30 +1132,43 @@ class Navigator:
     def style(self, name):
         return self.styles.get(name, 0)
 
-    def panel(self, screen, x, width, bottom, focused):
+    def panel(self, screen, x, width, bottom, focused, title="", note=""):
+        """A bordered box with its title set into the top edge and a note at its right end."""
         border = self.style("active" if focused else "gutter")
         corner = ("╔", "═", "╗", "║", "╚", "╝") if focused else ("┌", "─", "┐", "│", "└", "┘")
         a, horizontal, b, vertical, c, d = corner
-        put(screen, 4, x, a + horizontal * (width - 2) + b, width, border)
+        put(screen, BOX_TOP, x, a + horizontal * (width - 2) + b, width, border)
+        room = width - 6
+        if note and cells(note) + 2 <= room // 2:
+            put(screen, BOX_TOP, x + width - 3 - cells(note) - 1, f" {note} ", cells(note) + 2, border)
+            room -= cells(note) + 3
+        if title and room > 3:
+            if cells(title) > room:
+                title = "…" + title[-(room - 1):]  # Keep the end of a long path: the file name.
+                while cells(title) > room:
+                    title = "…" + title[2:]
+            put(screen, BOX_TOP, x + 2, f" {title} ", cells(title) + 2,
+                self.style("header" if focused else "surface") | curses.A_BOLD)
         put(screen, bottom, x, c + horizontal * (width - 2) + d, width, border)
-        for y in range(5, bottom):
+        for y in range(BOX_TOP + 1, bottom):
             put(screen, y, x, vertical, 1, border)
             put(screen, y, x + width - 1, vertical, 1, border)
 
     def draw_tree(self, screen, x, width, bottom):
-        focused = not self.preview_focus and not self.searching
-        self.panel(screen, x, width, bottom, focused)
-        header = self.style("header" if focused else "surface")
+        focused = not self.preview_focus
         icons = ICONS[self.icons]
         icon = icons["changes" if self.changes else "project"]
         title = "CHANGED FILES" if self.changes else "PROJECT FILES"
-        band(screen, 5, x + 1, f" {icon} {title}" if icon else f" {title}", width - 2, header)
         flag = icons["shown" if self.include_ignored else "hidden"]  # Ctrl+H toggles.
-        if flag:
-            put(screen, 5, x + width - 2 - cells(flag), flag, cells(flag), header)
+        self.panel(screen, x, width, bottom, focused, f"{icon} {title}" if icon else title, flag)
         git = (icons["loading"] if self.index and self.index.status_pending
                else icons["error"] if self.index and self.index.status_error else "Space preview")
-        put(screen, 6, x + 2, f"{len(self.items)} rows · {git}", width - 4, self.style("muted"))
+        if self.searching or self.query:
+            count = f"{len(self.items)} match{'' if len(self.items) == 1 else 'es'}" if self.query.strip() else ""
+            self.query_line(screen, x + 1, width - 2, self.query, " Type part of a name or path",
+                            self.searching, count)
+        else:
+            put(screen, BOX_TOP + 1, x + 2, f"{len(self.items)} rows · {git}", width - 4, self.style("muted"))
         if not self.items:
             empty = "Loading Git status…" if self.index and self.index.status_pending else "Git status unavailable" if self.index and self.index.status_error else "No matching files"
             put(screen, self.content_top, x + 2, empty, width - 4, self.style("muted"))
@@ -1167,11 +1184,48 @@ class Navigator:
             status = self.index.status.get(row.path, "  ")
             text = f"{'›' if selected else ' '} {status} {'  ' * row.depth}{marker}{label}"
             band(screen, self.content_top + offset, x + 1, text, width - 2, style)
+            if self.query.strip() and row.path != "..":
+                self.draw_match(screen, self.content_top + offset, x + 1 + cells(text) - cells(label),
+                                x + width - 1, label, selected)
+
+    def draw_match(self, screen, y, left, right, label, selected):
+        """Redraw a filter result: its folder dimmed, the matched characters in the accent colour."""
+        marks = highlights(label, self.query)
+        folder = label.rfind("/") + 1
+        base = self.style("inactive" if self.preview_focus else "selected") if selected else self.style("base")
+        column = left
+        for index, char in enumerate(label):
+            size = cells(char)
+            if column + size > right:
+                break
+            if index in marks:
+                style = (self.style("key") if selected else self.style("active")) | curses.A_BOLD
+            elif index < folder:
+                style = base | curses.A_DIM if selected else self.style("muted")
+            else:
+                style = base
+            put(screen, y, column, char, size, style)
+            column += size
+
+    def query_line(self, screen, left, width, text, placeholder, editing, note):
+        """A box's summary row as a query: ⌕, the text with a cursor while editing, a note on the right."""
+        y, right = BOX_TOP + 1, left + width
+        band(screen, y, left, "", width, self.style("surface"))
+        put(screen, y, left + 1, "\u2315", 1, self.style("active") | curses.A_BOLD)
+        x = left + 3
+        if text:
+            put(screen, y, x, text, right - x - 1, self.style("base") | curses.A_BOLD)
+            x += cells(text)
+        if editing:
+            put(screen, y, x, "▏", 1, self.style("active") | curses.A_BOLD)
+            x += 1
+        if not text:
+            put(screen, y, x, placeholder, right - x - 1, self.style("muted"))
+        if note and right - cells(note) - 1 > x + 2:
+            put(screen, y, right - cells(note) - 1, note, cells(note), self.style("muted"))
 
     def draw_content(self, screen, x, width, bottom):
-        self.panel(screen, x, width, bottom, self.preview_focus)
-        band(screen, 5, x + 1, " " + (self.active or "No file selected"), width - 2,
-             self.style("header" if self.preview_focus else "surface"))
+        self.panel(screen, x, width, bottom, self.preview_focus, self.active or "No file selected")
         label = "MARKDOWN" if self.rendered is not None else "FILE PREVIEW · ^D vimdiff"
         if self.syntax is not None:
             label = self.language
@@ -1187,7 +1241,16 @@ class Navigator:
             else:
                 label += (f" · Diagram {keys.index(current) + 1}/{len(keys)} "
                           f"{round(self.zoom_of(current) * 100)}% · v Diagram source")
-        put(screen, 6, x + 2, label if self.active else "OPEN A FILE TO BEGIN", width - 4, self.style("muted"))
+        if self.finding or (self.find_query and self.active):
+            total = len(self.matches()) if self.find_query else 0
+            note = (f"{self.find_index + 1}/{total}" if total and self.find_index >= 0
+                    else f"{total} found" if self.find_query else "")
+            if not self.finding and self.find_query:
+                note += "  ·  n N Next/Prev"
+            self.query_line(screen, x + 1, width - 2, self.find_query, " Type text to find in the preview",
+                            self.finding, note)
+        else:
+            put(screen, BOX_TOP + 1, x + 2, label if self.active else "OPEN A FILE TO BEGIN", width - 4, self.style("muted"))
         if self.diagram_view():
             self.draw_diagram(screen, x, width)
             return
@@ -1235,7 +1298,7 @@ class Navigator:
             screen.refresh()
             return
         bottom = height - 4
-        self.content_top = 7
+        self.content_top = BOX_TOP + 2
         self.body = self.tree_body = bottom - self.content_top
         self.divider = max(26, min(width // 4, 38))
         self.narrow = width < 90
@@ -1261,13 +1324,6 @@ class Navigator:
         band(screen, 0, max(19, width - len(badge) - 2), badge, len(badge), self.style("header") | curses.A_BOLD)
         put(screen, 1, 2, "[..]", 4, self.style("active"))
         put(screen, 1, 8, str(self.root), width - 10, self.style("muted"))
-        if self.finding or (self.preview_focus and self.find_query and not self.searching):
-            text = f" ⌕  Find in preview: {self.find_query}" + (" ▏" if self.finding else "  ·  n N Next/Prev")
-            band(screen, 2, 1, text, width - 3, self.style("selected" if self.finding else "surface"))
-        else:
-            hint = "Type filename…  Enter Apply · Esc Cancel" if self.searching else "/ to search files"
-            band(screen, 2, 1, f" ⌕  {self.query or hint}" + (" ▏" if self.searching and self.query else ""), width - 3,
-                 self.style("selected" if self.searching else "surface"))
         if self.narrow:
             if self.preview_focus:
                 self.draw_content(screen, 0, width - 1, bottom)
@@ -1509,7 +1565,7 @@ class Navigator:
         if self.finding:
             hints, mode = [("⌃U", "Clear"), ("Enter", "Keep"), ("Esc", "Cancel"), ("abc", "Ignores case")], "FIND"
         elif self.searching:
-            hints, mode = [("⌃U", "Clear"), ("Enter", "Apply"), ("Esc", "Cancel")], "SEARCH"
+            hints, mode = [("↑ ↓", "Pick"), ("⌃U", "Clear"), ("Enter", "Apply"), ("Esc", "Cancel")], "SEARCH"
         elif self.preview_focus:
             hints, mode = [("j k", "Line"), ("Space b", "Page"), ("d u", "Half"), ("g G", "Top/End"),
                            ("/", "Find"), ("n N", "Next/Prev"), ("⌃O", "Root")], ""
@@ -1704,7 +1760,7 @@ class Navigator:
             elif x >= 8:
                 self.begin_root()
             return
-        if y < 4 or y > self.content_top + self.body or x < 0:
+        if y <= BOX_TOP or y > self.content_top + self.body or x < 0:
             return
         if event.action in ("up", "down"):
             amount = -3 if event.action == "up" else 3
@@ -1779,11 +1835,18 @@ class Navigator:
             self.searching = True
             self.preview_focus = False
         elif self.searching:
+            steps = {curses.KEY_UP: -1, curses.KEY_DOWN: 1, "\x10": -1, "\x0e": 1,
+                     curses.KEY_PPAGE: -self.tree_body, curses.KEY_NPAGE: self.tree_body}
+            if key in steps:
+                # Pick among the matches without leaving the filter.
+                self.selected = max(0, min(len(self.items) - 1, self.selected + steps[key]))
+                return True
             if key == "\x1b":
                 self.query = self.search_before
                 self.searching = False
             elif key in ("\n", "\r", curses.KEY_ENTER):
                 self.searching = False
+                return True  # Keep the match picked with the arrows.
             elif key in ("\x15", "\b", "\x7f", curses.KEY_BACKSPACE):
                 self.query = "" if key == "\x15" else self.query[:-1]
             elif isinstance(key, str) and key.isprintable():

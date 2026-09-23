@@ -114,6 +114,21 @@ class CommandLineTests(unittest.TestCase):
         self.assertIsNone(self.nav.command)
         self.assertEqual(self.nav.query, ":")
 
+    def test_arrows_pick_filter_results_while_typing(self):
+        for key in "/py":
+            self.nav.key(key, None)
+        paths = [row.path for row in self.nav.items]
+        self.nav.key(curses.KEY_DOWN, None)
+        self.assertTrue(self.nav.searching)
+        self.assertEqual(self.nav.items[self.nav.selected].path, paths[1])
+        self.nav.key(curses.KEY_UP, None)
+        self.nav.key(curses.KEY_UP, None)  # Stops at the first match.
+        self.assertEqual(self.nav.selected, 0)
+        self.nav.key("\x0e", None)
+        self.nav.key("\n", None)
+        self.assertFalse(self.nav.searching)
+        self.assertEqual(self.nav.items[self.nav.selected].path, paths[1])
+
     def test_cd_changes_root_and_completes_directories(self):
         self.assertEqual(command_line.complete("cd s", self.root, [])[0], "cd src/")
         self.run_line("cd src")

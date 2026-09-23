@@ -86,7 +86,8 @@ class FindTests(unittest.TestCase):
             self.nav.draw(screen)
         drawn = [call.args[2] for call in screen.addstr.call_args_list]
         self.assertIn("needle", drawn)
-        self.assertTrue(any("Find in preview: needle" in text for text in drawn))
+        self.assertIn("\u2315", drawn)  # The preview box shows the find query with its match count.
+        self.assertTrue(any("n N Next/Prev" in text for text in drawn))
 
     def test_tree_focus_slash_still_filters_filenames(self):
         self.nav.load("plain.txt")
@@ -95,6 +96,15 @@ class FindTests(unittest.TestCase):
         self.assertTrue(self.nav.searching)
         self.assertFalse(self.nav.finding)
         self.assertEqual(self.nav.query, "code")
+
+
+class HighlightTests(unittest.TestCase):
+    def test_marks_follow_the_search_ranking(self):
+        from core import highlights
+        self.assertEqual(highlights("src/ui.py", "ui"), {4, 5})              # In the file name first.
+        self.assertEqual(highlights("ui/main.py", "ui/m"), {0, 1, 2, 3})     # Then in the path.
+        self.assertEqual(highlights("src/herdr_main.py", "hm"), {4, 10})     # Else letters in order.
+        self.assertEqual(highlights("a.py", ""), set())
 
 
 if __name__ == "__main__":

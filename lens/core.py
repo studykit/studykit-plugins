@@ -186,6 +186,28 @@ def search(files: list[str], query: str) -> list[str]:
     return [row[-1] for row in sorted(ranked)]
 
 
+def highlights(name: str, query: str) -> set[int]:
+    """Indexes of the characters in name that the search matched, the way search() matched them."""
+    needle = query.casefold().strip()
+    path = name.casefold()
+    start = path.rfind("/") + 1
+    if not needle:
+        return set()
+    found = path.find(needle, start)
+    if found < 0:
+        found = path.find(needle)
+    if found >= 0:
+        return set(range(found, found + len(needle)))
+    marks, position = set(), 0 if "/" in needle else start
+    for char in needle:
+        position = path.find(char, position)
+        if position < 0:
+            return set()
+        marks.add(position)
+        position += 1
+    return marks
+
+
 @dataclass(frozen=True)
 class Row:
     path: str
