@@ -1,20 +1,16 @@
 # wiki/ref/
 
-Local copies of official documentation cited as evidence in this repository, saved
-under guard's evidence contract: when a claim rests on official docs, the cited
-content is saved here and the answer cites both the source URL and this local path.
-Each file records the relevant excerpt of one source and names its origin URL and
+Local copies of official documentation cited as evidence in this repository: when a
+claim rests on official docs, the cited content is saved here and the answer cites both
+the source URL and this local path. Each file records the relevant excerpt of one source and names its origin URL and
 retrieval date, so a citation stays inspectable after the upstream page changes.
 
-This is guard's default refs directory; `refs_dir` in `.claude/guard.local.json`
-overrides the location. Files are committed through the normal git workflow — guard
-never commits.
+Files are committed through the normal git workflow.
 
 **Adding a reference:** save the excerpt as `<topic>.md` with `Source:` and
 `Retrieved:` lines at the top, then add a row below. A file missing from this index
 reads as a file nobody saved — the index is how the next reader finds it without
-opening ten files. guard's `post-edit` hook fails the write when a new file is not
-listed here.
+opening ten files.
 
 ## Index
 

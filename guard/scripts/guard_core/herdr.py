@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 
-_BUCKETS = ("edited_files", "edited_agent_docs", "edited_refs", "edited_docs")
+_BUCKETS = ("edited_files", "edited_agent_docs", "edited_docs")
 _SOURCE = "plugin:studykit.guard"
 
 

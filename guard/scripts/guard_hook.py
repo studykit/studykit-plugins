@@ -34,7 +34,6 @@ Subcommands
 - toggle-cli     CLI (argv), compatibility notice for retired auto-audit mute
 - status         CLI (stdin JSON), the status-line segment — ``guard_core.cmd_status``
 - settings       CLI (argv), run by the ``guard:settings`` skill — ``guard_core.cmd_settings``
-- refs-dir       CLI, prints the resolved refs directory — ``guard_core.cmd_settings``
 - candidates     CLI compatibility notice for the retired roster — ``guard_core.cmd_candidates``
 - inputs         CLI (argv), run by a dispatched agent — ``guard_core.cmd_inputs``
 - knowledge-dirs CLI, prints the configured knowledge dirs — ``guard_core.cmd_plan``
@@ -61,7 +60,7 @@ from guard_core.cmd_candidates import cmd_candidates
 from guard_core.cmd_inputs import cmd_inputs
 from guard_core.cmd_plan import cmd_knowledge_dirs
 from guard_core.cmd_plan_gate import cmd_exit_plan, cmd_plan_audited, cmd_plan_toggle_cli
-from guard_core.cmd_settings import cmd_refs_dir, cmd_settings
+from guard_core.cmd_settings import cmd_settings
 from guard_core.cmd_status import cmd_status, cmd_toggle_cli
 from guard_core.cmd_checkpoint import cmd_file_checkpoint
 
@@ -73,7 +72,6 @@ SUBCOMMANDS = {
     "stop": cmd_stop,
     "session-start": cmd_session_start,
     "session-end": cmd_session_end,
-    "refs-dir": cmd_refs_dir,
     "candidates": cmd_candidates,
     "inputs": cmd_inputs,
     "knowledge-dirs": cmd_knowledge_dirs,

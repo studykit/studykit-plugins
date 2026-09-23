@@ -283,9 +283,9 @@ frontmatter reasoning moved with them to `../../global/dev/agent-frontmatter-rat
 
 `tools: Read, Grep, Glob, Bash`
 
-`Read`/`Grep`/`Glob` for the refs directory and for the repository it searches to tell an external
-fact from a local one. `Bash` for `refs-dir` and for `git log` on a file whose history says when a
-passage arrived.
+`Read`/`Grep`/`Glob` for the files under audit, any index beside them, and the repository it
+searches to tell an external fact from a local one. `Bash` for `git log` on a file whose history
+says when a passage arrived.
 
 No `WebFetch`/`WebSearch`: what is auditable is the file's internal honesty, all of which is on
 disk, and a page that reads differently today says nothing about whether the excerpt was honest

@@ -1,15 +1,9 @@
 """``post-edit`` (PostToolUse on file-writing tools and Bash).
 
-Two independent jobs. It records a changed file only when the current file-review rules
-select an audit for it, keeping the four audit buckets disjoint
-(``agents._edited_bucket``). Separately, it requires a file saved inside the refs directory
-to be listed in that directory's ``AGENTS.md``, blocking until it is; that prohibition is
-independent of audit settings.
-
-Both jobs see a subagent's writes as well as the main agent's, since tool events fire the
-same hooks inside a subagent (https://code.claude.com/docs/en/hooks). That matters for the
-index check in particular: the agent that saves a reference is usually a subagent, and a
-check that only saw the main agent's writes would miss exactly those files.
+It records a changed file only when the current file-review rules select an audit for it,
+keeping the audit buckets disjoint (``agents._edited_bucket``). It sees a subagent's writes
+as well as the main agent's, since tool events fire the same hooks inside a subagent
+(https://code.claude.com/docs/en/hooks).
 
 Native file tools carry an exact target. Bash does not expose its write-set, so its targets
 come from the existing worktree snapshot/hash comparison and are marked as inferred. The
@@ -23,15 +17,13 @@ from __future__ import annotations
 import hashlib
 import json
 import subprocess
-import sys
 
 from pathlib import Path
 from typing import Any
 
 from .config import _HOST_IS_CODEX, _load_config
 from .cmd_checkpoint import review_rule
-from .paths import (_doc_scope, _project_dir, _project_rel, _refs_dir, _state_root,
-                    _trace)
+from .paths import _doc_scope, _project_dir, _state_root, _trace
 from .payload import _read_payload, _session_id
 from .agents import _edited_bucket
 from .herdr import report_pending
@@ -98,7 +90,6 @@ def _git_worktree_snapshot(project_dir: Path, config: dict[str, Any],
     except (OSError, subprocess.SubprocessError):
         return None
     try:
-        refs = _refs_dir(project_dir, config).resolve()
         project = project_dir.resolve()
         state_root = _state_root(project_dir).resolve()
     except OSError:
@@ -116,8 +107,7 @@ def _git_worktree_snapshot(project_dir: Path, config: dict[str, Any],
             continue
         if (not target.is_file() or project not in resolved.parents
                 or state_root in resolved.parents
-                or (review_rule(project_dir, resolved, config) is None
-                    and not (resolved.suffix.lower() == ".md" and refs in resolved.parents))):
+                or review_rule(project_dir, resolved, config) is None):
             continue
         cached = (prior or {}).get(rel)
         if (isinstance(cached, dict) and cached.get("mtime_ns") == stat.st_mtime_ns
@@ -199,8 +189,7 @@ def record_shell_writes(project_dir: Path, payload: dict[str, Any],
     )
     targets: list[Path] = []
     for rel in changed:
-        # A deletion leaves no file for a reviewer to read and must not trip the refs-index
-        # gate. A rename's destination is independently present in `after` and is recorded.
+        # A deletion leaves no file for a reviewer to read. A rename's destination is independently present in `after` and is recorded.
         if rel not in after:
             continue
         synthetic_input = {"file_path": rel}
@@ -279,11 +268,10 @@ def _record_edited_source(project_dir: Path, payload: dict, tool_input: Any,
     try:
         project = project_dir.resolve()
         state_root = _state_root(project_dir).resolve()
-        refs = _refs_dir(project_dir, config).resolve()
         docs = _doc_scope(project_dir, config)
     except OSError:
         return
-    bucket = _edited_bucket(target, refs, docs)
+    bucket = _edited_bucket(target, docs)
     if bucket is None:
         return
     if project not in target.parents or state_root in target.parents:
@@ -364,43 +352,12 @@ def _tool_target_path(project_dir: Path, tool_input: Any) -> Path | None:
         return None
 
 
-def _targets_refs_dir(project_dir: Path, tool_input: Any, config: dict[str, Any]) -> bool:
-    """True when a mutating tool's target path is inside the refs directory
-    (`wiki/ref/` by default, or the validated `refs_dir` config path)."""
-    target = _tool_target_path(project_dir, tool_input)
-    if target is None:
-        return False
-    try:
-        refs = _refs_dir(project_dir, config).resolve()
-    except OSError:
-        return False
-    return target == refs or refs in target.parents
-
-
-REFS_INDEX_NAME = "AGENTS.md"
-
-
-# Files in the refs dir that are the index machinery itself, never indexed entries.
-_REFS_INDEX_SKIP = {REFS_INDEX_NAME, "CLAUDE.md"}
-
-
 def cmd_post_edit() -> int:
-    """PostToolUse on the file-writing tools. Two jobs on the one payload.
+    """PostToolUse on the file-writing tools: record what was written.
 
-    1. Record the source file, if that is what was written, against this turn — the
-       list consumed by an explicit file checkpoint. This is the event
-       that actually sees the path, so nothing has to be reconstructed from a transcript
-       later; Stop only reads back what accumulated here.
-    2. Require a file saved inside the refs dir to be listed in a refs index — the
-       nearest ``AGENTS.md`` at or above it, so a refs tree split into subdirectories can
-       index itself per directory. A saved reference nothing points at is a file the next
-       reader never finds, so the index is the deliverable, not a courtesy. This fires *after*
-       the write rather than blocking it: the natural order is save-then-index, and
-       blocking the save would force an index entry for a file that does not exist yet.
-
-    Job 2 blocks with ``decision: "block"`` so the reason returns to the model as work
-    to finish; job 1 never emits anything. Silent in every other case — a write outside
-    the refs dir, the index itself, or a file already listed.
+    The list is consumed by an explicit file checkpoint. This is the event that actually
+    sees the path, so nothing has to be reconstructed from a transcript later; Stop only
+    reads back what accumulated here. It never emits anything.
     """
     project_dir = _project_dir()
     payload = _read_payload()
@@ -408,89 +365,8 @@ def cmd_post_edit() -> int:
         return 0
 
     config = _load_config(project_dir)
-    tool_input = payload.get("tool_input")
     if payload.get("tool_name") == "Bash":
-        targets = record_shell_writes(project_dir, payload, config)
-        try:
-            refs = _refs_dir(project_dir, config).resolve()
-        except OSError:
-            refs = None
-        for target in targets:
-            if refs is None or target.name in _REFS_INDEX_SKIP:
-                continue
-            if target != refs and refs not in target.parents:
-                continue
-            reason = refs_index_gap(project_dir, target, config)
-            if reason is not None:
-                json.dump({"decision": "block", "reason": reason}, sys.stdout)
-                _trace(project_dir, None, "post-edit", "refs_missing", file=target.name)
-                return 0
+        record_shell_writes(project_dir, payload, config)
         return 0
-    _record_edited_source(project_dir, payload, tool_input, config)
-    if not _targets_refs_dir(project_dir, tool_input, config):
-        return 0
-    target = _tool_target_path(project_dir, tool_input)
-    if target is None or target.name in _REFS_INDEX_SKIP:
-        return 0
-
-    reason = refs_index_gap(project_dir, target, config)
-    if reason is None:
-        _trace(project_dir, None, "post-edit", "refs_listed", file=target.name)
-        return 0
-
-    json.dump({"decision": "block", "reason": reason}, sys.stdout)
-    _trace(project_dir, None, "post-edit", "refs_missing", file=target.name)
+    _record_edited_source(project_dir, payload, payload.get("tool_input"), config)
     return 0
-
-
-def _refs_index_chain(refs: Path, target: Path) -> list[Path]:
-    """Candidate indexes for ``target``, nearest first: its own directory, then each
-    directory up to and including the refs root.
-
-    Callers have already established that ``target`` is inside ``refs``; the containment
-    test in the loop is there so a caller that has not cannot walk out of the project.
-    """
-    chain: list[Path] = []
-    current = target.parent
-    while True:
-        chain.append(current / REFS_INDEX_NAME)
-        if current == refs or refs not in current.parents:
-            return chain
-        current = current.parent
-
-
-def refs_index_gap(project_dir: Path, target: Path, config: dict[str, Any]) -> str | None:
-    """The block reason when ``target`` is missing from the refs index, else None.
-
-    Host-neutral so both adapters enforce one rule. Matching is by file name anywhere
-    in the index text rather than by table structure: the index is prose a human
-    maintains, and pinning the check to a column layout would fail the moment someone
-    reformats it.
-
-    A refs tree big enough to be split into subdirectories indexes itself per directory,
-    so any index from the file's own directory up to the refs root settles it. A flat
-    refs dir is the same single read as before, and a split one is satisfied whether the
-    rows stayed in the root index or moved down beside the files — neither layout has to
-    be declared anywhere. The row is then asked for at the nearest index that EXISTS,
-    since that is where the maintainer put the rows for this file's neighbours; naming the
-    root index instead would send every row back to the file the split was meant to empty.
-    """
-    try:
-        refs = _refs_dir(project_dir, config).resolve()
-        chain = _refs_index_chain(refs, target.resolve())
-    except OSError:
-        return None
-    for index in chain:
-        try:
-            if target.name in index.read_text(encoding="utf-8"):
-                return None
-        except OSError:
-            continue  # No index at this level, or unreadable: try the one above.
-    # No index yet anywhere: the first saved reference is what creates it, at the root.
-    index = next((path for path in chain if path.exists()), chain[-1])
-    return (
-        f"guard: `{target.name}` is saved but not listed in the reference index. "
-        f"Add a row for it to `{_project_rel(project_dir, index)}` — file name, what "
-        "it covers, and the source — so the next reader finds it without opening "
-        "every file. Then continue."
-    )

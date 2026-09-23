@@ -44,7 +44,7 @@ invocations cannot write the cache at the same time.
 
 ## Open questions
 
-- Whether `refs_dir` resolution should be cached too. Needs investigation.
+- Whether `doc_dir` resolution should be cached too. Needs investigation.
 - What happens on a `/clear`. TBD.
 - Whether the mtime granularity is enough on the user's filesystem — we would need to check.
 
@@ -66,9 +66,8 @@ Do not read before running the agent.
    something else. Whatever makes the turn record safe is not shown to be the thing that makes
    a concurrent cache write safe, and the analogy is doing the work.
 5. **"Per the Claude Code hooks documentation, hooks ... are serialized"** — a documentation
-   claim with a named source but no URL and no quoted passage. On this path the finding is the
-   missing citation, NOT a missing local copy under the refs directory: requiring a saved copy
-   here is the turn-path rule and applying it is itself a defect in the audit.
+   claim with a named source but no URL and no quoted passage. The finding is the missing
+   citation.
 6. **The three "Open questions"** are the deferrals audit's, not this one's. A report that
    raises them is reporting outside its remit.
 

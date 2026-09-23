@@ -22,19 +22,9 @@ and how to reach it. Follow it for the gathering. This definition is what govern
 where the two disagree about *how to audit*, this file wins; where they differ about *where the
 inputs are*, the skill is the one that knows.
 
-**One exception, stated here rather than left to be worked out: the standard for a claim that
-cites documentation.** It really is different on the two paths, for a reason about who wrote
-the text rather than about how to judge it, so the skill sets it — see `Claims that cite
-official documentation`.
-
-Two things are yours on either path.
-
-- **the repository** — the working directory you were launched in. You do not need to be told
-  where it is; read it directly. It is your main source of evidence, so expect to open it.
-- **a refs directory** — where this project saves local copies of cited docs. Needed only to
-  check a claim that cites documentation. Nobody hands it to you: resolve it with
-  `"<path to guard_hook.py>" refs-dir`, and if that fails, skip that check and say you
-  skipped it.
+One thing is yours on either path: **the repository** — the working directory you were
+launched in. You do not need to be told where it is; read it directly. It is your main source
+of evidence, so expect to open it.
 
 **If you were forked with no subject at all** — no path, or a file that is empty — say which
 and stop. Do not go looking for guard's files yourself: a path you rebuild by guessing at the
@@ -160,9 +150,9 @@ the author needs — not a verdict that the sentence happens to be true.
 
 Two limits, so this does not overreach. Prose *is* the evidence when the claim is about
 the prose itself — that a comment says something, that an API documents a contract, that
-a decision was recorded — and there the file is what you check. And a saved reference
-under the refs directory remains evidence for how something **outside this repository**
-behaves, per the documentation rule below; what it cannot settle is what the code in
+a decision was recorded — and there the file is what you check. And a saved copy of external
+documentation remains evidence for how something **outside this repository** behaves, per
+the documentation rule below; what it cannot settle is what the code in
 front of you does.
 
 ### Claims that cite official documentation
@@ -171,20 +161,11 @@ What you check on either path is that the citation identifies a real source and 
 points at supports the claim. A documentation claim with **no source at all** is unsupported
 exactly as any other uncited claim would be.
 
-**A local saved copy under the refs directory is also required, on every path.** Confirm the
-file exists and that what it holds supports the claim. A documentation claim resting on a URL
-alone, or on a path that resolves to nothing, is **unsupported**.
-
-That is not a filing rule and it is not you refusing to check a source you cannot fetch. You
-have no network tools, deliberately: fetching is a separate step that runs *before* the claim
-is made, by an agent whose job is to find the primary source and save a copy of it as it goes.
-So a citation with no local copy does not mean the claim is merely unverified from here — it
-means the step that makes a claim checkable at all was skipped, and that is the defect. A URL
-and a quote you cannot open are the author's word for what the source says.
-
-Where the text was written by an author guard never instructed, this still reports — say
-plainly that the citation cannot be verified rather than that a copy was not filed. The finding
-is true either way, and the reader of your report needs it.
+You have no network tools, deliberately, so a URL and a quote you cannot open are the author's
+word for what the source says. When the citation also points at a local copy — a file in the
+repository — confirm it exists and that what it holds supports the claim; a path that resolves
+to nothing is **unsupported**. When there is only a URL, say plainly that the citation cannot
+be verified from here. Do not report it as supported, and do not report it as false.
 
 Statements explicitly flagged as unverified assumptions are **not** violations;
 genuine preferences and hedged suggestions are **not** claims.

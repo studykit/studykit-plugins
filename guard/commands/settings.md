@@ -105,7 +105,6 @@ made through the CLI, report that instead of working around it.
 | `doc_dir` | comma-separated project directories | Limits the ordinary Markdown documents eligible for review. An empty value means the whole project. |
 | `files_exclude` | comma-separated project-relative globs | Ordered exclusions for all file types. `!pattern` restores matches; the last matching pattern wins. Use `generated/**` for a directory tree. |
 | `file_review_rules` | JSON array | Per-path actions. Each item is `{"glob":"...","action":{"kind":"agent" or "skill","name":"..."}}`. Unmatched files are not reviewed; use `files_exclude` for explicit exclusions. Use the file-review setup below for guided configuration. |
-| `refs_dir` | a project-relative path, or empty | Where guard saves cited-doc copies. Empty = the git-tracked default `wiki/ref/`, committed with the repo; a different tracked path (e.g. `docs/refs`) overrides it. |
 | `knowledge_dir` | comma-separated directories, or empty | Operational knowledge directories, such as topology, environments and runbooks. Available through audit inputs and `guard-knowledge-dirs`, including to user-supplied reviewers. Guard never writes here. Absolute and `~` paths are supported; order is precedence. Empty means none configured. |
 
 ## Registering a reviewer

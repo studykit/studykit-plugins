@@ -53,8 +53,7 @@ def cmd_status() -> int:
 
     A plugin cannot install the MAIN status line — only `agent` and `subagentStatusLine` are
     honored in a plugin's settings.json — so this prints a segment the user composes into
-    whatever status line they already run. The excerpt is saved in the refs dir as
-    `claude-code-statusline.md`.
+    whatever status line they already run (`wiki/ref/claude-code-statusline.md`).
 
     The trailing plan flag is filled (`⚑`) when armed and outline (`⚐`) when muted.
 

@@ -2,13 +2,13 @@
 
 ## Docs finder removal (v0.158.0)
 
-The bundled `docs-finder` agent is no longer needed and has been removed, along with its
-settings-command guidance and obsolete runtime comments. It had no dedicated configuration
+The bundled `docs-finder` agent has been removed: the main agent did not invoke it on its own,
+so it was not doing the job it shipped for. Its settings-command guidance and obsolete runtime
+comments went with it. It had no dedicated configuration
 key, hook dispatch, or Codex setup entry. Documentation lookup now belongs to the caller's
 tools or independently installed agents.
 
-Saved-reference indexing, `ext-docs-auditor`, and knowledge-directory access remain in use by
-other reviews. References to `docs-finder` and its former name `ext-docs-fetcher` below are
+`ext-docs-auditor` and knowledge-directory access remain in use by other reviews. References to `docs-finder` and its former name `ext-docs-fetcher` below are
 historical design notes and measurements, not instructions to invoke an available agent.
 
 Claude, Codex, and Herdr manifests use 0.158.0. Marketplace registrations and descriptions
@@ -79,9 +79,7 @@ compatibility conversion or migration notices. Existing queue buckets remain rea
 but current rules decide what is retained and who reviews it. Earlier descriptions below
 of document rules, switches, and mode aliases are historical.
 
-Both native writes and shell snapshots use the same selection policy. Reference Markdown
-is still snapshotted even without an audit rule or when excluded from review: the refs-index
-gate is independent. A regression exercising that path also exposed and fixed undefined
+Both native writes and shell snapshots use the same selection policy. A regression exercising that path also exposed and fixed undefined
 `_emit` calls in the Codex adapter; missing-index feedback now serializes directly.
 
 Run `uv run --python 3.11 python -m unittest discover -s guard/dev -p 'test_*.py'` and
@@ -246,7 +244,7 @@ config -> paths -> turnrec / payload / emit -> transcript
 | `cmd_search` | `pre-search` |
 | `cmd_stop` | `stop` |
 | `cmd_session` | `session-start` |
-| `cmd_settings` | `settings`, `refs-dir` |
+| `cmd_settings` | `settings` |
 | `cmd_status` | `toggle`, `toggle-cli`, `status` |
 
 Two rules this layout exists to hold, both of which broke once already:
@@ -283,18 +281,17 @@ beyond the state root.
 | Event | Subcommand | Role |
 | --- | --- | --- |
 | `PreToolUse` (`Bash\|Grep\|Glob`) | `pre-search` | Deny a search rooted at the filesystem root: `find /`, `grep -r /`, `rg /` (and `fd`/`ag`/`ack`/`locate`), a `/`-anchored glob like `/*`, or a `Grep`/`Glob` call whose `path` is `/`. Reads the tool ARGUMENT only — never the caller — which is why it survives where the removed `pre-write` hook could not. Ignores the agent switches and the mute. Silent for every other call, and fails open on a command `shlex` cannot parse. |
-| `PostToolUse` (`Bash\|Write\|Edit\|MultiEdit\|NotebookEdit`) and `PostToolUseFailure` (`Bash`) | `post-edit` | Add a source file, agent instruction file, saved reference or ordinary document to the session's pending checkpoint queue, then block when a file saved in the refs dir is not listed in that dir's `AGENTS.md`. Native targets are exact; Bash targets come from snapshot/hash differences and retain inferred provenance. |
+| `PostToolUse` (`Bash\|Write\|Edit\|MultiEdit\|NotebookEdit`) and `PostToolUseFailure` (`Bash`) | `post-edit` | Add a source file, agent instruction file or ordinary document to the session's pending checkpoint queue. Emits nothing. Native targets are exact; Bash targets come from snapshot/hash differences and retain inferred provenance. |
 | (called via Bash, not a hook) | `settings` | `guard:settings` (a `context: fork` skill, so it runs in a forked `general-purpose` agent rather than in the main session) shows/sets/unsets guard.local.json settings; the agent modes also apply to the live session's `state/<sid>.json` (session id from `--session`/`CLAUDE_CODE_SESSION_ID`). `set` preserves every other key; `unset <key>` is the only way to delete one. |
 | `Stop` | `stop` | Recover writes from an interrupted Bash call and emit nothing. It records nothing about the turn, reads none of the response and launches no audit. |
 | `SessionEnd` (`clear`) | `session-end` | Carry a live plan-gate override into the session `/clear` is about to open. It writes nothing when the gate still matches the project's configured default. |
-| `SessionStart` | `session-start` | Sweep state and turn records past retention, export `GUARD_REFS_DIR` and `GUARD_TOGGLE_CLI`, state the refs rule as session context, and name the explicit audit commands when any agent is on. Also records this session's `transcript_path`, the host-owned field every turn audit needs. Claude emits one JSON object; Codex keeps the plain-text form. |
+| `SessionStart` | `session-start` | Sweep state and turn records past retention, export `GUARD_PROJECT_DIR` and `GUARD_TOGGLE_CLI`, and name the explicit audit commands when any agent is on. Also records this session's `transcript_path`, the host-owned field every turn audit needs. Claude emits one JSON object; Codex keeps the plain-text form. |
 | (called via Bash, not a hook) | `candidates` | The router's roster for explicit turn/report/answer audits: prints the eligible agents switched on for this session. It deliberately reads no retired file-audit mute. |
 | (called via Bash, not a hook) | `transcript` | `index` / `turn` / `find` over the session transcript, for the audit agents. Writes an extract file and prints only its path plus a one-line summary; `--since` / `--until` / `--last` bound which turns are scanned. |
 | (called via Bash, not a hook) | `file-checkpoint` | Snapshot all or selected paths, resume an immutable selection by token, explicitly clear all or selected paths, and safely complete the pending queue. The shared `audit-files` skill is its caller on both hosts; completion removes only paths whose contents still match its token, while any clear invalidates every live token. |
 | (called via Bash, not a hook) | `toggle-cli` | Compatibility message for the retired `guard on\|off` command. File audits are explicit checkpoints and no longer have an automatic Stop path to mute. |
 | (called via Bash, not a hook) | `status` | Status-line segment: pending file count plus the plan gate flag (`⚑` armed, `⚐` muted); nothing at all on failure. |
 | (called via Bash, not a hook) | `handover-written` | Record `<path>` as the handover this session wrote, for the `guard:handover` skill to run as its last step. Writes one key into `state/<sid>.json`; the file must exist, so a path that was never written is refused while someone can still act on it. Session id from `CLAUDE_CODE_SESSION_ID`. Fails open — the handover file is the deliverable, and the record only decides whether the next session is told about it. |
-| (called via Bash, not a hook) | `refs-dir` | Print the resolved refs directory (auditor fallback; applies `refs_dir` validation). |
 
 ## The turn audit is invoked, not recommended (v0.118.0)
 
@@ -476,7 +473,7 @@ the other's plumbing and had to invent a reconciliation step to do it.
   (mint, record in state, save the request) were all removed by later decisions until only
   `mkdir` was left. The whole lane is two markdown files.
 - **A `.md` under `.claude/answers/` falls into no edited-file bucket** (`agents._edited_bucket`):
-  not a source suffix, not under the refs dir, not an agent-doc name. The date prefix also makes
+  not a source suffix, not an agent-doc name. The date prefix also makes
   a collision with `CLAUDE.md` unreachable. Checked, because a document that audited itself as
   a turn's edit would be silent.
 - **The triage is inline here and forked on the other entry, and that asymmetry is the point.**
@@ -526,17 +523,6 @@ the other's plumbing and had to invent a reconciliation step to do it.
   text* is a defect whatever the author happened to run. Crediting the transcript would let an
   under-evidenced document ship. So the existing `audit-report-*` entries apply unchanged, and
   the answer path needs no entry files of its own.
-- **`audit-report-claims` § 5 changes, and the rule then leaves both skills.** The document path
-  accepted a URL plus a quote and treated a missing local copy as no finding. But the auditor
-  has no `WebFetch` and that is deliberate rather than a limitation: fetching belongs to
-  `docs-finder`, upstream, *before* the claim is made, and it saves the local copy as it goes.
-  A citation with no local copy therefore does not mean "the auditor cannot check this" — it
-  means the step that makes a claim checkable was skipped, which is itself the defect. With the
-  standard the same on both paths, the refs-copy rule stops being one of the two path-dependent
-  judgments and hoists into `agents/claims-auditor.md`; § 5 comes out of both skills. What this
-  costs is `/guard:audit-report` pointed at a foreign document, where every external citation
-  now reports — truthfully, as unverifiable from here, which is a fact that document's reader
-  should have.
 - **The translation runs after the audit, once, and the skill decides it.** A `/guard:answer`
   document is English like every other document guard produces, so a Korean reader cannot read
   the deliverable they asked for — the translation is part of finishing the lane, not a second
@@ -580,8 +566,8 @@ What worked without intervention: an ordinary turn produced no file and no guard
 `/guard:audit-turn` resolved the last human turn past a `/guard:audit-turn` relay, a
 `task-notification`, and a `!` command, and cut it out of the transcript at that moment; the
 Stop hook named `comment-corrector` over an edited source file and nothing about the turn; and
-`/guard:answer` wrote its document, dispatched `docs-finder` mid-draft (which saved two refs
-copies and indexed them, exercising the refs gate), ruled out no audit, ran all three
+`/guard:answer` wrote its document, dispatched `docs-finder` mid-draft (which saved two
+references), ruled out no audit, ran all three
 concurrently, waited for all of them before editing, and applied findings that included one
 deferral the session then went and settled empirically against three interpreters.
 
@@ -958,12 +944,6 @@ Two details decided rather than defaulted:
   three of these four. Stating it in `audit-docs` as well would make it a rule of that one
   entry point.
 
-Removed in the same release: `_REFS_LEAD` and `_refs_context`, a second lead naming
-`ext-docs-auditor` for the refs files a turn wrote. Nothing had called them since document
-review became rule-driven — `cmd_stop` folds `edited_refs` into `docs` and a project's rule
-picks the action — so they were a divergent second statement of the docs block's rule, kept
-alive only by being read as if they still ran.
-
 ## Storage layout (`${CLAUDE_PROJECT_DIR}/.claude/guard/`)
 
 A **turn is the transcript's `promptId`**. guard keeps no copy of a turn's content: it
@@ -973,23 +953,18 @@ written by the main agent.
 - `state/<sid>.json` — the session's live agent modes (one key per agent, named after it,
   valued `off`/`on`), the per-turn markers keyed on `prompt_id` that keep each once-only action once-only
   (`last_audited_prompt_id`, `pending_verify_prompt_id`), and the turn's edited files
-  (`edited_prompt_id` + `edited_files` + `edited_agent_docs` + `edited_refs` + `edited_docs`),
+  (`edited_prompt_id` + `edited_files` + `edited_agent_docs` + `edited_docs`),
   plus `edited_provenance`, keyed by absolute path with the content hash and `native`/`shell`
   evidence source. The edited lists are stored WITH the prompt_id they belong to, not as bare lists: PostToolUse appends
   and Stop reads back, and without the id a previous turn's files would ride into this turn's
-  recommendation. Four lists, one marker — the split is by which agent can judge the file
-  (`_edited_bucket`: source code for `comment-corrector`, `AGENTS.md`/`CLAUDE.md` for
-  `agents-md-auditor`, anything under the refs directory for `ext-docs-auditor`, and ordinary
-  Markdown for configured document-review actions), while "which
-  turn was this" is the same question for all three, and a new turn resets ALL of them or an
-  untouched one holds stale files under a fresh id. The refs test is by LOCATION and runs
-  first, which is what keeps the buckets disjoint: the refs directory's own `AGENTS.md` index
-  and `CLAUDE.md` shim would otherwise be matched by name and sent to `agents-md-auditor`.
+  recommendation. Three lists, one marker — the split is by kind of file
+  (`_edited_bucket`: source code, `AGENTS.md`/`CLAUDE.md`, and ordinary Markdown), while
+  "which turn was this" is the same question for all three, and a new turn resets ALL of them
+  or an untouched one holds stale files under a fresh id.
   `_read_state` honors only known keys, so a hand-edited or stale file degrades to
   defaults instead of injecting state — which cuts both ways, and a NEW key must be added to
-  both the `default` dict and the `keys` tuple. `edited_refs` was added to `default` alone at
-  first: every write landed and the next read dropped it, which is indistinguishable from
-  PostToolUse never having run. `plan_audit_paused` is **seeded from the
+  both the `default` dict and the `keys` tuple: a key added to `default` alone is written and
+  then dropped on the next read, which is indistinguishable from PostToolUse never having run. `plan_audit_paused` is **seeded from the
   config** on every read — armed when the file says nothing — while `audit_paused` opens armed
   with no key behind it at all, and
   are the session's own from then on: the shell toggles write here and never there. See the
@@ -1072,13 +1047,13 @@ payloads, not memory.
   `export` lines appended to that file reach all subsequent Bash commands. Source:
   official hooks docs (https://code.claude.com/docs/en/hooks, "CLAUDE_ENV_FILE"),
   fetched 2026-07-09 — docs-verified only, not yet observed on a live session; if
-  `GUARD_REFS_DIR` fails to appear, re-check this first.
+  `GUARD_PROJECT_DIR` fails to appear, re-check this first.
 
 - **A `SessionStart` entry with no matcher fires on every source**, and the sources are
   `startup`, `resume`, `clear`, `compact` and `fork`. `compact` is the load-bearing one:
   guard's SessionStart hook registers no matcher, so a context compaction that drops its
-  injected lines immediately gets them restated. That is the whole reason the refs rule and
-  the closeout file pointer can be stated once per session instead of on every `UserPromptSubmit`. The
+  injected lines immediately gets them restated. That is the whole reason the closeout file
+  pointer can be stated once per session instead of on every `UserPromptSubmit`. The
   same section confirms that plain stdout becomes model-visible context for exactly three
   events — `UserPromptSubmit`, `UserPromptExpansion`, `SessionStart` — which is how those
   lines used to reach the model. They now go through `hookSpecificOutput.additionalContext`
@@ -1146,8 +1121,8 @@ payloads, not memory.
   `Stop hook feedback`. Source: official hooks docs
   (https://code.claude.com/docs/en/hooks, "Stop decision control"), excerpt saved at
   `wiki/ref/claude-code-stop-hook-decision-control.md`, fetched 2026-08-21. This is why
-  guard's recommendation is `additionalContext` and its refs-index gap is still a block:
-  one is guidance from a working hook, the other is unfinished work.
+  guard's recommendation is `additionalContext`: it is guidance from a working hook, not
+  unfinished work.
 
   **That reading is about Stop, and did not carry to `UserPromptExpansion`.** guard
   registers no expansion hook any more, and this is kept because the two events read
@@ -2099,8 +2074,8 @@ payloads, not memory.
   It is **not** in the Bash tool's environment — reaching that takes an explicit
   `CLAUDE_ENV_FILE` export and nothing here does one
   (`wiki/ref/claude-code-hooks-session-env.md`, `wiki/ref/claude-code-skill-substitutions.md`).
-  So the three Bash-invoked verbs — `transcript` (an audit agent), `settings` (the settings
-  skill), `refs-dir` (the auditor fallback and the output style) — never see it, and what
+  So the Bash-invoked verbs — `transcript` (an audit agent), `settings` (the settings
+  skill) — never see it, and what
   stands in for it decides whether they are correct at all.
 
   It was `Path.cwd()`, and that failed silently in both directions. An agent that had
@@ -2114,9 +2089,6 @@ payloads, not memory.
   avoid. Both halves are fixed: `_cli_project_dir` walks up to the git root, and the ignore
   patterns are `**/`-prefixed so a stray tree anywhere is still ignored.
 
-  `refs-dir` was on `_project_dir` and therefore printed NOTHING to every caller it has ever
-  had. That is not a fail-open — the verb *is* the answer it was asked for.
-
   The primary fix is that guard now **tells** the Bash environment the root instead of
   letting it be inferred: SessionStart appends `export GUARD_PROJECT_DIR=…` to
   `$CLAUDE_ENV_FILE`, the one channel whose variables reach every later Bash command. So on
@@ -2127,8 +2099,8 @@ payloads, not memory.
 
   Both exports go through `_export_to_bash_env`, which appends a line only when it is not
   already there. SessionStart registers no matcher, so it fires on `startup`, `resume`,
-  `clear`, `compact` and `fork` alike; before this was shared, `GUARD_REFS_DIR` was appended
-  again on every compaction for the life of the session. Only `GUARD_`-prefixed names are
+  `clear`, `compact` and `fork` alike, and a blind append would add the line again on every
+  compaction for the life of the session. Only `GUARD_`-prefixed names are
   ever exported — the host owns `CLAUDE_PROJECT_DIR`, and other tooling reads its presence as
   "running inside a hook".
 
@@ -2140,30 +2112,6 @@ payloads, not memory.
   checkout with its own state. A project that is not a git repository still falls back to the
   cwd; there is nothing better to offer, and `status` is unaffected either way because its
   root arrives in the status-line payload.
-- **A saved reference must be indexed.** The `post-edit` hook (PostToolUse) blocks when a
-  file written inside the refs dir is not named in an `AGENTS.md` at or above it. A
-  reference nothing points at is one the next reader never finds, so the index is part of
-  the save, not a courtesy. It runs *after* the write, not as a PreToolUse gate: the
-  natural order is save-then-index, and blocking the save would demand an index row for a
-  file that does not exist yet. Matching is a substring search for the file name anywhere
-  in the index — the index is prose a human maintains, so pinning the check to a table
-  layout would fail the first time someone reformats it. `AGENTS.md` and its `CLAUDE.md`
-  shim are skipped (`_REFS_INDEX_SKIP`) or writing the index would trip its own hook.
-
-  The search is a chain, not one file (`_refs_index_chain`): the file's own directory
-  first, then each directory up to the refs root. A refs collection outgrows a single flat
-  list, and the projects that split it put an index in each subdirectory; reading only the
-  root index made that layout unusable, because every save under it blocked and told the
-  author to write the row into the one file the split existed to empty. Any index in the
-  chain settles the check, so a project that kept all its rows at the root is unaffected
-  and one that moved them down works without declaring anything. When the row really is
-  missing, the block names the nearest index that *exists* — where the rows for this
-  file's neighbours already are — falling back to the root index when the tree has none
-  yet.
-  The check itself is `refs_index_gap`, shared by both hosts: Claude reaches it through
-  `post-edit`, Codex from its single PostToolUse adapter. This one stays a
-  `decision: "block"` rather than `additionalContext`: it is unfinished work, not
-  guidance.
 - **guard ships no output style.** `output-styles/simple.md` shipped through v0.122.0 and was
   removed in v0.123.0. It was opt-in — no `force-for-plugin`, so a user had to select **Simple**
   in `/config` — and opt-in is what made it dead weight: a style inactive for most users could
@@ -2183,61 +2131,12 @@ payloads, not memory.
   no entry in it, and the absence is the design rather than an oversight. `docs-finder` is
   selected by the main agent from its own description, so there is nothing said unasked for a
   switch to govern and no per-turn eligibility to compute — guard keeps no copy of the prompt
-  it would be dispatched on anyway. `ext-docs-auditor` is named by the Stop hook whenever
-  `edited_refs` is non-empty, which is a fact about the turn rather than a judgment, so routing
-  it could only restate the file list and a switch in front of it would be a way to stop a
-  just-saved reference from ever being checked.
+  it would be dispatched on anyway. `ext-docs-auditor` is selected by a file-review rule, so
+  there is no per-turn eligibility for a switch to govern either.
 
-  Three things follow, and each of them broke or would have broken by assuming the registry is
-  the roster. `edited_refs` is a `_edited_bucket` value with no `AUDIT_AGENTS` entry behind it,
-  so nothing computes eligibility for it and `cmd_stop` reads the list directly.
-  And `settings set` refuses both names, which is
-  correct and has to be *said* — `commands/settings.md` tells the skill to explain the refusal
-  rather than let it read as a bug.
-- **`docs-finder` and `ext-docs-auditor` are a pair: one writes references, the other checks
-  them.** That is the point of shipping both, and each half has a constraint that looks like an
-  omission. The names stopped rhyming when the finder's search space outgrew the refs
-  directory; the auditor's subject did not move.
-
-  `docs-finder` searches in a fixed order — the refs directory, then the repository's own
-  documentation, then any configured knowledge directory — and goes to the network only for an
-  external subject that none of them settles. It **reports which of those it was**, and that
-  distinction is the whole report. It is what the agent replaced: a read-only lookup that
-  answered `none` and left the session to remember, unprompted, to dispatch a fetcher next. If
-  the report ever stops making the distinction, restore the distinction — do not split the
-  agent back into a looker-up and a fetcher.
-
-  Two rules hold that shape and both were asked for explicitly. **The report carries locations
-  and never content** — not a quote, not a gist, on any of the kinds. A sentence about what a
-  document says is a second version of it for the caller to disagree with, and the caller is
-  about to open the file anyway. And **an internal document does not settle an external
-  question**: a repo doc discussing a vendor's API records what somebody here believed, so it
-  is reported, labelled internal, and the source is fetched regardless. Drop that second rule
-  and the refs requirement in `audit-turn-claims` becomes satisfiable by this project quoting
-  itself.
-
-  Why the search space widened at all: the trigger the main agent has to apply is "am I about
-  to state something I did not read this session", and the old boundary — external only — made
-  it apply a second test it has to already be right about to use. Both misreadings of the old
-  name resolved toward not dispatching: `ext-` said "internal is out of scope" and `fetcher`
-  said "not applicable when I am not fetching". Under-invocation was the reported failure; the
-  name is part of the fix.
-
-  `ext-docs-auditor` has **no network on purpose**. A saved reference exists to be a faithful
-  copy of something external, so what the auditor judges is whether the excerpt is honest
-  about its own origin — and a page that reads differently today says nothing about whether it
-  was honest when it was taken. An auditor that could fetch would drift into doing the
-  fetcher's job, leaving nothing that checks the fetcher.
-
-  **MarkItDown stays a Bash one-liner (`uv run --with 'markitdown[all]'`) and must not become
-  an MCP server.** The fetcher needs it because `WebFetch` paraphrases a long page and `curl`
-  returns tag soup from a source that serves no markdown; the `[all]` extra is for PDFs and
-  costs no dependency, since guard already requires `uv`. Two reasons against wiring it as
-  MCP, and the first is a trap: `mcpServers` in a plugin-shipped agent's frontmatter is
-  **silently ignored**, not rejected (`wiki/ref/claude-code-plugin-mcp-servers.md`), so that
-  route looks like it works and does not. The route that does work — a plugin-wide `.mcp.json`
-  — is session-wide by design, which would hand `convert_to_markdown` (an arbitrary local-file
-  read, by its own README) to the main conversation as well.
+  One thing follows that would break by assuming the registry is the roster: `settings set`
+  refuses both names, which is correct and has to be *said* — `commands/settings.md` tells the
+  skill to explain the refusal rather than let it read as a bug.
 - **A finding whose fix is a document that does not exist yet is the user's call, not the
   main agent's.** Two agents produce that kind routinely, and both are barred from writing the
   document they recommend. `agents-md-auditor` says an instruction file carries content that
@@ -2382,9 +2281,7 @@ payloads, not memory.
 - **The file-reading agents are never routed.** The Stop hook splits the eligible set by
   `reads`: the `reads="turn"` agents go to the router, and `comment-corrector`
   (`reads="files"`) and `agents-md-auditor` (`reads="agent-docs"`) are dispatched directly in
-  the same emission, to be sent in the same message so they run concurrently — as is
-  `ext-docs-auditor`, which reaches the same block from `edited_refs` rather than from the
-  eligible set. Two
+  the same emission, to be sent in the same message so they run concurrently. Two
   reasons, and the second is why this is a split rather than the narrower "skip the router
   when it is alone".
 
@@ -2582,8 +2479,7 @@ payloads, not memory.
   unsupported. Do not soften this into "summarize the relevant context": a summary of
   evidence is an argument about evidence.
 - **The dispatch passes only what the agent cannot obtain itself.** That is the answer
-  file's path — nothing more. Not the refs directory: the
-  agent resolves it with the `refs-dir` subcommand. Not the repository: it is the working
+  file's path — nothing more. Not the repository: it is the working
   tree the agent already runs in. Not a transcript path: a pointer an agent cannot use is
   one it may chase anyway. Not a summary of the turn either, from guard or from the main
   agent — priming an audit with the author's own account of the work is how an unexamined
@@ -2793,7 +2689,7 @@ payloads, not memory.
   damage, not by which agent it is. **`yellow` means this agent edits files you wrote** and
   is worn by `comment-corrector` and `docs-finder` — the two that land unattended in a diff
   the user has to review, one rewriting comments in the source the turn just produced, the
-  other adding files under the refs directory and rows to its index. **`red`** is the audit
+  other adding saved documentation. **`red`** is the audit
   path — the auditors, `korean-translator`, `korean-corrector`, `agents-md-auditor`,
   `ext-docs-auditor`, and the router — where the worst case is a wrong finding rather than a
   wrong edit. `korean-translator` writes a file rather than finding anything and is still
@@ -2855,17 +2751,6 @@ payloads, not memory.
   the user's real question as `pending_verify_prompt_id`. Re-establish this reason, not the
   old one, before removing it again: if `UserPromptSubmit` starts firing for `!` commands,
   the skip has no basis left.
-- **`_safe_project_subdir` is guard's self-neutering defense** for the one config key that
-  names a directory guard treats specially (`refs_dir`): strictly inside the project (the
-  root itself fails, because a path is never in its own `.parents` — this is what rejects
-  `"."`), and never guard's state root, a path under it, or the config file. Without it a
-  `refs_dir` of `.claude/guard` would make guard's own state a directory it invites the
-  model to write into, and `.claude/guard.local.json` would put the agent settings there.
-  Keep it one implementation; two copies means one of them gets fixed.
-  **What it deliberately does not catch: an ANCESTOR of guard's state.** `.claude` is
-  neither the state root nor under it, so it is a legal value — the rule is containment,
-  not reachability, and anything else that starts trusting a configured directory has to
-  bring its own check on the actual target rather than assume this one covered it.
 - **The config-mutating CLI can weaken guard, and Bash is ungated.** `settings set
   claims-auditor off` reaches guard's own configuration, and the model can invoke this
   script through Bash — nothing stops it. `_cli_write_allowed` requires a marker
@@ -3064,24 +2949,14 @@ guessed mention is not evidence that the registered definition ran. End-to-end n
 reviewer dispatch and plugin-qualified skill discovery remain unverified in that environment.
 The skill therefore explicitly forbids emulating a named reviewer through a generic agent.
 
-`refs_dir` (string, default `""`) — project-relative directory for guard's cited-doc
-copies; empty = the git-tracked default `wiki/ref/` (references committed with the repo), a
-different tracked path (e.g. `"docs/refs"`) overrides it; commits stay in the user's normal
-workflow (guard never commits). `_refs_dir` validates the value (see `_safe_project_subdir`
-above) and everything that names the location follows it: the `post-edit` index check, the
-claims auditor's own resolution (via the `refs-dir` CLI subcommand), and the SessionStart
-context line, which states the refs rule to the agent and names the resolved path (also
-exported as `GUARD_REFS_DIR` via `$CLAUDE_ENV_FILE`, per the official hooks docs, so a Bash
-caller resolves it with one `echo`). The output style carries no refs instruction: it is
-user-selected (no `force-for-plugin`), so nothing load-bearing may depend on it being
-active. guard fixes no reference-mark syntax — `claims-auditor` is told to check that a
+guard fixes no reference-mark syntax — `claims-auditor` is told to check that a
 mark *resolves*, never to grade its form.
 
 `knowledge_dir` (list of strings, default `[]`; a bare string is accepted as one entry) —
 where the project records what its **deployed** system looks like: topology, environments,
 runbooks. Exposed through `paths._knowledge_dirs` to audit inputs and `knowledge-dirs` for
 user-supplied reviewers. Nothing derives a write path from it, which is why it is deliberately
-NOT confined to the project the way `refs_dir` is: this material routinely lives in a knowledge base outside the
+NOT confined to the project: this material routinely lives in a knowledge base outside the
 repository, so an absolute path and a `~` are the expected shapes. Order is precedence. A list
 because the knowledge is normally split — one directory per system, per team, or per source.
 
@@ -3172,16 +3047,10 @@ this needs: **the agent definition is the system prompt and the skill body is th
 
 ### The judgments that really do differ, and where they live
 
-Two of the three audits have a point where the paths do not differ by degree — they reverse.
+One of the three audits has a point where the paths do not differ by degree — they reverse.
 That is what originally argued for two agents, and it is the part the entry split has to
 answer for.
 
-- **The documentation rule (claims).** On a turn, a claim citing official docs must point at a
-  local saved copy under the refs directory or it is unsupported — the session that wrote the
-  turn is told by SessionStart to save one, so its absence is a defect. On a document the same
-  rule fails *every* citation in *every* document, because nothing told the document's author to
-  save one and guard has no way to reach an author it never hosted. Off the turn path the URL is
-  the whole citation.
 - **A deferral handed to a person (deferrals).** On a turn, "your call" is legitimate outright:
   the user was there and being asked is the point. In a document nobody was, so the same
   sentence is the author deferring on their own behalf unless the text records the question
@@ -3192,12 +3061,13 @@ answer for.
   is asking for. So a decision genuinely the user's stands only when the plan puts it to them
   as a question to answer NOW.
 
-Neither needs a second definition. **The agent states the shared part of the rule and says in
+It needs no second definition. **The agent states the shared part of the rule and says in
 so many words that the reversing part is its skill's to settle**, and each skill settles it.
 What the agent must not do is state one path's answer as the rule and leave the other skill
 contradicting it silently — a reader of the agent would then have two rules and no way to tell
-which was authoritative. `clarity-auditor` has no such point; nothing about what makes an
-explanation followable differs by path, and its skills carry gathering only.
+which was authoritative. `claims-auditor` and `clarity-auditor` have no such point: what makes a
+claim supported or an explanation followable does not differ by path, and their skills carry
+gathering only.
 
 The rest of what differs is gathering, and gathering is what a skill is for. History is absent
 on the document path by construction rather than missing — `cmd_inputs._inputs_for_file` prints
@@ -3342,13 +3212,12 @@ the same turn-record path for every agent, and nothing offered that is set to `o
 
 ```bash
 export CLAUDE_PROJECT_DIR=/tmp/guard-test/proj
-# Override these two as well, and do not skip it. A shell inside a project that already runs
-# guard has them exported by that project's SessionStart, and `settings` resolves its project
+# Override this one as well, and do not skip it. A shell inside a project that already runs
+# guard has it exported by that project's SessionStart, and `settings` resolves its project
 # from `GUARD_PROJECT_DIR` (never from `CLAUDE_PROJECT_DIR`, which no Bash command receives).
-# Leave them and the recipe's `settings set` lines silently rewrite the REAL project's
+# Leave it and the recipe's `settings set` lines silently rewrite the REAL project's
 # `guard.local.json` — every switch in it — while the assertions below still read as passing.
 export GUARD_PROJECT_DIR=/tmp/guard-test/proj
-export GUARD_REFS_DIR=/tmp/guard-test/proj/refs
 export CLAUDE_PLUGIN_ROOT=/path/to/guard
 export GUARD_TRACE=1
 H="$CLAUDE_PLUGIN_ROOT/scripts/guard_hook.py"
@@ -3541,14 +3410,6 @@ run pe "Renamed it."
 #      NO `answer file:` line, no closeout, and no `Dispatch these BEFORE you close the turn
 #      out` — that lead was for a turn block that no longer exists.
 
-# A refs file still blocks until it is indexed. This ignores every switch and the mute, and it
-# is the only `deny`-shaped thing guard does at this hook's sibling.
-CLAUDE_CODE_SESSION_ID=s1 "$H" toggle-cli off > /dev/null
-mkdir -p "$CLAUDE_PROJECT_DIR/wiki/ref"; touch "$CLAUDE_PROJECT_DIR/wiki/ref/new-doc.md"
-echo '{"session_id":"s1","prompt_id":"pr","tool_name":"Write","tool_input":{"file_path":"'$CLAUDE_PROJECT_DIR'/wiki/ref/new-doc.md"}}' | "$H" post-edit
-#   -> blocks, naming the index. A mute must not lift a prohibition.
-CLAUDE_CODE_SESSION_ID=s1 "$H" toggle-cli on > /dev/null
-
 # A HOOK must obey CLAUDE_PROJECT_DIR even when a stale GUARD_PROJECT_DIR is in the
 # environment. This is the nested-session case and it is not exotic: guard exports
 # GUARD_PROJECT_DIR into its own session's Bash, so any `claude` started from there — a
@@ -3640,9 +3501,9 @@ conversational subagent lands in both, whether it comes from this plugin or from
 Measured 2026-08-26 against claude 2.1.246, in a throwaway git project driven from a second
 tmux/Herdr pane with `GUARD_TRACE=1`, `--plugin-dir` on the working tree, and
 `claims-auditor`/`deferrals-auditor` set to `fresh`. The pane's environment was checked empty
-of `GUARD_PROJECT_DIR` / `GUARD_REFS_DIR` / `GUARD_TOGGLE_CLI` / `CLAUDE_CODE_SESSION_ID`
+of `GUARD_PROJECT_DIR` / `GUARD_TOGGLE_CLI` / `CLAUDE_CODE_SESSION_ID`
 first — a pane inherits the launching shell's environment, and this repository's own sessions
-export three of those.
+export two of those.
 
 The session was armed with `guard on`, a background subagent named `chat` was spawned, and its
 transcript was opened from the interactive panel with `↓` then `Enter`. Four messages were sent
@@ -3795,7 +3656,7 @@ fewer tokens on that run, finished sooner, and was better calibrated about what 
 to score it as a finding).
 
 **`docs-finder` — one question about a long documentation page**, both arms sandboxed to
-their own refs directory so neither could touch the repository. Both produced a correct saved
+their own scratch directory so neither could touch the repository. Both produced a correct saved
 excerpt with the right quotes, and both answered the question in the report.
 
 The difference was in how they got there, and it is decisive for this agent. `WebFetch`
@@ -3826,7 +3687,7 @@ the one named above, that a paraphrase saved as documentation reads downstream a
 **What to re-run before changing either field.** The ext-docs-auditor arm needs a ground-truth set
 with both heading-marked and unmarked project content, and at least one file whose substance is
 unattributed — that last case is what separated the models. The fetcher arm needs a long page
-with a section a summarizer will drop, and it must be sandboxed to a scratch refs directory:
+with a section a summarizer will drop, and it must be sandboxed to a scratch directory:
 the agent writes, and an arm pointed at the real one leaves two competing references behind.
 
 ## A stored verdict is invisible when it is wrong
@@ -3999,7 +3860,7 @@ model free to claim it worked, which is exactly what happened once here.
 
 ```bash
 cd /tmp/guard-cli-test/proj    # a git repo with .claude/guard.local.json
-env -u GUARD_PROJECT_DIR -u GUARD_REFS_DIR GUARD_TRACE=1 claude -p "Reply with OK." \
+env -u GUARD_PROJECT_DIR GUARD_TRACE=1 claude -p "Reply with OK." \
   --plugin-dir /path/to/guard --model haiku --effort low \
   --no-session-persistence --max-turns 4 --debug-file /tmp/d.log
 ```
@@ -4075,13 +3936,9 @@ each module below imports without pulling in the hook entry point: `turnrec._wri
 file left alone, and a read-only dir returning None rather than raising),
 `transcript._turn_identity(path, prompt_id)` on a
 fixture JSONL (a typed prompt, a `task-notification`, a slash command, a prompt_id absent
-from the file), `_safe_project_subdir(project_dir, value)` on its rejection cases (`"."`,
-`".."`, `".claude/guard"`, `"../elsewhere"`, `"/etc"` — all None; a plain subdirectory
-resolves), `agents._eligible_agents(state, edited, agent_docs, refs)` on the file-reading
-prerequisite (each bucket gates only its own agent), `agents._edited_bucket(path, refs_dir)`
-on a source file, an `AGENTS.md`, a `CLAUDE.md`, a plain `.md` that must land in no bucket,
-a file inside the refs dir, and the refs dir's OWN `AGENTS.md`, which must land in
-`edited_refs` and never in `edited_agent_docs`, `state._read_state` on a file holding every
+from the file), `agents._edited_bucket(path, doc_scope)`
+on a source file, an `AGENTS.md`, a `CLAUDE.md`, and a plain `.md` outside the document scope,
+which must land in no bucket, `state._read_state` on a file holding every
 bucket key (each must survive the round trip),
 `config._parse_mode` / `config._agent_mode` on the aliases and on a junk value (which must
 read as `off`), `config._load_config` on a mode written into the file (it must survive the

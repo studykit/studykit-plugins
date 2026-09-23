@@ -13,7 +13,7 @@
       }
     },
     {
-      "glob": "wiki/ref/**/*.md",
+      "glob": "docs/references/**/*.md",
       "action": {
         "kind": "agent",
         "name": "guard:ext-docs-auditor"
@@ -37,6 +37,5 @@
   "files_exclude": [
     "docs/generated/**",
     "!docs/generated/README.md"
-  ],
-  "refs_dir": ""
+  ]
 }

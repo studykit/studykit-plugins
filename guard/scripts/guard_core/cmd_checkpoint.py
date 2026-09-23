@@ -13,12 +13,12 @@ from typing import Any
 from .config import (FileReviewRule, _file_review_rule, _file_review_rules,
                      _load_config, _file_excluded)
 from .herdr import report_pending
-from .paths import _cli_project_dir, _project_rel, _doc_scope, _refs_dir, _state_root
+from .paths import _cli_project_dir, _project_rel, _doc_scope, _state_root
 from .agents import _edited_bucket
 from .state import _edit_source, _edited_files, _read_state, _write_state
 
 
-_BUCKETS = ("edited_files", "edited_agent_docs", "edited_refs", "edited_docs")
+_BUCKETS = ("edited_files", "edited_agent_docs", "edited_docs")
 _CODEX_AGENTS = {
     "guard:doc-auditor": "guard_doc_auditor",
     "guard:agents-md-auditor": "guard_agents_md_auditor",
@@ -119,8 +119,7 @@ def review_rule(project_dir: Path, target: Path, config: dict[str, Any]) -> File
     relative = _project_rel(project_dir, target)
     if _file_excluded(relative, config.get("files_exclude", [])):
         return None
-    if _edited_bucket(target, _refs_dir(project_dir, config).resolve(),
-                      _doc_scope(project_dir, config)) is None:
+    if _edited_bucket(target, _doc_scope(project_dir, config)) is None:
         return None
     return _file_review_rule(relative, _file_review_rules(config))
 

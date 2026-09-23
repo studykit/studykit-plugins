@@ -1,9 +1,9 @@
 """``session-start`` (SessionStart) — the sweep, the exports, and the standing context.
 
 Sweeps state files, ``trace.log``, and turns/ and extracts/ dirs older than retention;
-exports ``GUARD_PROJECT_DIR`` and ``GUARD_REFS_DIR`` via ``$CLAUDE_ENV_FILE`` (append-once,
-since this event also fires on every compaction); and states as session context the refs rule
-always, plus explicit review entry points when their configuration is present.
+exports ``GUARD_PROJECT_DIR`` and ``GUARD_TOGGLE_CLI`` via ``$CLAUDE_ENV_FILE`` (append-once,
+since this event also fires on every compaction); and states as session context the explicit
+review entry points when their configuration is present.
 This context is stated once at session start rather than repeated at every Stop.
 """
 
@@ -21,7 +21,7 @@ from .config import (
     ORPHAN_MAX_AGE_SECONDS, _HOST_IS_CODEX, _audit_on, _load_config, _file_review_rules
 )
 from .paths import (
-    _clear_handoff_file, _project_dir, _refs_dir, _state_root, _trace, _trace_file
+    _clear_handoff_file, _project_dir, _state_root, _trace, _trace_file
 )
 from .payload import _read_payload, _session_id
 from .state import _plan_audit_paused, _read_state, _write_state
@@ -72,8 +72,7 @@ def _export_to_bash_env(name: str, value: str) -> bool:
     SessionStart is handed ``CLAUDE_ENV_FILE``, a path whose ``export`` lines reach every
     later Bash command Claude Code runs (`wiki/ref/claude-code-hooks-session-env.md`). It is
     the only channel by which a Bash-invoked verb learns something the HOST decided rather
-    than inferring it, and guard uses it for two values: the project root and the resolved
-    refs directory.
+    than inferring it, and guard uses it for the project root and the path of its own CLI.
 
     ``GUARD_``-prefixed names only, never ``CLAUDE_PROJECT_DIR``: the host owns that name,
     other tooling reads its presence as "running inside a hook", and guard exporting it into
@@ -81,8 +80,7 @@ def _export_to_bash_env(name: str, value: str) -> bool:
 
     Appended only when the identical line is not already present. SessionStart registers no
     matcher, so it fires on `startup`, `resume`, `clear`, `compact` and `fork` alike, and a
-    blind append added the same export once per compaction for the life of the session —
-    which is what `GUARD_REFS_DIR` did before this became shared.
+    blind append added the same export once per compaction for the life of the session.
 
     Best-effort, silent on failure: everything that reads these has a fallback, and the
     session's context lines go out either way.
@@ -96,8 +94,7 @@ def _append_env_file(text: str, marker: str | None = None) -> bool:
     ``marker`` is the line that identifies a multi-line block already being present; for a
     single line the text is its own marker. SessionStart registers no matcher, so it fires
     on `startup`, `resume`, `clear`, `compact` and `fork` alike — a blind append added the
-    same content once per compaction for the life of the session, which is what
-    ``GUARD_REFS_DIR`` did before this check existed.
+    same content once per compaction for the life of the session.
     """
     env_file = os.environ.get("CLAUDE_ENV_FILE", "").strip()
     if not env_file:
@@ -375,11 +372,7 @@ def cmd_session_start() -> int:
                 d.rmdir()
             except OSError:
                 pass
-    # The resolved refs directory, so a Bash caller gets it with one `echo` instead of
-    # re-deriving the `refs_dir` validation from the raw config.
     session_cfg = _load_config(project_dir)
-    refs = _refs_dir(project_dir, session_cfg)
-    _export_to_bash_env("GUARD_REFS_DIR", str(refs))
 
     # The CLI behind the shell toggle. `CLAUDE_PLUGIN_ROOT` is given to hook processes and
     # substituted into command bodies, but it is NOT in the Bash tool's environment, so a
@@ -411,19 +404,6 @@ def cmd_session_start() -> int:
             "`guard-plan` in a shell changes it. Do not mention this unless the "
             "user asks."
         )
-    # The injected contract states the general rule — a doc-based claim cites the source
-    # URL and a local saved copy — but not where this project keeps that copy, which
-    # is per-project config (`refs_dir`). Inject the resolved path here instead: for
-    # SessionStart, plain stdout becomes context the model can act on (docs:
-    # https://code.claude.com/docs/en/hooks, "Exit code 0"). Without it the judge
-    # would fail a docs claim for a missing refs copy that nothing told the model
-    # where to write.
-    context.append(
-        "guard: when a claim rests on official documentation, save the cited content "
-        f"to this project's refs directory — {refs} — and cite both the source URL "
-        "and that local path. The same path is in $GUARD_REFS_DIR for Bash."
-    )
-
     # Explicit-only skills are not offered through model-trigger descriptions. Name the
     # available entry points once at session start when their configuration is present.
     prefix = "$guard:" if _HOST_IS_CODEX else "/guard:"

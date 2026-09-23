@@ -23,8 +23,8 @@ Keep host payloads, environment variables and output shapes at adapter boundarie
   authorize implementation. Only `answer` produces the requested answer document.
 - File checkpoints select reviewers only through glob rules; there are no per-agent switches.
   The former claims, deferrals, and clarity switches are retired; none of the explicit reviewer settings depend on them.
-- The refs-index gate and refusal of searches rooted at `/` ignore audit switches: they are
-  prohibitions, not optional review opinions.
+- Refusal of searches rooted at `/` ignores audit switches: it is a prohibition, not an
+  optional review opinion.
 
 ## Invariants
 

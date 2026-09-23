@@ -1,4 +1,4 @@
-"""Validated project configuration and the refs-dir query.
+"""Validated project configuration.
 
 File rules are read at each checkpoint; only the automatic plan gate has a session switch.
 Mutating verbs require the user-invoked configuration marker.
@@ -19,7 +19,7 @@ from .config import (
     _parse_switch, _plan_review_action, _turn_review_action, _answer_review_action, _write_config
 )
 from .paths import (_cli_project_dir, _doc_dir_entries,
-                    _knowledge_dir_entries, _refs_dir, _trace)
+                    _knowledge_dir_entries, _trace)
 from .state import _plan_audit_paused, _read_state, _write_state
 from .cmd_checkpoint import reconcile_queue
 from .herdr import report_pending
@@ -193,7 +193,7 @@ def _config_show_lines(project_dir: Path, session_id: str | None) -> list[str]:
         if session_id is None or state is None:
             return "file checkpoint: unknown — no session id in this environment"
         pending = {
-            path for bucket in ("edited_files", "edited_agent_docs", "edited_refs", "edited_docs")
+            path for bucket in ("edited_files", "edited_agent_docs", "edited_docs")
             for path in state.get(bucket, []) if isinstance(path, str) and path
         }
         return (f"file checkpoint: {len(pending)} pending — run `/guard:audit-files`; "
@@ -208,7 +208,6 @@ def _config_show_lines(project_dir: Path, session_id: str | None) -> list[str]:
         """
         return [f"{k}: (retired) {RETIRED_KEYS[k]}" for k in RETIRED_KEYS if k in raw]
 
-    refs_rel = raw.get("refs_dir") if isinstance(raw.get("refs_dir"), str) else ""
     # The pending count and plan switch are listed first: they are the two live session facts
     # that cannot be recovered from the project config alone.
     return [
@@ -219,7 +218,6 @@ def _config_show_lines(project_dir: Path, session_id: str | None) -> list[str]:
         reviewer_line("plan_review"),
         reviewer_line("turn_review"),
         reviewer_line("answer_review"),
-        "refs_dir: " + (refs_rel if refs_rel else "(default wiki/ref/)"),
         knowledge_line(),
         doc_line("doc_dir"),
         "files_exclude: " + json.dumps(cfg.get("files_exclude", [])),
@@ -341,8 +339,6 @@ def cmd_settings() -> int:
         # user who just turned auditing off would keep being audited for the rest of the
         # session, having been shown a line that says it is off.
         _apply_session_scalar(project_dir, session_id, _SWITCH_STATE_KEY[key], not on)
-    elif key == "refs_dir":
-        raw["refs_dir"] = value  # "" resets to the default; _refs_dir validates at use
     elif key == "knowledge_dir":
         # Comma-separated, and the whole list is REPLACED. Order is precedence, so the user
         # has to be able to state it; an append-only verb would leave no way to reorder or
@@ -397,7 +393,7 @@ def cmd_settings() -> int:
     else:
         print(f"guard settings: unknown or unsettable key {key!r}. Settable: "
               + ", ".join(AUDIT_SWITCHES)
-              + ", refs_dir, knowledge_dir, doc_dir, files_exclude, file_review_rules, "
+              + ", knowledge_dir, doc_dir, files_exclude, file_review_rules, "
                 "plan_review, turn_review, answer_review.",
               file=sys.stderr)
         return 0
@@ -413,18 +409,3 @@ def cmd_settings() -> int:
     _trace(project_dir, session_id, "settings", "set", key=key)
     return 0
 
-
-def cmd_refs_dir() -> int:
-    """Print the resolved refs directory (absolute), applying `refs_dir` validation.
-
-    The single query point for "where do cited-doc copies go": the claims auditor falls
-    back to it when its dispatch omits `refs_dir`, and anything with the script
-    path can use it instead of re-implementing _refs_dir's fallback rules.
-
-    A CLI verb, so `_cli_project_dir`. On `_project_dir` it printed NOTHING to every caller
-    it has — the Bash environment has no `CLAUDE_PROJECT_DIR` to find — which is not a
-    fail-open, since the whole verb is the answer it was asked for.
-    """
-    project_dir = _cli_project_dir()
-    print(_refs_dir(project_dir, _load_config(project_dir)))
-    return 0

@@ -121,12 +121,11 @@ def _handle_post_tool(project_dir: Path, payload: dict[str, Any], session_id: st
     _save_turn(project_dir, session_id, turn_id, turn)
 
     config = core_config._load_config(project_dir)
-    shell_targets: list[Path] = []
     if core_search.is_shell_tool(payload.get("tool_name")):
         normalized = dict(payload)
         normalized["prompt_id"] = turn_id
         normalized["session_id"] = session_id
-        shell_targets = core_edit.record_shell_writes(project_dir, normalized, config)
+        core_edit.record_shell_writes(project_dir, normalized, config)
     edited_paths = _edited_paths(payload)
     for edited_path in edited_paths:
         normalized = dict(payload)
@@ -134,25 +133,6 @@ def _handle_post_tool(project_dir: Path, payload: dict[str, Any], session_id: st
         normalized["session_id"] = session_id
         synthetic_input = {"file_path": edited_path}
         core_edit._record_edited_source(project_dir, normalized, synthetic_input, config)
-
-        # The reference index remains an enforcement gate, independent of review rules.
-        if not core_edit._targets_refs_dir(project_dir, synthetic_input, config):
-            continue
-        target = core_edit._tool_target_path(project_dir, synthetic_input)
-        if target is not None and target.name not in core_edit._REFS_INDEX_SKIP:
-            reason = core_edit.refs_index_gap(project_dir, target, config)
-            if reason is not None:
-                json.dump({"decision": "block", "reason": reason}, sys.stdout)
-                return
-    for target in shell_targets:
-        synthetic_input = {"file_path": str(target)}
-        if not core_edit._targets_refs_dir(project_dir, synthetic_input, config):
-            continue
-        if target.name not in core_edit._REFS_INDEX_SKIP:
-            reason = core_edit.refs_index_gap(project_dir, target, config)
-            if reason is not None:
-                json.dump({"decision": "block", "reason": reason}, sys.stdout)
-                return
 
 
 def _edited_paths(payload: dict[str, Any]) -> list[str]:

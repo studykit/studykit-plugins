@@ -2,16 +2,14 @@
 
 Holds the plan gate state and the files this
 session has edited since the last file-audit checkpoint
-(``edited_prompt_id`` / ``edited_files`` / ``edited_agent_docs`` / ``edited_refs`` /
-``edited_docs``), their per-path source evidence (``edited_provenance``),
+(``edited_prompt_id`` / ``edited_files`` / ``edited_agent_docs`` / ``edited_docs``), their per-path source evidence (``edited_provenance``),
 ``last_audited_prompt_id`` / ``last_audited_fingerprint``, ``pending_verify_prompt_id``,
 ``transcript_path``, and
 ``updated_at``.
 
 Both the ``default`` dict and the ``keys`` tuple in ``_read_state`` are the schema, and a new
 key must be added to BOTH. A key missing from ``keys`` is written by whoever set it and then
-dropped on the very next read, which looks exactly like the writer never ran — that is how
-``edited_refs`` behaved for its first hour of existence.
+dropped on the very next read, which looks exactly like the writer never ran.
 """
 
 from __future__ import annotations
@@ -50,12 +48,11 @@ def _read_state(project_dir: Path, session_id: str, config: dict[str, Any]) -> d
         "transcript_path": "",
         # Files written since the last checkpoint, accumulated by PostToolUse and read by the
         # explicit `audit-files` entry. `edited_prompt_id` is diagnostic only: it records the
-        # most recent turn that added an edit and never scopes the queue. The four lists
+        # most recent turn that added an edit and never scopes the queue. The three lists
         # preserve existing queue storage; rules, not buckets, choose the reviewer.
         "edited_prompt_id": "",
         "edited_files": [],
         "edited_agent_docs": [],
-        "edited_refs": [],
         "edited_docs": [],
         "edited_truncated": {},
         # Per-path evidence for the current edit lists. Native file tools name an exact
@@ -97,7 +94,7 @@ def _read_state(project_dir: Path, session_id: str, config: dict[str, Any]) -> d
             "pending_verify_prompt_id", "file_checkpoints",
             "transcript_path", "plan_audit_paused", "plan_audited_hash",
             "edited_prompt_id", "edited_files",
-            "edited_agent_docs", "edited_refs", "edited_docs", "edited_truncated",
+            "edited_agent_docs", "edited_docs", "edited_truncated",
             "edited_provenance",
             "updated_at")
     default.update({k: data[k] for k in keys if k in data})
@@ -145,7 +142,7 @@ def _edit_source(state: dict[str, Any], path: str) -> str | None:
 def _edited_fingerprint(state: dict[str, Any], prompt_id: str) -> str:
     """Hash the current contents of the retained pending edit set and overflow counts."""
     digest = hashlib.sha256()
-    for bucket in ("edited_files", "edited_agent_docs", "edited_refs", "edited_docs"):
+    for bucket in ("edited_files", "edited_agent_docs", "edited_docs"):
         for raw in _edited_files(state, prompt_id, bucket):
             path = Path(raw)
             digest.update(bucket.encode())

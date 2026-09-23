@@ -3,7 +3,7 @@
 There are two root resolvers and merging them breaks one of the two. Hook events use
 ``_project_dir`` — the env var alone, failing open — because a hook is handed
 ``CLAUDE_PROJECT_DIR`` and a hook that guessed would write state somewhere nobody looks. The
-CLI verbs (``transcript``, ``settings``, ``refs-dir``) use ``_cli_project_dir``:
+CLI verbs (``transcript``, ``settings``) use ``_cli_project_dir``:
 ``GUARD_PROJECT_DIR``, which SessionStart exports into the Bash environment via
 ``$CLAUDE_ENV_FILE``, else the git root above the cwd. ``CLAUDE_PROJECT_DIR`` itself is never
 in that environment, so a CLI verb refusing to guess would answer nothing at all.
@@ -31,7 +31,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from .agents import DocScope
-from .config import CONFIG_REL, STATE_DIR_REL, TRACE_FILE_NAME, _trace_enabled
+from .config import STATE_DIR_REL, TRACE_FILE_NAME, _trace_enabled
 
 
 def _project_dir() -> Path | None:
@@ -104,44 +104,6 @@ def _state_file(project_dir: Path, session_id: str) -> Path:
     return _state_root(project_dir) / "state" / f"{session_id}.json"
 
 
-def _safe_project_subdir(project_dir: Path, raw: Any) -> Path | None:
-    """Resolve a configured project-relative directory, or None if it is not safe.
-
-    guard's self-neutering defense for a config key that names a directory guard
-    treats specially (``refs_dir``). A value is honored only when it resolves:
-
-    - inside the project, STRICTLY below it — ``project not in candidate.parents``
-      rejects the project root itself, because a path is never in its own
-      ``.parents`` and ``"."`` resolves to the project dir. A root-level exemption
-      would exempt every project write and neuter the gate, so this strictness is
-      load-bearing: do not relax it to a ``==``-tolerant containment test.
-    - outside guard's OWN config/state — a value of ``.claude/guard`` would let the
-      model write ``state/<sid>.json``, and ``.claude/guard.local.json`` would let it
-      turn the audit off.
-
-    Note what this does NOT catch: an ANCESTOR of guard's state (e.g. ``.claude``)
-    is a legal value — it is neither the state root nor under it.
-
-    Returns the resolved absolute Path, or None when the value is unusable (not a
-    non-empty str, unresolvable, or failing either rule above); ``_refs_dir`` then
-    falls back to its default.
-    """
-    if not isinstance(raw, str) or not raw.strip():
-        return None
-    try:
-        candidate = (project_dir / raw.strip()).resolve()
-        project = project_dir.resolve()
-        state_root = _state_root(project_dir).resolve()
-        config_path = (project_dir / CONFIG_REL).resolve()
-    except OSError:
-        return None
-    if project not in candidate.parents:
-        return None
-    if candidate == state_root or state_root in candidate.parents or candidate == config_path:
-        return None
-    return candidate
-
-
 def _clear_handoff_file(project_dir: Path) -> Path:
     """Where a `/clear`ed session leaves its switches for the session replacing it.
 
@@ -162,18 +124,17 @@ def _knowledge_dirs(project_dir: Path, config: dict[str, Any] | None = None) -> 
 
     Exposed through audit inputs and `knowledge-dirs` for readers that need deployment
     topology, environments or runbooks. That material routinely lives OUTSIDE the
-    repository (a personal or team knowledge base), which is why this is not
-    ``_safe_project_subdir``: an absolute path and a ``~`` are the expected shapes here, and
-    confining it to the project would exclude the case the key exists for.
+    repository (a personal or team knowledge base), so it is not confined to the project: an
+    absolute path and a ``~`` are the expected shapes here, and confining it would exclude
+    the case the key exists for.
 
     A LIST, because the knowledge is normally split rather than centralized — one directory
     per system, per team, or per source, and a design touching two systems needs both. Order
     is preserved and is the user's statement of precedence: the reading agent starts at the
     front.
 
-    Nothing writes here and nothing derives a write path from it, so the containment rules
-    that make ``refs_dir`` a self-neutering hazard do not apply. What is checked is only
-    that each value resolves to a real directory; a typo then drops that entry rather than
+    Nothing writes here and nothing derives a write path from it, so there is nothing to
+    contain. What is checked is only that each value resolves to a real directory; a typo then drops that entry rather than
     the whole setting, and it drops SILENTLY here — the ``settings`` CLI is where a bad path
     is reported, because this runs on a dispatch and an agent cannot act on a warning it was
     not built to read.
@@ -261,23 +222,6 @@ def _knowledge_dir_entries(project_dir: Path, config: dict[str, Any] | None = No
             continue
         out.append((text, candidate if candidate.is_dir() else None))
     return out
-
-
-def _refs_dir(project_dir: Path, config: dict[str, Any] | None = None) -> Path:
-    """Directory where guard saves local copies of cited docs.
-
-    Writes here are the assistant grounding its own claims (per the output style),
-    not implementing the user's task.
-
-    Default is ``wiki/ref/`` under the project, a git-tracked location so the
-    collected references are committed with the repo; the ``refs_dir`` config key
-    may point it at a different project path (e.g. ``docs/refs``). A configured
-    value is honored only when ``_safe_project_subdir`` accepts it (strictly inside
-    the project, outside guard's own config/state — see there for why); anything
-    else falls back to the default, so ``refs_dir`` can never become a hole.
-    """
-    default = project_dir / "wiki" / "ref"
-    return _safe_project_subdir(project_dir, (config or {}).get("refs_dir", "")) or default
 
 
 def _project_rel(project_dir: Path, path: Path) -> str:

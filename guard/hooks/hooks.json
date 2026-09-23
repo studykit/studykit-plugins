@@ -33,7 +33,7 @@
             "type": "command",
             "command": "uv run --script \"${CLAUDE_PLUGIN_ROOT}/scripts/guard_hook.py\" post-edit",
             "timeout": 10,
-            "description": "Add a source file, agent instruction file, saved reference or ordinary document to the session's pending checkpoint queue (including writes made by Bash and by subagents), and require a file saved inside the refs dir to be listed in the refs index (AGENTS.md)."
+            "description": "Add a source file, agent instruction file or ordinary document to the session's pending checkpoint queue (including writes made by Bash and by subagents)."
           }
         ]
       }
@@ -70,7 +70,7 @@
             "type": "command",
             "command": "uv run --script \"${CLAUDE_PLUGIN_ROOT}/scripts/guard_hook.py\" session-start",
             "timeout": 5,
-            "description": "Sweep guard state and turn records past the retention window, record this session's transcript path (the one field guard cannot derive), export GUARD_PROJECT_DIR and GUARD_REFS_DIR, and state the refs rule as session context — plus, when review rules are configured, the entry points the user invokes."
+            "description": "Sweep guard state and turn records past the retention window, record this session's transcript path (the one field guard cannot derive), export GUARD_PROJECT_DIR and GUARD_TOGGLE_CLI, and, when review rules are configured, state as session context the entry points the user invokes."
           }
         ]
       }

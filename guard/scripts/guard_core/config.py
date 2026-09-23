@@ -121,22 +121,14 @@ DEFAULT_CONFIG: dict[str, Any] = {
     # environments, runbooks. Exposed to audit inputs and user-supplied reviewers;
     # guard never writes here. Empty means the project has none.
     #
-    # Unlike `refs_dir` this is NOT confined to the project. The material it points at is
-    # frequently a knowledge base kept outside the repository, and since nothing derives a
-    # write from it, the containment rules that make `refs_dir` a hazard have nothing to
-    # protect here. See `paths._knowledge_dirs`.
+    # NOT confined to the project. The material it points at is frequently a knowledge base
+    # kept outside the repository, and nothing derives a write from it. See
+    # `paths._knowledge_dirs`.
     #
     # A LIST — this knowledge is normally split across directories rather than centralized,
     # and order is precedence. A bare string is still accepted (one directory), since that
     # is what a user with one will write.
     "knowledge_dir": [],
-    # Where guard saves local copies of cited docs, relative to
-    # the project dir. Empty = the default git-tracked `wiki/ref/`, so the collected
-    # references are committed with the repo. Point it at a different tracked path
-    # (e.g. "docs/refs") to override. Values that resolve outside the project, at the
-    # project root, or into guard's own config/state are ignored (fall back to the
-    # default) — see _refs_dir for why.
-    "refs_dir": "",
 }
 
 _ACTION_NAME_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9:_-]*")
@@ -362,8 +354,7 @@ def _load_config(project_dir: Path) -> dict[str, Any]:
     """Load the JSON config at guard.local.json, if present. Fail-open to defaults.
 
     Only keys present in DEFAULT_CONFIG are honored, and only when the supplied value
-    matches the default's JSON type — a str for ``refs_dir``, a list for
-    file-review rules,
+    matches the default's JSON type — a list for file-review rules,
     (or a bare str) for ``knowledge_dir`` — so a malformed value can never change a setting
     by accident.
     """

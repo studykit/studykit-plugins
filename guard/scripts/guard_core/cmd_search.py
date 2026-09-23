@@ -10,8 +10,7 @@ this makes it a refusal rather than a request.
 
 Independent of the agent switches, and of the session mute. The switches govern whether
 guard *says* something unasked at the end of a turn; this is a prohibition on a tool call,
-and a prohibition that a mute could lift would not be one. It is the same reasoning that
-keeps the refs-index check in ``cmd_edit`` outside the switches.
+and a prohibition that a mute could lift would not be one.
 
 Scope, stated as a boundary rather than a limitation: this denies the ROOT of a search, not
 searches it dislikes. `/etc`, `/usr`, and every other absolute path are allowed — they are
