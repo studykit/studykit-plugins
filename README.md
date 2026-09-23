@@ -57,6 +57,6 @@ For compatibility and versioning rules, see `AGENTS.md`.
 - `d2` — D2 diagram composition, rendering, and visualization
 - `guard` — user-configured answer, turn, and plan reviews, plus rule-based checkpoints for changed files
 - `handover` — create a self-contained session handover and load a recorded handover after a clear
-- `lens` — Herdr file tree with popup and overlay views, saved navigation state, filename search, Markdown and source previews, and Git diffs
+- `lens` — Herdr file tree with popup and overlay views, saved navigation state, filename search, Markdown and source previews, diagram rendering (PlantUML, Mermaid, D2, Graphviz and more), and Git diffs
 
 `structurizr`, `d2` and `handover` are Claude Code only. `lens` installs through Herdr and works alongside any agent. The remaining plugins run in both Claude Code and Codex.

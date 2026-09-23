@@ -14,7 +14,7 @@ from diff_tool import comparison
 from popup_size import PopupSize, PRESETS
 from view_state import normalize as normalize_view
 import markdown_preview
-import plantuml_preview
+import diagram_preview
 import syntax_preview
 import terminal_input
 from theme_colors import resolve as resolve_theme, terminal_color
@@ -100,8 +100,8 @@ class Navigator:
     def __init__(self, root: Path, pane_id: str, changes: bool, editor: str,
                  size: PopupSize = PopupSize(), on_resize=None, theme_loader=None,
                  folder_style=None, on_state=None, layout_loader=None, on_layout=None,
-                 initial_state=None, defer_status=False, plantuml=None, graphics=None,
-                 cell_size=None):
+                 initial_state=None, defer_status=False, diagram_tools=None, graphics=None,
+                 cell_size=None, alignment="center", on_alignment=None):
         initial_state = normalize_view(initial_state, root)
         self.root, self.pane_id, self.editor = root, pane_id, editor
         self.changes = changes
@@ -150,19 +150,27 @@ class Navigator:
         self.pending_selection = ""
         self.pending_scroll = 0
         self.message = ""
-        # PlantUML diagrams need a renderer command and a Kitty graphics writer.
-        self.plantuml = plantuml
+        # Diagrams need their renderer commands and a Kitty graphics writer.
+        self.diagram_tools = diagram_tools or {}
+        self.diagram_languages = diagram_preview.available(self.diagram_tools) if graphics else set()
         self.graphics = graphics
         self.cell_size = cell_size
-        self.diagrams = {}  # PlantUML source -> ("ok", image ID, PNG) or ("error", message)
+        self.diagrams = {}  # (language, source) -> ("ok", image ID, PNG) or ("error", message)
         self.diagram_list, self.diagram_queue, self.diagram_job = [], [], None
         self.diagram_source = False
+        self.zooms = {}  # (language, source) -> zoom, kept while the navigator stays open.
+        self.chosen_diagram = None  # The Markdown diagram that zoom keys adjust.
+        self.zoom_version = 0
+        self.alignment = alignment if alignment in diagram_preview.ALIGNMENTS else "center"
+        self.on_alignment = on_alignment
+        self.diagram_extent = None  # Zoomed (cols, rows) of a diagram file's image.
         self.markdown_diagrams = []
         self.render_body = None
         self.image_id = 0
         self.placements = []
         self.images_sent, self.images_stale = set(), set()
         self.image_placed = self.cell = None
+        self.screen_size = None
         self.index = None
         self.items = []
         self.refresh()
@@ -544,19 +552,21 @@ class Navigator:
         self.start_diagrams()
 
     def diagram_file(self):
-        """A standalone PlantUML file, shown as one image filling the panel."""
-        return bool(self.diagram_list) and plantuml_preview.supported(self.active)
+        """A standalone diagram file, shown as one image filling the panel."""
+        return bool(self.diagram_list) and not self.markdown
 
     def diagram_sources(self):
-        if not self.previewable or self.plantuml is None or self.graphics is None:
+        if not self.previewable or not self.diagram_languages:
             return []
-        if plantuml_preview.supported(self.active):
-            return [self.source_text]
+        language = diagram_preview.file_language(self.active)
+        if language:
+            return [(language, self.source_text)] if language in self.diagram_languages else []
         if self.markdown:
             try:
-                return list(dict.fromkeys(markdown_preview.plantuml_blocks(self.source_text)))
+                blocks = markdown_preview.diagram_blocks(self.source_text)
             except Exception:
                 return []  # Markdown parsing failures fall back in prepare_preview.
+            return list(dict.fromkeys(key for key in blocks if key[0] in self.diagram_languages))
         return []
 
     def start_diagrams(self):
@@ -575,19 +585,18 @@ class Navigator:
             self.diagram_queue.remove(running)
         if self.diagram_job is not None or not self.diagram_queue:
             return
-        # One PlantUML process at a time: each JVM start is heavy.
-        source = self.diagram_queue.pop(0)
-        cwd, argv, result = (self.root / self.active).parent, self.plantuml, Future()
-        self.diagram_job = (source, result)
-        text = source if "@start" in source else f"@startuml\n{source}@enduml\n"
+        # One renderer at a time: JVM and headless-browser starts are heavy.
+        key = self.diagram_queue.pop(0)
+        cwd, tools, result = (self.root / self.active).parent, self.diagram_tools, Future()
+        self.diagram_job = (key, result)
 
         def work():
             try:
-                result.set_result(plantuml_preview.render(text, cwd, argv))
+                result.set_result(diagram_preview.render(*key, cwd, tools))
             except Exception as error:
                 result.set_exception(error)
 
-        Thread(target=work, name="lens-plantuml", daemon=True).start()
+        Thread(target=work, name="lens-diagram", daemon=True).start()
 
     def poll_diagram(self):
         if self.diagram_job is None or not self.diagram_job[1].done():
@@ -597,11 +606,12 @@ class Navigator:
         if source in self.diagram_list:
             try:
                 png = result.result()
-                plantuml_preview.image_size(png)
+                diagram_preview.image_size(png)
                 self.image_id += 1
                 self.diagrams[source] = ("ok", self.image_id, png)
             except Exception as error:
-                self.diagrams[source] = ("error", f"Could not render PlantUML: {error}")
+                title = diagram_preview.LANGUAGES[source[0]].title
+                self.diagrams[source] = ("error", f"Could not render {title}: {error}")
                 if self.markdown:
                     self.message = self.diagrams[source][1]
             self.render_width = None  # Markdown reserves rows for the new image.
@@ -616,14 +626,89 @@ class Navigator:
         return self.cell
 
     def draw_diagram(self, screen, x, width):
-        entry = self.diagrams.get(self.source_text)
+        key = self.diagram_list[0]
+        entry = self.diagrams.get(key)
         if entry is None or entry[0] == "error":
-            put(screen, self.content_top, x + 2, entry[1] if entry else "Rendering PlantUML…", width - 4,
+            waiting = f"Rendering {diagram_preview.LANGUAGES[key[0]].title}…"
+            put(screen, self.content_top, x + 2, entry[1] if entry else waiting, width - 4,
                 self.style("removed" if entry else "muted"))
             return
-        cols, rows = plantuml_preview.fit(plantuml_preview.image_size(entry[2]), width - 4,
-                                          self.body, self.cell_pixels())
-        self.placements.append((entry[1], 1, self.content_top, x + 2, cols, rows, None))
+        # A zoomed image larger than the panel is panned with the scroll offsets.
+        (full_cols, full_rows), (width_px, height_px) = self.diagram_extent, diagram_preview.image_size(entry[2])
+        left, top = self.horizontal, self.preview_scroll
+        cols, rows = min(width - 4, full_cols - left), min(self.body, full_rows - top)
+        crop = None
+        if (left, top, cols, rows) != (0, 0, full_cols, full_rows):
+            x0, x1 = round(left * width_px / full_cols), round((left + cols) * width_px / full_cols)
+            y0, y1 = round(top * height_px / full_rows), round((top + rows) * height_px / full_rows)
+            crop = (x0, y0, max(1, x1 - x0), max(1, y1 - y0))
+        left_edge = x + 2 + diagram_preview.offset(self.alignment, width - 4, cols)
+        self.placements.append((entry[1], 1, self.content_top, left_edge, cols, rows, crop))
+
+    def measure_diagram(self, cols):
+        self.diagram_extent = None
+        entry = self.diagrams.get(self.diagram_list[0]) if self.diagram_view() else None
+        if entry and entry[0] == "ok":
+            self.diagram_extent = diagram_preview.scaled(diagram_preview.image_size(entry[2]), cols,
+                                                         self.body, self.cell_pixels(),
+                                                         self.zoom_of(self.diagram_list[0]))
+            self.horizontal = min(self.horizontal, max(0, self.diagram_extent[0] - cols))
+
+    def zoom_of(self, key):
+        return self.zooms.get(key, 1.0)
+
+    def visible_diagrams(self):
+        return [key for line, key, (_, rows) in self.markdown_diagrams
+                if line < self.preview_scroll + self.body and line + rows > self.preview_scroll]
+
+    def current_diagram(self):
+        """The diagram zoom keys adjust: a file's only diagram, or in Markdown the
+        chosen one while it is on screen, else the first one on screen."""
+        if not self.markdown:
+            return self.diagram_list[0] if self.diagram_list else None
+        visible = self.visible_diagrams()
+        if self.chosen_diagram in visible:
+            return self.chosen_diagram
+        return visible[0] if visible else None
+
+    def zoom_diagram(self, key):
+        target = self.current_diagram()
+        if target is None:
+            self.message = "Scroll a diagram into view to zoom it"
+            return
+        zooms = diagram_preview.ZOOMS
+        index = zooms.index(self.zoom_of(target))
+        zoom = 1.0 if key == "0" else zooms[max(0, min(len(zooms) - 1, index + (-1 if key == "-" else 1)))]
+        self.zooms[target] = zoom
+        self.chosen_diagram = target
+        if not self.markdown:
+            self.preview_scroll = self.horizontal = 0
+        self.zoom_version += 1
+        self.render_width = None  # Markdown reserves rows for the new size.
+        title = diagram_preview.LANGUAGES[target[0]].title
+        self.message = f"{title} zoom {round(zoom * 100)}%" + (" (fit)" if zoom == 1 else "")
+
+    def align_diagrams(self):
+        alignments = diagram_preview.ALIGNMENTS
+        self.alignment = alignments[(alignments.index(self.alignment) + 1) % len(alignments)]
+        self.message = f"Diagram alignment: {self.alignment.title()}"
+        if self.on_alignment is not None:
+            try:
+                self.on_alignment(self.alignment)
+            except (OSError, ValueError) as error:
+                self.message += f" (not saved: {error})"
+
+    def choose_diagram(self, step):
+        keys = [key for _, key, _ in self.markdown_diagrams]
+        if not keys:
+            return
+        current = self.current_diagram()
+        index = keys.index(current) + step if current in keys else (0 if step > 0 else len(keys) - 1)
+        index = max(0, min(len(keys) - 1, index))
+        self.chosen_diagram = keys[index]
+        line = self.markdown_diagrams[index][0]
+        self.preview_scroll = max(0, min(line - 1, max(0, self.preview_length() - self.body)))
+        self.message = f"Diagram {index + 1}/{len(keys)} · {round(self.zoom_of(keys[index]) * 100)}%"
 
     def markdown_rows(self, width):
         rows = {}
@@ -632,12 +717,14 @@ class Navigator:
         for source in self.diagram_list:
             entry = self.diagrams.get(source)
             if entry and entry[0] == "ok":
-                size = plantuml_preview.image_size(entry[2])
-                rows[source] = plantuml_preview.fit(size, width, self.body, self.cell_pixels())
+                size = diagram_preview.image_size(entry[2])
+                rows[source] = diagram_preview.scaled(size, width, self.body, self.cell_pixels(),
+                                                      self.zoom_of(source), max_cols=width)
         return rows
 
-    def place_markdown(self, x):
+    def place_markdown(self, screen, x):
         # Images partly scrolled out of the panel are cropped to their visible rows.
+        current = self.current_diagram() if len(self.markdown_diagrams) > 1 else None
         for number, (line, source, (cols, rows)) in enumerate(self.markdown_diagrams, 1):
             top, bottom = max(line, self.preview_scroll), min(line + rows, self.preview_scroll + self.body)
             entry = self.diagrams.get(source)
@@ -645,11 +732,16 @@ class Navigator:
                 continue
             crop = None
             if top > line or bottom < line + rows:
-                width, height = plantuml_preview.image_size(entry[2])
+                width, height = diagram_preview.image_size(entry[2])
                 start, stop = round((top - line) * height / rows), round((bottom - line) * height / rows)
                 crop = (0, start, width, max(1, stop - start))
+            left_edge = x + diagram_preview.offset(self.alignment, self.render_width, cols)
             self.placements.append((entry[1], number, self.content_top + top - self.preview_scroll,
-                                    x, cols, bottom - top, crop))
+                                    left_edge, cols, bottom - top, crop))
+            if source == current:
+                # Mark which of several diagrams the zoom keys will change.
+                for row in range(top, bottom):
+                    put(screen, self.content_top + row - self.preview_scroll, x - 1, "▌", 1, self.style("active"))
 
     def sync_image(self):
         if self.graphics is None:
@@ -659,42 +751,50 @@ class Navigator:
             wanted = tuple(self.placements)
         data = b""
         for image_id in sorted(self.images_stale & self.images_sent):
-            data += plantuml_preview.delete(image_id)
+            data += diagram_preview.delete(image_id)
         self.images_sent -= self.images_stale
         self.images_stale.clear()
         if wanted != self.image_placed:
             if self.image_placed is None:
                 # Unknown screen state: drop every placement before redrawing.
                 previous = ()
-                data += b"".join(plantuml_preview.hide(image_id) for image_id in sorted(self.images_sent))
+                data += b"".join(diagram_preview.hide(image_id) for image_id in sorted(self.images_sent))
             else:
                 previous = self.image_placed
             keep = {placement[:2] for placement in wanted}
             for placement in previous:
                 if placement[:2] not in keep and placement[0] in self.images_sent:
-                    data += plantuml_preview.hide(*placement[:2])
+                    data += diagram_preview.hide(*placement[:2])
             images = {entry[1]: entry[2] for entry in self.diagrams.values() if entry[0] == "ok"}
             for placement in wanted:
                 if placement[0] not in self.images_sent:
-                    data += plantuml_preview.transmit(placement[0], images[placement[0]])
+                    data += diagram_preview.transmit(placement[0], images[placement[0]])
                     self.images_sent.add(placement[0])
                 if placement not in previous:
                     # The same image and placement ID replaces its old position.
-                    data += plantuml_preview.place(*placement)
+                    data += diagram_preview.place(*placement)
             self.image_placed = wanted
         if data:
             self.graphics(data)
 
+    def track_size(self, size):
+        # A resize makes curses clear the screen, which also drops Kitty placements;
+        # send the images again after the redraw instead of trusting the old state.
+        if size != self.screen_size:
+            if self.screen_size is not None:
+                self.release_image()
+            self.screen_size = size
+
     def release_image(self):
         if self.graphics is not None and self.images_sent:
-            self.graphics(b"".join(plantuml_preview.delete(image_id) for image_id in sorted(self.images_sent)))
+            self.graphics(b"".join(diagram_preview.delete(image_id) for image_id in sorted(self.images_sent)))
         self.images_sent.clear()
         self.images_stale.clear()
         self.image_placed = None
 
     def prepare_preview(self, width):
         # Diagram rows depend on the panel height as well as its width.
-        body = self.body if self.markdown and self.diagram_list else None
+        body = (self.body, self.zoom_version) if self.markdown and self.diagram_list else None
         if not self.previewable or (self.render_width == width and self.render_body == body):
             return
         self.render_width, self.render_body = width, body
@@ -874,9 +974,17 @@ class Navigator:
         if self.syntax is not None:
             label = self.language
         if self.diagram_file():
-            label = "PLANTUML · v Source" if not self.diagram_source else f"{label} · v Diagram"
+            title = diagram_preview.LANGUAGES[self.diagram_list[0][0]].title.upper()
+            label = (f"{title} · {round(self.zoom_of(self.diagram_list[0]) * 100)}% · v Source" if not self.diagram_source
+                     else f"{label} · v Diagram")
         elif self.markdown and self.diagram_list and self.rendered is not None:
-            label += " · v PlantUML source" if not self.diagram_source else " · v PlantUML diagrams"
+            current = self.current_diagram()
+            keys = [key for _, key, _ in self.markdown_diagrams]
+            if self.diagram_source or current not in keys:
+                label += " · v Diagrams" if self.diagram_source else " · v Diagram source"
+            else:
+                label += (f" · Diagram {keys.index(current) + 1}/{len(keys)} "
+                          f"{round(self.zoom_of(current) * 100)}% · v Diagram source")
         put(screen, 6, x + 2, label if self.active else "OPEN A FILE TO BEGIN", width - 4, self.style("muted"))
         if self.diagram_view():
             self.draw_diagram(screen, x, width)
@@ -894,10 +1002,12 @@ class Navigator:
             else:
                 put(screen, y + 1, x + 3, line, width - 6, self.style("muted"))
         if self.rendered is not None and self.markdown_diagrams:
-            self.place_markdown(x + 2)
+            self.place_markdown(screen, x + 2)
 
     def preview_length(self):
-        return 1 if self.diagram_view() else len(self.content)
+        if self.diagram_view():
+            return self.diagram_extent[1] if self.diagram_extent else 1
+        return len(self.content)
 
     def draw(self, screen):
         screen.bkgd(" ", self.style("base"))
@@ -921,6 +1031,7 @@ class Navigator:
         self.narrow = width < 90
         content_width = width - 1 if self.narrow else width - self.divider - 2
         self.prepare_preview(content_width - 4)
+        self.measure_diagram(content_width - 4)
         if self.restore_horizontal:
             longest = max((sum(0 if unicodedata.combining(char) else
                                2 if unicodedata.east_asian_width(char) in "WF" else 1
@@ -961,7 +1072,9 @@ class Navigator:
         if self.preview_focus and not self.searching:
             help_text = "j/k Line  Space/f/b Page  d/u Half  g/G Top/End  / Search  ^O Root  ^T Git root"
             if self.diagram_list:
-                help_text = "v Diagram/Source  " + help_text
+                # "/" opens search, so these key pairs are not joined with a slash.
+                help_text = ("+ - Zoom  0 Fit  a Align  " + ("[ ] Prev/Next diagram  " if self.markdown else "")
+                             + "v Diagram/Source  " + help_text)
         put(screen, height - 1, 1, help_text, width - 2, self.style("muted"))
         if self.size_draft:
             self.draw_size(screen)
@@ -985,6 +1098,15 @@ class Navigator:
         shared = {"\x0e": 1, "\x10": -1, "\x06": page, "\x02": -page}
         if key in shared:
             self.scroll_preview(shared[key])
+            return True
+        if key in ("+", "=", "-", "0") and self.diagram_list and not self.diagram_source:
+            self.zoom_diagram(key)
+            return True
+        if key == "a" and self.diagram_list and not self.diagram_source:
+            self.align_diagrams()
+            return True
+        if key in ("[", "]") and self.markdown and self.markdown_diagrams:
+            self.choose_diagram(-1 if key == "[" else 1)
             return True
         if key == "v" and self.diagram_list:
             self.diagram_source = not self.diagram_source
@@ -1183,6 +1305,7 @@ class Navigator:
                 self.poll_status()
                 self.poll_diagram()
                 terminal_input.sync_size(screen)
+                self.track_size(screen.getmaxyx())
                 if applied_palette != self.palette:
                     self.styles = theme(self.palette, self.folder_style)
                     self.color_pairs.clear()

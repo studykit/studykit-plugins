@@ -1,7 +1,7 @@
 # Lens
 
 Browse the focused Herdr pane's working directory in a popup or overlay with a project tree,
-filename search, file previews, PlantUML diagrams, and side-by-side Git comparisons in vimdiff. Works alongside any shell or agent,
+filename search, file previews, rendered diagrams, and side-by-side Git comparisons in vimdiff. Works alongside any shell or agent,
 including Claude Code and Codex, on macOS and Linux.
 
 Requires Herdr 0.9.0 or later, `uv` on Herdr's `PATH`, and Python 3.11 or later
@@ -11,9 +11,9 @@ for browsing and required for change indicators and diffs. Comparing files also
 requires `vimdiff` or Vim compiled with diff support.
 Markdown rendering uses the Python `Rich` library and source highlighting uses
 `Pygments`; both dependencies are managed automatically. Glow is not required.
-PlantUML diagram previews need `plantuml` on Herdr's `PATH` (or `PLANTUML_JAR`
-pointing at a PlantUML jar, with Java installed) and an outer terminal that
-supports the Kitty graphics protocol, such as Ghostty, kitty, or WezTerm.
+Diagram previews need an outer terminal that supports the Kitty graphics
+protocol, such as Ghostty, kitty, or WezTerm, and each language's renderer on
+Herdr's `PATH` (see [Diagrams](#diagrams)).
 
 ## Install
 
@@ -84,7 +84,10 @@ pane in that tab.
 | g / G (preview focused) | Jump to the beginning / end |
 | Mouse wheel | Scroll the panel under the pointer without changing keyboard focus |
 | Tab / Shift+Tab | Switch focus between files and preview |
-| v | Switch PlantUML previews (files and Markdown blocks) between diagrams and source |
+| v | Switch diagram previews (files and Markdown blocks) between images and source |
+| + (or =) / - / 0 | Zoom the current diagram in / out / back to fit |
+| [ / ] | Select the previous / next diagram in a Markdown preview |
+| a | Align diagrams left, center, or right |
 | Ctrl+D | Open a side-by-side HEAD / working-tree comparison in vimdiff |
 | Ctrl+E | Open the selected file in an editor |
 | Ctrl+G | Toggle changed files only |
@@ -261,25 +264,62 @@ shows the detected language. Colors follow the Herdr theme, including in Markdow
 code blocks. Code previews retain source line numbers and do not wrap; Left/Right
 scrolls long lines horizontally. Files are displayed, never executed.
 
-PlantUML files (`.puml`, `.plantuml`, `.pu`, `.iuml`, and `.wsd`) are rendered as
-a diagram image scaled to fit the preview panel. Rendering runs in the background;
-the preview shows *Rendering PlantUML…* until the image is ready, and an error
-message if PlantUML cannot produce one. Syntax errors show PlantUML's own error
-image. Only the first diagram of a file with several `@startuml` blocks is shown.
-`!include` paths resolve relative to the file's folder. Press `v` to switch
-between the diagram and its source.
+### Diagrams
 
-In Markdown, fenced code blocks tagged `plantuml` or `puml` are drawn as images in
-place of the code, scaled to the panel width and at most one panel tall, and scroll
-with the text; an image partly scrolled out of view is cropped. `@startuml` /
-`@enduml` may be omitted inside a fence. Blocks render one after another in the
-background and show as code until their image is ready, so the text below them
-shifts once as each image appears. A block PlantUML cannot render stays as code,
-and the status line reports the error. Press `v` to show every block as code. Diagrams are hidden while a Lens dialog is
-open and redrawn after an editor or vimdiff exits; press Ctrl+R if a Herdr menu or
-screen clear removes one. Without PlantUML, or with `[terminal].kitty_graphics = false`
-in Herdr's configuration, these files use the normal source preview. In a terminal
-without Kitty graphics the diagram area stays empty; press `v` to read the source.
+Diagram files and Markdown code blocks in these languages are drawn as images.
+Lens uses only local tools; nothing is sent to a rendering service. A language
+whose tools are not installed keeps the normal source preview.
+
+| Language | Fence tags | Files | Tools on `PATH` |
+|---|---|---|---|
+| PlantUML | `plantuml`, `puml` | `.puml`, `.plantuml`, `.pu`, `.iuml`, `.wsd` | `plantuml` (or `PLANTUML_JAR` with Java) |
+| Mermaid | `mermaid`, `mmd` | `.mmd`, `.mermaid` | `mmdc` from `@mermaid-js/mermaid-cli` |
+| D2 | `d2` | `.d2` | `d2`, `rsvg-convert` |
+| Graphviz | `dot`, `graphviz`, `gv` | `.dot`, `.gv` | `dot` |
+| Pikchr | `pikchr` | `.pikchr`, `.pik` | `pikchr`, `rsvg-convert` |
+| Svgbob | `bob`, `svgbob` | `.bob` | `svgbob_cli`, `rsvg-convert` |
+| WaveDrom | `wavedrom` | — | `wavedrom-cli`, `rsvg-convert` |
+| Vega-Lite | `vega-lite`, `vegalite` | `.vl.json` | `vl2svg` from `vega-lite` and `vega-cli`, `rsvg-convert` |
+| Structurizr DSL | `structurizr` | `workspace.dsl` | `structurizr-cli`, `plantuml` |
+
+`rsvg-convert` comes from librsvg. SVG output is placed on a white background so
+diagrams stay readable in dark themes. Structurizr has no command-line renderer
+of its own, so Lens exports the workspace's first view as C4-PlantUML and renders
+that. Mermaid starts a headless browser, so its diagrams take a few seconds.
+
+A diagram file is scaled to fit the preview panel. Rendering runs in the
+background; the preview shows *Rendering …* until the image is ready and an error
+message if the tool fails. PlantUML syntax errors show PlantUML's own error image,
+and only the first diagram of a file with several `@startuml` blocks is shown.
+Relative includes resolve from the file's folder. Press `v` to switch between the
+diagram and its source.
+
+Each diagram has its own zoom, from 25% to 400% of its fitted size; `+` (or `=`)
+and `-` step through the levels and `0` returns to fit. A zoomed diagram file
+larger than the panel pans with the usual scroll keys and Left/Right. In Markdown,
+zoom applies to the selected diagram, marked with a bar in the left margin when a
+document has several: the first diagram on screen, or the one chosen with `[` and
+`]`, which also scroll it into view. Markdown diagrams grow up to the panel width
+and may become taller than the panel. Zoom levels last while the navigator stays
+open.
+
+Diagrams narrower than the panel are centered. Press `a` to cycle every diagram
+between left, center, and right alignment; the choice is remembered across Herdr
+sessions.
+
+In Markdown, tagged fenced code blocks are drawn as images in place of the code,
+scaled to the panel width and at most one panel tall, and scroll with the text; an
+image partly scrolled out of view is cropped. `@startuml` / `@enduml` may be
+omitted inside a PlantUML fence. Blocks render one after another and show as code
+until their image is ready, so the text below them shifts once as each image
+appears. A block that fails to render stays as code, and the status line reports
+the error. Press `v` to show every block as code.
+
+Diagrams are hidden while a Lens dialog is open and redrawn after an editor or
+vimdiff exits; press Ctrl+R if a Herdr menu or screen clear removes one. With
+`[terminal].kitty_graphics = false` in Herdr's configuration, all diagrams use the
+source preview. In a terminal without Kitty graphics the diagram area stays empty;
+press `v` to read the source.
 
 Unknown extensions and plain text use the normal numbered preview. Highlighting
 errors also fall back to plain text. Binary files remain excluded.

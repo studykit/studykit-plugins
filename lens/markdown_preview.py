@@ -10,7 +10,6 @@ from theme_colors import resolve as resolve_theme
 
 MAX_RENDER_BYTES = 8 * 1024 * 1024
 FOOTNOTE_DEFINITION = re.compile(r"\[\^[^\]\s]+\]:")
-DIAGRAM_LANGUAGES = ("plantuml", "puml")
 
 
 @dataclass(frozen=True)
@@ -139,26 +138,29 @@ def clean_source(text: str) -> str:
     return "".join(char for char in text if char.isprintable() or char in "\n\t")
 
 
-def diagram_fence(token) -> bool:
-    words = token.info.split()
-    return token.type == "fence" and bool(words) and words[0].lower() in DIAGRAM_LANGUAGES
+def diagram_key(token):
+    """(language, source) for a fenced block in a known diagram language, else None."""
+    from diagram_preview import fence_language
+    language = fence_language(token.info) if token.type == "fence" else None
+    return (language, token.content) if language else None
 
 
-def plantuml_blocks(text: str) -> list[str]:
-    return [token.content for token in preview_tokens(clean_source(text)) if diagram_fence(token)]
+def diagram_blocks(text: str) -> list[tuple[str, str]]:
+    return [key for token in preview_tokens(clean_source(text)) if (key := diagram_key(token))]
 
 
 def replace_diagrams(tokens, diagrams, marker):
-    # Swap each rendered PlantUML fence for a one-word paragraph; its rendered
+    # Swap each rendered diagram fence for a one-word paragraph; its rendered
     # line is later replaced by blank rows the image is drawn over.
     from markdown_it.token import Token
     result, found = [], []
     for token in tokens:
-        if not diagram_fence(token) or token.content not in diagrams:
+        key = diagram_key(token)
+        if key not in diagrams:
             result.append(token)
             continue
         word = f"{marker}{len(found)}"
-        found.append(token.content)
+        found.append(key)
         inline = Token("inline", "", 0, content=word, map=token.map, level=token.level + 1, block=True,
                        children=[Token("text", "", 0, content=word)])
         result += [Token("paragraph_open", "p", 1, map=token.map, level=token.level, block=True), inline,
@@ -171,8 +173,8 @@ def render(text: str, width: int, colors=None) -> list[list[Span]]:
 
 
 def render_diagrams(text: str, width: int, colors=None, diagrams=None):
-    """Render Markdown; PlantUML fences whose source maps to a row count in
-    `diagrams` become that many blank lines, reported as (line, source, rows)."""
+    """Render Markdown; diagram fences whose (language, source) maps to a row count
+    in `diagrams` become that many blank lines, reported as (line, key, rows)."""
     # Import lazily so a broken/missing dependency can fall back to source text.
     from rich.console import Console
     from obsidian_markdown import markdown_type

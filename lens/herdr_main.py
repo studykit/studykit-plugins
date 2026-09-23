@@ -21,7 +21,7 @@ import tomllib
 from popup_size import PopupSize, load_size, save_size
 from layout_mode import MODES, load_layout, save_layout
 from ls_colors import directory_style
-import plantuml_preview
+import diagram_preview
 from view_state import load_view, save_view
 
 
@@ -290,6 +290,7 @@ def main(env: dict, operation: str) -> int:
         import curses
         from ui import Navigator
         state_dir = Path(env["HERDR_PLUGIN_STATE_DIR"]) if env.get("HERDR_PLUGIN_STATE_DIR") else None
+        config_dir = Path(env["HERDR_PLUGIN_CONFIG_DIR"]) if env.get("HERDR_PLUGIN_CONFIG_DIR") else None
         restored = None
         if env.get("LENS_RESUME"):
             path = resume_path(env, env["LENS_RESUME"])
@@ -314,9 +315,12 @@ def main(env: dict, operation: str) -> int:
                               on_layout=lambda placement, chosen, view:
                                   change_layout(env, pane_id, placement, chosen, view),
                               initial_state=restored, defer_status=True,
-                              plantuml=plantuml_preview.command(env),
-                              graphics=plantuml_preview.write if kitty_graphics(env) else None,
-                              cell_size=lambda: cell_size(env, pane_id))
+                              diagram_tools=diagram_preview.tools(env),
+                              graphics=diagram_preview.write if kitty_graphics(env) else None,
+                              cell_size=lambda: cell_size(env, pane_id),
+                              alignment=diagram_preview.load_alignment(config_dir),
+                              on_alignment=(lambda chosen: diagram_preview.save_alignment(config_dir, chosen))
+                                  if config_dir else None)
         if restored is not None and env.get("LENS_RESUME"):
             navigator.message = "Restored view after layout change"
         try:
