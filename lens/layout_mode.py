@@ -6,7 +6,9 @@ import os
 from pathlib import Path
 import tempfile
 
-MODES = ("popup", "overlay")
+MODES = ("popup", "overlay", "left", "right")
+# Split placements share the tab with the source pane instead of covering it.
+SPLITS = ("left", "right")
 
 
 def load_layout(config_dir: Path | None) -> str:

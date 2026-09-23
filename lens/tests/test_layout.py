@@ -146,6 +146,20 @@ class LayoutAdapterTests(unittest.TestCase):
     def test_layout_uses_the_host_surface(self):
         self.assertEqual(herdr_main.current_layout({"HERDR_PANE_ID": "navigator"}), "overlay")
         self.assertEqual(herdr_main.current_layout({}), "popup")
+        for placement in ("left", "right", "overlay"):
+            self.assertEqual(herdr_main.current_layout(
+                {"HERDR_PANE_ID": "navigator", "LENS_PLACEMENT": placement}), placement)
+        self.assertEqual(herdr_main.current_layout(
+            {"HERDR_PANE_ID": "navigator", "LENS_PLACEMENT": "popup"}), "overlay")
+
+    def test_half_layouts_are_offered_by_key_and_command(self):
+        nav = Navigator(Path(tempfile.gettempdir()), "source", False, "",
+                        layout_loader=Mock(return_value="overlay"), on_layout=Mock(return_value=True))
+        nav.key("\x17", None)
+        self.assertFalse(nav.key("3", None))
+        nav.on_layout.assert_called_with("left", PopupSize(), nav.export_state())
+        self.assertFalse(nav.run_command("layout right", None))
+        nav.on_layout.assert_called_with("right", PopupSize(), nav.export_state())
 
     def test_helper_drops_caller_context_but_records_pane_and_process_to_wait_for(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -177,6 +191,61 @@ class LayoutAdapterTests(unittest.TestCase):
             opened.assert_called_once_with(env, "herdr", "source", Path(directory), False,
                                            PopupSize(), path.resolve(), placement="popup")
 
+class WholeTabHalfTests(unittest.TestCase):
+    # Top pane over a bottom row split 40:60, as Herdr reports it.
+    LAYOUT = {"tab_id": "w:t1", "zoomed": True, "area": {"x": 0, "y": 0, "width": 100, "height": 30},
+              "panes": [{"pane_id": "top", "rect": {"x": 0, "y": 0, "width": 100, "height": 9}},
+                        {"pane_id": "left", "rect": {"x": 0, "y": 9, "width": 40, "height": 21}},
+                        {"pane_id": "right", "rect": {"x": 40, "y": 9, "width": 60, "height": 21}}],
+              "splits": [{"direction": "down", "ratio": 0.3, "rect": {"x": 0, "y": 0, "width": 100, "height": 30}},
+                         {"direction": "right", "ratio": 0.4, "rect": {"x": 0, "y": 9, "width": 100, "height": 21}}]}
+
+    def test_split_tree_follows_the_reported_rectangles(self):
+        panes = [{**pane["rect"], "pane_id": pane["pane_id"]} for pane in self.LAYOUT["panes"]]
+        self.assertEqual(herdr_main.split_tree(panes, self.LAYOUT["splits"], self.LAYOUT["area"]),
+                         ("down", 0.3, "top", ("right", 0.4, "left", "right")))
+
+    def run_half(self, placement, fail=False):
+        calls = []
+        def call(binary, *args):
+            calls.append(args)
+            if args[:2] == ("pane", "layout"):
+                return {"layout": self.LAYOUT}
+            if args[:2] == ("pane", "move") and "--new-tab" in args:
+                return {"move_result": {"pane": {"tab_id": "w:t9"}}}
+            if args[:3] == ("plugin", "pane", "open"):
+                if fail:
+                    raise RuntimeError("host unavailable")
+                return {"plugin_pane": {"pane": {"pane_id": "lens"}}}
+            return {}
+        with patch("herdr_main.call", side_effect=call):
+            try:
+                herdr_main.open_half("herdr", "left", ["plugin", "pane", "open"], placement)
+            except RuntimeError:
+                pass
+        return calls
+
+    def test_other_panes_wait_aside_and_return_with_their_splits(self):
+        calls = self.run_half("left")
+        self.assertEqual(calls, [
+            ("pane", "layout", "--pane", "left"),
+            ("pane", "zoom", "left", "--off"),
+            ("pane", "move", "left", "--new-tab", "--no-focus"),
+            ("pane", "move", "right", "--tab", "w:t9", "--split", "right", "--target-pane", "left", "--no-focus"),
+            ("plugin", "pane", "open", "--target-pane", "top"),
+            ("pane", "swap", "--source-pane", "lens", "--target-pane", "top"),
+            ("pane", "move", "left", "--tab", "w:t1", "--split", "down", "--target-pane", "top", "--ratio", "0.3", "--no-focus"),
+            ("pane", "move", "right", "--tab", "w:t1", "--split", "right", "--target-pane", "left", "--ratio", "0.4", "--no-focus"),
+            ("plugin", "pane", "focus", "lens"),
+        ])
+        self.assertNotIn("swap", [args[1] for args in self.run_half("right")])
+
+    def test_failed_open_still_returns_every_pane(self):
+        calls = self.run_half("right", fail=True)
+        moves = [args for args in calls if args[:2] == ("pane", "move") and "w:t1" in args]
+        self.assertEqual([args[2] for args in moves], ["left", "right"])
+
+
 class LayoutPreferenceTests(unittest.TestCase):
     def setUp(self):
         directory = tempfile.TemporaryDirectory()
@@ -187,7 +256,7 @@ class LayoutPreferenceTests(unittest.TestCase):
 
     def test_each_saved_mode_is_used_by_browse_and_changes(self):
         from layout_mode import load_layout, save_layout
-        for mode in ("popup", "overlay"):
+        for mode in ("popup", "overlay", "left", "right"):
             save_layout(self.root, mode)
             self.assertEqual(load_layout(self.root), mode)
             for operation in ("browse", "changes"):

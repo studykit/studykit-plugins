@@ -60,6 +60,8 @@ def band(screen, y, x, text, width, style=0):
 
 # The two boxes start right under the root line; each box's first row holds its
 # summary, or the filename filter / preview find while one is in use.
+LAYOUT_KEYS = {"1": "popup", "2": "overlay", "3": "left", "4": "right"}
+LAYOUT_NAMES = {"popup": "Popup", "overlay": "Overlay", "left": "Left half", "right": "Right half"}
 BOX_TOP = 2
 
 # Tree status marks. Nerd Font glyphs need a patched font, so plain text is the default.
@@ -458,8 +460,8 @@ class Navigator:
     def layout_key(self, key):
         if key == "\x1b":
             self.layout_dialog = False
-        elif key in ("1", "2"):
-            chosen = {"1": "popup", "2": "overlay"}[key]
+        elif key in LAYOUT_KEYS:
+            chosen = LAYOUT_KEYS[key]
             self.layout_dialog = False
             if chosen == self.layout:
                 return True
@@ -470,7 +472,7 @@ class Navigator:
                     if self.on_layout(chosen, self.size, self.export_state()):
                         return False
                     self.layout = chosen
-                    self.message = f"Layout: {chosen.title()}"
+                    self.message = f"Layout: {LAYOUT_NAMES[chosen]}"
                 except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as error:
                     self.message = f"Could not switch layout: {error}"
         return True
@@ -478,13 +480,15 @@ class Navigator:
     def draw_layout(self, screen):
         height, width = screen.getmaxyx()
         box_width = min(62, width - 2)
-        x, top = (width - box_width) // 2, max(0, (height - 8) // 2)
-        for y in range(top, min(height, top + 8)):
+        x, top = (width - box_width) // 2, max(0, (height - 10) // 2)
+        for y in range(top, min(height, top + 10)):
             band(screen, y, x, "", box_width, self.style("surface"))
         band(screen, top, x, "  LAYOUT", box_width, self.style("header") | curses.A_BOLD)
-        lines = [f"  Current: {self.layout.title()}", "",
-                 "  1 Popup    Open a floating window",
-                 "  2 Overlay  Expand the navigator", "  Esc Cancel"]
+        lines = [f"  Current: {LAYOUT_NAMES.get(self.layout, self.layout)}", "",
+                 "  1 Popup       Open a floating window",
+                 "  2 Overlay     Expand the navigator",
+                 "  3 Left half   Share the pane, navigator on the left",
+                 "  4 Right half  Share the pane, navigator on the right", "  Esc Cancel"]
         for offset, line in enumerate(lines, 1):
             put(screen, top + offset, x, line, box_width, self.style("base"))
 
@@ -1390,7 +1394,7 @@ class Navigator:
             argument = chosen[0]
         needs = {"open": "a file", "goto": "a line number", "find": "text", "cd": "a directory",
                  "zoom": "in, out, fit or a percent", "align": "left, center or right",
-                 "layout": "popup or overlay", "icons": "nerd or plain"}
+                 "layout": "popup, overlay, left or right", "icons": "nerd or plain"}
         if name in needs and not argument:
             self.message = f":{command.usage} needs {needs[name]}"
             return True
@@ -1467,12 +1471,13 @@ class Navigator:
             else:
                 self.begin_app_picker()
         elif name == "layout":
-            if argument not in ("popup", "overlay"):
+            keys = {mode: key for key, mode in LAYOUT_KEYS.items()}
+            if argument not in keys:
                 self.message = f":{command.usage}"
                 return True
             self.begin_layout()
             if self.layout_dialog:
-                return self.layout_key("1" if argument == "popup" else "2")
+                return self.layout_key(keys[argument])
         return True
 
     def open_file(self, argument):

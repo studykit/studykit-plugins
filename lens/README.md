@@ -44,6 +44,8 @@ layout. Press **Ctrl+W**, then choose a display mode:
 | --- | --- | --- |
 | 1 | Popup | Show a floating window above your work |
 | 2 | Overlay | Expand the navigator across the tab's pane area |
+| 3 | Left half | Show the navigator over the left half of the tab, beside your panes |
+| 4 | Right half | Show the navigator over the right half of the tab, beside your panes |
 | Escape | Cancel | Keep the current display mode |
 
 Switching modes briefly reopens the navigator and restores the navigation root,
@@ -53,10 +55,13 @@ dialog before opening the layout menu.
 
 **Ctrl+Y** adjusts the popup's size while Popup is active. Layout and popup
 dimensions are remembered across launches and shared across roots. Closing an
-overlay restores the previous focus and zoom state.
+overlay restores the previous focus and zoom state. A half keeps the tab's other
+panes in the remaining half with their splits and proportions, and closing it
+returns them to their full size. Opening a half briefly moves those panes through
+a temporary tab, and turns off the tab's zoom.
 
-In Overlay mode, invoking either file action again in the same tab focuses the
-existing navigator and restores its zoom instead of creating another pane.
+In Overlay and half modes, invoking either file action again in the same tab focuses the
+existing navigator (restoring an overlay's zoom) instead of creating another pane.
 Its root, filter, preview, and current mode remain intact; use Ctrl+G to switch
 between the project and changed-files views. Each tab can have its own
 navigator. Close the overlay before opening a fresh view from another source
@@ -99,7 +104,7 @@ pane in that tab.
 | Ctrl+G | Toggle changed files only |
 | Ctrl+H | Show / hide Git-ignored files; enabling switches to the full project view |
 | Ctrl+R | Refresh the file list and preview, then reload Git status |
-| Ctrl+W, then 1 / 2 | Switch to Popup / Overlay |
+| Ctrl+W, then 1 – 4 | Switch to Popup / Overlay / Left half / Right half |
 | Ctrl+Y (Popup) | Adjust popup size and remember it for future launches |
 | Ctrl+U in search | Clear the search text |
 | Escape | Return to files from content; clear search when in files; otherwise close |
@@ -306,7 +311,7 @@ unambiguous prefix. While filtering filenames, `:` is ordinary text.
 | `editor` / `diff` | Open the current file in an editor / vimdiff |
 | `launch [FILE]` (`xdg-open`, `start`) | Open the selected or named file or folder in its OS application |
 | `with [APP]` (`app`) | Open the selected file or folder with APP (a macOS application name, or a command elsewhere); alone, show the list |
-| `layout popup\|overlay` | Switch display mode |
+| `layout popup\|overlay\|left\|right` | Switch display mode |
 | `icons nerd\|plain` | Use [Nerd Font](https://www.nerdfonts.com) icons or plain text in the file tree; remembered |
 | `config` (`settings`) | Edit the settings file and reload it |
 | `help [COMMAND]` | List commands or describe one |

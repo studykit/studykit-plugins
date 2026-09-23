@@ -19,7 +19,7 @@ import time
 import tomllib
 
 from popup_size import PopupSize, load_size, save_size
-from layout_mode import MODES, load_layout, save_layout
+from layout_mode import MODES, SPLITS, load_layout, save_layout
 from ls_colors import directory_style
 import diagram_preview
 import settings as lens_settings
@@ -145,14 +145,19 @@ def open_panel(env, binary, pane_id, root, changes, size, resume=None, placement
             "--env", f"LENS_SOURCE_PANE={pane_id}",
             "--env", f"LENS_CHANGES={int(changes)}",
             "--env", f"LENS_WIDTH={size.width}",
-            "--env", f"LENS_HEIGHT={size.height}", "--focus"]
+            "--env", f"LENS_HEIGHT={size.height}",
+            "--env", f"LENS_PLACEMENT={placement}", "--focus"]
     if placement == "popup":
         args.extend(["--width", f"{size.width}%", "--height", f"{size.height}%"])
+    elif placement in SPLITS:
+        # Herdr only splits to the right or down; a left half swaps afterwards.
+        # open_half() adds the pane to split.
+        args.extend(["--placement", "split", "--direction", "right"])
     if resume:
         args.extend(["--env", f"LENS_RESUME={resume}"])
-    if placement != "overlay":
+    if placement == "popup":
         return call(binary, *args)
-    return open_overlay(env, binary, pane_id, args, resume)
+    return open_overlay(env, binary, pane_id, args, resume, placement)
 
 
 def overlay_slot(env, binary, source_pane):
@@ -167,7 +172,7 @@ def overlay_slot(env, binary, source_pane):
     return Path(directory) / "overlays" / f"{key}.json", tab_id
 
 
-def focus_overlay(env, binary, pane_id, tab_id, terminal_id=None):
+def focus_overlay(env, binary, pane_id, tab_id, terminal_id=None, zoom=True):
     try:
         # Pane IDs can be reused after a host restart or moved to another tab.
         # Check the live terminal identity before focusing a recorded pane.
@@ -184,11 +189,12 @@ def focus_overlay(env, binary, pane_id, tab_id, terminal_id=None):
     if (plugin_pane["plugin_id"] != env["HERDR_PLUGIN_ID"]
             or plugin_pane["entrypoint"] != "navigator"):
         return None
-    call(binary, "pane", "zoom", pane_id, "--on")
+    if zoom:
+        call(binary, "pane", "zoom", pane_id, "--on")
     return result
 
 
-def open_overlay(env, binary, source_pane, args, resume=None):
+def open_overlay(env, binary, source_pane, args, resume=None, placement="overlay"):
     slot = overlay_slot(env, binary, source_pane)
     if slot is None:
         return call(binary, *args)
@@ -206,21 +212,99 @@ def open_overlay(env, binary, source_pane, args, resume=None):
         result = None
         if (isinstance(record, dict) and isinstance(record.get("pane_id"), str)
                 and isinstance(record.get("terminal_id"), str)):
-            result = focus_overlay(env, binary, record["pane_id"], tab_id, record["terminal_id"])
+            # Records from before split placements existed are overlays.
+            kept = record.get("placement", "overlay")
+            result = focus_overlay(env, binary, record["pane_id"], tab_id, record["terminal_id"],
+                                   zoom=kept == "overlay")
+            if result is not None:
+                placement = kept
         if result is None:
             # Also adopt a focused navigator launched before instance tracking
             # existed. A regular source pane is rejected by the plugin API.
-            result = focus_overlay(env, binary, source_pane, tab_id)
+            result = focus_overlay(env, binary, source_pane, tab_id, zoom=placement == "overlay")
         if result is None:
-            result = call(binary, *args)
+            result = open_half(binary, source_pane, args, placement) if placement in SPLITS else call(binary, *args)
         elif resume:
             Path(resume).unlink(missing_ok=True)
         pane = result["plugin_pane"]["pane"]
         stream.seek(0)
         stream.truncate()
-        json.dump({"pane_id": pane["pane_id"], "terminal_id": pane["terminal_id"]}, stream)
+        json.dump({"pane_id": pane["pane_id"], "terminal_id": pane["terminal_id"],
+                   "placement": placement}, stream)
         stream.flush()
         return result
+
+
+def split_tree(panes, splits, rect):
+    """The tab's split tree, rebuilt from pane and split rectangles.
+
+    A leaf is a pane ID; a branch is (direction, ratio, first, second)."""
+    if len(panes) == 1:
+        return panes[0]["pane_id"]
+    split = next(split for split in splits if split["rect"] == rect)
+    key, extent = ("x", "width") if split["direction"] == "right" else ("y", "height")
+    start, size = rect[key], rect[extent]
+    # The cut is the edge no pane crosses; the ratio only picks among candidates.
+    cuts = [edge for edge in {pane[key] + pane[extent] for pane in panes} - {start + size}
+            if all(pane[key] + pane[extent] <= edge or pane[key] >= edge for pane in panes)]
+    cut = min(cuts, key=lambda edge: abs(edge - (start + size * split["ratio"])))
+    first = {**rect, extent: cut - start}
+    second = {**rect, key: cut, extent: start + size - cut}
+    return (split["direction"], split["ratio"],
+            split_tree([pane for pane in panes if pane[key] + pane[extent] <= cut], splits, first),
+            split_tree([pane for pane in panes if pane[key] >= cut], splits, second))
+
+
+def leaves(tree):
+    return [tree] if isinstance(tree, str) else leaves(tree[2]) + leaves(tree[3])
+
+
+def rebuild(binary, tree, tab_id):
+    """Move panes back into the slot held by the tree's first leaf, recreating its splits."""
+    if isinstance(tree, str):
+        return
+    direction, ratio, first, second = tree
+    call(binary, "pane", "move", leaves(second)[0], "--tab", tab_id, "--split", direction,
+         "--target-pane", leaves(first)[0], "--ratio", str(ratio), "--no-focus")
+    rebuild(binary, first, tab_id)
+    rebuild(binary, second, tab_id)
+
+
+def open_half(binary, source_pane, args, placement):
+    """Open the navigator over the left or right half of the whole tab.
+
+    Herdr splits single panes only. To split the tab itself, every pane but one
+    waits in a temporary tab, the navigator splits the one left, and the others
+    return with their original splits and ratios beside it. Closing the
+    navigator then removes that outer split and restores the tab by itself."""
+    layout = call(binary, "pane", "layout", "--pane", source_pane)["layout"]
+    try:
+        tree = split_tree([{**pane["rect"], "pane_id": pane["pane_id"]} for pane in layout["panes"]],
+                          layout["splits"], layout["area"])
+    except (StopIteration, ValueError, KeyError):
+        tree = source_pane  # An unexpected layout still gets half of the source pane.
+    if layout.get("zoomed"):
+        call(binary, "pane", "zoom", source_pane, "--off")
+    anchor, *waiting = leaves(tree)
+    temporary = None
+    try:
+        for pane in waiting:
+            if temporary is None:
+                temporary = call(binary, "pane", "move", pane, "--new-tab", "--no-focus")["move_result"]["pane"]["tab_id"]
+                parked = pane
+            else:
+                call(binary, "pane", "move", pane, "--tab", temporary, "--split", "right",
+                     "--target-pane", parked, "--no-focus")
+        result = call(binary, *args, "--target-pane", anchor)
+        created = result["plugin_pane"]["pane"]["pane_id"]
+        if placement == "left":
+            call(binary, "pane", "swap", "--source-pane", created, "--target-pane", anchor)
+    finally:
+        # Also on failure: the panes must never stay in the temporary tab.
+        if waiting:
+            rebuild(binary, tree, layout["tab_id"])
+    call(binary, "plugin", "pane", "focus", created)
+    return result
 
 
 def navigator_pane(env, binary, pane_id):
@@ -263,7 +347,10 @@ def resume_path(env, raw):
 
 
 def current_layout(env):
-    return "overlay" if env.get("HERDR_PANE_ID") else "popup"
+    if not env.get("HERDR_PANE_ID"):
+        return "popup"  # Popups have no pane ID.
+    placement = env.get("LENS_PLACEMENT")
+    return placement if placement in MODES and placement != "popup" else "overlay"
 
 
 def change_layout(env, pane_id, placement, size, view):

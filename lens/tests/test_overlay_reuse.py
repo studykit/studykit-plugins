@@ -24,6 +24,7 @@ class OverlayReuseTests(unittest.TestCase):
         self.created = 0
         self.focused = []
         self.zoomed = []
+        self.swapped = []
         self.on_create = lambda: None
         self.calls = patch("herdr_main.call", side_effect=self.call).start()
         self.addCleanup(patch.stopall)
@@ -48,15 +49,42 @@ class OverlayReuseTests(unittest.TestCase):
                 raise RuntimeError("plugin_pane_not_found")
             self.focused.append(args[3])
             return {"plugin_pane": self.panes[args[3]]}
+        if args[:2] == ("pane", "layout"):
+            rect = {"x": 0, "y": 0, "width": 80, "height": 24}
+            return {"layout": {"tab_id": "w1:t1", "area": rect, "splits": [], "zoomed": False,
+                               "panes": [{"pane_id": args[3], "rect": rect}]}}
+        if args[:2] == ("pane", "swap"):
+            self.swapped.append(args[2:])
+            return {}
         if args[:2] == ("pane", "zoom"):
             self.assertEqual(args[3], "--on")
             self.zoomed.append(args[2])
             return {}
         self.fail(f"Unexpected host command: {args}")
 
-    def open(self, source="source", **kwargs):
+    def open(self, source="source", placement="overlay", **kwargs):
         return herdr_main.open_panel(self.env, "herdr", source, self.root, False,
-                                     PopupSize(), placement="overlay", **kwargs)
+                                     PopupSize(), placement=placement, **kwargs)
+
+    def test_halves_split_the_source_pane_and_reuse_without_zoom(self):
+        for placement in ("left", "right"):
+            self.panes.clear()
+            self.swapped.clear()
+            self.calls.reset_mock()
+            for path in (self.root / "overlays").glob("*.json"):
+                path.unlink()
+            pane = self.open(placement=placement)["plugin_pane"]["pane"]["pane_id"]
+            args = next(call.args for call in self.calls.call_args_list
+                        if call.args[1:4] == ("plugin", "pane", "open"))
+            self.assertEqual(args[args.index("--placement") + 1], "split")
+            self.assertEqual(args[args.index("--target-pane") + 1], "source")
+            self.assertEqual(args[args.index("--direction") + 1], "right")
+            self.assertIn(f"LENS_PLACEMENT={placement}", args)
+            self.assertEqual(self.swapped, [("--source-pane", pane, "--target-pane", "source")]
+                             if placement == "left" else [])
+            self.open(placement=placement)
+            self.assertEqual(self.focused[-1], pane)
+            self.assertEqual(self.zoomed, [])
 
     def test_repeated_action_from_overlay_or_source_reuses_the_same_terminal(self):
         initial = self.open()["plugin_pane"]
