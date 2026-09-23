@@ -29,8 +29,8 @@ class OverlayReuseTests(unittest.TestCase):
         self.calls = patch("herdr_main.call", side_effect=self.call).start()
         self.addCleanup(patch.stopall)
 
-    def call(self, binary, *args):
-        if args[:3] == ("plugin", "pane", "open"):
+    def call(self, env, method, /, **params):
+        if method == "plugin.pane.open":
             self.on_create()
             self.created += 1
             pane_id = f"w1:p{self.created + 1}"
@@ -38,32 +38,31 @@ class OverlayReuseTests(unittest.TestCase):
                                   "pane": {"pane_id": pane_id, "terminal_id": f"terminal-{self.created}",
                                            "tab_id": "w1:t1"}}
             return {"plugin_pane": self.panes[pane_id]}
-        if args[:2] == ("pane", "get"):
-            if args[2] == "source":
+        if method == "pane.get":
+            if params["pane_id"] == "source":
                 return {"pane": {"tab_id": "w1:t1"}}
-            if args[2] not in self.panes:
+            if params["pane_id"] not in self.panes:
                 raise RuntimeError("pane_not_found")
-            return {"pane": self.panes[args[2]]["pane"]}
-        if args[:3] == ("plugin", "pane", "focus"):
-            if args[3] not in self.panes:
+            return {"pane": self.panes[params["pane_id"]]["pane"]}
+        if method == "plugin.pane.focus":
+            if params["pane_id"] not in self.panes:
                 raise RuntimeError("plugin_pane_not_found")
-            self.focused.append(args[3])
-            return {"plugin_pane": self.panes[args[3]]}
-        if args[:2] == ("pane", "layout"):
-            rect = {"x": 0, "y": 0, "width": 80, "height": 24}
-            return {"layout": {"tab_id": "w1:t1", "area": rect, "splits": [], "zoomed": False,
-                               "panes": [{"pane_id": args[3], "rect": rect}]}}
-        if args[:2] == ("pane", "swap"):
-            self.swapped.append(args[2:])
+            self.focused.append(params["pane_id"])
+            return {"plugin_pane": self.panes[params["pane_id"]]}
+        if method == "layout.export":
+            return {"layout": {"workspace_id": "w1", "tab_id": "w1:t1", "zoomed": False,
+                               "root": {"type": "pane", "pane_id": params["pane_id"]}}}
+        if method == "pane.swap":
+            self.swapped.append((params["source_pane_id"], params["target_pane_id"]))
             return {}
-        if args[:2] == ("pane", "zoom"):
-            self.assertEqual(args[3], "--on")
-            self.zoomed.append(args[2])
+        if method == "pane.zoom":
+            self.assertEqual(params["mode"], "on")
+            self.zoomed.append(params["pane_id"])
             return {}
-        self.fail(f"Unexpected host command: {args}")
+        self.fail(f"Unexpected host request: {method} {params}")
 
     def open(self, source="source", placement="overlay", **kwargs):
-        return herdr_main.open_panel(self.env, "herdr", source, self.root, False,
+        return herdr_main.open_panel(self.env, source, self.root, False,
                                      PopupSize(), placement=placement, **kwargs)
 
     def test_halves_split_the_source_pane_and_reuse_without_zoom(self):
@@ -74,14 +73,13 @@ class OverlayReuseTests(unittest.TestCase):
             for path in (self.root / "overlays").glob("*.json"):
                 path.unlink()
             pane = self.open(placement=placement)["plugin_pane"]["pane"]["pane_id"]
-            args = next(call.args for call in self.calls.call_args_list
-                        if call.args[1:4] == ("plugin", "pane", "open"))
-            self.assertEqual(args[args.index("--placement") + 1], "split")
-            self.assertEqual(args[args.index("--target-pane") + 1], "source")
-            self.assertEqual(args[args.index("--direction") + 1], "right")
-            self.assertIn(f"LENS_PLACEMENT={placement}", args)
-            self.assertEqual(self.swapped, [("--source-pane", pane, "--target-pane", "source")]
-                             if placement == "left" else [])
+            request = next(call.kwargs for call in self.calls.call_args_list
+                           if call.args[1] == "plugin.pane.open")
+            self.assertEqual(request["placement"], "split")
+            self.assertEqual(request["target_pane_id"], "source")
+            self.assertEqual(request["direction"], "right")
+            self.assertEqual(request["env"]["LENS_PLACEMENT"], placement)
+            self.assertEqual(self.swapped, [(pane, "source")] if placement == "left" else [])
             self.open(placement=placement)
             self.assertEqual(self.focused[-1], pane)
             self.assertEqual(self.zoomed, [])
@@ -96,7 +94,7 @@ class OverlayReuseTests(unittest.TestCase):
 
     def test_focused_overlay_created_before_tracking_is_adopted(self):
         initial = self.open()["plugin_pane"]
-        slot, _ = herdr_main.overlay_slot(self.env, "herdr", "source")
+        slot, _ = herdr_main.overlay_slot(self.env, "source")
         slot.write_text("invalid previous record")
         pane_id = initial["pane"]["pane_id"]
         self.open(pane_id)
@@ -132,7 +130,7 @@ class OverlayReuseTests(unittest.TestCase):
         self.assertEqual(self.created, 1)
 
     def test_lookup_and_creation_share_an_exclusive_lock(self):
-        path, _ = herdr_main.overlay_slot(self.env, "herdr", "source")
+        path, _ = herdr_main.overlay_slot(self.env, "source")
         def assert_locked():
             with path.open("a+") as stream:
                 with self.assertRaises(BlockingIOError):
@@ -145,15 +143,15 @@ class OverlayReuseTests(unittest.TestCase):
         self.assertEqual(self.created, 1)
 
     def test_slot_is_scoped_to_both_host_session_and_tab(self):
-        first, _ = herdr_main.overlay_slot(self.env, "herdr", "source")
-        second, _ = herdr_main.overlay_slot({**self.env, "HERDR_SOCKET_PATH": "/session-b/herdr.sock"}, "herdr", "source")
-        third, _ = herdr_main.overlay_slot({**self.env, "HERDR_PLUGIN_CONTEXT_JSON": '{"tab_id":"w1:t2"}'}, "herdr", "source")
+        first, _ = herdr_main.overlay_slot(self.env, "source")
+        second, _ = herdr_main.overlay_slot({**self.env, "HERDR_SOCKET_PATH": "/session-b/herdr.sock"}, "source")
+        third, _ = herdr_main.overlay_slot({**self.env, "HERDR_PLUGIN_CONTEXT_JSON": '{"tab_id":"w1:t2"}'}, "source")
         self.assertEqual(len({first, second, third}), 3)
 
     def test_missing_context_tab_uses_live_source_metadata(self):
-        original = herdr_main.overlay_slot(self.env, "herdr", "source")
+        original = herdr_main.overlay_slot(self.env, "source")
         self.env.pop("HERDR_PLUGIN_CONTEXT_JSON")
-        self.assertEqual(herdr_main.overlay_slot(self.env, "herdr", "source"), original)
+        self.assertEqual(herdr_main.overlay_slot(self.env, "source"), original)
 
     def test_another_plugin_is_not_reused_as_lens(self):
         self.panes["other"] = {"plugin_id": "another.plugin", "entrypoint": "navigator", "pane": {}}

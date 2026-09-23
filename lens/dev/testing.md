@@ -65,9 +65,19 @@ Repeat from a nested directory and another source pane. Confirm that the origina
 pane receives no command input. Test a linked working tree rather than an older
 installed checkout.
 
-Herdr 0.9.1 supports manifest `placement = "popup"` but its CLI rejects an explicit
-`--placement popup` override. Popup launches therefore use the dedicated popup
-manifest entrypoint. Overlay launches use the native overlay manifest entrypoint.
+The adapter talks to Herdr through the socket API (`HERDR_SOCKET_PATH`), one
+newline-delimited JSON request per call, instead of spawning the `herdr` CLI.
+Herdr 0.9.1's CLI rejected an explicit `--placement popup` override, so popup
+launches use the dedicated popup manifest entrypoint. Overlay launches use the
+native overlay manifest entrypoint.
+
+Left and right halves cover the whole tab. Herdr splits only single panes, and
+`layout.apply` recreates panes without their processes, so a half parks every
+pane but the first in a temporary tab, splits the first, and moves the others
+back following the `layout.export` tree. Moves fail in a zoomed tab, so zoom is
+turned off first. Live-check a tab with nested splits: the ratios must match
+before opening and after closing. The overlay placement opens beside the
+*focused* pane, so focus the test tab before driving it from another pane.
 Popups do not have pane IDs or receive `HERDR_PANE_ID`; the action forwards the
 source pane ID explicitly. Direct pane entrypoints use the focused pane in the
 plugin context. The source folder remains fixed during a popup invocation.
@@ -430,10 +440,8 @@ restores the previous focus and zoom state when its native overlay closes.
 Mode transitions reuse the one-use resume mechanism used by popup resizing.
 Wait for the old Python process and any old overlay pane to disappear before
 opening the replacement. Remove `HERDR_PANE_ID` from the helper environment:
-Herdr 0.9.1's `pane current` defaults to that caller ID, which is stale after
-pane closure. The focus guard cancels transitions if the user moves to another
-source. Popup launches omit the placement override because the installed 0.9.1
-CLI rejects `--placement popup` while accepting manifest popup placement.
+it names the navigator that is closing. The focus guard cancels transitions if
+the user moves to another source.
 
 Save the last successfully selected mode atomically in the plugin config
 `layout.json`. Both actions load it. Missing, invalid, or legacy `split`

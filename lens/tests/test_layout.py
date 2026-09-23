@@ -108,7 +108,7 @@ class LayoutAdapterTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 herdr_main.change_layout({}, "source", "split", PopupSize(), {})
             with self.assertRaises(ValueError):
-                herdr_main.open_panel({}, "herdr", "source", Path("/tmp"), False,
+                herdr_main.open_panel({}, "source", Path("/tmp"), False,
                                       PopupSize(), placement="split")
         call.assert_not_called()
         reopen.assert_not_called()
@@ -122,13 +122,13 @@ class LayoutAdapterTests(unittest.TestCase):
 
     def test_popup_launch_uses_manifest_without_pane_target_or_placement_override(self):
         with patch("herdr_main.call") as call:
-            herdr_main.open_panel({"HERDR_PLUGIN_ID": "plugin"}, "herdr", "source", Path("/tmp"),
+            herdr_main.open_panel({"HERDR_PLUGIN_ID": "plugin"}, "source", Path("/tmp"),
                                   False, PopupSize(), placement="popup")
-        args = call.call_args.args
-        self.assertEqual(args[args.index("--entrypoint") + 1], "popup")
-        self.assertNotIn("--target-pane", args)
-        self.assertNotIn("--placement", args)
-        self.assertIn("LENS_SOURCE_PANE=source", args)
+        request = call.call_args.kwargs
+        self.assertEqual(request["entrypoint"], "popup")
+        self.assertNotIn("target_pane_id", request)
+        self.assertNotIn("placement", request)
+        self.assertEqual(request["env"]["LENS_SOURCE_PANE"], "source")
 
     def test_overlay_launch_uses_native_overlay_manifest_without_split_controls(self):
         import tomllib
@@ -136,12 +136,12 @@ class LayoutAdapterTests(unittest.TestCase):
         entries = {entry["id"]: entry["placement"] for entry in manifest["panes"]}
         self.assertEqual(entries, {"navigator": "overlay", "popup": "popup"})
         with patch("herdr_main.call") as call:
-            herdr_main.open_panel({"HERDR_PLUGIN_ID": "plugin"}, "herdr", "source", Path("/tmp"),
+            herdr_main.open_panel({"HERDR_PLUGIN_ID": "plugin"}, "source", Path("/tmp"),
                                   False, PopupSize(), placement="overlay")
-        args = call.call_args.args
-        self.assertEqual(args[args.index("--entrypoint") + 1], "navigator")
-        for flag in ("--placement", "--target-pane", "--direction", "--width", "--height"):
-            self.assertNotIn(flag, args)
+        request = call.call_args.kwargs
+        self.assertEqual(request["entrypoint"], "navigator")
+        for field in ("placement", "target_pane_id", "direction", "width", "height"):
+            self.assertNotIn(field, request)
 
     def test_layout_uses_the_host_surface(self):
         self.assertEqual(herdr_main.current_layout({"HERDR_PANE_ID": "navigator"}), "overlay")
@@ -188,62 +188,96 @@ class LayoutAdapterTests(unittest.TestCase):
                                                           {"pane": {"pane_id": "source"}}]), \
                     patch("herdr_main.open_panel") as opened:
                 herdr_main.reopen(env, str(path))
-            opened.assert_called_once_with(env, "herdr", "source", Path(directory), False,
+            opened.assert_called_once_with(env, "source", Path(directory), False,
                                            PopupSize(), path.resolve(), placement="popup")
 
 class WholeTabHalfTests(unittest.TestCase):
-    # Top pane over a bottom row split 40:60, as Herdr reports it.
-    LAYOUT = {"tab_id": "w:t1", "zoomed": True, "area": {"x": 0, "y": 0, "width": 100, "height": 30},
-              "panes": [{"pane_id": "top", "rect": {"x": 0, "y": 0, "width": 100, "height": 9}},
-                        {"pane_id": "left", "rect": {"x": 0, "y": 9, "width": 40, "height": 21}},
-                        {"pane_id": "right", "rect": {"x": 40, "y": 9, "width": 60, "height": 21}}],
-              "splits": [{"direction": "down", "ratio": 0.3, "rect": {"x": 0, "y": 0, "width": 100, "height": 30}},
-                         {"direction": "right", "ratio": 0.4, "rect": {"x": 0, "y": 9, "width": 100, "height": 21}}]}
-
-    def test_split_tree_follows_the_reported_rectangles(self):
-        panes = [{**pane["rect"], "pane_id": pane["pane_id"]} for pane in self.LAYOUT["panes"]]
-        self.assertEqual(herdr_main.split_tree(panes, self.LAYOUT["splits"], self.LAYOUT["area"]),
-                         ("down", 0.3, "top", ("right", 0.4, "left", "right")))
+    # Top pane over a bottom row split 40:60, as layout.export reports it.
+    LAYOUT = {"workspace_id": "w", "tab_id": "w:t1", "zoomed": True, "root": {
+        "type": "split", "direction": "down", "ratio": 0.3,
+        "first": {"type": "pane", "pane_id": "top"},
+        "second": {"type": "split", "direction": "right", "ratio": 0.4,
+                   "first": {"type": "pane", "pane_id": "left"},
+                   "second": {"type": "pane", "pane_id": "right"}}}}
 
     def run_half(self, placement, fail=False):
         calls = []
-        def call(binary, *args):
-            calls.append(args)
-            if args[:2] == ("pane", "layout"):
+        def call(env, method, /, **params):
+            calls.append((method, params))
+            if method == "layout.export":
                 return {"layout": self.LAYOUT}
-            if args[:2] == ("pane", "move") and "--new-tab" in args:
+            if method == "pane.move" and params["destination"]["type"] == "new_tab":
                 return {"move_result": {"pane": {"tab_id": "w:t9"}}}
-            if args[:3] == ("plugin", "pane", "open"):
+            if method == "plugin.pane.open":
                 if fail:
                     raise RuntimeError("host unavailable")
                 return {"plugin_pane": {"pane": {"pane_id": "lens"}}}
             return {}
         with patch("herdr_main.call", side_effect=call):
             try:
-                herdr_main.open_half("herdr", "left", ["plugin", "pane", "open"], placement)
+                herdr_main.open_half({}, "left", {"entrypoint": "navigator"}, placement)
             except RuntimeError:
                 pass
         return calls
 
     def test_other_panes_wait_aside_and_return_with_their_splits(self):
-        calls = self.run_half("left")
-        self.assertEqual(calls, [
-            ("pane", "layout", "--pane", "left"),
-            ("pane", "zoom", "left", "--off"),
-            ("pane", "move", "left", "--new-tab", "--no-focus"),
-            ("pane", "move", "right", "--tab", "w:t9", "--split", "right", "--target-pane", "left", "--no-focus"),
-            ("plugin", "pane", "open", "--target-pane", "top"),
-            ("pane", "swap", "--source-pane", "lens", "--target-pane", "top"),
-            ("pane", "move", "left", "--tab", "w:t1", "--split", "down", "--target-pane", "top", "--ratio", "0.3", "--no-focus"),
-            ("pane", "move", "right", "--tab", "w:t1", "--split", "right", "--target-pane", "left", "--ratio", "0.4", "--no-focus"),
-            ("plugin", "pane", "focus", "lens"),
+        back = lambda pane, split, target, ratio: ("pane.move", {"pane_id": pane, "destination": {
+            "type": "tab", "tab_id": "w:t1", "split": split, "target_pane_id": target, "ratio": ratio}})
+        self.assertEqual(self.run_half("left"), [
+            ("layout.export", {"pane_id": "left"}),
+            ("pane.zoom", {"pane_id": "left", "mode": "off"}),
+            ("pane.move", {"pane_id": "left", "destination": {"type": "new_tab", "workspace_id": "w"}}),
+            ("pane.move", {"pane_id": "right", "destination": {
+                "type": "tab", "tab_id": "w:t9", "split": "right", "target_pane_id": "left"}}),
+            ("plugin.pane.open", {"entrypoint": "navigator", "target_pane_id": "top"}),
+            ("pane.swap", {"source_pane_id": "lens", "target_pane_id": "top"}),
+            back("left", "down", "top", 0.3),
+            back("right", "right", "left", 0.4),
+            ("plugin.pane.focus", {"pane_id": "lens"}),
         ])
-        self.assertNotIn("swap", [args[1] for args in self.run_half("right")])
+        self.assertNotIn("pane.swap", [method for method, _ in self.run_half("right")])
 
     def test_failed_open_still_returns_every_pane(self):
         calls = self.run_half("right", fail=True)
-        moves = [args for args in calls if args[:2] == ("pane", "move") and "w:t1" in args]
-        self.assertEqual([args[2] for args in moves], ["left", "right"])
+        moves = [params["pane_id"] for method, params in calls
+                 if method == "pane.move" and params["destination"].get("tab_id") == "w:t1"]
+        self.assertEqual(moves, ["left", "right"])
+
+
+class SocketTests(unittest.TestCase):
+    def serve(self, reply):
+        import socket, threading
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        path = str(Path(directory.name) / "herdr.sock")
+        server = socket.socket(socket.AF_UNIX)
+        server.bind(path)
+        server.listen(1)
+        self.addCleanup(server.close)
+        received = []
+        def answer():
+            connection, _ = server.accept()
+            with connection:
+                received.append(json.loads(connection.makefile().readline()))
+                connection.sendall(json.dumps(reply).encode() + b"\n")
+        threading.Thread(target=answer, daemon=True).start()
+        return {"HERDR_SOCKET_PATH": path}, received
+
+    def test_request_is_one_json_line_and_returns_the_result(self):
+        env, received = self.serve({"id": "x", "result": {"type": "pong"}})
+        self.assertEqual(herdr_main.call(env, "pane.get", pane_id="w:p1"), {"type": "pong"})
+        self.assertEqual(received[0]["method"], "pane.get")
+        self.assertEqual(received[0]["params"], {"pane_id": "w:p1"})
+
+    def test_an_env_parameter_reaches_the_host(self):
+        env, received = self.serve({"id": "x", "result": {}})
+        herdr_main.call(env, "plugin.pane.open", env={"LENS_CHANGES": "1"})
+        self.assertEqual(received[0]["params"], {"env": {"LENS_CHANGES": "1"}})
+
+    def test_error_reply_raises_with_its_code(self):
+        env, _ = self.serve({"id": "x", "error": {"code": "pane_not_found", "message": "pane w:p1 not found"}})
+        with self.assertRaisesRegex(RuntimeError, "pane_not_found"):
+            herdr_main.call(env, "pane.get", pane_id="w:p1")
 
 
 class LayoutPreferenceTests(unittest.TestCase):
@@ -264,7 +298,7 @@ class LayoutPreferenceTests(unittest.TestCase):
                         patch("herdr_main.open_panel") as opened:
                     herdr_main.main(self.env, operation)
                 self.assertEqual(opened.call_args.kwargs["placement"], mode)
-                self.assertEqual(opened.call_args.args[4], operation == "changes")
+                self.assertEqual(opened.call_args.args[3], operation == "changes")
 
     def test_missing_invalid_or_old_split_preference_defaults_to_popup(self):
         from layout_mode import load_layout

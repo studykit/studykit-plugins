@@ -315,28 +315,29 @@ class AdapterTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             env = {"HERDR_PLUGIN_CONTEXT_JSON": json.dumps({"focused_pane_id": "focused"}), "HERDR_PANE_ID": "caller"}
             with patch("herdr_main.call", return_value={"pane": {"foreground_cwd": directory, "cwd": "/"}}) as call:
-                pane, root = herdr_main.source(env, "herdr-binary")
+                pane, root = herdr_main.source(env)
             self.assertEqual(pane, "focused")
             self.assertEqual(root, Path(directory).resolve())
-            call.assert_called_once_with("herdr-binary", "pane", "get", "focused")
+            call.assert_called_once_with(env, "pane.get", pane_id="focused")
 
     def test_action_defaults_to_popup_and_forwards_source(self):
         env = {"HERDR_ENV": "1", "HERDR_PLUGIN_ID": "studykit.lens"}
         with patch("herdr_main.source", return_value=("w1:p9", Path("/tmp/project"))), patch("herdr_main.call") as call:
             herdr_main.main(env, "changes")
-        argv = call.call_args.args
-        self.assertIn("LENS_SOURCE_PANE=w1:p9", argv)
-        self.assertIn("LENS_CHANGES=1", argv)
-        self.assertEqual(argv[argv.index("--entrypoint") + 1], "popup")
-        self.assertNotIn("--placement", argv)
-        self.assertNotIn("--target-pane", argv)
-        self.assertIn("--width", argv)
-        self.assertIn("--height", argv)
+        self.assertEqual(call.call_args.args[1], "plugin.pane.open")
+        request = call.call_args.kwargs
+        self.assertEqual(request["env"]["LENS_SOURCE_PANE"], "w1:p9")
+        self.assertEqual(request["env"]["LENS_CHANGES"], "1")
+        self.assertEqual(request["entrypoint"], "popup")
+        self.assertNotIn("placement", request)
+        self.assertNotIn("target_pane_id", request)
+        self.assertIn("width", request)
+        self.assertIn("height", request)
 
     def test_missing_or_invalid_context_does_not_browse_plugin_directory(self):
         for env in ({}, {"HERDR_PLUGIN_CONTEXT_JSON": "[]"}, {"HERDR_PLUGIN_CONTEXT_JSON": "bad"}):
             with self.assertRaises(ValueError):
-                herdr_main.source(env, "herdr")
+                herdr_main.source(env)
 
     def test_requires_herdr(self):
         with self.assertRaisesRegex(ValueError, "inside Herdr"):

@@ -94,93 +94,93 @@ def cell_size(env, pane_id):
     # Popups get no pixel size from their pty, but every pane of the attached
     # client shares one cell size, so ask about the source pane instead.
     try:
-        with socket.socket(socket.AF_UNIX) as connection:
-            connection.settimeout(2)
-            connection.connect(env["HERDR_SOCKET_PATH"])
-            request = {"id": "lens-cell", "method": "pane.graphics.info", "params": {"pane_id": pane_id}}
-            connection.sendall(json.dumps(request).encode() + b"\n")
-            reply = b""
-            while not reply.endswith(b"\n"):
-                chunk = connection.recv(65536)
-                if not chunk:
-                    break
-                reply += chunk
-        result = json.loads(reply)["result"]
+        result = call(env, "pane.graphics.info", pane_id=pane_id, timeout=2)
         size = int(result["cell_width_px"]), int(result["cell_height_px"])
         return size if min(size) > 0 else None
-    except (OSError, KeyError, TypeError, ValueError):
+    except (OSError, KeyError, TypeError, ValueError, RuntimeError):
         return None
 
 
-def call(binary: str, *args: str) -> dict:
-    result = subprocess.run([binary, *args], capture_output=True, text=True, timeout=15)
-    if result.returncode:
-        raise RuntimeError(result.stderr.strip() or result.stdout.strip() or "Herdr command failed")
-    value = json.loads(result.stdout)
+def call(env: dict, method: str, /, *, timeout: float = 15, **params) -> dict:
+    """One request to the Herdr socket API; an error reply raises "code: message"."""
+    path = env.get("HERDR_SOCKET_PATH")
+    if not path:
+        raise RuntimeError("HERDR_SOCKET_PATH is not set")
+    with socket.socket(socket.AF_UNIX) as connection:
+        connection.settimeout(timeout)
+        connection.connect(path)
+        request = {"id": f"lens-{method}", "method": method, "params": params}
+        connection.sendall(json.dumps(request).encode() + b"\n")
+        reply = b""
+        while not reply.endswith(b"\n"):
+            chunk = connection.recv(65536)
+            if not chunk:
+                break
+            reply += chunk
+    value = json.loads(reply)
     if value.get("error"):
-        raise RuntimeError(str(value["error"]))
+        error = value["error"]
+        raise RuntimeError(f"{error.get('code')}: {error.get('message')}" if isinstance(error, dict) else str(error))
     return value["result"]
 
 
-def source(env: dict, binary: str) -> tuple[str, Path]:
+def source(env: dict) -> tuple[str, Path]:
     context = json.loads(env.get("HERDR_PLUGIN_CONTEXT_JSON") or "{}")
     if not isinstance(context, dict):
         raise ValueError("Herdr plugin context must be an object")
     pane_id = env.get("LENS_SOURCE_PANE") or context.get("focused_pane_id") or env.get("HERDR_PANE_ID")
     if not pane_id:
         raise ValueError("No focused pane was provided by Herdr")
-    pane = call(binary, "pane", "get", pane_id)["pane"]
+    pane = call(env, "pane.get", pane_id=pane_id)["pane"]
     cwd = pane.get("foreground_cwd") or pane.get("cwd")
     if not cwd or not Path(cwd).is_absolute() or not Path(cwd).is_dir():
         raise ValueError("The source pane's working directory is unavailable")
     return pane_id, Path(cwd).resolve()
 
 
-def open_panel(env, binary, pane_id, root, changes, size, resume=None, placement="popup"):
+def open_panel(env, pane_id, root, changes, size, resume=None, placement="popup"):
     if placement not in MODES:
         raise ValueError("Unknown navigator layout")
-    # Herdr 0.9.1 needs a manifest entrypoint for popup placement.
-    args = ["plugin", "pane", "open", "--plugin", env["HERDR_PLUGIN_ID"],
-            "--entrypoint", "popup" if placement == "popup" else "navigator", "--cwd", str(root),
-            "--env", f"LENS_SOURCE_PANE={pane_id}",
-            "--env", f"LENS_CHANGES={int(changes)}",
-            "--env", f"LENS_WIDTH={size.width}",
-            "--env", f"LENS_HEIGHT={size.height}",
-            "--env", f"LENS_PLACEMENT={placement}", "--focus"]
+    variables = {"LENS_SOURCE_PANE": pane_id, "LENS_CHANGES": str(int(changes)),
+                 "LENS_WIDTH": str(size.width), "LENS_HEIGHT": str(size.height),
+                 "LENS_PLACEMENT": placement}
+    if resume:
+        variables["LENS_RESUME"] = str(resume)
+    # Each placement has its own manifest entrypoint; popups need theirs.
+    request = {"plugin_id": env["HERDR_PLUGIN_ID"],
+               "entrypoint": "popup" if placement == "popup" else "navigator",
+               "cwd": str(root), "env": variables, "focus": True}
     if placement == "popup":
-        args.extend(["--width", f"{size.width}%", "--height", f"{size.height}%"])
-    elif placement in SPLITS:
+        request.update(width=f"{size.width}%", height=f"{size.height}%")
+        return call(env, "plugin.pane.open", **request)
+    if placement in SPLITS:
         # Herdr only splits to the right or down; a left half swaps afterwards.
         # open_half() adds the pane to split.
-        args.extend(["--placement", "split", "--direction", "right"])
-    if resume:
-        args.extend(["--env", f"LENS_RESUME={resume}"])
-    if placement == "popup":
-        return call(binary, *args)
-    return open_overlay(env, binary, pane_id, args, resume, placement)
+        request.update(placement="split", direction="right")
+    return open_overlay(env, pane_id, request, resume, placement)
 
 
-def overlay_slot(env, binary, source_pane):
+def overlay_slot(env, source_pane):
     directory, socket = env.get("HERDR_PLUGIN_STATE_DIR"), env.get("HERDR_SOCKET_PATH")
     if not directory or not socket:
         return None
     context = json.loads(env.get("HERDR_PLUGIN_CONTEXT_JSON") or "{}")
     tab_id = context.get("tab_id") if isinstance(context, dict) else None
     if not tab_id:
-        tab_id = call(binary, "pane", "get", source_pane)["pane"]["tab_id"]
+        tab_id = call(env, "pane.get", pane_id=source_pane)["pane"]["tab_id"]
     key = hashlib.sha256(json.dumps([socket, tab_id]).encode()).hexdigest()
     return Path(directory) / "overlays" / f"{key}.json", tab_id
 
 
-def focus_overlay(env, binary, pane_id, tab_id, terminal_id=None, zoom=True):
+def focus_overlay(env, pane_id, tab_id, terminal_id=None, zoom=True):
     try:
         # Pane IDs can be reused after a host restart or moved to another tab.
         # Check the live terminal identity before focusing a recorded pane.
         if terminal_id is not None:
-            pane = call(binary, "pane", "get", pane_id)["pane"]
+            pane = call(env, "pane.get", pane_id=pane_id)["pane"]
             if pane.get("terminal_id") != terminal_id or pane.get("tab_id") != tab_id:
                 return None
-        result = call(binary, "plugin", "pane", "focus", pane_id)
+        result = call(env, "plugin.pane.focus", pane_id=pane_id)
     except RuntimeError as error:
         if "pane_not_found" in str(error):
             return None
@@ -190,14 +190,15 @@ def focus_overlay(env, binary, pane_id, tab_id, terminal_id=None, zoom=True):
             or plugin_pane["entrypoint"] != "navigator"):
         return None
     if zoom:
-        call(binary, "pane", "zoom", pane_id, "--on")
+        call(env, "pane.zoom", pane_id=pane_id, mode="on")
     return result
 
 
-def open_overlay(env, binary, source_pane, args, resume=None, placement="overlay"):
-    slot = overlay_slot(env, binary, source_pane)
+def open_overlay(env, source_pane, request, resume=None, placement="overlay"):
+    slot = overlay_slot(env, source_pane)
     if slot is None:
-        return call(binary, *args)
+        return open_half(env, source_pane, request, placement) if placement in SPLITS \
+            else call(env, "plugin.pane.open", **request)
     path, tab_id = slot
     path.parent.mkdir(parents=True, exist_ok=True)
     # Keep this inode in place: replacing/unlinking a flock file allows two
@@ -214,16 +215,17 @@ def open_overlay(env, binary, source_pane, args, resume=None, placement="overlay
                 and isinstance(record.get("terminal_id"), str)):
             # Records from before split placements existed are overlays.
             kept = record.get("placement", "overlay")
-            result = focus_overlay(env, binary, record["pane_id"], tab_id, record["terminal_id"],
+            result = focus_overlay(env, record["pane_id"], tab_id, record["terminal_id"],
                                    zoom=kept == "overlay")
             if result is not None:
                 placement = kept
         if result is None:
             # Also adopt a focused navigator launched before instance tracking
             # existed. A regular source pane is rejected by the plugin API.
-            result = focus_overlay(env, binary, source_pane, tab_id, zoom=placement == "overlay")
+            result = focus_overlay(env, source_pane, tab_id, zoom=placement == "overlay")
         if result is None:
-            result = open_half(binary, source_pane, args, placement) if placement in SPLITS else call(binary, *args)
+            result = open_half(env, source_pane, request, placement) if placement in SPLITS \
+                else call(env, "plugin.pane.open", **request)
         elif resume:
             Path(resume).unlink(missing_ok=True)
         pane = result["plugin_pane"]["pane"]
@@ -235,81 +237,63 @@ def open_overlay(env, binary, source_pane, args, resume=None, placement="overlay
         return result
 
 
-def split_tree(panes, splits, rect):
-    """The tab's split tree, rebuilt from pane and split rectangles.
-
-    A leaf is a pane ID; a branch is (direction, ratio, first, second)."""
-    if len(panes) == 1:
-        return panes[0]["pane_id"]
-    split = next(split for split in splits if split["rect"] == rect)
-    key, extent = ("x", "width") if split["direction"] == "right" else ("y", "height")
-    start, size = rect[key], rect[extent]
-    # The cut is the edge no pane crosses; the ratio only picks among candidates.
-    cuts = [edge for edge in {pane[key] + pane[extent] for pane in panes} - {start + size}
-            if all(pane[key] + pane[extent] <= edge or pane[key] >= edge for pane in panes)]
-    cut = min(cuts, key=lambda edge: abs(edge - (start + size * split["ratio"])))
-    first = {**rect, extent: cut - start}
-    second = {**rect, key: cut, extent: start + size - cut}
-    return (split["direction"], split["ratio"],
-            split_tree([pane for pane in panes if pane[key] + pane[extent] <= cut], splits, first),
-            split_tree([pane for pane in panes if pane[key] >= cut], splits, second))
+def leaves(node):
+    """Pane IDs of a layout.export tree, first to last."""
+    if node["type"] == "pane":
+        return [node["pane_id"]]
+    return leaves(node["first"]) + leaves(node["second"])
 
 
-def leaves(tree):
-    return [tree] if isinstance(tree, str) else leaves(tree[2]) + leaves(tree[3])
-
-
-def rebuild(binary, tree, tab_id):
-    """Move panes back into the slot held by the tree's first leaf, recreating its splits."""
-    if isinstance(tree, str):
+def rebuild(env, node, tab_id):
+    """Move panes back into the slot held by the tree's first pane, recreating its splits."""
+    if node["type"] == "pane":
         return
-    direction, ratio, first, second = tree
-    call(binary, "pane", "move", leaves(second)[0], "--tab", tab_id, "--split", direction,
-         "--target-pane", leaves(first)[0], "--ratio", str(ratio), "--no-focus")
-    rebuild(binary, first, tab_id)
-    rebuild(binary, second, tab_id)
+    call(env, "pane.move", pane_id=leaves(node["second"])[0],
+         destination={"type": "tab", "tab_id": tab_id, "split": node["direction"],
+                      "target_pane_id": leaves(node["first"])[0], "ratio": node["ratio"]})
+    rebuild(env, node["first"], tab_id)
+    rebuild(env, node["second"], tab_id)
 
 
-def open_half(binary, source_pane, args, placement):
+def open_half(env, source_pane, request, placement):
     """Open the navigator over the left or right half of the whole tab.
 
-    Herdr splits single panes only. To split the tab itself, every pane but one
-    waits in a temporary tab, the navigator splits the one left, and the others
-    return with their original splits and ratios beside it. Closing the
-    navigator then removes that outer split and restores the tab by itself."""
-    layout = call(binary, "pane", "layout", "--pane", source_pane)["layout"]
-    try:
-        tree = split_tree([{**pane["rect"], "pane_id": pane["pane_id"]} for pane in layout["panes"]],
-                          layout["splits"], layout["area"])
-    except (StopIteration, ValueError, KeyError):
-        tree = source_pane  # An unexpected layout still gets half of the source pane.
+    Herdr splits single panes only, and layout.apply restarts every process. To
+    split the tab itself, every pane but one waits in a temporary tab, the
+    navigator splits the one left, and the others return with their original
+    splits and ratios beside it. Closing the navigator then removes that outer
+    split and restores the tab by itself."""
+    layout = call(env, "layout.export", pane_id=source_pane)["layout"]
     if layout.get("zoomed"):
-        call(binary, "pane", "zoom", source_pane, "--off")
+        # Herdr refuses to move panes out of a zoomed tab.
+        call(env, "pane.zoom", pane_id=source_pane, mode="off")
+    tree = layout["root"]
     anchor, *waiting = leaves(tree)
     temporary = None
     try:
         for pane in waiting:
             if temporary is None:
-                temporary = call(binary, "pane", "move", pane, "--new-tab", "--no-focus")["move_result"]["pane"]["tab_id"]
-                parked = pane
+                moved = call(env, "pane.move", pane_id=pane,
+                             destination={"type": "new_tab", "workspace_id": layout["workspace_id"]})
+                temporary, parked = moved["move_result"]["pane"]["tab_id"], pane
             else:
-                call(binary, "pane", "move", pane, "--tab", temporary, "--split", "right",
-                     "--target-pane", parked, "--no-focus")
-        result = call(binary, *args, "--target-pane", anchor)
+                call(env, "pane.move", pane_id=pane, destination={
+                    "type": "tab", "tab_id": temporary, "split": "right", "target_pane_id": parked})
+        result = call(env, "plugin.pane.open", **request, target_pane_id=anchor)
         created = result["plugin_pane"]["pane"]["pane_id"]
         if placement == "left":
-            call(binary, "pane", "swap", "--source-pane", created, "--target-pane", anchor)
+            call(env, "pane.swap", source_pane_id=created, target_pane_id=anchor)
     finally:
         # Also on failure: the panes must never stay in the temporary tab.
         if waiting:
-            rebuild(binary, tree, layout["tab_id"])
-    call(binary, "plugin", "pane", "focus", created)
+            rebuild(env, tree, layout["tab_id"])
+    call(env, "plugin.pane.focus", pane_id=created)
     return result
 
 
-def navigator_pane(env, binary, pane_id):
+def navigator_pane(env, pane_id):
     try:
-        plugin_pane = call(binary, "plugin", "pane", "focus", pane_id)["plugin_pane"]
+        plugin_pane = call(env, "plugin.pane.focus", pane_id=pane_id)["plugin_pane"]
     except RuntimeError as error:
         if "not_found" in str(error):
             return False
@@ -317,23 +301,23 @@ def navigator_pane(env, binary, pane_id):
     return plugin_pane["plugin_id"] == env["HERDR_PLUGIN_ID"] and plugin_pane["entrypoint"] == "navigator"
 
 
-def close_navigator(env, binary):
+def close_navigator(env):
     """Close this tab's Lens overlay if one is open. Returns whether it was."""
     context = json.loads(env.get("HERDR_PLUGIN_CONTEXT_JSON") or "{}")
     focused = context.get("focused_pane_id") if isinstance(context, dict) else None
     candidates = [focused] if focused else []
-    slot = overlay_slot(env, binary, focused) if focused else None
+    slot = overlay_slot(env, focused) if focused else None
     if slot is not None and slot[0].exists():
         try:
             record = json.loads(slot[0].read_text()[:8192])
-            pane = call(binary, "pane", "get", record["pane_id"])["pane"]
+            pane = call(env, "pane.get", pane_id=record["pane_id"])["pane"]
             if pane.get("terminal_id") == record["terminal_id"] and pane.get("tab_id") == slot[1]:
                 candidates.append(record["pane_id"])
         except (OSError, ValueError, KeyError, TypeError, RuntimeError):
             pass
     for pane_id in dict.fromkeys(candidates):
-        if navigator_pane(env, binary, pane_id):
-            call(binary, "plugin", "pane", "close", pane_id)
+        if navigator_pane(env, pane_id):
+            call(env, "plugin.pane.close", pane_id=pane_id)
             return True
     return False
 
@@ -373,7 +357,7 @@ def prepare_resize(env, pane_id, size, view, placement="popup"):
         # The navigator exits after this returns. The helper waits for its surface
         # to close before opening the replacement with the saved view.
         helper_env = dict(env)
-        # `pane current` otherwise resolves the now-closed navigator from its env.
+        # The helper must not act as the navigator that is about to close.
         helper_env.pop("HERDR_PANE_ID", None)
         with (directory / "resize.log").open("ab") as log:
             subprocess.Popen([sys.executable, str(Path(__file__).resolve()), "reopen", str(path)],
@@ -391,7 +375,6 @@ def reopen(env, raw):
     view, pane_id = payload["view"], payload["pane_id"]
     placement = payload.get("placement", "popup")
     previous_pane = payload.get("previous_pane")
-    binary = env.get("HERDR_BIN_PATH") or "herdr"
     deadline = time.monotonic() + 5
     try:
         previous_pid = payload.get("previous_pid")
@@ -406,7 +389,7 @@ def reopen(env, raw):
         while True:
             if previous_pane:
                 try:
-                    call(binary, "pane", "get", previous_pane)
+                    call(env, "pane.get", pane_id=previous_pane)
                 except RuntimeError as error:
                     if "pane_not_found" not in str(error):
                         raise
@@ -416,11 +399,11 @@ def reopen(env, raw):
                         raise RuntimeError("The previous navigator pane did not close")
                     time.sleep(0.05)
                     continue
-            current = call(binary, "pane", "current")["pane"]
+            current = call(env, "pane.current")["pane"]
             if current["pane_id"] != pane_id:
                 raise RuntimeError("Layout change cancelled because focus moved to another source pane")
             try:
-                open_panel(env, binary, pane_id, Path(view["root"]), view["changes"], size, path,
+                open_panel(env, pane_id, Path(view["root"]), view["changes"], size, path,
                            placement=placement)
                 break
             except RuntimeError as error:
@@ -439,15 +422,14 @@ def reopen(env, raw):
 def main(env: dict, operation: str) -> int:
     if env.get("HERDR_ENV") != "1":
         raise ValueError("Run Lens from inside Herdr")
-    binary = env.get("HERDR_BIN_PATH") or "herdr"
     if operation == "toggle":
-        if close_navigator(env, binary):
+        if close_navigator(env):
             return 0
         operation = "browse"
-    pane_id, root = source(env, binary)
+    pane_id, root = source(env)
     if operation in ("browse", "changes"):
         config_dir = Path(env["HERDR_PLUGIN_CONFIG_DIR"]) if env.get("HERDR_PLUGIN_CONFIG_DIR") else None
-        open_panel(env, binary, pane_id, root, operation == "changes", load_size(config_dir),
+        open_panel(env, pane_id, root, operation == "changes", load_size(config_dir),
                    placement=load_layout(config_dir))
     elif operation == "panel":
         import curses

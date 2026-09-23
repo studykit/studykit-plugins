@@ -55,9 +55,10 @@ class ToggleActionTests(unittest.TestCase):
                "HERDR_PLUGIN_CONTEXT_JSON": json.dumps({"focused_pane_id": "w:p2", "tab_id": "w:t"})}
         replies = {"focus": {"plugin_pane": {"plugin_id": "studykit.lens", "entrypoint": "navigator"}},
                    "close": {}}
-        with patch("herdr_main.call", side_effect=lambda binary, *args: replies[args[2]]) as call:
+        with patch("herdr_main.call", side_effect=lambda env, method, /, **params: replies[method.split(".")[-1]]) as call:
             self.assertEqual(herdr_main.main(env, "toggle"), 0)
-        self.assertEqual(call.call_args.args[1:], ("plugin", "pane", "close", "w:p2"))
+        self.assertEqual(call.call_args.args[1:], ("plugin.pane.close",))
+        self.assertEqual(call.call_args.kwargs, {"pane_id": "w:p2"})
 
     def test_toggle_opens_when_no_navigator_is_open(self):
         env = {"HERDR_ENV": "1", "HERDR_PLUGIN_ID": "studykit.lens",
@@ -66,7 +67,7 @@ class ToggleActionTests(unittest.TestCase):
                 patch("herdr_main.source", return_value=("w:p1", Path("/tmp"))), \
                 patch("herdr_main.open_panel") as open_panel:
             self.assertEqual(herdr_main.main(env, "toggle"), 0)
-        self.assertEqual(open_panel.call_args.args[2], "w:p1")
+        self.assertEqual(open_panel.call_args.args[1], "w:p1")
 
 
 if __name__ == "__main__":

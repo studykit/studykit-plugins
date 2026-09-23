@@ -96,12 +96,12 @@ class ResizeAdapterTests(unittest.TestCase):
 
     def test_open_passes_dimensions_and_resume_file(self):
         with patch("herdr_main.call") as call:
-            herdr_main.open_panel(self.env, "herdr", "source", self.directory, False,
+            herdr_main.open_panel(self.env, "source", self.directory, False,
                                   PopupSize(85, 80), self.path, placement="popup")
-        args = call.call_args.args
-        self.assertEqual(args[args.index("--width") + 1], "85%")
-        self.assertEqual(args[args.index("--height") + 1], "80%")
-        self.assertIn(f"LENS_RESUME={self.path}", args)
+        request = call.call_args.kwargs
+        self.assertEqual(request["width"], "85%")
+        self.assertEqual(request["height"], "80%")
+        self.assertEqual(request["env"]["LENS_RESUME"], str(self.path))
 
     def test_reopen_waits_for_old_popup_then_saves_size(self):
         with patch("herdr_main.call", return_value={"pane": {"pane_id": "source"}}), \
