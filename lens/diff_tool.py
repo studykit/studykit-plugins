@@ -74,7 +74,7 @@ def comparison(index: Index, name: str):
     if not binary:
         raise ValueError("Install Vim with diff support (vimdiff or vim) to compare files")
     before, after = snapshots(index, name)
-    with tempfile.TemporaryDirectory(prefix="file-nav-diff-") as directory:
+    with tempfile.TemporaryDirectory(prefix="lens-diff-") as directory:
         root = Path(directory)
         left, right = Path("HEAD") / name, Path("WORKTREE") / name
         for relative, content in ((left, before), (right, after)):

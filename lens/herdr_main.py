@@ -48,7 +48,7 @@ def source(env: dict, binary: str) -> tuple[str, Path]:
     context = json.loads(env.get("HERDR_PLUGIN_CONTEXT_JSON") or "{}")
     if not isinstance(context, dict):
         raise ValueError("Herdr plugin context must be an object")
-    pane_id = env.get("FILE_NAV_SOURCE_PANE") or context.get("focused_pane_id") or env.get("HERDR_PANE_ID")
+    pane_id = env.get("LENS_SOURCE_PANE") or context.get("focused_pane_id") or env.get("HERDR_PANE_ID")
     if not pane_id:
         raise ValueError("No focused pane was provided by Herdr")
     pane = call(binary, "pane", "get", pane_id)["pane"]
@@ -64,14 +64,14 @@ def open_panel(env, binary, pane_id, root, changes, size, resume=None, placement
     # Herdr 0.9.1 needs a manifest entrypoint for popup placement.
     args = ["plugin", "pane", "open", "--plugin", env["HERDR_PLUGIN_ID"],
             "--entrypoint", "popup" if placement == "popup" else "navigator", "--cwd", str(root),
-            "--env", f"FILE_NAV_SOURCE_PANE={pane_id}",
-            "--env", f"FILE_NAV_CHANGES={int(changes)}",
-            "--env", f"FILE_NAV_WIDTH={size.width}",
-            "--env", f"FILE_NAV_HEIGHT={size.height}", "--focus"]
+            "--env", f"LENS_SOURCE_PANE={pane_id}",
+            "--env", f"LENS_CHANGES={int(changes)}",
+            "--env", f"LENS_WIDTH={size.width}",
+            "--env", f"LENS_HEIGHT={size.height}", "--focus"]
     if placement == "popup":
         args.extend(["--width", f"{size.width}%", "--height", f"{size.height}%"])
     if resume:
-        args.extend(["--env", f"FILE_NAV_RESUME={resume}"])
+        args.extend(["--env", f"LENS_RESUME={resume}"])
     if placement != "overlay":
         return call(binary, *args)
     return open_overlay(env, binary, pane_id, args, resume)
@@ -242,7 +242,7 @@ def reopen(env, raw):
 
 def main(env: dict, operation: str) -> int:
     if env.get("HERDR_ENV") != "1":
-        raise ValueError("Run File Navigator from inside Herdr")
+        raise ValueError("Run Lens from inside Herdr")
     binary = env.get("HERDR_BIN_PATH") or "herdr"
     pane_id, root = source(env, binary)
     if operation in ("browse", "changes"):
@@ -254,21 +254,21 @@ def main(env: dict, operation: str) -> int:
         from ui import Navigator
         state_dir = Path(env["HERDR_PLUGIN_STATE_DIR"]) if env.get("HERDR_PLUGIN_STATE_DIR") else None
         restored = None
-        if env.get("FILE_NAV_RESUME"):
-            path = resume_path(env, env["FILE_NAV_RESUME"])
+        if env.get("LENS_RESUME"):
+            path = resume_path(env, env["LENS_RESUME"])
             restored = json.loads(path.read_text())["view"]
             root = Path(restored["root"]).resolve(strict=True)
             path.unlink()
         else:
             restored = load_view(state_dir, root)
             # An explicit changes action must still open the changes view.
-            if restored is not None and env.get("FILE_NAV_CHANGES") == "1":
+            if restored is not None and env.get("LENS_CHANGES") == "1":
                 restored["changes"] = True
-        size = PopupSize(int(env.get("FILE_NAV_WIDTH", 96)), int(env.get("FILE_NAV_HEIGHT", 92)))
+        size = PopupSize(int(env.get("LENS_WIDTH", 96)), int(env.get("LENS_HEIGHT", 92)))
         on_resize = None
         if env.get("HERDR_PLUGIN_STATE_DIR") and env.get("HERDR_PLUGIN_CONFIG_DIR"):
             on_resize = lambda chosen, view: prepare_resize(env, pane_id, chosen, view)
-        navigator = Navigator(root, pane_id, env.get("FILE_NAV_CHANGES") == "1",
+        navigator = Navigator(root, pane_id, env.get("LENS_CHANGES") == "1",
                               env.get("VISUAL") or env.get("EDITOR") or "", size, on_resize,
                               theme_loader=lambda: theme_config(env),
                               folder_style=directory_style(env, sys.platform),
@@ -277,7 +277,7 @@ def main(env: dict, operation: str) -> int:
                               on_layout=lambda placement, chosen, view:
                                   change_layout(env, pane_id, placement, chosen, view),
                               initial_state=restored, defer_status=True)
-        if restored is not None and env.get("FILE_NAV_RESUME"):
+        if restored is not None and env.get("LENS_RESUME"):
             navigator.message = "Restored view after layout change"
         try:
             curses.wrapper(navigator.run)
@@ -296,5 +296,5 @@ if __name__ == "__main__":
             sys.exit(reopen(env, sys.argv[2]))
         sys.exit(main(env, operation))
     except (OSError, ValueError, KeyError, RuntimeError, subprocess.SubprocessError) as error:
-        print(f"File Navigator: {error}", file=sys.stderr)
+        print(f"Lens: {error}", file=sys.stderr)
         sys.exit(1)

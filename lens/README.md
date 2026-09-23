@@ -1,4 +1,4 @@
-# File Navigator
+# Lens
 
 Browse the focused Herdr pane's working directory in a popup or overlay with a project tree,
 filename search, file previews, and side-by-side Git comparisons in vimdiff. Works alongside any shell or agent,
@@ -15,15 +15,15 @@ Markdown rendering uses the Python `Rich` library and source highlighting uses
 ## Install
 
 ```sh
-herdr plugin install studykit/studykit-plugins/file-nav
+herdr plugin install studykit/studykit-plugins/lens
 ```
 
 Open **Files: browse project** or **Files: browse changes** from Herdr's plugin
 actions. You can also invoke either action from the CLI:
 
 ```sh
-herdr plugin action invoke studykit.file-nav.browse
-herdr plugin action invoke studykit.file-nav.changes
+herdr plugin action invoke studykit.lens.browse
+herdr plugin action invoke studykit.lens.changes
 ```
 
 The navigator uses the pane that was focused when you invoked the action. Its root is
@@ -288,13 +288,13 @@ Add bindings to your Herdr configuration, choosing unused keys:
 [[keys.command]]
 key = "prefix+t"
 type = "plugin_action"
-command = "studykit.file-nav.browse"
+command = "studykit.lens.browse"
 description = "browse project files"
 
 [[keys.command]]
 key = "prefix+d"
 type = "plugin_action"
-command = "studykit.file-nav.changes"
+command = "studykit.lens.changes"
 description = "browse changed files"
 ```
 

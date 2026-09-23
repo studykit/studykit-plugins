@@ -62,7 +62,7 @@ From the repository root:
 
 ```sh
 uv run --no-config --no-project --with rich==15.0.0 python \
-  file-nav/dev/benchmark_startup.py /absolute/path/to/project \
+  lens/dev/benchmark_startup.py /absolute/path/to/project \
   --ignored --preview README.md
 ```
 
@@ -80,7 +80,7 @@ from pathlib import Path
 import subprocess
 import tempfile
 
-root = Path(tempfile.mkdtemp(prefix="file-nav-benchmark-"))
+root = Path(tempfile.mkdtemp(prefix="lens-benchmark-"))
 subprocess.run(["git", "init", "-q", str(root)], check=True)
 (root / ".gitignore").write_text("cache/\n")
 (root / "README.md").write_text("# Preview fixture\n\nHello navigator.\n")

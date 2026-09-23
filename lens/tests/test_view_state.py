@@ -233,7 +233,7 @@ class AdapterStateTests(StateFixture):
 
     def test_explicit_changes_action_overrides_saved_browse_mode(self):
         self.nav.checkpoint()
-        self.panel(lambda nav: self.assertTrue(nav.changes), {"FILE_NAV_CHANGES": "1"})
+        self.panel(lambda nav: self.assertTrue(nav.changes), {"LENS_CHANGES": "1"})
 
     def test_panel_restores_ignored_view_without_default_scan(self):
         self.nav.toggle_ignored()
@@ -249,7 +249,7 @@ class AdapterStateTests(StateFixture):
         path = self.directory / "resize-test.json"
         path.write_text(json.dumps({"view": view}))
         self.panel(lambda nav: self.assertEqual(nav.export_state(), view),
-                   {"FILE_NAV_RESUME": str(path)})
+                   {"LENS_RESUME": str(path)})
         self.assertFalse(path.exists())
 
     def test_wrapper_exception_still_checkpoints_current_state(self):

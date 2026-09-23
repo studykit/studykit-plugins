@@ -42,7 +42,7 @@ def snapshots(project: Path, path: Path) -> tuple[str, bytes, bytes]:
     head = _git(root, "rev-parse", "--verify", "HEAD")
     if head.returncode == 0:
         revision = head.stdout.decode("ascii").strip()
-        # Staged renames need the original HEAD path, as in File Navigator.
+        # Staged renames need the original HEAD path, as in Lens.
         records = iter(_output(root, "diff", "--name-status", "-z", "--find-renames",
                                revision, "--").split(b"\0"))
         for status in records:

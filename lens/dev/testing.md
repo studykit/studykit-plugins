@@ -43,13 +43,13 @@ with either agent inside Herdr.
 Run automated checks from the repository root:
 
 ```sh
-uv run --no-config --no-project --with rich==15.0.0 python -m unittest discover -s file-nav/tests -v
+uv run --no-config --no-project --with rich==15.0.0 python -m unittest discover -s lens/tests -v
 ```
 
 For local development, register the working tree:
 
 ```sh
-herdr plugin link /absolute/path/to/file-nav
+herdr plugin link /absolute/path/to/lens
 ```
 
 Use a throwaway project with tracked, staged, unstaged, deleted, and untracked

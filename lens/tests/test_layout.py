@@ -126,7 +126,7 @@ class LayoutAdapterTests(unittest.TestCase):
         self.assertEqual(args[args.index("--entrypoint") + 1], "popup")
         self.assertNotIn("--target-pane", args)
         self.assertNotIn("--placement", args)
-        self.assertIn("FILE_NAV_SOURCE_PANE=source", args)
+        self.assertIn("LENS_SOURCE_PANE=source", args)
 
     def test_overlay_launch_uses_native_overlay_manifest_without_split_controls(self):
         import tomllib
@@ -180,7 +180,7 @@ class LayoutPreferenceTests(unittest.TestCase):
         directory = tempfile.TemporaryDirectory()
         self.addCleanup(directory.cleanup)
         self.root = Path(directory.name).resolve()
-        self.env = {"HERDR_ENV": "1", "HERDR_PLUGIN_ID": "studykit.file-nav",
+        self.env = {"HERDR_ENV": "1", "HERDR_PLUGIN_ID": "studykit.lens",
                     "HERDR_PLUGIN_CONFIG_DIR": str(self.root)}
 
     def test_each_saved_mode_is_used_by_browse_and_changes(self):

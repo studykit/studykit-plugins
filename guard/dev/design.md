@@ -20,13 +20,13 @@ Official packaging references checked on 2026-09-21:
 ## Herdr file diffs (v0.157.0)
 
 The pending-files popup now opens a HEAD/working-tree comparison with `d` or `Ctrl+D`.
-The baseline deliberately matches File Navigator, not the last audit checkpoint: Guard
+The baseline deliberately matches Lens, not the last audit checkpoint: Guard
 retains revision fingerprints rather than historical file contents. Staged changes and
 later edits appear together. Opening a diff does not clear or audit pending files.
 
 Both sides are disposable byte snapshots. Vim receives no project file to save, disables
 user configuration and modelines, and opens two non-modifiable, read-only windows.
-The bundled Vim configuration follows File Navigator's controls and colors. Guard ships
+The bundled Vim configuration follows Lens's controls and colors. Guard ships
 its own viewer so either plugin can be installed independently. Exiting with `q` restores
 the curses panel and its cursor, scroll position, and multi-selection.
 

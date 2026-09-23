@@ -16,7 +16,7 @@ class OverlayReuseTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
-        self.env = {"HERDR_PLUGIN_ID": "studykit.file-nav",
+        self.env = {"HERDR_PLUGIN_ID": "studykit.lens",
                     "HERDR_PLUGIN_STATE_DIR": str(self.root),
                     "HERDR_SOCKET_PATH": "/session-a/herdr.sock",
                     "HERDR_PLUGIN_CONTEXT_JSON": json.dumps({"tab_id": "w1:t1"})}
@@ -127,7 +127,7 @@ class OverlayReuseTests(unittest.TestCase):
         self.env.pop("HERDR_PLUGIN_CONTEXT_JSON")
         self.assertEqual(herdr_main.overlay_slot(self.env, "herdr", "source"), original)
 
-    def test_another_plugin_is_not_reused_as_file_navigator(self):
+    def test_another_plugin_is_not_reused_as_lens(self):
         self.panes["other"] = {"plugin_id": "another.plugin", "entrypoint": "navigator", "pane": {}}
         self.open("other")
         self.assertEqual(self.created, 1)

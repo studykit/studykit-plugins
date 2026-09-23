@@ -466,7 +466,7 @@ class Navigator:
 
         # Only one query runs at a time. Leaving the UI never joins a slow Git
         # process; its normal subprocess timeout still bounds the query.
-        Thread(target=work, name="file-nav-status", daemon=True).start()
+        Thread(target=work, name="lens-status", daemon=True).start()
 
     def poll_status(self):
         if self.status_job is None or not self.status_job[1].done():
@@ -744,7 +744,7 @@ class Navigator:
             self.scroll = self.selected - self.tree_body + 1
         self.preview_scroll = min(self.preview_scroll, max(0, self.preview_length() - self.body))
         focus = "ROOT" if self.root_draft is not None else "SEARCH" if self.searching else "CONTENT" if self.preview_focus else "FILES"
-        band(screen, 0, 0, "  FILE NAVIGATOR", width - 1, self.style("surface") | curses.A_BOLD)
+        band(screen, 0, 0, "  LENS", width - 1, self.style("surface") | curses.A_BOLD)
         badge = f" FOCUS: {focus} "
         band(screen, 0, max(19, width - len(badge) - 2), badge, len(badge), self.style("header") | curses.A_BOLD)
         put(screen, 1, 2, "[..]", 4, self.style("active"))

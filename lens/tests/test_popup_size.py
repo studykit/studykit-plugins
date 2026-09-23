@@ -86,7 +86,7 @@ class ResizeAdapterTests(unittest.TestCase):
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)
         self.directory = Path(self.temporary.name).resolve()
-        self.env = {"HERDR_PLUGIN_ID": "studykit.file-nav", "HERDR_ENV": "1",
+        self.env = {"HERDR_PLUGIN_ID": "studykit.lens", "HERDR_ENV": "1",
                     "HERDR_PLUGIN_STATE_DIR": str(self.directory),
                     "HERDR_PLUGIN_CONFIG_DIR": str(self.directory / "config")}
         self.payload = {"pane_id": "source", "size": {"width": 85, "height": 80},
@@ -101,7 +101,7 @@ class ResizeAdapterTests(unittest.TestCase):
         args = call.call_args.args
         self.assertEqual(args[args.index("--width") + 1], "85%")
         self.assertEqual(args[args.index("--height") + 1], "80%")
-        self.assertIn(f"FILE_NAV_RESUME={self.path}", args)
+        self.assertIn(f"LENS_RESUME={self.path}", args)
 
     def test_reopen_waits_for_old_popup_then_saves_size(self):
         with patch("herdr_main.call", return_value={"pane": {"pane_id": "source"}}), \

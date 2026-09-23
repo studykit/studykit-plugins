@@ -287,7 +287,7 @@ class AdapterTests(unittest.TestCase):
             result = subprocess.run([str(plugin / command[0]), *command[1:]],
                                     cwd=directory, env=env, text=True, capture_output=True)
         self.assertEqual(result.returncode, 1)
-        self.assertIn("Run File Navigator from inside Herdr", result.stderr)
+        self.assertIn("Run Lens from inside Herdr", result.stderr)
 
     def test_context_precedes_caller_and_uses_foreground_cwd(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -299,12 +299,12 @@ class AdapterTests(unittest.TestCase):
             call.assert_called_once_with("herdr-binary", "pane", "get", "focused")
 
     def test_action_defaults_to_popup_and_forwards_source(self):
-        env = {"HERDR_ENV": "1", "HERDR_PLUGIN_ID": "studykit.file-nav"}
+        env = {"HERDR_ENV": "1", "HERDR_PLUGIN_ID": "studykit.lens"}
         with patch("herdr_main.source", return_value=("w1:p9", Path("/tmp/project"))), patch("herdr_main.call") as call:
             herdr_main.main(env, "changes")
         argv = call.call_args.args
-        self.assertIn("FILE_NAV_SOURCE_PANE=w1:p9", argv)
-        self.assertIn("FILE_NAV_CHANGES=1", argv)
+        self.assertIn("LENS_SOURCE_PANE=w1:p9", argv)
+        self.assertIn("LENS_CHANGES=1", argv)
         self.assertEqual(argv[argv.index("--entrypoint") + 1], "popup")
         self.assertNotIn("--placement", argv)
         self.assertNotIn("--target-pane", argv)
