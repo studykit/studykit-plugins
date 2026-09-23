@@ -9,6 +9,7 @@ from unittest.mock import Mock, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from terminal_input import Mouse
+import ui
 from ui import Navigator
 
 
@@ -68,7 +69,7 @@ class RootNavigationTests(unittest.TestCase):
         self.assertEqual(self.nav.index.files, ["nested.txt"])
 
     def test_parent_shortcuts_and_click_keep_previous_folder_selected(self):
-        for key in ("\x7f", curses.KEY_BACKSPACE, Mouse(3, 1, "click")):
+        for key in ("\x7f", curses.KEY_BACKSPACE, Mouse(3, ui.ROOT_ROW, "click")):
             with self.subTest(key=key):
                 self.nav.change_root(self.first / "child")
                 self.nav.key(key, None)
@@ -99,7 +100,7 @@ class RootNavigationTests(unittest.TestCase):
         before = self.nav.export_state()
         self.nav.key("\x0f", None)
         draft = self.nav.root_draft
-        for key in ("\x13", "\x14", "\x17", Mouse(3, 1, "click"), "\x04"):
+        for key in ("\x13", "\x14", "\x17", Mouse(3, ui.ROOT_ROW, "click"), "\x04"):
             self.nav.key(key, None)
         self.assertEqual(self.nav.root_draft, draft)
         self.nav.key("\x1b", None)
@@ -143,7 +144,7 @@ class RootNavigationTests(unittest.TestCase):
         empty.mkdir()
         self.enter_path(empty)
         self.assertEqual(self.nav.root, empty)
-        self.assertEqual([row.path for row in self.nav.items], [".."])
+        self.assertEqual([row.path for row in self.nav.items], [".", ".."])
         self.nav.key("\x7f", None)
         self.assertEqual(self.nav.root, self.base)
 
@@ -179,7 +180,7 @@ class RootNavigationTests(unittest.TestCase):
         self.assertIn("한글 project", restored.source_text)
 
     def test_modal_draw_and_path_click(self):
-        self.nav.key(Mouse(10, 1, "click"), None)
+        self.nav.key(Mouse(10, ui.ROOT_ROW, "click"), None)
         self.assertIsNotNone(self.nav.root_draft)
         screen = Mock()
         for dimensions in ((44, 160), (20, 50), (10, 30)):
@@ -188,17 +189,56 @@ class RootNavigationTests(unittest.TestCase):
         self.assertTrue(any("CHANGE ROOT" in str(call) for call in screen.addstr.call_args_list))
 
     def test_parent_entry_enter_click_and_changes_mode(self):
-        for key in ("\n", Mouse(10, self.nav.content_top, "click")):
+        for key in ("\n", Mouse(10, self.nav.content_top + 1, "click")):
             for changes in (False, True):
                 self.nav.change_root(self.first / "child")
                 self.nav.changes = changes
                 self.nav.rebuild()
-                self.assertEqual(self.nav.items[0].path, "..")
+                self.nav.selected = 1
+                self.assertEqual(self.nav.items[1].path, "..")
                 with patch.object(self.nav, "show_diff") as diff:
                     self.nav.key(key, None)
                 self.assertEqual(self.nav.root, self.first)
                 self.assertFalse(self.nav.preview_focus)
                 diff.assert_not_called()
+
+    def test_enter_makes_a_folder_the_root_and_click_folds_it(self):
+        rows = [row.path for row in self.nav.items]
+        self.assertEqual(rows[:2], [".", ".."])
+        self.nav.selected = rows.index("child")
+        self.nav.key(Mouse(10, self.nav.content_top + self.nav.selected, "click"), None)
+        self.assertEqual(self.nav.root, self.first)
+        self.assertIn("child", self.nav.expanded)
+        self.nav.key("\n", None)
+        self.assertEqual(self.nav.root, self.first / "child")
+        self.assertEqual(self.nav.items[self.nav.selected].path, "nested.txt")
+        self.nav.key("\x7f", None)  # Backspace goes back up.
+        self.assertEqual(self.nav.root, self.first)
+
+    def test_space_folds_folders_but_not_dot_rows(self):
+        rows = [row.path for row in self.nav.items]
+        self.nav.selected = rows.index("child")
+        self.nav.key(" ", None)
+        self.assertIn("child", self.nav.expanded)
+        self.nav.key(" ", None)
+        self.assertNotIn("child", self.nav.expanded)
+        for index in (0, 1):
+            self.nav.selected = index
+            self.nav.key(" ", None)
+            self.assertEqual(self.nav.root, self.first)
+            self.assertEqual(self.nav.expanded, set())
+
+    def test_dot_row_opens_the_root_folder(self):
+        self.nav.selected = 0
+        self.nav.key("\n", None)
+        self.assertEqual(self.nav.root, self.first)
+        self.assertIn("o opens it", self.nav.message)
+        with patch("ui.subprocess.Popen") as popen, patch("ui.opener_command", return_value=["open", "x"]) as opener:
+            popen.return_value.wait.return_value = 0
+            popen.return_value.communicate.return_value = (b"", b"")
+            popen.return_value.returncode = 0
+            self.nav.key("o", None)
+        self.assertEqual(opener.call_args.args[1].resolve(), self.first)
 
     def test_parent_entry_is_not_searchable_or_previewable(self):
         self.nav.selected = 0

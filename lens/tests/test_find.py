@@ -87,7 +87,7 @@ class FindTests(unittest.TestCase):
         drawn = [call.args[2] for call in screen.addstr.call_args_list]
         self.assertIn("needle", drawn)
         self.assertIn("\u2315", drawn)  # The preview box shows the find query with its match count.
-        self.assertTrue(any("n N Next/Prev" in text for text in drawn))
+        self.assertIn("next/prev", drawn)  # The echo area offers n / N.
 
     def test_tree_focus_slash_still_filters_filenames(self):
         self.nav.load("plain.txt")

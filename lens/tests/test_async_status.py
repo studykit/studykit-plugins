@@ -70,6 +70,7 @@ class DeferredStatusTests(unittest.TestCase):
         def read(screen):
             self.assertTrue(started.wait(2))
             nav.key("j", screen)
+            nav.key("j", screen)
             self.assertEqual(nav.items[nav.selected].path, "a.txt")
             return "\x03"
         with patch("ui.read_status", side_effect=slow_status), \
@@ -126,7 +127,7 @@ class DeferredStatusTests(unittest.TestCase):
         nav.status_job[1].result(timeout=2)
         nav.poll_status()
         self.assertEqual(nav.index.status, {})
-        self.assertEqual([row.path for row in nav.items], [".."])
+        self.assertEqual([row.path for row in nav.items], [".", ".."])
 
     def test_root_change_keeps_one_worker_and_discards_previous_root(self):
         nav = self.navigator()
@@ -177,17 +178,18 @@ class DeferredStatusTests(unittest.TestCase):
     def test_changes_view_restores_selection_after_status_without_losing_checkpoint(self):
         state = {"root": str(self.root), "changes": True, "selected": "gone.txt", "scroll": 1}
         nav = self.navigator(initial_state=state)
-        self.assertEqual([row.path for row in nav.items], [".."])
+        self.assertEqual([row.path for row in nav.items], [".", ".."])
         self.assertEqual(nav.export_state()["selected"], "gone.txt")
         self.assertEqual(nav.export_state()["scroll"], 1)
         self.complete(nav)
-        self.assertEqual([row.path for row in nav.items], ["..", "b.txt", "gone.txt"])
+        self.assertEqual([row.path for row in nav.items], [".", "..", "b.txt", "gone.txt"])
         self.assertEqual(nav.items[nav.selected].path, "gone.txt")
         self.assertEqual(nav.scroll, 1)
 
     def test_input_overrides_selection_waiting_for_status(self):
         nav = self.navigator(initial_state={"root": str(self.root), "changes": True, "selected": "gone.txt"})
         nav.key("\x07", None)
+        nav.key("j", None)
         nav.key("j", None)
         self.complete(nav)
         self.assertEqual(nav.items[nav.selected].path, "a.txt")

@@ -74,15 +74,18 @@ pane in that tab.
 | `/` (tree focused) | Enter filename/path search, including inside collapsed folders |
 | `/` (preview focused) | Find text in the preview |
 | n / N (preview focused) | Jump to the next / previous match |
+| `?` | List every key; any key closes the list |
 | `:` or Alt+X | Open the command line (see below) |
 | Ctrl+O | Change the navigation root by entering a directory path |
 | Enter / click on the tree's `..` row | Move the navigation root to its parent |
 | Backspace (tree focused) / click `[..]` | Move the navigation root to its parent |
+| Enter on a folder | Make the folder the navigation root; Backspace returns |
+| `.` row, then o / O | Open the navigation root itself in the OS or with an application |
 | Ctrl+T | Move to the current Git repository root |
 | Enter / Escape in search | Apply the filter / cancel and restore the previous filter |
-| Click or Enter | Expand a folder or open the file; in changed-files mode, open vimdiff |
+| Click, or Enter on a file | Expand or collapse a folder (click), or open the file; in changed-files mode, open vimdiff |
 | h / j / k / l (tree focused) | Collapse or move to parent / down / up / expand or enter a folder |
-| Space (tree focused) | Preview the selected file while keeping tree focus, including in changed-files mode |
+| Space (tree focused) | Preview the selected file while keeping tree focus, including in changed-files mode; on a folder, expand or collapse it |
 | Left / Right | Collapse / expand folders; scroll horizontally in preview |
 | Up / Down, Page Up / Down | Move through files or scroll preview |
 | Ctrl+N / Ctrl+P | Scroll preview down / up one line without changing focus |
@@ -92,6 +95,7 @@ pane in that tab.
 | d / u (preview focused) | Scroll down / up half a screen |
 | g / G (preview focused) | Jump to the beginning / end |
 | Mouse wheel | Scroll the panel under the pointer without changing keyboard focus |
+| Drag the border between the panels | Resize the file tree; the width is remembered across launches |
 | Tab / Shift+Tab | Switch focus between files and preview |
 | v | Switch diagram previews (files and Markdown blocks) between images and source |
 | + (or =) / - / 0 | Zoom the current diagram in / out / back to fit |
@@ -117,7 +121,7 @@ directories are excluded. Hidden files are included. Git status uses the usual
 two-column codes, including `??` for new files and `D` for deleted files.
 
 The file list and saved preview appear before Git status finishes loading.
-You can navigate, search, and close the navigator while `Git…` is shown under the file tree title;
+You can navigate, search, and close the navigator while `Git…` is shown in the file tree's top border;
 change indicators appear when ready. The changes-only view shows its loading
 state first, then fills with changed files. If status lookup fails, the file
 browser remains usable; press Ctrl+R to retry.
@@ -154,8 +158,8 @@ The tree always starts with a `..` entry, including empty directories and
 changes-only mode. Enter or click it to go up; at the filesystem root it does
 nothing. Filename search results omit this entry. Backspace moves up only in
 the unfiltered tree, and remains a text-editing key during search.
-Closed folders display `▸ `, expanded folders display `▾ `, and the parent
-entry displays `↑  ..`. Files have no folder icon. Use a Nerd Font in your
+Folders show a closed or open folder glyph, including the parent entry `..` and the
+root entry `.`. Files have no folder icon. Use a Nerd Font in your
 terminal to display these folder glyphs.
 
 Changing roots clears the filename filter, expanded folders, and old preview,
@@ -216,8 +220,8 @@ Within vimdiff, `Tab` switches sides, `]c` / `[c` jump between changes, and `q` 
 `:qa!` returns to the navigator. Both sides are read-only temporary snapshots.
 The comparison uses a bundled Vim theme and key mappings, independent of your vimrc.
 
-The active panel has a bright header, a double border, and an explicit
-`FOCUS: FILES`, `FOCUS: CONTENT`, or `FOCUS: SEARCH` badge. Opening a file moves focus
+The active panel has a bright header and a double border, and the bar above the
+last row names the focus: `FILES`, `CONTENT`, `SEARCH`, `FIND`, or `COMMAND`. Opening a file moves focus
 to content; Tab, Escape, or clicking the file panel brings it back. `/` activates
 the highlighted search field. Narrow terminals show one panel at a time.
 
@@ -291,8 +295,17 @@ scrolls long lines horizontally. Files are displayed, never executed.
 
 Press `:` (as in Vim) or Alt+X (as in Emacs) to type a command, then Enter to run
 it. Tab completes command names, file paths, directories, and fixed arguments,
-listing the candidates when more than one fits; Up / Down recall earlier commands;
-Escape, or Backspace on an empty line, cancels. Commands may be shortened to any
+and opens a list of the candidates when more than one fits. In the list, typing
+narrows it, Up / Down or Tab choose, Enter inserts the choice, and Escape closes the
+list. Otherwise Up / Down (or Ctrl+P / Ctrl+N) recall earlier commands, and Escape,
+Ctrl+G, or Backspace on an empty line, cancels.
+
+The line edits with Emacs keys: Ctrl+A / Ctrl+E go to the start / end, Ctrl+B /
+Ctrl+F and Alt+B / Alt+F move by character and word (so do the arrow, Home and End
+keys), Ctrl+D deletes forward, Ctrl+K / Ctrl+U kill to the end / start, Alt+D /
+Alt+Backspace kill a word, Ctrl+W kills the argument before the cursor, and Ctrl+Y
+yanks the last kill. Tab completes the text before the
+cursor and keeps the rest. Commands may be shortened to any
 unambiguous prefix. While filtering filenames, `:` is ordinary text.
 
 | Command | Action |
@@ -430,6 +443,7 @@ pause = false      # true waits for Enter afterwards, for tools that print and e
 [ui]
 icons = "nerd"     # or "plain"; overrides :icons at startup
 align = "center"   # diagram alignment: left, center, right
+tree_padding = 1   # blank columns on each side of the file tree's rows (0 - 8)
 
 [keys]
 # A key, then an action name or a ":" command line. These add to the

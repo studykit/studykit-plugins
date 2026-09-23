@@ -58,11 +58,11 @@ def band(screen, y, x, text, width, style=0):
     put(screen, y, x, text, width, style)
 
 
-# The two boxes start right under the root line; each box's first row holds its
-# summary, or the filename filter / preview find while one is in use.
+# The two boxes start right under the root line; the filename filter and the
+# preview find take the last row of their box while in use.
 LAYOUT_KEYS = {"1": "popup", "2": "overlay", "3": "left", "4": "right"}
 LAYOUT_NAMES = {"popup": "Popup", "overlay": "Overlay", "left": "Left half", "right": "Right half"}
-BOX_TOP = 2
+ROOT_ROW, BOX_TOP = 0, 1
 
 # Tree status marks. Nerd Font glyphs need a patched font, so plain text is the default.
 ICONS = {
@@ -73,9 +73,17 @@ ICONS = {
 }
 
 
+def human_size(size):
+    """A byte count as Emacs's mode line shows it: 512, 2.0k, 1.3M."""
+    for unit in ("", "k", "M", "G"):
+        if size < 1024 or unit == "G":
+            return f"{size}" if not unit else f"{size:.1f}{unit}"
+        size /= 1024
+
+
 def theme(palette=None, folder_style=None) -> dict[str, int]:
     palette = palette or resolve_theme()
-    styles = {"active": curses.A_BOLD, "header": curses.A_REVERSE | curses.A_BOLD,
+    styles = {"active": curses.A_BOLD, "header": curses.A_REVERSE | curses.A_BOLD, "modeline": curses.A_REVERSE, "modeline_dim": curses.A_REVERSE | curses.A_DIM,
               "selected": curses.A_REVERSE | curses.A_BOLD, "inactive": curses.A_DIM,
               "muted": curses.A_DIM, "hunk": curses.A_BOLD, "key": curses.A_REVERSE}
     if not curses.has_colors():
@@ -94,7 +102,8 @@ def theme(palette=None, folder_style=None) -> dict[str, int]:
         "surface": (p["text"], p["active_row_bg"]), "folder": (p["text"], p["panel_bg"]),
         "hunk": (p["mauve"], p["surface_dim"]), "removed": (p["red"], p["panel_bg"]),
         "added": (p["green"], p["panel_bg"]), "gutter": (p["overlay0"], p["panel_bg"]),
-        "key": (p["accent"], p["selection_bg"]),
+        "key": (p["accent"], p["selection_bg"]), "modeline": (p["text"], p["active_row_bg"]),
+        "modeline_dim": (p["subtext0"], p["active_row_bg"]),
     }
     if folder_style is not None:
         palettes["folder"] = (folder_style.foreground,
@@ -122,13 +131,33 @@ def theme(palette=None, folder_style=None) -> dict[str, int]:
     return styles
 
 
+# Every key, by where it applies, for the ? popup.
+KEY_GROUPS = (
+    ("General", (("Tab", "Switch focus"), (":", "Command line"), ("?", "This list"), ("⌃E", "Edit file"),
+                 ("⌃D", "Diff with HEAD"), ("o / O", "Open / open with"), ("⌃G", "Changed files only"),
+                 ("⌃H", "Ignored files"), ("⌃R", "Refresh"), ("⌃O", "Change root"), ("⌃T", "Repository root"),
+                 ("⌃W", "Layout"), ("⌃Y", "Popup size"), ("Esc", "Back / close"), ("⌃C", "Quit"))),
+    ("Files", (("j k", "Move"), ("h l", "Fold / unfold"), ("Enter", "Open / enter folder"), ("Space", "Preview / fold"),
+               ("/", "Filter names"), ("⌫", "Parent folder"), ("⌃N ⌃P", "Scroll preview"),
+               ("⌃F ⌃B", "Page preview"))),
+    ("Preview", (("j k", "Line"), ("Space b", "Page"), ("d u", "Half page"), ("g G", "Top / end"),
+                 ("/", "Find"), ("n N", "Next / previous"), ("← →", "Scroll sideways"))),
+    ("Diagrams", (("v", "Image / source"), ("+ -", "Zoom"), ("0", "Fit"), ("a", "Align"),
+                  ("[ ]", "Previous / next"))),
+    ("Command line", (("Tab", "Complete"), ("↑ ↓", "History"), ("⌃A ⌃E", "Start / end"),
+                      ("⌃B ⌃F", "Char"), ("M-b M-f", "Word"), ("⌃K ⌃U", "Kill to end / start"),
+                      ("M-d M-⌫ ⌃W", "Kill word"), ("⌃Y", "Yank"), ("⌃G Esc", "Cancel"))),
+)
+
+
 class Navigator:
     def __init__(self, root: Path, pane_id: str, changes: bool, editor: str,
                  size: PopupSize = PopupSize(), on_resize=None, theme_loader=None,
                  folder_style=None, on_state=None, layout_loader=None, on_layout=None,
                  initial_state=None, defer_status=False, diagram_tools=None, graphics=None,
                  cell_size=None, alignment="center", on_alignment=None, close_keys=(),
-                 icons="plain", on_icons=None, settings_loader=None, settings_file=None):
+                 icons="plain", on_icons=None, settings_loader=None, settings_file=None,
+                 tree_width=None, on_tree_width=None):
         initial_state = normalize_view(initial_state, root)
         self.root, self.pane_id, self.editor = root, pane_id, editor
         self.environment_editor = editor
@@ -158,6 +187,7 @@ class Navigator:
         self.rendered = None
         self.syntax = None
         self.language = ""
+        self.active_size = None
         self.render_width = None
         self.restore_horizontal = False
         self.color_pairs = {}
@@ -168,8 +198,8 @@ class Navigator:
         self.palette = resolve_theme()
         self.styles = {}
         self.body = self.tree_body = 10
-        self.content_top = BOX_TOP + 2
-        self.divider = 26
+        self.content_top = BOX_TOP + 1
+        self.divider, self.screen_width = 26, 120
         self.narrow = False
         self.size = size
         self.size_draft = None
@@ -200,6 +230,8 @@ class Navigator:
         self.on_alignment = on_alignment
         self.icons = icons if icons in ICONS else "plain"
         self.on_icons = on_icons
+        # The divider dragged with the mouse: the tree's width, or None for the automatic one.
+        self.tree_width, self.on_tree_width, self.dragging = tree_width, on_tree_width, False
         self.diagram_extent = None  # Zoomed (cols, rows) of a diagram file's image.
         self.markdown_diagrams = []
         self.render_body = None
@@ -218,6 +250,9 @@ class Navigator:
         # Command line (":" or Alt+X): the draft while open, else None.
         self.command = None
         self.command_history, self.command_recall = [], 0
+        self.command_menu = None  # Tab's completion list: {"selected", "scroll"} while open.
+        self.key_help = False  # The ? popup listing every key.
+        self.command_cursor, self.command_killed = 0, ""  # Emacs editing: point and the last kill.
         # Key sequences that close Lens, such as the host's toggle binding.
         self.close_keys, self.close_typed = [tuple(keys) for keys in close_keys], ()
         self.index = None
@@ -230,6 +265,7 @@ class Navigator:
             self.message = self.settings_errors  # Config mistakes outrank the restore note.
 
     def apply_settings(self):
+        self.tree_padding = 1
         if self.settings_loader is None:
             return
         chosen = self.settings_loader()
@@ -240,6 +276,7 @@ class Navigator:
             self.icons = chosen.icons
         if chosen.align:
             self.alignment = chosen.align
+        self.tree_padding = 1 if chosen.tree_padding is None else chosen.tree_padding
         self.bindings = chosen.keys
         self.message = self.settings_errors = "; ".join(chosen.errors)
 
@@ -612,7 +649,8 @@ class Navigator:
         self.items = rows(names, self.expanded, self.query,
                           directories=self.index.directories if not self.changes else ())
         if not self.query:
-            self.items.insert(0, Row("..", directory=True))
+            # "." stands for the root itself, so o and O can open it; ".." climbs out.
+            self.items[:0] = [Row(".", directory=True), Row("..", directory=True)]
         self.selected = min(self.selected, max(0, len(self.items) - 1))
 
     def load(self, name: str):
@@ -631,6 +669,10 @@ class Navigator:
             self.markdown = Path(name).suffix.lower() in (".md", ".markdown")
         except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as error:
             self.content = [str(error)]
+        try:
+            self.active_size = (self.index.root / name).stat().st_size
+        except (OSError, AttributeError):
+            self.active_size = None
         self.start_diagrams()
 
     def diagram_file(self):
@@ -939,22 +981,31 @@ class Navigator:
             if visible:
                 put(screen, y, x + start, "".join(visible), width - start, self.span_style(span.style))
 
-    def activate(self, screen=None):
+    def activate(self, screen=None, fold=False):
+        """Enter: open a file, or make a folder the root, as Backspace leaves it. A click folds instead."""
         if not self.items:
             return
         row = self.items[self.selected]
         if row.path == "..":
             self.parent_root()
+        elif row.path == ".":
+            self.message = "This folder: o opens it, O opens it with an application"
+        elif row.directory and not fold:
+            if self.change_root(row.path):
+                self.selected = min(2, len(self.items) - 1)  # The first entry, below "." and "..".
         elif row.directory:
-            if row.path in self.expanded:
-                self.expanded.remove(row.path)
-            else:
-                self.expanded.add(row.path)
-            self.rebuild()
+            self.toggle_fold(row)
         else:
             self.preview_selected()
             if self.changes:
                 self.show_diff(screen)
+
+    def toggle_fold(self, row):
+        if row.path in self.expanded:
+            self.expanded.remove(row.path)
+        else:
+            self.expanded.add(row.path)
+        self.rebuild()
 
     def preview_selected(self, *, focus=True):
         if not self.items or self.items[self.selected].directory:
@@ -1064,36 +1115,41 @@ class Navigator:
         return True
 
     def draw_app_picker(self, screen):
-        height, width = screen.getmaxyx()
         picker, choices = self.app_picker, self.app_choices()
+        empty = f"Enter opens with \"{picker['query']}\"" if picker["query"] else "No applications found"
+        self.draw_picker(screen, picker, f"OPEN WITH  {picker['target'] or '.'}", picker["query"],
+                         [(app, "recent" if app in self.recent_apps else "") for app in choices], empty,
+                         "↑↓ Choose  Enter Open  ⌃U Clear  Esc Cancel")
+
+    def draw_picker(self, screen, picker, title, query, choices, empty, hints, cursor=None):
+        """A centred list box: a title, the typed query, (label, note) choices and a key-hint footer."""
+        height, width = screen.getmaxyx()
         box_width = min(64, width - 2)
         rows = max(1, min(14, height - 10))
         box_height = rows + 5
         x, top = (width - box_width) // 2, max(0, (height - box_height) // 2)
         for y in range(top, min(height, top + box_height)):
             band(screen, y, x, "", box_width, self.style("surface"))
-        target = picker["target"] or "."
-        band(screen, top, x, f"  OPEN WITH  {target}", box_width, self.style("header") | curses.A_BOLD)
-        band(screen, top + 1, x + 2, f"› {picker['query']}▏", box_width - 4, self.style("selected"))
+        band(screen, top, x, f"  {title}", box_width, self.style("header") | curses.A_BOLD)
+        cursor = len(query) if cursor is None else cursor
+        band(screen, top + 1, x + 2, f"› {query[:cursor]}▏{query[cursor:]}", box_width - 4, self.style("selected"))
         selected = picker["selected"]
         if selected < picker["scroll"]:
             picker["scroll"] = selected
         elif selected >= picker["scroll"] + rows:
             picker["scroll"] = selected - rows + 1
-        shown = choices[picker["scroll"]:picker["scroll"] + rows]
-        for offset, app in enumerate(shown):
+        for offset, (label, note) in enumerate(choices[picker["scroll"]:picker["scroll"] + rows]):
             index = picker["scroll"] + offset
-            recent = "  recent" if app in self.recent_apps else ""
             style = self.style("selected") | curses.A_BOLD if index == selected else self.style("surface")
-            band(screen, top + 2 + offset, x + 2, f" {app}", box_width - 4, style)
-            if recent:
-                put(screen, top + 2 + offset, x + box_width - 10, recent.strip(), 8, self.style("muted"))
+            band(screen, top + 2 + offset, x + 2, f" {label}", box_width - 4, style)
+            if note:
+                room = max(0, min(cells(note), box_width - cells(label) - 10))
+                if room:
+                    put(screen, top + 2 + offset, x + box_width - 3 - room, note, room, self.style("muted"))
         if not choices:
-            message = f"Enter opens with \"{picker['query']}\"" if picker["query"] else "No applications found"
-            put(screen, top + 2, x + 3, message, box_width - 6, self.style("muted"))
+            put(screen, top + 2, x + 3, empty, box_width - 6, self.style("muted"))
         count = f"{selected + 1 if choices else 0}/{len(choices)}"
-        put(screen, top + box_height - 2, x + 2, f"↑↓ Choose  Enter Open  ⌃U Clear  Esc Cancel   {count}",
-            box_width - 4, self.style("active"))
+        put(screen, top + box_height - 2, x + 2, f"{hints}   {count}", box_width - 4, self.style("active"))
 
     def run_terminal(self, screen, command, cwd, pause=False):
         self.release_image()
@@ -1164,33 +1220,36 @@ class Navigator:
         icon = icons["changes" if self.changes else "project"]
         title = "CHANGED FILES" if self.changes else "PROJECT FILES"
         flag = icons["shown" if self.include_ignored else "hidden"]  # Ctrl+H toggles.
-        self.panel(screen, x, width, bottom, focused, f"{icon} {title}" if icon else title, flag)
         git = (icons["loading"] if self.index and self.index.status_pending
-               else icons["error"] if self.index and self.index.status_error else "Space preview")
+               else icons["error"] if self.index and self.index.status_error else "")
+        self.panel(screen, x, width, bottom, focused, f"{icon} {title}" if icon else title,
+                   f"{git}  {flag}" if git else flag)
         if self.searching or self.query:
+            # The filter sits at the foot of the tree, like a minibuffer under its window.
             count = f"{len(self.items)} match{'' if len(self.items) == 1 else 'es'}" if self.query.strip() else ""
             self.query_line(screen, x + 1, width - 2, self.query, " Type part of a name or path",
-                            self.searching, count)
-        else:
-            put(screen, BOX_TOP + 1, x + 2, f"{len(self.items)} rows · {git}", width - 4, self.style("muted"))
+                            self.searching, count, y=bottom - 1)
         if not self.items:
             empty = "Loading Git status…" if self.index and self.index.status_pending else "Git status unavailable" if self.index and self.index.status_error else "No matching files"
             put(screen, self.content_top, x + 2, empty, width - 4, self.style("muted"))
+        pad = self.tree_padding
         for offset, row in enumerate(self.items[self.scroll:self.scroll + self.tree_body]):
             selected = self.selected == self.scroll + offset
             style = self.style("folder" if row.directory else "base")
             if selected:
                 style = self.style("inactive" if self.preview_focus else "selected")
-            marker = ("▾  " if row.path in self.expanded else "▸  ") if row.directory else "    "
-            if row.path == "..":
-                marker = "↑  "
+            opened = row.path in self.expanded and row.path not in (".", "..")
+            # The open or closed folder says enough; files line up after the glyph's width.
+            marker = ("\uf07c " if opened else "\uf07b ") if row.directory else "  "
             label = row.path if self.query else row.path.rsplit("/", 1)[-1]
-            status = self.index.status.get(row.path, "  ")
-            text = f"{'›' if selected else ' '} {status} {'  ' * row.depth}{marker}{label}"
-            band(screen, self.content_top + offset, x + 1, text, width - 2, style)
-            if self.query.strip() and row.path != "..":
+            # Inside Git the status column is always there, so rows do not shift when status arrives.
+            status = self.index.status.get(row.path, "  ") + " " if self.index.repository else ""
+            text = f"{' ' * pad}{status}{'  ' * row.depth}{marker}{label}"
+            band(screen, self.content_top + offset, x + 1, "", width - 2, style)
+            put(screen, self.content_top + offset, x + 1, text, width - 2 - pad, style)
+            if self.query.strip() and row.path not in (".", ".."):
                 self.draw_match(screen, self.content_top + offset, x + 1 + cells(text) - cells(label),
-                                x + width - 1, label, selected)
+                                x + width - 1 - pad, label, selected)
 
     def draw_match(self, screen, y, left, right, label, selected):
         """Redraw a filter result: its folder dimmed, the matched characters in the accent colour."""
@@ -1211,9 +1270,9 @@ class Navigator:
             put(screen, y, column, char, size, style)
             column += size
 
-    def query_line(self, screen, left, width, text, placeholder, editing, note):
-        """A box's summary row as a query: ⌕, the text with a cursor while editing, a note on the right."""
-        y, right = BOX_TOP + 1, left + width
+    def query_line(self, screen, left, width, text, placeholder, editing, note, y):
+        """A query row in a box: ⌕, the text with a cursor while editing, a note on the right."""
+        right = left + width
         band(screen, y, left, "", width, self.style("surface"))
         put(screen, y, left + 1, "\u2315", 1, self.style("active") | curses.A_BOLD)
         x = left + 3
@@ -1229,32 +1288,23 @@ class Navigator:
             put(screen, y, right - cells(note) - 1, note, cells(note), self.style("muted"))
 
     def draw_content(self, screen, x, width, bottom):
-        self.panel(screen, x, width, bottom, self.preview_focus, self.active or "No file selected")
-        label = "MARKDOWN" if self.rendered is not None else "FILE PREVIEW · ^D vimdiff"
-        if self.syntax is not None:
-            label = self.language
+        note = ""
         if self.diagram_file():
-            title = diagram_preview.LANGUAGES[self.diagram_list[0][0]].title.upper()
-            label = (f"{title} · {round(self.zoom_of(self.diagram_list[0]) * 100)}% · v Source" if not self.diagram_source
-                     else f"{label} · v Diagram")
+            note = "source" if self.diagram_source else f"{round(self.zoom_of(self.diagram_list[0]) * 100)}%"
         elif self.markdown and self.diagram_list and self.rendered is not None:
             current = self.current_diagram()
             keys = [key for _, key, _ in self.markdown_diagrams]
-            if self.diagram_source or current not in keys:
-                label += " · v Diagrams" if self.diagram_source else " · v Diagram source"
-            else:
-                label += (f" · Diagram {keys.index(current) + 1}/{len(keys)} "
-                          f"{round(self.zoom_of(current) * 100)}% · v Diagram source")
+            if self.diagram_source:
+                note = "diagram source"
+            elif current in keys:
+                note = f"diagram {keys.index(current) + 1}/{len(keys)} · {round(self.zoom_of(current) * 100)}%"
+        self.panel(screen, x, width, bottom, self.preview_focus, self.active or "No file selected", note)
         if self.finding or (self.find_query and self.active):
             total = len(self.matches()) if self.find_query else 0
-            note = (f"{self.find_index + 1}/{total}" if total and self.find_index >= 0
-                    else f"{total} found" if self.find_query else "")
-            if not self.finding and self.find_query:
-                note += "  ·  n N Next/Prev"
+            found = (f"{self.find_index + 1}/{total}" if total and self.find_index >= 0
+                     else f"{total} found" if self.find_query else "")
             self.query_line(screen, x + 1, width - 2, self.find_query, " Type text to find in the preview",
-                            self.finding, note)
-        else:
-            put(screen, BOX_TOP + 1, x + 2, label if self.active else "OPEN A FILE TO BEGIN", width - 4, self.style("muted"))
+                            self.finding, found, y=bottom - 1)
         if self.diagram_view():
             self.draw_diagram(screen, x, width)
             return
@@ -1289,6 +1339,7 @@ class Navigator:
         screen.erase()
         self.placements = []
         height, width = screen.getmaxyx()
+        self.screen_width = width
         if height < 15 or width < 36:
             put(screen, 0, 0, "^W Layout (36 × 15 minimum)", width, curses.A_BOLD)
             if self.layout_dialog:
@@ -1301,10 +1352,14 @@ class Navigator:
                 self.draw_app_picker(screen)
             screen.refresh()
             return
-        bottom = height - 4
-        self.content_top = BOX_TOP + 2
+        bottom = height - 3
+        self.content_top = BOX_TOP + 1
         self.body = self.tree_body = bottom - self.content_top
-        self.divider = max(26, min(width // 4, 38))
+        if self.searching or self.query:
+            self.tree_body -= 1  # The filter row at the foot of the tree.
+        if self.finding or (self.find_query and self.active):
+            self.body -= 1  # The find row at the foot of the preview.
+        self.divider = self.divider_for(width)
         self.narrow = width < 90
         content_width = width - 1 if self.narrow else width - self.divider - 2
         self.prepare_preview(content_width - 4)
@@ -1323,11 +1378,8 @@ class Navigator:
         focus = ("ROOT" if self.root_draft is not None else "COMMAND" if self.command is not None
                  else "SEARCH" if self.searching else "FIND" if self.finding
                  else "CONTENT" if self.preview_focus else "FILES")
-        band(screen, 0, 0, "  LENS", width - 1, self.style("surface") | curses.A_BOLD)
-        badge = f" FOCUS: {focus} "
-        band(screen, 0, max(19, width - len(badge) - 2), badge, len(badge), self.style("header") | curses.A_BOLD)
-        put(screen, 1, 2, "[..]", 4, self.style("active"))
-        put(screen, 1, 8, str(self.root), width - 10, self.style("muted"))
+        put(screen, ROOT_ROW, 2, "[..]", 4, self.style("active"))
+        put(screen, ROOT_ROW, 8, str(self.root), width - 10, self.style("muted"))
         if self.narrow:
             if self.preview_focus:
                 self.draw_content(screen, 0, width - 1, bottom)
@@ -1337,8 +1389,8 @@ class Navigator:
             self.draw_tree(screen, 0, self.divider, bottom)
             self.draw_content(screen, self.divider + 1, width - self.divider - 2, bottom)
         position = f"{self.preview_scroll + 1}/{self.preview_length()}" if self.preview_focus else f"{self.selected + 1 if self.items else 0}/{len(self.items)}"
-        band(screen, height - 3, 0, f" {focus}  {position}  ·  {self.message}", width - 1, self.style("surface"))
-        self.draw_hints(screen, height, width)
+        self.draw_mode_line(screen, height - 2, width, focus)
+        self.draw_echo(screen, height - 1, width)
         if self.size_draft:
             self.draw_size(screen)
         if self.layout_dialog:
@@ -1347,10 +1399,59 @@ class Navigator:
             self.draw_root(screen)
         if self.app_picker is not None:
             self.draw_app_picker(screen)
+        if self.key_help:
+            self.draw_key_help(screen)
+        if self.command_menu is not None and self.command is not None:
+            self.draw_command_menu(screen)
         screen.refresh()
 
+    def command_choices(self):
+        """Completion works on the text before the cursor; the text after it is kept."""
+        return command_line.candidates(self.command[:self.command_cursor], self.root,
+                                       self.index.files if self.index else [])
+
+    def set_command(self, text, tail=""):
+        self.command, self.command_cursor = text + tail, len(text)
+
+    def draw_command_menu(self, screen):
+        head, options = self.command_choices()
+        self.command_menu["selected"] = min(self.command_menu["selected"], max(0, len(options) - 1))
+        notes = {}
+        if not head:
+            notes = {name: command_line.lookup(name).help for name in options}
+        self.draw_picker(screen, self.command_menu, "COMPLETE", f":{self.command}",
+                         [(name, notes.get(name, "")) for name in options], "No completions",
+                         "↑↓ Choose  Enter Insert  Esc Close", cursor=self.command_cursor + 1)
+
+    def command_menu_key(self, key):
+        """Keys while the completion list is open. Returns False for keys the command line handles."""
+        menu = self.command_menu
+        head, options = self.command_choices()
+        steps = {curses.KEY_UP: -1, "\x10": -1, curses.KEY_BTAB: -1, curses.KEY_DOWN: 1, "\x0e": 1, "\t": 1,
+                 curses.KEY_PPAGE: -10, curses.KEY_NPAGE: 10}
+        if key in ("\x1b", "\x07"):
+            self.command_menu = None
+        elif key in ("\n", "\r", curses.KEY_ENTER):
+            if options:
+                option = options[min(menu["selected"], len(options) - 1)]
+                self.set_command(command_line.accept(head, option), self.command[self.command_cursor:])
+                # A folder leads on to its contents; anything else is finished.
+                self.command_menu = {"selected": 0, "scroll": 0} if option.endswith("/") else None
+            else:
+                self.command_menu = None
+        elif key in steps:
+            if options:
+                menu["selected"] = (menu["selected"] + steps[key]) % len(options) if key in ("\t", curses.KEY_BTAB) \
+                    else max(0, min(len(options) - 1, menu["selected"] + steps[key]))
+        else:
+            menu["selected"] = menu["scroll"] = 0  # Typing narrows the list from the top.
+            return False
+        return True
+
     def command_key(self, key, screen):
-        if key == "\x1b":
+        if self.command_menu is not None and self.command_menu_key(key):
+            return True
+        if key in ("\x1b", "\x07"):
             self.command = None
         elif key in ("\n", "\r", curses.KEY_ENTER):
             text, self.command = self.command.strip(), None
@@ -1361,20 +1462,24 @@ class Navigator:
                 del self.command_history[:-50]
                 return self.run_command(text, screen)
         elif key == "\t":
-            self.command, options = command_line.complete(self.command, self.root, self.index.files if self.index else [])
-            self.message = "  ".join(options) if len(options) > 1 else "" if options else "No completions"
+            tail = self.command[self.command_cursor:]
+            text, options = command_line.complete(self.command[:self.command_cursor], self.root,
+                                                  self.index.files if self.index else [])
+            self.set_command(text, tail)
+            self.message = "" if options else "No completions"
+            if len(options) > 1:
+                self.command_menu = {"selected": 0, "scroll": 0}
         elif key in (curses.KEY_UP, curses.KEY_DOWN, "\x10", "\x0e"):
             step = -1 if key in (curses.KEY_UP, "\x10") else 1
             self.command_recall = max(0, min(len(self.command_history), self.command_recall + step))
-            self.command = (self.command_history[self.command_recall]
-                            if self.command_recall < len(self.command_history) else "")
-        elif key == "\x15":
-            self.command = ""
-        elif key in ("\b", "\x7f", curses.KEY_BACKSPACE):
-            # Backspace on an empty line closes it, as in Vim.
-            self.command = self.command[:-1] if self.command else None
-        elif isinstance(key, str) and key.isprintable():
-            self.command += key
+            self.set_command(self.command_history[self.command_recall]
+                             if self.command_recall < len(self.command_history) else "")
+        elif key in ("\b", "\x7f", curses.KEY_BACKSPACE) and not self.command:
+            self.command = None  # Backspace on an empty line closes it, as in Vim.
+        else:
+            edited = command_line.edit(self.command, self.command_cursor, key, self.command_killed)
+            if edited:
+                self.command, self.command_cursor, self.command_killed = edited
         return True
 
     def run_command(self, text, screen):
@@ -1543,44 +1648,97 @@ class Navigator:
         self.zooms[target] = zoom
         self.message = f"{diagram_preview.LANGUAGES[target[0]].title} zoom {round(zoom * 100)}%"
 
-    def hint_row(self, screen, y, width, hints, mode=""):
-        """Keys as highlighted chips followed by dimmed labels, clipped at the width."""
-        x = 1
-        if mode:
-            put(screen, y, x, f" {mode} ", width - x, self.style("header") | curses.A_BOLD)
-            x += cells(mode) + 3
-        for key, label in hints:
-            needed = cells(key) + 2 + 1 + cells(label)
-            if x + needed > width - 1:
-                break
-            put(screen, y, x, f" {key} ", needed, self.style("key"))
-            put(screen, y, x + cells(key) + 3, label, cells(label), self.style("muted"))
-            x += needed + 2
-
-    def draw_hints(self, screen, height, width):
-        if self.command is not None:
-            # The command line takes the last row, as in Vim and Emacs.
-            self.hint_row(screen, height - 2, width, [("Tab", "Complete"), ("↑ ↓", "History"), ("Enter", "Run"),
-                                                     ("Esc", "Cancel"), (":help", "Commands")], "COMMAND")
-            band(screen, height - 1, 0, f":{self.command}▏", width - 1, self.style("base") | curses.A_BOLD)
-            return
-        self.hint_row(screen, height - 2, width, [
-            ("Tab", "Focus"), ("Enter", "Scroll" if self.preview_focus else "Open"), (":", "Command"),
-            ("⌃E", "Edit"), ("⌃D", "Diff"), ("o O", "Open/With"), ("⌃W", "Layout"), ("⌃Y", "Size"), ("Esc", "Back")])
-        if self.finding:
-            hints, mode = [("⌃U", "Clear"), ("Enter", "Keep"), ("Esc", "Cancel"), ("abc", "Ignores case")], "FIND"
-        elif self.searching:
-            hints, mode = [("↑ ↓", "Pick"), ("⌃U", "Clear"), ("Enter", "Apply"), ("Esc", "Cancel")], "SEARCH"
-        elif self.preview_focus:
-            hints, mode = [("j k", "Line"), ("Space b", "Page"), ("d u", "Half"), ("g G", "Top/End"),
-                           ("/", "Find"), ("n N", "Next/Prev"), ("⌃O", "Root")], ""
-            if self.diagram_list:
-                hints = ([("+ -", "Zoom"), ("0", "Fit"), ("a", "Align")]
-                         + ([("[ ]", "Diagram")] if self.markdown else []) + [("v", "Source")] + hints)
+    def draw_mode_line(self, screen, y, width, focus):
+        """The bar between the panels and the command line, as Emacs draws one above the minibuffer."""
+        if self.preview_focus:
+            top, shown, total = self.preview_scroll, self.body, self.preview_length()
+            position = f"L{top + 1}/{total}"
         else:
-            hints, mode = [("j k", "Move"), ("h l", "Fold"), ("Space", "Preview"), ("/", "Search"),
-                           ("⌃N ⌃P", "Line"), ("⌃F ⌃B", "Page"), ("⌃O", "Root"), ("⌫", "Up")], ""
-        self.hint_row(screen, height - 1, width, hints, mode)
+            top, shown, total = self.scroll, self.tree_body, len(self.items)
+            position = f"{self.selected + 1 if self.items else 0}/{total}"
+        # Emacs's share of the view: All when it fits, Top and Bot at the ends, else a percentage.
+        where = ("All" if total <= shown else "Top" if top == 0 else "Bot" if top + shown >= total
+                 else f"{round(top * 100 / (total - shown))}%")
+        name = self.active or self.root.name or str(self.root)
+        size = human_size(self.active_size) if self.active and self.active_size is not None else ""
+        style, dim = self.style("modeline"), self.style("modeline_dim")
+        band(screen, y, 0, "", width - 1, style)
+        x = 0
+        for text, look in ((f" {focus} ", self.style("header") | curses.A_BOLD), (size, dim),
+                           (name, style | curses.A_BOLD), (f"{position}  {where}", dim)):
+            if not text or x >= width - 2:
+                continue
+            put(screen, y, x, text, width - 2 - x, look)
+            x += cells(text) + 2
+
+    def echo_keys(self):
+        """The few keys worth showing for the current state; ? lists the rest."""
+        if self.command is not None:
+            return [("Tab", "complete"), ("↑↓", "history"), ("Esc", "cancel")]
+        if self.finding:
+            return [("Enter", "keep"), ("⌃U", "clear"), ("Esc", "cancel")]
+        if self.searching:
+            return [("↑↓", "pick"), ("Enter", "apply"), ("Esc", "cancel")]
+        if self.preview_focus:
+            if self.find_query:
+                return [("n N", "next/prev"), ("/", "find"), (":", "command"), ("?", "keys")]
+            return [("/", "find"), ("Tab", "files"), (":", "command"), ("?", "keys")]
+        return [("Space", "preview"), ("/", "filter"), (":", "command"), ("?", "keys")]
+
+    def draw_echo(self, screen, y, width):
+        """The last row, as Emacs's echo area: the command line or the latest message on the left,
+        the keys for the current state dimmed on the right."""
+        band(screen, y, 0, "", width - 1, self.style("base"))
+        if self.command is not None:
+            style = self.style("base") | curses.A_BOLD
+            put(screen, y, 0, f":{self.command}", width - 1, style)
+            column = 1 + cells(self.command[:self.command_cursor])
+            char = self.command[self.command_cursor:self.command_cursor + 1] or " "
+            if column + cells(char) < width:
+                put(screen, y, column, char, cells(char), style | curses.A_REVERSE)
+            used = column + 1
+        else:
+            put(screen, y, 1, self.message, width - 2, self.style("base"))
+            used = 1 + cells(self.message)
+        keys = self.echo_keys()
+        # Drop keys from the left until the rest fit beside the text.
+        while keys and used + 4 + sum(cells(key) + cells(label) + 3 for key, label in keys) > width - 1:
+            keys = keys[1:]
+        x = width - 1 - sum(cells(key) + cells(label) + 3 for key, label in keys)
+        for key, label in keys:
+            put(screen, y, x, key, cells(key), self.style("active") | curses.A_BOLD)
+            put(screen, y, x + cells(key) + 1, label, cells(label), self.style("muted"))
+            x += cells(key) + cells(label) + 3
+
+    def draw_key_help(self, screen):
+        """Every key in a centred box, grouped as KEY_GROUPS lists them, in as many columns as fit."""
+        height, width = screen.getmaxyx()
+        key_width = max(cells(key) for _, keys in KEY_GROUPS for key, _ in keys)
+        column_width = key_width + 2 + max(cells(label) for _, keys in KEY_GROUPS for _, label in keys)
+        columns = max(1, min(3, (width - 6) // (column_width + 3)))
+        # Fill columns top to bottom with whole groups, balancing their heights.
+        stacks, lengths = [[] for _ in range(columns)], [0] * columns
+        for group in KEY_GROUPS:
+            shortest = lengths.index(min(lengths))
+            stacks[shortest].append(group)
+            lengths[shortest] += len(group[1]) + 2
+        box_width = min(width - 2, columns * (column_width + 3) + 3)
+        box_height = min(height, max(lengths) + 3)
+        x, top = (width - box_width) // 2, max(0, (height - box_height) // 2)
+        for row in range(top, top + box_height):
+            band(screen, row, x, "", box_width, self.style("surface"))
+        band(screen, top, x, "  KEYS", box_width, self.style("header") | curses.A_BOLD)
+        put(screen, top, x + box_width - 16, "any key closes", 14, self.style("header"))
+        for number, stack in enumerate(stacks):
+            left, row = x + 3 + number * (column_width + 3), top + 2
+            for title, keys in stack:
+                put(screen, row, left, title.upper(), column_width, self.style("inactive") | curses.A_BOLD)
+                row += 1
+                for key, label in keys:
+                    put(screen, row, left, key, key_width, self.style("surface") | curses.A_BOLD)
+                    put(screen, row, left + key_width + 2, label, column_width - key_width - 2, self.style("inactive"))
+                    row += 1
+                row += 1
 
     def matches(self):
         if self.find_content is not self.content or self.find_for != self.find_query:
@@ -1755,11 +1913,41 @@ class Navigator:
         elif pressed:
             self.handle_mouse(terminal_input.Mouse(x, y, "click"), screen)
 
+    def divider_for(self, width):
+        # The preview keeps at least 40 columns however far the divider is dragged.
+        if self.tree_width is None:
+            return max(26, min(width // 4, 38))
+        return max(16, min(self.tree_width, width - 40))
+
+    def drag_divider(self, event):
+        """Mouse drags on the border between the boxes resize the tree. Returns True if handled."""
+        if event.action == "click" and not self.narrow and abs(event.x - self.divider) <= 1 \
+                and BOX_TOP <= event.y <= self.content_top + self.body:
+            self.dragging = True
+        elif event.action == "drag" and self.dragging:
+            self.tree_width = self.divider = self.divider_for_pointer(event.x)
+        elif event.action == "release" and self.dragging:
+            self.dragging = False
+            if self.on_tree_width is not None:
+                try:
+                    self.on_tree_width(self.tree_width)
+                except OSError as error:
+                    self.message = f"Could not save the tree width: {error}"
+        else:
+            return event.action in ("drag", "release")  # Stray motion does nothing else.
+        return True
+
+    def divider_for_pointer(self, x):
+        self.tree_width = x + 1  # The tree's right border follows the pointer.
+        return self.divider_for(self.screen_width)
+
     def handle_mouse(self, event, screen=None):
         if self.root_draft is not None or self.size_draft or self.layout_dialog or self.app_picker is not None:
             return
+        if self.drag_divider(event):
+            return
         x, y = event.x, event.y
-        if y == 1 and event.action == "click" and not self.searching:
+        if y == ROOT_ROW and event.action == "click" and not self.searching:
             if 2 <= x < 6:
                 self.parent_root()
             elif x >= 8:
@@ -1783,15 +1971,18 @@ class Navigator:
                 index = self.scroll + y - self.content_top
                 if index < len(self.items):
                     self.selected = index
-                    self.activate(screen)
+                    self.activate(screen, fold=True)
 
     def key(self, key, screen) -> bool:
         if isinstance(key, terminal_input.Appearance):
             self.appearance = key.mode
             self.update_theme()
             return True
+        if isinstance(key, terminal_input.Mouse) and key.action in ("drag", "release"):
+            self.drag_divider(key)  # Motion never cancels a search or a dialog.
+            return True
         typing = (self.layout_dialog or self.size_draft or self.root_draft is not None
-                  or self.app_picker is not None
+                  or self.app_picker is not None or self.key_help
                   or self.finding or self.searching or self.command is not None)
         if key in self.bindings and not typing:
             target = self.bindings[key]
@@ -1808,6 +1999,9 @@ class Navigator:
                 self.close_typed = typed  # Wait for the rest of the binding.
                 return True
             self.close_typed = ()
+        if self.key_help:
+            self.key_help = False  # Any key closes the list; it does nothing else.
+            return True
         if self.layout_dialog:
             return self.layout_key(key)
         if self.app_picker is not None:
@@ -1820,8 +2014,12 @@ class Navigator:
             return self.find_key(key, screen)
         if self.command is not None:
             return self.command_key(key, screen)
+        if key == "?" and not self.searching:
+            self.key_help = True
+            return True
         if (key == ":" or key == "\x1bx") and not self.searching:
-            self.command, self.command_recall = "", len(self.command_history)
+            self.command, self.command_recall, self.command_menu = "", len(self.command_history), None
+            self.command_cursor = 0
             return True
         if key == "/" and self.preview_focus and not self.searching and self.active:
             self.begin_find()
@@ -1874,7 +2072,12 @@ class Navigator:
         elif self.preview_key(key):
             pass
         elif key == " " and not self.preview_focus:
-            self.preview_selected(focus=False)
+            row = self.items[self.selected] if self.items else None
+            if row and row.directory:
+                if row.path not in (".", ".."):  # These two never fold.
+                    self.toggle_fold(row)
+            else:
+                self.preview_selected(focus=False)
         elif key == "\x17":
             self.begin_layout()
         elif key == "\x19":
@@ -1927,6 +2130,8 @@ class Navigator:
                 row = self.items[self.selected]
                 if row.path == "..":
                     self.parent_root()
+                elif row.path == ".":
+                    pass
                 elif key == curses.KEY_RIGHT and row.directory:
                     if row.path in self.expanded:
                         if self.selected + 1 < len(self.items) and self.items[self.selected + 1].path.startswith(row.path + "/"):

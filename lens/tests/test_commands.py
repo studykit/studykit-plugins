@@ -3,6 +3,7 @@ import curses
 import sys
 import tempfile
 import unittest
+from unittest.mock import Mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import command_line
@@ -91,9 +92,110 @@ class CommandLineTests(unittest.TestCase):
         self.assertEqual(self.nav.command, "open src/deep/module.py")
         self.nav.key("\x15", None)
         self.nav.key("c", None)
-        self.nav.key("\t", None)  # cd, changes: shown as candidates.
+        self.nav.key("\t", None)  # cd, changes, config: listed in the completion menu.
         self.assertEqual(self.nav.command, "c")
-        self.assertIn("changes", self.nav.message)
+        self.assertIsNotNone(self.nav.command_menu)
+
+    def test_completion_menu_picks_narrows_and_inserts(self):
+        self.nav.key(":", None)
+        self.nav.key("c", None)
+        self.nav.key("\t", None)
+        self.assertEqual(self.nav.command_choices()[1], ["cd", "changes", "config"])
+        self.nav.key(curses.KEY_DOWN, None)
+        self.nav.key("\t", None)  # Tab also moves on.
+        self.assertEqual(self.nav.command_menu["selected"], 2)
+        self.nav.key("h", None)  # Typing narrows the list and goes back to its top.
+        self.assertEqual(self.nav.command_choices()[1], ["changes"])
+        self.nav.key("\n", None)  # Enter inserts the choice without running it.
+        self.assertEqual(self.nav.command, "changes ")
+        self.assertIsNone(self.nav.command_menu)
+        self.nav.key("\x15", None)
+        for char in "open s":
+            self.nav.key(char, None)
+        self.nav.key("\t", None)
+        self.assertEqual(self.nav.command, "open src/")
+        self.nav.key("\t", None)
+        self.assertIsNotNone(self.nav.command_menu)
+        self.nav.key("\x1b", None)  # Esc closes the list, not the command line.
+        self.assertIsNone(self.nav.command_menu)
+        self.assertEqual(self.nav.command, "open src/")
+
+    def test_emacs_keys_edit_the_command_line(self):
+        self.nav.key(":", None)
+        for char in "open src/main.py":
+            self.nav.key(char, None)
+        self.nav.key("\x01", None)  # C-a
+        self.assertEqual(self.nav.command_cursor, 0)
+        self.nav.key("\x1bf", None)  # M-f
+        self.assertEqual(self.nav.command_cursor, 4)
+        self.nav.key("\x0b", None)  # C-k
+        self.assertEqual(self.nav.command, "open")
+        self.nav.key("\x19", None)  # C-y
+        self.assertEqual(self.nav.command, "open src/main.py")
+        self.nav.key("\x05", None)  # C-e
+        self.nav.key("\x1b\x7f", None)  # M-DEL
+        self.assertEqual(self.nav.command, "open src/main.")
+        self.nav.key("\x17", None)  # C-w kills the whole path.
+        self.assertEqual(self.nav.command, "open ")
+        self.nav.key("\x02", None)  # C-b, then typing inserts at point.
+        self.nav.key("x", None)
+        self.assertEqual((self.nav.command, self.nav.command_cursor), ("openx ", 5))
+        self.nav.key("\x1bb", None)  # M-b
+        self.nav.key("\x04", None)  # C-d
+        self.assertEqual(self.nav.command, "penx ")
+        self.nav.key("\x05", None)
+        self.nav.key("\x02", None)
+        self.nav.key("\x15", None)  # C-u kills to the start only.
+        self.assertEqual((self.nav.command, self.nav.command_cursor), (" ", 0))
+        self.nav.key("\x07", None)  # C-g cancels.
+        self.assertIsNone(self.nav.command)
+
+    def test_completion_keeps_text_after_the_cursor(self):
+        self.nav.key(":", None)
+        for char in "op src/main.py":
+            self.nav.key(char, None)
+        for _ in "src/main.py":
+            self.nav.key("\x02", None)
+        self.nav.key("\x02", None)
+        self.nav.key("\t", None)
+        self.assertEqual(self.nav.command, "open  src/main.py")
+        self.assertEqual(self.nav.command_cursor, 5)
+
+    def test_mode_line_sits_above_the_command_line(self):
+        screen = Mock()
+        screen.getmaxyx.return_value = (30, 120)
+        self.nav.load("notes.txt")
+        self.nav.key(":", None)
+        self.nav.draw(screen)
+        rows = {}
+        for call in screen.addstr.call_args_list:
+            rows.setdefault(call.args[0], []).append(call.args[2])
+        self.assertIn(" COMMAND ", rows[28])
+        self.assertIn("notes.txt", rows[28])
+        self.assertIn("6", rows[28])  # The file size.
+        self.assertTrue(any(text.startswith(":") for text in rows[29]))
+
+    def test_question_mark_lists_keys_until_any_key(self):
+        screen = Mock()
+        screen.getmaxyx.return_value = (40, 120)
+        self.nav.key("?", None)
+        self.nav.draw(screen)
+        texts = [call.args[2] for call in screen.addstr.call_args_list]
+        self.assertIn("COMMAND LINE", texts)
+        self.nav.key("j", None)  # Closes the list without moving.
+        self.assertFalse(self.nav.key_help)
+        self.assertEqual(self.nav.selected, 0)
+
+    def test_completion_menu_draws_like_the_application_picker(self):
+        screen = Mock()
+        screen.getmaxyx.return_value = (30, 120)
+        self.nav.key(":", None)
+        self.nav.key("c", None)
+        self.nav.key("\t", None)
+        self.nav.draw(screen)
+        texts = [call.args[2] for call in screen.addstr.call_args_list]
+        self.assertTrue(any("COMPLETE" in text for text in texts))
+        self.assertTrue(any("Change the navigation root" in text for text in texts))
 
     def test_history_and_backspace_on_empty_line(self):
         self.run_line("help")

@@ -21,8 +21,11 @@ class Appearance:
 
 
 def mouse_event(button: int, x: int, y: int, released=False):
-    if released or button & 32:
-        return None
+    # Only the left button drags; its motion and release end a divider drag.
+    if released or (button & 3 == 3 and not button & 64):
+        return Mouse(x, y, "release") if not button & 64 else None
+    if button & 32:
+        return Mouse(x, y, "drag") if button & 3 == 0 else None
     if button & 64 and button & 3 in (0, 1):
         return Mouse(x, y, "up" if button & 3 == 0 else "down")
     if button & 3 == 0:
@@ -46,7 +49,7 @@ def decode(sequence: str):
                 "Z": curses.KEY_BTAB}[key[1]]
     numbered = re.fullmatch(r"\x1b\[(\d+)(?:;\d+)?~", sequence)
     if numbered:
-        return {1: curses.KEY_HOME, 4: curses.KEY_END, 5: curses.KEY_PPAGE,
+        return {1: curses.KEY_HOME, 3: curses.KEY_DC, 4: curses.KEY_END, 5: curses.KEY_PPAGE,
                 6: curses.KEY_NPAGE, 7: curses.KEY_HOME, 8: curses.KEY_END}.get(int(numbered[1]))
     return None
 
@@ -84,7 +87,7 @@ def enable(screen):
     # keypad(False) prevents older ncurses from swallowing button-five reports.
     screen.keypad(False)
     curses.mousemask(0)
-    sys.stdout.write("\x1b[?1000h\x1b[?1006h\x1b[?996n")
+    sys.stdout.write("\x1b[?1000h\x1b[?1002h\x1b[?1006h\x1b[?996n")
     sys.stdout.flush()
 
 
@@ -101,5 +104,5 @@ def sync_size(screen):
 
 
 def disable():
-    sys.stdout.write("\x1b[?1000l\x1b[?1006l")
+    sys.stdout.write("\x1b[?1000l\x1b[?1002l\x1b[?1006l")
     sys.stdout.flush()

@@ -1,6 +1,7 @@
 """Command table and completion for the `:` / Alt+X command line."""
 
 from dataclasses import dataclass
+import curses
 import os
 import sys
 from pathlib import Path
@@ -99,15 +100,12 @@ def applications(platform=sys.platform):
     return sorted(names)
 
 
-def complete(text, root, files):
-    """Complete the command line. Returns (new text, candidates shown when ambiguous)."""
+def candidates(text, root, files):
+    """The fixed part of the command line and the candidates for the word after it."""
     word, space, rest = text.lstrip().partition(" ")
     if not space:
-        names = sorted({name for command in COMMANDS for name in (command.name, *command.aliases)
-                        if name.startswith(word)})
-        if len(names) == 1:
-            return names[0] + " ", names
-        return (common(names) or word), names
+        return "", sorted({name for command in COMMANDS for name in (command.name, *command.aliases)
+                           if name.startswith(word)})
     command = lookup(word)
     if command is None:
         return text, []
@@ -124,10 +122,22 @@ def complete(text, root, files):
         options = [name for name in applications() if name.lower().startswith(rest.lower())]
     else:
         options = [choice for choice in command.choices if choice.startswith(rest)]
+    return f"{word} ", options
+
+
+def accept(head, option):
+    """The command line with option chosen; a command name is followed by its argument's space."""
+    return head + option + ("" if head else " ")
+
+
+def complete(text, root, files):
+    """Complete the command line. Returns (new text, candidates shown when ambiguous)."""
+    head, options = candidates(text, root, files)
     if not options:
         return text, []
-    completed = options[0] if len(options) == 1 else common(options) or rest
-    return f"{word} {completed}", options
+    if len(options) == 1:
+        return accept(head, options[0]), options
+    return head + (common(options) or text[len(head):].lstrip()), options
 
 
 def describe(word=""):
@@ -138,3 +148,60 @@ def describe(word=""):
         aliases = f" (also {', '.join(command.aliases)})" if command.aliases else ""
         return f":{command.usage} — {command.help}{aliases}"
     return "Commands: " + "  ".join(command.name for command in COMMANDS) + "  ·  :help NAME for details"
+
+
+def word_start(text, cursor):
+    """Where the word before cursor begins, skipping the gap in front of it, as Emacs M-b does."""
+    while cursor and not text[cursor - 1].isalnum():
+        cursor -= 1
+    while cursor and text[cursor - 1].isalnum():
+        cursor -= 1
+    return cursor
+
+
+def word_end(text, cursor):
+    """Where the word after cursor ends, as Emacs M-f does."""
+    while cursor < len(text) and not text[cursor].isalnum():
+        cursor += 1
+    while cursor < len(text) and text[cursor].isalnum():
+        cursor += 1
+    return cursor
+
+
+def field_start(text, cursor):
+    """Where the space-separated field before cursor begins: C-w kills a whole path at once."""
+    while cursor and text[cursor - 1] == " ":
+        cursor -= 1
+    while cursor and text[cursor - 1] != " ":
+        cursor -= 1
+    return cursor
+
+
+def edit(text, cursor, key, killed):
+    """Apply one Emacs-style editing key to the line. Returns (text, cursor, killed), or None if the key
+    is not an editing key. killed holds the last killed text, for C-y."""
+    moves = {"\x01": 0, curses.KEY_HOME: 0, "\x05": len(text), curses.KEY_END: len(text),
+             "\x02": max(0, cursor - 1), curses.KEY_LEFT: max(0, cursor - 1),
+             "\x06": min(len(text), cursor + 1), curses.KEY_RIGHT: min(len(text), cursor + 1),
+             "\x1bb": word_start(text, cursor), "\x1bf": word_end(text, cursor)}
+    if key in moves:
+        return text, moves[key], killed
+    # Kills: the span removed, which C-y can put back.
+    spans = {"\x0b": (cursor, len(text)), "\x15": (0, cursor),
+             "\x1bd": (cursor, word_end(text, cursor)),
+             "\x1b\x7f": (word_start(text, cursor), cursor), "\x1b\x08": (word_start(text, cursor), cursor),
+             "\x17": (field_start(text, cursor), cursor)}
+    if key in spans:
+        start, end = spans[key]
+        if start == end:
+            return text, cursor, killed
+        return text[:start] + text[end:], start, text[start:end]
+    if key in ("\x04", curses.KEY_DC):
+        return text[:cursor] + text[cursor + 1:], cursor, killed
+    if key in ("\b", "\x7f", curses.KEY_BACKSPACE):
+        return text[:max(0, cursor - 1)] + text[cursor:], max(0, cursor - 1), killed
+    if key == "\x19":
+        return text[:cursor] + killed + text[cursor:], cursor + len(killed), killed
+    if isinstance(key, str) and key.isprintable():
+        return text[:cursor] + key + text[cursor:], cursor + len(key), killed
+    return None

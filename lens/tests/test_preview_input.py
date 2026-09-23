@@ -18,8 +18,10 @@ class InputTests(unittest.TestCase):
         self.assertEqual(terminal.decode("\x1b[<65;40;12M"), terminal.Mouse(39, 11, "down"))
         self.assertEqual(terminal.decode("\x1b[<69;40;12M"), terminal.Mouse(39, 11, "down"))
         self.assertEqual(terminal.decode("\x1b[<0;2;3M"), terminal.Mouse(1, 2, "click"))
-        self.assertIsNone(terminal.decode("\x1b[<0;2;3m"))
-        self.assertIsNone(terminal.decode("\x1b[<32;2;3M"))
+        self.assertEqual(terminal.decode("\x1b[<0;2;3m"), terminal.Mouse(1, 2, "release"))
+        self.assertEqual(terminal.decode("\x1b[<32;2;3M"), terminal.Mouse(1, 2, "drag"))
+        self.assertIsNone(terminal.decode("\x1b[<34;2;3M"))  # Right-button motion.
+        self.assertEqual(terminal.decode("\x1b[M#!!"), terminal.Mouse(0, 0, "release"))
 
     def test_arrows_and_page_keys_without_keypad(self):
         for sequence, key in (("\x1b[A", curses.KEY_UP), ("\x1bOB", curses.KEY_DOWN),
@@ -183,11 +185,43 @@ class PreviewTests(unittest.TestCase):
         self.assertTrue(self.nav.preview_focus)
         self.assertEqual(self.nav.preview_scroll, 3)
 
+    def test_rows_do_not_shift_when_git_status_arrives(self):
+        def texts():
+            with patch("ui.band"), patch("ui.put") as put, patch.object(self.nav, "panel"):
+                self.nav.draw_tree(Mock(), 0, 50, 20)
+            return [call.args[3] for call in put.call_args_list if call.args[3].endswith("plain.txt")]
+        self.nav.index.repository = self.root
+        self.nav.index.status = {}
+        before = texts()
+        self.nav.index.status = {"other.txt": " M"}
+        self.assertEqual(texts(), before)
+        self.nav.index.repository = None  # Outside Git there is no column at all.
+        self.assertLess(len(texts()[0]), len(before[0]))
+
+    def test_dragging_the_divider_resizes_and_saves_the_tree_width(self):
+        saved = []
+        self.nav.on_tree_width = saved.append
+        screen = Mock()
+        screen.getmaxyx.return_value = (30, 120)
+        self.nav.draw(screen)
+        start = self.nav.divider
+        self.nav.key(terminal.Mouse(start - 1, 10, "click"), None)  # The tree's right border.
+        self.nav.key(terminal.Mouse(start + 9, 10, "drag"), None)
+        self.assertEqual(self.nav.divider, start + 10)
+        self.nav.key(terminal.Mouse(115, 10, "drag"), None)
+        self.assertEqual(self.nav.divider, 80)  # The preview keeps 40 columns.
+        self.nav.key(terminal.Mouse(115, 10, "release"), None)
+        self.assertEqual(saved, [80])
+        self.nav.draw(screen)
+        self.assertEqual(self.nav.divider, 80)
+        self.nav.key(terminal.Mouse(20, 10, "drag"), None)  # Released: motion is ignored.
+        self.assertEqual(self.nav.divider, 80)
+
     def test_click_still_focuses_preview_or_tree(self):
         self.nav.divider = 30
         self.nav.key(terminal.Mouse(40, 10, "click"), None)
         self.assertTrue(self.nav.preview_focus)
-        self.nav.key(terminal.Mouse(10, 4, "click"), None)
+        self.nav.key(terminal.Mouse(10, self.nav.content_top, "click"), None)
         self.assertFalse(self.nav.preview_focus)
 
     def test_markdown_render_cached_by_width_and_reload(self):
@@ -261,9 +295,11 @@ class PreviewTests(unittest.TestCase):
         self.nav.key("j", None)
         self.assertEqual(self.nav.selected, 2)
         self.nav.key("j", None)
-        self.assertEqual(self.nav.selected, 2)
-        self.nav.key("k", None)
-        self.nav.key("k", None)
+        self.assertEqual(self.nav.selected, 3)
+        self.nav.key("j", None)
+        self.assertEqual(self.nav.selected, 3)
+        for _ in range(3):
+            self.nav.key("k", None)
         self.assertEqual(self.nav.selected, 0)
         self.assertEqual(self.nav.query, "")
         self.assertFalse(self.nav.preview_focus)
@@ -321,18 +357,22 @@ class PreviewTests(unittest.TestCase):
         (self.root / "한글 폴더").mkdir()
         (self.root / "한글 폴더" / "child.txt").write_text("content")
         self.nav.refresh()
-        for expanded, marker in ((False, "▸  "), (True, "▾  ")):
-            with self.subTest(expanded=expanded):
+        cases = (("nerd", False, "\uf07b 한글 폴더"), ("nerd", True, "\uf07c 한글 폴더"),
+                 ("plain", False, "\uf07b 한글 폴더"), ("plain", True, "\uf07c 한글 폴더"))
+        for icons, expanded, folder in cases:
+            with self.subTest(icons=icons, expanded=expanded):
+                self.nav.icons = icons
                 self.nav.expanded = {"한글 폴더"} if expanded else set()
                 self.nav.rebuild()
-                with patch("ui.band") as band, patch("ui.put"), patch.object(self.nav, "panel"):
+                with patch("ui.band"), patch("ui.put") as put, patch.object(self.nav, "panel"):
                     self.nav.draw_tree(Mock(), 0, 50, 20)
-                labels = [call.args[3] for call in band.call_args_list]
-                self.assertTrue(any("↑  .." in label for label in labels))
-                self.assertTrue(any(marker + "한글 폴더" in label for label in labels))
+                labels = [call.args[3] for call in put.call_args_list]
+                self.assertTrue(any(folder in label for label in labels))
+                self.assertTrue(any(label.endswith("\uf07b ..") for label in labels))
+                self.assertFalse(any("▸" in label or "▾" in label for label in labels))
                 file_labels = [label for label in labels if label.endswith(("plain.txt", "child.txt"))]
                 self.assertTrue(file_labels)
-                self.assertTrue(all("" not in label and "" not in label for label in file_labels))
+                self.assertTrue(all("\uf07b" not in label and "\uf07c" not in label for label in file_labels))
 
     def test_search_results_do_not_show_folder_icons_for_parent_path(self):
         (self.root / "folder").mkdir()
@@ -340,7 +380,7 @@ class PreviewTests(unittest.TestCase):
         self.nav.refresh()
         self.nav.query = "child"
         self.nav.rebuild()
-        with patch("ui.band") as band, patch("ui.put"), patch.object(self.nav, "panel"):
+        with patch("ui.band"), patch("ui.put") as band, patch.object(self.nav, "panel"):  # Rows are put over a blank band.
             self.nav.draw_tree(Mock(), 0, 50, 20)
         label = next(call.args[3] for call in band.call_args_list if "folder/child.txt" in call.args[3])
         self.assertNotIn("", label)
@@ -353,14 +393,15 @@ class PreviewTests(unittest.TestCase):
         self.nav.refresh()
         screen = Mock()
         screen.getmaxyx.return_value = (30, 100)
-        for expanded, marker in ((False, "▸  folder"), (True, "▾  folder")):
+        self.nav.icons = "nerd"
+        for expanded, marker in ((False, "\uf07b folder"), (True, "\uf07c folder")):
             screen.reset_mock()
             self.nav.expanded = {"folder"} if expanded else set()
             self.nav.rebuild()
             self.nav.draw_tree(screen, 0, 50, 25)
             output = [call.args[2] for call in screen.addstr.call_args_list]
             self.assertTrue(any(marker in line for line in output))
-            self.assertTrue(any("↑  .." in line for line in output))
+            self.assertTrue(any("\uf07b .." in line for line in output))
 
     def test_tree_keys_are_text_in_search_and_ignored_in_resize_dialog(self):
         self.nav.key("\x19", None)

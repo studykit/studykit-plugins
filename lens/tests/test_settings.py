@@ -66,6 +66,16 @@ align = "left"
         for mistake in ("'ctrl+q' needs an action", "unknown key 'hyper+q'", "unknown command in 'ctrl+b'"):
             self.assertIn(mistake, nav.message)
 
+    def test_tree_padding_is_one_by_default_and_bounded(self):
+        self.assertEqual(self.navigator().tree_padding, 1)
+        self.write("[ui]\ntree_padding = 3\n")
+        self.assertEqual(self.navigator().tree_padding, 3)
+        for bad in ("-1", "9", "true", '"2"'):
+            self.write(f"[ui]\ntree_padding = {bad}\n")
+            nav = self.navigator()
+            self.assertEqual(nav.tree_padding, 1)
+            self.assertIn("ui.tree_padding", nav.message)
+
     def test_invalid_toml_is_reported(self):
         self.write("[ui\n")
         self.assertIn("config.toml:", self.navigator().message)

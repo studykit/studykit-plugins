@@ -59,13 +59,26 @@ def load_icons(config_dir):
 
 
 def save_icons(config_dir, icons):
+    save_choice(config_dir, "icons", icons)
+
+
+def load_tree_width(config_dir):
+    """The file tree width dragged with the mouse, or None for the automatic width."""
+    try:
+        value = json.loads((config_dir / "tree_width.json").read_text())["tree_width"]
+        return value if type(value) is int and 10 <= value <= 1000 else None
+    except (OSError, ValueError, TypeError, KeyError):
+        return None
+
+
+def save_choice(config_dir, name, value):
     config_dir.mkdir(parents=True, exist_ok=True)
-    fd, temporary = tempfile.mkstemp(prefix=".icons-", dir=config_dir)
+    fd, temporary = tempfile.mkstemp(prefix=f".{name}-", dir=config_dir)
     try:
         with os.fdopen(fd, "w") as stream:
-            json.dump({"icons": icons}, stream)
+            json.dump({name: value}, stream)
             stream.write("\n")
-        os.replace(temporary, config_dir / "icons.json")
+        os.replace(temporary, config_dir / f"{name}.json")
     finally:
         Path(temporary).unlink(missing_ok=True)
 
@@ -468,6 +481,9 @@ def main(env: dict, operation: str) -> int:
                               close_keys=toggle_keys(env),
                               icons=load_icons(config_dir) if config_dir else "plain",
                               on_icons=(lambda chosen: save_icons(config_dir, chosen)) if config_dir else None,
+                              tree_width=load_tree_width(config_dir) if config_dir else None,
+                              on_tree_width=(lambda chosen: save_choice(config_dir, "tree_width", chosen))
+                                  if config_dir else None,
                               settings_loader=lambda: lens_settings.load(lens_settings.location(env)),
                               settings_file=lambda: lens_settings.ensure(lens_settings.location(env)),
                               on_alignment=(lambda chosen: diagram_preview.save_alignment(config_dir, chosen))

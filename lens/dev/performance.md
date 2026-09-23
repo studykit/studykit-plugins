@@ -41,7 +41,7 @@ PTY client, and `prefix+t`. Each open was followed by Ctrl+C before reopening.
 The baseline's dependency bootstrap was warmed before the final comparison.
 The before and after host runs were sequential. Timing began when the prefix
 and shortcut bytes were written to the client and stopped when its output
-contained `FOCUS: FILES`; it includes host dispatch, action/panel launches,
+contained `FOCUS: FILES` (the header badge of that version; the focus now shows in the mode line as ` FILES `); it includes host dispatch, action/panel launches,
 filesystem scanning, restoration, preview rendering, and client delivery.
 It does not measure physical monitor presentation latency.
 

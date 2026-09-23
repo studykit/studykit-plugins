@@ -162,7 +162,7 @@ class ProjectTests(unittest.TestCase):
         self.write("click.txt", "click opened\n")
         nav = Navigator(self.root, "source-pane", False, "")
         nav.narrow, nav.divider, nav.body = False, 30, 10
-        with patch("curses.getmouse", return_value=(0, 5, nav.content_top + 1, 0, curses.BUTTON1_CLICKED)):
+        with patch("curses.getmouse", return_value=(0, 5, nav.content_top + 2, 0, curses.BUTTON1_CLICKED)):
             nav.mouse()
         self.assertEqual(nav.active, "click.txt")
         self.assertEqual(nav.content, ["click opened"])

@@ -53,6 +53,7 @@ TEMPLATE = """\
 [ui]
 # icons = "nerd"      # Nerd Font icons in the file tree, or "plain"
 # align = "center"    # Diagram alignment: left, center, right
+# tree_padding = 1    # Blank columns on each side of the file tree's rows (0 - 8)
 
 [keys]
 # Extra bindings: a key, then a Lens action or a ":" command line.
@@ -70,6 +71,7 @@ class Settings:
     opener: str = ""
     icons: str | None = None
     align: str | None = None
+    tree_padding: int | None = None
     keys: dict = field(default_factory=dict)  # curses key -> action name or ":command"
     errors: list[str] = field(default_factory=list)
 
@@ -160,6 +162,12 @@ def load(file: Path | None) -> Settings:
             settings.align = ui["align"]
         else:
             settings.errors.append("config.toml: ui.align must be left, center, or right")
+    if ui.get("tree_padding") is not None:
+        padding = ui["tree_padding"]
+        if isinstance(padding, int) and not isinstance(padding, bool) and 0 <= padding <= 8:
+            settings.tree_padding = padding
+        else:
+            settings.errors.append("config.toml: ui.tree_padding must be a whole number from 0 to 8")
     for spec, target in section("keys").items():
         key = chord(spec)
         if key is None:
