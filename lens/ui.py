@@ -71,7 +71,7 @@ def theme(palette=None, folder_style=None) -> dict[str, int]:
     palette = palette or resolve_theme()
     styles = {"active": curses.A_BOLD, "header": curses.A_REVERSE | curses.A_BOLD,
               "selected": curses.A_REVERSE | curses.A_BOLD, "inactive": curses.A_DIM,
-              "muted": curses.A_DIM, "hunk": curses.A_BOLD}
+              "muted": curses.A_DIM, "hunk": curses.A_BOLD, "key": curses.A_REVERSE}
     if not curses.has_colors():
         return styles
     curses.start_color()
@@ -88,6 +88,7 @@ def theme(palette=None, folder_style=None) -> dict[str, int]:
         "surface": (p["text"], p["active_row_bg"]), "folder": (p["text"], p["panel_bg"]),
         "hunk": (p["mauve"], p["surface_dim"]), "removed": (p["red"], p["panel_bg"]),
         "added": (p["green"], p["panel_bg"]), "gutter": (p["overlay0"], p["panel_bg"]),
+        "key": (p["accent"], p["selection_bg"]),
     }
     if folder_style is not None:
         palettes["folder"] = (folder_style.foreground,
@@ -106,9 +107,12 @@ def theme(palette=None, folder_style=None) -> dict[str, int]:
             styles["folder"] |= getattr(curses, "A_ITALIC", 0)
         if folder_style.underline:
             styles["folder"] |= curses.A_UNDERLINE
+    if "key" in styles:
+        styles["key"] |= curses.A_BOLD
     if p["selection_bg"] == p["panel_bg"]:
         styles["selected"] |= curses.A_REVERSE
         styles["header"] |= curses.A_REVERSE
+        styles["key"] |= curses.A_REVERSE
     return styles
 
 
@@ -125,6 +129,7 @@ class Navigator:
         self.settings_loader, self.settings_file = settings_loader, settings_file
         self.bindings = {}  # From config.toml [keys]: key -> action name or ":command".
         self.settings_errors = ""
+        self.diff_command, self.diff_pause = "", False
         self.changes = changes
         self.include_ignored = initial_state["include_ignored"] if initial_state else False
         self.query = ""
@@ -220,6 +225,7 @@ class Navigator:
             return
         chosen = self.settings_loader()
         self.editor = chosen.editor or self.environment_editor
+        self.diff_command, self.diff_pause = chosen.diff, chosen.diff_pause
         if chosen.icons:
             self.icons = chosen.icons
         if chosen.align:
@@ -969,13 +975,20 @@ class Navigator:
         except (OSError, ValueError, subprocess.SubprocessError) as error:
             self.message = str(error)
 
-    def run_terminal(self, screen, command, cwd):
+    def run_terminal(self, screen, command, cwd, pause=False):
         self.release_image()
         terminal_input.disable()
         curses.def_prog_mode()
         curses.endwin()
         try:
-            return subprocess.run(command, cwd=cwd)
+            result = subprocess.run(command, cwd=cwd)
+            if pause:
+                # Tools that print and exit would otherwise vanish behind the redraw.
+                try:
+                    input("\nPress Enter to return to Lens ")
+                except EOFError:
+                    pass
+            return result
         finally:
             curses.reset_prog_mode()
             try:
@@ -991,9 +1004,12 @@ class Navigator:
             self.message = "Select a file to compare with HEAD"
             return
         try:
-            with comparison(self.index, name) as (command, cwd):
-                result = self.run_terminal(screen, command, cwd)
-            self.message = "Returned from vimdiff" if result.returncode == 0 else f"vimdiff exited with status {result.returncode}"
+            with comparison(self.index, name, self.diff_command) as (command, cwd):
+                result = self.run_terminal(screen, command, cwd, pause=bool(self.diff_command) and self.diff_pause)
+            tool = Path(command[0]).name
+            # diff tools exit with 1 when the files differ, so only 2 and up are failures.
+            failed = result.returncode > (1 if self.diff_command else 0)
+            self.message = f"{tool} exited with status {result.returncode}" if failed else f"Returned from {tool}"
         except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as error:
             self.message = str(error)
 
@@ -1131,9 +1147,7 @@ class Navigator:
         band(screen, 0, max(19, width - len(badge) - 2), badge, len(badge), self.style("header") | curses.A_BOLD)
         put(screen, 1, 2, "[..]", 4, self.style("active"))
         put(screen, 1, 8, str(self.root), width - 10, self.style("muted"))
-        if self.command is not None:
-            band(screen, 2, 1, f" :{self.command}▏", width - 3, self.style("selected"))
-        elif self.finding or (self.preview_focus and self.find_query and not self.searching):
+        if self.finding or (self.preview_focus and self.find_query and not self.searching):
             text = f" ⌕  Find in preview: {self.find_query}" + (" ▏" if self.finding else "  ·  n N Next/Prev")
             band(screen, 2, 1, text, width - 3, self.style("selected" if self.finding else "surface"))
         else:
@@ -1150,20 +1164,7 @@ class Navigator:
             self.draw_content(screen, self.divider + 1, width - self.divider - 2, bottom)
         position = f"{self.preview_scroll + 1}/{self.preview_length()}" if self.preview_focus else f"{self.selected + 1 if self.items else 0}/{len(self.items)}"
         band(screen, height - 3, 0, f" {focus}  {position}  ·  {self.message}", width - 1, self.style("surface"))
-        enter_hint = "Enter Scroll" if self.preview_focus else "Enter Open"
-        put(screen, height - 2, 1, f"^W Layout  Tab Focus  {enter_hint}  ^Y Popup size  ^D Vimdiff  ^E Edit  Esc Back", width - 2, self.style("active"))
-        help_text = "SEARCH: Type filter  ^U Clear  Enter Apply  Esc Cancel" if self.searching else "^N/P Preview line  ^F/B Preview page  h/j/k/l Move  Space Preview  / Search  : Command  ^O Root  Backspace Up"
-        if self.preview_focus and not self.searching:
-            help_text = "j/k Line  Space/f/b Page  d/u Half  g/G Top/End  / Find  n N Next/Prev  : Command  ^O Root"
-            if self.diagram_list:
-                # "/" opens search, so these key pairs are not joined with a slash.
-                help_text = ("+ - Zoom  0 Fit  a Align  " + ("[ ] Prev/Next diagram  " if self.markdown else "")
-                             + "v Diagram/Source  " + help_text)
-        if self.command is not None:
-            help_text = "COMMAND: Tab Complete  ↑/↓ History  Enter Run  Esc Cancel  ·  help Lists commands"
-        elif self.finding:
-            help_text = "FIND: Type text (lowercase ignores case)  ^U Clear  Enter Keep  Esc Cancel"
-        put(screen, height - 1, 1, help_text, width - 2, self.style("muted"))
+        self.draw_hints(screen, height, width)
         if self.size_draft:
             self.draw_size(screen)
         if self.layout_dialog:
@@ -1357,6 +1358,45 @@ class Navigator:
         self.zoom_diagram("0")
         self.zooms[target] = zoom
         self.message = f"{diagram_preview.LANGUAGES[target[0]].title} zoom {round(zoom * 100)}%"
+
+    def hint_row(self, screen, y, width, hints, mode=""):
+        """Keys as highlighted chips followed by dimmed labels, clipped at the width."""
+        x = 1
+        if mode:
+            put(screen, y, x, f" {mode} ", width - x, self.style("header") | curses.A_BOLD)
+            x += cells(mode) + 3
+        for key, label in hints:
+            needed = cells(key) + 2 + 1 + cells(label)
+            if x + needed > width - 1:
+                break
+            put(screen, y, x, f" {key} ", needed, self.style("key"))
+            put(screen, y, x + cells(key) + 3, label, cells(label), self.style("muted"))
+            x += needed + 2
+
+    def draw_hints(self, screen, height, width):
+        if self.command is not None:
+            # The command line takes the last row, as in Vim and Emacs.
+            self.hint_row(screen, height - 2, width, [("Tab", "Complete"), ("↑ ↓", "History"), ("Enter", "Run"),
+                                                     ("Esc", "Cancel"), (":help", "Commands")], "COMMAND")
+            band(screen, height - 1, 0, f":{self.command}▏", width - 1, self.style("base") | curses.A_BOLD)
+            return
+        self.hint_row(screen, height - 2, width, [
+            ("Tab", "Focus"), ("Enter", "Scroll" if self.preview_focus else "Open"), (":", "Command"),
+            ("⌃E", "Edit"), ("⌃D", "Diff"), ("⌃W", "Layout"), ("⌃Y", "Size"), ("Esc", "Back")])
+        if self.finding:
+            hints, mode = [("⌃U", "Clear"), ("Enter", "Keep"), ("Esc", "Cancel"), ("abc", "Ignores case")], "FIND"
+        elif self.searching:
+            hints, mode = [("⌃U", "Clear"), ("Enter", "Apply"), ("Esc", "Cancel")], "SEARCH"
+        elif self.preview_focus:
+            hints, mode = [("j k", "Line"), ("Space b", "Page"), ("d u", "Half"), ("g G", "Top/End"),
+                           ("/", "Find"), ("n N", "Next/Prev"), ("⌃O", "Root")], ""
+            if self.diagram_list:
+                hints = ([("+ -", "Zoom"), ("0", "Fit"), ("a", "Align")]
+                         + ([("[ ]", "Diagram")] if self.markdown else []) + [("v", "Source")] + hints)
+        else:
+            hints, mode = [("j k", "Move"), ("h l", "Fold"), ("Space", "Preview"), ("/", "Search"),
+                           ("⌃N ⌃P", "Line"), ("⌃F ⌃B", "Page"), ("⌃O", "Root"), ("⌫", "Up")], ""
+        self.hint_row(screen, height - 1, width, hints, mode)
 
     def matches(self):
         if self.find_content is not self.content or self.find_for != self.find_query:

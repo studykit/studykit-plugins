@@ -1,6 +1,7 @@
-"""Prepare a read-only HEAD/working-tree comparison for Vim."""
+"""Prepare a read-only HEAD/working-tree comparison for Vim or a configured tool."""
 from contextlib import contextmanager
 import os
+import shlex
 from pathlib import Path
 import shutil
 import stat
@@ -68,11 +69,26 @@ def snapshots(index: Index, name: str) -> tuple[bytes, bytes]:
     return before, after
 
 
+def configured_command(configured: str, before: Path, after: Path, name: str) -> list[str]:
+    command = shlex.split(configured)
+    if not command or not shutil.which(command[0]):
+        raise ValueError("Configured diff tool was not found on PATH")
+    # Substitute after splitting so each path stays one literal argument.
+    values = {"{before}": str(before), "{after}": str(after), "{name}": name}
+    if not any(key in part for part in command for key in ("{before}", "{after}")):
+        command += ["{before}", "{after}"]
+    for key, value in values.items():
+        command = [part.replace(key, value) for part in command]
+    return command
+
+
 @contextmanager
-def comparison(index: Index, name: str):
-    binary = shutil.which("vimdiff") or shutil.which("vim")
-    if not binary:
-        raise ValueError("Install Vim with diff support (vimdiff or vim) to compare files")
+def comparison(index: Index, name: str, configured: str = ""):
+    binary = None
+    if not configured:
+        binary = shutil.which("vimdiff") or shutil.which("vim")
+        if not binary:
+            raise ValueError("Install Vim with diff support (vimdiff or vim) to compare files")
     before, after = snapshots(index, name)
     with tempfile.TemporaryDirectory(prefix="lens-diff-") as directory:
         root = Path(directory)
@@ -81,6 +97,9 @@ def comparison(index: Index, name: str):
             target = root / relative
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_bytes(content)
+        if configured:
+            yield configured_command(configured, root / left, root / right, name), root
+            return
         # Both buffers are disposable snapshots, so even :w! cannot edit the project.
         command = [binary, "-N", "-u", "NONE", "-U", "NONE", "-i", "NONE", "-n", "-R",
                    "--noplugin", "--cmd", "set nomodeline", "-d", "-O",

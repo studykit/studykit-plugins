@@ -213,6 +213,27 @@ class ProjectTests(unittest.TestCase):
             result = subprocess.run(command, cwd=cwd, capture_output=True, timeout=10)
             self.assertEqual(result.returncode, 0, result.stderr)
 
+    def test_configured_diff_tool_gets_both_snapshots(self):
+        self.init()
+        self.write("file.py", "before\n")
+        self.commit()
+        self.write("file.py", "after\n")
+        nav = Navigator(self.root, "pane", False, "")
+        nav.diff_command, nav.diff_pause = "diff -u", True
+        nav.load("file.py")
+        nav.preview_focus = True
+        seen = {}
+        def run(screen, command, cwd, pause=False):
+            seen.update(command=command, pause=pause, output=subprocess.run(command, capture_output=True).stdout)
+            return subprocess.CompletedProcess(command, 1)
+        with patch.object(nav, "run_terminal", side_effect=run):
+            nav.show_diff(None)
+        self.assertEqual(seen["command"][:2], ["diff", "-u"])
+        self.assertTrue(seen["pause"])
+        self.assertIn(b"-before", seen["output"])
+        self.assertIn(b"+after", seen["output"])
+        self.assertEqual(nav.message, "Returned from diff")  # Status 1 only means "files differ".
+
     def test_changes_enter_opens_vimdiff_and_tab_changes_focus(self):
         self.init()
         self.write("file.txt", "new\n")

@@ -1,4 +1,4 @@
-"""User settings from config.toml in the plugin's config directory."""
+"""User settings from ~/.config/lens/config.toml."""
 from __future__ import annotations
 
 import curses
@@ -35,6 +35,15 @@ TEMPLATE = """\
 # command = "nvim +{line} {file}"
 # command = "code --wait --goto {file}:{line}"
 
+[diff]
+# Command used by Ctrl+D and :diff, instead of the built-in vimdiff. {before} is
+# the HEAD copy, {after} the working copy, {name} the path; both copies are
+# temporary files. Without {before}/{after}, the two paths are appended.
+# Emacs ediff in the terminal; quitting ediff (q) also closes its frame:
+# command = '''emacsclient -nw -a '' --eval '(ediff-files "{before}" "{after}" (list (lambda () (let ((frame (selected-frame))) (add-hook (quote ediff-quit-hook) (lambda () (run-at-time 0 nil (function delete-frame) frame)) t t)))))' '''
+# command = "difft {before} {after}"
+# pause = true        # Wait for Enter afterwards, for tools that print and exit
+
 [ui]
 # icons = "nerd"      # Nerd Font icons in the file tree, or "plain"
 # align = "center"    # Diagram alignment: left, center, right
@@ -50,6 +59,8 @@ TEMPLATE = """\
 @dataclass
 class Settings:
     editor: str = ""
+    diff: str = ""
+    diff_pause: bool = False
     icons: str | None = None
     align: str | None = None
     keys: dict = field(default_factory=dict)  # curses key -> action name or ":command"
@@ -84,16 +95,20 @@ def known(word):
     return word.isdigit() or command_line.lookup(word) is not None
 
 
-def path(config_dir: Path) -> Path:
-    return config_dir / "config.toml"
+def location(env) -> Path:
+    """LENS_CONFIG, else config.toml under $XDG_CONFIG_HOME/lens (~/.config/lens)."""
+    if env.get("LENS_CONFIG"):
+        return Path(env["LENS_CONFIG"]).expanduser()
+    base = Path(env["XDG_CONFIG_HOME"]) if env.get("XDG_CONFIG_HOME") else Path.home() / ".config"
+    return base / "lens" / "config.toml"
 
 
-def load(config_dir: Path | None) -> Settings:
+def load(file: Path | None) -> Settings:
     settings = Settings()
-    if config_dir is None:
+    if file is None:
         return settings
     try:
-        with path(config_dir).open("rb") as stream:
+        with file.open("rb") as stream:
             data = tomllib.load(stream)
     except FileNotFoundError:
         return settings
@@ -113,6 +128,15 @@ def load(config_dir: Path | None) -> Settings:
         settings.editor = command.strip()
     else:
         settings.errors.append("config.toml: editor.command must be a string")
+    diff = section("diff")
+    if isinstance(diff.get("command", ""), str):
+        settings.diff = diff.get("command", "").strip()
+    else:
+        settings.errors.append("config.toml: diff.command must be a string")
+    if isinstance(diff.get("pause", False), bool):
+        settings.diff_pause = diff.get("pause", False)
+    else:
+        settings.errors.append("config.toml: diff.pause must be true or false")
     ui = section("ui")
     if ui.get("icons") is not None:
         if ui["icons"] in ("nerd", "plain"):
@@ -137,10 +161,9 @@ def load(config_dir: Path | None) -> Settings:
     return settings
 
 
-def ensure(config_dir: Path) -> Path:
+def ensure(file: Path) -> Path:
     """The config file, created from the commented template when missing."""
-    config_dir.mkdir(parents=True, exist_ok=True)
-    target = path(config_dir)
-    if not target.exists():
-        target.write_text(TEMPLATE)
-    return target
+    file.parent.mkdir(parents=True, exist_ok=True)
+    if not file.exists():
+        file.write_text(TEMPLATE)
+    return file

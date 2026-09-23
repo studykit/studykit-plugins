@@ -8,7 +8,8 @@ Requires Herdr 0.9.0 or later, `uv` on Herdr's `PATH`, and Python 3.11 or later
 with curses. `uv` manages the Python dependencies automatically; the first launch
 requires network access to download any missing dependencies. Git is optional
 for browsing and required for change indicators and diffs. Comparing files also
-requires `vimdiff` or Vim compiled with diff support.
+requires `vimdiff` or Vim compiled with diff support, unless another diff tool is
+set in the settings.
 Markdown rendering uses the Python `Rich` library and source highlighting uses
 `Pygments`; both dependencies are managed automatically. Glow is not required.
 Diagram previews need an outer terminal that supports the Kitty graphics
@@ -91,7 +92,7 @@ pane in that tab.
 | + (or =) / - / 0 | Zoom the current diagram in / out / back to fit |
 | [ / ] | Select the previous / next diagram in a Markdown preview |
 | a | Align diagrams left, center, or right |
-| Ctrl+D | Open a side-by-side HEAD / working-tree comparison in vimdiff |
+| Ctrl+D | Compare HEAD with the working tree in vimdiff, or in the diff tool from the settings |
 | Ctrl+E | Open the selected file in an editor |
 | Ctrl+G | Toggle changed files only |
 | Ctrl+H | Show / hide Git-ignored files; enabling switches to the full project view |
@@ -390,8 +391,8 @@ diff previews do not modify project files.
 
 ## Settings
 
-Lens reads `config.toml` from its Herdr plugin config directory (print it with
-`herdr plugin config-dir studykit.lens`). Run `:config` inside Lens to open the
+Lens reads `~/.config/lens/config.toml` (under `$XDG_CONFIG_HOME` when that is
+set, or the path in `LENS_CONFIG`). Run `:config` inside Lens to open the
 file in your editor; it is created with commented examples the first time, and
 the settings reload when the editor exits. Otherwise changes apply the next time
 Lens opens. Mistakes are reported in the status line and the rest still applies.
@@ -401,6 +402,15 @@ Lens opens. Mistakes are reported in the status line and the rest still applies.
 # {file} and {line} are replaced; without {file}, the path is appended.
 # {line} is the first line shown in a code or text preview, otherwise 1.
 command = "nvim +{line} {file}"
+
+[diff]
+# Replaces the built-in vimdiff for Ctrl+D and :diff. {before} is the HEAD copy
+# and {after} the working copy, both temporary files; {name} is the path.
+# Without {before}/{after}, the two paths are appended.
+# Emacs ediff in the terminal; quitting ediff (q) also closes its frame.
+command = '''emacsclient -nw -a '' --eval '(ediff-files "{before}" "{after}" (list (lambda () (let ((frame (selected-frame))) (add-hook (quote ediff-quit-hook) (lambda () (run-at-time 0 nil (function delete-frame) frame)) t t)))))' '''
+# command = "difft {before} {after}"
+pause = false      # true waits for Enter afterwards, for tools that print and exit
 
 [ui]
 icons = "nerd"     # or "plain"; overrides :icons at startup

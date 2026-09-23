@@ -28,14 +28,14 @@ class SettingsTests(unittest.TestCase):
         temp = tempfile.TemporaryDirectory()
         self.addCleanup(temp.cleanup)
         self.base = Path(temp.name)
-        self.config = self.base / "config"
+        self.config = self.base / "config" / "lens" / "config.toml"
         self.root = self.base / "project"
         self.root.mkdir()
         (self.root / "code.py").write_text("\n".join(f"x = {i}" for i in range(50)))
 
     def write(self, text):
-        self.config.mkdir(exist_ok=True)
-        settings.path(self.config).write_text(text)
+        self.config.parent.mkdir(parents=True, exist_ok=True)
+        self.config.write_text(text)
 
     def navigator(self):
         return Navigator(self.root, "pane", False, "env-editor",
@@ -90,13 +90,42 @@ align = "left"
         with patch("ui.editor_command", side_effect=lambda editor, path, line=1: [editor, str(path)]), \
                 patch.object(nav, "run_terminal", side_effect=fake_editor) as run:
             nav.run_command("config", None)
-        self.assertEqual(run.call_args.args[1], ["env-editor", str(self.config / "config.toml")])
+        self.assertEqual(run.call_args.args[1], ["env-editor", str(self.config)])
         self.assertEqual((nav.icons, nav.message), ("nerd", "Settings reloaded"))
+
+    def test_location_follows_xdg_and_override(self):
+        self.assertEqual(settings.location({"XDG_CONFIG_HOME": "/x"}), Path("/x/lens/config.toml"))
+        self.assertEqual(settings.location({"LENS_CONFIG": "/y/lens.toml", "XDG_CONFIG_HOME": "/x"}),
+                         Path("/y/lens.toml"))
+        self.assertEqual(settings.location({}), Path.home() / ".config" / "lens" / "config.toml")
 
     def test_template_is_valid_and_fully_commented(self):
         settings.ensure(self.config)
         loaded = settings.load(self.config)
         self.assertEqual((loaded.editor, loaded.icons, loaded.keys, loaded.errors), ("", None, {}, []))
+
+
+class DiffCommandTests(unittest.TestCase):
+    def test_placeholders_and_appended_paths(self):
+        import diff_tool
+        before, after = Path("/t/HEAD/a b.py"), Path("/t/WORKTREE/a b.py")
+        with patch("diff_tool.shutil.which", return_value="/bin/tool"):
+            self.assertEqual(diff_tool.configured_command("difft", before, after, "a b.py"),
+                             ["difft", "/t/HEAD/a b.py", "/t/WORKTREE/a b.py"])
+            self.assertEqual(diff_tool.configured_command(
+                "emacsclient --eval '(ediff-files \"{before}\" \"{after}\")'", before, after, "a b.py"),
+                ["emacsclient", "--eval", '(ediff-files "/t/HEAD/a b.py" "/t/WORKTREE/a b.py")'])
+        with patch("diff_tool.shutil.which", return_value=None):
+            with self.assertRaises(ValueError):
+                diff_tool.configured_command("missing-tool", before, after, "a b.py")
+
+    def test_settings_and_template_parse(self):
+        with tempfile.TemporaryDirectory() as directory:
+            file = Path(directory) / "config.toml"
+            file.write_text(settings.TEMPLATE.replace("# command = \"difft", "command = \"difft")
+                            .replace("# pause = true", "pause = true"))
+            loaded = settings.load(file)
+        self.assertEqual((loaded.diff, loaded.diff_pause, loaded.errors), ("difft {before} {after}", True, []))
 
 
 class EditorCommandTests(unittest.TestCase):

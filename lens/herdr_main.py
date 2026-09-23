@@ -399,8 +399,8 @@ def main(env: dict, operation: str) -> int:
                               close_keys=toggle_keys(env),
                               icons=load_icons(config_dir) if config_dir else "plain",
                               on_icons=(lambda chosen: save_icons(config_dir, chosen)) if config_dir else None,
-                              settings_loader=(lambda: lens_settings.load(config_dir)) if config_dir else None,
-                              settings_file=(lambda: lens_settings.ensure(config_dir)) if config_dir else None,
+                              settings_loader=lambda: lens_settings.load(lens_settings.location(env)),
+                              settings_file=lambda: lens_settings.ensure(lens_settings.location(env)),
                               on_alignment=(lambda chosen: diagram_preview.save_alignment(config_dir, chosen))
                                   if config_dir else None)
         if restored is not None and env.get("LENS_RESUME"):
