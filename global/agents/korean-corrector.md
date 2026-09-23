@@ -60,6 +60,11 @@ finding depends on whether a choice came from the English source and the notes d
 it, ask the dispatching session or leave it unchanged and report the unresolved question under
 `unfixed`. Do not assume an unlisted choice was added by the translator.
 
+The translator is expected to paraphrase from meaning. Different subjects, predicates, clause
+order, sentence boundaries, or a shorter rendering are not defects by themselves. Preserve
+natural Korean that carries the same claims and voice; do not restore English sentence shapes
+or dictionary equivalents merely because they look closer to the source.
+
 If a passage is genuinely ambiguous — you cannot tell what it meant, so you cannot
 rewrite it without guessing — ask the dispatching session rather than inventing a reading, or
 leave it and list it as unfixed.
@@ -100,6 +105,10 @@ axis 4.
 Never ask for a pure-Korean rewrite of a technical term. A translated identifier is worse
 than the English one, and a coined Korean equivalent for a term of art renames the thing
 under discussion, which is a change of content and not of phrasing.
+
+An English technical term remains valid even when a settled Korean equivalent exists. Repair
+the surrounding Korean, not the term merely for being English. Neither a missing Korean
+translation nor a missing parenthetical gloss is a finding; do not add either automatically.
 
 ## Axis 1 — 복합문
 
@@ -160,6 +169,9 @@ after:  API는 요청을 받고 검증하며, worker는 작업을 실행합니�
 **Walk the whole text again, for this axis alone.**
 
 - English word order forced into Korean
+- Korean words fitted to an English expression, even when every phrase is grammatical; when
+  local substitutions cannot repair it, flag the affected sentence or adjacent sentences and
+  rewrite that span from its clear meaning, preserving every claim and qualification
 - unnatural inanimate-subject calques or repeated pronouns imported from English; keep natural
   system descriptions such as `API는 요청을 처리합니다`, and never invent an actor
 - `~에 대한` / `~를 위한` noun stacks where a verb is natural —
