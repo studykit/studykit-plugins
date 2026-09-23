@@ -163,6 +163,31 @@ class CommandLineTests(unittest.TestCase):
         self.nav.key("c", None)
         self.assertTrue(self.nav.changes)
 
+    def test_emacs_keys_edit_the_filter_and_find(self):
+        for key in ("/", *"main.py", "\x01", "\x0b"):  # C-a C-k
+            self.nav.key(key, None)
+        self.assertEqual((self.nav.query, self.nav.query_cursor), ("", 0))
+        self.nav.key("\x19", None)  # C-y
+        self.nav.key("\x1bb", None)  # M-b
+        self.nav.key("x", None)
+        self.assertEqual(self.nav.query, "main.xpy")
+        self.nav.key("\x02", None)  # C-b
+        self.nav.key("\x04", None)  # C-d
+        self.assertEqual(self.nav.query, "main.py")
+        self.assertEqual(self.nav.items[0].path, "src/main.py")
+        self.nav.key("\n", None)
+        self.run_line("preview notes.txt")
+        for key in ("/", *"helo", "\x02", "l"):
+            self.nav.key(key, None)
+        self.assertEqual((self.nav.find_query, self.nav.message), ("hello", "Match 1/1"))
+
+    def test_emacs_keys_edit_the_application_picker(self):
+        self.nav.app_picker = {"target": "", "query": "", "cursor": 0, "selected": 0, "scroll": 0,
+                               "apps": ["Finder", "Safari"]}
+        for key in (*"Safar", "\x01", "\x0b", "\x19", "\x02", "\x04"):
+            self.nav.key(key, None)
+        self.assertEqual((self.nav.app_picker["query"], self.nav.app_picker["cursor"]), ("Safa", 4))
+
     def test_completion_keeps_text_after_the_cursor(self):
         self.nav.key(":", None)
         for char in "prev src/main.py":
@@ -248,6 +273,10 @@ class CommandLineTests(unittest.TestCase):
         self.assertEqual(command_line.complete("cd s", self.root, [])[0], "cd src/")
         self.run_line("cd src")
         self.assertEqual(self.nav.root, (self.root / "src").resolve())
+
+    def test_git_root_reports_a_root_outside_git(self):
+        self.run_line("git-root")
+        self.assertEqual(self.nav.message, "The current root is not inside a Git repository")
 
 
 if __name__ == "__main__":

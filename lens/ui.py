@@ -135,7 +135,7 @@ def theme(palette=None, folder_style=None) -> dict[str, int]:
 KEY_GROUPS = (
     ("General", (("Tab", "Switch focus"), (":", "Command line"), ("?", "This list"), ("⌃E", "Edit file"),
                  ("⌃D", "Diff with HEAD"), ("o / O", "Open / open with"), ("c", "Changed files only"),
-                 ("⌃H", "Ignored files"), ("⌃R", "Refresh"), ("⌃O", "Change root"), ("⌃T", "Repository root"),
+                 ("⌃H", "Ignored files"), ("⌃R", "Refresh"), ("⌃O", "Change root"), ("t", "Repository root"),
                  ("⌃W", "Layout"), ("⌃Y", "Popup size"), ("Esc", "Back / close"), ("⌃G", "Cancel, never close"), ("⌃C", "Quit"))),
     ("Files", (("j k", "Move"), ("e", "Edit file or folder"), ("h l", "Fold / unfold"), ("Enter", "Open / enter folder"), ("Space", "Preview / fold"),
                ("/", "Filter names"), ("⌫", "Parent folder"), ("⌃N ⌃P", "Scroll preview"),
@@ -253,6 +253,7 @@ class Navigator:
         self.command_menu = None  # Tab's completion list: {"selected", "scroll"} while open.
         self.key_help = False  # The ? popup listing every key.
         self.command_cursor, self.command_killed = 0, ""  # Emacs editing: point and the last kill.
+        self.query_cursor = self.find_cursor = 0  # Point in the filter and in find; the kill is shared.
         # Key sequences that close Lens, such as the host's toggle binding.
         self.close_keys, self.close_typed = [tuple(keys) for keys in close_keys], ()
         self.index = None
@@ -333,13 +334,23 @@ class Navigator:
             return False
         previous = self.root
         self.checkpoint()
+        # A previewed file that is still under the new root stays in the preview.
+        kept = ""
+        if self.active:
+            try:
+                kept = (previous / self.active).relative_to(index.root).as_posix()
+            except ValueError:
+                pass
         self.root, self.index = index.root, index
         self.pending_selection = ""
         self.query = self.search_before = ""
-        self.searching = self.preview_focus = False
+        self.searching = False
         self.expanded.clear()
-        self.selected = self.scroll = self.preview_scroll = self.horizontal = 0
-        self.clear_preview()
+        self.selected = self.scroll = 0
+        if kept:
+            self.active = kept
+        else:
+            self.clear_preview()
         self.root_draft = None
         self.root_error = ""
         self.rebuild()
@@ -407,23 +418,10 @@ class Navigator:
             self.root_draft = None
         elif key in ("\n", "\r", curses.KEY_ENTER):
             self.change_root(self.root_draft)
-        elif key == "\x15":
-            self.root_draft, self.root_cursor = "", 0
-        elif key in ("\b", "\x7f", curses.KEY_BACKSPACE):
-            if self.root_cursor:
-                self.root_draft = self.root_draft[:self.root_cursor - 1] + self.root_draft[self.root_cursor:]
-                self.root_cursor -= 1
-        elif key == curses.KEY_DC:
-            self.root_draft = self.root_draft[:self.root_cursor] + self.root_draft[self.root_cursor + 1:]
-        elif key in (curses.KEY_LEFT, curses.KEY_RIGHT):
-            self.root_cursor = max(0, min(len(self.root_draft), self.root_cursor + (-1 if key == curses.KEY_LEFT else 1)))
-        elif key in (curses.KEY_HOME, "\x01"):
-            self.root_cursor = 0
-        elif key in (curses.KEY_END, "\x05"):
-            self.root_cursor = len(self.root_draft)
-        elif isinstance(key, str) and key.isprintable() and len(self.root_draft) < 4096:
-            self.root_draft = self.root_draft[:self.root_cursor] + key + self.root_draft[self.root_cursor:]
-            self.root_cursor += len(key)
+        else:
+            edited = command_line.edit(self.root_draft, self.root_cursor, key, self.command_killed)
+            if edited and len(edited[0]) <= 4096:
+                self.root_draft, self.root_cursor, self.command_killed = edited
         return True
 
     def draw_root(self, screen):
@@ -1093,7 +1091,7 @@ class Navigator:
             apps = command_line.applications()
         except OSError as error:
             apps, self.message = [], f"Could not list applications: {error}"
-        self.app_picker = {"target": self.launch_target(), "query": "", "selected": 0, "scroll": 0, "apps": apps}
+        self.app_picker = {"target": self.launch_target(), "query": "", "cursor": 0, "selected": 0, "scroll": 0, "apps": apps}
 
     def app_choices(self):
         """Applications matching the picker's query: recent ones first, then name prefixes, then the rest."""
@@ -1119,12 +1117,12 @@ class Navigator:
             step = {curses.KEY_UP: -1, "\x10": -1, curses.KEY_DOWN: 1, "\x0e": 1,
                     curses.KEY_PPAGE: -10, curses.KEY_NPAGE: 10}[key]
             picker["selected"] = max(0, min(len(choices) - 1, picker["selected"] + step))
-        elif key == "\x15":
-            picker["query"], picker["selected"] = "", 0
-        elif key in (curses.KEY_BACKSPACE, "\x7f", "\x08"):
-            picker["query"], picker["selected"] = picker["query"][:-1], 0
-        elif isinstance(key, str) and key.isprintable():
-            picker["query"], picker["selected"] = picker["query"] + key, 0
+        else:
+            edited = command_line.edit(picker["query"], picker["cursor"], key, self.command_killed)
+            if edited:
+                if edited[0] != picker["query"]:
+                    picker["selected"] = 0
+                picker["query"], picker["cursor"], self.command_killed = edited
         return True
 
     def draw_app_picker(self, screen):
@@ -1132,7 +1130,7 @@ class Navigator:
         empty = f"Enter opens with \"{picker['query']}\"" if picker["query"] else "No applications found"
         self.draw_picker(screen, picker, f"OPEN WITH  {picker['target'] or '.'}", picker["query"],
                          [(app, "recent" if app in self.recent_apps else "") for app in choices], empty,
-                         "↑↓ Choose  Enter Open  ⌃U Clear  Esc Cancel")
+                         "↑↓ Choose  Enter Open  ⌃U Clear  Esc Cancel", cursor=picker["cursor"])
 
     def draw_picker(self, screen, picker, title, query, choices, empty, hints, cursor=None):
         """A centred list box: a title, the typed query, (label, note) choices and a key-hint footer."""
@@ -1241,7 +1239,7 @@ class Navigator:
             # The filter sits at the foot of the tree, like a minibuffer under its window.
             count = f"{len(self.items)} match{'' if len(self.items) == 1 else 'es'}" if self.query.strip() else ""
             self.query_line(screen, x + 1, width - 2, self.query, " Type part of a name or path",
-                            self.searching, count, y=bottom - 1)
+                            self.searching, count, y=bottom - 1, cursor=self.query_cursor)
         if not self.items:
             empty = "Loading Git status…" if self.index and self.index.status_pending else "Git status unavailable" if self.index and self.index.status_error else "No matching files"
             put(screen, self.content_top, x + 2, empty, width - 4, self.style("muted"))
@@ -1283,18 +1281,20 @@ class Navigator:
             put(screen, y, column, char, size, style)
             column += size
 
-    def query_line(self, screen, left, width, text, placeholder, editing, note, y):
-        """A query row in a box: ⌕, the text with a cursor while editing, a note on the right."""
+    def query_line(self, screen, left, width, text, placeholder, editing, note, y, cursor=None):
+        """A query row in a box: ⌕, the text with a cursor at point while editing, a note on the right."""
         right = left + width
         band(screen, y, left, "", width, self.style("surface"))
         put(screen, y, left + 1, "\u2315", 1, self.style("active") | curses.A_BOLD)
         x = left + 3
-        if text:
-            put(screen, y, x, text, right - x - 1, self.style("base") | curses.A_BOLD)
-            x += cells(text)
-        if editing:
-            put(screen, y, x, "▏", 1, self.style("active") | curses.A_BOLD)
-            x += 1
+        point = len(text) if cursor is None else cursor
+        for part, bar in ((text[:point], editing), (text[point:], False)):
+            if part:
+                put(screen, y, x, part, right - x - 1, self.style("base") | curses.A_BOLD)
+                x += cells(part)
+            if bar:
+                put(screen, y, x, "▏", 1, self.style("active") | curses.A_BOLD)
+                x += 1
         if not text:
             put(screen, y, x, placeholder, right - x - 1, self.style("muted"))
         if note and right - cells(note) - 1 > x + 2:
@@ -1317,7 +1317,7 @@ class Navigator:
             found = (f"{self.find_index + 1}/{total}" if total and self.find_index >= 0
                      else f"{total} found" if self.find_query else "")
             self.query_line(screen, x + 1, width - 2, self.find_query, " Type text to find in the preview",
-                            self.finding, found, y=bottom - 1)
+                            self.finding, found, y=bottom - 1, cursor=self.find_cursor)
         if self.diagram_view():
             self.draw_diagram(screen, x, width)
             return
@@ -1546,6 +1546,8 @@ class Navigator:
             self.find_next(1, origin=self.preview_scroll)
         elif name == "cd":
             self.change_root(argument)
+        elif name == "git-root":
+            self.repository_root()
         elif name == "icons":
             if argument not in ICONS:
                 self.message = f":{command.usage}"
@@ -1773,7 +1775,7 @@ class Navigator:
 
     def begin_find(self):
         self.finding = True
-        self.find_before, self.find_query = self.find_query, ""
+        self.find_before, self.find_query, self.find_cursor = self.find_query, "", 0
         self.find_origin = (self.preview_scroll, self.horizontal)
 
     def find_key(self, key, screen):
@@ -1790,18 +1792,16 @@ class Navigator:
             elif self.find_query and not self.matches():
                 self.message = f"Not found: {self.find_query}"
             return True
-        if key == "\x15":
-            self.find_query = ""
-        elif key in ("\b", "\x7f", curses.KEY_BACKSPACE):
-            self.find_query = self.find_query[:-1]
-        elif isinstance(key, str) and key.isprintable():
-            self.find_query += key
-        elif isinstance(key, terminal_input.Mouse):
+        if isinstance(key, terminal_input.Mouse):
             if key.action in ("up", "down"):
                 self.handle_mouse(key, screen)
             return True
-        else:
+        edited = command_line.edit(self.find_query, self.find_cursor, key, self.command_killed)
+        if edited is None or edited[0] == self.find_query:
+            if edited:
+                self.find_cursor = edited[1]  # Only the point moved.
             return True
+        self.find_query, self.find_cursor, self.command_killed = edited
         # Incremental: show the first match at or below where the search began.
         self.preview_scroll, self.horizontal = self.find_origin
         if self.find_query:
@@ -2053,6 +2053,7 @@ class Navigator:
             if not self.searching:
                 self.search_before = self.query
             self.searching = True
+            self.query_cursor = len(self.query)
             self.preview_focus = False
         elif self.searching:
             steps = {curses.KEY_UP: -1, curses.KEY_DOWN: 1, "\x10": -1, "\x0e": 1,
@@ -2067,20 +2068,24 @@ class Navigator:
             elif key in ("\n", "\r", curses.KEY_ENTER):
                 self.searching = False
                 return True  # Keep the match picked with the arrows.
-            elif key in ("\x15", "\b", "\x7f", curses.KEY_BACKSPACE):
-                self.query = "" if key == "\x15" else self.query[:-1]
-            elif isinstance(key, str) and key.isprintable():
-                self.query += key
             elif isinstance(key, terminal_input.Mouse):
                 self.handle_mouse(key, screen)
                 return True
+            else:
+                edited = command_line.edit(self.query, self.query_cursor, key, self.command_killed)
+                if edited is None:
+                    return True
+                changed = edited[0] != self.query
+                self.query, self.query_cursor, self.command_killed = edited
+                if not changed:
+                    return True  # Only the point moved.
             self.selected = self.scroll = 0
             self.rebuild()
         elif isinstance(key, terminal_input.Mouse):
             self.handle_mouse(key, screen)
         elif key == "\x0f":
             self.begin_root()
-        elif key == "\x14":
+        elif key == "t":
             self.repository_root()
         elif key == "\x08":
             self.toggle_ignored()

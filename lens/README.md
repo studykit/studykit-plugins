@@ -81,7 +81,7 @@ pane in that tab.
 | Backspace (tree focused) / click `[..]` | Move the navigation root to its parent |
 | Enter on a folder | Make the folder the navigation root; Backspace returns |
 | `.` row, then o / O | Open the navigation root itself in the OS or with an application |
-| Ctrl+T | Move to the current Git repository root |
+| t | Move to the current Git repository root |
 | Enter / Escape in search | Apply the filter / cancel and restore the previous filter |
 | Click, or Enter on a file | Expand or collapse a folder (click), or open the file; in changed-files mode, open vimdiff |
 | h / j / k / l (tree focused) | Collapse or move to parent / down / up / expand or enter a folder |
@@ -154,7 +154,7 @@ directory, and press Enter. Absolute paths, `~`, spaces, and paths relative to
 the current navigation root (including `..`) are supported; no shell expansion
 or commands are executed. Escape cancels. When a folder is selected in the tree,
 Ctrl+O prefills that folder, so Enter makes it the new root. Clicking the displayed
-root path also opens this dialog. Ctrl+T jumps to the Git root when available.
+root path also opens this dialog. `t` jumps to the Git root when available.
 The tree always starts with a `..` entry, including empty directories and
 changes-only mode. Enter or click it to go up; at the filesystem root it does
 nothing. Filename search results omit this entry. Backspace moves up only in
@@ -163,8 +163,9 @@ Folders show a closed or open folder glyph, including the parent entry `..` and 
 root entry `.`. Files have no folder icon. Use a Nerd Font in your
 terminal to display these folder glyphs.
 
-Changing roots clears the filename filter, expanded folders, and old preview,
-then focuses the new tree. The changes-only mode stays as selected. Invalid or
+Changing roots clears the filename filter and expanded folders. The preview and
+its focus stay when the previewed file is still under the new root (as after `t`
+or going up); otherwise the preview clears and the new tree gets focus. The changes-only mode stays as selected. Invalid or
 unreadable destinations leave the previous tree intact. The source pane's working
 directory is never changed. Resizing preserves the chosen root; closing and
 opening a fresh navigator starts from the invoking pane's directory again.
@@ -193,7 +194,8 @@ shared preference rather than a per-root setting.
 Typing only changes the filter after `/`. Enter leaves search and focuses the
 file list; press Enter again to open the selected result. Ordinary character keys
 outside search do not change the filter. Within search, `/` is an ordinary path
-separator.
+separator. The filter edits with Emacs keys, as every text field does (see
+[Command line](#command-line)); Up / Down and Ctrl+P / Ctrl+N pick a match.
 
 With the preview focused, `/` finds text in the preview instead; press Tab first
 to search filenames. The preview jumps to the first match at or below the current
@@ -305,7 +307,9 @@ The line edits with Emacs keys: Ctrl+A / Ctrl+E go to the start / end, Ctrl+B /
 Ctrl+F and Alt+B / Alt+F move by character and word (so do the arrow, Home and End
 keys), Ctrl+D deletes forward, Ctrl+K / Ctrl+U kill to the end / start, Alt+D /
 Alt+Backspace kill a word, Ctrl+W kills the argument before the cursor, and Ctrl+Y
-yanks the last kill. Tab completes the text before the
+yanks the last kill. Every text field edits the same way: the filename filter,
+find in the preview, the Change root prompt, and the application picker, which
+share one kill. Tab completes the text before the
 cursor and keeps the rest. Commands may be shortened to any
 unambiguous prefix. While filtering filenames, `:` is ordinary text.
 
@@ -316,6 +320,7 @@ unambiguous prefix. While filtering filenames, `:` is ordinary text.
 | `top` / `bottom` | Jump to the start / end of the preview |
 | `find TEXT` | Find text in the preview; `n` / `N` continue |
 | `cd DIR` (`root`) | Change the navigation root; relative to the current root, `~`, or absolute |
+| `git-root` | Change the root to the Git repository root, like `t` |
 | `zoom in\|out\|fit\|PERCENT` | Zoom the current diagram |
 | `align left\|center\|right` | Align diagrams |
 | `source` / `diagram` | Show diagram source / images |
@@ -465,7 +470,7 @@ with a letter, or one of `space`, `tab`, `enter`, `escape`, `backspace`, `delete
 | `search`, `command`, `next-match`, `prev-match` | `/`, `:`, `n`, `N` |
 | `preview`, `edit`, `diff` | Space, Ctrl+E (and e in files), Ctrl+D |
 | `changes`, `ignored`, `refresh` | `c`, Ctrl+H, Ctrl+R |
-| `root`, `git-root`, `parent` | Ctrl+O, Ctrl+T, Backspace |
+| `root`, `git-root`, `parent` | Ctrl+O, `t`, Backspace |
 | `layout`, `popup-size` | Ctrl+W, Ctrl+Y |
 | `top`, `bottom` | `g`, `G` |
 | `zoom-in`, `zoom-out`, `zoom-fit`, `align` | `+`, `-`, `0`, `a` |

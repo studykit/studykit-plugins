@@ -115,8 +115,11 @@ class RootNavigationTests(unittest.TestCase):
         before = self.nav.export_state()
         self.nav.key("\x0f", None)
         draft = self.nav.root_draft
-        for key in ("\x13", "\x14", "\x17", Mouse(3, ui.ROOT_ROW, "click"), "\x04"):
+        for key in ("\x13", "\x14", "\x12", Mouse(3, ui.ROOT_ROW, "click"), "\x0f"):
             self.nav.key(key, None)
+        self.assertEqual(self.nav.root_draft, draft)
+        self.nav.key("\x17", None)  # C-w kills the last path part, as on the command line.
+        self.nav.key("\x19", None)  # C-y puts it back.
         self.assertEqual(self.nav.root_draft, draft)
         self.nav.key("\x1b", None)
         self.assertEqual(self.nav.export_state(), before)
@@ -174,16 +177,25 @@ class RootNavigationTests(unittest.TestCase):
         for root in (self.first, self.second):
             subprocess.run(["git", "-C", str(root), "init", "-q"], check=True, capture_output=True)
         self.nav.change_root(self.first / "child")
-        self.nav.key("\x14", None)
+        self.nav.key("t", None)
         self.assertEqual(self.nav.root, self.first)
         self.assertEqual(self.nav.index.repository, self.first)
         self.enter_path(self.second)
         self.assertEqual(self.nav.index.repository, self.second)
         self.assertEqual(self.nav.index.status, {"file.md": "??"})
         self.nav.change_root(self.base)
-        self.nav.key("\x14", None)
+        self.nav.key("t", None)
         self.assertEqual(self.nav.root, self.base)
         self.assertIn("not inside a Git", self.nav.message)
+
+    def test_changing_root_keeps_a_preview_still_under_it(self):
+        self.nav.change_root(self.first / "child")
+        self.nav.load("nested.txt")
+        self.nav.preview_focus = True
+        self.nav.change_root(self.first)
+        self.assertEqual((self.nav.active, self.nav.preview_focus), ("child/nested.txt", True))
+        self.nav.change_root(self.second)
+        self.assertEqual((self.nav.active, self.nav.preview_focus), ("", False))
 
     def test_resize_state_retains_changed_root(self):
         self.nav.change_root(self.second)

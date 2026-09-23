@@ -11,7 +11,7 @@ ACTIONS = {
     "focus": "\t", "back": "\x1b", "quit": "\x03",
     "search": "/", "command": ":", "next-match": "n", "prev-match": "N",
     "preview": " ", "edit": "\x05", "diff": "\x04", "changes": "c", "ignored": "\x08",
-    "refresh": "\x12", "root": "\x0f", "git-root": "\x14", "parent": curses.KEY_BACKSPACE,
+    "refresh": "\x12", "root": "\x0f", "git-root": "t", "parent": curses.KEY_BACKSPACE,
     "layout": "\x17", "popup-size": "\x19", "top": "g", "bottom": "G",
     "zoom-in": "+", "zoom-out": "-", "zoom-fit": "0", "align": "a",
     "prev-diagram": "[", "next-diagram": "]", "source": "v", "launch": "o", "launch-with": "O",

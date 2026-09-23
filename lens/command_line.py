@@ -22,6 +22,7 @@ COMMANDS = (
     Command("goto", ("goto-line",), "goto LINE", "Jump to a preview line (or type the number alone)"),
     Command("find", ("search",), "find TEXT", "Find text in the preview"),
     Command("cd", ("root",), "cd DIR", "Change the navigation root", argument="directory"),
+    Command("git-root", (), "git-root", "Change the root to the Git repository root"),
     Command("top", (), "top", "Jump to the start of the preview"),
     Command("bottom", ("end",), "bottom", "Jump to the end of the preview"),
     Command("zoom", (), "zoom in|out|fit|PERCENT", "Zoom the current diagram",

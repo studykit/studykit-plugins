@@ -255,7 +255,7 @@ NUL, and bidi controls remain filtered.
 ## Navigation root changes
 
 Version 0.9 adds a synthetic `..` tree entry, parent navigation, a Ctrl+O path
-dialog, and Ctrl+T Git-root navigation. Parent entries never participate in file
+dialog, and `t` Git-root navigation. Parent entries never participate in file
 search, previews, editing, or diff snapshots. A root switch validates and scans
 the destination before replacing the current index; failures preserve the old
 view. Successful changes clear root-relative view state and reselect the previous
