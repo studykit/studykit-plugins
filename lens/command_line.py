@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass
 import os
+import sys
 from pathlib import Path
 
 
@@ -32,6 +33,10 @@ COMMANDS = (
     Command("ignored", (), "ignored [on|off]", "Show or hide Git-ignored files", ("on", "off")),
     Command("refresh", ("reload",), "refresh", "Reload the file list and preview"),
     Command("editor", ("vim", "emacs"), "editor", "Open the current file in an editor"),
+    Command("launch", ("xdg-open", "start"), "launch [FILE]",
+            "Open the selected file or folder in the application the OS assigns", argument="file"),
+    Command("with", ("app",), "with [APP]",
+            "Open the selected file or folder with an application; alone, list them", argument="application"),
     Command("diff", ("vimdiff",), "diff", "Compare the current file with HEAD"),
     Command("icons", (), "icons nerd|plain", "Use Nerd Font icons or plain text in the tree",
             ("nerd", "plain")),
@@ -73,6 +78,26 @@ def directories(root, partial):
     return [prefix + name + "/" for name in names]
 
 
+def applications(platform=sys.platform):
+    """Application names for :with completion: .app bundles on macOS, else commands on PATH."""
+    names = set()
+    if platform == "darwin":
+        for base in ("/Applications", "/Applications/Utilities", "/System/Applications",
+                     "/System/Applications/Utilities", str(Path.home() / "Applications")):
+            try:
+                names.update(entry.name[:-4] for entry in os.scandir(base) if entry.name.endswith(".app"))
+            except OSError:
+                pass
+    else:
+        for base in os.environ.get("PATH", "").split(os.pathsep):
+            try:
+                names.update(entry.name for entry in os.scandir(base)
+                             if entry.is_file() and os.access(entry.path, os.X_OK))
+            except OSError:
+                pass
+    return sorted(names)
+
+
 def complete(text, root, files):
     """Complete the command line. Returns (new text, candidates shown when ambiguous)."""
     word, space, rest = text.lstrip().partition(" ")
@@ -93,6 +118,9 @@ def complete(text, root, files):
                           for name in options})
     elif command.argument == "directory":
         options = directories(root, rest)
+    elif command.argument == "application":
+        # Application names often contain spaces; match case-insensitively.
+        options = [name for name in applications() if name.lower().startswith(rest.lower())]
     else:
         options = [choice for choice in command.choices if choice.startswith(rest)]
     if not options:

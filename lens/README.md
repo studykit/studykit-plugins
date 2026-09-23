@@ -94,6 +94,8 @@ pane in that tab.
 | a | Align diagrams left, center, or right |
 | Ctrl+D | Compare HEAD with the working tree in vimdiff, or in the diff tool from the settings |
 | Ctrl+E | Open the selected file in an editor |
+| o | Open the selected file or folder (or the previewed file) in the application your OS assigns to it, e.g. Finder for a folder |
+| O | Choose an application from a list to open it with; type to filter, recently used ones come first |
 | Ctrl+G | Toggle changed files only |
 | Ctrl+H | Show / hide Git-ignored files; enabling switches to the full project view |
 | Ctrl+R | Refresh the file list and preview, then reload Git status |
@@ -302,6 +304,8 @@ unambiguous prefix. While filtering filenames, `:` is ordinary text.
 | `ignored [on\|off]` | Show or hide Git-ignored files |
 | `refresh` | Reload the file list and preview |
 | `editor` / `diff` | Open the current file in an editor / vimdiff |
+| `launch [FILE]` (`xdg-open`, `start`) | Open the selected or named file or folder in its OS application |
+| `with [APP]` (`app`) | Open the selected file or folder with APP (a macOS application name, or a command elsewhere); alone, show the list |
 | `layout popup\|overlay` | Switch display mode |
 | `icons nerd\|plain` | Use [Nerd Font](https://www.nerdfonts.com) icons or plain text in the file tree; remembered |
 | `config` (`settings`) | Edit the settings file and reload it |
@@ -412,6 +416,12 @@ command = '''emacsclient -nw -a '' --eval '(ediff-files "{before}" "{after}" (li
 # command = "difft {before} {after}"
 pause = false      # true waits for Enter afterwards, for tools that print and exit
 
+[open]
+# Optional. Unset, "o" and :launch use the application the OS assigns to each
+# file or folder (open on macOS, xdg-open on Linux, start on Windows). Set a
+# command only to override that; {file} is replaced, else the path is appended.
+# command = "xdg-open {file}"
+
 [ui]
 icons = "nerd"     # or "plain"; overrides :icons at startup
 align = "center"   # diagram alignment: left, center, right
@@ -439,6 +449,7 @@ with a letter, or one of `space`, `tab`, `enter`, `escape`, `backspace`, `delete
 | `top`, `bottom` | `g`, `G` |
 | `zoom-in`, `zoom-out`, `zoom-fit`, `align` | `+`, `-`, `0`, `a` |
 | `prev-diagram`, `next-diagram`, `source` | `[`, `]`, `v` |
+| `launch`, `launch-with` | `o`, `O` |
 
 ## Optional keyboard shortcuts
 

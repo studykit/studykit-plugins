@@ -9,7 +9,7 @@ import subprocess
 from threading import Thread
 import unicodedata
 
-from core import Row, apply_status, checked_path, editor_command, preview, read_status, rows, scan
+from core import Row, apply_status, application_command, checked_path, editor_command, opener_command, preview, read_status, rows, scan
 from diff_tool import comparison
 from popup_size import PopupSize, PRESETS
 from view_state import normalize as normalize_view
@@ -130,6 +130,9 @@ class Navigator:
         self.bindings = {}  # From config.toml [keys]: key -> action name or ":command".
         self.settings_errors = ""
         self.diff_command, self.diff_pause = "", False
+        self.opener = ""
+        self.app_picker = None  # O: {"target", "query", "selected", "scroll", "apps"} while choosing.
+        self.recent_apps = []
         self.changes = changes
         self.include_ignored = initial_state["include_ignored"] if initial_state else False
         self.query = ""
@@ -226,6 +229,7 @@ class Navigator:
         chosen = self.settings_loader()
         self.editor = chosen.editor or self.environment_editor
         self.diff_command, self.diff_pause = chosen.diff, chosen.diff_pause
+        self.opener = chosen.opener
         if chosen.icons:
             self.icons = chosen.icons
         if chosen.align:
@@ -817,7 +821,7 @@ class Navigator:
         if self.graphics is None:
             return
         wanted = ()
-        if self.root_draft is None and not self.size_draft and not self.layout_dialog:
+        if self.root_draft is None and not self.size_draft and not self.layout_dialog and self.app_picker is None:
             wanted = tuple(self.placements)
         data = b""
         for image_id in sorted(self.images_stale & self.images_sent):
@@ -975,6 +979,114 @@ class Navigator:
         except (OSError, ValueError, subprocess.SubprocessError) as error:
             self.message = str(error)
 
+    def launch_target(self):
+        """What o and O open: the preview's file, else the selected row."""
+        if self.preview_focus and self.active:
+            return self.active
+        return self.items[self.selected].path if self.items else ""
+
+    def launch(self, name=None, app=None):
+        """Hand a file or folder to the OS, or to app."""
+        if name is None:
+            name = self.launch_target()
+        if app:
+            self.recent_apps = [app] + [known for known in self.recent_apps if known != app][:9]
+        try:
+            if name == "..":
+                path = self.root.parent
+            elif Path(name).expanduser().is_absolute():
+                path = Path(name).expanduser()
+            else:
+                path = checked_path(self.root, name) if name else self.root
+            if not path.exists():
+                raise ValueError(f"No such file: {name}")
+            # Detached: a GUI application must not hold the terminal or block Lens.
+            command = application_command(app, path) if app else opener_command(self.opener, path)
+            process = subprocess.Popen(command, cwd=self.root,
+                                       stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                                       stderr=subprocess.PIPE, start_new_session=True)
+            try:
+                _, error = process.communicate(timeout=2)
+            except subprocess.TimeoutExpired:
+                error = None  # Still running: the application took it.
+            if process.returncode:
+                detail = (error or b"").decode(errors="replace").strip().splitlines()
+                raise ValueError(detail[-1] if detail else f"Open command exited with status {process.returncode}")
+            self.message = f"Opened {path.name or path}" + (f" with {app}" if app else "")
+        except (OSError, ValueError, subprocess.SubprocessError) as error:
+            self.message = str(error)
+
+    def begin_app_picker(self):
+        try:
+            apps = command_line.applications()
+        except OSError as error:
+            apps, self.message = [], f"Could not list applications: {error}"
+        self.app_picker = {"target": self.launch_target(), "query": "", "selected": 0, "scroll": 0, "apps": apps}
+
+    def app_choices(self):
+        """Applications matching the picker's query: recent ones first, then name prefixes, then the rest."""
+        picker = self.app_picker
+        query = picker["query"].lower()
+        recent = [app for app in self.recent_apps if query in app.lower()]
+        rest = [app for app in picker["apps"] if query in app.lower() and app not in recent]
+        rest.sort(key=lambda app: not app.lower().startswith(query))
+        return recent + rest
+
+    def app_picker_key(self, key):
+        picker = self.app_picker
+        choices = self.app_choices()
+        if key == "\x1b":
+            self.app_picker = None
+        elif key in ("\n", "\r", curses.KEY_ENTER):
+            # With no match, the typed text is used as is: an unlisted app or a command.
+            app = choices[picker["selected"]] if choices else picker["query"].strip()
+            self.app_picker = None
+            if app:
+                self.launch(picker["target"], app)
+        elif key in (curses.KEY_UP, curses.KEY_DOWN, "\x10", "\x0e", curses.KEY_PPAGE, curses.KEY_NPAGE):
+            step = {curses.KEY_UP: -1, "\x10": -1, curses.KEY_DOWN: 1, "\x0e": 1,
+                    curses.KEY_PPAGE: -10, curses.KEY_NPAGE: 10}[key]
+            picker["selected"] = max(0, min(len(choices) - 1, picker["selected"] + step))
+        elif key == "\x15":
+            picker["query"], picker["selected"] = "", 0
+        elif key in (curses.KEY_BACKSPACE, "\x7f", "\x08"):
+            picker["query"], picker["selected"] = picker["query"][:-1], 0
+        elif isinstance(key, str) and key.isprintable():
+            picker["query"], picker["selected"] = picker["query"] + key, 0
+        return True
+
+    def draw_app_picker(self, screen):
+        height, width = screen.getmaxyx()
+        picker, choices = self.app_picker, self.app_choices()
+        box_width = min(64, width - 2)
+        rows = max(1, min(14, height - 10))
+        box_height = rows + 5
+        x, top = (width - box_width) // 2, max(0, (height - box_height) // 2)
+        for y in range(top, min(height, top + box_height)):
+            band(screen, y, x, "", box_width, self.style("surface"))
+        target = picker["target"] or "."
+        band(screen, top, x, f"  OPEN WITH  {target}", box_width, self.style("header") | curses.A_BOLD)
+        band(screen, top + 1, x + 2, f"› {picker['query']}▏", box_width - 4, self.style("selected"))
+        selected = picker["selected"]
+        if selected < picker["scroll"]:
+            picker["scroll"] = selected
+        elif selected >= picker["scroll"] + rows:
+            picker["scroll"] = selected - rows + 1
+        shown = choices[picker["scroll"]:picker["scroll"] + rows]
+        for offset, app in enumerate(shown):
+            index = picker["scroll"] + offset
+            recent = "  recent" if app in self.recent_apps else ""
+            style = self.style("selected") | curses.A_BOLD if index == selected else self.style("surface")
+            band(screen, top + 2 + offset, x + 2, f" {app}", box_width - 4, style)
+            if recent:
+                put(screen, top + 2 + offset, x + box_width - 10, recent.strip(), 8, self.style("muted"))
+        if not choices:
+            message = f"Enter opens with \"{picker['query']}\"" if picker["query"] else "No applications found"
+            put(screen, top + 2, x + 3, message, box_width - 6, self.style("muted"))
+        count = f"{selected + 1 if choices else 0}/{len(choices)}"
+        put(screen, top + box_height - 2, x + 2, f"↑↓ Choose  Enter Open  ⌃U Clear  Esc Cancel   {count}",
+            box_width - 4, self.style("active"))
+
     def run_terminal(self, screen, command, cwd, pause=False):
         self.release_image()
         terminal_input.disable()
@@ -1118,6 +1230,8 @@ class Navigator:
                 self.draw_size(screen)
             if self.root_draft is not None:
                 self.draw_root(screen)
+            if self.app_picker is not None:
+                self.draw_app_picker(screen)
             screen.refresh()
             return
         bottom = height - 4
@@ -1171,6 +1285,8 @@ class Navigator:
             self.draw_layout(screen)
         if self.root_draft is not None:
             self.draw_root(screen)
+        if self.app_picker is not None:
+            self.draw_app_picker(screen)
         screen.refresh()
 
     def command_key(self, key, screen):
@@ -1287,6 +1403,13 @@ class Navigator:
             self.edit(screen)
         elif name == "diff":
             self.show_diff(screen)
+        elif name == "launch":
+            self.launch(argument or None)
+        elif name == "with":
+            if argument:
+                self.launch(app=argument)
+            else:
+                self.begin_app_picker()
         elif name == "layout":
             if argument not in ("popup", "overlay"):
                 self.message = f":{command.usage}"
@@ -1382,7 +1505,7 @@ class Navigator:
             return
         self.hint_row(screen, height - 2, width, [
             ("Tab", "Focus"), ("Enter", "Scroll" if self.preview_focus else "Open"), (":", "Command"),
-            ("⌃E", "Edit"), ("⌃D", "Diff"), ("⌃W", "Layout"), ("⌃Y", "Size"), ("Esc", "Back")])
+            ("⌃E", "Edit"), ("⌃D", "Diff"), ("o O", "Open/With"), ("⌃W", "Layout"), ("⌃Y", "Size"), ("Esc", "Back")])
         if self.finding:
             hints, mode = [("⌃U", "Clear"), ("Enter", "Keep"), ("Esc", "Cancel"), ("abc", "Ignores case")], "FIND"
         elif self.searching:
@@ -1572,7 +1695,7 @@ class Navigator:
             self.handle_mouse(terminal_input.Mouse(x, y, "click"), screen)
 
     def handle_mouse(self, event, screen=None):
-        if self.root_draft is not None or self.size_draft or self.layout_dialog:
+        if self.root_draft is not None or self.size_draft or self.layout_dialog or self.app_picker is not None:
             return
         x, y = event.x, event.y
         if y == 1 and event.action == "click" and not self.searching:
@@ -1607,6 +1730,7 @@ class Navigator:
             self.update_theme()
             return True
         typing = (self.layout_dialog or self.size_draft or self.root_draft is not None
+                  or self.app_picker is not None
                   or self.finding or self.searching or self.command is not None)
         if key in self.bindings and not typing:
             target = self.bindings[key]
@@ -1625,6 +1749,8 @@ class Navigator:
             self.close_typed = ()
         if self.layout_dialog:
             return self.layout_key(key)
+        if self.app_picker is not None:
+            return self.app_picker_key(key)
         if self.size_draft:
             return self.size_key(key)
         if self.root_draft is not None:
@@ -1711,6 +1837,10 @@ class Navigator:
             self.show_diff(screen)
         elif key == "\x05":
             self.edit(screen)
+        elif key == "o":
+            self.launch()
+        elif key == "O":
+            self.begin_app_picker()
         elif key == "\x07":
             self.changes = not self.changes
             self.preview_focus = False

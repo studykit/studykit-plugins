@@ -14,7 +14,7 @@ ACTIONS = {
     "refresh": "\x12", "root": "\x0f", "git-root": "\x14", "parent": curses.KEY_BACKSPACE,
     "layout": "\x17", "popup-size": "\x19", "top": "g", "bottom": "G",
     "zoom-in": "+", "zoom-out": "-", "zoom-fit": "0", "align": "a",
-    "prev-diagram": "[", "next-diagram": "]", "source": "v",
+    "prev-diagram": "[", "next-diagram": "]", "source": "v", "launch": "o", "launch-with": "O",
 }
 
 NAMED = {
@@ -44,6 +44,12 @@ TEMPLATE = """\
 # command = "difft {before} {after}"
 # pause = true        # Wait for Enter afterwards, for tools that print and exit
 
+[open]
+# Optional. Unset, "o" and :launch use the application the OS assigns to each
+# file or folder (open on macOS, xdg-open on Linux, start on Windows). Set a
+# command only to override that; {file} is replaced, else the path is appended.
+# command = "xdg-open {file}"
+
 [ui]
 # icons = "nerd"      # Nerd Font icons in the file tree, or "plain"
 # align = "center"    # Diagram alignment: left, center, right
@@ -61,6 +67,7 @@ class Settings:
     editor: str = ""
     diff: str = ""
     diff_pause: bool = False
+    opener: str = ""
     icons: str | None = None
     align: str | None = None
     keys: dict = field(default_factory=dict)  # curses key -> action name or ":command"
@@ -137,6 +144,11 @@ def load(file: Path | None) -> Settings:
         settings.diff_pause = diff.get("pause", False)
     else:
         settings.errors.append("config.toml: diff.pause must be true or false")
+    opener = section("open").get("command", "")
+    if isinstance(opener, str):
+        settings.opener = opener.strip()
+    else:
+        settings.errors.append("config.toml: open.command must be a string")
     ui = section("ui")
     if ui.get("icons") is not None:
         if ui["icons"] in ("nerd", "plain"):

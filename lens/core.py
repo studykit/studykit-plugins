@@ -7,6 +7,7 @@ import shlex
 import shutil
 import stat
 import subprocess
+import sys
 from collections import deque
 from dataclasses import dataclass, field
 
@@ -255,3 +256,34 @@ def editor_command(configured: str, path: Path, line: int = 1) -> list[str]:
     if any("{file}" in part for part in command):
         return [part.replace("{file}", target).replace("{line}", str(line)) for part in command]
     return [*(part.replace("{line}", str(line)) for part in command), target]
+
+
+def opener_command(configured: str, path: Path, platform: str = sys.platform) -> list[str]:
+    """The command that hands a file or folder to the application the OS associates with it."""
+    if configured:
+        command = shlex.split(configured)
+    elif platform == "darwin":
+        command = ["open"]
+    elif platform.startswith("win"):
+        command = ["cmd", "/c", "start", ""]
+    else:
+        command = ["xdg-open"]
+    if not command or not shutil.which(command[0]):
+        raise ValueError(f"{command[0] if command else 'Open command'} was not found on PATH")
+    target = str(path.absolute())
+    if any("{file}" in part for part in command):
+        return [part.replace("{file}", target) for part in command]
+    return [*command, target]
+
+
+def application_command(app: str, path: Path, platform: str = sys.platform) -> list[str]:
+    """The command that opens a file or folder with a chosen application."""
+    target = str(path.absolute())
+    if platform == "darwin":
+        return ["open", "-a", app, target]  # open reports an unknown application itself.
+    if platform.startswith("win"):
+        return ["cmd", "/c", "start", "", app, target]
+    command = shlex.split(app)
+    if not command or not shutil.which(command[0]):
+        raise ValueError(f"{app} was not found on PATH")
+    return [*command, target]
