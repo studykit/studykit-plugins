@@ -109,7 +109,7 @@ directories are excluded. Hidden files are included. Git status uses the usual
 two-column codes, including `??` for new files and `D` for deleted files.
 
 The file list and saved preview appear before Git status finishes loading.
-You can navigate, search, and close the navigator while `Git: loading…` is shown;
+You can navigate, search, and close the navigator while `Git…` is shown under the file tree title;
 change indicators appear when ready. The changes-only view shows its loading
 state first, then fills with changed files. If status lookup fails, the file
 browser remains usable; press Ctrl+R to retry.
@@ -122,7 +122,7 @@ use Ctrl+H to include files excluded by Git ignore rules.
 
 Git-ignored files are hidden by default. Ctrl+H includes excluded directories,
 their files, empty folders, and nested repositories in the tree and file search.
-The header shows `Ignored: shown` or `Ignored: hidden`. Git metadata (`.git`,
+The file tree's title shows `+ignored` while they are shown (an eye icon with `:icons nerd`). Git metadata (`.git`,
 `.hg`, `.svn`) remains hidden, and directory symlinks are not followed. Outside
 Git, this toggle also includes normally skipped dependency/cache directories.
 Ignored files are not treated as Git changes; Ctrl+G still shows only changes
@@ -302,6 +302,7 @@ unambiguous prefix. While filtering filenames, `:` is ordinary text.
 | `refresh` | Reload the file list and preview |
 | `editor` / `diff` | Open the current file in an editor / vimdiff |
 | `layout popup\|overlay` | Switch display mode |
+| `icons nerd\|plain` | Use [Nerd Font](https://www.nerdfonts.com) icons or plain text in the file tree; remembered |
 | `help [COMMAND]` | List commands or describe one |
 | `quit` (`q`, `exit`) | Close Lens |
 

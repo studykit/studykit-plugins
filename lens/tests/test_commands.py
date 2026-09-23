@@ -63,6 +63,14 @@ class CommandLineTests(unittest.TestCase):
         self.run_line("zoom in")
         self.assertEqual(self.nav.message, "No diagram in this preview")
 
+    def test_icons_command_switches_and_saves(self):
+        saved = []
+        self.nav.on_icons = saved.append
+        self.run_line("icons n")
+        self.assertEqual((self.nav.icons, saved), ("nerd", ["nerd"]))
+        self.run_line("icons bogus")
+        self.assertEqual(self.nav.icons, "nerd")
+
     def test_fixed_arguments_accept_prefixes(self):
         self.run_line("ignored of")
         self.assertFalse(self.nav.include_ignored)

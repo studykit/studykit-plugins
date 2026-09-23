@@ -57,6 +57,15 @@ def band(screen, y, x, text, width, style=0):
     put(screen, y, x, text, width, style)
 
 
+# Tree status marks. Nerd Font glyphs need a patched font, so plain text is the default.
+ICONS = {
+    "plain": {"project": "", "changes": "", "hidden": "", "shown": "+ignored",
+              "loading": "Git…", "error": "No Git status"},
+    "nerd": {"project": "\U000f0645", "changes": "\uf47f", "hidden": "\U000f0209", "shown": "\U000f0208",
+             "loading": "\uf46a Git…", "error": "\uf071 No Git status"},
+}
+
+
 def theme(palette=None, folder_style=None) -> dict[str, int]:
     palette = palette or resolve_theme()
     styles = {"active": curses.A_BOLD, "header": curses.A_REVERSE | curses.A_BOLD,
@@ -107,7 +116,8 @@ class Navigator:
                  size: PopupSize = PopupSize(), on_resize=None, theme_loader=None,
                  folder_style=None, on_state=None, layout_loader=None, on_layout=None,
                  initial_state=None, defer_status=False, diagram_tools=None, graphics=None,
-                 cell_size=None, alignment="center", on_alignment=None, close_keys=()):
+                 cell_size=None, alignment="center", on_alignment=None, close_keys=(),
+                 icons="plain", on_icons=None):
         initial_state = normalize_view(initial_state, root)
         self.root, self.pane_id, self.editor = root, pane_id, editor
         self.changes = changes
@@ -169,6 +179,8 @@ class Navigator:
         self.zoom_version = 0
         self.alignment = alignment if alignment in diagram_preview.ALIGNMENTS else "center"
         self.on_alignment = on_alignment
+        self.icons = icons if icons in ICONS else "plain"
+        self.on_icons = on_icons
         self.diagram_extent = None  # Zoomed (cols, rows) of a diagram file's image.
         self.markdown_diagrams = []
         self.render_body = None
@@ -965,9 +977,17 @@ class Navigator:
     def draw_tree(self, screen, x, width, bottom):
         focused = not self.preview_focus and not self.searching
         self.panel(screen, x, width, bottom, focused)
-        band(screen, 5, x + 1, " CHANGED FILES" if self.changes else " PROJECT FILES", width - 2,
-             self.style("header" if focused else "surface"))
-        put(screen, 6, x + 2, f"{len(self.items)} rows · Space preview", width - 4, self.style("muted"))
+        header = self.style("header" if focused else "surface")
+        icons = ICONS[self.icons]
+        icon = icons["changes" if self.changes else "project"]
+        title = "CHANGED FILES" if self.changes else "PROJECT FILES"
+        band(screen, 5, x + 1, f" {icon} {title}" if icon else f" {title}", width - 2, header)
+        flag = icons["shown" if self.include_ignored else "hidden"]  # Ctrl+H toggles.
+        if flag:
+            put(screen, 5, x + width - 2 - cells(flag), flag, cells(flag), header)
+        git = (icons["loading"] if self.index and self.index.status_pending
+               else icons["error"] if self.index and self.index.status_error else "Space preview")
+        put(screen, 6, x + 2, f"{len(self.items)} rows · {git}", width - 4, self.style("muted"))
         if not self.items:
             empty = "Loading Git status…" if self.index and self.index.status_pending else "Git status unavailable" if self.index and self.index.status_error else "No matching files"
             put(screen, self.content_top, x + 2, empty, width - 4, self.style("muted"))
@@ -1084,10 +1104,6 @@ class Navigator:
             hint = "Type filename…  Enter Apply · Esc Cancel" if self.searching else "/ to search files"
             band(screen, 2, 1, f" ⌕  {self.query or hint}" + (" ▏" if self.searching and self.query else ""), width - 3,
                  self.style("selected" if self.searching else "surface"))
-        mode = "CHANGES" if self.changes else "PROJECT"
-        visibility = "shown" if self.include_ignored else "hidden"
-        status_hint = " · Git: loading…" if self.index and self.index.status_pending else " · Git: unavailable" if self.index and self.index.status_error else ""
-        put(screen, 3, 2, f"{mode} · Ignored: {visibility} (^H){status_hint}", width - 4, self.style("active"))
         if self.narrow:
             if self.preview_focus:
                 self.draw_content(screen, 0, width - 1, bottom)
@@ -1165,7 +1181,7 @@ class Navigator:
             argument = chosen[0]
         needs = {"open": "a file", "goto": "a line number", "find": "text", "cd": "a directory",
                  "zoom": "in, out, fit or a percent", "align": "left, center or right",
-                 "layout": "popup or overlay"}
+                 "layout": "popup or overlay", "icons": "nerd or plain"}
         if name in needs and not argument:
             self.message = f":{command.usage} needs {needs[name]}"
             return True
@@ -1199,6 +1215,17 @@ class Navigator:
             self.find_next(1, origin=self.preview_scroll)
         elif name == "cd":
             self.change_root(argument)
+        elif name == "icons":
+            if argument not in ICONS:
+                self.message = f":{command.usage}"
+                return True
+            self.icons = argument
+            self.message = f"Icons: {argument}"
+            if self.on_icons is not None:
+                try:
+                    self.on_icons(argument)
+                except (OSError, ValueError) as error:
+                    self.message += f" (not saved: {error})"
         elif name in ("zoom", "align", "source", "diagram"):
             self.diagram_command(name, argument)
         elif name in ("changes", "project"):

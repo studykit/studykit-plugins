@@ -49,6 +49,26 @@ def kitty_graphics(env):
     return True
 
 
+def load_icons(config_dir):
+    try:
+        value = json.loads((config_dir / "icons.json").read_text())
+        return value["icons"] if isinstance(value, dict) and value.get("icons") in ("nerd", "plain") else "plain"
+    except (OSError, ValueError, TypeError):
+        return "plain"
+
+
+def save_icons(config_dir, icons):
+    config_dir.mkdir(parents=True, exist_ok=True)
+    fd, temporary = tempfile.mkstemp(prefix=".icons-", dir=config_dir)
+    try:
+        with os.fdopen(fd, "w") as stream:
+            json.dump({"icons": icons}, stream)
+            stream.write("\n")
+        os.replace(temporary, config_dir / "icons.json")
+    finally:
+        Path(temporary).unlink(missing_ok=True)
+
+
 def chord(spec):
     """One Herdr key chord ("ctrl+s", "alt+x", "shift+a", "a") as curses input."""
     *mods, name = spec.lower().split("+") if spec != "+" else ["+"]
@@ -390,6 +410,8 @@ def main(env: dict, operation: str) -> int:
                               cell_size=lambda: cell_size(env, pane_id),
                               alignment=diagram_preview.load_alignment(config_dir),
                               close_keys=toggle_keys(env),
+                              icons=load_icons(config_dir) if config_dir else "plain",
+                              on_icons=(lambda chosen: save_icons(config_dir, chosen)) if config_dir else None,
                               on_alignment=(lambda chosen: diagram_preview.save_alignment(config_dir, chosen))
                                   if config_dir else None)
         if restored is not None and env.get("LENS_RESUME"):

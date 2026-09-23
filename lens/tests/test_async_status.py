@@ -207,11 +207,11 @@ class DeferredStatusTests(unittest.TestCase):
         screen = Mock()
         screen.getmaxyx.return_value = (30, 120)
         nav.draw(screen)
-        self.assertTrue(any("Git: loading" in call.args[2] for call in screen.addstr.call_args_list))
+        self.assertTrue(any("Git…" in call.args[2] for call in screen.addstr.call_args_list))
         self.complete(nav)
         screen.reset_mock()
         nav.draw(screen)
-        self.assertFalse(any("Git: loading" in call.args[2] for call in screen.addstr.call_args_list))
+        self.assertFalse(any("Git…" in call.args[2] for call in screen.addstr.call_args_list))
 
     def test_non_git_root_has_no_background_job(self):
         with tempfile.TemporaryDirectory() as directory:

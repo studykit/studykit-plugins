@@ -33,6 +33,8 @@ COMMANDS = (
     Command("refresh", ("reload",), "refresh", "Reload the file list and preview"),
     Command("editor", ("vim", "emacs"), "editor", "Open the current file in an editor"),
     Command("diff", ("vimdiff",), "diff", "Compare the current file with HEAD"),
+    Command("icons", (), "icons nerd|plain", "Use Nerd Font icons or plain text in the tree",
+            ("nerd", "plain")),
     Command("layout", (), "layout popup|overlay", "Switch display mode", ("popup", "overlay")),
     Command("help", ("?",), "help [COMMAND]", "List commands or describe one"),
     Command("quit", ("q", "exit", "kill-emacs"), "quit", "Close Lens"),

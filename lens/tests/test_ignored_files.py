@@ -187,10 +187,11 @@ class IgnoredFileTests(unittest.TestCase):
         nav = self.navigator()
         screen = Mock()
         screen.getmaxyx.return_value = (30, 120)
-        for state in ("hidden", "shown"):
+        nav.icons = "nerd"
+        for flag in ("\U000f0209", "\U000f0208"):
             screen.reset_mock()
             nav.draw(screen)
-            self.assertTrue(any(f"Ignored: {state} (^H)" in call.args[2]
+            self.assertTrue(any(call.args[2] == flag
                                 for call in screen.addstr.call_args_list))
             nav.key("\x08", None)
 
