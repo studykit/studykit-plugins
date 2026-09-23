@@ -1,0 +1,21 @@
+{
+  "name": "diagram",
+  "version": "0.1.0",
+  "description": "PlantUML, D2, and Structurizr DSL diagram creation, syntax reference, validation, and rendering",
+  "author": {
+    "name": "studykit"
+  },
+  "repository": "https://github.com/studykit/studykit-plugins",
+  "license": "MIT",
+  "keywords": [
+    "diagram",
+    "plantuml",
+    "d2",
+    "structurizr",
+    "c4",
+    "uml",
+    "sequence",
+    "architecture",
+    "visualization"
+  ]
+}

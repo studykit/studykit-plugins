@@ -1,24 +1,26 @@
 {
-  "name": "plantuml",
-  "version": "0.3.1",
-  "description": "PlantUML diagram reference, creation, and validation plugin",
+  "name": "diagram",
+  "version": "0.1.0",
+  "description": "PlantUML, D2, and Structurizr DSL diagram creation, syntax reference, validation, and rendering",
   "author": {
     "name": "studykit"
   },
   "repository": "https://github.com/studykit/studykit-plugins",
   "license": "MIT",
   "keywords": [
-    "plantuml",
     "diagram",
+    "plantuml",
+    "d2",
+    "structurizr",
+    "c4",
     "uml",
     "sequence",
-    "class",
-    "activity",
+    "architecture",
     "visualization"
   ],
   "interface": {
-    "displayName": "PlantUML",
-    "shortDescription": "Create and reference PlantUML diagrams",
+    "displayName": "Diagram",
+    "shortDescription": "Create and check PlantUML, D2, and Structurizr diagrams",
     "developerName": "studykit",
     "category": "Productivity",
     "capabilities": [

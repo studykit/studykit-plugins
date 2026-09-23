@@ -52,11 +52,9 @@ For compatibility and versioning rules, see `AGENTS.md`.
 - `korea-gov-data` — extract and organize Open API specifications from KOSIS (Korean Statistical Information Service)
 - `dom-analyzer` — HTML/XML DOM structure analysis toolkit with hierarchy visualization
 - `spectrack` — provider-backed workflow over GitHub Issues, Jira, GitHub repository wiki directory, and Confluence with issue and knowledge authoring contracts
-- `plantuml` — PlantUML diagram reference, creation, and validation
-- `structurizr` — Structurizr DSL diagram composition, C4 model visualization, and architecture documentation
-- `d2` — D2 diagram composition, rendering, and visualization
+- `diagram` — PlantUML, D2, and Structurizr DSL diagram creation, syntax reference, validation, and rendering
 - `guard` — user-configured answer, turn, and plan reviews, plus rule-based checkpoints for changed files
 - `handover` — create a self-contained session handover and load a recorded handover after a clear
 - `lens` — Herdr file tree with popup and overlay views, saved navigation state, filename search, Markdown and source previews, diagram rendering (PlantUML, Mermaid, D2, Graphviz and more), and Git diffs
 
-`structurizr`, `d2` and `handover` are Claude Code only. `lens` installs through Herdr and works alongside any agent. The remaining plugins run in both Claude Code and Codex.
+`handover` is Claude Code only. `lens` installs through Herdr and works alongside any agent. The remaining plugins run in both Claude Code and Codex.

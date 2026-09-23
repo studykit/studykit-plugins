@@ -57,40 +57,16 @@
       "keywords": ["workflow", "github", "jira", "confluence", "wiki", "issues", "spec", "usecase", "authoring"]
     },
     {
-      "name": "plantuml",
-      "source": "./plantuml",
-      "description": "PlantUML diagram reference, creation, and validation plugin",
+      "name": "diagram",
+      "source": "./diagram",
+      "description": "PlantUML, D2, and Structurizr DSL diagram creation, syntax reference, validation, and rendering",
       "author": {
         "name": "studykit"
       },
       "repository": "https://github.com/studykit/studykit-plugins",
       "license": "MIT",
       "category": "diagram",
-      "keywords": ["plantuml", "diagram", "uml", "sequence", "class", "activity", "visualization", "c4", "architecture", "sprites"]
-    },
-    {
-      "name": "structurizr",
-      "source": "./structurizr",
-      "description": "Structurizr DSL diagram composition, C4 model visualization, and architecture documentation plugin",
-      "author": {
-        "name": "studykit"
-      },
-      "repository": "https://github.com/studykit/studykit-plugins",
-      "license": "MIT",
-      "category": "diagram",
-      "keywords": ["structurizr", "c4-model", "architecture", "diagram", "dsl", "system-context", "container", "deployment"]
-    },
-    {
-      "name": "d2",
-      "source": "./d2",
-      "description": "D2 diagram composition, rendering, and visualization plugin",
-      "author": {
-        "name": "studykit"
-      },
-      "repository": "https://github.com/studykit/studykit-plugins",
-      "license": "MIT",
-      "category": "diagram",
-      "keywords": ["d2", "d2lang", "diagram", "architecture", "flowchart", "erd", "sequence", "visualization"]
+      "keywords": ["diagram", "plantuml", "d2", "structurizr", "c4", "uml", "sequence", "architecture", "visualization"]
     },
     {
       "name": "guard",

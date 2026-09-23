@@ -1,8 +1,8 @@
 """Validate PlantUML syntax using the PlantUML online server API.
 
 Usage:
-    uv run skills/compose/scripts/validate_online.py <file.puml> [file2.puml ...]
-    echo '@startuml\nA -> B\n@enduml' | uv run skills/compose/scripts/validate_online.py -
+    uv run scripts/validate_online.py <file.puml> [file2.puml ...]
+    echo '@startuml\nA -> B\n@enduml' | uv run scripts/validate_online.py -
 
 No local PlantUML installation required.
 """

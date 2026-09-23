@@ -1,14 +1,6 @@
-# PlantUML Compose Skill Map
+# PlantUML Reference Map
 
-Use this file first to choose the right reference document for the request.
-
-## Mode Hints
-
-| User intent | Mode |
-|---|---|
-| "draw", "create", "generate", "make a diagram", "add to markdown", "insert into file" | `create` |
-| "syntax", "how do I write", "example for", "reference" | `reference` |
-| "check", "validate", "lint", "syntax check", "is this valid", "why does this fail", "invalid PlantUML" | `check` |
+Choose the PlantUML reference files for the request. Paths are relative to this directory.
 
 ## Primary Diagram References
 
@@ -59,5 +51,3 @@ Load these only when the request needs less-common or specialized syntax:
 2. Add `creole-and-links.md` if the request needs rich text, links, formulas, or complex notes.
 3. Add `sprites.md` if the request needs icons or logos.
 4. For C4 diagrams with logos, load both `c4-diagram.md` and `sprites.md`.
-5. In `reference` mode, answer from the selected docs without writing files.
-6. In `create` mode, validate after any file write.

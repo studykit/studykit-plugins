@@ -53,10 +53,10 @@
       "category": "Coding"
     },
     {
-      "name": "plantuml",
+      "name": "diagram",
       "source": {
         "source": "local",
-        "path": "./plantuml"
+        "path": "./diagram"
       },
       "policy": {
         "installation": "AVAILABLE",

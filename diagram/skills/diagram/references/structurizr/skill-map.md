@@ -1,14 +1,6 @@
-# Structurizr Compose Skill Map
+# Structurizr Reference Map
 
-Use this file first to choose the right reference document for the request.
-
-## Mode Hints
-
-| User intent | Mode |
-|---|---|
-| "draw", "create", "generate", "make a diagram", "add to markdown", "insert into file" | `create` |
-| "syntax", "how do I write", "example for", "reference" | `reference` |
-| "check", "validate", "is this valid", "why does this fail" | `check` |
+Choose the Structurizr reference files for the request. Paths are relative to this directory.
 
 ## Primary View References
 
@@ -36,5 +28,16 @@ Use this file first to choose the right reference document for the request.
 2. Add `dsl-language.md` if the request needs general DSL syntax beyond what the view reference covers.
 3. Add `styles.md` or `themes.md` if the request mentions specific styling, colors, or themes.
 4. Add `cookbook.md` for complete multi-view workspace examples or advanced patterns.
-5. In `reference` mode, answer from the selected docs without writing files.
-6. In `create` mode, preview after any file write.
+
+## Official Documentation
+
+When these references do not cover a feature, consult the official Structurizr docs:
+
+| Topic | URL |
+|-------|-----|
+| DSL Language Reference | https://docs.structurizr.com/dsl/language |
+| Cookbook (patterns & recipes) | https://docs.structurizr.com/dsl/cookbook/ |
+| Cookbook: specific recipe | https://docs.structurizr.com/dsl/cookbook/{recipe-name}/ |
+| Themes | https://docs.structurizr.com/dsl/cookbook/themes/ |
+| AWS icons | https://docs.structurizr.com/dsl/cookbook/amazon-web-services/ |
+| CLI export | https://docs.structurizr.com/cli/export |
