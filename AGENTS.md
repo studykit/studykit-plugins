@@ -38,10 +38,15 @@ the session it runs in, and testing in your own would take your work with it.
 test "${HERDR_ENV:-}" = 1                      # refuse to drive Herdr from outside it
 herdr pane split --current --direction down --cwd "$PWD" --no-focus
 herdr agent start <name> --kind claude --pane <returned pane id> \
-  -- --plugin-dir /abs/path/to/<plugin>
+  -- --plugin-dir /abs/path/to/<plugin> --model haiku
 herdr agent prompt <name> '<what to run>' --wait --timeout 120000
 herdr agent read <name> --source recent-unwrapped --lines 60
 ```
+
+Run the test session on a low-cost model (`--model haiku` for Claude Code, `-m gpt-6-luna` for
+Codex). A probe checks whether the plugin fires, not how well the model reasons,
+so a frontier model only adds cost. Move to a stronger model only when the behavior under
+test depends on model judgment, and say so in the result.
 
 A plugin that ships a shell command can put it on `PATH` for the session with no install
 step: `$CLAUDE_ENV_FILE` is a shell script the host *sources*, not a list of `export` lines,
