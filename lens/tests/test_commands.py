@@ -28,8 +28,8 @@ class CommandLineTests(unittest.TestCase):
             self.nav.key(char, None)
         return self.nav.key("\n", None)
 
-    def test_open_reveals_the_file_and_goto_jumps(self):
-        self.run_line("e src/deep/module.py")
+    def test_preview_reveals_the_file_and_goto_jumps(self):
+        self.run_line("preview src/deep/module.py")
         self.assertEqual(self.nav.active, "src/deep/module.py")
         self.assertTrue(self.nav.preview_focus)
         self.assertEqual(self.nav.items[self.nav.selected].path, "src/deep/module.py")
@@ -49,7 +49,7 @@ class CommandLineTests(unittest.TestCase):
         self.assertFalse(self.run_line("q", opener="\x1bx"))
 
     def test_find_command_uses_preview_search(self):
-        self.run_line("open src/main.py")
+        self.run_line("preview src/main.py")
         self.run_line("find needle")
         self.assertEqual(self.nav.find_query, "needle")
         self.assertEqual(self.nav.message, "Match 1/1")
@@ -57,7 +57,7 @@ class CommandLineTests(unittest.TestCase):
     def test_errors_are_reported(self):
         self.run_line("bogus")
         self.assertIn("Unknown command: bogus", self.nav.message)
-        self.run_line("open missing.txt")
+        self.run_line("preview missing.txt")
         self.assertIn("No such file", self.nav.message)
         self.run_line("goto 3")
         self.assertEqual(self.nav.message, "Open a file first")
@@ -80,16 +80,16 @@ class CommandLineTests(unittest.TestCase):
 
     def test_tab_completes_commands_and_paths(self):
         self.nav.key(":", None)
-        for char in "op":
+        for char in "prev":
             self.nav.key(char, None)
         self.nav.key("\t", None)
-        self.assertEqual(self.nav.command, "open ")
+        self.assertEqual(self.nav.command, "preview ")
         for char in "src/d":
             self.nav.key(char, None)
         self.nav.key("\t", None)
-        self.assertEqual(self.nav.command, "open src/deep/")
+        self.assertEqual(self.nav.command, "preview src/deep/")
         self.nav.key("\t", None)
-        self.assertEqual(self.nav.command, "open src/deep/module.py")
+        self.assertEqual(self.nav.command, "preview src/deep/module.py")
         self.nav.key("\x15", None)
         self.nav.key("c", None)
         self.nav.key("\t", None)  # cd, changes, config: listed in the completion menu.
@@ -110,39 +110,39 @@ class CommandLineTests(unittest.TestCase):
         self.assertEqual(self.nav.command, "changes ")
         self.assertIsNone(self.nav.command_menu)
         self.nav.key("\x15", None)
-        for char in "open s":
+        for char in "preview s":
             self.nav.key(char, None)
         self.nav.key("\t", None)
-        self.assertEqual(self.nav.command, "open src/")
+        self.assertEqual(self.nav.command, "preview src/")
         self.nav.key("\t", None)
         self.assertIsNotNone(self.nav.command_menu)
         self.nav.key("\x1b", None)  # Esc closes the list, not the command line.
         self.assertIsNone(self.nav.command_menu)
-        self.assertEqual(self.nav.command, "open src/")
+        self.assertEqual(self.nav.command, "preview src/")
 
     def test_emacs_keys_edit_the_command_line(self):
         self.nav.key(":", None)
-        for char in "open src/main.py":
+        for char in "preview src/main.py":
             self.nav.key(char, None)
         self.nav.key("\x01", None)  # C-a
         self.assertEqual(self.nav.command_cursor, 0)
         self.nav.key("\x1bf", None)  # M-f
-        self.assertEqual(self.nav.command_cursor, 4)
+        self.assertEqual(self.nav.command_cursor, 7)
         self.nav.key("\x0b", None)  # C-k
-        self.assertEqual(self.nav.command, "open")
+        self.assertEqual(self.nav.command, "preview")
         self.nav.key("\x19", None)  # C-y
-        self.assertEqual(self.nav.command, "open src/main.py")
+        self.assertEqual(self.nav.command, "preview src/main.py")
         self.nav.key("\x05", None)  # C-e
         self.nav.key("\x1b\x7f", None)  # M-DEL
-        self.assertEqual(self.nav.command, "open src/main.")
+        self.assertEqual(self.nav.command, "preview src/main.")
         self.nav.key("\x17", None)  # C-w kills the whole path.
-        self.assertEqual(self.nav.command, "open ")
+        self.assertEqual(self.nav.command, "preview ")
         self.nav.key("\x02", None)  # C-b, then typing inserts at point.
         self.nav.key("x", None)
-        self.assertEqual((self.nav.command, self.nav.command_cursor), ("openx ", 5))
+        self.assertEqual((self.nav.command, self.nav.command_cursor), ("previewx ", 8))
         self.nav.key("\x1bb", None)  # M-b
         self.nav.key("\x04", None)  # C-d
-        self.assertEqual(self.nav.command, "penx ")
+        self.assertEqual(self.nav.command, "reviewx ")
         self.nav.key("\x05", None)
         self.nav.key("\x02", None)
         self.nav.key("\x15", None)  # C-u kills to the start only.
@@ -152,14 +152,14 @@ class CommandLineTests(unittest.TestCase):
 
     def test_completion_keeps_text_after_the_cursor(self):
         self.nav.key(":", None)
-        for char in "op src/main.py":
+        for char in "prev src/main.py":
             self.nav.key(char, None)
         for _ in "src/main.py":
             self.nav.key("\x02", None)
         self.nav.key("\x02", None)
         self.nav.key("\t", None)
-        self.assertEqual(self.nav.command, "open  src/main.py")
-        self.assertEqual(self.nav.command_cursor, 5)
+        self.assertEqual(self.nav.command, "preview  src/main.py")
+        self.assertEqual(self.nav.command_cursor, 8)
 
     def test_mode_line_sits_above_the_command_line(self):
         screen = Mock()
@@ -199,11 +199,11 @@ class CommandLineTests(unittest.TestCase):
 
     def test_history_and_backspace_on_empty_line(self):
         self.run_line("help")
-        self.run_line("help open")
-        self.assertIn(":open FILE", self.nav.message)
+        self.run_line("help preview")
+        self.assertIn(":preview FILE", self.nav.message)
         self.nav.key(":", None)
         self.nav.key(curses.KEY_UP, None)
-        self.assertEqual(self.nav.command, "help open")
+        self.assertEqual(self.nav.command, "help preview")
         self.nav.key(curses.KEY_UP, None)
         self.assertEqual(self.nav.command, "help")
         self.nav.key("\x15", None)

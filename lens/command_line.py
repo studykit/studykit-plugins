@@ -18,7 +18,7 @@ class Command:
 
 
 COMMANDS = (
-    Command("open", ("e", "find-file"), "open FILE", "Preview a file", argument="file"),
+    Command("preview", (), "preview FILE", "Preview a file", argument="file"),
     Command("goto", ("goto-line",), "goto LINE", "Jump to a preview line (or type the number alone)"),
     Command("find", ("search",), "find TEXT", "Find text in the preview"),
     Command("cd", ("root",), "cd DIR", "Change the navigation root", argument="directory"),
@@ -33,7 +33,7 @@ COMMANDS = (
     Command("project", ("all",), "project", "List every project file"),
     Command("ignored", (), "ignored [on|off]", "Show or hide Git-ignored files", ("on", "off")),
     Command("refresh", ("reload",), "refresh", "Reload the file list and preview"),
-    Command("editor", ("vim", "emacs"), "editor", "Open the current file in an editor"),
+    Command("editor", (), "editor", "Open the current file or folder in an editor"),
     Command("launch", ("xdg-open", "start"), "launch [FILE]",
             "Open the selected file or folder in the application the OS assigns", argument="file"),
     Command("with", ("app",), "with [APP]",

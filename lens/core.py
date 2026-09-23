@@ -263,7 +263,8 @@ def preview(index: Index, name: str) -> str:
     return text + ("\n[Preview truncated at 256 KiB]" if truncated else "")
 
 
-def editor_command(configured: str, path: Path, line: int = 1) -> list[str]:
+def editor_command(configured: str, path: Path, line: int | None = 1) -> list[str]:
+    """The editor command for path. line None (a folder) drops the {line} placeholders."""
     if configured:
         command = shlex.split(configured)
         if not command or not shutil.which(command[0]):
@@ -275,6 +276,8 @@ def editor_command(configured: str, path: Path, line: int = 1) -> list[str]:
     # Placeholders are substituted per argument, after splitting, so a path
     # with spaces or shell characters stays one literal argument.
     target = str(path.absolute())
+    if line is None:
+        command = [part.replace(":{line}", "") for part in command if "{line}" not in part or "{file}" in part]
     if any("{file}" in part for part in command):
         return [part.replace("{file}", target).replace("{line}", str(line)) for part in command]
     return [*(part.replace("{line}", str(line)) for part in command), target]

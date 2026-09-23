@@ -102,7 +102,7 @@ pane in that tab.
 | [ / ] | Select the previous / next diagram in a Markdown preview |
 | a | Align diagrams left, center, or right |
 | Ctrl+D | Compare HEAD with the working tree in vimdiff, or in the diff tool from the settings |
-| Ctrl+E | Open the selected file in an editor |
+| Ctrl+E (or e with files focused) | Open the selected file or folder in an editor |
 | o | Open the selected file or folder (or the previewed file) in the application your OS assigns to it, e.g. Finder for a folder |
 | O | Choose an application from a list to open it with; type to filter, recently used ones come first |
 | Ctrl+G | Toggle changed files only |
@@ -310,7 +310,7 @@ unambiguous prefix. While filtering filenames, `:` is ordinary text.
 
 | Command | Action |
 | --- | --- |
-| `open FILE` (`e`, `find-file`) | Preview a file and reveal it in the tree |
+| `preview FILE` | Preview a file and reveal it in the tree |
 | `goto LINE` (`goto-line`), or just the number | Jump to a preview line |
 | `top` / `bottom` | Jump to the start / end of the preview |
 | `find TEXT` | Find text in the preview; `n` / `N` continue |
@@ -321,7 +321,7 @@ unambiguous prefix. While filtering filenames, `:` is ordinary text.
 | `changes` / `project` | List changed files only / every file |
 | `ignored [on\|off]` | Show or hide Git-ignored files |
 | `refresh` | Reload the file list and preview |
-| `editor` / `diff` | Open the current file in an editor / vimdiff |
+| `editor` / `diff` | Open the current file or folder in an editor / vimdiff |
 | `launch [FILE]` (`xdg-open`, `start`) | Open the selected or named file or folder in its OS application |
 | `with [APP]` (`app`) | Open the selected file or folder with APP (a macOS application name, or a command elsewhere); alone, show the list |
 | `layout popup\|overlay\|left\|right` | Switch display mode |
@@ -423,6 +423,7 @@ Lens opens. Mistakes are reported in the status line and the rest still applies.
 [editor]
 # {file} and {line} are replaced; without {file}, the path is appended.
 # {line} is the first line shown in a code or text preview, otherwise 1.
+# For a folder, arguments holding {line} (and a ":{line}" suffix) are left out.
 command = "nvim +{line} {file}"
 
 [diff]
@@ -461,7 +462,7 @@ with a letter, or one of `space`, `tab`, `enter`, `escape`, `backspace`, `delete
 | --- | --- |
 | `focus`, `back`, `quit` | Tab, Escape, Ctrl+C |
 | `search`, `command`, `next-match`, `prev-match` | `/`, `:`, `n`, `N` |
-| `preview`, `edit`, `diff` | Space, Ctrl+E, Ctrl+D |
+| `preview`, `edit`, `diff` | Space, Ctrl+E (and e in files), Ctrl+D |
 | `changes`, `ignored`, `refresh` | Ctrl+G, Ctrl+H, Ctrl+R |
 | `root`, `git-root`, `parent` | Ctrl+O, Ctrl+T, Backspace |
 | `layout`, `popup-size` | Ctrl+W, Ctrl+Y |

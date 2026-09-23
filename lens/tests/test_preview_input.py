@@ -277,7 +277,7 @@ class PreviewTests(unittest.TestCase):
     def test_unbound_pager_keys_do_not_change_files_or_search(self):
         self.nav.load("plain.txt")
         self.nav.preview_scroll = 10
-        keys = "efbydugG<>"
+        keys = "fbydugG<>"  # e is bound in files too: it opens the editor.
         for key in keys:
             self.nav.key(key, None)
         self.assertEqual(self.nav.selected, 0)

@@ -145,6 +145,9 @@ class EditorCommandTests(unittest.TestCase):
             self.assertEqual(core.editor_command("code --goto {file}:{line}", path, 12),
                              ["code", "--goto", "/tmp/a b; rm.txt:12"])
             self.assertEqual(core.editor_command("nvim +{line}", path, 3), ["nvim", "+3", "/tmp/a b; rm.txt"])
+            self.assertEqual(core.editor_command("nvim +{line}", path, None), ["nvim", "/tmp/a b; rm.txt"])
+            self.assertEqual(core.editor_command("code --goto {file}:{line}", path, None),
+                             ["code", "--goto", "/tmp/a b; rm.txt"])
             self.assertEqual(core.editor_command("vim", path, 3), ["vim", "/tmp/a b; rm.txt"])
 
 

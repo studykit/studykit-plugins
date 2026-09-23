@@ -137,7 +137,7 @@ KEY_GROUPS = (
                  ("⌃D", "Diff with HEAD"), ("o / O", "Open / open with"), ("⌃G", "Changed files only"),
                  ("⌃H", "Ignored files"), ("⌃R", "Refresh"), ("⌃O", "Change root"), ("⌃T", "Repository root"),
                  ("⌃W", "Layout"), ("⌃Y", "Popup size"), ("Esc", "Back / close"), ("⌃C", "Quit"))),
-    ("Files", (("j k", "Move"), ("h l", "Fold / unfold"), ("Enter", "Open / enter folder"), ("Space", "Preview / fold"),
+    ("Files", (("j k", "Move"), ("e", "Edit file or folder"), ("h l", "Fold / unfold"), ("Enter", "Open / enter folder"), ("Space", "Preview / fold"),
                ("/", "Filter names"), ("⌫", "Parent folder"), ("⌃N ⌃P", "Scroll preview"),
                ("⌃F ⌃B", "Page preview"))),
     ("Preview", (("j k", "Line"), ("Space b", "Page"), ("d u", "Half page"), ("g G", "Top / end"),
@@ -1021,16 +1021,29 @@ class Navigator:
             return self.items[self.selected].path
         return ""
 
+    def edit_target(self):
+        """What the editor opens: the preview's file, else the selected file or folder."""
+        if self.preview_focus:
+            return self.active
+        return self.items[self.selected].path if self.items else ""
+
     def edit(self, screen):
-        name = self.current_file()
+        name = self.edit_target()
         if not name:
             return
         try:
-            path = checked_path(self.root, name)
-            if not path.is_file():
+            if name == "..":
+                path = self.root.parent
+            else:
+                path = checked_path(self.root, name) if name != "." else self.root
+            if path.is_dir():
+                # Editors such as Vim and Emacs browse a folder they are given.
+                line = None
+            elif not path.is_file():
                 raise ValueError("File no longer exists; use diff to inspect deletions")
-            # Code and plain text previews show source lines; start the editor there.
-            line = self.preview_scroll + 1 if self.preview_focus and name == self.active and self.rendered is None else 1
+            else:
+                # Code and plain text previews show source lines; start the editor there.
+                line = self.preview_scroll + 1 if self.preview_focus and name == self.active and self.rendered is None else 1
             command = editor_command(self.editor, path, line)
             result = self.run_terminal(screen, command, self.root)
             self.refresh()
@@ -1497,7 +1510,7 @@ class Navigator:
         chosen = [choice for choice in command.choices if choice.startswith(argument)]
         if argument and argument not in command.choices and len(chosen) == 1:
             argument = chosen[0]
-        needs = {"open": "a file", "goto": "a line number", "find": "text", "cd": "a directory",
+        needs = {"preview": "a file", "goto": "a line number", "find": "text", "cd": "a directory",
                  "zoom": "in, out, fit or a percent", "align": "left, center or right",
                  "layout": "popup, overlay, left or right", "icons": "nerd or plain"}
         if name in needs and not argument:
@@ -1507,7 +1520,7 @@ class Navigator:
             return False
         if name == "help":
             self.message = command_line.describe(argument)
-        elif name == "open":
+        elif name == "preview":
             self.open_file(argument)
         elif name in ("goto", "top", "bottom"):
             if not self.active:
@@ -2106,7 +2119,7 @@ class Navigator:
             self.preview_focus = not self.preview_focus
         elif key == "\x04":
             self.show_diff(screen)
-        elif key == "\x05":
+        elif key == "\x05" or (key == "e" and not self.preview_focus):
             self.edit(screen)
         elif key == "o":
             self.launch()

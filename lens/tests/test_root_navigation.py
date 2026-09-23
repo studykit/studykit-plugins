@@ -34,6 +34,21 @@ class RootNavigationTests(unittest.TestCase):
             self.nav.key(char, None)
         self.nav.key("\n", None)
 
+    def test_editor_opens_folders_without_a_line(self):
+        self.nav.editor = "vim +{line}"
+        opened = []
+        self.nav.run_terminal = lambda screen, command, cwd: opened.append(command) or Mock(returncode=0)
+        for name, expected in ((".", self.first), ("..", self.base), ("child", self.first / "child")):
+            self.nav.selected = [row.path for row in self.nav.items].index(name)
+            with patch("core.shutil.which", return_value="/bin/vim"):
+                self.nav.edit(None)
+            self.assertEqual(opened[-1], ["vim", str(expected.absolute())])
+        self.nav.key("e", None)  # e edits from the files panel, like Ctrl+E.
+        self.assertEqual(len(opened), 4)
+        self.nav.preview_focus = True
+        self.nav.key("e", None)  # In the preview, e scrolls.
+        self.assertEqual(len(opened), 4)
+
     def test_relative_root_resets_stale_file_state_and_leaves_cwd_unchanged(self):
         cwd = Path.cwd()
         self.nav.load("file.md")
