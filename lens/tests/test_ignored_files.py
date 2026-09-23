@@ -114,7 +114,7 @@ class IgnoredFileTests(unittest.TestCase):
         nav.changes = True
         nav.key("\x08", None)
         self.assertFalse(nav.changes)
-        nav.key("\x07", None)
+        nav.key("c", None)
         self.assertTrue(nav.changes)
         self.assertNotIn("sources", [row.path for row in nav.items])
 

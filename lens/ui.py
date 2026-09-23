@@ -134,9 +134,9 @@ def theme(palette=None, folder_style=None) -> dict[str, int]:
 # Every key, by where it applies, for the ? popup.
 KEY_GROUPS = (
     ("General", (("Tab", "Switch focus"), (":", "Command line"), ("?", "This list"), ("⌃E", "Edit file"),
-                 ("⌃D", "Diff with HEAD"), ("o / O", "Open / open with"), ("⌃G", "Changed files only"),
+                 ("⌃D", "Diff with HEAD"), ("o / O", "Open / open with"), ("c", "Changed files only"),
                  ("⌃H", "Ignored files"), ("⌃R", "Refresh"), ("⌃O", "Change root"), ("⌃T", "Repository root"),
-                 ("⌃W", "Layout"), ("⌃Y", "Popup size"), ("Esc", "Back / close"), ("⌃C", "Quit"))),
+                 ("⌃W", "Layout"), ("⌃Y", "Popup size"), ("Esc", "Back / close"), ("⌃G", "Cancel, never close"), ("⌃C", "Quit"))),
     ("Files", (("j k", "Move"), ("e", "Edit file or folder"), ("h l", "Fold / unfold"), ("Enter", "Open / enter folder"), ("Space", "Preview / fold"),
                ("/", "Filter names"), ("⌫", "Parent folder"), ("⌃N ⌃P", "Scroll preview"),
                ("⌃F ⌃B", "Page preview"))),
@@ -2012,6 +2012,10 @@ class Navigator:
                 self.close_typed = typed  # Wait for the rest of the binding.
                 return True
             self.close_typed = ()
+        # C-g cancels like Escape everywhere, except that it never closes Lens.
+        cancel = key == "\x07"
+        if cancel:
+            key = "\x1b"
         if self.key_help:
             self.key_help = False  # Any key closes the list; it does nothing else.
             return True
@@ -2042,7 +2046,7 @@ class Navigator:
                    "k": curses.KEY_UP, "l": curses.KEY_RIGHT}.get(key, key)
         navigation = (curses.KEY_UP, curses.KEY_DOWN, curses.KEY_LEFT, curses.KEY_RIGHT,
                       curses.KEY_PPAGE, curses.KEY_NPAGE, curses.KEY_HOME, curses.KEY_END)
-        if (self.searching or key in ("/", "\x07") or isinstance(key, terminal_input.Mouse)
+        if (self.searching or key in ("/", "c") or isinstance(key, terminal_input.Mouse)
                 or (not self.preview_focus and key in navigation)):
             self.pending_selection = ""
         if key == "/" and not self.searching:
@@ -2110,7 +2114,7 @@ class Navigator:
                 self.query = ""
                 self.selected = self.scroll = 0
                 self.rebuild()
-            else:
+            elif not cancel:
                 return False
         elif key in ("\n", "\r", curses.KEY_ENTER):
             if not self.preview_focus:
@@ -2125,7 +2129,7 @@ class Navigator:
             self.launch()
         elif key == "O":
             self.begin_app_picker()
-        elif key == "\x07":
+        elif key == "c":
             self.changes = not self.changes
             self.preview_focus = False
             self.selected = self.scroll = 0

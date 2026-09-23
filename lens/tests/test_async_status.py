@@ -118,7 +118,7 @@ class DeferredStatusTests(unittest.TestCase):
         nav.poll_status()
         self.assertEqual(nav.index.status["new.txt"], "??")
         self.assertEqual(nav.index.status["a.txt"], " M")
-        nav.key("\x07", None)
+        nav.key("c", None)
         self.assertIn("new.txt", [row.path for row in nav.items])
         self.git("add", ".")
         self.git("commit", "-qm", "all changes saved")
@@ -188,7 +188,7 @@ class DeferredStatusTests(unittest.TestCase):
 
     def test_input_overrides_selection_waiting_for_status(self):
         nav = self.navigator(initial_state={"root": str(self.root), "changes": True, "selected": "gone.txt"})
-        nav.key("\x07", None)
+        nav.key("c", None)
         nav.key("j", None)
         nav.key("j", None)
         self.complete(nav)

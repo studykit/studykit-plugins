@@ -62,7 +62,7 @@ a temporary tab, and turns off the tab's zoom.
 
 In Overlay and half modes, invoking either file action again in the same tab focuses the
 existing navigator (restoring an overlay's zoom) instead of creating another pane.
-Its root, filter, preview, and current mode remain intact; use Ctrl+G to switch
+Its root, filter, preview, and current mode remain intact; use `c` to switch
 between the project and changed-files views. Each tab can have its own
 navigator. Close the overlay before opening a fresh view from another source
 pane in that tab.
@@ -105,13 +105,14 @@ pane in that tab.
 | Ctrl+E (or e with files focused) | Open the selected file or folder in an editor |
 | o | Open the selected file or folder (or the previewed file) in the application your OS assigns to it, e.g. Finder for a folder |
 | O | Choose an application from a list to open it with; type to filter, recently used ones come first |
-| Ctrl+G | Toggle changed files only |
+| c | Toggle changed files only |
 | Ctrl+H | Show / hide Git-ignored files; enabling switches to the full project view |
 | Ctrl+R | Refresh the file list and preview, then reload Git status |
 | Ctrl+W, then 1 – 4 | Switch to Popup / Overlay / Left half / Right half |
 | Ctrl+Y (Popup) | Adjust popup size and remember it for future launches |
 | Ctrl+U in search | Clear the search text |
 | Escape | Return to files from content; clear search when in files; otherwise close |
+| Ctrl+G | Cancel like Escape (prompts, filter, preview focus), but never close |
 | Ctrl+C | Close immediately, retaining the current view for the next launch |
 
 Search is case-insensitive, ranks filename matches ahead of path matches, and
@@ -137,7 +138,7 @@ their files, empty folders, and nested repositories in the tree and file search.
 The file tree's title shows `+ignored` while they are shown (an eye icon with `:icons nerd`). Git metadata (`.git`,
 `.hg`, `.svn`) remains hidden, and directory symlinks are not followed. Outside
 Git, this toggle also includes normally skipped dependency/cache directories.
-Ignored files are not treated as Git changes; Ctrl+G still shows only changes
+Ignored files are not treated as Git changes; `c` still shows only changes
 reported by the current repository. Switch the root to a nested repository to
 use that repository's own Git status and diff base.
 
@@ -463,7 +464,7 @@ with a letter, or one of `space`, `tab`, `enter`, `escape`, `backspace`, `delete
 | `focus`, `back`, `quit` | Tab, Escape, Ctrl+C |
 | `search`, `command`, `next-match`, `prev-match` | `/`, `:`, `n`, `N` |
 | `preview`, `edit`, `diff` | Space, Ctrl+E (and e in files), Ctrl+D |
-| `changes`, `ignored`, `refresh` | Ctrl+G, Ctrl+H, Ctrl+R |
+| `changes`, `ignored`, `refresh` | `c`, Ctrl+H, Ctrl+R |
 | `root`, `git-root`, `parent` | Ctrl+O, Ctrl+T, Backspace |
 | `layout`, `popup-size` | Ctrl+W, Ctrl+Y |
 | `top`, `bottom` | `g`, `G` |

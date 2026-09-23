@@ -150,6 +150,19 @@ class CommandLineTests(unittest.TestCase):
         self.nav.key("\x07", None)  # C-g cancels.
         self.assertIsNone(self.nav.command)
 
+    def test_ctrl_g_cancels_but_never_closes(self):
+        for key in "/py":
+            self.nav.key(key, None)
+        self.nav.key("\x07", None)  # Leaves the filter like Escape.
+        self.assertEqual((self.nav.searching, self.nav.query), (False, ""))
+        self.nav.preview_focus = True
+        self.assertTrue(self.nav.key("\x07", None))
+        self.assertFalse(self.nav.preview_focus)
+        self.assertTrue(self.nav.key("\x07", None))  # Nothing left to cancel: stays open.
+        self.assertFalse(self.nav.changes)
+        self.nav.key("c", None)
+        self.assertTrue(self.nav.changes)
+
     def test_completion_keeps_text_after_the_cursor(self):
         self.nav.key(":", None)
         for char in "prev src/main.py":

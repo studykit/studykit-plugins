@@ -154,7 +154,7 @@ class ProjectTests(unittest.TestCase):
         nav.key("\x15", None)
         nav.key("\n", None)
         self.assertEqual(nav.query, "")
-        nav.key("\x07", None)
+        nav.key("c", None)
         self.assertTrue(nav.changes)
         self.assertFalse(nav.key("\x1b", None))
 
