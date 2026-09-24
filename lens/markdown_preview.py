@@ -25,9 +25,12 @@ class Style:
 class Span:
     text: str
     style: Style = Style()
+    link: str = ""  # A web address a Ctrl-click on this text opens.
 
 
 ESCAPES = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)")
+HYPERLINK = re.compile(r"\x1b\]8;[^;\x07\x1b]*;([^\x07\x1b]*)")
+WEB_ADDRESS = re.compile(r"https?://\S+", re.I)
 
 
 def sgr(style: Style, parameters: str) -> Style:
@@ -67,6 +70,7 @@ def sgr(style: Style, parameters: str) -> Style:
 def parse_ansi(text: str) -> list[list[Span]]:
     lines: list[list[Span]] = [[]]
     style = Style()
+    link = ""
 
     def append(value):
         for i, line in enumerate(value.split("\n")):
@@ -74,10 +78,10 @@ def parse_ansi(text: str) -> list[list[Span]]:
                 lines.append([])
             cleaned = "".join(char for char in line.expandtabs(4) if char.isprintable())
             if cleaned:
-                if lines[-1] and lines[-1][-1].style == style:
-                    lines[-1][-1] = Span(lines[-1][-1].text + cleaned, style)
+                if lines[-1] and (lines[-1][-1].style, lines[-1][-1].link) == (style, link):
+                    lines[-1][-1] = Span(lines[-1][-1].text + cleaned, style, link)
                 else:
-                    lines[-1].append(Span(cleaned, style))
+                    lines[-1].append(Span(cleaned, style, link))
 
     end = 0
     for escape in ESCAPES.finditer(text):
@@ -85,6 +89,8 @@ def parse_ansi(text: str) -> list[list[Span]]:
         token = escape[0]
         if token.startswith("\x1b[") and token.endswith("m"):
             style = sgr(style, token[2:-1])
+        elif hyperlink := HYPERLINK.match(token):
+            link = hyperlink[1] if WEB_ADDRESS.fullmatch(hyperlink[1]) else ""
         end = escape.end()
     append(text[end:])
     return lines
@@ -168,6 +174,37 @@ def replace_diagrams(tokens, diagrams, marker):
     return result, found
 
 
+def link_tokens(tokens):
+    """Keep Rich's `text (destination)` link layout, but tag both parts of a web link
+    with its address; Rich only emits hyperlinks when it drops the destination."""
+    from markdown_it.token import Token
+
+    def styled(tag, children, href=None):
+        opened = [Token("link_open", "a", 1, attrs={"href": href})] if href else []
+        closed = [Token("link_close", "a", -1)] if href else []
+        # Rich styles an unknown token by its tag; a `link_open` type would read as a real link.
+        return [*opened, Token(f"styled_{tag}_open", tag, 1), *children,
+                Token(f"styled_{tag}_close", tag, -1), *closed]
+
+    for token in tokens:
+        children, token.children, link = token.children or [], token.children and [], None
+        for child in children:
+            if child.type == "link_open":
+                link = (str(child.attrs.get("href", "")), [])
+            elif child.type == "link_close" and link:
+                href, inner = link
+                web = href if WEB_ADDRESS.fullmatch(href) else None
+                token.children += [*styled("link", inner, web), Token("text", "", 0, content=" ("),
+                                   *styled("link_url", [Token("text", "", 0, content=href)], web),
+                                   Token("text", "", 0, content=")")]
+                link = None
+            elif link:
+                link[1].append(child)
+            else:
+                token.children.append(child)
+    return tokens
+
+
 def render(text: str, width: int, colors=None) -> list[list[Span]]:
     return render_diagrams(text, width, colors)[0]
 
@@ -236,9 +273,9 @@ def render_diagrams(text: str, width: int, colors=None, diagrams=None):
                           force_terminal=True, force_jupyter=False, legacy_windows=False,
                           no_color=False, markup=False, highlight=False, emoji=False,
                           theme=palette)
-        markdown = markdown_type()("", code_theme=CodeTheme(), hyperlinks=False)
+        markdown = markdown_type()("", code_theme=CodeTheme(), hyperlinks=True)
         markdown.markup = text
-        markdown.parsed, found = replace_diagrams(preview_tokens(text), diagrams or {}, marker)
+        markdown.parsed, found = replace_diagrams(link_tokens(preview_tokens(text)), diagrams or {}, marker)
         console.print(markdown)
         lines = parse_ansi(output.getvalue())
     if not found:

@@ -197,7 +197,7 @@ def markdown_type():
                         border_style="markdown.hr")
 
     class ObsidianMarkdown(Markdown):
-        inlines = Markdown.inlines | {"wikilink", "embed", "mark", "checked", "unchecked"}
+        inlines = Markdown.inlines | {"wikilink", "embed", "mark", "checked", "unchecked", "link", "link_url"}
         elements = {**Markdown.elements, "callout_open": Callout,
                     "callout_title_open": CalloutTitle, "frontmatter": Properties}
 

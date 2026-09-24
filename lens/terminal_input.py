@@ -13,6 +13,7 @@ class Mouse:
     x: int
     y: int
     action: str
+    ctrl: bool = False
 
 
 @dataclass(frozen=True)
@@ -29,7 +30,7 @@ def mouse_event(button: int, x: int, y: int, released=False):
     if button & 64 and button & 3 in (0, 1):
         return Mouse(x, y, "up" if button & 3 == 0 else "down")
     if button & 3 == 0:
-        return Mouse(x, y, "click")
+        return Mouse(x, y, "click", bool(button & 16))
     return None
 
 

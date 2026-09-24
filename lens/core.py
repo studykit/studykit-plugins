@@ -283,8 +283,9 @@ def editor_command(configured: str, path: Path, line: int | None = 1) -> list[st
     return [*(part.replace("{line}", str(line)) for part in command), target]
 
 
-def opener_command(configured: str, path: Path, platform: str = sys.platform) -> list[str]:
-    """The command that hands a file or folder to the application the OS associates with it."""
+def opener_command(configured: str, path: Path | str, platform: str = sys.platform) -> list[str]:
+    """The command that hands a file, folder, or web address (a str) to the application the
+    OS associates with it."""
     if configured:
         command = shlex.split(configured)
     elif platform == "darwin":
@@ -295,7 +296,7 @@ def opener_command(configured: str, path: Path, platform: str = sys.platform) ->
         command = ["xdg-open"]
     if not command or not shutil.which(command[0]):
         raise ValueError(f"{command[0] if command else 'Open command'} was not found on PATH")
-    target = str(path.absolute())
+    target = path if isinstance(path, str) else str(path.absolute())
     if any("{file}" in part for part in command):
         return [part.replace("{file}", target) for part in command]
     return [*command, target]

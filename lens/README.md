@@ -130,7 +130,9 @@ The tree always starts with `..` (the parent folder) and `.` (the root itself). 
 | `a` | Align diagrams left, center or right |
 
 **Mouse**: click to select or focus, scroll the wheel over either panel, and drag the
-border between the panels to resize the tree. Lens remembers the width.
+border between the panels to resize the tree. Lens remembers the width. Ctrl+click a
+web address in the preview, or the text of a Markdown link to one, to open it in your
+browser.
 
 ### Filtering filenames
 

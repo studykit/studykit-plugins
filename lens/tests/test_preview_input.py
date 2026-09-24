@@ -18,6 +18,7 @@ class InputTests(unittest.TestCase):
         self.assertEqual(terminal.decode("\x1b[<65;40;12M"), terminal.Mouse(39, 11, "down"))
         self.assertEqual(terminal.decode("\x1b[<69;40;12M"), terminal.Mouse(39, 11, "down"))
         self.assertEqual(terminal.decode("\x1b[<0;2;3M"), terminal.Mouse(1, 2, "click"))
+        self.assertEqual(terminal.decode("\x1b[<16;2;3M"), terminal.Mouse(1, 2, "click", ctrl=True))
         self.assertEqual(terminal.decode("\x1b[<0;2;3m"), terminal.Mouse(1, 2, "release"))
         self.assertEqual(terminal.decode("\x1b[<32;2;3M"), terminal.Mouse(1, 2, "drag"))
         self.assertIsNone(terminal.decode("\x1b[<34;2;3M"))  # Right-button motion.
@@ -86,6 +87,32 @@ class PreviewTests(unittest.TestCase):
         self.nav.preview_scroll = 49
         self.nav.handle_mouse(terminal.Mouse(40, 10, "down"))
         self.assertEqual(self.nav.preview_scroll, 50)
+
+    def ctrl_click(self, name, line, column):
+        self.nav.load(name)
+        self.nav.divider, self.nav.body, self.nav.content_top = 30, 20, 3
+        self.nav.prepare_preview(60)
+        self.nav.text_left = 33 if self.nav.rendered is not None else 39
+        with patch.object(self.nav, "detach") as detach:
+            self.nav.handle_mouse(terminal.Mouse(self.nav.text_left + column, 3 + line, "click", ctrl=True))
+        return detach.call_args[0][0][-1] if detach.called else None
+
+    def test_ctrl_click_opens_markdown_web_links_and_bare_addresses(self):
+        (self.root / "links.md").write_text(
+            "[**Docs**](https://example.com/a) [local](notes.md)\n\nSee https://example.org/x_(y), ok.\n")
+        self.assertEqual(self.ctrl_click("links.md", 0, 1), "https://example.com/a")  # The link text.
+        self.assertEqual(self.ctrl_click("links.md", 0, 10), "https://example.com/a")  # Its address.
+        self.assertIsNone(self.ctrl_click("links.md", 0, 36))  # A relative destination.
+        self.assertEqual(self.nav.message, "No web address under the pointer")
+        self.assertEqual(self.ctrl_click("links.md", 2, 10), "https://example.org/x_(y)")
+        self.assertIsNone(self.ctrl_click("links.md", 2, 1))
+        self.assertEqual(self.nav.active, "links.md")
+
+    def test_ctrl_click_opens_addresses_in_plain_and_code_previews(self):
+        (self.root / "notes.txt").write_text("<https://example.com/p?q=1>.\n")
+        (self.root / "main.py").write_text("URL = 'https://example.com/code'\n")
+        self.assertEqual(self.ctrl_click("notes.txt", 0, 5), "https://example.com/p?q=1")
+        self.assertEqual(self.ctrl_click("main.py", 0, 10), "https://example.com/code")
 
     def test_shared_preview_keys_preserve_focus_tree_and_active_file(self):
         self.nav.load("plain.txt")
@@ -476,8 +503,10 @@ class PreviewTests(unittest.TestCase):
     def test_ansi_styles_and_terminal_control_removal(self):
         lines = md.parse_ansi("\x1b[1;38;5;117mTitle\x1b[0m\n\x1b[2J\x1b]8;;https://example.com\x07Link\x1b]8;;\x1b\\")
         self.assertEqual(lines[0][0], md.Span("Title", md.Style(foreground=117, bold=True)))
-        self.assertEqual(lines[1], [md.Span("Link")])
+        self.assertEqual(lines[1], [md.Span("Link", link="https://example.com")])
         self.assertNotIn("\x1b", str(lines))
+        lines = md.parse_ansi("\x1b]8;;javascript:alert(1)\x07Link\x1b]8;;\x07")
+        self.assertEqual(lines[0], [md.Span("Link")])
 
     def test_rich_formats_markdown_without_external_commands(self):
         with patch("subprocess.run", side_effect=AssertionError("External renderer")), patch("sys.stdout", new_callable=io.StringIO) as output:

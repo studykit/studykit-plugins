@@ -22,6 +22,9 @@ import terminal_input
 from theme_colors import resolve as resolve_theme, terminal_color
 
 
+OPENING = {")": "(", "]": "[", ">": "<"}
+
+
 def clean(text: str) -> str:
     # Nerd Font glyphs occupy Unicode's private-use category (Co), which Python
     # excludes from isprintable() even though terminals can render them safely.
@@ -247,6 +250,7 @@ class Navigator:
         self.find_index = -1
         self.find_origin = (0, 0)
         self.text_width = 60
+        self.text_left = 0
         # Command line (":" or Alt+X): the draft while open, else None.
         self.command = None
         self.command_history, self.command_recall = [], 0
@@ -1095,19 +1099,57 @@ class Navigator:
                 path = checked_path(self.root, name) if name else self.root
             if not path.exists():
                 raise ValueError(f"No such file: {name}")
-            # Detached: a GUI application must not hold the terminal or block Lens.
-            command = application_command(app, path) if app else opener_command(self.opener, path)
-            process = subprocess.Popen(command, cwd=self.root,
-                                       stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
-                                       stderr=subprocess.PIPE, start_new_session=True)
-            try:
-                _, error = process.communicate(timeout=2)
-            except subprocess.TimeoutExpired:
-                error = None  # Still running: the application took it.
-            if process.returncode:
-                detail = (error or b"").decode(errors="replace").strip().splitlines()
-                raise ValueError(detail[-1] if detail else f"Open command exited with status {process.returncode}")
+            self.detach(application_command(app, path) if app else opener_command(self.opener, path))
             self.message = f"Opened {path.name or path}" + (f" with {app}" if app else "")
+        except (OSError, ValueError, subprocess.SubprocessError) as error:
+            self.message = str(error)
+
+    def detach(self, command):
+        # Detached: a GUI application must not hold the terminal or block Lens.
+        process = subprocess.Popen(command, cwd=self.root,
+                                   stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                                   stderr=subprocess.PIPE, start_new_session=True)
+        try:
+            _, error = process.communicate(timeout=2)
+        except subprocess.TimeoutExpired:
+            error = None  # Still running: the application took it.
+        if process.returncode:
+            detail = (error or b"").decode(errors="replace").strip().splitlines()
+            raise ValueError(detail[-1] if detail else f"Open command exited with status {process.returncode}")
+
+    def link_at(self, x, y):
+        """The web address drawn at a screen cell of the preview, or None."""
+        number = self.preview_scroll + y - self.content_top
+        column = x - self.text_left + self.horizontal
+        if (not self.active or self.diagram_view() or not 0 <= y - self.content_top < self.body
+                or column < 0 or number >= len(self.content)):
+            return None
+        styled = self.rendered if self.rendered is not None else self.syntax
+        spans = styled[number] if styled is not None else [markdown_preview.Span(clean(self.content[number]))]
+        text, start = "", 0
+        for span in spans:
+            if start <= column < start + cells(span.text) and span.link:
+                return span.link  # A Markdown link's text as well as its address.
+            text, start = text + span.text, start + cells(span.text)
+        for match in markdown_preview.WEB_ADDRESS.finditer(text):
+            address = match[0].rstrip(".,;:!?'\"")
+            # A closing bracket ends the address unless the address opened it, as Wikipedia's do.
+            while address[-1] in ")]>" and address.count(address[-1]) > address.count(OPENING[address[-1]]):
+                address = address[:-1].rstrip(".,;:!?'\"")
+            left = cells(text[:match.start()])
+            if left <= column < left + cells(address):
+                return address
+        return None
+
+    def open_link(self, x, y):
+        """Ctrl-click: hand the web address under the pointer to the OS."""
+        address = self.link_at(x, y)
+        if address is None:
+            self.message = "No web address under the pointer"
+            return
+        try:
+            self.detach(opener_command("", address))
+            self.message = f"Opened {address}"
         except (OSError, ValueError, subprocess.SubprocessError) as error:
             self.message = str(error)
 
@@ -1349,6 +1391,7 @@ class Navigator:
             self.draw_diagram(screen, x, width)
             return
         self.text_width = width - (4 if self.rendered is not None else 10)
+        self.text_left = x + (2 if self.rendered is not None else 8)
         highlight = bool(self.find_query) and bool(self.matches())
         for offset, line in enumerate(self.content[self.preview_scroll:self.preview_scroll + self.body]):
             y = self.content_top + offset
@@ -1951,7 +1994,8 @@ class Navigator:
         elif state & getattr(curses, "BUTTON5_PRESSED", 0):
             self.handle_mouse(terminal_input.Mouse(x, y, "down"), screen)
         elif pressed:
-            self.handle_mouse(terminal_input.Mouse(x, y, "click"), screen)
+            ctrl = bool(state & getattr(curses, "BUTTON_CTRL", 0))
+            self.handle_mouse(terminal_input.Mouse(x, y, "click", ctrl), screen)
 
     def divider_for(self, width):
         # The preview keeps at least 40 columns however far the divider is dragged.
@@ -1995,17 +2039,20 @@ class Navigator:
             return
         if y <= BOX_TOP or y > self.content_top + self.body or x < 0:
             return
+        over_preview = self.preview_focus if self.narrow else x > self.divider
         if event.action in ("up", "down"):
             amount = -3 if event.action == "up" else 3
-            over_preview = self.preview_focus if self.narrow else x > self.divider
             if over_preview:
                 self.scroll_preview(amount)
             else:
                 self.selected = max(0, min(len(self.items) - 1, self.selected + amount))
             return
+        if event.action == "click" and event.ctrl and over_preview:
+            self.open_link(x, y)
+            return
         self.searching = False
         if not self.narrow:
-            self.preview_focus = x > self.divider
+            self.preview_focus = over_preview
         if event.action == "click":
             if not self.preview_focus and self.content_top <= y < self.content_top + self.tree_body:
                 index = self.scroll + y - self.content_top
