@@ -106,6 +106,7 @@ These keys work outside text fields. Letters in a text field are just text.
 | Space | Preview the file and stay in the tree; on a folder, fold or unfold it |
 | `l` / Right | Unfold a folder; press again to go to its first entry |
 | `h` / Left | Fold a folder, or go to the parent |
+| `H` / `L` | Fold / unfold a folder and every folder under it; on `.`, the whole tree |
 | Backspace, or Enter on `..` | Move the root up one folder |
 | Ctrl+N / Ctrl+P | Scroll the preview one line without leaving the tree |
 | Ctrl+F / Ctrl+B | Scroll the preview one screen without leaving the tree |

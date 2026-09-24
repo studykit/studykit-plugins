@@ -137,7 +137,7 @@ KEY_GROUPS = (
                  ("⌃D", "Diff with HEAD"), ("o / O", "Open / open with"), ("c", "Changed files only"),
                  ("⌃H", "Ignored files"), ("⌃R", "Refresh"), ("⌃O", "Change root"), ("t", "Repository root"),
                  ("⌃W", "Layout"), ("⌃Y", "Popup size"), ("Esc", "Back / close"), ("⌃G", "Cancel, never close"), ("⌃C", "Quit"))),
-    ("Files", (("j k", "Move"), ("h l", "Fold / unfold"), ("Enter", "Open / enter folder"), ("Space", "Preview / fold"),
+    ("Files", (("j k", "Move"), ("h l", "Fold / unfold"), ("H L", "Fold / unfold all under"), ("Enter", "Open / enter folder"), ("Space", "Preview / fold"),
                ("/", "Filter names"), ("⌫", "Parent folder"), ("⌃N ⌃P", "Scroll preview"),
                ("⌃F ⌃B", "Page preview"))),
     ("Preview", (("j k", "Line"), ("Space b", "Page"), ("d u", "Half page"), ("g G", "Top / end"),
@@ -1004,6 +1004,30 @@ class Navigator:
         else:
             self.expanded.add(row.path)
         self.rebuild()
+
+    def fold_tree(self, unfold: bool):
+        """Fold or unfold the selected folder and every folder under it; on ".", the whole tree."""
+        if self.index is None or not self.items:
+            return
+        row = self.items[self.selected]
+        if not row.directory or row.path == "..":
+            return  # Nothing to fold under a file, and ".." lies outside the root.
+        prefix = "" if row.path == "." else row.path + "/"
+        inside = lambda folder: folder == row.path or folder.startswith(prefix)
+        if unfold:
+            names = [name for name in self.index.files if not self.changes or name in self.index.status]
+            folders = {name.rpartition("/")[0] for name in names}
+            if not self.changes:
+                folders.update(self.index.directories)
+            for folder in folders:
+                while folder and inside(folder):
+                    self.expanded.add(folder)
+                    folder = folder.rpartition("/")[0]
+        else:
+            self.expanded = {folder for folder in self.expanded if not inside(folder)}
+        self.rebuild()
+        # The folder stays visible either way, so the selection stays on it.
+        self.selected = next((i for i, entry in enumerate(self.items) if entry.path == row.path), self.selected)
 
     def preview_selected(self, *, focus=True):
         if not self.items or self.items[self.selected].directory:
@@ -2102,6 +2126,8 @@ class Navigator:
                     self.toggle_fold(row)
             else:
                 self.preview_selected(focus=False)
+        elif key in ("H", "L") and not self.preview_focus and not self.query:
+            self.fold_tree(key == "L")
         elif key == "\x17":
             self.begin_layout()
         elif key == "\x19":

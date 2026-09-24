@@ -276,6 +276,33 @@ class ProjectTests(unittest.TestCase):
         nav.key("\t", None)
         self.assertEqual(nav.current_file(), "b")
 
+    def test_fold_and_unfold_under_selected_folder(self):
+        self.write("a/b/c.txt", "c")
+        self.write("a/d.txt", "d")
+        self.write("e/f/g.txt", "g")
+        nav = Navigator(self.root, "pane", False, "")
+        at = lambda path: next(i for i, row in enumerate(nav.items) if row.path == path)
+        nav.selected = at("a")
+        nav.key("L", None)
+        self.assertEqual(nav.expanded, {"a", "a/b"})
+        self.assertEqual(nav.items[nav.selected].path, "a")
+        nav.selected = at(".")
+        nav.key("L", None)
+        self.assertEqual(nav.expanded, {"a", "a/b", "e", "e/f"})
+        nav.selected = at("a/b")
+        nav.key("H", None)
+        self.assertEqual(nav.expanded, {"a", "e", "e/f"})
+        nav.selected = at("..")
+        nav.key("H", None)  # Above the root: nothing folds.
+        self.assertEqual(nav.expanded, {"a", "e", "e/f"})
+        nav.selected = at("a/d.txt")
+        nav.key("H", None)  # A file has nothing under it.
+        self.assertEqual(nav.expanded, {"a", "e", "e/f"})
+        nav.selected = at(".")
+        nav.key("H", None)
+        self.assertEqual(nav.expanded, set())
+        self.assertEqual(nav.items[nav.selected].path, ".")
+
     def test_mouse_release_does_not_steal_content_focus(self):
         self.write("a", "a")
         nav = Navigator(self.root, "pane", False, "")

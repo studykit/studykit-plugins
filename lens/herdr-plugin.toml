@@ -1,6 +1,6 @@
 id = "studykit.lens"
 name = "Lens"
-version = "0.18.1"
+version = "0.19.0"
 min_herdr_version = "0.9.0"
 description = "Browse files in a popup or overlay with saved views, previews and Git diffs"
 platforms = ["linux", "macos"]
