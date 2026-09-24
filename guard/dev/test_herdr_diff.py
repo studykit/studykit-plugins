@@ -13,6 +13,7 @@ from unittest.mock import Mock, patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "herdr"))
 import guard_diff
 import guard_herdr
+import guard_settings
 
 
 class DiffTests(unittest.TestCase):
@@ -138,6 +139,24 @@ class DiffTests(unittest.TestCase):
                 self.assertIn("-d", command)
 
     @unittest.skipUnless(shutil.which("vimdiff") or shutil.which("vim"), "Vim unavailable")
+    def test_configured_tool_receives_snapshot_paths(self):
+        path = self.write("dir/file name.py", b"before\n")
+        self.commit()
+        path.write_bytes(b"after\n")
+        with patch.object(guard_diff.shutil, "which", return_value="/usr/bin/difft"):
+            with guard_diff.comparison(self.root, path, "difft --title {name}") as (command, cwd):
+                self.assertEqual(command[:3], ["difft", "--title", "dir/file name.py"])
+                self.assertEqual(Path(command[3]).read_bytes(), b"before\n")
+                self.assertEqual(Path(command[4]).read_bytes(), b"after\n")
+            with guard_diff.comparison(self.root, path, "meld {after} {before}") as (command, _):
+                self.assertEqual(Path(command[1]).read_bytes(), b"after\n")
+                self.assertEqual(len(command), 3)
+        with patch.object(guard_diff.shutil, "which", return_value=None):
+            with self.assertRaisesRegex(ValueError, "not found on PATH"):
+                with guard_diff.comparison(self.root, path, "missing-tool"):
+                    self.fail("The tool is unavailable")
+
+    @unittest.skipUnless(shutil.which("vimdiff") or shutil.which("vim"), "Vim unavailable")
     def test_real_vim_has_two_read_only_vertical_diff_windows(self):
         path = self.write("file.py", b"before\n")
         self.commit()
@@ -164,6 +183,8 @@ class PanelTests(unittest.TestCase):
                 pane = {"cwd": "/project", "agent": "codex"}
                 pending = {"files": {"/project/first": "1", "/project/second": "2"}}
                 stack.enter_context(patch.object(guard_herdr, "_pending", return_value=(pane, pending)))
+                settings = guard_settings.Settings()
+                stack.enter_context(patch.object(guard_herdr, "_settings", return_value=settings))
                 for name in ("curs_set", "use_default_colors", "init_pair", "color_pair"):
                     stack.enter_context(patch.object(guard_herdr.curses, name, return_value=0))
                 diff = stack.enter_context(patch.object(guard_herdr, "_open_diff", return_value="Returned"))
@@ -171,7 +192,7 @@ class PanelTests(unittest.TestCase):
                     guard_herdr, "_checkpoint", return_value={"files": {"/project/first": "1"}, "token": "t"}))
                 audit = stack.enter_context(patch.object(guard_herdr, "_prompt_audit", return_value=True))
                 self.assertEqual(guard_herdr._panel(screen), 0)
-                diff.assert_called_once_with(screen, Path("/project"), "/project/second")
+                diff.assert_called_once_with(screen, Path("/project"), "/project/second", settings)
                 checkpoint.assert_called_once_with(pane, "show", "--paths-json", '["/project/first"]')
                 audit.assert_called_once_with(pane, "t")
 
@@ -188,11 +209,47 @@ class PanelTests(unittest.TestCase):
             screen.keypad.assert_called_once_with(True)
             screen.refresh.assert_called_once()
 
+    def test_configured_diff_pauses_and_tolerates_differences_status(self):
+        settings = guard_settings.Settings(diff="difft", diff_pause=True)
+        with patch.object(guard_herdr, "comparison") as comparison, \
+                patch.object(guard_herdr, "_run_terminal", return_value=1) as run:
+            comparison.return_value.__enter__.return_value = (["/usr/bin/difft", "a", "b"], Path("/tmp"))
+            message = guard_herdr._open_diff(Mock(), Path("/tmp"), "/tmp/file", settings)
+        comparison.assert_called_once_with(Path("/tmp"), Path("/tmp/file"), "difft")
+        self.assertTrue(run.call_args.kwargs["pause"])
+        self.assertEqual(message, "Returned from difft.")
+
+    def test_editor_setting_overrides_environment(self):
+        with patch.dict(guard_herdr.os.environ, {"VISUAL": "vim"}), \
+                patch.object(guard_herdr.shutil, "which", return_value="/usr/bin/x"):
+            self.assertEqual(guard_herdr._editor_command("/p/a b", "code --wait --goto {file}:{line}"),
+                             ["code", "--wait", "--goto", "/p/a b:1"])
+            self.assertEqual(guard_herdr._editor_command("/p/f", "hx"), ["hx", "/p/f"])
+            self.assertEqual(guard_herdr._editor_command("/p/f"), ["vim", "/p/f"])
+        with patch.object(guard_herdr.shutil, "which", return_value=None):
+            self.assertEqual(guard_herdr._open_editor(Mock(), "/p/f", "missing"),
+                             "Configured editor was not found on PATH")
+
     def test_diff_preparation_error_remains_in_panel(self):
         with patch.object(guard_herdr, "comparison", side_effect=ValueError("Binary file")), \
                 patch.object(guard_herdr, "_run_terminal") as run:
             self.assertEqual(guard_herdr._open_diff(Mock(), Path("/tmp"), "/tmp/file"), "Binary file")
             run.assert_not_called()
+
+
+class SettingsTests(unittest.TestCase):
+    def test_location_and_partial_errors(self):
+        self.assertEqual(guard_settings.location({"GUARD_HERDR_CONFIG": "/x/g.toml"}), Path("/x/g.toml"))
+        self.assertEqual(guard_settings.location({"XDG_CONFIG_HOME": "/cfg"}), Path("/cfg/guard/herdr.toml"))
+        with tempfile.TemporaryDirectory() as directory:
+            file = Path(directory) / "herdr.toml"
+            self.assertEqual(guard_settings.load(file), guard_settings.Settings())
+            file.write_text('[editor]\ncommand = " hx "\n[diff]\ncommand = 3\npause = true\n')
+            settings = guard_settings.load(file)
+            self.assertEqual((settings.editor, settings.diff, settings.diff_pause), ("hx", "", True))
+            self.assertEqual(settings.errors, ["herdr.toml: diff.command must be a string"])
+            file.write_text("[editor")
+            self.assertEqual(len(guard_settings.load(file).errors), 1)
 
 
 if __name__ == "__main__":

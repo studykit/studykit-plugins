@@ -1,5 +1,23 @@
 # guard — design detail
 
+## Herdr editor and diff settings (v0.161.0)
+
+The pending-files popup reads `[editor].command`, `[diff].command`, and `[diff].pause` from
+`$GUARD_HERDR_CONFIG`, else `$XDG_CONFIG_HOME/guard/herdr.toml` (`~/.config/guard/herdr.toml`).
+The keys and placeholder rules deliberately copy Lens's `config.toml` so one command line
+works in both, but Guard keeps its own file and parser: either Herdr plugin must install and
+run without the other, and Lens's file is Lens's contract. The queue has no cursor line, so
+`{line}` is substituted with 1. A configured tool that is missing from `PATH` or fails to
+parse is reported instead of silently falling back, as Lens does. Like Lens, a configured diff
+tool's exit status 1 means "files differ", not failure. Settings reload on `r`.
+
+The configured tool receives the same disposable HEAD/WORKTREE snapshots as vimdiff, so a tool
+that saves cannot write the project file.
+
+Claude, Codex, and Herdr manifests use 0.161.0; the Herdr manifest had lagged at 0.159.0.
+Marketplace descriptions already cover Herdr diffs and need no change.
+Run the tests with the `test_herdr_diff.py` recipe under "Herdr file diffs" below.
+
 ## Docs finder removal (v0.158.0)
 
 The bundled `docs-finder` agent has been removed: the main agent did not invoke it on its own,

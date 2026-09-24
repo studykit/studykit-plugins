@@ -146,7 +146,8 @@ herdr plugin install studykit/studykit-plugins/guard
 It provides two actions—show pending files and audit pending files—and a popup pane listing the
 queue for the focused Claude Code or Codex session. In the popup, use the arrow keys or `j`/`k`
 to move the cursor, Space to select or deselect multiple files, and Enter to open the current
-file in `$VISUAL` or `$EDITOR`; Guard falls back to `nvim`, `vim`, then `vi`.
+file in `$VISUAL` or `$EDITOR`; Guard falls back to `nvim`, `vim`, then `vi`. Both tools can be
+changed in the [settings](#editor-and-diff-tool).
 Press `d` or `Ctrl+D` to compare the current file's Git `HEAD` version with its working-tree
 contents in a read-only, side-by-side vimdiff view, including staged and unstaged changes.
 New files compare against an empty `HEAD` side. This requires `vimdiff` or Vim with diff
@@ -171,3 +172,26 @@ rows = [
 
 The token disappears when the checkpoint queue is empty. Guard continues to work normally
 when the Herdr plugin is not installed.
+
+### Editor and diff tool
+
+To choose the tools the popup opens, create `~/.config/guard/herdr.toml` (or
+`$XDG_CONFIG_HOME/guard/herdr.toml`, or the path in `GUARD_HERDR_CONFIG`). It uses the same
+`[editor]` and `[diff]` settings as [Lens](../lens/README.md#settings):
+
+```toml
+[editor]
+# Replaces $VISUAL / $EDITOR for Enter. {file} is replaced and {line} becomes 1;
+# without {file}, the path is appended.
+command = "nvim {file}"
+
+[diff]
+# Replaces vimdiff for d and Ctrl+D. {before} is the HEAD copy and {after} the
+# working copy, both temporary files; {name} is the path.
+# Without {before}/{after}, the two paths are appended.
+command = "difft {before} {after}"
+pause = true       # wait for Enter afterwards, for tools that print and exit
+```
+
+The file is read when the popup opens and again on `r`. Mistakes are reported in the popup
+and the valid settings still apply. A configured tool must be on Herdr's `PATH`.

@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any
 
 from guard_diff import comparison
+import guard_settings
 
 
 def _context() -> dict[str, Any]:
@@ -116,12 +117,31 @@ def audit_action() -> int:
     return 0 if _prompt_audit(_pane()) else 1
 
 
-def _editor_command(path: str) -> list[str] | None:
-    """Resolve a terminal editor without involving a shell."""
-    configured = os.environ.get("VISUAL") or os.environ.get("EDITOR")
+def _settings() -> guard_settings.Settings:
+    return guard_settings.load(guard_settings.location(os.environ))
+
+
+def _editor_command(path: str, configured: str = "") -> list[str] | None:
+    """Resolve a terminal editor without involving a shell.
+
+    A configured command follows Lens: ``{file}`` and ``{line}`` are substituted per argument
+    (the queue has no line, so ``{line}`` is 1), and without ``{file}`` the path is appended.
+    """
     if configured:
         try:
             command = shlex.split(configured)
+        except ValueError as error:
+            raise ValueError(f"Configured editor command is malformed: {error}") from None
+        if not command or not shutil.which(command[0]):
+            raise ValueError("Configured editor was not found on PATH")
+        command = [part.replace("{line}", "1") for part in command]
+        if any("{file}" in part for part in command):
+            return [part.replace("{file}", path) for part in command]
+        return [*command, path]
+    environment = os.environ.get("VISUAL") or os.environ.get("EDITOR")
+    if environment:
+        try:
+            command = shlex.split(environment)
         except ValueError:
             command = []
         if command and shutil.which(command[0]):
@@ -172,11 +192,18 @@ def _put(screen: Any, y: int, x: int, text: str, style: int = 0) -> None:
         pass
 
 
-def _run_terminal(screen: Any, command: list[str], cwd: Path) -> int:
+def _run_terminal(screen: Any, command: list[str], cwd: Path, pause: bool = False) -> int:
     try:
         curses.def_prog_mode()
         curses.endwin()
-        return subprocess.run(command, cwd=str(cwd), check=False).returncode
+        status = subprocess.run(command, cwd=str(cwd), check=False).returncode
+        if pause:
+            # Tools that print and exit would otherwise vanish behind the redraw.
+            try:
+                input("\nPress Enter to return to Guard ")
+            except EOFError:
+                pass
+        return status
     finally:
         try:
             curses.reset_prog_mode()
@@ -188,8 +215,11 @@ def _run_terminal(screen: Any, command: list[str], cwd: Path) -> int:
             pass
 
 
-def _open_editor(screen: Any, path: str) -> str:
-    command = _editor_command(path)
+def _open_editor(screen: Any, path: str, configured: str = "") -> str:
+    try:
+        command = _editor_command(path, configured)
+    except ValueError as error:
+        return str(error)
     if command is None:
         return "No terminal editor found. Set $VISUAL or $EDITOR."
     if not Path(path).is_file():
@@ -202,12 +232,18 @@ def _open_editor(screen: Any, path: str) -> str:
         return f"Could not start editor: {error}."
 
 
-def _open_diff(screen: Any, project: Path, path: str) -> str:
+def _open_diff(screen: Any, project: Path, path: str,
+               settings: guard_settings.Settings | None = None) -> str:
+    settings = settings or guard_settings.Settings()
     try:
-        with comparison(project, Path(path)) as (command, cwd):
-            status = _run_terminal(screen, command, cwd)
-        return ("Returned from vimdiff." if status == 0 else
-                f"vimdiff exited with status {status}.")
+        with comparison(project, Path(path), settings.diff) as (command, cwd):
+            status = _run_terminal(screen, command, cwd,
+                                   pause=bool(settings.diff) and settings.diff_pause)
+        tool = "vimdiff" if not settings.diff else Path(command[0]).name
+        # Diff tools exit with 1 when the files differ, so only 2 and up are failures.
+        failed = status > (1 if settings.diff else 0)
+        return (f"{tool} exited with status {status}." if failed else
+                f"Returned from {tool}.")
     except (OSError, ValueError, subprocess.SubprocessError) as error:
         return str(error)
 
@@ -243,7 +279,8 @@ def _panel(screen: Any) -> int:
     selected = 0
     scroll = 0
     marked: set[str] = set()
-    message = ""
+    settings = _settings()
+    message = "; ".join(settings.errors)
     pane, pending = _pending()
     while True:
         project, rows = _file_rows(pane, pending)
@@ -316,10 +353,10 @@ def _panel(screen: Any) -> int:
                 marked.add(path)
             message = f"{len(marked)} file{'s' if len(marked) != 1 else ''} selected."
         elif key in (curses.KEY_ENTER, "\n", "\r") and rows:
-            message = _open_editor(screen, rows[selected][0])
+            message = _open_editor(screen, rows[selected][0], settings.editor)
             pane, pending = _pending()
         elif key in ("d", "D", "\x04") and rows:
-            message = _open_diff(screen, project, rows[selected][0])
+            message = _open_diff(screen, project, rows[selected][0], settings)
         elif key in ("a", "A"):
             token: str | None = None
             audit_count = len(rows)
@@ -370,7 +407,9 @@ def _panel(screen: Any) -> int:
                     pane, pending = _pending()
         elif key in ("r", "R", curses.KEY_RESIZE):
             pane, pending = _pending()
-            message = ("Queue refreshed." if not pending.get("error") else
+            settings = _settings()
+            message = ("; ".join(settings.errors) if settings.errors else
+                       "Queue refreshed." if not pending.get("error") else
                        "Refresh failed; see the message above.")
         else:
             message = "Use Space to select files, then a to audit or c to clear them."

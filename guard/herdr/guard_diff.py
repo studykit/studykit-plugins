@@ -3,6 +3,7 @@
 from contextlib import contextmanager
 import os
 from pathlib import Path
+import shlex
 import shutil
 import stat
 import subprocess
@@ -81,11 +82,29 @@ def snapshots(project: Path, path: Path) -> tuple[str, bytes, bytes]:
     return name, before, after
 
 
+def configured_command(configured: str, before: Path, after: Path, name: str) -> list[str]:
+    try:
+        command = shlex.split(configured)
+    except ValueError as error:
+        raise ValueError(f"Configured diff command is malformed: {error}") from None
+    if not command or not shutil.which(command[0]):
+        raise ValueError("Configured diff tool was not found on PATH")
+    # Substitute after splitting so each path stays one literal argument, as in Lens.
+    if not any(key in part for part in command for key in ("{before}", "{after}")):
+        command += ["{before}", "{after}"]
+    values = {"{before}": str(before), "{after}": str(after), "{name}": name}
+    for key, value in values.items():
+        command = [part.replace(key, value) for part in command]
+    return command
+
+
 @contextmanager
-def comparison(project: Path, path: Path):
-    binary = shutil.which("vimdiff") or shutil.which("vim")
-    if not binary:
-        raise ValueError("Install Vim with diff support (vimdiff or vim) to compare files")
+def comparison(project: Path, path: Path, configured: str = ""):
+    binary = None
+    if not configured:
+        binary = shutil.which("vimdiff") or shutil.which("vim")
+        if not binary:
+            raise ValueError("Install Vim with diff support (vimdiff or vim) to compare files")
     name, before, after = snapshots(project, path)
     with tempfile.TemporaryDirectory(prefix="guard-diff-") as directory:
         root = Path(directory)
@@ -94,6 +113,9 @@ def comparison(project: Path, path: Path):
             target = root / relative
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_bytes(content)
+        if configured:
+            yield configured_command(configured, root / left, root / right, name), root
+            return
         # Even a forced save targets a disposable snapshot, not the project file.
         command = [binary, "-N", "-u", "NONE", "-U", "NONE", "-i", "NONE", "-n", "-R",
                    "--noplugin", "--cmd", "set nomodeline", "-d", "-O",
