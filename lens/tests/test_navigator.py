@@ -8,6 +8,7 @@ import sys
 import tempfile
 import tomllib
 import unittest
+import unittest.mock
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -233,6 +234,20 @@ class ProjectTests(unittest.TestCase):
         self.assertIn(b"-before", seen["output"])
         self.assertIn(b"+after", seen["output"])
         self.assertEqual(nav.message, "Returned from diff")  # Status 1 only means "files differ".
+
+    def test_keyboard_mode_reset_after_child_and_screen_restore(self):
+        # Emacs's tty frames push a kitty keyboard mode and can exit without popping it.
+        nav = Navigator(self.root, "pane", False, "")
+        events = []
+        screen = unittest.mock.Mock()
+        screen.refresh.side_effect = lambda: events.append("refresh")
+        with patch("ui.subprocess.run", side_effect=lambda *a, **k: events.append("child")), \
+                patch("ui.terminal_input.reset_keyboard", side_effect=lambda: events.append("reset")), \
+                patch("ui.terminal_input.enable"), patch("ui.terminal_input.disable"), \
+                patch.object(curses, "def_prog_mode"), patch.object(curses, "endwin"), \
+                patch.object(curses, "reset_prog_mode"), patch.object(curses, "curs_set"):
+            nav.run_terminal(screen, ["emacsclient"], self.root)
+        self.assertEqual(events, ["child", "refresh", "reset"])
 
     def test_changes_enter_opens_vimdiff_and_tab_changes_focus(self):
         self.init()

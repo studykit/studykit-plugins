@@ -20,6 +20,10 @@ from guard_diff import comparison
 import guard_settings
 
 
+# Kitty keyboard flags to 0 on the current screen's stack, then modifyOtherKeys off.
+KEYBOARD_RESET = "\x1b[=0;1u\x1b[>4;0m"
+
+
 def _context() -> dict[str, Any]:
     try:
         value = json.loads(os.environ.get("HERDR_PLUGIN_CONTEXT_JSON", "{}"))
@@ -213,6 +217,11 @@ def _run_terminal(screen: Any, command: list[str], cwd: Path, pause: bool = Fals
             screen.refresh()
         except curses.error:
             pass
+        # A child such as Emacs can push a kitty keyboard mode or enable modifyOtherKeys and
+        # exit without undoing it; Ctrl keys would then arrive as CSI sequences the panel
+        # cannot decode. The alternate screen keeps its own stack, so reset after refresh.
+        sys.stdout.write(KEYBOARD_RESET)
+        sys.stdout.flush()
 
 
 def _open_editor(screen: Any, path: str, configured: str = "") -> str:

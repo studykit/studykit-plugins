@@ -103,6 +103,19 @@ def sync_size(screen):
         pass
 
 
+# Kitty keyboard flags to 0 on the current screen's stack, then modifyOtherKeys off.
+RESET_KEYBOARD = "\x1b[=0;1u\x1b[>4;0m"
+
+
+def reset_keyboard():
+    # A child such as Emacs can push a keyboard mode and exit without popping it. The
+    # terminal would then encode Ctrl keys as CSI sequences that Lens cannot decode. The
+    # main and alternate screens keep separate stacks, so call this once curses is back
+    # on its own screen.
+    sys.stdout.write(RESET_KEYBOARD)
+    sys.stdout.flush()
+
+
 def disable():
     sys.stdout.write("\x1b[?1000l\x1b[?1002l\x1b[?1006l")
     sys.stdout.flush()

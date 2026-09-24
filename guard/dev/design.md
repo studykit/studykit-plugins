@@ -1,5 +1,15 @@
 # guard — design detail
 
+## Keyboard mode reset after a popup child (v0.161.1)
+
+Doom Emacs's `kkp` pushes a kitty keyboard mode (`CSI > 5 u`) on an `emacsclient -nw` frame
+and did not pop it when the frame closed. Herdr then encoded Ctrl keys for the popup as
+`CSI 99;5 u` rather than `\x03`, so the panel stopped recognizing them. After any child exits,
+the panel writes `CSI = 0;1 u` (kitty flags 0) and `CSI > 4;0 m` (modifyOtherKeys off), after
+curses has re-entered the alternate screen, whose stack is separate from the main screen's.
+A 2026-09-24 raw probe in a Herdr pane read `ESC [99;5u` for Ctrl+C before the reset and
+`\x03` after it. Lens 0.18.1 carries the same reset.
+
 ## Herdr editor and diff settings (v0.161.0)
 
 The pending-files popup reads `[editor].command`, `[diff].command`, and `[diff].pause` from

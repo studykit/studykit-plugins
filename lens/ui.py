@@ -1184,6 +1184,8 @@ class Navigator:
                 pass
             terminal_input.enable(screen)
             screen.clear()
+            screen.refresh()
+            terminal_input.reset_keyboard()
 
     def show_diff(self, screen):
         name = self.current_file()

@@ -230,6 +230,21 @@ class PanelTests(unittest.TestCase):
             self.assertEqual(guard_herdr._open_editor(Mock(), "/p/f", "missing"),
                              "Configured editor was not found on PATH")
 
+    def test_keyboard_mode_reset_after_screen_restore(self):
+        # Emacs's tty frames push a kitty keyboard mode and can exit without popping it.
+        events = []
+        screen = Mock()
+        screen.refresh.side_effect = lambda: events.append("refresh")
+        stdout = Mock()
+        stdout.write.side_effect = lambda text: events.append(text)
+        with ExitStack() as stack:
+            for name in ("def_prog_mode", "endwin", "reset_prog_mode", "curs_set"):
+                stack.enter_context(patch.object(guard_herdr.curses, name))
+            stack.enter_context(patch.object(guard_herdr.subprocess, "run", return_value=Mock(returncode=0)))
+            stack.enter_context(patch.object(guard_herdr.sys, "stdout", stdout))
+            guard_herdr._run_terminal(screen, ["emacsclient"], Path("/tmp"))
+        self.assertEqual(events, ["refresh", guard_herdr.KEYBOARD_RESET])
+
     def test_diff_preparation_error_remains_in_panel(self):
         with patch.object(guard_herdr, "comparison", side_effect=ValueError("Binary file")), \
                 patch.object(guard_herdr, "_run_terminal") as run:
