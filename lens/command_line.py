@@ -22,7 +22,9 @@ COMMANDS = (
     Command("goto", ("goto-line",), "goto LINE", "Jump to a preview line (or type the number alone)"),
     Command("find", ("search",), "find TEXT", "Find text in the preview"),
     Command("cd", ("root",), "cd DIR", "Change the navigation root", argument="directory"),
-    Command("git-root", (), "git-root", "Change the root to the Git repository root"),
+    Command("git.root", (), "git.root", "Change the root to the Git repository root"),
+    Command("git.history", (), "git.history", "Browse commits on the current branch"),
+    Command("git.file-history", (), "git.file-history", "Browse commits for the current file"),
     Command("top", (), "top", "Jump to the start of the preview"),
     Command("bottom", ("end",), "bottom", "Jump to the end of the preview"),
     Command("zoom", (), "zoom in|out|fit|PERCENT", "Zoom the current diagram",
@@ -30,22 +32,22 @@ COMMANDS = (
     Command("align", (), "align left|center|right", "Align diagrams", ("left", "center", "right")),
     Command("source", (), "source", "Show diagram source"),
     Command("diagram", ("image",), "diagram", "Show diagram images"),
-    Command("changes", (), "changes", "List changed files only"),
+    Command("git.changes", (), "git.changes", "List changed files only"),
     Command("project", ("all",), "project", "List every project file"),
-    Command("ignored", (), "ignored [on|off]", "Show or hide Git-ignored files", ("on", "off")),
+    Command("git.ignored", (), "git.ignored [on|off]", "Show or hide ignored files", ("on", "off")),
     Command("refresh", ("reload",), "refresh", "Reload the file list and preview"),
     Command("editor", (), "editor", "Open the current file or folder in an editor"),
     Command("launch", ("xdg-open", "start"), "launch [FILE]",
             "Open the selected file or folder in the application the OS assigns", argument="file"),
     Command("with", ("app",), "with [APP]",
             "Open the selected file or folder with an application; alone, list them", argument="application"),
-    Command("diff", ("vimdiff",), "diff", "Compare the current file with HEAD"),
+    Command("git.diff", (), "git.diff", "Compare the current file with HEAD"),
     Command("icons", (), "icons nerd|plain", "Use Nerd Font icons or plain text in the tree",
             ("nerd", "plain")),
     Command("layout", (), "layout popup|overlay|left|right", "Switch display mode",
             ("popup", "overlay", "left", "right")),
     Command("config", ("settings",), "config", "Edit Lens settings (config.toml) and reload them"),
-    Command("help", ("?",), "help [COMMAND]", "List commands or describe one"),
+    Command("help", ("?",), "help [GROUP|COMMAND]", "List commands or describe one", argument="command"),
     Command("quit", ("q", "exit", "kill-emacs"), "quit", "Close Lens"),
 )
 
@@ -121,6 +123,9 @@ def candidates(text, root, files):
     elif command.argument == "application":
         # Application names often contain spaces; match case-insensitively.
         options = [name for name in applications() if name.lower().startswith(rest.lower())]
+    elif command.argument == "command":
+        options = sorted({name for entry in COMMANDS for name in (entry.name, *entry.aliases)
+                          if name.startswith(rest)})
     else:
         options = [choice for choice in command.choices if choice.startswith(rest)]
     return f"{word} ", options
@@ -143,12 +148,17 @@ def complete(text, root, files):
 
 def describe(word=""):
     if word:
+        grouped = [command.name for command in COMMANDS if command.name.startswith(word.rstrip(".") + ".")]
+        if grouped:
+            return f"{word.rstrip('.')} commands: " + "  ".join(grouped)
         command = lookup(word)
         if command is None:
             return f"Unknown command: {word}"
         aliases = f" (also {', '.join(command.aliases)})" if command.aliases else ""
         return f":{command.usage} — {command.help}{aliases}"
-    return "Commands: " + "  ".join(command.name for command in COMMANDS) + "  ·  :help NAME for details"
+    groups = sorted({command.name.partition(".")[0] for command in COMMANDS if "." in command.name})
+    other = [command.name for command in COMMANDS if "." not in command.name]
+    return "Groups: " + ", ".join(groups) + "  ·  Commands: " + "  ".join(other) + "  ·  :help GROUP for details"
 
 
 def word_start(text, cursor):

@@ -12,6 +12,7 @@ import unicodedata
 
 from core import Row, apply_status, application_command, checked_path, editor_command, highlights, opener_command, preview, read_status, rows, scan
 from diff_tool import comparison
+import git_history
 from popup_size import PopupSize, PRESETS
 from view_state import normalize as normalize_view
 import command_line
@@ -144,6 +145,7 @@ KEY_GROUPS = (
                  ("⌃H", "Ignored files"), ("⌃R", "Refresh"), ("⌃O", "Change root"), ("t", "Repository root"),
                  ("⌃W", "Layout"), ("⌃Y", "Popup size"), ("Esc", "Back / close"), ("⌃G", "Cancel, never close"), ("⌃C", "Quit"))),
     ("Files", (("j k", "Move"), ("h l", "Fold / unfold"), ("=", "Fold / unfold all under"), ("Enter", "Open / enter folder"), ("Space", "Preview / fold"),
+               ("H", "File history"),
                ("/", "Filter names"), ("⌫", "Parent folder"), ("⌃N ⌃P", "Scroll preview"),
                ("⌃F ⌃B", "Page preview"))),
     ("Preview", (("j k", "Line"), ("Space b", "Page"), ("d u", "Half page"), ("g G", "Top / end"),
@@ -151,9 +153,6 @@ KEY_GROUPS = (
                  ("⌃click", "Open or follow link"), ("⌫ H", "Back from a followed link"), ("L", "Forward again"))),
     ("Diagrams", (("v", "Image / source"), ("+ -", "Zoom"), ("0", "Fit"), ("a", "Align"),
                   ("[ ]", "Previous / next"))),
-    ("Command line", (("Tab", "Complete"), ("↑ ↓", "History"), ("⌃A ⌃E", "Start / end"),
-                      ("⌃B ⌃F", "Char"), ("M-b M-f", "Word"), ("⌃K ⌃U", "Kill to end / start"),
-                      ("M-d M-⌫ ⌃W", "Kill word"), ("⌃Y", "Yank"), ("⌃G Esc", "Cancel"))),
 )
 
 
@@ -175,6 +174,21 @@ class Navigator:
         self.opener = ""
         self.app_picker = None  # O: {"target", "query", "selected", "scroll", "apps"} while choosing.
         self.recent_apps = []
+        self.history_mode = ""  # Project or file history, separate from the saved file view.
+        self.history_path = ""
+        self.history_branch = ""
+        self.history_commits = []
+        self.history_more = False
+        self.history_selected = self.history_scroll = 0
+        self.history_files = []
+        self.history_file_selected = 0
+        self.history_patch = False
+        self.history_right_focus = False
+        self.history_right_scroll = 0
+        self.history_file_jump = False
+        self.history_horizontal = 0
+        self.history_error = ""
+        self.history_patch_text = None
         self.changes = changes
         self.include_ignored = initial_state["include_ignored"] if initial_state else False
         self.query = ""
@@ -314,7 +328,15 @@ class Navigator:
                 "selected": self.pending_selection or (self.items[self.selected].path if self.items else ""),
                 "scroll": self.pending_scroll if self.pending_selection else self.scroll,
                 "preview_scroll": self.preview_scroll,
-                "horizontal": self.horizontal, "preview_focus": self.preview_focus}
+                "horizontal": self.horizontal, "preview_focus": self.preview_focus,
+                "history_mode": self.history_mode,
+                "history_path": self.history_path if self.history_mode == "file" else "",
+                "history_selected": self.history_selected,
+                "history_file_selected": self.history_file_selected,
+                "history_right_focus": self.history_right_focus,
+                "history_right_scroll": self.history_right_scroll,
+                "history_horizontal": self.history_horizontal,
+                "history_patch": self.history_patch}
 
     def checkpoint(self):
         if self.on_state is None or self.index is None:
@@ -354,6 +376,7 @@ class Navigator:
             except ValueError:
                 pass
         self.root, self.index = index.root, index
+        self.history_mode = ""
         self.pending_selection = ""
         self.query = self.search_before = ""
         self.searching = False
@@ -493,6 +516,20 @@ class Navigator:
             self.horizontal = state["horizontal"]
             self.restore_horizontal = True
             self.preview_focus = state["preview_focus"]
+        if state["history_mode"]:
+            self.open_history(file=state["history_mode"] == "file", path=state["history_path"])
+            if self.history_mode:
+                for _ in range(20):
+                    if not self.history_more or len(self.history_commits) > state["history_selected"]:
+                        break
+                    self.history_load_more()
+                self.history_selected = min(state["history_selected"], len(self.history_commits) - 1)
+                self.history_select()
+                self.history_file_selected = min(state["history_file_selected"], max(0, len(self.history_files) - 1))
+                self.history_right_focus = state["history_right_focus"]
+                self.history_right_scroll = state["history_right_scroll"]
+                self.history_horizontal = state["history_horizontal"]
+                self.history_patch = state["history_patch"] and self.history_mode == "project"
         self.message = self.index.note or "Restored previous view"
         return True
 
@@ -1339,6 +1376,240 @@ class Navigator:
         except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as error:
             self.message = str(error)
 
+    def open_history(self, *, file=False, path=""):
+        if self.index is None or self.index.repository is None:
+            self.message = "Git history is unavailable outside a Git repository"
+            return
+        name = self.current_file() if file and not path else ""
+        if file and not (name or path):
+            self.message = "Select a file to view its history"
+            return
+        try:
+            path = path or ((self.root / name).relative_to(self.index.repository).as_posix() if file else "")
+            branch = git_history.branch(self.index.repository)
+            entries, more = git_history.commits(self.index.repository, path=path)
+            if not entries:
+                self.message = "No commits found for this file" if file else "No commits on this branch"
+                return
+            self.history_mode = "file" if file else "project"
+            self.history_path, self.history_branch = path, branch
+            self.history_commits, self.history_more = entries, more
+            self.history_selected = self.history_scroll = 0
+            self.history_right_focus = self.history_patch = False
+            self.history_right_scroll = self.history_file_selected = 0
+            self.history_select()
+            self.message = ""
+        except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as error:
+            self.message = f"Could not load Git history: {error}"
+
+    def history_select(self):
+        self.history_patch = False
+        self.history_patch_text = None
+        self.history_horizontal = 0
+        self.history_right_scroll = self.history_file_selected = 0
+        self.history_file_jump = False
+        self.history_error = ""
+        try:
+            commit = self.history_commits[self.history_selected]
+            files = git_history.changed_files(self.index.repository, commit.oid)
+            if self.history_mode == "file":
+                files = [item for item in files if item.path == commit.path or item.previous == commit.path]
+            self.history_files = files
+        except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as error:
+            self.history_files = []
+            self.history_error = str(error)
+
+    def history_load_more(self):
+        if not self.history_more:
+            return
+        try:
+            entries, more = git_history.commits(self.index.repository, len(self.history_commits), self.history_path)
+            self.history_commits.extend(entries)
+            self.history_more = more
+        except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as error:
+            self.history_more = False
+            self.message = f"Could not load more commits: {error}"
+
+    def history_move(self, amount):
+        target = self.history_selected + amount
+        if target >= len(self.history_commits) and self.history_more:
+            self.history_load_more()
+        target = max(0, min(target, len(self.history_commits) - 1))
+        if target != self.history_selected:
+            self.history_selected = target
+            self.history_select()
+
+    def history_lines(self):
+        commit = self.history_commits[self.history_selected]
+        heading = [commit.subject, f"{commit.oid[:12]}  {commit.author}  {commit.date}"]
+        if self.history_patch or self.history_mode == "file":
+            if not self.history_files:
+                return heading + ["", self.history_error or "No file diff in this commit"], -1
+            try:
+                changed = self.history_files[self.history_file_selected]
+                if self.history_patch_text is None:
+                    self.history_patch_text = git_history.patch(self.index.repository, commit.oid, changed)
+                return heading + ["", *self.history_patch_text.splitlines()], -1
+            except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as error:
+                return heading + ["", str(error)], -1
+        body = commit.body.splitlines() if commit.body else []
+        lines = heading + ([""] + body if body else []) + ["", "Changed files:"]
+        first = len(lines)
+        lines.extend(f"{'›' if i == self.history_file_selected else ' '} {item.status:4} {item.previous + ' → ' if item.previous else ''}{item.path}"
+                     for i, item in enumerate(self.history_files))
+        if not self.history_files:
+            lines.append(self.history_error or "No changed files")
+        return lines, first + self.history_file_selected if self.history_files else -1
+
+    def history_key(self, key, screen):
+        if isinstance(key, terminal_input.Mouse):
+            over_right = self.history_right_focus if self.narrow else key.x > self.divider
+            if key.action in ("up", "down"):
+                amount = -3 if key.action == "up" else 3
+                if over_right:
+                    self.history_right_scroll = max(0, self.history_right_scroll + amount)
+                else:
+                    self.history_move(amount)
+            elif key.action == "click" and self.content_top <= key.y < self.content_top + self.body:
+                right = over_right
+                self.history_right_focus = right
+                if not right:
+                    target = self.history_scroll + key.y - self.content_top
+                    self.history_move(target - self.history_selected)
+                elif self.history_mode == "project" and not self.history_patch:
+                    _, first = self.history_lines()
+                    target = self.history_right_scroll + key.y - self.content_top - first
+                    if 0 <= target < len(self.history_files):
+                        self.history_file_selected = target
+            return True
+        if key in ("\x1b", "\x07", curses.KEY_BACKSPACE):
+            if self.history_patch:
+                self.history_patch = False
+                self.history_right_scroll = 0
+            elif self.history_right_focus:
+                self.history_right_focus = False
+            elif key != "\x07":
+                self.history_mode = ""
+            return True
+        if key == "h":
+            return self.history_key("\x1b", screen)
+        if key == "l":
+            return self.history_key("\n", screen)
+        if key in ("\t", curses.KEY_BTAB):
+            self.history_right_focus = not self.history_right_focus
+            return True
+        if key == "\x12":
+            self.refresh()
+            self.open_history(file=self.history_mode == "file")
+            return True
+        if key == "\x17":
+            self.begin_layout()
+            return True
+        if key in (curses.KEY_LEFT, curses.KEY_RIGHT) and self.history_right_focus \
+                and (self.history_patch or self.history_mode == "file"):
+            self.history_horizontal = max(0, self.history_horizontal + (-8 if key == curses.KEY_LEFT else 8))
+            return True
+        if key in ("\n", "\r", curses.KEY_ENTER):
+            if not self.history_right_focus:
+                self.history_right_focus = True
+            elif self.history_mode == "project" and not self.history_patch and self.history_files:
+                self.history_patch = True
+                self.history_patch_text = None
+                self.history_right_scroll = 0
+                self.history_horizontal = 0
+            return True
+        movement = {"j": 1, "k": -1, curses.KEY_DOWN: 1, curses.KEY_UP: -1,
+                    curses.KEY_NPAGE: self.body, curses.KEY_PPAGE: -self.body}
+        if key in movement:
+            amount = movement[key]
+            if not self.history_right_focus:
+                self.history_move(amount)
+            elif self.history_mode == "project" and not self.history_patch:
+                if key in ("j", "k", curses.KEY_DOWN, curses.KEY_UP):
+                    self.history_file_selected = max(0, min(self.history_file_selected + amount,
+                                                             len(self.history_files) - 1))
+                    self.history_file_jump = bool(self.history_files)
+                else:
+                    self.history_right_scroll = max(0, self.history_right_scroll + amount)
+            else:
+                self.history_right_scroll = max(0, self.history_right_scroll + amount)
+            return True
+        if key in ("g", curses.KEY_HOME, "G", curses.KEY_END):
+            last = key in ("G", curses.KEY_END)
+            if not self.history_right_focus:
+                self.history_move((len(self.history_commits) - 1 if last else 0) - self.history_selected)
+            else:
+                self.history_right_scroll = 1_000_000 if last else 0
+            return True
+        if key == " " and self.history_right_focus:
+            self.history_right_scroll += self.body
+        return True
+
+    def mouse_history(self, screen=None):
+        try:
+            _, x, y, _, state = curses.getmouse()
+        except curses.error:
+            return
+        if state & getattr(curses, "BUTTON4_PRESSED", 0):
+            self.history_key(terminal_input.Mouse(x, y, "up"), screen)
+        elif state & getattr(curses, "BUTTON5_PRESSED", 0):
+            self.history_key(terminal_input.Mouse(x, y, "down"), screen)
+        elif state & (curses.BUTTON1_CLICKED | curses.BUTTON1_DOUBLE_CLICKED | curses.BUTTON1_PRESSED):
+            self.history_key(terminal_input.Mouse(x, y, "click"), screen)
+
+    def draw_history(self, screen, height, width):
+        bottom = height - 3
+        self.content_top = BOX_TOP + 1
+        self.body = bottom - self.content_top
+        self.divider = max(38, min(width // 2, 62, width - 42))
+        self.narrow = width < 90
+        title = f"HISTORY · {self.history_path if self.history_mode == 'file' else self.history_branch}"
+        put(screen, ROOT_ROW, 2, title, width - 4, self.style("active") | curses.A_BOLD)
+        left_width = width - 1 if self.narrow else self.divider
+        right_x = 0 if self.narrow else self.divider + 1
+        right_width = width - 1 if self.narrow else width - self.divider - 2
+        show_left = not self.narrow or not self.history_right_focus
+        show_right = not self.narrow or self.history_right_focus
+        if show_left:
+            self.panel(screen, 0, left_width, bottom, not self.history_right_focus, "COMMITS",
+                       f"{len(self.history_commits)}{'+' if self.history_more else ''}")
+            self.history_scroll = max(0, min(self.history_scroll, self.history_selected))
+            if self.history_selected >= self.history_scroll + self.body:
+                self.history_scroll = self.history_selected - self.body + 1
+            for offset, commit in enumerate(self.history_commits[self.history_scroll:self.history_scroll + self.body]):
+                number = self.history_scroll + offset
+                style = self.style("selected" if number == self.history_selected and not self.history_right_focus
+                                   else "inactive" if number == self.history_selected else "base")
+                band(screen, self.content_top + offset, 1, "", left_width - 2, style)
+                put(screen, self.content_top + offset, 2,
+                    f"{commit.date} {commit.oid[:7]} {commit.subject}", left_width - 4, style)
+        if show_right:
+            detail = "FILE DIFF" if self.history_mode == "file" or self.history_patch else "COMMIT DETAILS"
+            self.panel(screen, right_x, right_width, bottom, self.history_right_focus, detail)
+            lines, selected_line = self.history_lines()
+            if selected_line >= 0 and self.history_right_focus and self.history_file_jump:
+                self.history_right_scroll = max(0, min(self.history_right_scroll, selected_line))
+                if selected_line >= self.history_right_scroll + self.body:
+                    self.history_right_scroll = selected_line - self.body + 1
+                self.history_file_jump = False
+            self.history_right_scroll = max(0, min(self.history_right_scroll, max(0, len(lines) - self.body)))
+            for offset, line in enumerate(lines[self.history_right_scroll:self.history_right_scroll + self.body]):
+                number = self.history_right_scroll + offset
+                style = (self.style("selected") if number == selected_line and self.history_right_focus
+                         else self.style("added") if line.startswith("+") and not line.startswith("+++")
+                         else self.style("removed") if line.startswith("-") and not line.startswith("---")
+                         else self.style("hunk") if line.startswith("@@") else self.style("base"))
+                if number == selected_line and self.history_right_focus:
+                    band(screen, self.content_top + offset, right_x + 1, "", right_width - 2, style)
+                shown = clean(line)[self.history_horizontal:] if number >= 3 and \
+                    (self.history_patch or self.history_mode == "file") else line
+                put(screen, self.content_top + offset, right_x + 2, shown, right_width - 4, style)
+        band(screen, height - 2, 0, "", width - 1, self.style("modeline"))
+        focus = "DIFF" if self.history_right_focus and (self.history_patch or self.history_mode == "file") else "DETAILS" if self.history_right_focus else "COMMITS"
+        put(screen, height - 2, 0, f" {focus}  {self.history_selected + 1}/{len(self.history_commits)}  {title}",
+            width - 1, self.style("modeline"))
+        self.draw_echo(screen, height - 1, width)
+
     def style(self, name):
         return self.styles.get(name, 0)
 
@@ -1503,6 +1774,18 @@ class Navigator:
                 self.draw_root(screen)
             if self.app_picker is not None:
                 self.draw_app_picker(screen)
+            screen.refresh()
+            return
+        if self.history_mode:
+            self.draw_history(screen, height, width)
+            if self.layout_dialog:
+                self.draw_layout(screen)
+            if self.size_draft:
+                self.draw_size(screen)
+            if self.key_help:
+                self.draw_key_help(screen)
+            if self.command_menu is not None and self.command is not None:
+                self.draw_command_menu(screen)
             screen.refresh()
             return
         bottom = height - 3
@@ -1686,8 +1969,10 @@ class Navigator:
             self.find_next(1, origin=self.preview_scroll)
         elif name == "cd":
             self.change_root(argument)
-        elif name == "git-root":
+        elif name == "git.root":
             self.repository_root()
+        elif name in ("git.history", "git.file-history"):
+            self.open_history(file=name == "git.file-history")
         elif name == "icons":
             if argument not in ICONS:
                 self.message = f":{command.usage}"
@@ -1701,27 +1986,30 @@ class Navigator:
                     self.message += f" (not saved: {error})"
         elif name in ("zoom", "align", "source", "diagram"):
             self.diagram_command(name, argument)
-        elif name in ("changes", "project"):
-            want = name == "changes"
+        elif name in ("git.changes", "project"):
+            self.history_mode = ""
+            want = name == "git.changes"
             if self.changes != want:
                 self.changes = want
                 self.preview_focus = False
                 self.selected = self.scroll = 0
                 self.rebuild()
             self.message = "Changed files only" if want else "All project files"
-        elif name == "ignored":
+        elif name == "git.ignored":
             if argument not in ("", "on", "off"):
                 self.message = f":{command.usage}"
             elif argument == "" or (argument == "on") != self.include_ignored:
                 self.toggle_ignored()
         elif name == "refresh":
             self.refresh()
+            if self.history_mode:
+                self.open_history(file=self.history_mode == "file")
             self.message = "Refreshed"
         elif name == "config":
             self.edit_settings(screen)
         elif name == "editor":
             self.edit(screen)
-        elif name == "diff":
+        elif name == "git.diff":
             self.show_diff(screen)
         elif name == "launch":
             self.launch(argument or None)
@@ -1830,6 +2118,14 @@ class Navigator:
         """The few keys worth showing for the current state; ? lists the rest."""
         if self.command is not None:
             return [("Tab", "complete"), ("↑↓", "history"), ("Esc", "cancel")]
+        if self.history_mode:
+            if not self.history_right_focus:
+                return [("Enter", "details" if self.history_mode == "project" else "diff"),
+                        ("Tab", "switch"), ("Esc", "files"), ("?", "keys")]
+            if self.history_mode == "project" and not self.history_patch:
+                return [("j k", "file"), ("Enter", "diff"), ("Esc", "commits"), ("?", "keys")]
+            return [("j k", "scroll"), ("Esc", "files" if self.history_mode == "project" else "commits"),
+                    ("?", "keys")]
         if self.finding:
             return [("Enter", "keep"), ("⌃U", "clear"), ("Esc", "cancel")]
         if self.searching:
@@ -1865,15 +2161,49 @@ class Navigator:
             put(screen, y, x + cells(key) + 1, label, cells(label), self.style("muted"))
             x += cells(key) + cells(label) + 3
 
+    def key_groups(self):
+        if self.history_mode:
+            common = (("Tab", "Switch panels"), (":", "Command line"), ("?", "This list"),
+                      ("⌃R", "Reload history"), ("⌃W", "Layout"), ("⌃C", "Quit"))
+            if not self.history_right_focus:
+                current = (("j k ↑ ↓", "Move commits"), ("PgUp PgDn", "Move a page"),
+                           ("g G", "First / last loaded"), ("Enter l", "Show details"),
+                           ("Esc h", "Return to files"))
+                if self.history_mode == "file":
+                    current = tuple((key, "Show diff" if key == "Enter l" else label)
+                                    for key, label in current)
+            elif self.history_mode == "project" and not self.history_patch:
+                current = (("j k ↑ ↓", "Choose a file"), ("PgUp PgDn", "Scroll a page"),
+                           ("g G", "Top / end"), ("Enter l", "Show file diff"),
+                           ("Esc h", "Back to commits"))
+            else:
+                current = (("j k ↑ ↓", "Scroll diff"), ("PgUp PgDn", "Scroll a page"),
+                           ("Space", "Next page"), ("← →", "Scroll sideways"), ("g G", "Top / end"),
+                           ("Esc h", "Back to files" if self.history_mode == "project" else "Back to commits"))
+            return (("History", common), ("Current panel", current))
+        repository = self.index is not None and self.index.repository is not None
+        general = tuple((key, label) for key, label in KEY_GROUPS[0][1]
+                        if not (key == "⌃D" and (not self.current_file() or not repository))
+                        and not (key in ("t", "c") and not repository)
+                        and not (key == "⌃Y" and self.layout != "popup"))
+        panel = KEY_GROUPS[2] if self.preview_focus else KEY_GROUPS[1]
+        if not self.preview_focus and (not self.current_file() or not self.index or not self.index.repository):
+            panel = (panel[0], tuple((key, label) for key, label in panel[1] if key != "H"))
+        groups = [("General", general), panel]
+        if self.preview_focus and self.diagram_list:
+            groups.append(KEY_GROUPS[3])
+        return tuple(groups)
+
     def draw_key_help(self, screen):
-        """Every key in a centred box, grouped as KEY_GROUPS lists them, in as many columns as fit."""
+        """Keys for the active view and panel, grouped in a centred box."""
+        groups = self.key_groups()
         height, width = screen.getmaxyx()
-        key_width = max(cells(key) for _, keys in KEY_GROUPS for key, _ in keys)
-        column_width = key_width + 2 + max(cells(label) for _, keys in KEY_GROUPS for _, label in keys)
+        key_width = max(cells(key) for _, keys in groups for key, _ in keys)
+        column_width = key_width + 2 + max(cells(label) for _, keys in groups for _, label in keys)
         columns = max(1, min(3, (width - 6) // (column_width + 3)))
         # Fill columns top to bottom with whole groups, balancing their heights.
         stacks, lengths = [[] for _ in range(columns)], [0] * columns
-        for group in KEY_GROUPS:
+        for group in groups:
             shortest = lengths.index(min(lengths))
             stacks[shortest].append(group)
             lengths[shortest] += len(group[1]) + 2
@@ -2158,6 +2488,8 @@ class Navigator:
             self.close_typed = ()
         # C-g cancels like Escape everywhere, except that it never closes Lens.
         cancel = key == "\x07"
+        if cancel and self.history_mode:
+            return self.history_key(key, screen)
         if cancel:
             key = "\x1b"
         if self.key_help:
@@ -2182,6 +2514,11 @@ class Navigator:
             self.command, self.command_recall, self.command_menu = "", len(self.command_history), None
             self.command_cursor = 0
             return True
+        if self.history_mode:
+            if key == curses.KEY_MOUSE:
+                self.mouse_history(screen)
+                return True
+            return self.history_key(key, screen)
         if key == "/" and self.preview_focus and not self.searching and self.active:
             self.begin_find()
             return True
@@ -2231,6 +2568,8 @@ class Navigator:
             self.begin_root()
         elif key == "t":
             self.repository_root()
+        elif key == "H" and not self.preview_focus:
+            self.open_history(file=True)
         elif key == "\x08":
             self.toggle_ignored()
         elif key in ("\x7f", curses.KEY_BACKSPACE) and not self.preview_focus and not self.query:

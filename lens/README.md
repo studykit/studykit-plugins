@@ -2,7 +2,7 @@
 
 A file browser for [Herdr](https://herdr.dev). It opens on the focused pane's working
 directory, in a popup, an overlay, or half of the tab. It has a project tree, fuzzy
-filename search, previews of code, Markdown and diagrams, and Git diffs. It works
+filename search, previews of code, Markdown and diagrams, Git diffs, and commit history. It works
 alongside any shell or agent, including Claude Code and Codex, on macOS and Linux.
 
 ## Requirements
@@ -107,6 +107,7 @@ These keys work outside text fields. Letters in a text field are just text.
 | `l` / Right | Unfold a folder; press again to go to its first entry |
 | `h` / Left | Fold a folder, or go to the parent |
 | `=` | Unfold a folder and every folder under it, or fold them all once they are open; on `.`, the whole tree |
+| `H` | Show the selected file's Git history |
 | Backspace, or Enter on `..` | Move the root up one folder |
 | Ctrl+N / Ctrl+P | Scroll the preview one line without leaving the tree |
 | Ctrl+F / Ctrl+B | Scroll the preview one screen without leaving the tree |
@@ -211,6 +212,23 @@ status, make it the root.
 Lens does not watch for changes. Press Ctrl+R to see new files and updated status.
 Lens also refreshes when you return from the editor.
 
+### Commit history
+
+Run `:git.history` for commits on the current branch across the whole Git repository,
+even if Lens is browsing a subdirectory. Run `:git.file-history` while a file is
+selected or previewed to see commits that changed that file. File history follows
+renames, including commits under the file's old name. Both views are read-only.
+
+The left panel lists commits. In project history, the right panel shows the
+selected commit's message and changed files. Tab moves to the file list; select a
+file and press Enter to see its patch. In file history, the right panel shows the
+selected commit's patch for that file immediately. `j` / `k` or the arrow keys
+move through commits, files or patch lines according to the focused panel.
+Page Up / Page Down move a screen; reaching the end of loaded commits loads more.
+Escape returns from a patch to the file list, then to the commits, then to the
+file browser. Ctrl+R reloads history. Merge commits show changes against their
+first parent. The history view is restored with Lens's saved view.
+
 ## Previews
 
 - **Code and config files** are highlighted by extension or by name, such as
@@ -290,7 +308,8 @@ source.
 
 Press `:` (as in Vim) or Alt+X (as in Emacs), type a command, and press Enter. You can
 shorten a command to any unambiguous prefix. Tab completes command names, paths and
-arguments. When more than one fits, Tab opens a list: typing narrows it, Up / Down or
+arguments. Git commands share the `git.` prefix; `:help git` lists them. When
+more than one fits, Tab opens a list: typing narrows it, Up / Down or
 Tab choose, and Enter inserts the choice. Up / Down (or Ctrl+P / Ctrl+N) recall
 earlier commands. Escape, Ctrl+G, or Backspace on an empty line cancels.
 
@@ -301,11 +320,12 @@ earlier commands. Escape, Ctrl+G, or Backspace on an empty line cancels.
 | `top` / `bottom` | Go to the start / end of the preview |
 | `find TEXT` | Find text in the preview; `n` / `N` continue |
 | `cd DIR` (`root`) | Change the root |
-| `git-root` | Change the root to the Git repository root |
-| `changes` / `project` | Show only changed files / every file |
-| `ignored [on\|off]` | Show or hide Git-ignored files |
+| `git.root` | Change the root to the Git repository root |
+| `git.history` / `git.file-history` | Browse repository commits / commits for the selected file |
+| `git.changes` / `project` | Show only changed files / every file |
+| `git.ignored [on\|off]` | Show or hide ignored files |
 | `refresh` | Reload the file list and preview |
-| `editor` / `diff` | Open the current file in your editor / the diff tool |
+| `editor` / `git.diff` | Open the current file in your editor / compare it with HEAD |
 | `launch [FILE]` (`xdg-open`, `start`) | Open a file or folder in its OS application |
 | `with [APP]` (`app`) | Open with APP: a macOS application name, or a command elsewhere. Alone, it shows the list. |
 | `zoom in\|out\|fit\|PERCENT` | Zoom the current diagram |
@@ -314,7 +334,7 @@ earlier commands. Escape, Ctrl+G, or Backspace on an empty line cancels.
 | `layout popup\|overlay\|left\|right` | Switch the display mode |
 | `icons nerd\|plain` | Use Nerd Font icons or plain text in the tree |
 | `config` (`settings`) | Edit the settings file |
-| `help [COMMAND]` | List the commands, or describe one |
+| `help [GROUP\|COMMAND]` | List command groups, a group's commands, or describe one |
 | `quit` (`q`, `exit`) | Close Lens |
 
 ## Display modes
@@ -371,7 +391,7 @@ applies the rest.
 command = "nvim +{line} {file}"
 
 [diff]
-# Replaces vimdiff for Ctrl+D and :diff. {before} is the HEAD copy and {after}
+# Replaces vimdiff for Ctrl+D and :git.diff. {before} is the HEAD copy and {after}
 # the working copy, both temporary files; {name} is the path.
 # Without {before}/{after}, the two paths are appended.
 command = "difft {before} {after}"
@@ -411,6 +431,9 @@ You can write a key in `[keys]` as:
 - `ctrl+`, `alt+` or `shift+` followed by a letter
 - one of `space`, `tab`, `enter`, `escape`, `backspace`, `delete`, `up`, `down`,
   `left`, `right`, `home`, `end`, `pageup` or `pagedown`
+
+The action names below are for key bindings. To bind a command instead, prefix
+it with `:`, for example `"alt+h" = ":git.history"`.
 
 | Action | Built-in key |
 | --- | --- |

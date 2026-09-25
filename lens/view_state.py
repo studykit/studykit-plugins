@@ -48,6 +48,25 @@ def normalize(value, root: Path):
         if type(item) is not int or not 0 <= item <= 1_000_000_000:
             return None
         result[key] = item
+    mode = value.get("history_mode", "")
+    path = value.get("history_path", "")
+    if mode not in ("", "project", "file") or not isinstance(path, str) or len(path) > 4096 or "\0" in path:
+        return None
+    if path and (Path(path).is_absolute() or ".." in Path(path).parts):
+        return None
+    if (mode == "file" and not path) or (mode != "file" and path):
+        return None
+    result["history_mode"], result["history_path"] = mode, path
+    for key in ("history_selected", "history_file_selected", "history_right_scroll", "history_horizontal"):
+        item = value.get(key, 0)
+        if type(item) is not int or not 0 <= item <= 1_000_000:
+            return None
+        result[key] = item
+    for key in ("history_right_focus", "history_patch"):
+        item = value.get(key, False)
+        if type(item) is not bool:
+            return None
+        result[key] = item
     return result
 
 

@@ -38,7 +38,7 @@ TEMPLATE = """\
 # command = "code --wait --goto {file}:{line}"
 
 [diff]
-# Command used by Ctrl+D and :diff, instead of the built-in vimdiff. {before} is
+# Command used by Ctrl+D and :git.diff, instead of the built-in vimdiff. {before} is
 # the HEAD copy, {after} the working copy, {name} the path; both copies are
 # temporary files. Without {before}/{after}, the two paths are appended.
 # Emacs ediff in the terminal; quitting ediff (q) also closes its frame:

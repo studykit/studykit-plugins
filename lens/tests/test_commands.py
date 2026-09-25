@@ -73,9 +73,9 @@ class CommandLineTests(unittest.TestCase):
         self.assertEqual(self.nav.icons, "nerd")
 
     def test_fixed_arguments_accept_prefixes(self):
-        self.run_line("ignored of")
+        self.run_line("git.ignored of")
         self.assertFalse(self.nav.include_ignored)
-        self.run_line("ig on")
+        self.run_line("git.ignored on")
         self.assertTrue(self.nav.include_ignored)
 
     def test_tab_completes_commands_and_paths(self):
@@ -92,7 +92,7 @@ class CommandLineTests(unittest.TestCase):
         self.assertEqual(self.nav.command, "preview src/deep/module.py")
         self.nav.key("\x15", None)
         self.nav.key("c", None)
-        self.nav.key("\t", None)  # cd, changes, config: listed in the completion menu.
+        self.nav.key("\t", None)  # cd and config are listed in the completion menu.
         self.assertEqual(self.nav.command, "c")
         self.assertIsNotNone(self.nav.command_menu)
 
@@ -100,14 +100,11 @@ class CommandLineTests(unittest.TestCase):
         self.nav.key(":", None)
         self.nav.key("c", None)
         self.nav.key("\t", None)
-        self.assertEqual(self.nav.command_choices()[1], ["cd", "changes", "config"])
-        self.nav.key(curses.KEY_DOWN, None)
-        self.nav.key("\t", None)  # Tab also moves on.
-        self.assertEqual(self.nav.command_menu["selected"], 2)
-        self.nav.key("h", None)  # Typing narrows the list and goes back to its top.
-        self.assertEqual(self.nav.command_choices()[1], ["changes"])
+        self.assertEqual(self.nav.command_choices()[1], ["cd", "config"])
+        self.nav.key("o", None)  # Typing narrows the list and goes back to its top.
+        self.assertEqual(self.nav.command_choices()[1], ["config"])
         self.nav.key("\n", None)  # Enter inserts the choice without running it.
-        self.assertEqual(self.nav.command, "changes ")
+        self.assertEqual(self.nav.command, "config ")
         self.assertIsNone(self.nav.command_menu)
         self.nav.key("\x15", None)
         for char in "preview s":
@@ -219,7 +216,9 @@ class CommandLineTests(unittest.TestCase):
         self.nav.key("?", None)
         self.nav.draw(screen)
         texts = [call.args[2] for call in screen.addstr.call_args_list]
-        self.assertIn("COMMAND LINE", texts)
+        self.assertIn("FILES", texts)
+        self.assertNotIn("PREVIEW", texts)
+        self.assertNotIn("DIAGRAMS", texts)
         self.nav.key("j", None)  # Closes the list without moving.
         self.assertFalse(self.nav.key_help)
         self.assertEqual(self.nav.selected, 0)
@@ -275,7 +274,7 @@ class CommandLineTests(unittest.TestCase):
         self.assertEqual(self.nav.root, (self.root / "src").resolve())
 
     def test_git_root_reports_a_root_outside_git(self):
-        self.run_line("git-root")
+        self.run_line("git.root")
         self.assertEqual(self.nav.message, "The current root is not inside a Git repository")
 
 
