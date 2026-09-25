@@ -13,7 +13,9 @@ import shutil
 import socket
 import subprocess
 import sys
+import termios
 import tomllib
+import tty
 
 
 def call(env: dict, method: str, /, **params) -> dict:
@@ -63,11 +65,14 @@ def source_pane(env: dict) -> tuple[str, str, Path, str]:
     return pane_id, pane["terminal_id"], Path(cwd).resolve(), label
 
 
-def shell_identity(env: dict, pane_id: str, terminal_id: str) -> tuple[str, str]:
-    server = hashlib.sha256(env["HERDR_SOCKET_PATH"].encode()).hexdigest()[:16]
-    session = hashlib.sha256(f"{pane_id}\0{terminal_id}".encode()).hexdigest()[:24]
+def shell_server(env: dict) -> str:
     # Preserve the existing tmux socket name across the plugin rename.
-    return f"popup-shell-{server}", session
+    return "popup-shell-" + hashlib.sha256(env["HERDR_SOCKET_PATH"].encode()).hexdigest()[:16]
+
+
+def shell_identity(env: dict, pane_id: str, terminal_id: str) -> tuple[str, str]:
+    session = hashlib.sha256(f"{pane_id}\0{terminal_id}".encode()).hexdigest()[:24]
+    return shell_server(env), session
 
 
 def open_popup(env: dict) -> None:
@@ -96,20 +101,27 @@ def indicator(env: dict) -> str:
 
 
 def mark_pane(env: dict, pane_id: str) -> None:
-    """Prefix the pane's agent label with the indicator while its shell lives."""
-    agent = call(env, "pane.get", pane_id=pane_id)["pane"].get("agent")
+    """Show the indicator on the pane while its shell lives."""
     icon = indicator(env)
-    if not agent or not icon:
+    if not icon:
         return
-    # The agent guard drops the label once a different agent takes the pane.
-    call(env, "pane.report_metadata", pane_id=pane_id, source=env["HERDR_PLUGIN_ID"],
-         agent=agent, display_agent=f"{icon} {agent}")
+    agent = call(env, "pane.get", pane_id=pane_id)["pane"].get("agent")
+    source = env["HERDR_PLUGIN_ID"]
+    if agent:
+        # A title would hide the agent name on the pane border, so mark the name
+        # instead. The agent guard drops it once a different agent takes the pane.
+        call(env, "pane.report_metadata", pane_id=pane_id, source=source, agent=agent,
+             display_agent=f"{icon} {agent}", clear_title=True)
+    else:
+        # Without an agent the border shows the metadata title.
+        call(env, "pane.report_metadata", pane_id=pane_id, source=source,
+             clear_display_agent=True, title=icon)
 
 
 def unmark_pane(env: dict, pane_id: str) -> None:
     try:
         call(env, "pane.report_metadata", pane_id=pane_id, source=env["HERDR_PLUGIN_ID"],
-             clear_display_agent=True)
+             clear_display_agent=True, clear_title=True)
     except RuntimeError:
         pass  # The pane may have closed before its shell.
 
@@ -144,6 +156,69 @@ def on_agent_detected(env: dict) -> None:
     pane_id = event_pane(json.loads(env.get("HERDR_PLUGIN_EVENT_JSON") or "{}"))
     if pane_id and pane_has_shell(env, pane_id):
         mark_pane(env, pane_id)
+
+
+def on_pane_closed(env: dict) -> None:
+    """Ask whether to end the shells a closed pane leaves running in tmux."""
+    pane_id = event_pane(json.loads(env.get("HERDR_PLUGIN_EVENT_JSON") or "{}"))
+    state = Path(env["HERDR_PLUGIN_STATE_DIR"])
+    tmux = shutil.which("tmux")
+    if not pane_id or not tmux or not state.is_dir():
+        return
+    server = shell_server(env)
+    for record in state.glob("shell-*.pane"):
+        try:
+            if record.read_text().strip() != pane_id:
+                continue
+        except FileNotFoundError:
+            continue
+        # Closing a pane and its process exiting can both report the same pane;
+        # whichever hook removes the record first asks.
+        try:
+            record.unlink()
+        except FileNotFoundError:
+            continue
+        session = record.name[len("shell-"):-len(".pane")]
+        if subprocess.run([tmux, "-L", server, "-f", "/dev/null", "has-session",
+                           "-t", f"={session}"], env=env, capture_output=True).returncode:
+            continue
+        call(env, "plugin.pane.open", plugin_id=env["HERDR_PLUGIN_ID"], entrypoint="confirm",
+             focus=True, env={"POPUP_SHELL_SERVER": server, "POPUP_SHELL_SESSION": session,
+                              "SHELLBOX_SOURCE_PANE": pane_id})
+
+
+def read_key() -> str:
+    descriptor = sys.stdin.fileno()
+    saved = termios.tcgetattr(descriptor)
+    try:
+        tty.setraw(descriptor, termios.TCSANOW)  # Keep a key typed before the prompt.
+        return os.read(descriptor, 1).decode(errors="replace")
+    finally:
+        termios.tcsetattr(descriptor, termios.TCSADRAIN, saved)
+
+
+def run_confirm(env: dict) -> None:
+    server, session = env["POPUP_SHELL_SERVER"], env["POPUP_SHELL_SESSION"]
+    if not server.startswith("popup-shell-") or not session.isalnum():
+        raise ValueError("Invalid shell session")
+    tmux = shutil.which("tmux")
+    if not tmux:
+        raise ValueError("tmux is required for persistent shell popups")
+    command = [tmux, "-L", server, "-f", "/dev/null"]
+    running = subprocess.run([*command, "display-message", "-p", "-t", f"={session}:",
+                              "#{pane_current_command}"],
+                             env=env, capture_output=True).stdout.decode().strip()
+    attach = shlex.join(["tmux", "-L", server, "attach-session", "-t", session])
+    print(f"Pane {env.get('SHELLBOX_SOURCE_PANE', '')} closed, but its shellbox shell"
+          f" is still running{f' ({running})' if running else ''}.\n")
+    print("  y    end the shell")
+    print("  n    keep it; attach later with:")
+    print(f"       {attach}\n")
+    print("End the shell? [y/N] ", end="", flush=True)
+    answer = read_key().lower()
+    print(answer if answer.isprintable() else "")
+    if answer == "y":
+        subprocess.run([*command, "kill-session", "-t", f"={session}"], env=env, check=True)
 
 
 def on_session_closed(env: dict, session: str) -> None:
@@ -345,6 +420,10 @@ def main(env: dict, operation: str, *args: str) -> int:
         open_popup(env)
     elif operation == "panel":
         run_panel(env)
+    elif operation == "confirm":
+        run_confirm(env)
+    elif operation == "pane-closed":
+        on_pane_closed(env)
     elif operation == "agent-detected":
         on_agent_detected(env)
     elif operation == "closed" and len(args) == 1:

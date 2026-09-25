@@ -1,6 +1,6 @@
 id = "studykit.shellbox"
 name = "shellbox"
-version = "0.6.0"
+version = "0.7.0"
 min_herdr_version = "0.9.0"
 description = "Show or hide a persistent shell popup for each Herdr pane"
 platforms = ["linux", "macos"]
@@ -20,6 +20,22 @@ width = "90%"
 height = "85%"
 command = ["./herdr_main.py", "panel"]
 
+[[panes]]
+id = "confirm"
+title = "Shell still running"
+placement = "popup"
+width = 72
+height = 12
+command = ["./herdr_main.py", "confirm"]
+
 [[events]]
 on = "pane.agent_detected"
 command = ["./herdr_main.py", "agent-detected"]
+
+[[events]]
+on = "pane.closed"
+command = ["./herdr_main.py", "pane-closed"]
+
+[[events]]
+on = "pane.exited"
+command = ["./herdr_main.py", "pane-closed"]
