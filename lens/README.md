@@ -128,11 +128,13 @@ The tree always starts with `..` (the parent folder) and `.` (the root itself). 
 | `+` (or `=`) / `-` / `0` | Zoom the diagram in / out / back to fit |
 | `[` / `]` | Select the previous / next diagram in Markdown |
 | `a` | Align diagrams left, center or right |
+| Backspace or `H` / `L` | Go back to where you followed a link from / forward again |
 
 **Mouse**: click to select or focus, scroll the wheel over either panel, and drag the
 border between the panels to resize the tree. Lens remembers the width. Ctrl+click a
 web address in the preview, or the text of a Markdown link to one, to open it in your
-browser.
+browser; Ctrl+click an Obsidian link to follow it, and press Backspace or `H` in the preview to
+come back (`L` goes forward again).
 
 ### Filtering filenames
 
@@ -227,14 +229,22 @@ Files are only displayed, never run. Colors follow your Herdr theme, including
 
 Lens also renders these Obsidian features:
 
-- Wiki links (`[[Note]]`, `[[Note#Heading]]`, `[[Note|Label]]`), for display only
+- Wiki links (`[[Note]]`, `[[Note#Heading]]`, `[[Note#^block-id]]`, `[[Note|Label]]`) and
+  Markdown links to vault files (`[text](Note.md)`). Ctrl+click one to open the note in the
+  preview at that heading or block; other files open in their default application.
 - Callouts (`> [!note]`, `> [!warning]` …), with nesting. They always show expanded.
 - Highlights (`==text==`) and task checkboxes (`- [ ]`, `- [x]`)
 - YAML frontmatter, in a **Properties** panel
-- Embeds (`![[Note]]`, `![[image.png]]`), shown as placeholders
+- Note embeds (`![[Note]]`, `![[Note#Heading]]`, `![[Note#^block-id]]`), shown inline
+  in a titled box. Block IDs (`^block-id`) are hidden, as in Obsidian's reading view.
+- Image embeds (`![[image.png]]`, `![[image.png|300]]`), drawn like diagrams where the
+  terminal shows images. PNG needs nothing extra; SVG needs `rsvg-convert`, and JPEG,
+  GIF, WebP and the rest need `sips` (macOS) or ImageMagick.
 
-Lens does not follow links, transclude notes, hide comments, or run MathJax or
-Dataview.
+Embeds and links resolve as Obsidian resolves them, inside the vault (the folder holding
+`.obsidian`, or the browsed folder when there is none). An embed that sits inside a
+sentence, a missing file, and other file types (PDF, audio, canvas) stay as
+placeholders. Lens does not hide comments or run MathJax or Dataview.
 
 ### Diagrams
 
@@ -414,6 +424,7 @@ You can write a key in `[keys]` as:
 | `zoom-in`, `zoom-out`, `zoom-fit`, `align` | `+`, `-`, `0`, `a` |
 | `prev-diagram`, `next-diagram`, `source` | `[`, `]`, `v` |
 | `launch`, `launch-with` | `o`, `O` |
+| `link-back`, `link-forward` | Backspace or `H`, and `L`, in the preview |
 
 **Theme and colors.** Lens follows your Herdr theme, and Ctrl+R rereads it. The
 `terminal` theme keeps your terminal's default colors. With `auto_switch`, Lens

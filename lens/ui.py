@@ -5,6 +5,7 @@ import curses
 from concurrent.futures import Future
 import os
 from pathlib import Path
+import re
 import subprocess
 from threading import Thread
 import unicodedata
@@ -16,6 +17,7 @@ from view_state import normalize as normalize_view
 import command_line
 import settings
 import markdown_preview
+import obsidian_embeds
 import diagram_preview
 import syntax_preview
 import terminal_input
@@ -23,6 +25,7 @@ from theme_colors import resolve as resolve_theme, terminal_color
 
 
 OPENING = {")": "(", "]": "[", ">": "<"}
+MAX_LINK_HISTORY = 50
 
 
 def clean(text: str) -> str:
@@ -144,7 +147,8 @@ KEY_GROUPS = (
                ("/", "Filter names"), ("⌫", "Parent folder"), ("⌃N ⌃P", "Scroll preview"),
                ("⌃F ⌃B", "Page preview"))),
     ("Preview", (("j k", "Line"), ("Space b", "Page"), ("d u", "Half page"), ("g G", "Top / end"),
-                 ("/", "Find"), ("n N", "Next / previous"), ("← →", "Scroll sideways"))),
+                 ("/", "Find"), ("n N", "Next / previous"), ("← →", "Scroll sideways"),
+                 ("⌃click", "Open or follow link"), ("⌫ H", "Back from a followed link"), ("L", "Forward again"))),
     ("Diagrams", (("v", "Image / source"), ("+ -", "Zoom"), ("0", "Fit"), ("a", "Align"),
                   ("[ ]", "Previous / next"))),
     ("Command line", (("Tab", "Complete"), ("↑ ↓", "History"), ("⌃A ⌃E", "Start / end"),
@@ -187,6 +191,10 @@ class Navigator:
         self.source_text = ""
         self.previewable = False
         self.markdown = False
+        self.vault = None  # Where a Markdown preview resolves Obsidian embeds and links.
+        self.pending_anchor = None  # A followed link's #heading or #^block, found once rendered.
+        self.link_history = []  # (file, preview scroll, sideways scroll) each followed link left.
+        self.link_future = []  # Positions Back left, for Forward; following a new link clears it.
         self.rendered = None
         self.syntax = None
         self.language = ""
@@ -671,6 +679,10 @@ class Navigator:
             self.markdown = Path(name).suffix.lower() in (".md", ".markdown")
         except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as error:
             self.content = [str(error)]
+        self.vault = None
+        if self.markdown:
+            path = self.index.root / name
+            self.vault = obsidian_embeds.Vault(obsidian_embeds.vault_root(path, self.index.root), path)
         try:
             self.active_size = (self.index.root / name).stat().st_size
         except (OSError, AttributeError):
@@ -689,7 +701,7 @@ class Navigator:
             return [(language, self.source_text)] if language in self.diagram_languages else []
         if self.markdown:
             try:
-                blocks = markdown_preview.diagram_blocks(self.source_text)
+                blocks = markdown_preview.diagram_blocks(self.source_text, self.vault)
             except Exception:
                 return []  # Markdown parsing failures fall back in prepare_preview.
             return list(dict.fromkeys(key for key in blocks if key[0] in self.diagram_languages))
@@ -844,8 +856,12 @@ class Navigator:
             entry = self.diagrams.get(source)
             if entry and entry[0] == "ok":
                 size = diagram_preview.image_size(entry[2])
+                widest = width
+                if source[0] == "image" and int(source[1].split("\n")[1]):
+                    # Obsidian's |width is in pixels; it caps the image as it does in the app.
+                    widest = min(width, max(1, round(int(source[1].split("\n")[1]) / self.cell_pixels()[0])))
                 rows[source] = diagram_preview.scaled(size, width, self.body, self.cell_pixels(),
-                                                      self.zoom_of(source), max_cols=width)
+                                                      self.zoom_of(source), max_cols=widest)
         return rows
 
     def place_markdown(self, screen, x):
@@ -930,10 +946,11 @@ class Navigator:
                 sizes = self.markdown_rows(width)
                 if sizes:
                     self.rendered, found = markdown_preview.render_diagrams(
-                        self.source_text, width, self.palette, {source: rows for source, (_, rows) in sizes.items()})
+                        self.source_text, width, self.palette, {source: rows for source, (_, rows) in sizes.items()},
+                        self.vault)
                     self.markdown_diagrams = [(line, source, sizes[source]) for line, source, _ in found]
                 else:
-                    self.rendered = markdown_preview.render(self.source_text, width, self.palette)
+                    self.rendered = markdown_preview.render(self.source_text, width, self.palette, self.vault)
                 self.content = ["".join(span.text for span in line) for line in self.rendered]
             else:
                 highlighted = syntax_preview.render(self.source_text, self.active, self.palette)
@@ -948,6 +965,8 @@ class Navigator:
             self.markdown_diagrams = []
             self.content = self.source_text.splitlines() or ["(Empty file)"]
             self.message = "Preview styling unavailable; showing source"
+        if self.pending_anchor:
+            self.jump_to_anchor()
 
     def span_style(self, style):
         attributes = (curses.A_BOLD if style.bold else 0) | (curses.A_UNDERLINE if style.underline else 0)
@@ -1141,11 +1160,62 @@ class Navigator:
                 return address
         return None
 
+    def follow(self, target):
+        """Open a linked note in the preview, at its heading or block; other files go to the OS."""
+        path, _, subpath = target.rpartition("#")
+        if Path(path).suffix.lower() not in obsidian_embeds.NOTE_SUFFIXES:
+            self.launch(path)
+            return
+        origin = (self.active, self.preview_scroll, self.horizontal)
+        self.open_file(path)
+        if self.active != origin[0] or subpath:
+            self.link_history = [*self.link_history, origin][-MAX_LINK_HISTORY:]
+            self.link_future = []
+        if subpath and self.active and (self.root / self.active).resolve() == Path(path):
+            self.pending_anchor = subpath  # Rendered lines exist only after the next draw.
+
+    def link_step(self, forward=False):
+        """Back: return to where the last followed link left. Forward: undo a Back."""
+        source, target = (self.link_future, self.link_history) if forward else (self.link_history, self.link_future)
+        here = (self.active, self.preview_scroll, self.horizontal)
+        while source:
+            name, scroll, horizontal = source.pop()
+            if self.index and name in self.index.files:
+                target.append(here)
+                del target[:-MAX_LINK_HISTORY]
+                self.open_file(name)
+                # The next draw renders the file, then clamps this to its length.
+                self.preview_scroll, self.horizontal = scroll, horizontal
+                self.message = f"{'Forward' if forward else 'Back'} to {name}"
+                return
+        self.message = "No link to go forward to" if forward else "No followed link to go back from"
+
+    def jump_to_anchor(self):
+        anchor, self.pending_anchor = self.pending_anchor, None
+        normalize = lambda text: " ".join(clean(text).split()).lower()
+        if anchor.startswith("^"):
+            block = obsidian_embeds.section(self.source_text, anchor) or ""
+            last = obsidian_embeds.LIST_ITEM.sub("", (block.strip().splitlines() or [""])[-1])
+            # Rendered text has no Markdown markers, so match a few plain words of the block.
+            wanted = " ".join(re.sub(r"[*_`~=\[\]]", "", last).split()[:4]).lower()
+            found = lambda line: wanted and wanted in normalize(line)
+        else:
+            wanted = normalize(anchor.split("#")[-1])
+            found = lambda line: normalize(line).lstrip("# ") == wanted
+        for number, line in enumerate(self.content):
+            if found(line):
+                self.preview_scroll = number
+                return
+        self.message = f"No #{anchor} in {self.active}"
+
     def open_link(self, x, y):
-        """Ctrl-click: hand the web address under the pointer to the OS."""
+        """Ctrl-click: follow a vault link in Lens, or hand a web address to the OS."""
         address = self.link_at(x, y)
         if address is None:
-            self.message = "No web address under the pointer"
+            self.message = "No link under the pointer"
+            return
+        if address.startswith(markdown_preview.FILE_LINK):
+            self.follow(address[len(markdown_preview.FILE_LINK):])
             return
         try:
             self.detach(opener_command("", address))
@@ -2165,6 +2235,10 @@ class Navigator:
             self.toggle_ignored()
         elif key in ("\x7f", curses.KEY_BACKSPACE) and not self.preview_focus and not self.query:
             self.parent_root()
+        elif key == "link-back" or (key in ("\x7f", curses.KEY_BACKSPACE, "H") and self.preview_focus):
+            self.link_step()
+        elif key == "link-forward" or (key == "L" and self.preview_focus):
+            self.link_step(forward=True)
         elif (key == "=" and not self.preview_focus and not self.query and self.items
               and self.items[self.selected].directory):
             self.fold_tree()  # Elsewhere "=" zooms a diagram, as "+" does.

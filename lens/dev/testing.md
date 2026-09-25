@@ -330,7 +330,8 @@ Rich element and inline-style maps are subclassed rather than mutated globally.
 
 Callouts render as theme-colored panels; all foldable bodies stay expanded.
 Frontmatter is highlighted as YAML without deserializing it. Embeds retain a
-visible target label without resolving files or fetching URLs. The extension
+visible target label without resolving files or fetching URLs. (Version 0.22
+resolves note and image embeds; see below.) The extension
 does not introduce dependencies, change host adapters, or alter keybindings.
 The plugin remains Herdr-only, so no Claude/Codex marketplace registration is
 added. The root catalog describes the new user-facing preview support.
@@ -357,6 +358,39 @@ References checked for this change:
 - https://help.obsidian.md/syntax
 - https://markdown-it-py.readthedocs.io/en/latest/architecture.html
 - https://rich.readthedocs.io/en/stable/markdown.html
+
+## Obsidian embeds
+
+Version 0.22 reverses the placeholder-only rule for `![[...]]`. An embed alone in its
+paragraph is resolved inside the vault — the nearest ancestor holding `.obsidian`,
+else the browsed root — by path from the note, then from the vault root, then by
+filename anywhere, nearest the root first, as Obsidian's shortest-path links do. A
+resolved path must stay inside the vault after symlinks, so `../` cannot read
+beyond it. Hidden folders (including `.trash`) are not searched.
+
+Notes are parsed with the same token pipeline and wrapped in `obsidian_note_*`
+tokens that Rich draws as a titled panel; a note embedding itself stops at the
+repeat, and depth is capped. Heading sections honor fences; `#^id` takes the
+paragraph or list item ending in the ID, or the block above an ID on its own
+line (which Obsidian separates with a blank line). Block ID markers are hidden
+everywhere, as in the reading view.
+
+Images reuse the diagram pipeline as the `image` pseudo-language: the key holds
+the path, the `|W` or `|WxH` size and the mtime, so an edited image re-renders.
+Only PNG reaches Kitty graphics, so other formats are converted with
+`rsvg-convert`, `sips` or ImageMagick. An image inside an embedded note replaces
+its panel row, so the panel's side border is missing beside the picture.
+
+Wiki links and relative Markdown links resolve the same way, per note while its
+folder is known, and travel to the UI as `lens-file:` span links (Rich emits them
+as OSC 8, which parse_ansi keeps instead of forwarding). Following one calls
+`open_file`; the `#heading` or `#^block` is located on the next render by
+matching rendered lines, so a heading near the end scrolls only as far as the
+last page allows.
+
+A live check ran Lens from a separate Herdr 0.9.1 pane on a throwaway vault:
+whole notes, heading sections, block and list IDs, a recursive embed, inline and
+missing placeholders rendered as expected, and the image embed reserved its rows.
 
 ## Footnote reference layout
 

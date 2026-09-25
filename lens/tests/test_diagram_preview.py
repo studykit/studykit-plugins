@@ -42,8 +42,8 @@ class RendererTests(unittest.TestCase):
             with patch("shutil.which", side_effect=lambda name: "/bin/" + name if name in ("java", "d2") else None):
                 found = puml.tools({"PLANTUML_JAR": jar.name})
                 self.assertEqual(found["plantuml"][-2:], ["-jar", jar.name])
-                # d2 also needs rsvg-convert to turn its SVG into PNG.
-                self.assertEqual(puml.available(found), {"plantuml"})
+                # d2 also needs rsvg-convert to turn its SVG into PNG; images need no tool.
+                self.assertEqual(puml.available(found), {"plantuml", "image"})
                 self.assertNotIn("plantuml", puml.tools({"PLANTUML_JAR": jar.name + ".missing"}))
 
     def test_plantuml_pipes_wrapped_source_and_keeps_first_image(self):
@@ -68,6 +68,22 @@ class RendererTests(unittest.TestCase):
             found = {"svgbob_cli": [sys.executable, "-c", svg], "rsvg-convert": [sys.executable, "-c", rsvg]}
             self.assertEqual(puml.image_size(puml.render("svgbob", "-->", Path(cwd), found)), (4, 5))
 
+    def test_images_pass_png_through_and_convert_other_formats(self):
+        rsvg = (f"import sys; assert sys.stdin.buffer.read() == b'<svg/>'; "
+                f"sys.stdout.buffer.write({png(4, 5)!r})")
+        with tempfile.TemporaryDirectory() as cwd:
+            folder = Path(cwd)
+            (folder / "a.png").write_bytes(png(3, 2))
+            (folder / "b.svg").write_bytes(b"<svg/>")
+            (folder / "c.jpg").write_bytes(b"\xff\xd8")
+            self.assertEqual(puml.render("image", f"{folder / 'a.png'}\n0\n0\n1", folder, {}), png(3, 2))
+            found = {"rsvg-convert": [sys.executable, "-c", rsvg]}
+            self.assertEqual(puml.image_size(puml.render("image", f"{folder / 'b.svg'}\n0\n0\n1", folder, found)), (4, 5))
+            with self.assertRaisesRegex(RuntimeError, "rsvg-convert"):
+                puml.render("image", f"{folder / 'b.svg'}\n0\n0\n1", folder, {})
+            with patch("shutil.which", return_value=None), self.assertRaisesRegex(RuntimeError, "sips or ImageMagick"):
+                puml.render("image", f"{folder / 'c.jpg'}\n0\n0\n1", folder, {})
+
     def test_error_summary_skips_stack_traces_and_temp_paths(self):
         trace = b"/usr/lib/node/cli.js:10\n    throw e\nError: Parse error on line 4:\n    at fromText (x.js:1)\n"
         self.assertEqual(puml.summary(trace), "Error: Parse error on line 4:")
@@ -82,6 +98,8 @@ class RendererTests(unittest.TestCase):
                    "structurizr": 'workspace {\n model {\n s = softwareSystem "S"\n }\n views {\n systemContext s {\n include *\n }\n }\n}\n'}
         found = puml.tools({})
         with tempfile.TemporaryDirectory() as cwd:
+            (Path(cwd) / "a.png").write_bytes(png(3, 2))
+            samples["image"] = f"{Path(cwd) / 'a.png'}\n0\n0\n1"
             for language in sorted(puml.available(found)):
                 with self.subTest(language=language):
                     width, height = puml.image_size(puml.render(language, samples[language], Path(cwd), found))
@@ -332,6 +350,22 @@ class MarkdownDiagramTests(unittest.TestCase):
         with patch.object(self.nav, "span_style", return_value=0):
             self.nav.draw(screen)
         self.nav.sync_image()
+
+    def test_obsidian_image_embeds_are_placed_at_their_width(self):
+        (self.root / "assets").mkdir()
+        (self.root / "assets" / "pic.png").write_bytes(png(200, 100))
+        (self.root / "embeds.md").write_text("# Pictures\n\n![[pic.png|100]]\n\n![[pic.png]]\n")
+        self.nav.load("embeds.md")
+        self.settle()
+        path = str((self.root / "assets" / "pic.png").resolve())
+        self.assertEqual({(call.args[0], call.args[1].split("\n")[0]) for call in self.render.call_args_list},
+                         {("image", path)})
+        self.draw()
+        # |100 is 10 cells at 10 pixels each; the bare embed fits the panel instead.
+        widths = sorted(cols for _, _, _, _, cols, _, _ in self.nav.placements)
+        self.assertEqual(widths[0], 10)
+        self.assertGreater(widths[1], 10)
+        self.assertFalse(any("Embed" in line for line in self.nav.content))
 
     def test_blocks_ignore_fences_nested_in_other_code(self):
         from markdown_preview import diagram_blocks

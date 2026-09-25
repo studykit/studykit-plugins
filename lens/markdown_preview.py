@@ -10,6 +10,8 @@ from theme_colors import resolve as resolve_theme
 
 MAX_RENDER_BYTES = 8 * 1024 * 1024
 FOOTNOTE_DEFINITION = re.compile(r"\[\^[^\]\s]+\]:")
+BLOCK_ID = re.compile(r"(?:^|[ \t])\^[A-Za-z0-9-]+[ \t]*$")
+BLOCK_ID_LINE = re.compile(r"\^[A-Za-z0-9-]+")
 
 
 @dataclass(frozen=True)
@@ -25,12 +27,15 @@ class Style:
 class Span:
     text: str
     style: Style = Style()
-    link: str = ""  # A web address a Ctrl-click on this text opens.
+    link: str = ""  # A web address, or FILE_LINK and a vault file, a Ctrl-click follows.
 
 
 ESCAPES = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)")
 HYPERLINK = re.compile(r"\x1b\]8;[^;\x07\x1b]*;([^\x07\x1b]*)")
 WEB_ADDRESS = re.compile(r"https?://\S+", re.I)
+# Internal links carry `FILE_LINK/absolute/path#subpath`; never emitted to the terminal.
+FILE_LINK = "lens-file:"
+URI_SCHEME = re.compile(r"[A-Za-z][A-Za-z0-9+.-]*:")
 
 
 def sgr(style: Style, parameters: str) -> Style:
@@ -90,7 +95,8 @@ def parse_ansi(text: str) -> list[list[Span]]:
         if token.startswith("\x1b[") and token.endswith("m"):
             style = sgr(style, token[2:-1])
         elif hyperlink := HYPERLINK.match(token):
-            link = hyperlink[1] if WEB_ADDRESS.fullmatch(hyperlink[1]) else ""
+            target = hyperlink[1]
+            link = target if WEB_ADDRESS.fullmatch(target) or target.startswith(FILE_LINK) else ""
         end = escape.end()
     append(text[end:])
     return lines
@@ -108,7 +114,8 @@ class BoundedOutput(io.StringIO):
         return super().write(text)
 
 
-def preview_tokens(text: str):
+def preview_tokens(text: str, vault=None, depth=0, seen=frozenset()):
+    """Markdown tokens; with an obsidian_embeds.Vault, embeds of notes and images too."""
     from markdown_it import MarkdownIt
     from markdown_it.rules_block import reference
     from obsidian_markdown import install
@@ -135,7 +142,114 @@ def preview_tokens(text: str):
                     and FOOTNOTE_DEFINITION.match(following.content)):
                 current.type = "hardbreak"
                 current.tag = "br"
-    return tokens
+    tokens = hide_block_ids(tokens)
+    if vault is None:
+        return tokens
+    internal_links(tokens, vault)
+    return transclude(tokens, vault, depth, seen)
+
+
+def internal_links(tokens, vault):
+    """Resolve wiki links and Markdown links to vault files now, while each note's own
+    folder is known; an embedded note's links are relative to that note."""
+    from urllib.parse import unquote
+    from obsidian_embeds import split_target
+
+    for token in tokens:
+        for child in token.children or []:
+            if child.type == "wikilink":
+                target = child.meta["target"]
+            elif child.type == "link_open":
+                target = str(child.attrs.get("href", ""))
+                if URI_SCHEME.match(target):
+                    continue  # Web and mail addresses are not vault files.
+                target = unquote(target)
+            else:
+                continue
+            name, subpath = split_target(target)
+            # `[[#Heading]]` points into the note that holds it.
+            path = vault.find(name) if name else vault.current
+            if path is not None:
+                child.meta = {**(child.meta or {}), "file": f"{FILE_LINK}{path}#{subpath}"}
+
+
+def hide_block_ids(tokens):
+    """Drop Obsidian's `^block-id` markers, as its reading view does."""
+    result, index = [], 0
+    while index < len(tokens):
+        window = tokens[index:index + 3]
+        if ([token.type for token in window] == ["paragraph_open", "inline", "paragraph_close"]
+                and BLOCK_ID_LINE.fullmatch(window[1].content.strip())):
+            index += 3  # An ID on its own line, naming the block above.
+            continue
+        token = tokens[index]
+        last = (token.children or [None])[-1] if token.type == "inline" else None
+        if last is not None and last.type == "text" and (marker := BLOCK_ID.search(last.content)):
+            last.content = last.content[:marker.start()]
+        result.append(token)
+        index += 1
+    return result
+
+
+def embed_paragraph(tokens):
+    """The embeds of a paragraph that holds nothing else, else None."""
+    if [token.type for token in tokens] != ["paragraph_open", "inline", "paragraph_close"]:
+        return None
+    children = tokens[1].children or []
+    embeds = [child for child in children if child.type == "obsidian_embed"]
+    rest = all(child.type in ("obsidian_embed", "softbreak", "hardbreak")
+               or (child.type == "text" and not child.content.strip()) for child in children)
+    return embeds if embeds and rest else None
+
+
+def transclude(tokens, vault, depth, seen):
+    # Only an embed alone in its paragraph is replaced, as Obsidian shows it as a block;
+    # one inside a sentence, list text or table cell keeps its placeholder.
+    from markdown_it.token import Token
+    import obsidian_embeds as embeds
+
+    def placeholder(embed, opening):
+        inline = Token("inline", "", 0, content=embed.content, map=opening.map,
+                       level=opening.level + 1, children=[embed])
+        return [Token("paragraph_open", "p", 1, map=opening.map, level=opening.level, block=True),
+                inline, Token("paragraph_close", "p", -1, level=opening.level, block=True)]
+
+    result, index = [], 0
+    while index < len(tokens):
+        found = embed_paragraph(tokens[index:index + 3])
+        if found is None:
+            result.append(tokens[index])
+            index += 1
+            continue
+        opening = tokens[index]
+        index += 3
+        for embed in found:
+            name, subpath = embeds.split_target(embed.meta["target"])
+            path = vault.find(name)
+            suffix = path.suffix.lower() if path else ""
+            if suffix in embeds.IMAGE_SUFFIXES:
+                try:
+                    changed = path.stat().st_mtime_ns  # A new key re-renders an edited image.
+                except OSError:
+                    result += placeholder(embed, opening)
+                    continue
+                width, height = embeds.image_size(embed.meta.get("alias", "")) or (0, 0)
+                result.append(Token("obsidian_image", "img", 0, content=embed.content, map=opening.map,
+                                    level=opening.level, block=True,
+                                    info="\n".join(map(str, (path, width, height, changed)))))
+                continue
+            key = (path, subpath)
+            text = (vault.note(path, subpath) if suffix in embeds.NOTE_SUFFIXES
+                    and depth < embeds.MAX_DEPTH and key not in seen else None)
+            if text is None:
+                result += placeholder(embed, opening)
+                continue
+            title = embed.meta.get("alias") or embed.meta["target"]
+            result.append(Token("obsidian_note_open", "section", 1, meta={"title": title},
+                                level=opening.level, block=True))
+            result += preview_tokens(clean_source(text), vault.at(path), depth + 1, seen | {key})
+            result.append(Token("obsidian_note_close", "section", -1, level=opening.level, block=True))
+    return result
 
 
 def clean_source(text: str) -> str:
@@ -147,12 +261,14 @@ def clean_source(text: str) -> str:
 def diagram_key(token):
     """(language, source) for a fenced block in a known diagram language, else None."""
     from diagram_preview import fence_language
+    if token.type == "obsidian_image":
+        return ("image", token.info)
     language = fence_language(token.info) if token.type == "fence" else None
     return (language, token.content) if language else None
 
 
-def diagram_blocks(text: str) -> list[tuple[str, str]]:
-    return [key for token in preview_tokens(clean_source(text)) if (key := diagram_key(token))]
+def diagram_blocks(text: str, vault=None) -> list[tuple[str, str]]:
+    return [key for token in preview_tokens(clean_source(text), vault) if (key := diagram_key(token))]
 
 
 def replace_diagrams(tokens, diagrams, marker):
@@ -190,26 +306,29 @@ def link_tokens(tokens):
         children, token.children, link = token.children or [], token.children and [], None
         for child in children:
             if child.type == "link_open":
-                link = (str(child.attrs.get("href", "")), [])
+                link = (str(child.attrs.get("href", "")), [], (child.meta or {}).get("file"))
             elif child.type == "link_close" and link:
-                href, inner = link
-                web = href if WEB_ADDRESS.fullmatch(href) else None
+                href, inner, file = link
+                web = href if WEB_ADDRESS.fullmatch(href) else file
                 token.children += [*styled("link", inner, web), Token("text", "", 0, content=" ("),
                                    *styled("link_url", [Token("text", "", 0, content=href)], web),
                                    Token("text", "", 0, content=")")]
                 link = None
             elif link:
                 link[1].append(child)
+            elif child.type == "wikilink" and (child.meta or {}).get("file"):
+                token.children += [Token("link_open", "a", 1, attrs={"href": child.meta["file"]}), child,
+                                   Token("link_close", "a", -1)]
             else:
                 token.children.append(child)
     return tokens
 
 
-def render(text: str, width: int, colors=None) -> list[list[Span]]:
-    return render_diagrams(text, width, colors)[0]
+def render(text: str, width: int, colors=None, vault=None) -> list[list[Span]]:
+    return render_diagrams(text, width, colors, vault=vault)[0]
 
 
-def render_diagrams(text: str, width: int, colors=None, diagrams=None):
+def render_diagrams(text: str, width: int, colors=None, diagrams=None, vault=None):
     """Render Markdown; diagram fences whose (language, source) maps to a row count
     in `diagrams` become that many blank lines, reported as (line, key, rows)."""
     # Import lazily so a broken/missing dependency can fall back to source text.
@@ -275,7 +394,7 @@ def render_diagrams(text: str, width: int, colors=None, diagrams=None):
                           theme=palette)
         markdown = markdown_type()("", code_theme=CodeTheme(), hyperlinks=True)
         markdown.markup = text
-        markdown.parsed, found = replace_diagrams(link_tokens(preview_tokens(text)), diagrams or {}, marker)
+        markdown.parsed, found = replace_diagrams(link_tokens(preview_tokens(text, vault)), diagrams or {}, marker)
         console.print(markdown)
         lines = parse_ansi(output.getvalue())
     if not found:

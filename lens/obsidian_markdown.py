@@ -1,4 +1,5 @@
-"""Obsidian preview tokens; no vault access, link resolution, or execution."""
+"""Obsidian preview tokens; no link following or execution. Embeds are resolved by
+obsidian_embeds; these rules only parse them."""
 from __future__ import annotations
 
 import re
@@ -21,7 +22,7 @@ def wikilink(state, silent):
         embedded = match[0].startswith("!")
         token = state.push("obsidian_embed" if embedded else "wikilink",
                            "embed" if embedded else "wikilink", 0)
-        token.meta = {"target": target}
+        token.meta = {"target": target, "alias": alias}
         if embedded:
             if re.fullmatch(r"\d+(?:x\d+)?", alias):
                 label = f"{target} · {alias}"
@@ -155,8 +156,9 @@ def install(parser):
 
 def markdown_type():
     """Keep Rich optional until preview rendering is requested."""
-    from rich.markdown import BlockQuote, CodeBlock, Markdown, Paragraph
+    from rich.markdown import BlockQuote, CodeBlock, Markdown, MarkdownElement, Paragraph
     from rich.panel import Panel
+    from rich.text import Text
 
     class Callout(BlockQuote):
         style_name = "markdown.paragraph"
@@ -184,6 +186,30 @@ def markdown_type():
             self.text.style = context.console.get_style(
                 f"markdown.callout.{self.kind}", default="markdown.callout.note")
 
+    class EmbeddedNote(BlockQuote):
+        style_name = "markdown.paragraph"
+
+        @classmethod
+        def create(cls, markdown, token):
+            element = cls()
+            element.title = token.meta["title"]
+            return element
+
+        def __rich_console__(self, console, options):
+            yield Panel(self.elements, title=Text(self.title, style="markdown.embed"),
+                        title_align="left", padding=(0, 1), border_style="markdown.hr")
+
+    class EmbeddedImage(MarkdownElement):
+        # Drawn only until the image is ready, or where images cannot be shown.
+        @classmethod
+        def create(cls, markdown, token):
+            element = cls()
+            element.label = token.content
+            return element
+
+        def __rich_console__(self, console, options):
+            yield Text(self.label, style="markdown.embed")
+
     class Properties(CodeBlock):
         @classmethod
         def create(cls, markdown, token):
@@ -199,6 +225,7 @@ def markdown_type():
     class ObsidianMarkdown(Markdown):
         inlines = Markdown.inlines | {"wikilink", "embed", "mark", "checked", "unchecked", "link", "link_url"}
         elements = {**Markdown.elements, "callout_open": Callout,
-                    "callout_title_open": CalloutTitle, "frontmatter": Properties}
+                    "callout_title_open": CalloutTitle, "frontmatter": Properties,
+                    "obsidian_note_open": EmbeddedNote, "obsidian_image": EmbeddedImage}
 
     return ObsidianMarkdown

@@ -103,10 +103,86 @@ class PreviewTests(unittest.TestCase):
         self.assertEqual(self.ctrl_click("links.md", 0, 1), "https://example.com/a")  # The link text.
         self.assertEqual(self.ctrl_click("links.md", 0, 10), "https://example.com/a")  # Its address.
         self.assertIsNone(self.ctrl_click("links.md", 0, 36))  # A relative destination.
-        self.assertEqual(self.nav.message, "No web address under the pointer")
+        self.assertEqual(self.nav.message, "No link under the pointer")
         self.assertEqual(self.ctrl_click("links.md", 2, 10), "https://example.org/x_(y)")
         self.assertIsNone(self.ctrl_click("links.md", 2, 1))
         self.assertEqual(self.nav.active, "links.md")
+
+    def test_ctrl_click_follows_obsidian_links_to_headings_blocks_and_files(self):
+        (self.root / "notes").mkdir()
+        filler = "".join(f"Line {i}\n\n" for i in range(30))
+        (self.root / "notes" / "b.md").write_text(f"# B\n\n{filler}## Part Two\n\n{filler}Deep **block** text ^blk\n")
+        (self.root / "pic.png").write_bytes(b"\x89PNG\r\n\x1a\n")
+        (self.root / "a.md").write_text("[[b#Part Two]] [[pic.png]] [x](notes/b.md#%5Eblk) [[b#Nowhere]]\n")
+        self.nav.refresh()  # Index the files written after the navigator started.
+
+        def follow(column):
+            self.nav.load("a.md")
+            self.nav.preview_scroll = 0
+            launched = self.ctrl_click("a.md", 0, column)
+            self.nav.prepare_preview(60)  # The next draw renders the note and finds the anchor.
+            return launched
+
+        self.assertIsNone(follow(1))
+        self.assertEqual(self.nav.active, "notes/b.md")
+        self.assertEqual(self.nav.items[self.nav.selected].path, "notes/b.md")
+        self.assertEqual(self.nav.content[self.nav.preview_scroll].strip(), "Part Two")
+        self.assertIsNone(follow(19))
+        self.assertIn("Deep block text", self.nav.content[self.nav.preview_scroll])
+        self.assertIsNone(follow(43))
+        self.assertEqual(self.nav.message, "No #Nowhere in notes/b.md")
+        self.assertEqual(follow(12), str((self.root / "pic.png").resolve()))
+
+    def test_backspace_in_the_preview_returns_from_followed_links(self):
+        (self.root / "b.md").write_text("# B\n\n[[c]]\n")
+        (self.root / "c.md").write_text("# C\n")
+        (self.root / "a.md").write_text("".join(f"Line {i}\n\n" for i in range(40)) + "[[b]]\n")
+        self.nav.refresh()
+        self.nav.load("a.md")
+        self.nav.divider, self.nav.body, self.nav.content_top = 30, 20, 3
+        self.nav.prepare_preview(60)
+        self.nav.preview_scroll = 70
+        self.nav.text_left = 33
+        row = next(i for i, line in enumerate(self.nav.content) if line.strip() == "b")
+        self.nav.handle_mouse(terminal.Mouse(33, 3 + row - 70, "click", ctrl=True))
+        self.assertEqual(self.nav.active, "b.md")
+        self.nav.prepare_preview(60)
+        self.nav.preview_scroll = 0
+        row = next(i for i, line in enumerate(self.nav.content) if line.strip() == "c")
+        self.nav.handle_mouse(terminal.Mouse(33, 3 + row, "click", ctrl=True))
+        self.assertEqual(self.nav.active, "c.md")
+        self.nav.key("\x7f", None)
+        self.assertEqual((self.nav.active, self.nav.message), ("b.md", "Back to b.md"))
+        self.nav.key("\x7f", None)
+        self.assertEqual((self.nav.active, self.nav.preview_scroll), ("a.md", 70))
+        self.assertTrue(self.nav.preview_focus)
+        self.nav.key("\x7f", None)
+        self.assertEqual((self.nav.active, self.nav.message), ("a.md", "No followed link to go back from"))
+        self.nav.key("L", None)
+        self.assertEqual((self.nav.active, self.nav.message), ("b.md", "Forward to b.md"))
+        self.nav.key("L", None)
+        self.assertEqual(self.nav.active, "c.md")
+        self.nav.key("L", None)
+        self.assertEqual(self.nav.message, "No link to go forward to")
+        self.nav.key("H", None)
+        self.nav.key("H", None)
+        self.assertEqual((self.nav.active, self.nav.preview_scroll), ("a.md", 70))
+        self.nav.key("L", None)
+        self.assertEqual(self.nav.active, "b.md")
+        self.nav.prepare_preview(60)
+        self.nav.handle_mouse(terminal.Mouse(33, 3 + row, "click", ctrl=True))  # A new link drops Forward.
+        self.nav.key("L", None)
+        self.assertEqual((self.nav.active, self.nav.message), ("c.md", "No link to go forward to"))
+        self.nav.key("H", None)
+        self.nav.key("H", None)
+        self.nav.preview_focus = False
+        self.nav.message = ""
+        self.nav.bindings = {"B": "link-back"}  # A binding works from the tree too.
+        self.nav.key("B", None)
+        self.assertEqual(self.nav.message, "No followed link to go back from")
+        root = self.nav.root.resolve()
+        self.nav.key("\x7f", None)  # In the tree, Backspace still moves the root up.
+        self.assertEqual(self.nav.root.resolve(), root.parent)
 
     def test_ctrl_click_opens_addresses_in_plain_and_code_previews(self):
         (self.root / "notes.txt").write_text("<https://example.com/p?q=1>.\n")

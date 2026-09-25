@@ -42,7 +42,10 @@ LANGUAGES = {
     "wavedrom": Language("WaveDrom", ("wavedrom",), (), ("wavedrom-cli", "rsvg-convert")),
     "vega-lite": Language("Vega-Lite", ("vega-lite", "vegalite"), (".vl.json",), ("vl2svg", "rsvg-convert")),
     "structurizr": Language("Structurizr", ("structurizr",), ("workspace.dsl",), ("structurizr-cli", "plantuml")),
+    # Obsidian image embeds; the source is the file, its |size and mtime, one per line.
+    "image": Language("Image", (), (), ()),
 }
+MAX_IMAGE_BYTES = 32 * 1024 * 1024
 FENCES = {fence: language for language, spec in LANGUAGES.items() for fence in spec.fences}
 
 
@@ -115,8 +118,32 @@ def plantuml(source: str, cwd: Path, found) -> bytes:
     return first_image(result.stdout)
 
 
+def image(source: str, cwd: Path, found) -> bytes:
+    path = Path(source.split("\n")[0])
+    if path.stat().st_size > MAX_IMAGE_BYTES:
+        raise ValueError("The image is too large to preview")
+    data = path.read_bytes()
+    if data.startswith(PNG_SIGNATURE):
+        return first_image(data)
+    if path.suffix.lower() == ".svg":
+        if "rsvg-convert" not in found:
+            raise RuntimeError("SVG images need rsvg-convert")
+        return png(run([*found["rsvg-convert"], "-f", "png", "-b", "white", "-z", "2"], cwd, data), "rsvg-convert")
+    # Kitty graphics take PNG, so other formats go through whichever converter is installed.
+    with tempfile.TemporaryDirectory(prefix="lens-image-") as directory:
+        out = Path(directory) / "out.png"
+        if tool := shutil.which("sips"):
+            run([tool, "-s", "format", "png", str(path), "--out", str(out)], cwd, work=Path(directory))
+            return png(out.read_bytes(), "sips")
+        if tool := shutil.which("magick") or shutil.which("convert"):
+            return png(run([tool, f"{path}[0]", "png:-"], cwd), Path(tool).name)
+    raise RuntimeError(f"{path.suffix} images need sips or ImageMagick")
+
+
 def render(language: str, source: str, cwd: Path, found: dict[str, list[str]]) -> bytes:
     """Render one diagram; cwd is the source file's folder, for relative includes."""
+    if language == "image":
+        return image(source, cwd, found)
     if language == "plantuml":
         return plantuml(source, cwd, found)
     if language == "graphviz":

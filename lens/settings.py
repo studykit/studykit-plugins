@@ -15,6 +15,8 @@ ACTIONS = {
     "layout": "\x17", "popup-size": "\x19", "top": "g", "bottom": "G",
     "zoom-in": "+", "zoom-out": "-", "zoom-fit": "0", "align": "a",
     "prev-diagram": "[", "next-diagram": "]", "source": "v", "launch": "o", "launch-with": "O",
+    # Backspace, H and L do these only in the preview, so the actions have keys of their own.
+    "link-back": "link-back", "link-forward": "link-forward",
 }
 
 NAMED = {
