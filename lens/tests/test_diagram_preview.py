@@ -195,11 +195,11 @@ class NavigatorDiagramTests(unittest.TestCase):
         self.rendered()
         self.draw()
         self.writes.clear()
-        self.assertTrue(self.nav.preview_key("v"))
+        self.assertTrue(self.nav.preview_key("s"))
         self.draw()
         self.assertEqual(self.writes, [puml.hide(1, 1)])
         self.writes.clear()
-        self.nav.preview_key("v")
+        self.nav.preview_key("s")
         self.draw()
         self.assertNotIn(b"a=t", b"".join(self.writes))
         self.assertIn(b"a=p,i=1", b"".join(self.writes))
@@ -216,7 +216,7 @@ class NavigatorDiagramTests(unittest.TestCase):
         self.writes.clear()
         self.draw()
         self.assertEqual(self.writes, [puml.delete(1)])  # Leaving the file frees its image.
-        self.assertFalse(self.nav.preview_key("v"))
+        self.assertFalse(self.nav.preview_key("s"))
 
     def test_edited_source_rerenders_and_frees_old_image(self):
         self.rendered()
@@ -474,7 +474,7 @@ class MarkdownDiagramTests(unittest.TestCase):
         self.nav.preview_focus = True
         self.draw()
         self.writes.clear()
-        self.assertTrue(self.nav.preview_key("v"))
+        self.assertTrue(self.nav.preview_key("s"))
         self.draw()
         self.assertEqual(self.nav.markdown_diagrams, [])
         self.assertTrue(any("A -> B" in line for line in self.nav.content))

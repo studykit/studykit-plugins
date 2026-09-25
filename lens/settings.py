@@ -15,10 +15,10 @@ ACTIONS = {
     "refresh": "\x12", "root": "\x0f", "git-root": "t", "parent": "parent",
     "layout": "\x17", "popup-size": "\x19", "top": curses.KEY_HOME, "bottom": "G",
     "zoom-in": "+", "zoom-out": "-", "zoom-fit": "0", "align": "a",
-    "prev-diagram": "[", "next-diagram": "]", "source": "v", "launch": "o", "launch-with": "O",
+    "prev-diagram": "[", "next-diagram": "]", "source": "s", "launch": "o", "launch-with": "O",
     # Backspace, H and L do these only in the preview, so the actions have keys of their own.
     "link-back": "link-back", "link-forward": "link-forward",
-    "comment-select": "V", "comment-add": "A", "comment-send": "S", "comment-clear": "X",
+    "comment-select": "V", "comment-select-text": "v", "comment-add": "A", "comment-send": "S", "comment-clear": "X",
 }
 
 NAMED = {

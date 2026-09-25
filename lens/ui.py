@@ -180,7 +180,7 @@ KEY_GROUPS = (
     ("Preview", (("j k", "Cursor line"), ("Space b", "Page"), ("d u", "Half page"), ("g G", "Top / end"),
                  ("/", "Find"), ("n N", "Next / previous"), ("← →", "Scroll sideways"),
                  ("⌃click", "Open or follow link"), ("⌫ H", "Back from a followed link"), ("L", "Forward again"))),
-    ("Diagrams", (("v", "Image / source"), ("+ -", "Zoom"), ("0", "Fit"), ("a", "Align"),
+    ("Diagrams", (("s", "Image / source"), ("+ -", "Zoom"), ("0", "Fit"), ("a", "Align"),
                   ("[ ]", "Previous / next"))),
 )
 
@@ -231,7 +231,11 @@ class Navigator:
         self.expanded: set[str] = set()
         self.selected = self.scroll = self.preview_scroll = self.horizontal = 0
         self.preview_cursor = 0  # The preview line the cursor is on, in shown lines.
-        self.selection_anchor = None  # Where V started a line selection, or None.
+        self.selection_anchor = None  # The line where V or v started a selection, or None.
+        self.selection_kind = "line"  # V selects whole lines; v selects characters.
+        # The cursor's character in a source line, where v starts; want_column is where
+        # j and k try to return to, as Vim's cursor does across shorter lines.
+        self.anchor_column = self.preview_column = self.want_column = 0
         self.preview_focus = False
         self.active = ""
         self.content = ["Select a file and press Enter, or click it, to open it here."]
@@ -321,7 +325,6 @@ class Navigator:
         # Comments: line ranges collected for the target agent pane, one buffer per target.
         self.comment_store, self.agent_host = comment_store, agent_host
         self.submit_key = "\x13"
-        self.note_draft = None  # The note typed for a comment being added.
         self.composer = None  # The message editor before sending.
         self.agent_picker = None
         self.confirm_clear = False  # X asked to discard the comments; the next key answers.
@@ -448,7 +451,7 @@ class Navigator:
         self.previewable = self.markdown = self.preview_focus = False
         self.rendered = self.syntax = self.render_width = None
         self.restore_horizontal = False
-        self.preview_scroll = self.horizontal = self.preview_cursor = 0
+        self.preview_scroll = self.horizontal = self.preview_cursor = self.preview_column = self.want_column = 0
         self.selection_anchor = None
         self.markdown_diagrams = []
         self.start_diagrams()
@@ -749,7 +752,7 @@ class Navigator:
         if name != self.active:
             self.selection_anchor = None
         self.active = name
-        self.preview_scroll = self.horizontal = self.preview_cursor = 0
+        self.preview_scroll = self.horizontal = self.preview_cursor = self.preview_column = self.want_column = 0
         self.rendered = self.render_width = None
         self.syntax = None
         self.language = ""
@@ -1438,19 +1441,90 @@ class Navigator:
         return pane
 
     def comment_dialog(self):
-        return self.note_draft is not None or self.composer is not None or self.agent_picker is not None
+        return self.composer is not None or self.agent_picker is not None
 
-    def toggle_selection(self):
+    def toggle_selection(self, kind="line"):
+        """V selects lines and v characters, as in Vim: the same key again ends the selection,
+        the other key switches its kind."""
         if not self.source_view():
-            self.message = ("Comments need the source: press v to show the Markdown source" if self.markdown
+            self.message = ("Comments need the source: press s to show the Markdown source" if self.markdown
                             else "Comments need a text preview")
             return
-        if self.selection_anchor is not None:
+        if self.selection_anchor is not None and kind == self.selection_kind:
             self.selection_anchor = None
             return
         self.clamp_cursor()
-        self.selection_anchor = self.preview_cursor
-        self.message = "Select lines: j k extend, A adds a comment, Esc cancels"
+        self.preview_column = self.clamped_column(self.preview_cursor, self.preview_column)
+        if self.selection_anchor is None:
+            self.selection_anchor, self.anchor_column = self.preview_cursor, self.preview_column
+        elif kind == "char":
+            self.anchor_column = 0  # From a line selection: its first line, from the start.
+        self.selection_kind = kind
+        self.message = ("Select text: h l w b 0 ^ $ and j k extend, A copies it into the message, Esc cancels" if kind == "char"
+                        else "Select lines: j k extend, A adds a comment, Esc cancels")
+
+    def source_line(self, number):
+        lines = self.source_text.splitlines()
+        return lines[number] if 0 <= number < len(lines) else ""
+
+    def clamped_column(self, number, column):
+        return max(0, min(column, len(self.source_line(number)) - 1))
+
+    def char_selecting(self):
+        return self.selection_anchor is not None and self.selection_kind == "char" and self.source_view()
+
+    def char_range(self):
+        """((line, column), (line, column)) of a v selection, first to last, both inclusive."""
+        ends = sorted(((self.selection_anchor, self.anchor_column), (self.preview_cursor, self.preview_column)))
+        return ends[0], ends[1]
+
+    def move_column(self, key):
+        """h l w b 0 ^ $ along a source line. w and b continue onto the next or previous line."""
+        number, column = self.preview_cursor, self.preview_column
+        line = self.source_line(number)
+        kind = lambda char: 0 if char.isspace() else 1 if char.isalnum() or char == "_" else 2
+        if key == "h":
+            column -= 1
+        elif key == "l":
+            column += 1
+        elif key == "0":
+            column = 0
+        elif key == "^":
+            column = len(line) - len(line.lstrip()) if line.strip() else 0  # The first character that is not a space.
+        elif key == "$":
+            column = len(line) - 1
+        elif key == "w":
+            if column < len(line):
+                start = kind(line[column])
+                while column < len(line) and kind(line[column]) == start and start:
+                    column += 1
+            while column < len(line) and line[column].isspace():
+                column += 1
+            if column >= len(line) and number + 1 < len(self.content):
+                number, column = number + 1, 0
+                following = self.source_line(number)
+                column = len(following) - len(following.lstrip()) if following.strip() else 0
+        elif key == "b":
+            column -= 1
+            while True:  # Back over spaces, and line ends, to the previous word.
+                while column >= 0 and line[column].isspace():
+                    column -= 1
+                if column >= 0 or number == 0:
+                    break
+                number -= 1
+                line = self.source_line(number)
+                column = len(line) - 1
+            if column >= 0:
+                start = kind(line[column])
+                while column > 0 and kind(line[column - 1]) == start:
+                    column -= 1
+        self.preview_cursor, self.preview_column = number, self.clamped_column(number, column)
+        self.want_column = self.preview_column
+        self.show_cursor()
+        text = self.source_line(number)
+        # Bring the column into view when a long line is scrolled sideways.
+        point = len(clean(text[:self.preview_column]))
+        self.reveal((number, point, point + 1))
 
     def begin_comment(self):
         if not self.preview_focus:
@@ -1460,57 +1534,59 @@ class Navigator:
                 self.message = "Select a file or folder to comment on"
                 return
             path = self.root if row.path == "." else self.root / row.path
-            self.note_draft = {"text": "", "cursor": 0, "path": str(path.resolve()), "start": 0, "end": 0,
-                               "digest": ""}
+            self.add_comment(str(path.resolve()), 0, 0, "")
             return
         if not self.source_view():
-            self.message = ("Comments need the source: press v to show the Markdown source"
+            self.message = ("Comments need the source: press s to show the Markdown source"
                             if self.preview_focus and self.markdown else "Open a text file in the preview to comment on it")
             return
         self.clamp_cursor()
-        first, last = self.selected_lines() or (self.preview_cursor, self.preview_cursor)
+        characters = self.char_range() if self.char_selecting() else None
+        if characters:
+            (first, start), (last, end) = characters
+        else:
+            first, last = self.selected_lines() or (self.preview_cursor, self.preview_cursor)
         path = self.root / self.active
         lines = comments.read_lines(path)
         if lines is None or last >= len(lines):
             self.message = "Those lines are not in the file; press Ctrl+R to reload it"
             return
-        self.note_draft = {"text": "", "cursor": 0, "path": str(path.resolve()), "start": first + 1,
-                           "end": last + 1, "digest": comments.lines_digest(lines[first:last + 1])}
-
-    def note_key(self, key):
-        draft = self.note_draft
-        if key == "\x1b":
-            self.note_draft = None
-        elif key in ("\n", "\r", curses.KEY_ENTER):
-            self.note_draft = None
-            self.comment_buffer.add(draft["path"], draft["start"], draft["end"], draft["text"].strip(), draft["digest"])
+        if characters:
+            # Selected text is not a comment: it goes to the kill ring, and the message opens
+            # so C-y can put it wherever it belongs.
+            end = min(end, max(0, len(lines[last]) - 1))
+            if first == last:
+                copied = lines[first][start:end + 1]
+            else:
+                copied = "\n".join([lines[first][start:], *lines[first + 1:last], lines[last][:end + 1]])
+            self.command_killed = copied
             self.selection_anchor = None
-            self.save_comments()
-            if not self.message.startswith("Could not"):
-                self.message = f"Comment added · comment {len(self.comment_buffer.comments)} · S sends"
-        else:
-            edited = command_line.edit(draft["text"], draft["cursor"], key, self.command_killed)
-            if edited and len(edited[0]) <= comments.MAX_NOTE:
-                draft["text"], draft["cursor"], self.command_killed = edited
-        return True
+            self.begin_send(empty=True)
+            if self.composer is not None:
+                # Like an added comment, the paste goes after a blank line, unless it starts the message.
+                if self.composer["text"].strip():
+                    self.composer["text"] = self.composer["text"].rstrip("\n") + "\n\n"
+                self.composer["cursor"] = len(self.composer["text"])
+                self.composer["hint"] = f"Copied {len(copied)} character{'' if len(copied) == 1 else 's'} · C-y pastes"
+            return
+        self.add_comment(str(path.resolve()), first + 1, last + 1, comments.lines_digest(lines[first:last + 1]))
 
-    def draw_note(self, screen):
-        draft = self.note_draft
-        height, width = screen.getmaxyx()
-        box_width = min(88, width - 2)
-        x, top = (width - box_width) // 2, max(0, (height - 7) // 2)
-        for y in range(top, min(height, top + 7)):
-            band(screen, y, x, "", box_width, self.style("surface"))
-        reference = comments.reference(comments.Comment(0, draft["path"], draft["start"], draft["end"], "", ""),
-                                       self.root)
-        band(screen, top, x, f"  COMMENT  {reference}", box_width, self.style("header") | curses.A_BOLD)
-        put(screen, top + 1, x + 2, "A note for the agent about these lines (optional)", box_width - 4, self.style("muted"))
-        band(screen, top + 3, x + 2, "", box_width - 4, self.style("surface"))
-        self.draw_field(screen, top + 3, x + 3, box_width - 6, draft["text"], draft["cursor"],
-                        self.style("base") | curses.A_BOLD)
-        if not draft["text"]:
-            put(screen, top + 3, x + 5, "Type a note, or press Enter to skip", box_width - 9, self.style("muted"))
-        put(screen, top + 5, x + 2, "Enter Add  Esc Cancel", box_width - 4, self.style("active"))
+    def add_comment(self, path, start, end, digest, columns=(0, 0), excerpt=""):
+        """Add a comment and open the message on it, the point at the end of its reference so a
+        note can follow."""
+        comment = self.comment_buffer.add(path, start, end, "", digest, columns, excerpt)
+        self.selection_anchor = None
+        self.save_comments()
+        self.begin_send()
+        if self.composer is not None:
+            text, line = self.composer["text"], comments.line(comment, self.composer["cwd"])
+            if text.endswith(line):
+                point = len(text) - len(line) + len(line.split("\n")[0])
+                if comment.start:
+                    # A line comment gets a space after its reference, so the note is typed straight in.
+                    text = text[:point] + " " + text[point:]
+                    point += 1
+                self.composer["text"], self.composer["cursor"] = text, point
 
     def target_details(self):
         """(agent label, working directory, error) for the target pane."""
@@ -1547,9 +1623,9 @@ class Navigator:
             self.message = "Comments kept"
         return True
 
-    def begin_send(self):
+    def begin_send(self, empty=False):
         buffer = self.comment_buffer
-        if not buffer.comments and buffer.draft is None:
+        if not buffer.comments and buffer.draft is None and not empty:
             self.message = "No comments yet: select preview lines with V, then press A"
             return
         label, cwd, error = self.target_details()
@@ -1557,7 +1633,7 @@ class Navigator:
         text = comments.compose(buffer, cwd)
         self.selection_anchor = None
         self.composer = {"text": text, "cursor": len(text), "scroll": 0, "label": label, "cwd": cwd,
-                         "error": error, "changed": altered, "saved": buffer.draft}
+                         "error": error, "changed": altered, "saved": buffer.draft, "hint": ""}
 
     def persist_draft(self):
         """Save the message being edited as the target's draft, when it changed."""
@@ -1586,6 +1662,8 @@ class Navigator:
         elif isinstance(key, (str, int)):
             edited = command_line.edit_text(composer["text"], composer["cursor"], key, self.command_killed)
             if edited and len(edited[0]) <= comments.MAX_DRAFT:
+                if edited[0] != composer["text"]:
+                    composer["hint"] = ""
                 composer["text"], composer["cursor"], self.command_killed = edited
                 composer["error"] = ""
         return True
@@ -1633,6 +1711,8 @@ class Navigator:
         if composer["changed"]:
             put(screen, top + 2, x + 2, "Changed since added: " + ", ".join(composer["changed"]), box_width - 4,
                 self.style("removed"))
+        elif composer["hint"]:
+            put(screen, top + 2, x + 2, composer["hint"], box_width - 4, self.style("active"))
         area_top, area_rows, area_width = top + 3, box_height - 5, box_width - 4
         rows = wrap_rows(composer["text"], area_width)
         cursor_row = cursor_column = 0
@@ -1743,8 +1823,6 @@ class Navigator:
                          empty, "Tab Scope  ↑↓ Choose  Enter Pick  Esc Cancel", cursor=picker["cursor"])
 
     def draw_comment_dialogs(self, screen):
-        if self.note_draft is not None:
-            self.draw_note(screen)
         if self.composer is not None:
             self.draw_composer(screen)
         if self.agent_picker is not None:
@@ -2191,6 +2269,10 @@ class Navigator:
                 # Drawn over the line so the highlight wins.
                 left = x + 2 if self.rendered is not None else x + 8
                 self.draw_matches(screen, y, left, self.text_width, self.preview_scroll + offset)
+            if self.char_selecting():
+                self.draw_char_selection(screen, y, x + 8, width - 10, number)
+            elif self.preview_focus and number == self.preview_cursor and self.source_view():
+                self.draw_cursor_cell(screen, y, x + 8, width - 10, number)
         if self.rendered is not None and self.markdown_diagrams:
             self.place_markdown(screen, x + 2)
 
@@ -2509,7 +2591,7 @@ class Navigator:
     def diagram_command(self, name, argument):
         if self.markdown and self.previewable and name in ("source", "diagram"):
             if self.diagram_source != (name == "source"):
-                self.preview_key("v")
+                self.preview_key("s")
             self.message = "Markdown source" if self.diagram_source else "Rendered Markdown"
             return
         if not self.diagram_list:
@@ -2517,11 +2599,11 @@ class Navigator:
             return
         if name in ("source", "diagram"):
             if self.diagram_source != (name == "source"):
-                self.preview_key("v")
+                self.preview_key("s")
             self.message = "Diagram source" if self.diagram_source else "Diagram images"
             return
         if self.diagram_source:
-            self.preview_key("v")
+            self.preview_key("s")
         if name == "align":
             if argument not in diagram_preview.ALIGNMENTS:
                 self.message = "Use :align left, center or right"
@@ -2556,6 +2638,8 @@ class Navigator:
         if self.preview_focus:
             top, shown, total = self.preview_scroll, self.body, self.preview_length()
             position = f"L{(self.preview_cursor if self.cursor_view() else top) + 1}/{total}"
+            if self.source_view():
+                position += f" C{self.clamped_column(self.preview_cursor, self.preview_column) + 1}"
         else:
             top, shown, total = self.scroll, self.tree_body, len(self.items)
             position = f"{self.selected + 1 if self.items else 0}/{total}"
@@ -2597,12 +2681,14 @@ class Navigator:
         # Send only once there is something to send: the count shows in the bar above.
         send = [("S", "edit & send"), ("X", "clear")] if self.comment_buffer.comments or self.comment_buffer.draft is not None else []
         if self.preview_focus:
+            if self.char_selecting():
+                return [("h l w b", "move"), ("A", "copy to message"), ("Esc", "cancel")]
             if self.selection_anchor is not None:
                 return [("j k", "extend"), ("A", "add comment"), ("Esc", "cancel")]
             if self.find_query:
                 return [("n N", "next/prev"), ("/", "find"), (":", "command"), ("?", "keys")]
             if self.source_view():
-                return [("/", "find"), ("V", "select"), ("A", "comment"), *send, ("?", "keys")]
+                return [("/", "find"), ("v V", "select"), ("A", "comment"), *send, ("?", "keys")]
             return [("/", "find"), ("Tab", "files"), (":", "command"), *send, ("?", "keys")]
         return [("Space", "preview"), ("/", "filter"), ("A", "comment"), *send, ("?", "keys")]
 
@@ -2664,10 +2750,12 @@ class Navigator:
         groups = [("General", general), panel]
         if self.preview_focus and self.diagram_list:
             groups.append(KEY_GROUPS[3])
-        notes = (("V", "Select lines"), ("A", "Add comment")) if self.preview_focus \
+        notes = (("V", "Select lines"), ("v", "Select text"), ("h l w 0 ^ $", "Move in the line"),
+                 ("b", "Word back, in a text selection"),
+                 ("A", "Add comment, or copy the text")) if self.preview_focus \
             else (("A", "Comment on file or folder"),)
         if self.preview_focus and self.markdown:
-            notes = (("v", "Rendered / source"),) + notes
+            notes = (("s", "Rendered / source"),) + notes
         groups.append(("Comments", notes + (("S", "Edit and send"), ("X", "Discard all"),
                                             (":comment.target", "Choose agent"))))
         return self.configured_key_groups(tuple(groups))
@@ -2819,7 +2907,7 @@ class Navigator:
         matches = self.matches()
         if not matches:
             self.message = (f"Not found: {self.find_query}" if not self.diagram_view()
-                            else "Press v to search the diagram source")
+                            else "Press s to search the diagram source")
             return
         wrapped = False
         if origin is not None:
@@ -2854,6 +2942,54 @@ class Navigator:
             if first < self.horizontal or last > self.horizontal + self.text_width:
                 self.horizontal = max(0, first - self.text_width // 3)
 
+    def draw_char_selection(self, screen, y, x, width, number):
+        """Shade the selected characters of one line, and show the cursor as a block on its column."""
+        (first, start), (last, end) = self.char_range()
+        if not first <= number <= last:
+            return
+        line = self.source_line(number)
+        start = start if number == first else 0
+        end = end + 1 if number == last else len(line)
+        self.draw_segment(screen, y, x, width, number, start, max(start + 1, end), self.style("selected"))
+        if number == self.preview_cursor:
+            self.draw_cursor_cell(screen, y, x, width, number)
+
+    def column_at(self, number, cell):
+        """The character of a source line drawn at a screen cell of the text, counting from its left edge."""
+        line = self.source_line(number)
+        text = clean(line)
+        if self.syntax is not None:
+            target, index = cell + self.horizontal, 0
+            while index < len(text) and cells(text[:index + 1]) <= target:
+                index += 1
+        else:
+            shown, index = text[self.horizontal:], 0  # Plain text scrolls by characters.
+            while index < len(shown) and cells(shown[:index + 1]) <= cell:
+                index += 1
+            index += self.horizontal
+        # Back from the tab-expanded text to the line's own characters.
+        column = next((i for i in range(len(line)) if len(clean(line[:i + 1])) > index), len(line))
+        return self.clamped_column(number, column)
+
+    def draw_cursor_cell(self, screen, y, x, width, number):
+        column = self.clamped_column(number, self.preview_column)
+        self.draw_segment(screen, y, x, width, number, column, column + 1, self.style("selected") | curses.A_REVERSE)
+
+    def draw_segment(self, screen, y, x, width, number, start, end, style):
+        """Draw characters start to end of a source line over the preview, where the line shows them.
+        Past the end of the line, a space stands in so an empty line or the end still shows."""
+        line = self.source_line(number)
+        text = clean(line)
+        first, last = len(clean(line[:start])), len(clean(line[:end]))
+        shown = text[first:last] + " " * max(0, end - max(start, len(line)))
+        if self.syntax is not None:
+            column = cells(text[:first]) - self.horizontal
+        else:
+            column = cells(text[self.horizontal:first]) if first >= self.horizontal else -1
+        if column < 0 or column >= width or not shown:
+            return
+        put(screen, y, x + column, shown, width - column, style | curses.A_BOLD)
+
     def draw_matches(self, screen, y, x, width, number):
         line = clean(self.content[number])
         for index, (row, start, end) in enumerate(self.find_matches):
@@ -2879,6 +3015,8 @@ class Navigator:
                 self.scroll_preview(amount)
                 self.preview_cursor = cursor  # Keep its row on screen; the scroll clamped it.
             self.move_cursor(amount, clamp=False)
+            if self.source_view():
+                self.preview_column = self.clamped_column(self.preview_cursor, self.want_column)
         elif self.preview_focus:
             self.scroll_preview(amount)
         else:
@@ -2919,7 +3057,7 @@ class Navigator:
 
     def selected_lines(self):
         """The (first, last) shown lines of the V selection, or None."""
-        if self.selection_anchor is None or not self.source_view():
+        if self.selection_anchor is None or self.selection_kind != "line" or not self.source_view():
             return None
         return tuple(sorted((self.selection_anchor, self.preview_cursor)))
 
@@ -2938,10 +3076,10 @@ class Navigator:
         if key in ("[", "]") and self.markdown and self.markdown_diagrams:
             self.choose_diagram(-1 if key == "[" else 1)
             return True
-        if key == "v" and (self.diagram_list or (self.markdown and self.previewable)):
+        if key == "s" and (self.diagram_list or (self.markdown and self.previewable)):
             # In Markdown, v switches the whole file between rendered and source.
             self.diagram_source = not self.diagram_source
-            self.preview_scroll = self.horizontal = self.preview_cursor = 0
+            self.preview_scroll = self.horizontal = self.preview_cursor = self.preview_column = self.want_column = 0
             self.selection_anchor = None
             self.render_width = None
             return True
@@ -3041,6 +3179,8 @@ class Navigator:
                 number = self.preview_scroll + y - self.content_top
                 if number < len(self.content):
                     self.preview_cursor = number
+                    if self.source_view():
+                        self.preview_column = self.want_column = self.column_at(number, x - self.text_left)
             if not self.preview_focus and self.content_top <= y < self.content_top + self.tree_body:
                 index = self.scroll + y - self.content_top
                 if index < len(self.items):
@@ -3069,7 +3209,7 @@ class Navigator:
         typing = (self.layout_dialog or self.size_draft or self.root_draft is not None
                   or self.app_picker is not None or self.key_help
                   or self.finding or self.searching or self.command is not None
-                  or self.note_draft is not None or self.composer is not None
+                  or self.composer is not None
                   or self.agent_picker is not None or self.confirm_clear)
         target = None
         if not typing:
@@ -3115,8 +3255,6 @@ class Navigator:
             return self.agent_picker_key(key)
         if self.composer is not None:
             return self.composer_key(key)
-        if self.note_draft is not None:
-            return self.note_key(key)
         if self.size_draft:
             return self.size_key(key)
         if self.root_draft is not None:
@@ -3142,6 +3280,11 @@ class Navigator:
             return self.history_key(key, screen)
         if key == "/" and self.preview_focus and not self.searching and self.active:
             self.begin_find()
+            return True
+        # The cursor moves along a source line; b stays page up outside a text selection.
+        if self.preview_focus and self.source_view() and (
+                key in ("h", "l", "w", "0", "^", "$") or (key == "b" and self.char_selecting())):
+            self.move_column(key)
             return True
         if not self.preview_focus and not self.searching:
             key = {"h": curses.KEY_LEFT, "j": curses.KEY_DOWN,
@@ -3194,7 +3337,9 @@ class Navigator:
         elif key == "H" and not self.preview_focus:
             self.open_history(file=True)
         elif key == "V" and self.preview_focus:
-            self.toggle_selection()
+            self.toggle_selection("line")
+        elif key == "v" and self.preview_focus:
+            self.toggle_selection("char")
         elif key == "A":
             self.begin_comment()
         elif key == "S":

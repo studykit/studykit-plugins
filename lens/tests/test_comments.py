@@ -8,6 +8,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import command_line
 import comments
 import settings
+import terminal_input as terminal
 from ui import Navigator
 
 
@@ -72,7 +73,7 @@ class CommentModelTests(unittest.TestCase):
         self.assertEqual(comments.compose(buffer, self.root), "src/a.py:1")
         buffer.draft, buffer.drafted = "src/a.py:1 look here\n", {1}
         buffer.add(str(self.file), 2, 3, "and here", "y")
-        self.assertEqual(comments.compose(buffer, self.root), "src/a.py:1 look here\nsrc/a.py:2-3 — and here")
+        self.assertEqual(comments.compose(buffer, self.root), "src/a.py:1 look here\n\nsrc/a.py:2-3 — and here")
 
     def test_store_round_trips_buffers_and_targets(self):
         store = comments.Store(self.root / "state")
@@ -155,38 +156,38 @@ class NavigatorCommentTests(unittest.TestCase):
 
     def test_select_add_and_send(self):
         self.open("src/main.py")
-        self.keys("j", "j", "V", "j", "j", "A")
-        self.assertEqual((self.nav.note_draft["start"], self.nav.note_draft["end"]), (3, 5))
-        self.keys(*"check this", "\n")
+        self.keys("j", "j", "V", "j", "j", "A")  # A adds the comment and opens the message on it.
+        self.assertEqual(self.nav.composer["text"], "src/main.py:3-5 ")  # A space after a line reference.
+        self.keys(*"check this", "\x1b")
         self.assertIsNone(self.nav.selection_anchor)
         self.assertEqual(len(self.nav.comment_buffer.comments), 1)
-        self.keys("k", "A", "\n")  # A without a selection comments on the cursor line.
-        self.keys("S")
-        self.assertEqual(self.nav.composer["text"], "src/main.py:3-5 — check this\nsrc/main.py:4")
-        self.keys("\x05", *" ok?", "\x13")
-        self.assertEqual(self.host.sent, [("w1:p1", "src/main.py:3-5 — check this\nsrc/main.py:4 ok?")])
+        self.keys("k", "A")  # A without a selection comments on the cursor line.
+        self.assertEqual(self.nav.composer["text"], "src/main.py:3-5 check this\n\nsrc/main.py:4 ")
+        self.assertEqual(self.nav.composer["cursor"], len(self.nav.composer["text"]))
+        self.keys(*"ok?", "\x13")
+        self.assertEqual(self.host.sent, [("w1:p1", "src/main.py:3-5 check this\n\nsrc/main.py:4 ok?")])
         self.assertIsNone(self.nav.composer)
         self.assertEqual(self.nav.comment_buffer.comments, [])
         self.assertEqual(self.store.load(comments.Target("w1:p1", "t1")).comments, [])
 
     def test_escape_keeps_a_draft_that_survives_reopening(self):
         self.open("src/main.py")
-        self.keys("A", "\n", "S", "\x05", *" first", "\x1b")
+        self.keys("A", *"first", "\x1b")
         self.assertIsNone(self.nav.composer)
         self.nav = self.navigator()
         self.open("src/main.py")
         self.assertEqual(len(self.nav.comment_buffer.comments), 1)
-        self.keys("G", "A", "\n", "S")
-        self.assertEqual(self.nav.composer["text"], "src/main.py:1 first\nsrc/main.py:40")
+        self.keys("G", "A")
+        self.assertEqual(self.nav.composer["text"], "src/main.py:1 first\n\nsrc/main.py:40 ")
 
     def test_emptied_message_discards_the_comments(self):
         self.open("src/main.py")
-        self.keys("A", "\n", "S", "\x15", "\x1b")
+        self.keys("A", "\x15", "\x1b")
         self.assertEqual(self.nav.comment_buffer.comments, [])
 
     def test_failed_send_keeps_the_editor_open(self):
         self.open("src/main.py")
-        self.keys("A", "\n", "S")
+        self.keys("A")
         self.host.failure = "agent_blocked: waiting for approval"
         self.keys("\x13")
         self.assertIn("agent_blocked", self.nav.composer["error"])
@@ -199,36 +200,96 @@ class NavigatorCommentTests(unittest.TestCase):
         self.open("notes.md")
         self.keys("V")
         self.assertIsNone(self.nav.selection_anchor)
-        self.assertIn("press v", self.nav.message)
-        self.keys("v")
+        self.assertIn("press s", self.nav.message)
+        self.keys("s")
         self.nav.prepare_preview(60)
         self.assertIsNone(self.nav.rendered)
         self.assertEqual(self.nav.content[0], "# Title")
-        self.keys("j", "j", "A", "\n", "S")
-        self.assertEqual(self.nav.composer["text"], "notes.md:3")
+        self.keys("j", "j", "A")
+        self.assertEqual(self.nav.composer["text"], "notes.md:3 ")
 
     def test_tree_comments_name_a_file_or_folder(self):
         self.nav.preview_focus = False
         self.nav.selected = next(i for i, row in enumerate(self.nav.items) if row.path == "src")
-        self.keys("A", *"layout?", "\n")
+        self.keys("A", *" layout?", "\x1b")
         self.nav.selected = next(i for i, row in enumerate(self.nav.items) if row.path == "notes.md")
-        self.keys("A", "\n")
+        self.keys("A", "\x1b")
         self.nav.selected = next(i for i, row in enumerate(self.nav.items) if row.path == ".")
-        self.keys("A", "\n")
+        self.keys("A", "\x1b")
         self.nav.selected = next(i for i, row in enumerate(self.nav.items) if row.path == "..")
         self.keys("A")
-        self.assertIsNone(self.nav.note_draft)
+        self.assertIsNone(self.nav.composer)
         self.keys("S")
-        self.assertEqual(self.nav.composer["text"], "src/ — layout?\nnotes.md\n./")
+        self.assertEqual(self.nav.composer["text"], "src/ layout?\n\nnotes.md\n\n./")
         self.assertEqual(self.nav.composer["changed"], [])
         self.keys("\x1b")
         (self.root / "notes.md").unlink()
         self.keys("S")
         self.assertEqual(self.nav.composer["changed"], ["notes.md"])
 
+    def test_text_selection_sends_the_characters(self):
+        (self.root / "code.py").write_text("def run(job):\n    if retry and not timeout:\n        wait()\n")
+        self.nav.refresh()
+        self.open("code.py")
+        self.keys("j", "w", "v")  # The cursor moves along the line before a selection starts.
+        self.assertEqual((self.nav.selection_kind, self.nav.anchor_column), ("char", 4))
+        self.keys("w", "w", "$")
+        self.assertEqual(self.nav.preview_column, 28)
+        self.keys("j", "^")
+        self.assertEqual(self.nav.preview_column, 8)
+        self.keys("0", "l", "l", "A")  # Selected text is copied, not added, and the message opens.
+        self.assertIsNone(self.nav.selection_anchor)
+        self.assertEqual(self.nav.comment_buffer.comments, [])
+        self.assertEqual(self.nav.command_killed, "if retry and not timeout:\n   ")
+        self.assertIn("C-y", self.nav.composer["hint"])
+        self.keys(*"why? ", "\x19")
+        self.assertEqual(self.nav.composer["text"], "why? if retry and not timeout:\n   ")
+        self.assertEqual(self.nav.composer["hint"], "")
+        self.keys("\x1b")
+        self.nav.open_file("code.py")
+        self.keys("V", "A")  # A line selection is still a comment, after the kept draft.
+        self.assertEqual(self.nav.composer["text"], "why? if retry and not timeout:\n   \n\ncode.py:1 ")
+        self.keys("\x1b", "v", "A")  # A copy into a message that has text starts after a blank line.
+        self.assertEqual(self.nav.composer["text"][-len("code.py:1 \n\n"):], "code.py:1 \n\n")
+        self.assertEqual(self.nav.composer["cursor"], len(self.nav.composer["text"]))
+
+    def test_v_and_V_switch_or_end_the_selection(self):
+        self.open("src/main.py")
+        self.keys("V", "v")
+        self.assertEqual((self.nav.selection_kind, self.nav.selection_anchor), ("char", 0))
+        self.keys("V")
+        self.assertEqual(self.nav.selection_kind, "line")
+        self.keys("V")
+        self.assertIsNone(self.nav.selection_anchor)
+        self.keys("l", "l", "$", "h")  # The cursor moves along the line outside a selection too.
+        self.assertEqual(self.nav.preview_column, 4)  # "line 1" ends at column 5.
+        self.keys(*("j" * 9), "j", "k")  # j and k return to the wanted column on long enough lines.
+        self.assertEqual((self.nav.preview_cursor, self.nav.preview_column), (9, 4))
+        self.keys("b")  # b is still page up outside a text selection.
+        self.assertEqual(self.nav.preview_cursor, 0)
+
+    def test_click_puts_the_cursor_on_a_character(self):
+        (self.root / "tabs.txt").write_text("\tab cd\n")
+        self.nav.refresh()
+        self.open("tabs.txt")
+        self.nav.divider, self.nav.content_top, self.nav.text_left = 30, 2, 39
+        self.nav.handle_mouse(terminal.Mouse(39 + 5, 2, "click"))  # The tab takes four cells, then "ab".
+        self.assertEqual(self.nav.preview_column, 2)
+        self.nav.handle_mouse(terminal.Mouse(39 + 2, 2, "click"))
+        self.assertEqual(self.nav.preview_column, 0)
+        self.nav.handle_mouse(terminal.Mouse(39 + 40, 2, "click"))
+        self.assertEqual(self.nav.preview_column, 5)
+
+    def test_excerpt_fence_outlasts_backticks_inside(self):
+        buffer = comments.Buffer()
+        comment = buffer.add("/a.md", 1, 1, "", "d", (1, 5), "``` x")
+        self.assertEqual(comments.line(comment, None), "/a.md:1:1-1:5\n````\n``` x\n````")
+        self.assertEqual(comments.decode_buffer(comments.encode_buffer(comments.Target("p", "t"), buffer)).comments,
+                         [comment])
+
     def test_clear_asks_first(self):
         self.open("src/main.py")
-        self.keys("A", "\n", "X", "n")
+        self.keys("A", "\x1b", "X", "n")
         self.assertEqual(len(self.nav.comment_buffer.comments), 1)
         self.keys("X", "y")
         self.assertEqual(self.nav.comment_buffer.comments, [])
@@ -243,7 +304,7 @@ class NavigatorCommentTests(unittest.TestCase):
 
     def test_picker_scopes_and_target_buffers(self):
         self.open("src/main.py")
-        self.keys("A", "\n")
+        self.keys("A", "\x1b")
         self.nav.run_command("comment.target", None)
         labels = lambda: [agent["pane_id"] for agent in self.nav.agent_choices()]
         self.assertEqual(labels(), ["w1:p1"])
@@ -256,8 +317,8 @@ class NavigatorCommentTests(unittest.TestCase):
         self.keys("\n")
         self.assertEqual(self.nav.comment_target, comments.Target("w1:p2", "t2"))
         self.assertEqual(self.nav.comment_buffer.comments, [])  # Each agent has its own buffer.
-        self.keys("A", "\n", "S")
-        self.assertEqual(self.nav.composer["text"], "main.py:1")  # Relative to that agent's directory.
+        self.keys("A")
+        self.assertEqual(self.nav.composer["text"], "main.py:1 ")  # Relative to that agent's directory.
         self.keys("\x1b")
         self.nav = self.navigator()  # The chosen agent is remembered for this pane.
         self.assertEqual(self.nav.comment_target, comments.Target("w1:p2", "t2"))
