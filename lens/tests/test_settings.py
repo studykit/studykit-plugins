@@ -14,6 +14,7 @@ from ui import Navigator
 class ChordTests(unittest.TestCase):
     def test_chords(self):
         self.assertEqual(settings.chord("ctrl+a"), "\x01")
+        self.assertEqual(settings.chord("ctrl+;"), "ctrl+;")
         self.assertEqual(settings.chord("alt+x"), "\x1bx")
         self.assertEqual(settings.chord("shift+a"), "A")
         self.assertEqual(settings.chord("N"), "N")

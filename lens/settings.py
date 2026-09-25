@@ -12,7 +12,7 @@ ACTIONS = {
     "focus": "\t", "back": "\x1b", "quit": "\x11",
     "search": "/", "command": ":", "next-match": "n", "prev-match": "N",
     "preview": " ", "edit": "\x05", "diff": "\x04", "changes": "c", "ignored": "\x08",
-    "refresh": "\x12", "root": "\x0f", "git-root": "t", "parent": curses.KEY_BACKSPACE,
+    "refresh": "\x12", "root": "\x0f", "git-root": "t", "parent": "parent",
     "layout": "\x17", "popup-size": "\x19", "top": curses.KEY_HOME, "bottom": "G",
     "zoom-in": "+", "zoom-out": "-", "zoom-fit": "0", "align": "a",
     "prev-diagram": "[", "next-diagram": "]", "source": "v", "launch": "o", "launch-with": "O",
@@ -95,6 +95,8 @@ class Settings:
 
 def chord(spec):
     """One key chord such as "ctrl+s", "alt+x", "shift+a", "f", or "pagedown" as curses input."""
+    if spec.lower() == "ctrl+;":
+        return "ctrl+;"  # Kitty CSI-u or xterm modifyOtherKeys, decoded by terminal_input.
     if spec in ("+", "-"):
         return spec
     *mods, name = spec.lower().split("+") if len(spec) > 1 else [spec]

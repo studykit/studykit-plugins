@@ -98,7 +98,8 @@ def toggle_keys(env):
         parts = [prefix, spec[len("prefix+"):]] if spec.startswith("prefix+") else [spec]
         sequence = tuple(lens_settings.chord(part) for part in parts if isinstance(part, str))
         # A bare printable key would close Lens while typing a search.
-        if sequence and None not in sequence and not (len(sequence) == 1 and sequence[0].isprintable()):
+        if sequence and None not in sequence and not (len(sequence) == 1 and len(sequence[0]) == 1
+                                                     and sequence[0].isprintable()):
             found.append(sequence)
     return found
 

@@ -85,13 +85,29 @@ class RootNavigationTests(unittest.TestCase):
         self.assertEqual(self.nav.root, self.first / "child")
         self.assertEqual(self.nav.index.files, ["nested.txt"])
 
-    def test_parent_shortcuts_and_click_keep_previous_folder_selected(self):
-        for key in ("\x7f", curses.KEY_BACKSPACE, Mouse(3, ui.ROOT_ROW, "click")):
+    def test_parent_entry_and_click_keep_previous_folder_selected(self):
+        for key in ("\n", Mouse(3, ui.ROOT_ROW, "click")):
             with self.subTest(key=key):
                 self.nav.change_root(self.first / "child")
+                if key == "\n":
+                    self.nav.selected = next(i for i, row in enumerate(self.nav.items) if row.path == "..")
                 self.nav.key(key, None)
                 self.assertEqual(self.nav.root, self.first)
                 self.assertEqual(self.nav.items[self.nav.selected].path, "child")
+
+    def test_tree_backspace_does_not_change_root(self):
+        self.nav.change_root(self.first / "child")
+        for key in ("\x7f", curses.KEY_BACKSPACE):
+            with self.subTest(key=key):
+                self.nav.key(key, None)
+                self.assertEqual(self.nav.root, self.first / "child")
+        self.assertNotIn(("⌫", "Parent folder"), self.nav.key_groups()[1][1])
+
+    def test_parent_action_can_be_bound_explicitly(self):
+        self.nav.change_root(self.first / "child")
+        self.nav.bindings = {"P": "parent"}
+        self.nav.key("P", None)
+        self.assertEqual(self.nav.root, self.first)
 
     def test_invalid_empty_file_and_scan_failure_keep_previous_state(self):
         self.nav.load("file.md")
@@ -165,13 +181,15 @@ class RootNavigationTests(unittest.TestCase):
         self.enter_path(empty)
         self.assertEqual(self.nav.root, empty)
         self.assertEqual([row.path for row in self.nav.items], [".", ".."])
-        self.nav.key("\x7f", None)
+        self.nav.selected = next(i for i, row in enumerate(self.nav.items) if row.path == "..")
+        self.nav.key("\n", None)
         self.assertEqual(self.nav.root, self.base)
 
     def test_filesystem_root_parent_is_noop(self):
         self.nav.root = Path(self.first.anchor)
         with patch("ui.scan") as scan:
-            self.nav.key("\x7f", None)
+            self.nav.selected = next(i for i, row in enumerate(self.nav.items) if row.path == "..")
+            self.nav.key("\n", None)
         scan.assert_not_called()
         self.assertIn("Already", self.nav.message)
 
@@ -241,7 +259,8 @@ class RootNavigationTests(unittest.TestCase):
         self.nav.key("\n", None)
         self.assertEqual(self.nav.root, self.first / "child")
         self.assertEqual(self.nav.items[self.nav.selected].path, "nested.txt")
-        self.nav.key("\x7f", None)  # Backspace goes back up.
+        self.nav.selected = next(i for i, row in enumerate(self.nav.items) if row.path == "..")
+        self.nav.key("\n", None)
         self.assertEqual(self.nav.root, self.first)
 
     def test_space_folds_folders_but_not_dot_rows(self):

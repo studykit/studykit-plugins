@@ -18,22 +18,21 @@ class ToggleKeyTests(unittest.TestCase):
         path.write_text(text)
         return {"HERDR_CONFIG_PATH": str(path), "HERDR_PLUGIN_ID": "studykit.lens"}
 
-    def test_toggle_bindings_expand_the_prefix(self):
+    def test_toggle_bindings_accept_modified_punctuation_and_expand_the_prefix(self):
         env = self.config('''[keys]
 prefix = "ctrl+s"
 [[keys.command]]
-key = "prefix+ctrl+a"
-type = "plugin_action"
-command = "studykit.lens.toggle"
-[[keys.command]]
 key = "prefix+d"
 command = "studykit.lens.changes"
+[[keys.command]]
+key = "ctrl+;"
+command = "studykit.lens.toggle"
 [[keys.command]]
 key = "l"
 command = "studykit.lens.toggle"
 ''')
         # The bare "l" binding is dropped: it would close Lens mid-search.
-        self.assertEqual(herdr_main.toggle_keys(env), [("\x13", "\x01")])
+        self.assertEqual(herdr_main.toggle_keys(env), [("ctrl+;",)])
         self.assertEqual(herdr_main.toggle_keys(self.config('[[keys.command]]\nkey = "prefix+a"\n'
                                                             'command = "studykit.lens.toggle"\n')),
                          [("\x02", "a")])  # Herdr's default prefix is Ctrl+B.
@@ -47,6 +46,12 @@ command = "studykit.lens.toggle"
         self.assertEqual(nav.close_typed, ())
         self.assertTrue(nav.key("\x13", None))
         self.assertFalse(nav.key("\x01", None))
+
+    def test_direct_modified_punctuation_closes_popup(self):
+        temp = tempfile.TemporaryDirectory()
+        self.addCleanup(temp.cleanup)
+        nav = Navigator(Path(temp.name), "pane", False, "", close_keys=[("ctrl+;",)])
+        self.assertFalse(nav.key("ctrl+;", None))
 
 
 class ToggleActionTests(unittest.TestCase):

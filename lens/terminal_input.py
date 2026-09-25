@@ -35,6 +35,25 @@ def mouse_event(button: int, x: int, y: int, released=False):
 
 
 def decode(sequence: str):
+    if sequence in ("\x1b[59;5u", "\x1b[27;5;59~"):
+        return "ctrl+;"
+    kitty = re.fullmatch(r"\x1b\[(\d+)(?:;(\d+))?u", sequence)
+    if kitty:
+        code, modifier = int(kitty[1]), int(kitty[2] or 1) - 1
+        if code == 27 and modifier == 0:
+            return "\x1b"
+        if 32 <= code < 127:
+            char = chr(code)
+            if modifier & 1 and char.isalpha():
+                char = char.upper()
+            if modifier & 4:
+                if not "a" <= char.lower() <= "z":
+                    return None
+                char = chr(ord(char.lower()) - 96)
+            if modifier & 2:
+                char = "\x1b" + char
+            return char
+        return None
     appearance = re.fullmatch(r"\x1b\[\?997;([12])n", sequence)
     if appearance:
         return Appearance("light" if appearance[1] == "2" else "dark")
@@ -88,7 +107,8 @@ def enable(screen):
     # keypad(False) prevents older ncurses from swallowing button-five reports.
     screen.keypad(False)
     curses.mousemask(0)
-    sys.stdout.write("\x1b[?1000h\x1b[?1002h\x1b[?1006h\x1b[?996n")
+    # Distinguish Ctrl+punctuation from legacy control bytes (Ctrl+; can look like Escape).
+    sys.stdout.write("\x1b[>1u\x1b[?1000h\x1b[?1002h\x1b[?1006h\x1b[?996n")
     sys.stdout.flush()
 
 
@@ -104,8 +124,8 @@ def sync_size(screen):
         pass
 
 
-# Kitty keyboard flags to 0 on the current screen's stack, then modifyOtherKeys off.
-RESET_KEYBOARD = "\x1b[=0;1u\x1b[>4;0m"
+# Restore Lens's disambiguation flag after a child changes the keyboard mode.
+RESET_KEYBOARD = "\x1b[=1;1u\x1b[>4;0m"
 
 
 def reset_keyboard():
@@ -118,5 +138,5 @@ def reset_keyboard():
 
 
 def disable():
-    sys.stdout.write("\x1b[?1000l\x1b[?1002l\x1b[?1006l")
+    sys.stdout.write("\x1b[?1000l\x1b[?1002l\x1b[?1006l\x1b[<u")
     sys.stdout.flush()

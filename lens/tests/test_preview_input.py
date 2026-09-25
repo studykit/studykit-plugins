@@ -30,6 +30,30 @@ class InputTests(unittest.TestCase):
                               ("\x1b[Z", curses.KEY_BTAB)):
             self.assertEqual(terminal.decode(sequence), key)
 
+    def test_modified_semicolon_for_popup_toggle(self):
+        for sequence in ("\x1b[59;5u", "\x1b[27;5;59~"):
+            self.assertEqual(terminal.decode(sequence), "ctrl+;")
+            screen = Mock()
+            screen.get_wch.side_effect = list(sequence)
+            self.assertEqual(terminal.read(screen), "ctrl+;")
+
+    def test_kitty_disambiguation_keeps_existing_control_keys(self):
+        for sequence, key in (("\x1b[113;5u", "\x11"),  # Ctrl+Q
+                              ("\x1b[100;5u", "\x04"),  # Ctrl+D
+                              ("\x1b[120;3u", "\x1bx"),  # Alt+X
+                              ("\x1b[27u", "\x1b")):
+            self.assertEqual(terminal.decode(sequence), key)
+
+    def test_keyboard_mode_is_pushed_and_restored(self):
+        screen = Mock()
+        output = io.StringIO()
+        with patch("terminal_input.curses.raw"), patch("terminal_input.curses.mousemask"), \
+                patch("terminal_input.sys.stdout", output):
+            terminal.enable(screen)
+            terminal.disable()
+        self.assertIn("\x1b[>1u", output.getvalue())
+        self.assertTrue(output.getvalue().endswith("\x1b[<u"))
+
     def test_reader_restores_blocking_mode(self):
         screen = Mock()
         screen.get_wch.side_effect = list("\x1b[<65;40;12M")
@@ -181,8 +205,8 @@ class PreviewTests(unittest.TestCase):
         self.nav.key("B", None)
         self.assertEqual(self.nav.message, "No followed link to go back from")
         root = self.nav.root.resolve()
-        self.nav.key("\x7f", None)  # In the tree, Backspace still moves the root up.
-        self.assertEqual(self.nav.root.resolve(), root.parent)
+        self.nav.key("\x7f", None)
+        self.assertEqual(self.nav.root.resolve(), root)
 
     def test_ctrl_click_opens_addresses_in_plain_and_code_previews(self):
         (self.root / "notes.txt").write_text("<https://example.com/p?q=1>.\n")

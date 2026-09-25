@@ -146,7 +146,7 @@ KEY_GROUPS = (
                  ("⌃W", "Layout"), ("⌃Y", "Popup size"), ("Esc", "Back / close"), ("⌃G", "Cancel, never close"), ("⌃Q", "Quit"))),
     ("Files", (("j k", "Move"), ("h l", "Fold / unfold"), ("=", "Fold / unfold all under"), ("Enter", "Open / enter folder"), ("Space", "Preview / fold"),
                ("H", "File history"),
-               ("/", "Filter names"), ("⌫", "Parent folder"), ("⌃N ⌃P", "Scroll preview"),
+               ("/", "Filter names"), ("⌃N ⌃P", "Scroll preview"),
                ("⌃F ⌃B", "Page preview"))),
     ("Preview", (("j k", "Line"), ("Space b", "Page"), ("d u", "Half page"), ("g G", "Top / end"),
                  ("/", "Find"), ("n N", "Next / previous"), ("← →", "Scroll sideways"),
@@ -1043,7 +1043,7 @@ class Navigator:
                 put(screen, y, x + start, "".join(visible), width - start, self.span_style(span.style))
 
     def activate(self, screen=None, fold=False):
-        """Enter: open a file, or make a folder the root, as Backspace leaves it. A click folds instead."""
+        """Enter: open a file or make a folder the root. A click folds instead."""
         if not self.items:
             return
         row = self.items[self.selected]
@@ -2656,12 +2656,12 @@ class Navigator:
             self.begin_root()
         elif key == "t":
             self.repository_root()
+        elif key == "parent":
+            self.parent_root()
         elif key == "H" and not self.preview_focus:
             self.open_history(file=True)
         elif key == "\x08":
             self.toggle_ignored()
-        elif key in ("\x7f", curses.KEY_BACKSPACE) and not self.preview_focus and not self.query:
-            self.parent_root()
         elif key == "link-back" or (key in ("\x7f", curses.KEY_BACKSPACE, "H") and self.preview_focus):
             self.link_step()
         elif key == "link-forward" or (key == "L" and self.preview_focus):

@@ -42,7 +42,7 @@ To bind them to keys, add something like this to your Herdr configuration:
 
 ```toml
 [[keys.command]]
-key = "prefix+t"
+key = "ctrl+;"
 type = "plugin_action"
 command = "studykit.lens.toggle"
 description = "open or close Lens"
@@ -53,6 +53,10 @@ type = "plugin_action"
 command = "studykit.lens.changes"
 description = "browse changed files"
 ```
+
+Direct `Ctrl+;` input requires a terminal that reports modified punctuation as a
+distinct key. If your terminal sends it as a plain character, choose another
+Herdr binding.
 
 Lens is a Herdr plugin only. It needs no separate Claude Code or Codex install.
 
@@ -109,7 +113,7 @@ These keys work outside text fields. Letters in a text field are just text.
 | `=` | Unfold a folder and every folder under it, or fold them all once they are open; on `.`, the whole tree |
 | `H` | Show the selected file's Git history |
 | `g` | In a Git repository, show available Git shortcuts; then press a listed key |
-| Backspace, or Enter on `..` | Move the root up one folder |
+| Enter on `..` | Move the root up one folder |
 | Ctrl+N / Ctrl+P | Scroll the preview one line without leaving the tree |
 | Ctrl+F / Ctrl+B | Scroll the preview one screen without leaving the tree |
 
@@ -175,7 +179,7 @@ Change root prompt, and the application picker. They share one kill ring.
 
 ### Changing the root
 
-- **Enter** on a folder makes it the root. **Backspace** or `..` goes up.
+- **Enter** on a folder makes it the root. Enter on `..` goes up.
 - **`t`** goes to the Git repository root.
 - **Ctrl+O**, or a click on the root path, asks for a directory. It starts with the
   selected folder filled in. The path can be absolute, start with `~`, or be relative
@@ -469,7 +473,7 @@ Set `command = "none"` in a matching rule to disable a key in that state.
 | `search`, `command`, `next-match`, `prev-match` | `/`, `:`, `n`, `N` |
 | `preview`, `edit`, `diff` | Space, Ctrl+E (and `e`), Ctrl+D |
 | `changes`, `ignored`, `refresh` | `c`, Ctrl+H, Ctrl+R |
-| `root`, `git-root`, `parent` | Ctrl+O, `t`, Backspace |
+| `root`, `git-root`, `parent` | Ctrl+O, `t`, unbound (bind `parent` if wanted) |
 | `layout`, `popup-size` | Ctrl+W, Ctrl+Y |
 | `top`, `bottom` | `g` (preview or history), `G` |
 | `zoom-in`, `zoom-out`, `zoom-fit`, `align` | `+`, `-`, `0`, `a` |
