@@ -62,7 +62,7 @@ Verify both actions, the root displayed in the header, filename searches into
 collapsed directories, click/Enter previews, Ctrl+D vimdiff and `q` return, Ctrl+E editor return,
 refresh after edits, scrolling, terminal resize, Escape, and focus restoration.
 Repeat from a nested directory and another source pane. Confirm that the original
-pane receives no command input. Test a linked working tree rather than an older
+pane receives no command input, except a comment message the user submits. Test a linked working tree rather than an older
 installed checkout.
 
 The adapter talks to Herdr through the socket API (`HERDR_SOCKET_PATH`), one
@@ -514,3 +514,12 @@ Popup → Overlay → Popup, both saved modes on fresh launches, unchanged saved
 search/preview/scroll state, popup resizing, slash-only search, Ctrl+H visibility,
 and restoration of the source layout after overlay closure. Linux was not
 exercised in a live host session.
+
+## Comments
+
+Comments reach the target through `agent.prompt` on the socket API, which pastes
+the text with the pane's bracketed-paste mode and presses Enter. Live-check a
+multi-line message against both Claude Code and Codex: every line must arrive in
+one prompt, not as several submissions. Also check that a blocked agent (an
+approval prompt showing) makes the send fail and leaves the editor open. Check the
+picker's tab, workspace and session scopes with agents in more than one tab.

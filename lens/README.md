@@ -2,7 +2,8 @@
 
 A file browser for [Herdr](https://herdr.dev). It opens on the focused pane's working
 directory, in a popup, an overlay, or half of the tab. It has a project tree, fuzzy
-filename search, previews of code, Markdown and diagrams, Git diffs, and commit history. It works
+filename search, previews of code, Markdown and diagrams, Git diffs, and commit history.
+You can also select lines in a preview and send them to an agent as comments. It works
 alongside any shell or agent, including Claude Code and Codex, on macOS and Linux.
 
 ## Requirements
@@ -112,6 +113,7 @@ These keys work outside text fields. Letters in a text field are just text.
 | `h` / Left | Fold a folder, or go to the parent |
 | `=` | Unfold a folder and every folder under it, or fold them all once they are open; on `.`, the whole tree |
 | `H` | Show the selected file's Git history |
+| `A` | Comment on the selected file or folder; `S` edits and sends the comments, `X` discards them |
 | `g` | In a Git repository, show available Git shortcuts; then press a listed key |
 | Enter on `..` | Move the root up one folder |
 | Ctrl+N / Ctrl+P | Scroll the preview one line without leaving the tree |
@@ -124,19 +126,26 @@ The tree always starts with `..` (the parent folder) and `.` (the root itself). 
 
 | Key | Action |
 | --- | --- |
-| `j` or Enter / `k` or `y` | Scroll one line down / up |
+| `j` or Enter / `k` or `y` | Move the cursor one line down / up |
 | Space / `f`, `b` | Scroll one screen down / up |
 | `d` / `u`, Ctrl+U | Scroll half a screen down / up |
 | `g` or `<` / `G` or `>` | Go to the start / end |
+| `V` | Start or cancel a [line selection](#comments-to-agents) |
+| `A` | Add the selected lines, or the cursor line, as a comment |
+| `S` | Edit the comments and send them to an agent (also in the tree) |
+| `X` | Discard the comments and draft, after confirming with `y` (also in the tree) |
 | Left / Right | Scroll sideways |
 | `n` / `N` | Next / previous find match |
-| `v` | Switch diagrams between image and source |
+| `v` | Switch diagrams between image and source; in Markdown, the whole file between rendered and source |
 | `+` (or `=`) / `-` / `0` | Zoom the diagram in / out / back to fit |
 | `[` / `]` | Select the previous / next diagram in Markdown |
 | `a` | Align diagrams left, center or right |
 | Backspace or `H` / `L` | Go back to where you followed a link from / forward again |
 
-**Mouse**: click to select or focus, scroll the wheel over either panel, and drag the
+The preview keeps a cursor on one line, and the view scrolls when the cursor
+reaches its edge. Page keys scroll and carry the cursor with them.
+
+**Mouse**: click to select or focus, or to put the preview cursor on a line; scroll the wheel over either panel, and drag the
 border between the panels to resize the tree. Lens remembers the width. Ctrl+click a
 web address in the preview, or the text of a Markdown link to one, to open it in your
 browser; Ctrl+click an Obsidian link to follow it, and press Backspace or `H` in the preview to
@@ -163,7 +172,8 @@ diagram, press `v` first to show its source.
 ### Text fields
 
 Every place you type edits with Emacs keys: the filter, find, the command line, the
-Change root prompt, and the application picker. They share one kill ring.
+Change root prompt, the application and agent pickers, the comment note, and the
+comment message. They share one kill ring.
 
 | Key | Action |
 | --- | --- |
@@ -309,11 +319,54 @@ Mermaid takes a few seconds to render.
   first one on screen, or the one you pick with `[` / `]`.
 - **Alignment**: `a` cycles every diagram between left, center and right. Lens
   remembers the choice.
-- `v` shows every diagram as source.
+- `v` shows every diagram as source. In Markdown it shows the whole file as source.
 
 If Herdr clears a diagram from the screen, press Ctrl+R. With
 `[terminal].kitty_graphics = false` in Herdr's configuration, Lens always shows the
 source.
+
+## Comments to agents
+
+You can point an agent at lines in the preview without typing file names or line
+numbers:
+
+1. In the preview, put the cursor on a line and press `V`. Move with `j` / `k` to
+   extend the selection. Escape cancels it.
+2. Press `A` and type a note about the lines, or leave it empty. Enter adds the
+   comment. Without a selection, `A` comments on the cursor line.
+3. Repeat in any file. In the file tree, `A` comments on the selected file or folder
+   as a whole, without line numbers. The bar under the panels shows how many you have, as
+   `comment 3`.
+4. Press `S` to open the message. Each comment is one line, such as
+   `src/app.py:10-14 — why is this retried?`. Edit it freely, then press Ctrl+S to
+   send it. The agent receives it as a prompt.
+
+Paths are relative to the agent's working directory, or absolute for files outside
+it. If a file changed since you commented on it, the message editor says so above the
+text.
+
+Line comments only work where the preview shows the file's own lines: code and
+text. Press `v` in a Markdown preview to show its source first. A comment on a
+folder ends in `/`, such as `src/`.
+
+**Which agent.** Comments go to the agent in the pane you opened Lens from. Run
+`:comment.target` to pick another: the list shows agents in the current tab, and
+Tab widens it to the workspace and then the whole session. Type to filter. Lens
+remembers the choice for that pane, and each agent has its own comments. In Overlay
+and half modes, Lens keeps the pane it was first opened from, even when you reopen
+it from another pane in the tab.
+
+**Drafts.** Escape closes the message and keeps it as a draft, and so does closing
+Lens. `S` reopens the draft with any comments added since. Comments and drafts stay
+until you send them, even after Lens closes. If you delete the whole message and
+press Escape, the comments are discarded. `X` (or `:comment.clear`) discards them
+too, after you confirm with `y`.
+
+The message editor uses the [text field keys](#text-fields) on the current line.
+Enter starts a new line, Up / Down (or Ctrl+P / Ctrl+N) move between lines, and
+Backspace at the start of a line joins it to the one above. Sending fails when the
+agent is waiting at an approval or question prompt. The message then stays open so
+you can try again.
 
 ## Command line
 
@@ -337,6 +390,8 @@ earlier commands. Escape, Ctrl+G, or Backspace on an empty line cancels.
 | `git.ignored [on\|off]` | Show or hide ignored files |
 | `refresh` | Reload the file list and preview |
 | `editor` / `git.diff` | Open the current file in your editor / compare it with HEAD |
+| `comment.add` / `comment.send` | Add the selected lines as a comment / edit and send the comments |
+| `comment.target` / `comment.clear` | Choose the agent that gets comments / discard its comments |
 | `launch [FILE]` (`xdg-open`, `start`) | Open a file or folder in its OS application |
 | `with [APP]` (`app`) | Open with APP: a macOS application name, or a command elsewhere. Alone, it shows the list. |
 | `zoom in\|out\|fit\|PERCENT` | Zoom the current diagram |
@@ -398,7 +453,7 @@ applies the rest.
 ```toml
 [editor]
 # {file} and {line} are replaced; without {file}, the path is appended.
-# {line} is the first line shown in a code or text preview, otherwise 1.
+# {line} is the cursor line in a code or text preview, otherwise 1.
 command = "nvim +{line} {file}"
 
 [diff]
@@ -416,6 +471,9 @@ pause = true       # wait for Enter afterwards, for tools that print and exit
 icons = "nerd"     # or "plain"
 align = "center"   # diagram alignment: left, center, right
 tree_padding = 1   # blank columns on each side of the tree's rows (0 - 8)
+
+[comment]
+submit = "ctrl+s"  # the key that sends the message; a Ctrl or Alt chord
 
 [keys]
 # A key, then an action name or a ":" command line. These add to the
@@ -480,6 +538,7 @@ Set `command = "none"` in a matching rule to disable a key in that state.
 | `prev-diagram`, `next-diagram`, `source` | `[`, `]`, `v` |
 | `launch`, `launch-with` | `o`, `O` |
 | `link-back`, `link-forward` | Backspace or `H`, and `L`, in the preview |
+| `comment-select`, `comment-add`, `comment-send`, `comment-clear` | `V`, `A`, `S`, `X` |
 
 **Theme and colors.** Lens follows your Herdr theme, and Ctrl+R rereads it. The
 `terminal` theme keeps your terminal's default colors. With `auto_switch`, Lens

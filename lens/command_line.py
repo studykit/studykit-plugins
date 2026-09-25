@@ -42,6 +42,10 @@ COMMANDS = (
     Command("with", ("app",), "with [APP]",
             "Open the selected file or folder with an application; alone, list them", argument="application"),
     Command("git.diff", (), "git.diff", "Compare the current file with HEAD"),
+    Command("comment.add", (), "comment.add", "Comment on the selected preview lines, or the selected file or folder"),
+    Command("comment.send", (), "comment.send", "Edit the comments and send them to the target agent"),
+    Command("comment.target", (), "comment.target", "Choose the agent that receives comments"),
+    Command("comment.clear", (), "comment.clear", "Discard the comments and draft for the target agent"),
     Command("icons", (), "icons nerd|plain", "Use Nerd Font icons or plain text in the tree",
             ("nerd", "plain")),
     Command("layout", (), "layout popup|overlay|left|right", "Switch display mode",
@@ -216,3 +220,40 @@ def edit(text, cursor, key, killed):
     if isinstance(key, str) and key.isprintable():
         return text[:cursor] + key + text[cursor:], cursor + len(key), killed
     return None
+
+
+def edit_text(text, cursor, key, killed):
+    """edit() for text of several lines: the line keys act on the line at point, and point
+    crosses line ends as it does in Emacs. Enter inserts a newline. Returns (text, cursor,
+    killed), or None if the key is not an editing key."""
+    start = text.rfind("\n", 0, cursor) + 1
+    end = text.find("\n", cursor)
+    end = len(text) if end < 0 else end
+    column = cursor - start
+    if key in (curses.KEY_UP, "\x10", curses.KEY_DOWN, "\x0e"):
+        if key in (curses.KEY_UP, "\x10"):
+            if start == 0:
+                return text, 0, killed
+            above = text.rfind("\n", 0, start - 1) + 1
+            return text, min(above + column, start - 1), killed
+        if end == len(text):
+            return text, len(text), killed
+        below_end = text.find("\n", end + 1)
+        below_end = len(text) if below_end < 0 else below_end
+        return text, min(end + 1 + column, below_end), killed
+    if key in ("\n", "\r", curses.KEY_ENTER):
+        return text[:cursor] + "\n" + text[cursor:], cursor + 1, killed
+    joins = {"\x02": cursor == start and start > 0, curses.KEY_LEFT: cursor == start and start > 0,
+             "\x06": cursor == end and end < len(text), curses.KEY_RIGHT: cursor == end and end < len(text)}
+    if joins.get(key):
+        return text, cursor + (1 if key in ("\x06", curses.KEY_RIGHT) else -1), killed
+    if key in ("\b", "\x7f", curses.KEY_BACKSPACE) and cursor == start and start > 0:
+        return text[:start - 1] + text[start:], start - 1, killed
+    if key in ("\x04", curses.KEY_DC, "\x0b") and cursor == end and end < len(text):
+        # At the end of a line, C-d, Delete and C-k join the next line, as in Emacs.
+        return text[:end] + text[end + 1:], cursor, "\n" if key == "\x0b" else killed
+    edited = edit(text[start:end], column, key, killed)
+    if edited is None:
+        return None
+    line, point, killed = edited
+    return text[:start] + line + text[end:], start + point, killed

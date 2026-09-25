@@ -21,6 +21,7 @@ import tomllib
 from popup_size import PopupSize, load_size, save_size
 from layout_mode import MODES, SPLITS, load_layout, save_layout
 from ls_colors import directory_style
+import comments
 import diagram_preview
 import settings as lens_settings
 from view_state import load_view, save_view
@@ -136,6 +137,31 @@ def call(env: dict, method: str, /, *, timeout: float = 15, **params) -> dict:
         error = value["error"]
         raise RuntimeError(f"{error.get('code')}: {error.get('message')}" if isinstance(error, dict) else str(error))
     return value["result"]
+
+
+class AgentHost:
+    """The agent panes comments go to, through the Herdr socket API."""
+
+    def __init__(self, env):
+        self.env = env
+
+    def pane(self, pane_id):
+        return call(self.env, "pane.get", pane_id=pane_id, timeout=5)["pane"]
+
+    def agents(self):
+        agents = call(self.env, "agent.list", timeout=5)["agents"]
+        workspaces = {item["workspace_id"]: item.get("label", "")
+                      for item in call(self.env, "workspace.list", timeout=5)["workspaces"]}
+        tabs = {item["tab_id"]: item.get("number") for item in call(self.env, "tab.list", timeout=5)["tabs"]}
+        for agent in agents:
+            # Where the agent lives, for the picker's wider scopes.
+            agent["place"] = f"{workspaces.get(agent.get('workspace_id'), '')} · tab {tabs.get(agent.get('tab_id'), '?')}"
+        return agents
+
+    def send(self, pane_id, text):
+        # agent.prompt pastes the text as the pane's bracketed-paste mode expects, then presses
+        # Enter, and refuses an agent waiting at an approval or question dialog.
+        call(self.env, "agent.prompt", target=pane_id, text=text, timeout=15)
 
 
 def source(env: dict) -> tuple[str, Path]:
@@ -466,6 +492,11 @@ def main(env: dict, operation: str) -> int:
         if env.get("HERDR_PLUGIN_STATE_DIR") and env.get("HERDR_PLUGIN_CONFIG_DIR"):
             on_resize = lambda chosen, view: prepare_resize(env, pane_id, chosen, view)
         environment_editor = env.get("VISUAL") or env.get("EDITOR") or ""
+        host = AgentHost(env)
+        try:
+            source_terminal = host.pane(pane_id).get("terminal_id", "")
+        except (OSError, ValueError, KeyError, RuntimeError):
+            source_terminal = ""
         navigator = Navigator(root, pane_id, env.get("LENS_CHANGES") == "1",
                               environment_editor, size, on_resize,
                               theme_loader=lambda: theme_config(env),
@@ -488,7 +519,9 @@ def main(env: dict, operation: str) -> int:
                               settings_loader=lambda: lens_settings.load(lens_settings.location(env)),
                               settings_file=lambda: lens_settings.ensure(lens_settings.location(env)),
                               on_alignment=(lambda chosen: diagram_preview.save_alignment(config_dir, chosen))
-                                  if config_dir else None)
+                                  if config_dir else None,
+                              comment_store=comments.Store(state_dir) if state_dir else None,
+                              agent_host=host, source_terminal=source_terminal)
         if restored is not None and env.get("LENS_RESUME"):
             navigator.message = "Restored view after layout change"
         try:

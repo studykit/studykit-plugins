@@ -108,8 +108,10 @@ class CommandLineTests(unittest.TestCase):
         self.nav.key(":", None)
         self.nav.key("c", None)
         self.nav.key("\t", None)
-        self.assertEqual(self.nav.command_choices()[1], ["cd", "config"])
+        self.assertEqual(self.nav.command_choices()[1], ["cd", "comment.add", "comment.clear", "comment.send",
+                                                         "comment.target", "config"])
         self.nav.key("o", None)  # Typing narrows the list and goes back to its top.
+        self.nav.key("n", None)
         self.assertEqual(self.nav.command_choices()[1], ["config"])
         self.nav.key("\n", None)  # Enter inserts the choice without running it.
         self.assertEqual(self.nav.command, "config ")

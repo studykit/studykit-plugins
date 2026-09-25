@@ -368,17 +368,34 @@ class PreviewTests(unittest.TestCase):
         self.nav.load("plain.txt")
         self.nav.preview_focus = True
         self.nav.body = 10
-        for keys, amount in ((["j", "\x0e", "\n", "\r", curses.KEY_ENTER], 1),
-                             (["k", "y", "\x10"], -1),
-                             ([" ", "f", "\x06"], 10), (["b", "\x02"], -10),
-                             (["d"], 5), (["u", "\x15"], -5)):
+        # Line keys move the cursor within the view; C-n and C-p scroll it, as from the tree.
+        for keys, amount, scroll in ((["j", "\n", "\r", curses.KEY_ENTER], 1, 0), (["\x0e"], 1, 1),
+                                     (["k", "y"], -1, 0), (["\x10"], -1, -1),
+                                     ([" ", "f", "\x06"], 10, 10), (["b", "\x02"], -10, -10),
+                                     (["d"], 5, 5), (["u", "\x15"], -5, -5)):
             for key in keys:
                 with self.subTest(key=key):
-                    self.nav.preview_scroll = 20
+                    self.nav.preview_scroll, self.nav.preview_cursor = 20, 25
                     self.nav.key(key, None)
-                    self.assertEqual(self.nav.preview_scroll, 20 + amount)
+                    self.assertEqual(self.nav.preview_scroll, 20 + scroll)
+                    if key not in ("\x0e", "\x10", "\x06", "\x02"):
+                        self.assertEqual(self.nav.preview_cursor, 25 + amount)
                     self.assertTrue(self.nav.preview_focus)
                     self.assertEqual(self.nav.query, "")
+
+    def test_cursor_scrolls_the_preview_only_past_its_edges(self):
+        self.nav.load("plain.txt")
+        self.nav.preview_focus = True
+        self.nav.body = 10
+        for _ in range(12):
+            self.nav.key("j", None)
+        self.assertEqual((self.nav.preview_cursor, self.nav.preview_scroll), (12, 3))
+        self.nav.key("G", None)
+        self.assertEqual((self.nav.preview_cursor, self.nav.preview_scroll), (59, 50))
+        self.nav.key("g", None)
+        self.assertEqual((self.nav.preview_cursor, self.nav.preview_scroll), (0, 0))
+        self.nav.handle_mouse(terminal.Mouse(40, 10, "down"))  # The wheel carries the cursor into view.
+        self.assertEqual((self.nav.preview_cursor, self.nav.preview_scroll), (3, 3))
 
     def test_preview_less_boundaries_and_small_viewport(self):
         self.nav.load("plain.txt")

@@ -18,6 +18,7 @@ ACTIONS = {
     "prev-diagram": "[", "next-diagram": "]", "source": "v", "launch": "o", "launch-with": "O",
     # Backspace, H and L do these only in the preview, so the actions have keys of their own.
     "link-back": "link-back", "link-forward": "link-forward",
+    "comment-select": "V", "comment-add": "A", "comment-send": "S", "comment-clear": "X",
 }
 
 NAMED = {
@@ -58,6 +59,11 @@ TEMPLATE = """\
 # align = "center"    # Diagram alignment: left, center, right
 # tree_padding = 1    # Blank columns on each side of the file tree's rows (0 - 8)
 
+[comment]
+# The key that sends the comment message to the agent, in the message editor.
+# Enter adds a line there, so this must be a chord such as "ctrl+s" or "alt+s".
+# submit = "ctrl+s"
+
 [keys]
 # Extra bindings: a key, then a Lens action or a ":" command line.
 # In Git repositories, g opens a menu of available Git commands.
@@ -88,6 +94,7 @@ class Settings:
     icons: str | None = None
     align: str | None = None
     tree_padding: int | None = None
+    submit: object = "\x13"  # The comment editor's send key; Ctrl+S unless configured.
     keys: dict = field(default_factory=dict)  # curses key -> action name or ":command"
     rules: list[KeyBinding] = field(default_factory=list)  # Ordered conditional key bindings.
     errors: list[str] = field(default_factory=list)
@@ -261,6 +268,16 @@ def load(file: Path | None) -> Settings:
             settings.tree_padding = padding
         else:
             settings.errors.append("config.toml: ui.tree_padding must be a whole number from 0 to 8")
+    submit = section("comment").get("submit")
+    if submit is not None:
+        key = chord(submit) if isinstance(submit, str) else None
+        # A plain character or Enter would be typed into the message instead.
+        # Enter, Tab, Escape and C-g keep their meaning in the editor.
+        if (not isinstance(key, str) or key == "ctrl+;" or (len(key) == 1 and key.isprintable())
+                or key in ("\n", "\r", "\t", "\x1b", "\x07")):
+            settings.errors.append(f"config.toml: comment.submit must be a Ctrl or Alt chord, not {submit!r}")
+        else:
+            settings.submit = key
     def add_binding(destination, spec, target, location):
         key = chord(spec) if isinstance(spec, str) else None
         if key is None:

@@ -1,8 +1,8 @@
 id = "studykit.lens"
 name = "Lens"
-version = "0.24.0"
+version = "0.25.0"
 min_herdr_version = "0.9.0"
-description = "Browse files, Git changes, and commit history in a popup or overlay"
+description = "Browse files, Git changes, and commit history, and send line comments to agents"
 platforms = ["linux", "macos"]
 
 [[actions]]
