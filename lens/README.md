@@ -83,7 +83,7 @@ These keys work outside text fields. Letters in a text field are just text.
 | `/` | Filter filenames (tree), or find text (preview) |
 | Escape | Go back one step: leave the preview, clear the filter, then close Lens |
 | Ctrl+G | Cancel like Escape, but never close Lens |
-| Ctrl+C | Close Lens right away |
+| Ctrl+Q | Close Lens right away |
 | Ctrl+E, `e` | Open the selected file or folder in your editor; in the preview, the file it shows |
 | Ctrl+D | Compare the file with Git HEAD |
 | `o` | Open the file or folder in the application your OS assigns to it, such as Finder for a folder |
@@ -108,6 +108,7 @@ These keys work outside text fields. Letters in a text field are just text.
 | `h` / Left | Fold a folder, or go to the parent |
 | `=` | Unfold a folder and every folder under it, or fold them all once they are open; on `.`, the whole tree |
 | `H` | Show the selected file's Git history |
+| `g` | In a Git repository, show available Git shortcuts; then press a listed key |
 | Backspace, or Enter on `..` | Move the root up one folder |
 | Ctrl+N / Ctrl+P | Scroll the preview one line without leaving the tree |
 | Ctrl+F / Ctrl+B | Scroll the preview one screen without leaving the tree |
@@ -122,7 +123,7 @@ The tree always starts with `..` (the parent folder) and `.` (the root itself). 
 | `j` or Enter / `k` or `y` | Scroll one line down / up |
 | Space / `f`, `b` | Scroll one screen down / up |
 | `d` / `u`, Ctrl+U | Scroll half a screen down / up |
-| `g` / `G`, `<` / `>` | Go to the start / end |
+| `g` or `<` / `G` or `>` | Go to the start / end |
 | Left / Right | Scroll sideways |
 | `n` / `N` | Next / previous find match |
 | `v` | Switch diagrams between image and source |
@@ -213,6 +214,12 @@ Lens does not watch for changes. Press Ctrl+R to see new files and updated statu
 Lens also refreshes when you return from the editor.
 
 ### Commit history
+
+With the file tree focused, press `g`, then `p` for project history or `f` for
+the selected file's history. The `g` menu shows only commands available for the
+selection. Escape cancels it. The menu also offers `r` for repository root, `c` for changed
+files, `i` for ignored files, and `d` for the selected file's diff.
+In a preview or history view, `g` moves to the top instead.
 
 Run `:git.history` for commits on the current branch across the whole Git repository,
 even if Lens is browsing a subdirectory. Run `:git.file-history` while a file is
@@ -434,16 +441,37 @@ You can write a key in `[keys]` as:
 
 The action names below are for key bindings. To bind a command instead, prefix
 it with `:`, for example `"alt+h" = ":git.history"`.
+Bindings in `[keys]` apply in every view. Use `[[keybindings]]` to assign a key
+only when its `when` expression matches the current state:
+
+```toml
+[[keybindings]]
+key = "g"
+command = ":git.history"
+when = "tree && git"
+
+[[keybindings]]
+key = "g"
+command = "top"
+when = "preview"
+```
+
+The available conditions are `tree`, `preview`, `history`, `git`, `file`,
+`diagram`, `changes`, `historyProject`, and `historyFile`. Combine them with
+`&&`, `||`, `!`, and parentheses. `git` means the current root belongs to a Git
+repository; `file` means a file is selected. The last matching `[[keybindings]]`
+rule wins, then `[keys]` applies as a fallback. Text fields ignore these bindings.
+Set `command = "none"` in a matching rule to disable a key in that state.
 
 | Action | Built-in key |
 | --- | --- |
-| `focus`, `back`, `quit` | Tab, Escape, Ctrl+C |
+| `focus`, `back`, `quit` | Tab, Escape, Ctrl+Q |
 | `search`, `command`, `next-match`, `prev-match` | `/`, `:`, `n`, `N` |
 | `preview`, `edit`, `diff` | Space, Ctrl+E (and `e`), Ctrl+D |
 | `changes`, `ignored`, `refresh` | `c`, Ctrl+H, Ctrl+R |
 | `root`, `git-root`, `parent` | Ctrl+O, `t`, Backspace |
 | `layout`, `popup-size` | Ctrl+W, Ctrl+Y |
-| `top`, `bottom` | `g`, `G` |
+| `top`, `bottom` | `g` (preview or history), `G` |
 | `zoom-in`, `zoom-out`, `zoom-fit`, `align` | `+`, `-`, `0`, `a` |
 | `prev-diagram`, `next-diagram`, `source` | `[`, `]`, `v` |
 | `launch`, `launch-with` | `o`, `O` |

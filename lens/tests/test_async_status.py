@@ -72,7 +72,7 @@ class DeferredStatusTests(unittest.TestCase):
             nav.key("j", screen)
             nav.key("j", screen)
             self.assertEqual(nav.items[nav.selected].path, "a.txt")
-            return "\x03"
+            return "\x11"
         with patch("ui.read_status", side_effect=slow_status), \
                 patch("curses.curs_set"), patch("ui.theme", return_value={}), \
                 patch("terminal_input.enable"), patch("terminal_input.disable"), \
@@ -198,7 +198,8 @@ class DeferredStatusTests(unittest.TestCase):
         nav = self.navigator(initial_state={"root": str(self.root), "changes": True,
                                             "selected": "gone.txt", "scroll": 1})
         nav.refresh()
-        self.assertFalse(nav.key("\x03", None))
+        self.assertTrue(nav.key("\x03", None))
+        self.assertFalse(nav.key("\x11", None))
         self.assertEqual(nav.export_state()["selected"], "gone.txt")
         self.assertEqual(nav.export_state()["scroll"], 1)
         self.complete(nav)

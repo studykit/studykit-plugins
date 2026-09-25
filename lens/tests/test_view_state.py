@@ -203,7 +203,7 @@ class NavigatorStateTests(StateFixture):
         self.prepare_view()
         self.nav.preview_focus = False
         self.nav.body = 10
-        keys = iter(("\x06", "\x03"))
+        keys = iter(("\x06", "\x11"))
         observed = []
 
         def read(screen):

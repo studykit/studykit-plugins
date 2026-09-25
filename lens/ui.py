@@ -143,7 +143,7 @@ KEY_GROUPS = (
     ("General", (("Tab", "Switch focus"), (":", "Command line"), ("?", "This list"), ("⌃E e", "Edit file or folder"),
                  ("⌃D", "Diff with HEAD"), ("o / O", "Open / open with"), ("c", "Changed files only"),
                  ("⌃H", "Ignored files"), ("⌃R", "Refresh"), ("⌃O", "Change root"), ("t", "Repository root"),
-                 ("⌃W", "Layout"), ("⌃Y", "Popup size"), ("Esc", "Back / close"), ("⌃G", "Cancel, never close"), ("⌃C", "Quit"))),
+                 ("⌃W", "Layout"), ("⌃Y", "Popup size"), ("Esc", "Back / close"), ("⌃G", "Cancel, never close"), ("⌃Q", "Quit"))),
     ("Files", (("j k", "Move"), ("h l", "Fold / unfold"), ("=", "Fold / unfold all under"), ("Enter", "Open / enter folder"), ("Space", "Preview / fold"),
                ("H", "File history"),
                ("/", "Filter names"), ("⌫", "Parent folder"), ("⌃N ⌃P", "Scroll preview"),
@@ -169,6 +169,7 @@ class Navigator:
         self.environment_editor = editor
         self.settings_loader, self.settings_file = settings_loader, settings_file
         self.bindings = {}  # From config.toml [keys]: key -> action name or ":command".
+        self.binding_rules = []  # Ordered [[keybindings]] conditions.
         self.settings_errors = ""
         self.diff_command, self.diff_pause = "", False
         self.opener = ""
@@ -278,6 +279,7 @@ class Navigator:
         self.command_history, self.command_recall = [], 0
         self.command_menu = None  # Tab's completion list: {"selected", "scroll"} while open.
         self.key_help = False  # The ? popup listing every key.
+        self.key_group = ""  # A pending command prefix, currently Git's g.
         self.command_cursor, self.command_killed = 0, ""  # Emacs editing: point and the last kill.
         self.query_cursor = self.find_cursor = 0  # Point in the filter and in find; the kill is shared.
         # Key sequences that close Lens, such as the host's toggle binding.
@@ -305,6 +307,7 @@ class Navigator:
             self.alignment = chosen.align
         self.tree_padding = 1 if chosen.tree_padding is None else chosen.tree_padding
         self.bindings = chosen.keys
+        self.binding_rules = chosen.rules
         self.message = self.settings_errors = "; ".join(chosen.errors)
 
     def edit_settings(self, screen):
@@ -1782,7 +1785,7 @@ class Navigator:
                 self.draw_layout(screen)
             if self.size_draft:
                 self.draw_size(screen)
-            if self.key_help:
+            if self.key_help or self.key_group:
                 self.draw_key_help(screen)
             if self.command_menu is not None and self.command is not None:
                 self.draw_command_menu(screen)
@@ -1835,7 +1838,7 @@ class Navigator:
             self.draw_root(screen)
         if self.app_picker is not None:
             self.draw_app_picker(screen)
-        if self.key_help:
+        if self.key_help or self.key_group:
             self.draw_key_help(screen)
         if self.command_menu is not None and self.command is not None:
             self.draw_command_menu(screen)
@@ -2116,6 +2119,8 @@ class Navigator:
 
     def echo_keys(self):
         """The few keys worth showing for the current state; ? lists the rest."""
+        if self.key_group:
+            return [(key, label.lower()) for key, label, _ in self.git_group_keys()]
         if self.command is not None:
             return [("Tab", "complete"), ("↑↓", "history"), ("Esc", "cancel")]
         if self.history_mode:
@@ -2164,7 +2169,7 @@ class Navigator:
     def key_groups(self):
         if self.history_mode:
             common = (("Tab", "Switch panels"), (":", "Command line"), ("?", "This list"),
-                      ("⌃R", "Reload history"), ("⌃W", "Layout"), ("⌃C", "Quit"))
+                      ("⌃R", "Reload history"), ("⌃W", "Layout"), ("⌃Q", "Quit"))
             if not self.history_right_focus:
                 current = (("j k ↑ ↓", "Move commits"), ("PgUp PgDn", "Move a page"),
                            ("g G", "First / last loaded"), ("Enter l", "Show details"),
@@ -2180,23 +2185,80 @@ class Navigator:
                 current = (("j k ↑ ↓", "Scroll diff"), ("PgUp PgDn", "Scroll a page"),
                            ("Space", "Next page"), ("← →", "Scroll sideways"), ("g G", "Top / end"),
                            ("Esc h", "Back to files" if self.history_mode == "project" else "Back to commits"))
-            return (("History", common), ("Current panel", current))
+            return self.configured_key_groups((("History", common), ("Current panel", current)))
         repository = self.index is not None and self.index.repository is not None
         general = tuple((key, label) for key, label in KEY_GROUPS[0][1]
                         if not (key == "⌃D" and (not self.current_file() or not repository))
                         and not (key in ("t", "c") and not repository)
                         and not (key == "⌃Y" and self.layout != "popup"))
+        if repository and not self.preview_focus:
+            general += (("g", "Git commands"),)
         panel = KEY_GROUPS[2] if self.preview_focus else KEY_GROUPS[1]
         if not self.preview_focus and (not self.current_file() or not self.index or not self.index.repository):
             panel = (panel[0], tuple((key, label) for key, label in panel[1] if key != "H"))
         groups = [("General", general), panel]
         if self.preview_focus and self.diagram_list:
             groups.append(KEY_GROUPS[3])
-        return tuple(groups)
+        return self.configured_key_groups(tuple(groups))
+
+    def configured_key_groups(self, groups):
+        active = self.key_context()
+        chosen = {}
+        for rule in self.binding_rules:
+            if settings.when_matches(rule.when, active):
+                chosen[rule.key] = (rule.spec, rule.target)
+        if not chosen:
+            return groups
+        overridden = {spec for spec, _ in chosen.values() if len(spec) == 1}
+        shown = []
+        for title, rows in groups:
+            remaining = []
+            for label, description in rows:
+                parts = [part for part in label.replace("/", " / ").split() if part not in overridden]
+                while parts and parts[0] == "/":
+                    parts.pop(0)
+                while parts and parts[-1] == "/":
+                    parts.pop()
+                if parts:
+                    remaining.append((" ".join(parts), description))
+            shown.append((title, tuple(remaining)))
+        custom = tuple((spec, target) for spec, target in chosen.values() if target != "none")
+        if custom:
+            shown.append(("Configured", custom))
+        return tuple(shown)
+
+    def git_group_keys(self):
+        if self.history_mode or self.preview_focus or not self.index or not self.index.repository:
+            return ()
+        keys = [("p", "Project history", "git.history")]
+        if self.current_file():
+            keys.append(("f", "File history", "git.file-history"))
+        keys.extend((("r", "Repository root", "git.root"),
+                     ("c", "Changed files", "git.changes"),
+                     ("i", "Ignored files", "git.ignored")))
+        if self.current_file():
+            keys.append(("d", "Diff with HEAD", "git.diff"))
+        return tuple(keys)
+
+    def key_context(self):
+        """State names available to conditional user key bindings."""
+        active = {"history" if self.history_mode else "preview" if self.preview_focus else "tree"}
+        if self.index and self.index.repository:
+            active.add("git")
+        if self.current_file():
+            active.add("file")
+        if self.preview_focus and self.diagram_list:
+            active.add("diagram")
+        if self.changes:
+            active.add("changes")
+        if self.history_mode:
+            active.add("historyFile" if self.history_mode == "file" else "historyProject")
+        return active
 
     def draw_key_help(self, screen):
         """Keys for the active view and panel, grouped in a centred box."""
-        groups = self.key_groups()
+        groups = (("Git · g", tuple((key, label) for key, label, _ in self.git_group_keys())),) \
+            if self.key_group else self.key_groups()
         height, width = screen.getmaxyx()
         key_width = max(cells(key) for _, keys in groups for key, _ in keys)
         column_width = key_width + 2 + max(cells(label) for _, keys in groups for _, label in keys)
@@ -2212,8 +2274,10 @@ class Navigator:
         x, top = (width - box_width) // 2, max(0, (height - box_height) // 2)
         for row in range(top, top + box_height):
             band(screen, row, x, "", box_width, self.style("surface"))
-        band(screen, top, x, "  KEYS", box_width, self.style("header") | curses.A_BOLD)
-        put(screen, top, x + box_width - 16, "any key closes", 14, self.style("header"))
+        band(screen, top, x, "  GIT · g" if self.key_group else "  KEYS", box_width,
+             self.style("header") | curses.A_BOLD)
+        put(screen, top, x + box_width - 16, "Esc cancels" if self.key_group else "any key closes",
+            14, self.style("header"))
         for number, stack in enumerate(stacks):
             left, row = x + 3 + number * (column_width + 3), top + 2
             for title, keys in stack:
@@ -2468,16 +2532,37 @@ class Navigator:
         if isinstance(key, terminal_input.Mouse) and key.action in ("drag", "release"):
             self.drag_divider(key)  # Motion never cancels a search or a dialog.
             return True
+        if self.key_group:
+            self.key_group = ""
+            if key == "\x11":
+                return False
+            if key in ("\x1b", "\x07"):
+                return True
+            for suffix, _, command in self.git_group_keys():
+                if key == suffix:
+                    return self.run_command(command, screen)
+            self.message = "Unknown Git key · press g to see commands"
+            return True
         typing = (self.layout_dialog or self.size_draft or self.root_draft is not None
                   or self.app_picker is not None or self.key_help
                   or self.finding or self.searching or self.command is not None)
-        if key in self.bindings and not typing:
-            target = self.bindings[key]
+        target = None
+        if not typing:
+            active = self.key_context()
+            target = next((rule.target for rule in reversed(self.binding_rules)
+                           if rule.key == key and settings.when_matches(rule.when, active)), None)
+            if target is None:
+                target = self.bindings.get(key)
+        if target is not None:
+            if target == "none":
+                return True
             if target.startswith(":"):
                 return self.run_command(target[1:].strip(), screen)
             key = settings.ACTIONS[target]
-        if key == "\x03":
+        if key == "\x11":
             return False
+        if key == "\x03":
+            return True
         if self.close_keys:
             typed = self.close_typed + (key,)
             if typed in self.close_keys:
@@ -2507,6 +2592,9 @@ class Navigator:
             return self.find_key(key, screen)
         if self.command is not None:
             return self.command_key(key, screen)
+        if key == "g" and not self.searching and self.git_group_keys():
+            self.key_group = "git"
+            return True
         if key == "?" and not self.searching:
             self.key_help = True
             return True

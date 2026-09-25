@@ -2,17 +2,18 @@
 from __future__ import annotations
 
 import curses
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 import tomllib
 
 # Actions a [keys] binding may name, with the built-in key each one stands for.
 ACTIONS = {
-    "focus": "\t", "back": "\x1b", "quit": "\x03",
+    "focus": "\t", "back": "\x1b", "quit": "\x11",
     "search": "/", "command": ":", "next-match": "n", "prev-match": "N",
     "preview": " ", "edit": "\x05", "diff": "\x04", "changes": "c", "ignored": "\x08",
     "refresh": "\x12", "root": "\x0f", "git-root": "t", "parent": curses.KEY_BACKSPACE,
-    "layout": "\x17", "popup-size": "\x19", "top": "g", "bottom": "G",
+    "layout": "\x17", "popup-size": "\x19", "top": curses.KEY_HOME, "bottom": "G",
     "zoom-in": "+", "zoom-out": "-", "zoom-fit": "0", "align": "a",
     "prev-diagram": "[", "next-diagram": "]", "source": "v", "launch": "o", "launch-with": "O",
     # Backspace, H and L do these only in the preview, so the actions have keys of their own.
@@ -59,10 +60,23 @@ TEMPLATE = """\
 
 [keys]
 # Extra bindings: a key, then a Lens action or a ":" command line.
+# In Git repositories, g opens a menu of available Git commands.
 # "ctrl+f" = "search"
 # "alt+z" = ":zoom fit"
 # "ctrl+l" = ":icons nerd"
+# [[keybindings]]
+# key = "g"
+# command = ":git.history"
+# when = "tree && git"
 """
+
+
+@dataclass(frozen=True)
+class KeyBinding:
+    key: object
+    spec: str
+    target: str
+    when: object
 
 
 @dataclass
@@ -75,6 +89,7 @@ class Settings:
     align: str | None = None
     tree_padding: int | None = None
     keys: dict = field(default_factory=dict)  # curses key -> action name or ":command"
+    rules: list[KeyBinding] = field(default_factory=list)  # Ordered conditional key bindings.
     errors: list[str] = field(default_factory=list)
 
 
@@ -104,6 +119,80 @@ def chord(spec):
 def known(word):
     import command_line
     return word.isdigit() or command_line.lookup(word) is not None
+
+
+WHEN_NAMES = frozenset(("tree", "preview", "history", "git", "file", "diagram", "changes",
+                        "historyProject", "historyFile"))
+WHEN_TOKEN = re.compile(r"\s*(&&|\|\||!|\(|\)|[A-Za-z][A-Za-z0-9]*)")
+
+
+def parse_when(source):
+    """Parse a small VS Code-style boolean condition without evaluating Python code."""
+    if not isinstance(source, str):
+        raise ValueError("when must be a string")
+    if not source.strip():
+        return None
+    tokens, position = [], 0
+    while position < len(source):
+        match = WHEN_TOKEN.match(source, position)
+        if not match:
+            if not source[position:].strip():
+                break
+            raise ValueError("invalid when expression")
+        tokens.append(match.group(1))
+        position = match.end()
+    cursor = 0
+
+    def atom():
+        nonlocal cursor
+        if cursor == len(tokens):
+            raise ValueError("incomplete when expression")
+        token = tokens[cursor]
+        cursor += 1
+        if token == "!":
+            return ("!", atom())
+        if token == "(":
+            node = either()
+            if cursor == len(tokens) or tokens[cursor] != ")":
+                raise ValueError("unclosed when expression")
+            cursor += 1
+            return node
+        if token not in WHEN_NAMES:
+            raise ValueError(f"unknown when context {token!r}")
+        return token
+
+    def both():
+        nonlocal cursor
+        node = atom()
+        while cursor < len(tokens) and tokens[cursor] == "&&":
+            cursor += 1
+            node = ("&&", node, atom())
+        return node
+
+    def either():
+        nonlocal cursor
+        node = both()
+        while cursor < len(tokens) and tokens[cursor] == "||":
+            cursor += 1
+            node = ("||", node, both())
+        return node
+
+    result = either()
+    if cursor != len(tokens):
+        raise ValueError("invalid when expression")
+    return result
+
+
+def when_matches(expression, active):
+    if expression is None:
+        return True
+    if isinstance(expression, str):
+        return expression in active
+    if expression[0] == "!":
+        return not when_matches(expression[1], active)
+    if expression[0] == "&&":
+        return when_matches(expression[1], active) and when_matches(expression[2], active)
+    return when_matches(expression[1], active) or when_matches(expression[2], active)
 
 
 def location(env) -> Path:
@@ -170,16 +259,38 @@ def load(file: Path | None) -> Settings:
             settings.tree_padding = padding
         else:
             settings.errors.append("config.toml: ui.tree_padding must be a whole number from 0 to 8")
-    for spec, target in section("keys").items():
-        key = chord(spec)
+    def add_binding(destination, spec, target, location):
+        key = chord(spec) if isinstance(spec, str) else None
         if key is None:
-            settings.errors.append(f"config.toml: unknown key {spec!r}")
-        elif not isinstance(target, str) or not (target in ACTIONS or target.startswith(":")):
-            settings.errors.append(f"config.toml: {spec!r} needs an action or a \":\" command")
+            settings.errors.append(f"config.toml: unknown key {spec!r} in {location}")
+        elif not isinstance(target, str) or not (target in ACTIONS or target == "none" or target.startswith(":")):
+            settings.errors.append(f"config.toml: {spec!r} needs an action, none, or a \":\" command")
         elif target.startswith(":") and not known(target[1:].split(" ")[0]):
             settings.errors.append(f"config.toml: unknown command in {spec!r}")
         else:
-            settings.keys[key] = target
+            destination[key] = target
+
+    for spec, target in section("keys").items():
+        add_binding(settings.keys, spec, target, "[keys]")
+    rules = data.get("keybindings", [])
+    if not isinstance(rules, list):
+        settings.errors.append("config.toml: [[keybindings]] must be a list of tables")
+    else:
+        for number, rule in enumerate(rules, 1):
+            location = f"[[keybindings]] #{number}"
+            if not isinstance(rule, dict):
+                settings.errors.append(f"config.toml: {location} must be a table")
+                continue
+            spec, target = rule.get("key"), rule.get("command")
+            parsed = {}
+            add_binding(parsed, spec, target, location)
+            try:
+                condition = parse_when(rule.get("when", ""))
+            except ValueError as error:
+                settings.errors.append(f"config.toml: {location}: {error}")
+                continue
+            if parsed:
+                settings.rules.append(KeyBinding(next(iter(parsed)), spec, target, condition))
     return settings
 
 

@@ -92,6 +92,63 @@ align = "left"
         nav.key("\x1b", None)
         self.assertFalse(nav.key("q", None))
 
+    def test_when_bindings_override_global_only_in_the_matching_state(self):
+        self.write('''[keys]
+"g" = ":icons nerd"
+[[keybindings]]
+key = "g"
+command = ":icons plain"
+when = "tree && !history"
+[[keybindings]]
+key = "g"
+command = "top"
+when = "preview && file"
+''')
+        nav = self.navigator()
+        self.assertEqual(len(nav.binding_rules), 2)
+        self.assertIn(("g", ":icons plain"), nav.key_groups()[-1][1])
+        nav.key("g", None)
+        self.assertEqual(nav.icons, "plain")
+        nav.load("code.py")
+        nav.preview_focus = True
+        nav.body = 10
+        nav.preview_scroll = 20
+        self.assertIn(("g", "top"), nav.key_groups()[-1][1])
+        nav.key("g", None)
+        self.assertEqual(nav.preview_scroll, 0)
+        self.assertEqual(nav.icons, "plain")
+
+    def test_when_rule_can_disable_a_key_only_in_one_state(self):
+        self.write('''[[keybindings]]
+key = "g"
+command = "none"
+when = "preview"
+''')
+        nav = self.navigator()
+        nav.load("code.py")
+        nav.preview_focus = True
+        nav.body = 10
+        nav.preview_scroll = 20
+        nav.key("g", None)
+        self.assertEqual(nav.preview_scroll, 20)
+        self.assertFalse(any("g" in key.split() for _, rows in nav.key_groups() for key, _ in rows))
+
+    def test_when_expression_parsing_and_invalid_rules(self):
+        expression = settings.parse_when("tree && (git || !file)")
+        self.assertTrue(settings.when_matches(expression, {"tree", "git"}))
+        self.assertFalse(settings.when_matches(expression, {"tree", "file"}))
+        for source in ("tree &&", "(git", "tree + git", "mystery"):
+            with self.subTest(source=source), self.assertRaises(ValueError):
+                settings.parse_when(source)
+        self.write('''[[keybindings]]
+key = "ctrl+q"
+command = ":git.history"
+when = "mystery"
+''')
+        nav = self.navigator()
+        self.assertEqual(nav.binding_rules, [])
+        self.assertIn("unknown when context", nav.message)
+
     def test_config_command_creates_template_and_reloads(self):
         nav = self.navigator()
         def fake_editor(screen, command, cwd):

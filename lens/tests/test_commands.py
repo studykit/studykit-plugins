@@ -7,6 +7,7 @@ from unittest.mock import Mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import command_line
+import settings
 from ui import Navigator
 
 
@@ -47,6 +48,13 @@ class CommandLineTests(unittest.TestCase):
         self.nav.key("\x1b", None)
         self.assertIsNone(self.nav.command)
         self.assertFalse(self.run_line("q", opener="\x1bx"))
+
+    def test_ctrl_q_quits_and_ctrl_c_does_not(self):
+        self.assertTrue(self.nav.key("\x03", None))
+        self.nav.key(":", None)
+        self.assertTrue(self.nav.key("\x03", None))
+        self.assertFalse(self.nav.key("\x11", None))
+        self.assertEqual(settings.ACTIONS["quit"], "\x11")
 
     def test_find_command_uses_preview_search(self):
         self.run_line("preview src/main.py")

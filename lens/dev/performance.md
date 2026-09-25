@@ -95,7 +95,7 @@ print(root)
 For a live comparison, follow [the host test setup](testing.md), use a clean
 named session and a PTY client, dismiss first-run onboarding, and register the
 checkout under test. Enable ignored files and preview the fixture README, then
-close with Ctrl+C to save the view before measuring repeated shortcut opens.
+close with Ctrl+Q to save the view before measuring repeated shortcut opens.
 Keep the same terminal dimensions and fixture for both versions. Do not run
 other benchmarks concurrently with a timed host run.
 
