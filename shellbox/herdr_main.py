@@ -8,6 +8,7 @@ import json
 import os
 from pathlib import Path
 import pwd
+import shlex
 import shutil
 import socket
 import subprocess
@@ -36,6 +37,10 @@ def call(env: dict, method: str, /, **params) -> dict:
         raise RuntimeError(f"{error.get('code')}: {error.get('message')}"
                            if isinstance(error, dict) else str(error))
     return value["result"]
+
+
+# Nerd Font's nf-dev-tmux glyph.
+DEFAULT_INDICATOR = "\ue94c"
 
 
 def source_pane(env: dict) -> tuple[str, str, Path, str]:
@@ -71,7 +76,99 @@ def open_popup(env: dict) -> None:
     call(env, "plugin.pane.open", plugin_id=env["HERDR_PLUGIN_ID"],
          entrypoint="shell", cwd=str(cwd), focus=True,
          env={"POPUP_SHELL_SERVER": server, "POPUP_SHELL_SESSION": session,
-              "SHELLBOX_SOURCE_LABEL": label})
+              "SHELLBOX_SOURCE_LABEL": label, "SHELLBOX_SOURCE_PANE": pane_id})
+
+
+def plugin_config(env: dict) -> dict:
+    directory = env.get("HERDR_PLUGIN_CONFIG_DIR")
+    path = Path(directory) / "config.toml" if directory else None
+    if not path or not path.is_file():
+        return {}
+    with path.open("rb") as stream:
+        return tomllib.load(stream)
+
+
+def indicator(env: dict) -> str:
+    value = plugin_config(env).get("indicator", DEFAULT_INDICATOR)
+    if not isinstance(value, str):
+        raise ValueError("indicator must be a string")
+    return value.strip()
+
+
+def mark_pane(env: dict, pane_id: str) -> None:
+    """Prefix the pane's agent label with the indicator while its shell lives."""
+    agent = call(env, "pane.get", pane_id=pane_id)["pane"].get("agent")
+    icon = indicator(env)
+    if not agent or not icon:
+        return
+    # The agent guard drops the label once a different agent takes the pane.
+    call(env, "pane.report_metadata", pane_id=pane_id, source=env["HERDR_PLUGIN_ID"],
+         agent=agent, display_agent=f"{icon} {agent}")
+
+
+def unmark_pane(env: dict, pane_id: str) -> None:
+    try:
+        call(env, "pane.report_metadata", pane_id=pane_id, source=env["HERDR_PLUGIN_ID"],
+             clear_display_agent=True)
+    except RuntimeError:
+        pass  # The pane may have closed before its shell.
+
+
+def session_record(env: dict, session: str) -> Path:
+    return Path(env["HERDR_PLUGIN_STATE_DIR"]) / f"shell-{session}.pane"
+
+
+def pane_has_shell(env: dict, pane_id: str) -> bool:
+    tmux = shutil.which("tmux")
+    if not tmux:
+        return False
+    terminal_id = call(env, "pane.get", pane_id=pane_id)["pane"]["terminal_id"]
+    server, session = shell_identity(env, pane_id, terminal_id)
+    return subprocess.run([tmux, "-L", server, "-f", "/dev/null", "has-session", "-t", session],
+                          env=env, capture_output=True).returncode == 0
+
+
+def event_pane(value: object) -> str | None:
+    if isinstance(value, dict):
+        if isinstance(value.get("pane_id"), str):
+            return value["pane_id"]
+        values = value.values()
+    elif isinstance(value, list):
+        values = value
+    else:
+        return None
+    return next((found for item in values if (found := event_pane(item))), None)
+
+
+def on_agent_detected(env: dict) -> None:
+    pane_id = event_pane(json.loads(env.get("HERDR_PLUGIN_EVENT_JSON") or "{}"))
+    if pane_id and pane_has_shell(env, pane_id):
+        mark_pane(env, pane_id)
+
+
+def on_session_closed(env: dict, session: str) -> None:
+    if not session.isalnum():
+        raise ValueError("Invalid shell session")
+    record = session_record(env, session)
+    try:
+        pane_id = record.read_text().strip()
+    except FileNotFoundError:
+        return
+    record.unlink(missing_ok=True)
+    unmark_pane(env, pane_id)
+
+
+def watch_session_close(command: list[str], env: dict) -> None:
+    # The server's global environment belongs to whichever popup started it, so
+    # the hook names this plugin's context itself. A high hook index leaves the
+    # user's own session-closed hooks in place.
+    context = [f"{name}={env[name]}" for name in
+               ("HERDR_ENV", "HERDR_SOCKET_PATH", "HERDR_PLUGIN_ID", "HERDR_PLUGIN_STATE_DIR")]
+    script = shlex.join(["env", *context, sys.executable, str(Path(__file__).resolve()),
+                         "closed"]).replace("#", "##")
+    subprocess.run([*command, "set-hook", "-g", "session-closed[73]",
+                    f"run-shell {shlex.quote(script + ' #{hook_session_name}')}"],
+                   env=env, check=True)
 
 
 def tmux_config(env: dict) -> Path | None:
@@ -151,13 +248,7 @@ def apply_toggle_binding(command: list[str], env: dict) -> None:
 
 
 def close_binding(env: dict) -> tuple[str, str] | None:
-    directory = env.get("HERDR_PLUGIN_CONFIG_DIR")
-    path = Path(directory) / "config.toml" if directory else None
-    if path and path.is_file():
-        with path.open("rb") as stream:
-            configured = tomllib.load(stream).get("close_key", "C-q")
-    else:
-        configured = "C-q"
+    configured = plugin_config(env).get("close_key", "C-q")
     if not isinstance(configured, str):
         raise ValueError("close_key must be a tmux key string")
     if configured.lower() == "none":
@@ -236,16 +327,28 @@ def run_panel(env: dict) -> None:
         apply_close_binding(command, shell_env)
         apply_toggle_binding(command, shell_env)
         show_source_label(command, shell_env, session)
+        source = env.get("SHELLBOX_SOURCE_PANE")
+        if source:
+            watch_session_close(command, shell_env)
+            session_record(env, session).write_text(source)
+            try:
+                mark_pane(env, source)
+            except (OSError, RuntimeError) as error:
+                print(f"shellbox: indicator unavailable: {error}", file=sys.stderr)
     os.execvpe(tmux, [*command, "attach-session", "-t", session], shell_env)
 
 
-def main(env: dict, operation: str) -> int:
+def main(env: dict, operation: str, *args: str) -> int:
     if env.get("HERDR_ENV") != "1":
         raise ValueError("Run shellbox from inside Herdr")
     if operation == "open":
         open_popup(env)
     elif operation == "panel":
         run_panel(env)
+    elif operation == "agent-detected":
+        on_agent_detected(env)
+    elif operation == "closed" and len(args) == 1:
+        on_session_closed(env, args[0])
     else:
         raise ValueError(f"Unknown operation: {operation}")
     return 0
@@ -253,7 +356,7 @@ def main(env: dict, operation: str) -> int:
 
 if __name__ == "__main__":
     try:
-        sys.exit(main(dict(os.environ), sys.argv[1] if len(sys.argv) > 1 else "open"))
+        sys.exit(main(dict(os.environ), *(sys.argv[1:] or ["open"])))
     except (OSError, ValueError, KeyError, RuntimeError, subprocess.SubprocessError) as error:
         print(f"shellbox: {error}", file=sys.stderr)
         sys.exit(1)

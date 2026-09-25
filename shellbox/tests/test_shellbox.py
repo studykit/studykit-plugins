@@ -79,6 +79,46 @@ class PopupShellTests(unittest.TestCase):
             self.assertTrue(any(call.args[0][-3:] == ["root", "C-q", "detach-client"]
                                 for call in run.call_args_list))
 
+    def test_indicator_prefixes_the_source_agent_label(self):
+        with tempfile.TemporaryDirectory() as directory:
+            env = {"HERDR_PLUGIN_ID": "studykit.shellbox", "HERDR_PLUGIN_CONFIG_DIR": directory}
+            def host_call(_env, method, **params):
+                if method == "pane.get":
+                    return {"pane": {"agent": "claude"}}
+                reports.append(params)
+                return {}
+            reports = []
+            with patch("herdr_main.call", side_effect=host_call):
+                herdr_main.mark_pane(env, "w1:p2")
+                (Path(directory) / "config.toml").write_text('indicator = ""\n')
+                herdr_main.mark_pane(env, "w1:p2")
+            self.assertEqual(reports, [{"pane_id": "w1:p2", "source": "studykit.shellbox",
+                                        "agent": "claude",
+                                        "display_agent": " claude"}])
+
+    def test_closed_shell_clears_its_source_panes_indicator(self):
+        with tempfile.TemporaryDirectory() as directory:
+            env = {"HERDR_ENV": "1", "HERDR_PLUGIN_ID": "studykit.shellbox",
+                   "HERDR_PLUGIN_STATE_DIR": directory}
+            herdr_main.session_record(env, "abc123").write_text("w1:p2")
+            with patch("herdr_main.call") as call:
+                self.assertEqual(herdr_main.main(env, "closed", "abc123"), 0)
+                herdr_main.main(env, "closed", "abc123")
+            call.assert_called_once_with(env, "pane.report_metadata", pane_id="w1:p2",
+                                         source="studykit.shellbox", clear_display_agent=True)
+            self.assertFalse(herdr_main.session_record(env, "abc123").exists())
+
+    def test_agent_detection_marks_only_panes_with_a_shell(self):
+        env = {"HERDR_PLUGIN_EVENT_JSON": json.dumps({"event": "pane.agent_detected",
+                                                      "data": {"pane_id": "w1:p2"}})}
+        with patch("herdr_main.pane_has_shell", return_value=True) as has_shell, \
+             patch("herdr_main.mark_pane") as mark:
+            herdr_main.on_agent_detected(env)
+            has_shell.return_value = False
+            herdr_main.on_agent_detected(env)
+        self.assertEqual(has_shell.call_args.args[1], "w1:p2")
+        mark.assert_called_once_with(env, "w1:p2")
+
     def test_reopening_reuses_the_existing_session(self):
         with tempfile.TemporaryDirectory() as directory:
             env = {"HERDR_ENV": "1", "SHELL": "/bin/zsh",

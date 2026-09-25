@@ -28,6 +28,16 @@ from the source pane. The shell keeps its directory, variables, and running
 commands. Type `exit` or press Ctrl+D at the shell prompt to end that shell.
 The tmux status line shows the Herdr pane ID and title of the source pane.
 
+While a pane's shell is running, Herdr shows a tmux logo to the left of that
+pane's agent name, in the sidebar and in split pane borders. The logo is the
+Nerd Font `nf-dev-tmux` glyph and disappears when the shell exits. To use a
+different mark, such as an emoji, set it in the plugin's `config.toml`
+(described below); set `indicator = ""` to turn it off:
+
+```toml
+indicator = "🐚"
+```
+
 The popup loads your `~/.tmux.conf` or XDG tmux configuration, including your
 prefix and custom bindings. It also applies the configuration to an existing
 popup session when the file changes.
