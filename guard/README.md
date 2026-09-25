@@ -172,10 +172,13 @@ in Claude Code to create or correct it.
 ## Status line (Claude Code)
 
 `/guard:statusline` adds Guard's segment to your Claude Code status line. If you already have a
-status line, it is kept and runs alongside Guard's segment. The segment looks like this:
+status line, it is kept and runs after Guard's segment. Without one, Guard installs its own
+line: project path, git branch, remaining context, model and time. It uses Nerd Font icons and
+24-bit colour, so it needs a Nerd Font and a truecolor terminal. The row looks like this, with
+a shield icon in front of Guard's segment:
 
 ```text
-guard 2 pending · ⚑
+ 2 pending · ⚑    myrepo › src    main*    62%    Opus · xhigh ✻    3:41 PM
 ```
 
 The number counts the files waiting for `/guard:audit-files`. The flag shows the plan gate:

@@ -54,7 +54,8 @@ printf '{"session_id":"probe","workspace":{"project_dir":"<project root>"}}' \
 ```
 
 Expect one short field — `guard 3 pending · ⚐`, `guard 0 pending · ⚑` and so on — or
-nothing. If it prints nothing,
+nothing. The installed wrapper swaps the word `guard` for a shield icon, so the row itself
+shows the icon, not the word. If it prints nothing,
 stop and say so rather than installing a segment that will stay blank.
 
 **Then check whether the line you found already carries guard's field** — by RUNNING it, not
@@ -78,8 +79,11 @@ of a line that already reports guard is the one outcome this command must not pr
 Copy the wrapper to `~/.claude/guard-statusline.sh` and `chmod +x` it. Copy it verbatim — it
 is a shipped file, not a template to fill in.
 
-**If there is no status line yet**, the wrapper takes no argument and renders a plain default
-line of its own (directory, branch, context, model) beside guard's segment:
+**If there is no status line yet**, the wrapper takes no argument and renders its own default
+line after guard's segment: project-relative path, branch, remaining context, model with
+effort and thinking/fast marks, and the time, each labelled with a Nerd Font icon and drawn in
+24-bit colour. Tell the user it needs a Nerd Font and a truecolor terminal — without them the
+icons show as replacement boxes — and that chaining their own line instead is the way out:
 
 ```json
 {
@@ -146,8 +150,9 @@ Two things fail silently, and a passing run above shows neither:
   you that it depends on a PATH entry your login shell adds — commonly the prefix `uv` was
   installed under. Report it that way. It is the answer to have ready if the row later shows
   every other field and no guard, which is the shape this failure takes.
-- **`jq` is required by the wrapper's own default line, and only by it.** Without `jq` that
-  half is empty and guard's field prints alone. A chained command is unaffected.
+- **`jq` is required by the wrapper's own default line, and only by it.** Without `jq` every
+  field of that half except the clock is empty, so guard's field prints beside the time
+  alone. A chained command is unaffected.
 
 Say which of the two you checked. A probe from your shell is evidence that the files are
 right, not that the host can run them; the row itself, after the next assistant message, is.
