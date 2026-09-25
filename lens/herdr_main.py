@@ -72,6 +72,14 @@ def load_tree_width(config_dir):
         return None
 
 
+def load_sidebar(config_dir):
+    """Whether the comment list is open, as last left; open unless it was folded."""
+    try:
+        return json.loads((config_dir / "comment_sidebar.json").read_text())["comment_sidebar"] is not False
+    except (OSError, ValueError, TypeError, KeyError):
+        return True
+
+
 def save_choice(config_dir, name, value):
     config_dir.mkdir(parents=True, exist_ok=True)
     fd, temporary = tempfile.mkstemp(prefix=f".{name}-", dir=config_dir)
@@ -521,6 +529,9 @@ def main(env: dict, operation: str) -> int:
                               on_alignment=(lambda chosen: diagram_preview.save_alignment(config_dir, chosen))
                                   if config_dir else None,
                               comment_store=comments.Store(state_dir) if state_dir else None,
+                              sidebar_open=load_sidebar(config_dir) if config_dir else True,
+                              on_sidebar=(lambda chosen: save_choice(config_dir, "comment_sidebar", chosen))
+                                  if config_dir else None,
                               agent_host=host, source_terminal=source_terminal)
         if restored is not None and env.get("LENS_RESUME"):
             navigator.message = "Restored view after layout change"

@@ -67,6 +67,9 @@ def band(screen, y, x, text, width, style=0):
 
 
 AGENT_SCOPES = ("tab", "workspace", "session")
+# A reference in the comment message: path, then line, column, last line, last column.
+REFERENCE = re.compile(r"(.+?)(?::(\d+)(?::(\d+))?(?:-(\d+)(?::(\d+))?)?)?")
+REFERENCE_SHAPE = re.compile(r"\S+:\d+(?::\d+)?(?:-\d+(?::\d+)?)?")
 
 
 def key_label(key):
@@ -103,9 +106,9 @@ ROOT_ROW, BOX_TOP = 0, 1
 # Tree status marks. Nerd Font glyphs need a patched font, so plain text is the default.
 ICONS = {
     "plain": {"project": "", "changes": "", "hidden": "", "shown": "+ignored",
-              "loading": "Git…", "error": "No Git status"},
+              "loading": "Git…", "error": "No Git status", "comment": "💬"},
     "nerd": {"project": "\U000f0645", "changes": "\uf47f", "hidden": "\U000f0209", "shown": "\U000f0208",
-             "loading": "\uf46a Git…", "error": "\uf071 No Git status"},
+             "loading": "\uf46a Git…", "error": "\uf071 No Git status", "comment": "\uf075"},
 }
 
 
@@ -140,6 +143,9 @@ def theme(palette=None, folder_style=None) -> dict[str, int]:
         "added": (p["green"], p["panel_bg"]), "gutter": (p["overlay0"], p["panel_bg"]),
         "key": (p["accent"], p["selection_bg"]), "modeline": (p["text"], p["active_row_bg"]),
         "modeline_dim": (p["subtext0"], p["active_row_bg"]),
+        # Comments have colours of their own: peach marks what is commented, teal what links back.
+        "comment": (p["peach"], p["panel_bg"]), "badge": (p["panel_bg"], p["peach"]),
+        "reference": (p["teal"], p["active_row_bg"]), "hint": (p["green"], p["active_row_bg"]),
     }
     if folder_style is not None:
         palettes["folder"] = (folder_style.foreground,
@@ -193,7 +199,7 @@ class Navigator:
                  cell_size=None, alignment="center", on_alignment=None, close_keys=(),
                  icons="plain", on_icons=None, settings_loader=None, settings_file=None,
                  tree_width=None, on_tree_width=None, comment_store=None, agent_host=None,
-                 source_terminal=""):
+                 source_terminal="", sidebar_open=True, on_sidebar=None):
         initial_state = normalize_view(initial_state, root)
         self.root, self.pane_id, self.editor = root, pane_id, editor
         self.environment_editor = editor
@@ -327,6 +333,12 @@ class Navigator:
         self.submit_key = "\x13"
         self.composer = None  # The message editor before sending.
         self.agent_picker = None
+        self.comment_view = None  # A comment's paragraph, shown when its preview icon is clicked.
+        # The comment list on the right, shown while there are comments; folded to a strip or open.
+        self.sidebar_open, self.on_sidebar = sidebar_open, on_sidebar
+        self.sidebar_x = self.sidebar_width = self.sidebar_scroll = 0
+        self.sidebar_rows = []  # (screen row, comment) of each listed comment's first row.
+        self.cwd_cache = None  # (target, working directory): drawing the list must not ask Herdr each time.
         self.confirm_clear = False  # X asked to discard the comments; the next key answers.
         self.comment_buffers = {}  # Buffers kept in memory when there is no store.
         self.comment_source = comments.Target(pane_id, source_terminal or "")
@@ -1072,7 +1084,7 @@ class Navigator:
             self.palette["panel_bg"] if background is None else background)
         colors = (terminal_color(foreground, curses.COLORS), terminal_color(background, curses.COLORS, background=True))
         if colors not in self.color_pairs:
-            number = 16 + len(self.color_pairs)
+            number = 32 + len(self.color_pairs)  # After the named pairs theme() sets up.
             if number >= min(curses.COLOR_PAIRS, 256):
                 return self.style("base") | attributes
             try:
@@ -1441,7 +1453,7 @@ class Navigator:
         return pane
 
     def comment_dialog(self):
-        return self.composer is not None or self.agent_picker is not None
+        return self.composer is not None or self.agent_picker is not None or self.comment_view is not None
 
     def toggle_selection(self, kind="line"):
         """V selects lines and v characters, as in Vim: the same key again ends the selection,
@@ -1563,7 +1575,7 @@ class Navigator:
             self.selection_anchor = None
             self.begin_send(empty=True)
             if self.composer is not None:
-                # Like an added comment, the paste goes after a blank line, unless it starts the message.
+                # The paste goes after a blank line, unless it starts the message.
                 if self.composer["text"].strip():
                     self.composer["text"] = self.composer["text"].rstrip("\n") + "\n\n"
                 self.composer["cursor"] = len(self.composer["text"])
@@ -1571,22 +1583,12 @@ class Navigator:
             return
         self.add_comment(str(path.resolve()), first + 1, last + 1, comments.lines_digest(lines[first:last + 1]))
 
-    def add_comment(self, path, start, end, digest, columns=(0, 0), excerpt=""):
-        """Add a comment and open the message on it, the point at the end of its reference so a
-        note can follow."""
-        comment = self.comment_buffer.add(path, start, end, "", digest, columns, excerpt)
+    def add_comment(self, path, start, end, digest):
+        """Add a comment and open its note."""
+        comment = self.comment_buffer.add(path, start, end, "", digest)
         self.selection_anchor = None
         self.save_comments()
-        self.begin_send()
-        if self.composer is not None:
-            text, line = self.composer["text"], comments.line(comment, self.composer["cwd"])
-            if text.endswith(line):
-                point = len(text) - len(line) + len(line.split("\n")[0])
-                if comment.start:
-                    # A line comment gets a space after its reference, so the note is typed straight in.
-                    text = text[:point] + " " + text[point:]
-                    point += 1
-                self.composer["text"], self.composer["cursor"] = text, point
+        self.edit_note(comment.id)
 
     def target_details(self):
         """(agent label, working directory, error) for the target pane."""
@@ -1609,7 +1611,7 @@ class Navigator:
         count = len(buffer.comments)
         self.confirm_clear = True
         self.message = (f"Discard {count} comment{'' if count == 1 else 's'}"
-                        f"{' and the draft' if buffer.draft is not None else ''}? y discards, any other key keeps them")
+                        f"{' and the message' if buffer.draft else ''}? y discards, any other key keeps them")
 
     def clear_key(self, key):
         self.confirm_clear = False
@@ -1623,54 +1625,272 @@ class Navigator:
             self.message = "Comments kept"
         return True
 
+    def open_composer(self, mode, text, number=None, error="", changed=()):
+        self.selection_anchor = None
+        self.composer = {"mode": mode, "id": number, "text": text, "cursor": len(text), "scroll": 0,
+                         "list_scroll": 0, "cwd": self.comment_cwd(), "error": error, "changed": list(changed),
+                         "saved": text, "hint": "", "layout": None, "list": []}
+
+    def edit_note(self, number):
+        """The note of one comment, in the editor by itself."""
+        comment = self.comment_buffer.find(number)
+        if comment is None:
+            return
+        self.close_composer()
+        cwd = self.comment_cwd()
+        self.open_composer("note", comment.note, number,
+                           changed=[comments.reference(comment, cwd)] if comments.changed(comment) else ())
+
     def begin_send(self, empty=False):
+        """The message to send: the text around the comments, above the comments themselves."""
         buffer = self.comment_buffer
         if not buffer.comments and buffer.draft is None and not empty:
             self.message = "No comments yet: select preview lines with V, then press A"
             return
+        self.close_composer()
         label, cwd, error = self.target_details()
+        self.cwd_cache = (self.comment_target, cwd)
         altered = [comments.reference(comment, cwd) for comment in buffer.comments if comments.changed(comment)]
-        text = comments.compose(buffer, cwd)
-        self.selection_anchor = None
-        self.composer = {"text": text, "cursor": len(text), "scroll": 0, "label": label, "cwd": cwd,
-                         "error": error, "changed": altered, "saved": buffer.draft, "hint": ""}
+        self.open_composer("message", buffer.draft or "", error=error, changed=altered)
+        self.composer["label"] = label
 
     def persist_draft(self):
-        """Save the message being edited as the target's draft, when it changed."""
+        """Save what is being edited, the message or a note, when it changed."""
         composer = self.composer
         if composer is None or composer["text"] == composer["saved"]:
             return
-        self.comment_buffer.draft = composer["text"]
-        self.comment_buffer.drafted = {comment.id for comment in self.comment_buffer.comments}
+        if composer["mode"] == "note":
+            self.comment_buffer.set_note(composer["id"], composer["text"])
+        else:
+            self.comment_buffer.draft = composer["text"] if composer["text"].strip() else None
         composer["saved"] = composer["text"]
         self.save_comments()
+
+    def close_composer(self):
+        if self.composer is not None:
+            self.persist_draft()
+            self.composer = None
+
+    def comment_starts(self):
+        """First preview lines of the active file's comments: line index -> comments starting there."""
+        if not self.active or not self.comment_buffer.comments or not self.source_view():
+            return {}
+        path = str((self.root / self.active).resolve())
+        starts = {}
+        for comment in self.comment_buffer.comments:
+            if comment.path == path and comment.start:
+                starts.setdefault(comment.start - 1, []).append(comment)
+        return starts
+
+    def comment_cwd(self):
+        """The target agent's working directory, asked of Herdr once per target."""
+        if self.cwd_cache is None or self.cwd_cache[0] != self.comment_target:
+            self.cwd_cache = (self.comment_target, self.target_details()[1])
+        return self.cwd_cache[1]
+
+    def open_comment_view(self, found):
+        self.comment_view = {"ids": [comment.id for comment in found], "selected": 0, "confirm": False}
+
+    def view_line_comments(self):
+        """m: the comments on the cursor line, those starting there first, in the gutter icon's view."""
+        if not self.preview_focus or not self.source_view():
+            self.message = "Comments show in a code or text preview"
+            return
+        path, number = str((self.root / self.active).resolve()), self.preview_cursor + 1
+        covering = [comment for comment in self.comment_buffer.comments
+                    if comment.path == path and comment.start and comment.start <= number <= comment.end]
+        if not covering:
+            self.message = "No comment on this line · { and } go to the previous and next"
+            return
+        covering.sort(key=lambda comment: comment.start != number)
+        self.open_comment_view(covering)
+
+    def jump_comment(self, step):
+        """{ and }: the cursor to the previous or next line where a comment starts."""
+        starts = sorted(self.comment_starts())
+        if not starts:
+            self.message = "No comments in this file"
+            return
+        found = [line for line in starts if (line > self.preview_cursor if step > 0 else line < self.preview_cursor)]
+        if not found:
+            self.message = "No more comments " + ("below" if step > 0 else "above")
+            return
+        self.preview_cursor = found[0] if step > 0 else found[-1]
+        self.show_cursor()
+        position = starts.index(self.preview_cursor) + 1
+        self.message = f"Comment {position}/{len(starts)} · m shows it"
+
+    def comment_view_key(self, key):
+        view = self.comment_view
+        if key in ("j", "k", curses.KEY_DOWN, curses.KEY_UP, "\x0e", "\x10") and not view["confirm"]:
+            step = 1 if key in ("j", curses.KEY_DOWN, "\x0e") else -1
+            view["selected"] = max(0, min(len(view["ids"]) - 1, view["selected"] + step))
+            return True
+        number = view["ids"][view["selected"]]
+        if view["confirm"]:
+            self.comment_view = None
+            if key in ("y", "Y"):
+                self.comment_buffer.remove(number)
+                self.save_comments()
+                self.message = "Comment deleted"
+            return True
+        if key == "d":
+            view["confirm"] = True
+            return True
+        self.comment_view = None
+        if key in ("\n", "\r", curses.KEY_ENTER):
+            self.edit_note(number)
+        return True
+
+    def draw_comment_view(self, screen):
+        view, cwd = self.comment_view, self.comment_cwd()
+        found = [comment for comment in map(self.comment_buffer.find, view["ids"]) if comment is not None]
+        height, width = screen.getmaxyx()
+        box_width = min(80, width - 2)
+        rows = []  # (text, is it the reference)
+        several = len(found) > 1
+        for index, comment in enumerate(found):
+            if rows:
+                rows.append(("", False))
+            # With several comments, a mark shows which one Enter and d act on.
+            mark = ("› " if index == view["selected"] else "  ") if several else ""
+            rows.extend((mark + segment, True)
+                        for _, segment in wrap_rows(comments.reference(comment, cwd), box_width - 4 - len(mark)))
+            note = comment.note.strip() or "(No note yet)"
+            rows.extend((segment, False) for _, segment in wrap_rows(note, box_width - 4))
+        room = max(1, min(16, height - 6))
+        if len(rows) > room:
+            rows = rows[:room - 1] + [("…", False)]
+        box_height = len(rows) + 4
+        x, top = (width - box_width) // 2, max(0, (height - box_height) // 2)
+        for y in range(top, min(height, top + box_height)):
+            band(screen, y, x, "", box_width, self.style("surface"))
+        band(screen, top, x, f"  {ICONS[self.icons]['comment']} COMMENT", box_width, self.style("header") | curses.A_BOLD)
+        for offset, (row, heading) in enumerate(rows):
+            put(screen, top + 2 + offset, x + 2, row, box_width - 4,
+                self.style("reference") | curses.A_BOLD if heading else self.style("surface"))
+        hint = ("Delete this comment? y deletes, any other key keeps it" if view["confirm"]
+                else ("j k Choose  " if several else "") + "Enter Edit the note  d Delete  Any other key closes")
+        put(screen, top + box_height - 1, x + 2, hint, box_width - 4,
+            self.style("removed") | curses.A_BOLD if view["confirm"] else self.style("active"))
+
+    def commented_lines(self):
+        """Preview lines of the active file that a comment covers, as a set of line indexes."""
+        if not self.active or not self.comment_buffer.comments or not self.source_view():
+            return set()
+        path = str((self.root / self.active).resolve())
+        return {number for comment in self.comment_buffer.comments if comment.path == path and comment.start
+                for number in range(comment.start - 1, comment.end)}
 
     def composer_key(self, key):
         composer = self.composer
         if key == self.submit_key:
-            self.submit_comments()
-        elif key == "\x1b":
-            if composer["text"].strip():
-                self.persist_draft()
-                self.message = "Draft kept · S reopens it"
+            if composer["mode"] == "note":
+                self.begin_send()  # A note is saved on the way to the message it goes in.
             else:
-                # Everything was deleted from the message: nothing is left to send.
-                self.comment_buffer.clear()
-                self.save_comments()
-                self.message = "Comments discarded"
-            self.composer = None
+                self.submit_comments()
+        elif key == "\x1b":
+            note = composer["mode"] == "note"
+            self.close_composer()
+            self.message = "Note saved · S shows the message" if note else "Message kept · S reopens it"
+        elif isinstance(key, terminal_input.Mouse):
+            if key.action == "click":
+                self.composer_click(key.x, key.y)
+            elif key.action in ("up", "down") and composer["mode"] == "message":
+                composer["list_scroll"] = max(0, composer["list_scroll"] + (-3 if key.action == "up" else 3))
         elif isinstance(key, (str, int)):
             edited = command_line.edit_text(composer["text"], composer["cursor"], key, self.command_killed)
-            if edited and len(edited[0]) <= comments.MAX_DRAFT:
+            limit = comments.MAX_NOTE if composer["mode"] == "note" else comments.MAX_DRAFT
+            if edited and len(edited[0]) <= limit:
                 if edited[0] != composer["text"]:
                     composer["hint"] = ""
                 composer["text"], composer["cursor"], self.command_killed = edited
                 composer["error"] = ""
         return True
 
+    def composer_click(self, x, y):
+        """A click in the text puts the point there, or shows a reference typed in it; in the message's
+        comment list, a click on a reference shows it and a click on a note edits it."""
+        composer = self.composer
+        listed = next(((number, kind) for row, number, kind in composer["list"] if row == y), None)
+        if listed is not None:
+            number, kind = listed
+            comment = self.comment_buffer.find(number)
+            if comment is not None and kind == "reference":
+                self.show_reference(comments.reference(comment, composer["cwd"]))
+            elif comment is not None:
+                self.edit_note(number)
+            return
+        layout = composer.get("layout")
+        if layout is None:
+            return
+        area_top, left, area_rows, rows = layout
+        number = composer["scroll"] + y - area_top
+        if not 0 <= y - area_top < area_rows or not 0 <= number < len(rows) or x < left:
+            return
+        start, segment = rows[number]
+        index, used = start, 0
+        for char in segment:
+            if used + cells(char) > x - left:
+                break
+            used += cells(char)
+            index += 1
+        composer["cursor"] = index
+        text = composer["text"]
+        # The whitespace-separated word under the pointer, less trailing punctuation.
+        first = max(text.rfind(" ", 0, index), text.rfind("\n", 0, index)) + 1
+        last = min((position for position in (text.find(" ", index), text.find("\n", index)) if position >= 0),
+                   default=len(text))
+        word = text[first:last].rstrip(",;.)")
+        if first <= index < first + len(word) and REFERENCE_SHAPE.fullmatch(word):
+            self.show_reference(word)
+
+    def show_reference(self, word):
+        """Show a reference in the preview, its range selected; what was being edited is saved."""
+        match = REFERENCE.fullmatch(word)
+        base = (self.composer["cwd"] if self.composer is not None else self.comment_cwd()) or self.root
+        path = Path(match[1]).expanduser()
+        path = path if path.is_absolute() else base / path
+        try:
+            path = path.resolve(strict=True)
+            name = path.relative_to(self.root.resolve()).as_posix()
+        except (OSError, ValueError):
+            return  # Not a file under the root: only the point moves.
+        self.close_composer()
+        if path.is_dir():
+            parent = name
+            while parent and parent != ".":
+                self.expanded.add(parent)
+                parent = parent.rpartition("/")[0]
+            self.rebuild()
+            self.selected = next((i for i, row in enumerate(self.items) if row.path == name), self.selected)
+            self.preview_focus = False
+            self.message = f"{name}/ · S shows the message"
+            return
+        self.open_file(name)
+        if self.active != name:
+            return
+        self.message = f"{word} · S shows the message"
+        if not match[2]:
+            return
+        if not self.source_view() and self.markdown:
+            self.preview_key("s")  # Line numbers count source lines.
+        first, last = int(match[2]) - 1, int(match[4] or match[2]) - 1
+        total = len(self.content)
+        first, last = max(0, min(first, total - 1)), max(0, min(last, total - 1))
+        # The cursor on the first line keeps the start in view; the selection reaches the last.
+        self.selection_kind = "char" if match[3] else "line"
+        self.selection_anchor, self.preview_cursor = last, first
+        if match[3]:
+            self.anchor_column = self.clamped_column(last, int(match[5] or match[3]) - 1)
+            self.preview_column = self.want_column = self.clamped_column(first, int(match[3]) - 1)
+        self.preview_scroll = max(0, min(first - max(1, self.body) // 3, max(0, self.preview_length() - self.body)))
+        self.show_cursor()
+
     def submit_comments(self):
         composer = self.composer
-        text = composer["text"].strip()
+        self.persist_draft()
+        text = comments.compose(self.comment_buffer, composer["cwd"]).strip()
         if not text:
             composer["error"] = "The message is empty"
             return
@@ -1694,27 +1914,50 @@ class Navigator:
 
     def draw_composer(self, screen):
         composer = self.composer
+        note = composer["mode"] == "note"
         height, width = screen.getmaxyx()
         box_width = min(100, width - 2)
-        box_height = max(8, min(height - 2, 30))
+        box_height = max(10, min(height - 2, 30))
         x, top = (width - box_width) // 2, max(0, (height - box_height) // 2)
         for y in range(top, min(height, top + box_height)):
             band(screen, y, x, "", box_width, self.style("surface"))
-        target = composer["label"] or "agent"
-        band(screen, top, x, f"  SEND TO  {target} · {self.comment_target.pane_id}", box_width,
-             self.style("header") | curses.A_BOLD)
-        if composer["error"]:
-            put(screen, top + 1, x + 2, composer["error"], box_width - 4, self.style("removed") | curses.A_BOLD)
+        area_width = box_width - 4
+        if note:
+            comment = self.comment_buffer.find(composer["id"])
+            reference = comments.reference(comment, composer["cwd"]) if comment else ""
+            band(screen, top, x, f"  {ICONS[self.icons]['comment']} COMMENT  ", box_width, self.style("header") | curses.A_BOLD)
+            put(screen, top, x + 2 + cells(f"{ICONS[self.icons]['comment']} COMMENT  "), reference, box_width - 16,
+                self.style("header") | curses.A_BOLD | curses.A_UNDERLINE)
+            put(screen, top + 1, x + 2, composer["error"] or "What the agent should know about these lines",
+                area_width, self.style("removed") | curses.A_BOLD if composer["error"] else self.style("muted"))
         else:
+            band(screen, top, x, f"  SEND TO  {composer.get('label') or 'agent'} · {self.comment_target.pane_id}",
+                 box_width, self.style("header") | curses.A_BOLD)
             where = f"Paths relative to {composer['cwd']}" if composer["cwd"] else "Absolute paths"
-            put(screen, top + 1, x + 2, where, box_width - 4, self.style("muted"))
+            put(screen, top + 1, x + 2, composer["error"] or f"The message, then the comments · {where}", area_width,
+                self.style("removed") | curses.A_BOLD if composer["error"] else self.style("muted"))
         if composer["changed"]:
-            put(screen, top + 2, x + 2, "Changed since added: " + ", ".join(composer["changed"]), box_width - 4,
+            put(screen, top + 2, x + 2, "Changed since added: " + ", ".join(composer["changed"]), area_width,
                 self.style("removed"))
         elif composer["hint"]:
-            put(screen, top + 2, x + 2, composer["hint"], box_width - 4, self.style("active"))
-        area_top, area_rows, area_width = top + 3, box_height - 5, box_width - 4
+            put(screen, top + 2, x + 2, composer["hint"], area_width, self.style("hint") | curses.A_BOLD)
+        area_top, room = top + 3, box_height - 5
         rows = wrap_rows(composer["text"], area_width)
+        # The message keeps the lower part for its comments, read-only.
+        area_rows = room if note else max(3, min(len(rows) + 1, room // 3))
+        self.draw_text_area(screen, composer, rows, area_top, x + 2, area_rows, area_width)
+        if not composer["text"]:
+            put(screen, area_top, x + 4, "Write a note for this comment" if note
+                else "Anything to say around the comments (optional)", area_width - 2, self.style("muted"))
+        composer["list"] = []
+        if not note:
+            self.draw_comment_list(screen, composer, area_top + area_rows, x + 2, top + box_height - 1, area_width)
+        hints = ("Esc Save  {key} Save and review the message  Enter New line" if note else
+                 "{key} Send  Esc Keep  Click a note to edit it, a reference to view it")
+        put(screen, top + box_height - 1, x + 2, hints.format(key=key_label(self.submit_key)), area_width,
+            self.style("active"))
+
+    def draw_text_area(self, screen, composer, rows, area_top, left, area_rows, area_width):
         cursor_row = cursor_column = 0
         for number, (start, segment) in enumerate(rows):
             if start <= composer["cursor"] <= start + len(segment):
@@ -1726,17 +1969,41 @@ class Navigator:
         composer["scroll"] = max(0, min(composer["scroll"], cursor_row))
         if cursor_row >= composer["scroll"] + area_rows:
             composer["scroll"] = cursor_row - area_rows + 1
+        composer["layout"] = (area_top, left, area_rows, rows)
         for offset, (start, segment) in enumerate(rows[composer["scroll"]:composer["scroll"] + area_rows]):
-            put(screen, area_top + offset, x + 2, segment, area_width, self.style("base"))
+            put(screen, area_top + offset, left, segment, area_width, self.style("base"))
+            for found in REFERENCE_SHAPE.finditer(segment):
+                put(screen, area_top + offset, left + cells(segment[:found.start()]), found[0].rstrip(",;.)"),
+                    area_width - cells(segment[:found.start()]), self.style("reference") | curses.A_UNDERLINE)
         y = area_top + cursor_row - composer["scroll"]
         if 0 <= y - area_top < area_rows and cursor_column < area_width:
             index = composer["cursor"]
             char = composer["text"][index:index + 1]
             char = char if char and char != "\n" else " "
-            put(screen, y, x + 2 + cursor_column, char, cells(char), self.style("selected") | curses.A_REVERSE)
-        put(screen, top + box_height - 1, x + 2,
-            f"{key_label(self.submit_key)} Send  Enter New line  Esc Keep draft",
-            box_width - 4, self.style("active"))
+            put(screen, y, left + cursor_column, char, cells(char), self.style("selected") | curses.A_REVERSE)
+
+    def draw_comment_list(self, screen, composer, top, left, bottom, width):
+        """The comments under the message, as they will be sent; each one's rows are clickable."""
+        count = len(self.comment_buffer.comments)
+        put(screen, top, left, f"── {count} comment{'' if count == 1 else 's'} " + "─" * width, width, self.style("gutter"))
+        rows = []  # (comment ID, "reference" or "note", text)
+        for comment in self.comment_buffer.comments:
+            if rows:
+                rows.append((None, "", ""))
+            rows.extend((comment.id, "reference", segment)
+                        for _, segment in wrap_rows(comments.reference(comment, composer["cwd"]), width))
+            note = comment.note.strip() or "(No note · click to write one)"
+            rows.extend((comment.id, "note", segment) for _, segment in wrap_rows(note, width))
+        visible = max(0, bottom - top - 2)
+        composer["list_scroll"] = max(0, min(composer["list_scroll"], max(0, len(rows) - visible)))
+        for offset, (number, kind, text) in enumerate(rows[composer["list_scroll"]:composer["list_scroll"] + visible]):
+            y = top + 1 + offset
+            if number is None:
+                continue
+            composer["list"].append((y, number, kind))
+            style = (self.style("reference") | curses.A_BOLD | curses.A_UNDERLINE if kind == "reference"
+                     else self.style("muted") if text.startswith("(No note") else self.style("base"))
+            put(screen, y, left, text, width, style)
 
     def begin_agent_picker(self):
         if self.agent_host is None:
@@ -1825,8 +2092,88 @@ class Navigator:
     def draw_comment_dialogs(self, screen):
         if self.composer is not None:
             self.draw_composer(screen)
+        if self.comment_view is not None:
+            self.draw_comment_view(screen)
         if self.agent_picker is not None:
             self.draw_agent_picker(screen)
+
+    def sidebar_shown(self):
+        return bool(self.comment_buffer.comments) and not self.narrow
+
+    def sidebar_for(self, width):
+        """The comment list's width for a screen width, or 0 when it is not shown."""
+        if not self.comment_buffer.comments or width < 90:
+            return 0
+        if not self.sidebar_open:
+            return 2 + cells(ICONS[self.icons]["comment"])  # Folded: a strip with the icon and the count.
+        return max(24, min(44, width // 4, width - self.divider_for(width) - 44))
+
+    def toggle_sidebar(self):
+        if not self.comment_buffer.comments:
+            self.message = "No comments to list"
+            return
+        self.sidebar_open = not self.sidebar_open
+        if self.on_sidebar is not None:
+            try:
+                self.on_sidebar(self.sidebar_open)
+            except OSError as error:
+                self.message = f"Could not save the comment list: {error}"
+
+    def draw_sidebar(self, screen, x, width, bottom):
+        self.sidebar_x, self.sidebar_width, self.sidebar_rows = x, width, []
+        icon, count = ICONS[self.icons]["comment"], len(self.comment_buffer.comments)
+        if not self.sidebar_open:
+            self.panel(screen, x, width, bottom, False)
+            put(screen, BOX_TOP + 1, x + 1, icon, cells(icon), self.style("comment") | curses.A_BOLD)
+            for offset, char in enumerate(str(count)):
+                put(screen, BOX_TOP + 2 + offset, x + 1, char, 1, self.style("comment") | curses.A_BOLD)
+            return
+        self.panel(screen, x, width, bottom, False, f"{icon} COMMENTS", str(count))
+        cwd = self.comment_cwd()
+        rows = []  # (comment, style name, text) per row, a blank row between comments.
+        for comment in self.comment_buffer.comments:
+            if rows:
+                rows.append((None, "", ""))
+            rows.append((comment, "comment", comments.reference(comment, cwd)))
+            # The start of the note: its first three rows.
+            lines = [line for line in comment.note.splitlines() if line.strip()]
+            shown = [segment for line in lines for _, segment in wrap_rows(line, width - 4)]
+            rows.extend((comment, "muted", segment) for segment in shown[:3])
+            if len(shown) > 3:
+                rows.append((comment, "muted", "…"))
+        visible = bottom - self.content_top
+        self.sidebar_scroll = max(0, min(self.sidebar_scroll, max(0, len(rows) - visible)))
+        current = str((self.root / self.active).resolve()) if self.active else ""
+        for offset, (comment, look, line) in enumerate(rows[self.sidebar_scroll:self.sidebar_scroll + visible]):
+            y = self.content_top + offset
+            if comment is None:
+                continue
+            style = self.style(look) | (curses.A_BOLD if look == "comment" else 0)
+            self.sidebar_rows.append((y, comment, "reference" if look == "comment" else "note"))
+            if look == "comment" and comment.path == current:
+                band(screen, y, x + 1, "", width - 2, self.style("surface"))  # In the file previewed.
+            put(screen, y, x + 2, line, width - 4, style)
+
+    def sidebar_mouse(self, event):
+        """Mouse over the comment list. Returns True when the event was its own."""
+        if not self.sidebar_width or event.x < self.sidebar_x or self.narrow:
+            return False
+        if event.action in ("up", "down"):
+            if self.sidebar_open:
+                self.sidebar_scroll = max(0, self.sidebar_scroll + (-3 if event.action == "up" else 3))
+            return True
+        if event.action != "click":
+            return True
+        if not self.sidebar_open or event.y == BOX_TOP:
+            self.toggle_sidebar()  # The strip opens the list; the list's title folds it.
+            return True
+        # A reference shows its lines; the note under it opens for editing.
+        found = next(((comment, kind) for y, comment, kind in self.sidebar_rows if y == event.y), None)
+        if found is not None and found[1] == "reference":
+            self.show_reference(comments.reference(found[0], self.comment_cwd()))
+        elif found is not None:
+            self.edit_note(found[0].id)
+        return True
 
     def run_terminal(self, screen, command, cwd, pause=False):
         self.release_image()
@@ -2241,6 +2588,8 @@ class Navigator:
         self.text_left = x + (2 if self.rendered is not None else 8)
         highlight = bool(self.find_query) and bool(self.matches())
         chosen = self.selected_lines()
+        marked = self.commented_lines()
+        starts = self.comment_starts()
         for offset, line in enumerate(self.content[self.preview_scroll:self.preview_scroll + self.body]):
             y = self.content_top + offset
             number = self.preview_scroll + offset
@@ -2257,6 +2606,12 @@ class Navigator:
             elif self.active:
                 gutter = self.style("active") | curses.A_BOLD if look is not None else self.style("gutter")
                 put(screen, y, x + 1, f"{number + 1:5} │", 7, gutter)
+                if number in marked:
+                    # A comment covers this line: its number and a heavy bar in the comment colour.
+                    put(screen, y, x + 1, f"{number + 1:5} ┃", 7, self.style("comment") | curses.A_BOLD)
+                if number in starts:
+                    # Where a comment starts; a click shows what the message says there.
+                    put(screen, y, x + 1, ICONS[self.icons]["comment"], 2, self.style("comment") | curses.A_BOLD)
                 if look is not None:
                     band(screen, y, x + 8, "", width - 9, look)
                 if self.syntax is not None:
@@ -2322,7 +2677,8 @@ class Navigator:
             self.body -= 1  # The find row at the foot of the preview.
         self.divider = self.divider_for(width)
         self.narrow = width < 90
-        content_width = width - 1 if self.narrow else width - self.divider - 2
+        sidebar = 0 if self.narrow else self.sidebar_for(width)
+        content_width = width - 1 if self.narrow else width - self.divider - 2 - sidebar
         self.prepare_preview(content_width - 4)
         self.measure_diagram(content_width - 4)
         if self.restore_horizontal:
@@ -2350,7 +2706,11 @@ class Navigator:
                 self.draw_tree(screen, 0, width - 1, bottom)
         else:
             self.draw_tree(screen, 0, self.divider, bottom)
-            self.draw_content(screen, self.divider + 1, width - self.divider - 2, bottom)
+            self.draw_content(screen, self.divider + 1, content_width, bottom)
+            if sidebar:
+                self.draw_sidebar(screen, self.divider + 1 + content_width, sidebar, bottom)
+            else:
+                self.sidebar_width = 0
         position = f"{self.preview_scroll + 1}/{self.preview_length()}" if self.preview_focus else f"{self.selected + 1 if self.items else 0}/{len(self.items)}"
         self.draw_mode_line(screen, height - 2, width, focus)
         self.draw_echo(screen, height - 1, width)
@@ -2654,7 +3014,7 @@ class Navigator:
         count = len(self.comment_buffer.comments)
         for text, look in ((f" {focus} ", self.style("header") | curses.A_BOLD), (size, dim),
                            (name, style | curses.A_BOLD), (f"{position}  {where}", dim),
-                           (f"comment {count}" if count else "", self.style("key"))):
+                           (f" comment {count} " if count else "", self.style("badge") | curses.A_BOLD)):
             if not text or x >= width - 2:
                 continue
             put(screen, y, x, text, width - 2 - x, look)
@@ -2679,7 +3039,7 @@ class Navigator:
         if self.searching:
             return [("↑↓", "pick"), ("Enter", "apply"), ("Esc", "cancel")]
         # Send only once there is something to send: the count shows in the bar above.
-        send = [("S", "edit & send"), ("X", "clear")] if self.comment_buffer.comments or self.comment_buffer.draft is not None else []
+        send = [("S", "review & send"), ("C", "list"), ("X", "clear")] if self.comment_buffer.comments or self.comment_buffer.draft is not None else []
         if self.preview_focus:
             if self.char_selecting():
                 return [("h l w b", "move"), ("A", "copy to message"), ("Esc", "cancel")]
@@ -2751,12 +3111,14 @@ class Navigator:
         if self.preview_focus and self.diagram_list:
             groups.append(KEY_GROUPS[3])
         notes = (("V", "Select lines"), ("v", "Select text"), ("h l w 0 ^ $", "Move in the line"),
-                 ("b", "Word back, in a text selection"),
+                 ("b", "Word back, in a text selection"), ("m", "The comment on this line"),
+                 ("{ }", "Previous / next comment"),
                  ("A", "Add comment, or copy the text")) if self.preview_focus \
             else (("A", "Comment on file or folder"),)
         if self.preview_focus and self.markdown:
             notes = (("s", "Rendered / source"),) + notes
-        groups.append(("Comments", notes + (("S", "Edit and send"), ("X", "Discard all"),
+        groups.append(("Comments", notes + (("S", "Review and send"), ("C", "Fold / unfold the list"),
+                                            ("X", "Discard all"),
                                             (":comment.target", "Choose agent"))))
         return self.configured_key_groups(tuple(groups))
 
@@ -3158,6 +3520,8 @@ class Navigator:
             elif x >= 8:
                 self.begin_root()
             return
+        if BOX_TOP <= y <= self.content_top + self.body and self.sidebar_mouse(event):
+            return  # The comment list, its title row included.
         if y <= BOX_TOP or y > self.content_top + self.body or x < 0:
             return
         over_preview = self.preview_focus if self.narrow else x > self.divider
@@ -3177,6 +3541,11 @@ class Navigator:
         if event.action == "click":
             if self.preview_focus and self.cursor_view() and self.content_top <= y < self.content_top + self.body:
                 number = self.preview_scroll + y - self.content_top
+                if number < len(self.content) and 0 <= x - (self.text_left - 7) < 2 and self.source_view():
+                    found = self.comment_starts().get(number)
+                    if found:
+                        self.open_comment_view(found)
+                        return
                 if number < len(self.content):
                     self.preview_cursor = number
                     if self.source_view():
@@ -3209,7 +3578,7 @@ class Navigator:
         typing = (self.layout_dialog or self.size_draft or self.root_draft is not None
                   or self.app_picker is not None or self.key_help
                   or self.finding or self.searching or self.command is not None
-                  or self.composer is not None
+                  or self.composer is not None or self.comment_view is not None
                   or self.agent_picker is not None or self.confirm_clear)
         target = None
         if not typing:
@@ -3251,6 +3620,8 @@ class Navigator:
             return self.app_picker_key(key)
         if self.confirm_clear:
             return self.clear_key(key)
+        if self.comment_view is not None:
+            return self.comment_view_key(key)
         if self.agent_picker is not None:
             return self.agent_picker_key(key)
         if self.composer is not None:
@@ -3346,6 +3717,12 @@ class Navigator:
             self.begin_send()
         elif key == "X":
             self.begin_clear()
+        elif key == "C":
+            self.toggle_sidebar()
+        elif key == "m" and self.preview_focus:
+            self.view_line_comments()
+        elif key in ("{", "}") and self.preview_focus:
+            self.jump_comment(1 if key == "}" else -1)
         elif key == "\x08":
             self.toggle_ignored()
         elif key == "link-back" or (key in ("\x7f", curses.KEY_BACKSPACE, "H") and self.preview_focus):

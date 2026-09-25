@@ -133,9 +133,11 @@ The tree always starts with `..` (the parent folder) and `.` (the root itself). 
 | `V` | Start or cancel a [line selection](#comments-to-agents) |
 | `h` / `l`, `w`, `0` / `^` / `$` | In code and text, move the cursor one character, to the next word, or to the line's start / first character that is not a space / end |
 | `v` | Start or cancel a text selection at the cursor; in it, `b` moves back a word, and `A` copies the text into the message |
-| `A` | Add the selected lines, or the cursor line, as a comment; copy a text selection |
-| `S` | Edit the comments and send them to an agent (also in the tree) |
+| `A` | Add the selected lines, or the cursor line, as a comment and write its note; copy a text selection |
+| `S` | Review the message and send it to an agent (also in the tree) |
 | `X` | Discard the comments and draft, after confirming with `y` (also in the tree) |
+| `C` | Fold or unfold the comment list (also in the tree) |
+| `m` / `}` / `{` | Show the comment on the cursor line / go to the next / previous comment |
 | Left / Right | Scroll sideways |
 | `n` / `N` | Next / previous find match |
 | `s` | Switch diagrams between image and source; in Markdown, the whole file between rendered and source |
@@ -175,7 +177,7 @@ diagram, press `s` first to show its source.
 ### Text fields
 
 Every place you type edits with Emacs keys: the filter, find, the command line, the
-Change root prompt, the application and agent pickers, and the comment message. They share one kill ring.
+Change root prompt, the application and agent pickers, and comment notes and messages. They share one kill ring.
 
 | Key | Action |
 | --- | --- |
@@ -330,33 +332,37 @@ source.
 ## Comments to agents
 
 You can point an agent at lines in the preview without typing file names or line
-numbers:
+numbers. Each comment names a range and carries its own note; Lens puts them
+together into one message when you send it.
 
 1. In the preview, put the cursor on a line and press `V`. Move with `j` / `k` to
    extend the selection. Escape cancels it.
-   To select part of the text instead, move the cursor to where it starts and press
-   `v`. `h` / `l` move one character, `w` one word forward, `0` / `$` to the start /
-   end of the line, `^` to its first character that is not a space, and `j` / `k` a line; a click puts the cursor on a character.
-   In the selection, `b` moves back a word. `V` and `v` switch between the two kinds
-   of selection.
-2. Press `A`. The comment is added and the message opens on it, with the cursor
-   after its reference, such as `src/app.py:10-14`, so you can write what you want
-   right there. Without a selection, `A` comments on the cursor line. With a text
-   selection, `A` adds no comment: it copies the text and opens the message, and
-   Ctrl+Y pastes it where you want it.
-3. Press Escape to keep the message as a draft and go on selecting, or Ctrl+S to
-   send it. The agent receives it as a prompt. Each `A` adds its comment to the end
-   of the draft. In the file tree, `A` comments on the selected file or folder as a
-   whole, without line numbers. The bar under the panels shows how many comments
-   you have, as `comment 3`, and `S` reopens the message.
+2. Press `A`. The comment is added and its note opens: write what the agent should
+   know about those lines, on as many lines as you like, and press Escape to save
+   it. Without a selection, `A` comments on the cursor line. In the file tree, `A`
+   comments on the selected file or folder as a whole, without line numbers. The
+   bar under the panels counts the comments, as `comment 3`.
+3. Press `S` to review the message. Its top part is for anything you want to say
+   around the comments; below it, the comments are listed as they will be sent.
+   Press Ctrl+S to send it; the agent receives it as a prompt. Ctrl+S in a note
+   saves the note and shows the message.
 
-Paths are relative to the agent's working directory, or absolute for files outside
-it. If a file changed since you commented on it, the message editor says so above the
-text.
+The message is the top part, then each comment a blank line apart: its reference,
+such as `src/app.py:10-14`, and its note on the same line, or under it when the
+note has several lines. Paths are relative to the agent's working directory, or
+absolute for files outside it; a folder ends in `/`, such as `src/`. If a file
+changed since you commented on it, the editor says so above the text.
 
-Selections only work where the preview shows the file's own lines: code and
-text. Press `s` in a Markdown preview to show its source first. A comment on a
-folder ends in `/`, such as `src/`.
+**Text selections.** To take part of a line instead, move the cursor to where it
+starts and press `v`. `h` / `l` move one character, `w` one word forward, `0` / `$`
+to the start / end of the line, `^` to its first character that is not a space, and
+`j` / `k` a line; a click puts the cursor on a character. In the selection, `b`
+moves back a word, and `V` and `v` switch between the two kinds of selection. `A`
+on a text selection adds no comment: it copies the text and opens the message, and
+Ctrl+Y pastes it where you want it, in the message or in a note.
+
+Selections only work where the preview shows the file's own lines: code and text.
+Press `s` in a Markdown preview to show its source first.
 
 **Which agent.** Comments go to the agent in the pane you opened Lens from. Run
 `:comment.target` to pick another: the list shows agents in the current tab, and
@@ -365,17 +371,35 @@ remembers the choice for that pane, and each agent has its own comments. In Over
 and half modes, Lens keeps the pane it was first opened from, even when you reopen
 it from another pane in the tab.
 
-**Drafts.** Escape closes the message and keeps it as a draft, and so does closing
-Lens. `S` reopens the draft with any comments added since. Comments and drafts stay
-until you send them, even after Lens closes. If you delete the whole message and
-press Escape, the comments are discarded. `X` (or `:comment.clear`) discards them
-too, after you confirm with `y`.
+**Keeping and discarding.** Notes and the message are saved as you type, and stay
+until you send them, even after Lens closes. `X` (or `:comment.clear`) discards all
+of them after you confirm with `y`.
 
-The message editor uses the [text field keys](#text-fields) on the current line.
-Enter starts a new line, Up / Down (or Ctrl+P / Ctrl+N) move between lines, and
-Backspace at the start of a line joins it to the one above. Sending fails when the
-agent is waiting at an approval or question prompt. The message then stays open so
-you can try again.
+**In the preview.** Lines a comment covers show their line number and a heavy bar
+in the comment colour (peach in the built-in themes). The line where a comment
+starts also shows a comment icon (💬, or the Nerd Font glyph with
+`icons = "nerd"`). Click it, or press `m` on a line a comment covers, to read the
+comment: Enter edits its note, and `d` deletes the comment after you confirm with
+`y`. When several comments cover the line, `j` / `k` choose one. `}` and `{` move
+the cursor to the next and previous line where a comment starts.
+
+**Comment list.** While there are comments, a list on the right shows each one:
+its reference and the start of its note. Comments in the file you are previewing
+are highlighted. Click a reference to show it in the preview, or a note to edit it.
+Press `C`, or click the list's title, to fold it to a narrow strip with the icon
+and the count; click the strip or press `C` again to unfold it. Lens remembers
+whether it was folded. The list needs a terminal at least 90 columns wide.
+
+In the message, the comments' references work the same way: click one to show it,
+or its note to edit it. A reference you type in the text is underlined and opens
+the same way. Showing one saves what you were editing; `S` takes you back to the
+message.
+
+Notes and the message edit with the [text field keys](#text-fields) on the current
+line. Enter starts a new line, Up / Down (or Ctrl+P / Ctrl+N) move between lines,
+and Backspace at the start of a line joins it to the one above. Sending fails when
+the agent is waiting at an approval or question prompt. The message then stays
+open so you can try again.
 
 ## Command line
 
@@ -547,7 +571,7 @@ Set `command = "none"` in a matching rule to disable a key in that state.
 | `prev-diagram`, `next-diagram`, `source` | `[`, `]`, `s` |
 | `launch`, `launch-with` | `o`, `O` |
 | `link-back`, `link-forward` | Backspace or `H`, and `L`, in the preview |
-| `comment-select`, `comment-select-text`, `comment-add`, `comment-send`, `comment-clear` | `V`, `v`, `A`, `S`, `X` |
+| `comment-select`, `comment-select-text`, `comment-add`, `comment-send`, `comment-clear`, `comment-list`, `comment-view`, `comment-next`, `comment-prev` | `V`, `v`, `A`, `S`, `X`, `C`, `m`, `}`, `{` |
 
 **Theme and colors.** Lens follows your Herdr theme, and Ctrl+R rereads it. The
 `terminal` theme keeps your terminal's default colors. With `auto_switch`, Lens

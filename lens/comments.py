@@ -7,7 +7,7 @@ message is composed, because the target decides what "relative" means.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 import hashlib
 import json
 import os
@@ -17,9 +17,9 @@ import tempfile
 import time
 
 
-VERSION = 1
+VERSION = 2  # 1 kept the whole message as free text; 2 keeps a note per comment.
 MAX_COMMENTS = 500
-MAX_NOTE = 1000
+MAX_NOTE = 16 * 1024
 MAX_DRAFT = 64 * 1024
 MAX_EXCERPT = 16 * 1024
 MAX_READ = 4 * 1024 * 1024
@@ -41,7 +41,7 @@ class Comment:
     path: str  # Absolute.
     start: int  # 1-based, inclusive; 0 and 0 for a whole file or folder.
     end: int
-    note: str
+    note: str  # What the user says about these lines; several lines are fine.
     digest: str  # Of the lines when added, to notice later edits.
     start_column: int = 0  # 1-based and inclusive for a character selection, else 0.
     end_column: int = 0
@@ -51,8 +51,7 @@ class Comment:
 @dataclass
 class Buffer:
     comments: list[Comment] = field(default_factory=list)
-    draft: str | None = None
-    drafted: set[int] = field(default_factory=set)  # Comment IDs already written into the draft.
+    draft: str | None = None  # The message around the comments, not about any one of them.
 
     def add(self, path: str, start: int, end: int, note: str, digest: str,
             columns: tuple[int, int] = (0, 0), excerpt: str = "") -> Comment:
@@ -61,8 +60,18 @@ class Buffer:
         self.comments = [*self.comments, comment][-MAX_COMMENTS:]
         return comment
 
+    def find(self, number: int) -> Comment | None:
+        return next((comment for comment in self.comments if comment.id == number), None)
+
+    def set_note(self, number: int, note: str):
+        self.comments = [replace(comment, note=note[:MAX_NOTE]) if comment.id == number else comment
+                         for comment in self.comments]
+
+    def remove(self, number: int):
+        self.comments = [comment for comment in self.comments if comment.id != number]
+
     def clear(self):
-        self.comments, self.draft, self.drafted = [], None, set()
+        self.comments, self.draft = [], None
 
 
 def lines_digest(lines: list[str]) -> str:
@@ -108,8 +117,12 @@ def reference(comment: Comment, cwd: Path | None) -> str:
 
 
 def line(comment: Comment, cwd: Path | None) -> str:
+    """The comment as the message sends it: the reference, then the note on the same line, or
+    under it when the note has several lines."""
     text = reference(comment, cwd)
-    text = f"{text} — {comment.note}" if comment.note else text
+    note = comment.note.strip()
+    if note:
+        text += ("\n" if "\n" in note else " ") + note
     if comment.excerpt:
         # A fence longer than any backtick run inside, so the excerpt cannot close it early.
         longest = max((len(run) for run in re.findall(r"`+", comment.excerpt)), default=0)
@@ -119,14 +132,9 @@ def line(comment: Comment, cwd: Path | None) -> str:
 
 
 def compose(buffer: Buffer, cwd: Path | None) -> str:
-    """The message to edit: the saved draft, then comments added after it was saved."""
-    # A blank line sets each comment apart; the first starts the message.
-    fresh = "\n\n".join(line(comment, cwd) for comment in buffer.comments if comment.id not in buffer.drafted)
-    if buffer.draft is None or not buffer.draft.strip():
-        return fresh
-    if not fresh:
-        return buffer.draft
-    return buffer.draft.rstrip("\n") + "\n\n" + fresh
+    """The message sent: the text around the comments, then each comment, a blank line apart."""
+    parts = [buffer.draft.strip()] if buffer.draft and buffer.draft.strip() else []
+    return "\n\n".join(parts + [line(comment, cwd) for comment in buffer.comments])
 
 
 def valid_text(value, limit: int) -> bool:
@@ -135,7 +143,7 @@ def valid_text(value, limit: int) -> bool:
 
 def decode_buffer(payload) -> Buffer:
     buffer = Buffer()
-    if not isinstance(payload, dict) or payload.get("version") != VERSION:
+    if not isinstance(payload, dict) or payload.get("version") not in (1, VERSION):
         return buffer
     for item in payload.get("comments", [])[:MAX_COMMENTS] if isinstance(payload.get("comments"), list) else []:
         if not isinstance(item, dict):
@@ -150,11 +158,10 @@ def decode_buffer(payload) -> Buffer:
                 and valid_text(excerpt, MAX_EXCERPT)):
             buffer.comments.append(Comment(number, path, start, end, note, digest, first, last, excerpt))
     draft = payload.get("draft")
-    if valid_text(draft, MAX_DRAFT):
+    # A version 1 draft held the whole message, references and all: it cannot be split into
+    # notes, so only its comments carry over.
+    if valid_text(draft, MAX_DRAFT) and payload["version"] == VERSION:
         buffer.draft = draft
-        drafted = payload.get("drafted", [])
-        if isinstance(drafted, list):
-            buffer.drafted = {number for number in drafted if type(number) is int}
     return buffer
 
 
@@ -163,7 +170,7 @@ def encode_buffer(target: Target, buffer: Buffer) -> dict:
             "comments": [{"id": c.id, "path": c.path, "start": c.start, "end": c.end,
                           "note": c.note, "digest": c.digest, "start_column": c.start_column,
                           "end_column": c.end_column, "excerpt": c.excerpt} for c in buffer.comments],
-            "draft": buffer.draft, "drafted": sorted(buffer.drafted)}
+            "draft": buffer.draft}
 
 
 def write_json(path: Path, value):

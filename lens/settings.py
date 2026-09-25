@@ -18,7 +18,8 @@ ACTIONS = {
     "prev-diagram": "[", "next-diagram": "]", "source": "s", "launch": "o", "launch-with": "O",
     # Backspace, H and L do these only in the preview, so the actions have keys of their own.
     "link-back": "link-back", "link-forward": "link-forward",
-    "comment-select": "V", "comment-select-text": "v", "comment-add": "A", "comment-send": "S", "comment-clear": "X",
+    "comment-select": "V", "comment-select-text": "v", "comment-add": "A", "comment-send": "S",
+    "comment-clear": "X", "comment-list": "C", "comment-view": "m", "comment-prev": "{", "comment-next": "}",
 }
 
 NAMED = {
