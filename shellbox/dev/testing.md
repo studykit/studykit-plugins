@@ -11,8 +11,9 @@ The plugin config directory can set `close_key` to a tmux root key, a
 `prefix+` key, or `none`. Reopening applies the new binding without restarting
 the shell and removes the previous tracked plugin binding. The popup reads
 Herdr's action binding and mirrors it inside tmux so the same key shows and
-hides the popup. Keep the old tmux socket name across the plugin rename to
-preserve active shell sessions.
+hides the popup. The tmux server keeps the environment of the popup that
+started it, so each popup rewrites the server's `HERDR_*` values before a new
+shell starts; otherwise shells would report an older plugin id and directories.
 Each popup refreshes its session-specific tmux status label from the source
 pane ID and title, including when attaching to an older shell session.
 The indicator is presentation metadata. On an agent pane it is a

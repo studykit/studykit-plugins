@@ -66,8 +66,7 @@ def source_pane(env: dict) -> tuple[str, str, Path, str]:
 
 
 def shell_server(env: dict) -> str:
-    # Preserve the existing tmux socket name across the plugin rename.
-    return "popup-shell-" + hashlib.sha256(env["HERDR_SOCKET_PATH"].encode()).hexdigest()[:16]
+    return "shellbox-" + hashlib.sha256(env["HERDR_SOCKET_PATH"].encode()).hexdigest()[:16]
 
 
 def shell_identity(env: dict, pane_id: str, terminal_id: str) -> tuple[str, str]:
@@ -80,7 +79,7 @@ def open_popup(env: dict) -> None:
     server, session = shell_identity(env, pane_id, terminal_id)
     call(env, "plugin.pane.open", plugin_id=env["HERDR_PLUGIN_ID"],
          entrypoint="shell", cwd=str(cwd), focus=True,
-         env={"POPUP_SHELL_SERVER": server, "POPUP_SHELL_SESSION": session,
+         env={"SHELLBOX_SERVER": server, "SHELLBOX_SESSION": session,
               "SHELLBOX_SOURCE_LABEL": label, "SHELLBOX_SOURCE_PANE": pane_id})
 
 
@@ -183,7 +182,7 @@ def on_pane_closed(env: dict) -> None:
                            "-t", f"={session}"], env=env, capture_output=True).returncode:
             continue
         call(env, "plugin.pane.open", plugin_id=env["HERDR_PLUGIN_ID"], entrypoint="confirm",
-             focus=True, env={"POPUP_SHELL_SERVER": server, "POPUP_SHELL_SESSION": session,
+             focus=True, env={"SHELLBOX_SERVER": server, "SHELLBOX_SESSION": session,
                               "SHELLBOX_SOURCE_PANE": pane_id})
 
 
@@ -198,8 +197,8 @@ def read_key() -> str:
 
 
 def run_confirm(env: dict) -> None:
-    server, session = env["POPUP_SHELL_SERVER"], env["POPUP_SHELL_SESSION"]
-    if not server.startswith("popup-shell-") or not session.isalnum():
+    server, session = env["SHELLBOX_SERVER"], env["SHELLBOX_SESSION"]
+    if not server.startswith("shellbox-") or not session.isalnum():
         raise ValueError("Invalid shell session")
     tmux = shutil.which("tmux")
     if not tmux:
@@ -299,7 +298,7 @@ def toggle_chord(env: dict) -> tuple[str, ...] | None:
 
 def apply_toggle_binding(command: list[str], env: dict) -> None:
     wanted = toggle_chord(env)
-    raw = subprocess.run([*command, "show-option", "-gqv", "@popup_shell_toggle_binding"],
+    raw = subprocess.run([*command, "show-option", "-gqv", "@shellbox_toggle_binding"],
                          env=env, capture_output=True, check=True).stdout.decode().strip()
     try:
         previous = tuple(json.loads(raw)) if raw else None
@@ -309,16 +308,16 @@ def apply_toggle_binding(command: list[str], env: dict) -> None:
         subprocess.run([*command, "unbind-key", "-q", "-T", "root", previous[0]],
                        env=env, check=True)
         if len(previous) == 2:
-            subprocess.run([*command, "unbind-key", "-q", "-T", "popup-shell-toggle", previous[1]],
+            subprocess.run([*command, "unbind-key", "-q", "-T", "shellbox-toggle", previous[1]],
                            env=env, check=True)
     if wanted:
-        action = ["detach-client"] if len(wanted) == 1 else ["switch-client", "-T", "popup-shell-toggle"]
+        action = ["detach-client"] if len(wanted) == 1 else ["switch-client", "-T", "shellbox-toggle"]
         subprocess.run([*command, "bind-key", "-T", "root", wanted[0], *action],
                        env=env, check=True)
         if len(wanted) == 2:
-            subprocess.run([*command, "bind-key", "-T", "popup-shell-toggle", wanted[1],
+            subprocess.run([*command, "bind-key", "-T", "shellbox-toggle", wanted[1],
                             "detach-client"], env=env, check=True)
-    subprocess.run([*command, "set-option", "-g", "@popup_shell_toggle_binding",
+    subprocess.run([*command, "set-option", "-g", "@shellbox_toggle_binding",
                     json.dumps(wanted)], env=env, check=True)
 
 
@@ -336,7 +335,7 @@ def close_binding(env: dict) -> tuple[str, str] | None:
 
 def apply_close_binding(command: list[str], env: dict) -> None:
     wanted = close_binding(env)
-    saved = subprocess.run([*command, "show-option", "-gqv", "@popup_shell_close_binding"],
+    saved = subprocess.run([*command, "show-option", "-gqv", "@shellbox_close_binding"],
                            env=env, capture_output=True, check=True).stdout.decode().strip()
     if saved in ("", "none"):
         previous = None  # An unset marker may belong to a user-configured tmux server.
@@ -349,7 +348,7 @@ def apply_close_binding(command: list[str], env: dict) -> None:
         subprocess.run([*command, "bind-key", "-T", *wanted, "detach-client"],
                        env=env, check=True)
     marker = f"{wanted[0]}:{wanted[1]}" if wanted else "none"
-    subprocess.run([*command, "set-option", "-g", "@popup_shell_close_binding", marker],
+    subprocess.run([*command, "set-option", "-g", "@shellbox_close_binding", marker],
                    env=env, check=True)
 
 
@@ -365,9 +364,27 @@ def show_source_label(command: list[str], env: dict, session: str) -> None:
                    env=env, check=True)
 
 
+def refresh_environment(command: list[str], env: dict) -> None:
+    """Replace the Herdr values new shells inherit from the tmux server.
+
+    The server keeps the environment of the popup that started it, which can
+    come from an older plugin version or another invocation.
+    """
+    listed = subprocess.run([*command, "show-environment", "-g"], env=env, capture_output=True)
+    if listed.returncode:
+        return  # No server yet; the next session starts one with this environment.
+    for line in listed.stdout.decode().splitlines():
+        name = line.lstrip("-").partition("=")[0]
+        if name.startswith("HERDR_") and name not in env:
+            subprocess.run([*command, "set-environment", "-gu", name], env=env, check=True)
+    for name, value in env.items():
+        if name.startswith("HERDR_"):
+            subprocess.run([*command, "set-environment", "-g", name, value], env=env, check=True)
+
+
 def run_panel(env: dict) -> None:
-    server, session = env["POPUP_SHELL_SERVER"], env["POPUP_SHELL_SESSION"]
-    if not server.startswith("popup-shell-") or not session.isalnum():
+    server, session = env["SHELLBOX_SERVER"], env["SHELLBOX_SESSION"]
+    if not server.startswith("shellbox-") or not session.isalnum():
         raise ValueError("Invalid shell session")
     tmux = shutil.which("tmux")
     if not tmux:
@@ -387,17 +404,18 @@ def run_panel(env: dict) -> None:
         fcntl.flock(stream, fcntl.LOCK_EX)
         exists = subprocess.run([*command, "has-session", "-t", session],
                                 env=shell_env, capture_output=True).returncode == 0
+        refresh_environment(command, shell_env)
         if not exists:
             subprocess.run([*command, "new-session", "-d", "-s", session,
                             "-c", os.getcwd(), shell, "-i"], env=shell_env, check=True)
         config = tmux_config(env)
         if config:
             revision = f"{config.resolve()}:{config.stat().st_mtime_ns}"
-            loaded = subprocess.run([*command, "show-option", "-gqv", "@popup_shell_config"],
+            loaded = subprocess.run([*command, "show-option", "-gqv", "@shellbox_config"],
                                     env=shell_env, capture_output=True, check=True)
             if loaded.stdout.decode().strip() != revision:
                 subprocess.run([*command, "source-file", str(config)], env=shell_env, check=True)
-                subprocess.run([*command, "set-option", "-g", "@popup_shell_config", revision],
+                subprocess.run([*command, "set-option", "-g", "@shellbox_config", revision],
                                env=shell_env, check=True)
         apply_close_binding(command, shell_env)
         apply_toggle_binding(command, shell_env)

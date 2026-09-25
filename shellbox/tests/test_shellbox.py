@@ -29,7 +29,7 @@ class PopupShellTests(unittest.TestCase):
                 self.assertEqual(params["entrypoint"], "shell")
                 self.assertEqual(params["cwd"], str(root))
                 self.assertTrue(params["focus"])
-                self.assertEqual(params["env"]["POPUP_SHELL_SESSION"],
+                self.assertEqual(params["env"]["SHELLBOX_SESSION"],
                                  herdr_main.shell_identity(env, "w1:p2", "terminal-2")[1])
                 self.assertEqual(params["env"]["SHELLBOX_SOURCE_LABEL"],
                                  "Herdr w1:p2 · Editor 1 project")
@@ -61,8 +61,8 @@ class PopupShellTests(unittest.TestCase):
     def test_popup_attaches_to_a_persistent_shell(self):
         with tempfile.TemporaryDirectory() as directory:
             env = {"HERDR_ENV": "1", "SHELL": "/bin/zsh", "PWD": "/old",
-                   "TMUX": "other-server", "POPUP_SHELL_SERVER": "popup-shell-123",
-                   "POPUP_SHELL_SESSION": "abc123", "HERDR_PLUGIN_STATE_DIR": directory,
+                   "TMUX": "other-server", "SHELLBOX_SERVER": "shellbox-123",
+                   "SHELLBOX_SESSION": "abc123", "HERDR_PLUGIN_STATE_DIR": directory,
                    "HOME": directory}
             with patch("herdr_main.shutil.which", side_effect=lambda name: "/bin/tmux" if name == "tmux" else name), \
                  patch("herdr_main.os.access", return_value=True), \
@@ -76,7 +76,8 @@ class PopupShellTests(unittest.TestCase):
             self.assertEqual(argv[-3:], ["attach-session", "-t", "abc123"])
             self.assertEqual(shell_env["PWD"], os.getcwd())
             self.assertNotIn("TMUX", shell_env)
-            self.assertEqual(run.call_args_list[1].args[0][-2:], ["/bin/zsh", "-i"])
+            created = [call.args[0] for call in run.call_args_list if "new-session" in call.args[0]]
+            self.assertEqual(created[0][-2:], ["/bin/zsh", "-i"])
             self.assertTrue(any(call.args[0][-3:] == ["root", "C-q", "detach-client"]
                                 for call in run.call_args_list))
 
@@ -145,14 +146,14 @@ class PopupShellTests(unittest.TestCase):
             call.assert_called_once()
             params = call.call_args.kwargs
             self.assertEqual(params["entrypoint"], "confirm")
-            self.assertEqual(params["env"], {"POPUP_SHELL_SERVER": herdr_main.shell_server(env),
-                                             "POPUP_SHELL_SESSION": "live1",
+            self.assertEqual(params["env"], {"SHELLBOX_SERVER": herdr_main.shell_server(env),
+                                             "SHELLBOX_SESSION": "live1",
                                              "SHELLBOX_SOURCE_PANE": "w1:p2"})
             self.assertFalse(herdr_main.session_record(env, "gone1").exists())
             self.assertTrue(herdr_main.session_record(env, "other1").exists())
 
     def test_confirmation_ends_the_shell_only_on_yes(self):
-        env = {"POPUP_SHELL_SERVER": "popup-shell-123", "POPUP_SHELL_SESSION": "abc123"}
+        env = {"SHELLBOX_SERVER": "shellbox-123", "SHELLBOX_SESSION": "abc123"}
         for key, killed in (("y", True), ("n", False), ("\x1b", False)):
             with patch("herdr_main.shutil.which", return_value="/bin/tmux"), \
                  patch("herdr_main.read_key", return_value=key), \
@@ -164,11 +165,23 @@ class PopupShellTests(unittest.TestCase):
             self.assertEqual(any(item[-3:] == ["kill-session", "-t", "=abc123"] for item in calls),
                              killed)
 
+    def test_server_environment_takes_current_herdr_values(self):
+        env = {"HERDR_PLUGIN_ID": "studykit.shellbox", "HOME": "/home/me"}
+        with patch("herdr_main.subprocess.run") as run:
+            run.return_value.returncode = 0
+            run.return_value.stdout = (b"HERDR_PLUGIN_ID=studykit.old\n"
+                                       b"HERDR_PLUGIN_ACTION_ID=open\nHOME=/home/me\n")
+            herdr_main.refresh_environment(["tmux"], env)
+        calls = [call.args[0][1:] for call in run.call_args_list[1:]]
+        self.assertEqual(calls, [["set-environment", "-gu", "HERDR_PLUGIN_ACTION_ID"],
+                                 ["set-environment", "-g", "HERDR_PLUGIN_ID",
+                                  "studykit.shellbox"]])
+
     def test_reopening_reuses_the_existing_session(self):
         with tempfile.TemporaryDirectory() as directory:
             env = {"HERDR_ENV": "1", "SHELL": "/bin/zsh",
-                   "POPUP_SHELL_SERVER": "popup-shell-123",
-                   "POPUP_SHELL_SESSION": "abc123", "HERDR_PLUGIN_STATE_DIR": directory,
+                   "SHELLBOX_SERVER": "shellbox-123",
+                   "SHELLBOX_SESSION": "abc123", "HERDR_PLUGIN_STATE_DIR": directory,
                    "HOME": directory}
             with patch("herdr_main.shutil.which", side_effect=lambda name: "/bin/tmux" if name == "tmux" else name), \
                  patch("herdr_main.os.access", return_value=True), \
@@ -185,8 +198,8 @@ class PopupShellTests(unittest.TestCase):
             config = Path(directory) / ".tmux.conf"
             config.write_text("set -g prefix C-s\n")
             env = {"HERDR_ENV": "1", "SHELL": "/bin/zsh", "HOME": directory,
-                   "POPUP_SHELL_SERVER": "popup-shell-123",
-                   "POPUP_SHELL_SESSION": "abc123", "HERDR_PLUGIN_STATE_DIR": directory}
+                   "SHELLBOX_SERVER": "shellbox-123",
+                   "SHELLBOX_SESSION": "abc123", "HERDR_PLUGIN_STATE_DIR": directory}
             with patch("herdr_main.shutil.which", side_effect=lambda name: "/bin/tmux" if name == "tmux" else name), \
                  patch("herdr_main.os.access", return_value=True), \
                  patch("herdr_main.subprocess.run") as run, \
@@ -197,7 +210,7 @@ class PopupShellTests(unittest.TestCase):
             calls = [item.args[0] for item in run.call_args_list]
             self.assertEqual([item[-2:] for item in calls if "source-file" in item],
                              [["source-file", str(config)]])
-            self.assertTrue(any(item[-3:] == ["show-option", "-gqv", "@popup_shell_config"]
+            self.assertTrue(any(item[-3:] == ["show-option", "-gqv", "@shellbox_config"]
                                 for item in calls))
             self.assertTrue(any(item[-3:] == ["root", "C-q", "detach-client"]
                                 for item in calls))
@@ -255,9 +268,9 @@ command = "studykit.shellbox.open"
                 run.return_value.stdout = b""
                 herdr_main.apply_toggle_binding(["tmux", "-L", "test"], env)
             calls = [call.args[0] for call in run.call_args_list]
-            self.assertTrue(any(item[-5:] == ["root", "C-s", "switch-client", "-T", "popup-shell-toggle"]
+            self.assertTrue(any(item[-5:] == ["root", "C-s", "switch-client", "-T", "shellbox-toggle"]
                                 for item in calls))
-            self.assertTrue(any(item[-3:] == ["popup-shell-toggle", "s", "detach-client"]
+            self.assertTrue(any(item[-3:] == ["shellbox-toggle", "s", "detach-client"]
                                 for item in calls))
 
 
