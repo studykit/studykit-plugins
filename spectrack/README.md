@@ -30,6 +30,15 @@ A site on `*.atlassian.net` is treated as Jira Cloud automatically (set
 ranking, and estimates on Jira Cloud. Run `spectrack agile --help` to see
 commands and options. Jira Data Center and Server are not supported.
 
+`spectrack confluence` reads, searches (CQL), creates, updates, and moves
+Confluence Cloud pages on the same site with the same credentials. Page bodies
+are exchanged as Markdown by default; Markdown cannot carry macros, layouts, or
+panels, so use `--format adf` to edit such pages without losing them. Updates
+accept `--expected-version` to refuse overwriting a concurrent edit. Run
+`spectrack confluence --help` for commands and options. Confluence Data Center
+and Server are not supported, and Confluence is not a knowledge provider — the
+GitHub repository `wiki/` remains the knowledge store.
+
 - Your Atlassian account email, as `email:` under `providers.issues` in
   `.spectrack/config.yml` or in `JIRA_EMAIL` (which wins, so teammates sharing
   a committed config can each use their own).

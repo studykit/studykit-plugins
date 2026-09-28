@@ -16,7 +16,7 @@ from issue.jira.client import DEPLOYMENT_CLOUD, jira_deployment_from_settings
 from issue.jira.refs import JiraProviderError
 
 
-def cloud_agile_available(project: Path) -> bool:
+def jira_cloud_available(project: Path) -> bool:
     try:
         config = load_workflow_config(project)
         return bool(
@@ -32,8 +32,9 @@ def help_text(project: Path) -> str:
     commands = [
         "  issue            Work with configured issues",
     ]
-    if cloud_agile_available(project):
+    if jira_cloud_available(project):
         commands.append("  agile            Manage Jira Cloud boards, sprints, backlogs, epics, and issues")
+        commands.append("  confluence       Read, search, create, update, and move Confluence Cloud pages")
     commands.extend(
         [
             "  setup            Configure a project",

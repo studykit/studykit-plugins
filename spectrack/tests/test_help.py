@@ -35,6 +35,7 @@ def test_cloud_help_discovers_agile(tmp_path: Path, args: tuple[str, ...]) -> No
     result = _run(tmp_path, *args)
     assert result.returncode == 0, result.stderr
     assert "  agile " in result.stdout
+    assert "  confluence " in result.stdout
     assert "spectrack <command> --help" in result.stdout
 
 
@@ -47,6 +48,7 @@ def test_non_cloud_help_omits_agile(tmp_path: Path, kind: str, site: str | None)
     assert result.returncode == 0, result.stderr
     assert "  issue " in result.stdout
     assert "  agile " not in result.stdout
+    assert "  confluence " not in result.stdout
 
 
 def test_help_for_command_routes_to_command_help(tmp_path: Path) -> None:

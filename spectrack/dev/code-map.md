@@ -11,7 +11,9 @@ top-level command discovery. It resolves `<command>` to
 runs it with `uv run --script`. There is no entry-point registration —
 adding a top-level command means adding a script or package there.
 
-The Jira Cloud agile command lives in `scripts/agile/`.
+The Jira Cloud agile command lives in `scripts/agile/`, and the Confluence
+Cloud page command in `scripts/confluence/`; both reuse the Jira Cloud site
+and credentials.
 
 ## Issue dispatch
 
