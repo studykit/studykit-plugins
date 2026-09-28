@@ -7,6 +7,7 @@ for the focused pane. It works without Lens or any other plugin.
 
 - Herdr 0.9.0 or later on macOS or Linux
 - Python 3.11 or later and `tmux` on Herdr's `PATH`
+- A Nerd Fonts 3.5.1 or later terminal font for the default tmux logo (optional)
 
 ## Install
 
@@ -35,7 +36,9 @@ popup shows the `tmux` command that attaches to it later.
 While a pane's shell is running, Herdr shows a tmux logo to the left of that
 pane's agent name, in the sidebar and in split pane borders. A pane without an
 agent shows the logo alone as its border title. The logo is the Nerd Font
-`nf-dev-tmux` glyph and disappears when the shell exits. To use a
+`nf-dev-tmux` glyph (U+E94C) and disappears when the shell exits. The glyph
+first shipped in Nerd Fonts 3.5.1; 3.5.0 lists it but its fonts lack it, so the
+mark renders as a blank or a box until your terminal font is upgraded. To use a
 different mark, such as an emoji, set it in the plugin's `config.toml`
 (described below); set `indicator = ""` to turn it off:
 
