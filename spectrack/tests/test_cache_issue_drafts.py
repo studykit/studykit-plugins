@@ -1142,7 +1142,7 @@ def _jira_curl_get_args(url: str) -> tuple[str, ...]:
         "curl",
         "--silent",
         "--show-error",
-        "--fail",
+        "--fail-with-body",
         "--request",
         "GET",
         "--config",
@@ -1156,7 +1156,7 @@ def _jira_write_args() -> tuple[str, ...]:
         "curl",
         "--silent",
         "--show-error",
-        "--fail",
+        "--fail-with-body",
         "--config",
         "-",
     )

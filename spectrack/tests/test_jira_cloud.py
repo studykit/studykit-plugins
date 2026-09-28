@@ -31,8 +31,8 @@ from issue.providers import (  # noqa: E402
 from main_context import build_session_policy_context  # noqa: E402
 
 SITE = "https://acme.atlassian.net"
-GET = ("curl", "--silent", "--show-error", "--fail", "--request", "GET", "--config", "-")
-WRITE = ("curl", "--silent", "--show-error", "--fail", "--config", "-")
+GET = ("curl", "--silent", "--show-error", "--fail-with-body", "--request", "GET", "--config", "-")
+WRITE = ("curl", "--silent", "--show-error", "--fail-with-body", "--config", "-")
 
 
 class FakeRunner:

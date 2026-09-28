@@ -26,6 +26,10 @@ format when publishing, and fetched issues and comments come back as Markdown.
 A site on `*.atlassian.net` is treated as Jira Cloud automatically (set
 `deployment: cloud` for any other Cloud host). Cloud needs:
 
+`spectrack agile` manages Jira Software boards, sprints, backlogs, epics,
+ranking, and estimates on Jira Cloud. Run `spectrack agile --help` to see
+commands and options. Jira Data Center and Server are not supported.
+
 - Your Atlassian account email, as `email:` under `providers.issues` in
   `.spectrack/config.yml` or in `JIRA_EMAIL` (which wins, so teammates sharing
   a committed config can each use their own).

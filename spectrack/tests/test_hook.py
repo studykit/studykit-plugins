@@ -376,7 +376,7 @@ def jira_issue_payload(*, title: str = "Support Jira Data Center hooks") -> dict
 
 
 def curl_args(url: str) -> tuple[str, ...]:
-    return ("curl", "--silent", "--show-error", "--fail", "--request", "GET", "--config", "-", url)
+    return ("curl", "--silent", "--show-error", "--fail-with-body", "--request", "GET", "--config", "-", url)
 
 
 def jira_issue_url(issue: str = "TEST-1234") -> str:

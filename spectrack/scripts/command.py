@@ -87,7 +87,10 @@ def run_command(
     result = (runner or subprocess_runner)(request)
     if check and result.returncode != 0:
         stderr = result.stderr.strip()
+        stdout = result.stdout.strip()
         detail = f": {stderr}" if stderr else ""
+        if stdout:
+            detail += f"\n{stdout}"
         raise WorkflowCommandError(
             f"command failed with exit code {result.returncode}: {request.args[0]}{detail}",
             request=request,

@@ -229,7 +229,7 @@ def jira_get_json(
 
     url = f"{site.base_url}{path}"
     result = run_command(
-        ("curl", "--silent", "--show-error", "--fail", "--request", "GET", "--config", "-", url),
+        ("curl", "--silent", "--show-error", "--fail-with-body", "--request", "GET", "--config", "-", url),
         input_text=_curl_config(site),
         runner=runner,
     )
@@ -251,7 +251,7 @@ def jira_send_json(
 
     url = f"{site.base_url}{path}"
     result = run_command(
-        ("curl", "--silent", "--show-error", "--fail", "--config", "-"),
+        ("curl", "--silent", "--show-error", "--fail-with-body", "--config", "-"),
         input_text=_curl_json_config(site, method=method, url=url, payload=payload),
         runner=runner,
     )
@@ -329,7 +329,7 @@ def jira_delete(
 
     url = f"{site.base_url}{path}"
     result = run_command(
-        ("curl", "--silent", "--show-error", "--fail", "--config", "-"),
+        ("curl", "--silent", "--show-error", "--fail-with-body", "--config", "-"),
         input_text=_curl_method_config(site, method="DELETE", url=url),
         runner=runner,
     )

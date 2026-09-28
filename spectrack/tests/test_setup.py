@@ -76,7 +76,7 @@ def _jira_relationship_mappings() -> dict[str, Any]:
 
 
 def _curl_get_args(url: str) -> tuple[str, ...]:
-    return ("curl", "--silent", "--show-error", "--fail", "--request", "GET", "--config", "-", url)
+    return ("curl", "--silent", "--show-error", "--fail-with-body", "--request", "GET", "--config", "-", url)
 
 
 @pytest.mark.parametrize(

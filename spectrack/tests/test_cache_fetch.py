@@ -226,7 +226,7 @@ def remote_links_payload() -> list[dict[str, object]]:
 
 
 def curl_args(url: str) -> tuple[str, ...]:
-    return ("curl", "--silent", "--show-error", "--fail", "--request", "GET", "--config", "-", url)
+    return ("curl", "--silent", "--show-error", "--fail-with-body", "--request", "GET", "--config", "-", url)
 
 
 def jira_issue_url(issue: str = "TEST-1234") -> str:

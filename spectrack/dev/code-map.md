@@ -10,6 +10,8 @@ The `scripts/spectrack` launcher resolves `<command>` to
 runs it with `uv run --script`. There is no entry-point registration —
 adding a top-level command means adding a script or package there.
 
+The Jira Cloud agile command lives in `scripts/agile/`.
+
 ## Issue dispatch
 
 All issue operations route through `scripts/issue/dispatch.py`: the verb

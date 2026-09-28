@@ -117,7 +117,7 @@ def jira_search_args(project: Path, jql: str, *, max_results: int = 30) -> tuple
         site, jql=jql, max_results=max_results, fields=JIRA_SEARCH_FIELDS
     )
     url = f"{site.base_url}{path}"
-    return ("curl", "--silent", "--show-error", "--fail", "--request", "GET", "--config", "-", url)
+    return ("curl", "--silent", "--show-error", "--fail-with-body", "--request", "GET", "--config", "-", url)
 
 
 # ---------------------------------------------------------------------------

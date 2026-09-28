@@ -58,11 +58,11 @@ def result(args: tuple[str, ...], stdout: str = "", stderr: str = "", returncode
 
 
 def curl_args(url: str) -> tuple[str, ...]:
-    return ("curl", "--silent", "--show-error", "--fail", "--request", "GET", "--config", "-", url)
+    return ("curl", "--silent", "--show-error", "--fail-with-body", "--request", "GET", "--config", "-", url)
 
 
 def curl_write_args() -> tuple[str, ...]:
-    return ("curl", "--silent", "--show-error", "--fail", "--config", "-")
+    return ("curl", "--silent", "--show-error", "--fail-with-body", "--config", "-")
 
 
 def write_jira_config(
@@ -1297,7 +1297,7 @@ def test_data_center_add_attachment_uploads_and_refreshes_cache(tmp_path: Path) 
     cache = JiraDataCenterIssueCache.for_project(tmp_path)
     runner = FakeRunner(
         {
-            curl_write_args(): result(curl_write_args(), stdout=json.dumps(attachments_payload())),
+                ("curl", "--silent", "--show-error", "--fail", "--config", "-"): result(curl_write_args(), stdout=json.dumps(attachments_payload())),
             curl_args(issue_url()): result(curl_args(issue_url()), stdout=json.dumps(jira_issue_payload())),
             curl_args(remote_links_url()): result(curl_args(remote_links_url()), stdout=json.dumps(remote_links_payload())),
         }
@@ -1318,7 +1318,7 @@ def test_data_center_add_attachment_uploads_and_refreshes_cache(tmp_path: Path) 
     assert response.payload["attachments"][0]["id"] == "40001"
 
     upload_request = runner.requests[0]
-    assert upload_request.args == curl_write_args()
+    assert upload_request.args == ("curl", "--silent", "--show-error", "--fail", "--config", "-")
     text = str(upload_request.input_text)
     assert 'header = "X-Atlassian-Token: no-check"' in text
     assert 'request = "POST"' in text
