@@ -56,6 +56,8 @@ receive the full hook, skill, slash-command, and use-case/Jira agent surface. He
 first-turn workflow policy injection for repositories with `.spectrack/config.yml`
 and bundled plugin skills such as `spectrack:handoff`.
 
+Run `spectrack --help` in a configured project to see its available commands.
+
 SpecTrack depends on the **guard** plugin. In Claude Code, installing or
 enabling SpecTrack installs and enables `guard` automatically, and `guard`
 cannot be disabled on its own while SpecTrack is enabled. In Codex and Hermes

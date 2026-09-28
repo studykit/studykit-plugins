@@ -7,10 +7,9 @@ set -euo pipefail
 SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 PLUGIN_ROOT="$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd -P)"
 
-if [ "$#" -lt 1 ]; then
-  echo "usage: spectrack <script.py|command> [args...]" >&2
-  exit 2
-fi
+show_help() {
+  uv run --script "$SCRIPT_DIR/help.py" --project "$(resolve_project_dir)"
+}
 
 exec_workflow_command() {
   local command="$1"
@@ -27,8 +26,12 @@ exec_workflow_command() {
     elif [[ "$command" == *.py && ! -f "$SCRIPT_DIR/$command" && -f "$SCRIPT_DIR/${command%.py}/__main__.py" ]]; then
       # Older injected instructions append .py even to package commands.
       candidate="$SCRIPT_DIR/${command%.py}/__main__.py"
-    else
+    elif [[ -f "$SCRIPT_DIR/$command" ]]; then
       candidate="$SCRIPT_DIR/$command"
+    else
+      echo "unknown spectrack command: $command" >&2
+      echo "Run 'spectrack --help' to list commands." >&2
+      exit 2
     fi
   else
     candidate="$command"
@@ -69,6 +72,29 @@ apply_terminal_environment() {
   export SPECTRACK_PLUGIN_ROOT="$PLUGIN_ROOT"
   export SPECTRACK_PROJECT_DIR="${SPECTRACK_PROJECT_DIR:-$(resolve_project_dir)}"
 }
+
+if [ "$#" -eq 0 ]; then
+  show_help >&2
+  exit 2
+fi
+
+case "$1" in
+  -h|--help)
+    show_help
+    exit 0
+    ;;
+  help)
+    if [ "$#" -eq 1 ]; then
+      show_help
+      exit 0
+    fi
+    if [ "$#" -ne 2 ]; then
+      echo "usage: spectrack help [command]" >&2
+      exit 2
+    fi
+    set -- "$2" --help
+    ;;
+esac
 
 COMMAND="$1"
 shift

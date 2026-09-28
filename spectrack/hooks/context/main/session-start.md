@@ -19,9 +19,10 @@ Resolve PRD-component page locations before reading or writing them:
 </prd-path>
 
 <commands>
-Issue CLI. Run `spectrack issue --help` to list the verbs available for
-this project's backend, then `spectrack issue <verb> --help` for a verb's
-flags and usage.
+Run `spectrack --help` to discover top-level commands, then
+`spectrack <command> --help` for its options. For issue work, run
+`spectrack issue --help` to list this project's backend verbs, then
+`spectrack issue <verb> --help` for a verb's flags and usage.
 </commands>
 
 <authoring-issues>

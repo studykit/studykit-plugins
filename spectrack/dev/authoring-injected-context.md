@@ -50,10 +50,10 @@ every per-agent SubagentStart block.
   Everything else is referenced on demand.
 - **Per-verb CLI usage** is *not* injected and has no on-demand doc tree.
   The injected `main/session-start.md` and `subagent/session-start.md`
-  carry a `<commands>` block that points the agent at `spectrack issue
-  --help` (backend-aware verb list) and `spectrack issue <verb> --help`
-  (per-verb flags) — the single source of truth for issue-CLI usage. The
-  agent runs `--help` when it needs a verb's flags.
+  carry a `<commands>` block that points the agent at `spectrack --help`
+  for top-level discovery, `spectrack issue --help` for the backend-aware
+  issue verb list, and `spectrack issue <verb> --help` for per-verb flags.
+  The agent runs `--help` when it needs a command's options.
 
 The runtime manifests (`hooks/hooks.json` for Claude and
 `hooks/hooks.codex.json` for Codex) and their adapters

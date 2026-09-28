@@ -5,7 +5,8 @@ feature change touches.
 
 ## Launcher
 
-The `scripts/spectrack` launcher resolves `<command>` to
+The `scripts/spectrack` launcher uses `scripts/help.py` for project-aware
+top-level command discovery. It resolves `<command>` to
 `scripts/<command>.py` or a package's `scripts/<command>/__main__.py` and
 runs it with `uv run --script`. There is no entry-point registration —
 adding a top-level command means adding a script or package there.
