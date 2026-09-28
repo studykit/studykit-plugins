@@ -728,14 +728,6 @@ def test_bypass_policy_reads_data_center_without_writing_cache(tmp_path: Path) -
     assert not cache.issue_json_file(jira_site(tmp_path), "TEST-1234").exists()
 
 
-def test_cloud_deployment_is_rejected_for_now(tmp_path: Path) -> None:
-    write_jira_config(tmp_path, deployment="cloud")
-    runner = FakeRunner({})
-
-    with pytest.raises(ProviderOperationError, match="Jira Cloud is out of scope"):
-        dispatch_get(tmp_path, runner)
-
-
 def test_data_center_create_inline_refreshes_cache(tmp_path: Path) -> None:
     write_jira_config(tmp_path)
     site = jira_site(tmp_path)
@@ -1284,9 +1276,10 @@ def attachments_payload() -> list[dict[str, object]]:
 
 
 def test_curl_multipart_config_sets_token_and_repeated_form_lines() -> None:
-    from issue.jira.client import _curl_multipart_config
+    from issue.jira.client import JiraDataCenterSite, _curl_multipart_config
 
     config = _curl_multipart_config(
+        JiraDataCenterSite(base_url="https://jira.example.test", authority="jira.example.test"),
         url="https://jira.example.test/rest/api/2/issue/TEST-1234/attachments",
         file_paths=["/tmp/a.png", "/tmp/b.pdf"],
     )

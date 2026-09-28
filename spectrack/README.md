@@ -7,16 +7,42 @@ draft, publish, refresh, and link work items without leaving the session.
 
 ## Supported Providers
 
-- **Issues** — GitHub Issues, Jira (Data Center / Server), or a local
+- **Issues** — GitHub Issues, Jira (Data Center / Server or Cloud), or a local
   filesystem provider.
 - **Knowledge** — GitHub repository `wiki/`.
 
 Issue tracking and knowledge documentation are configured independently, so
 mixed setups (e.g., Jira issues + GitHub repository `wiki/`) are supported.
 
-On Jira projects, issue and comment bodies must be Jira wiki markup rather than
-Markdown. The assistant checks each draft against that markup and fixes wrong
-syntax before showing you the draft for confirmation.
+On Jira Data Center / Server projects, issue and comment bodies must be Jira
+wiki markup rather than Markdown. The assistant checks each draft against that
+markup and fixes wrong syntax before showing you the draft for confirmation.
+
+On Jira Cloud, drafts stay Markdown: SpecTrack converts them to Jira's document
+format when publishing, and fetched issues and comments come back as Markdown.
+
+### Jira Cloud
+
+A site on `*.atlassian.net` is treated as Jira Cloud automatically (set
+`deployment: cloud` for any other Cloud host). Cloud needs:
+
+- Your Atlassian account email, as `email:` under `providers.issues` in
+  `.spectrack/config.yml` or in `JIRA_EMAIL` (which wins, so teammates sharing
+  a committed config can each use their own).
+- An API token from <https://id.atlassian.com/manage-profile/security/api-tokens>,
+  either in `JIRA_API_TOKEN` or, on macOS, in the login Keychain:
+
+  ```sh
+  security add-generic-password -U -s jira-api-token -a <your-email> -w
+  ```
+
+  Set `JIRA_KEYCHAIN_SERVICE` to use a different Keychain service name.
+- Node.js and npm on `PATH`. The first publish installs Atlassian's Markdown
+  converter into `~/.cache/spectrack/` (or `$XDG_CACHE_HOME/spectrack/`).
+- Access to the site's Confluence. Fetched bodies are converted to Markdown
+  through it.
+
+Assign issues by Atlassian accountId, or use `me`.
 
 ## Installation
 
@@ -50,7 +76,8 @@ root. The fastest way to create it is the bundled setup skill:
 
 The skill walks through provider selection, fills in the required fields,
 and writes `.spectrack/config.yml`. It also installs the Codex roles used for
-use-case exploration, review, screen mocks, and Jira markup correction; restart
+use-case exploration, review, screen mocks, and — on Jira Data Center / Server —
+Jira markup correction; restart
 Codex after setup so the new `spectrack:*` roles are available.
 
 A minimal hand-written configuration looks like:

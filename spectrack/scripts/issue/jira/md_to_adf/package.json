@@ -1,0 +1,11 @@
+{
+  "name": "spectrack-md-to-adf",
+  "private": true,
+  "description": "Markdown to Atlassian Document Format converter used by the SpecTrack Jira Cloud provider",
+  "license": "MIT",
+  "dependencies": {
+    "@atlaskit/adf-schema": "57.6.10",
+    "@atlaskit/editor-json-transformer": "10.0.0",
+    "@atlaskit/editor-markdown-transformer": "6.3.1"
+  }
+}

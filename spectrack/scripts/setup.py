@@ -22,7 +22,6 @@ import tempfile
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlparse
 
 import yaml
 
@@ -61,6 +60,8 @@ from issue.jira.client import (  # noqa: E402
     jira_data_center_issue_path,
     jira_data_center_site_from_provider_config,
     jira_data_center_transitions_path,
+    jira_bodies_use_wiki_markup,
+    jira_deployment_from_settings,
     jira_get_json,
 )
 from issue.jira.refs import JiraProviderError, normalize_jira_issue_key  # noqa: E402
@@ -323,8 +324,9 @@ def build_jira_relationship_mappings(
 def inspect_jira_relationships(
     *,
     jira_site: str,
-    jira_deployment: str | None = "data_center",
-    jira_api_version: str | None = "2",
+    jira_deployment: str | None = None,
+    jira_api_version: str | None = None,
+    jira_email: str | None = None,
     jira_project: str | None = None,
     issues: Sequence[str] = (),
     field_queries: Sequence[str] = (),
@@ -332,13 +334,8 @@ def inspect_jira_relationships(
 ) -> dict[str, Any]:
     """Inspect Jira relationship surfaces without inferring config mappings."""
 
-    settings: dict[str, Any] = {
-        "site": jira_site,
-        "deployment": jira_deployment or "data_center",
-        "api_version": jira_api_version or "2",
-    }
+    settings = _jira_site_settings(jira_site, jira_deployment, jira_api_version, jira_email)
     _set_if_text(settings, "project", jira_project.upper() if jira_project else None)
-    _reject_cloud_provider("Jira", settings)
     site = jira_data_center_site_from_provider_config(
         ProviderConfig(role="issue", kind="jira", settings=settings)
     )
@@ -383,8 +380,9 @@ def inspect_jira_relationships(
 def inspect_jira_state_transitions(
     *,
     jira_site: str,
-    jira_deployment: str | None = "data_center",
-    jira_api_version: str | None = "2",
+    jira_deployment: str | None = None,
+    jira_api_version: str | None = None,
+    jira_email: str | None = None,
     issues: Sequence[str],
     runner: CommandRunner | None = None,
 ) -> dict[str, Any]:
@@ -393,12 +391,7 @@ def inspect_jira_state_transitions(
     if not issues:
         raise WorkflowSetupError("jira-state-transition-inspect requires at least one --issue")
 
-    settings: dict[str, Any] = {
-        "site": jira_site,
-        "deployment": jira_deployment or "data_center",
-        "api_version": jira_api_version or "2",
-    }
-    _reject_cloud_provider("Jira", settings)
+    settings = _jira_site_settings(jira_site, jira_deployment, jira_api_version, jira_email)
     site = jira_data_center_site_from_provider_config(
         ProviderConfig(role="issue", kind="jira", settings=settings)
     )
@@ -489,8 +482,9 @@ def build_config(
     github_wiki_prd_path: str | None = None,
     github_labels: Sequence[Mapping[str, str]] | None = None,
     jira_site: str | None = None,
-    jira_deployment: str | None = "data_center",
-    jira_api_version: str | None = "2",
+    jira_deployment: str | None = None,
+    jira_api_version: str | None = None,
+    jira_email: str | None = None,
     jira_project: str | None = None,
     jira_issue_type: str | None = None,
     jira_epic_fields: Mapping[str, str] | None = None,
@@ -544,6 +538,7 @@ def build_config(
         jira_site=jira_site,
         jira_deployment=jira_deployment,
         jira_api_version=jira_api_version,
+        jira_email=jira_email,
         jira_project=jira_project,
         jira_issue_type=jira_issue_type,
         jira_epic_fields=normalized_epic_fields,
@@ -568,7 +563,6 @@ def build_config(
     )
 
     if issue_provider == "jira":
-        _reject_cloud_provider("Jira", issues)
         _require_jira_relationship_mappings(jira_relationship_mappings)
         _validate_relationship_mappings(jira_relationship_mappings)
 
@@ -632,6 +626,9 @@ SPECTRACK_CODEX_AGENT_ROLES: Mapping[str, str] = {
     "usecase-explorer": "SpecTrack explorer that finds candidate use cases missed by an existing set of workflow usecase issues.",
     "usecase-reviewer": "SpecTrack reviewer that publishes review issues for quality findings in workflow usecase issues.",
 }
+# Roles that only serve Jira wiki-markup projects; every other project gets
+# them removed instead, since nothing there would ever dispatch them.
+JIRA_WIKI_MARKUP_CODEX_AGENT_ROLES = frozenset({"jira-format-corrector"})
 RETIRED_CODEX_AGENT_ROLES = frozenset({
     "implementation-auditor",
     "issue-implementer",
@@ -699,17 +696,24 @@ def ensure_agents_knowledge_root(
     }
 
 
-def install_codex_agents(project: Path) -> dict[str, Any]:
-    """Install SpecTrack Codex roles and project-local hook adapters."""
+def install_codex_agents(project: Path, config: WorkflowConfig | None = None) -> dict[str, Any]:
+    """Install SpecTrack Codex roles and project-local hook adapters.
+
+    ``config`` (loaded from the project when omitted) decides which roles the
+    project needs; without any config every role is installed.
+    """
 
     project = project.expanduser().resolve()
+    if config is None:
+        config = load_workflow_config(project)
+    wanted_roles = _codex_agent_roles_for(config)
     codex_dir = project / CODEX_DIRNAME
     role_dir = project / CODEX_SPECTRACK_AGENT_DIR
     codex_dir.mkdir(parents=True, exist_ok=True)
     role_dir.mkdir(parents=True, exist_ok=True)
 
     installed_roles: list[dict[str, str]] = []
-    for agent_name in sorted(SPECTRACK_CODEX_AGENT_ROLES):
+    for agent_name in sorted(wanted_roles):
         source_path = Path(__file__).resolve().parent.parent / "agents" / f"{agent_name}.md"
         body = _load_agent_instruction_body(source_path)
         role_path = role_dir / f"spectrack-{agent_name}.toml"
@@ -725,6 +729,11 @@ def install_codex_agents(project: Path) -> dict[str, Any]:
         )
 
     removed_roles: list[str] = []
+    for agent_name in sorted(set(SPECTRACK_CODEX_AGENT_ROLES) - wanted_roles):
+        role_path = role_dir / f"spectrack-{agent_name}.toml"
+        if role_path.exists():
+            role_path.unlink()
+            removed_roles.append(str(role_path))
     for agent_name in sorted(RETIRED_CODEX_AGENT_ROLES):
         for filename in (f"spectrack-{agent_name}.toml", f"{agent_name}.toml"):
             role_path = role_dir / filename
@@ -763,6 +772,16 @@ def install_codex_agents(project: Path) -> dict[str, Any]:
         "hooks": hooks,
         "restart_required": True,
     }
+
+
+def _codex_agent_roles_for(config: WorkflowConfig | None) -> set[str]:
+    roles = set(SPECTRACK_CODEX_AGENT_ROLES)
+    if config is None:
+        return roles
+    issues = config.issues
+    if issues.kind != "jira" or not jira_bodies_use_wiki_markup(issues.settings):
+        roles -= JIRA_WIKI_MARKUP_CODEX_AGENT_ROLES
+    return roles
 
 
 def install_codex_hooks(project: Path) -> dict[str, Any]:
@@ -953,7 +972,7 @@ def write_config(
     agents_update = ensure_agents_knowledge_root(project, verified)
     if agents_update is not None:
         result["agents_md"] = agents_update
-    result["codex_agents"] = install_codex_agents(project)
+    result["codex_agents"] = install_codex_agents(project, verified)
     return result
 
 
@@ -1012,14 +1031,6 @@ def profile_from_docs(paths: Sequence[Path], *, stdin_text: str | None = None) -
                 defaults[key] = value
                 sources[key] = source
 
-    jira_deployment = defaults.get("jira_deployment")
-    if isinstance(jira_deployment, str) and _is_cloud_deployment(jira_deployment):
-        warnings.append("Jira Cloud was found in provider profile defaults, but only Data Center or Server is supported")
-
-    jira_site = defaults.get("jira_site")
-    if isinstance(jira_site, str) and _is_atlassian_cloud_site(jira_site):
-        warnings.append("Jira atlassian.net site was found in provider profile defaults, but Cloud is unsupported")
-
     return {
         "operation": "profile_from_docs",
         "defaults": defaults,
@@ -1067,9 +1078,10 @@ def build_parser() -> argparse.ArgumentParser:
         "jira-relationship-inspect",
         help="inspect Jira link types, relationship fields, and sample issue relationship data",
     )
-    jira_inspect.add_argument("--jira-site", required=True, help="Jira Data Center or Server base URL")
-    jira_inspect.add_argument("--jira-deployment", default="data_center", help="Jira deployment; Cloud is unsupported")
-    jira_inspect.add_argument("--jira-api-version", default="2", help="Jira REST API version")
+    jira_inspect.add_argument("--jira-site", required=True, help="Jira base URL (Data Center, Server, or Cloud)")
+    jira_inspect.add_argument("--jira-deployment", help="Jira deployment: data_center or cloud (default: cloud for *.atlassian.net sites, else data_center)")
+    jira_inspect.add_argument("--jira-api-version", help="Jira REST API version (default: 3 on Cloud, 2 on Data Center)")
+    jira_inspect.add_argument("--jira-email", help="Atlassian account email for Jira Cloud basic auth; stored as providers.issues.email")
     jira_inspect.add_argument("--jira-project", help="Jira project key")
     jira_inspect.add_argument("--issue", action="append", default=[], help="sample Jira issue key to inspect")
     jira_inspect.add_argument(
@@ -1083,9 +1095,10 @@ def build_parser() -> argparse.ArgumentParser:
         "jira-state-transition-inspect",
         help="inspect Jira workflow transitions reachable from sample issues",
     )
-    jira_state_inspect.add_argument("--jira-site", required=True, help="Jira Data Center or Server base URL")
-    jira_state_inspect.add_argument("--jira-deployment", default="data_center", help="Jira deployment; Cloud is unsupported")
-    jira_state_inspect.add_argument("--jira-api-version", default="2", help="Jira REST API version")
+    jira_state_inspect.add_argument("--jira-site", required=True, help="Jira base URL (Data Center, Server, or Cloud)")
+    jira_state_inspect.add_argument("--jira-deployment", help="Jira deployment: data_center or cloud (default: cloud for *.atlassian.net sites, else data_center)")
+    jira_state_inspect.add_argument("--jira-api-version", help="Jira REST API version (default: 3 on Cloud, 2 on Data Center)")
+    jira_state_inspect.add_argument("--jira-email", help="Atlassian account email for Jira Cloud basic auth; stored as providers.issues.email")
     jira_state_inspect.add_argument(
         "--issue",
         action="append",
@@ -1176,6 +1189,7 @@ def _dispatch(args: argparse.Namespace) -> dict[str, Any]:
             jira_site=args.jira_site,
             jira_deployment=args.jira_deployment,
             jira_api_version=args.jira_api_version,
+            jira_email=args.jira_email,
             jira_project=args.jira_project,
             issues=args.issue,
             field_queries=args.field_query,
@@ -1185,6 +1199,7 @@ def _dispatch(args: argparse.Namespace) -> dict[str, Any]:
             jira_site=args.jira_site,
             jira_deployment=args.jira_deployment,
             jira_api_version=args.jira_api_version,
+            jira_email=args.jira_email,
             issues=args.issue,
         )
     if args.command == "jira-relationship-mappings":
@@ -1238,9 +1253,10 @@ def _add_config_build_args(parser: argparse.ArgumentParser) -> None:
         "--github-labels-json",
         help="JSON array of GitHub label objects {name,color,description}; or a file path when it names one",
     )
-    parser.add_argument("--jira-site", help="Jira Data Center or Server base URL")
-    parser.add_argument("--jira-deployment", default="data_center", help="Jira deployment; Cloud is unsupported")
-    parser.add_argument("--jira-api-version", default="2", help="Jira REST API version")
+    parser.add_argument("--jira-site", help="Jira base URL (Data Center, Server, or Cloud)")
+    parser.add_argument("--jira-deployment", help="Jira deployment: data_center or cloud (default: cloud for *.atlassian.net sites, else data_center)")
+    parser.add_argument("--jira-api-version", help="Jira REST API version (default: 3 on Cloud, 2 on Data Center)")
+    parser.add_argument("--jira-email", help="Atlassian account email for Jira Cloud basic auth; stored as providers.issues.email")
     parser.add_argument("--jira-project", help="Jira project key")
     parser.add_argument("--jira-issue-type", help="Jira issue type")
     parser.add_argument(
@@ -1315,6 +1331,7 @@ def _config_from_args(args: argparse.Namespace) -> dict[str, Any]:
         jira_site=args.jira_site,
         jira_deployment=args.jira_deployment,
         jira_api_version=args.jira_api_version,
+        jira_email=args.jira_email,
         jira_project=args.jira_project,
         jira_issue_type=args.jira_issue_type,
         jira_epic_issue_type=args.jira_epic_issue_type,
@@ -1369,6 +1386,7 @@ def _issue_provider_config(
     jira_site: str | None,
     jira_deployment: str | None,
     jira_api_version: str | None,
+    jira_email: str | None,
     jira_project: str | None,
     jira_issue_type: str | None,
     jira_epic_fields: Mapping[str, str] | None,
@@ -1388,9 +1406,8 @@ def _issue_provider_config(
         if normalized_labels:
             settings["labels"] = normalized_labels
     elif provider == "jira":
-        _set_if_text(settings, "site", jira_site)
-        _set_if_text(settings, "deployment", jira_deployment or "data_center")
-        _set_if_text(settings, "api_version", jira_api_version or "2")
+        if jira_site:
+            settings.update(_jira_site_settings(jira_site, jira_deployment, jira_api_version, jira_email))
         _set_if_text(settings, "project", jira_project.upper() if jira_project else None)
         _set_if_text(settings, "issue_type", jira_issue_type)
         _set_if_text(settings, "task_review_agent", jira_task_review_agent)
@@ -2155,13 +2172,25 @@ def _require_jira_relationship_mappings(mappings: Mapping[str, Any] | None) -> N
     )
 
 
-def _reject_cloud_provider(product: str, settings: Mapping[str, Any]) -> None:
-    deployment = _text(settings.get("deployment") or settings.get("type") or settings.get("edition"))
-    if deployment and _is_cloud_deployment(deployment):
-        raise WorkflowSetupError(f"{product} Cloud is unsupported; use Data Center or Server settings")
-    site = _text(settings.get("site") or settings.get("base_url") or settings.get("url") or settings.get("host") or settings.get("hostname"))
-    if site and _is_atlassian_cloud_site(site):
-        raise WorkflowSetupError(f"{product} Cloud atlassian.net sites are unsupported; use Data Center or Server settings")
+def _jira_site_settings(
+    site: str,
+    deployment: str | None,
+    api_version: str | None,
+    email: str | None = None,
+) -> dict[str, Any]:
+    """Build Jira site settings, detecting Cloud from an ``*.atlassian.net`` host.
+
+    Cloud only speaks REST v3 for ADF bodies, so its api_version defaults to 3;
+    Data Center keeps the v2 default.
+    """
+
+    settings: dict[str, Any] = {"site": site}
+    _set_if_text(settings, "deployment", deployment)
+    resolved = jira_deployment_from_settings(settings)
+    settings["deployment"] = resolved
+    settings["api_version"] = api_version or ("3" if resolved == "cloud" else "2")
+    _set_if_text(settings, "email", email)
+    return settings
 
 
 def _looks_like_provider_profile(text: str) -> bool:
@@ -2330,19 +2359,6 @@ def _dig_text(mapping: Mapping[str, Any], keys: tuple[str, str]) -> str | None:
     if not isinstance(first, Mapping):
         return None
     return _text(first.get(keys[1]))
-
-
-def _is_cloud_deployment(value: str) -> bool:
-    normalized = value.strip().lower().replace("-", "_").replace(" ", "_")
-    return normalized in {"cloud", "jira_cloud", "atlassian_cloud"}
-
-
-def _is_atlassian_cloud_site(value: str) -> bool:
-    raw = value.strip()
-    if "://" not in raw:
-        raw = f"https://{raw}"
-    parsed = urlparse(raw)
-    return bool(parsed.hostname and parsed.hostname.lower().endswith(".atlassian.net"))
 
 
 def _non_default_github_host(host: str | None) -> str | None:

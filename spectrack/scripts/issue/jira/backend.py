@@ -910,7 +910,7 @@ class JiraIssueBackend:
         )
         publish.add_argument(
             "--assignee",
-            help='Jira DC username or the literal "me" to resolve via /rest/api/<v>/myself',
+            help='Jira username (Data Center) or accountId (Cloud), or the literal "me" to resolve via /rest/api/<v>/myself',
         )
         publish.add_argument(
             "--parent",
@@ -1571,7 +1571,7 @@ class JiraIssueBackend:
 
         p_assign = subparsers.add_parser("assign", help="assign an issue to a user")
         p_assign.add_argument("issue", help="Jira issue key")
-        p_assign.add_argument("user", help='Jira DC username or the literal "me"')
+        p_assign.add_argument("user", help='Jira username (Data Center) or accountId (Cloud), or the literal "me"')
 
         p_unassign = subparsers.add_parser("unassign", help="clear the assignee")
         p_unassign.add_argument("issue", help="Jira issue key")

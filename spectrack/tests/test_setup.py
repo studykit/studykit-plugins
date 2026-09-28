@@ -223,14 +223,45 @@ def test_build_config_rejects_invalid_provider_for_role(tmp_path: Path) -> None:
         )
 
 
-def test_build_config_rejects_jira_cloud_deployment(tmp_path: Path) -> None:
-    with pytest.raises(WorkflowSetupError, match="Jira Cloud"):
-        build_config(
-            project=tmp_path,
-            issue_provider="jira",
-            knowledge_provider="github",
-            jira_site="https://acme.atlassian.net",
-        )
+def test_build_config_detects_jira_cloud_from_atlassian_net_site(tmp_path: Path) -> None:
+    payload = build_config(
+        project=tmp_path,
+        issue_provider="jira",
+        knowledge_provider="github",
+        jira_site="https://acme.atlassian.net",
+        jira_relationship_mappings=_jira_relationship_mappings(),
+    )
+
+    issues = payload["providers"]["issues"]
+    assert issues["deployment"] == "cloud"
+    assert issues["api_version"] == "3"
+
+
+def test_build_config_records_the_jira_cloud_account_email(tmp_path: Path) -> None:
+    payload = build_config(
+        project=tmp_path,
+        issue_provider="jira",
+        knowledge_provider="github",
+        jira_site="https://acme.atlassian.net",
+        jira_email="user@example.test",
+        jira_relationship_mappings=_jira_relationship_mappings(),
+    )
+
+    assert payload["providers"]["issues"]["email"] == "user@example.test"
+
+
+def test_build_config_keeps_data_center_defaults_for_other_sites(tmp_path: Path) -> None:
+    payload = build_config(
+        project=tmp_path,
+        issue_provider="jira",
+        knowledge_provider="github",
+        jira_site="https://jira.example.test",
+        jira_relationship_mappings=_jira_relationship_mappings(),
+    )
+
+    issues = payload["providers"]["issues"]
+    assert issues["deployment"] == "data_center"
+    assert issues["api_version"] == "2"
 
 
 def test_capabilities_mark_jira_setup_incomplete_when_relationship_mappings_are_missing() -> None:
@@ -1078,6 +1109,39 @@ def test_install_codex_agents_removes_legacy_managed_block_only(tmp_path: Path) 
     assert str(legacy_role) in result["removed_agents"]
 
 
+def _write_issue_provider_config(project: Path, issues_yaml: str) -> None:
+    config_path = project / ".spectrack" / "config.yml"
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    config_path.write_text(
+        "version: 1\nproviders:\n  issues:\n" + issues_yaml + "  knowledge:\n    kind: github\n",
+        encoding="utf-8",
+    )
+
+
+def test_install_codex_agents_skips_jira_format_corrector_on_jira_cloud(tmp_path: Path) -> None:
+    role_path = tmp_path / CODEX_SPECTRACK_AGENT_DIR / "spectrack-jira-format-corrector.toml"
+    role_path.parent.mkdir(parents=True)
+    role_path.write_text("stale role\n", encoding="utf-8")
+    _write_issue_provider_config(tmp_path, "    kind: jira\n    site: https://acme.atlassian.net\n")
+
+    result = install_codex_agents(tmp_path)
+
+    names = {item["name"] for item in result["agents"]}
+    assert "spectrack:jira-format-corrector" not in names
+    assert "spectrack:usecase-explorer" in names
+    assert not role_path.exists()
+    assert str(role_path) in result["removed_agents"]
+
+
+def test_install_codex_agents_keeps_jira_format_corrector_on_data_center(tmp_path: Path) -> None:
+    _write_issue_provider_config(tmp_path, "    kind: jira\n    site: https://jira.example.test\n")
+
+    result = install_codex_agents(tmp_path)
+
+    assert "spectrack:jira-format-corrector" in {item["name"] for item in result["agents"]}
+    assert (tmp_path / CODEX_SPECTRACK_AGENT_DIR / "spectrack-jira-format-corrector.toml").exists()
+
+
 def test_install_codex_agents_is_idempotent(tmp_path: Path) -> None:
     install_codex_agents(tmp_path)
 
@@ -1198,7 +1262,7 @@ providers:
     assert payload["defaults"]["github_wiki_host"] == "github.enterprise.test"
 
 
-def test_profile_from_docs_reports_cloud_defaults() -> None:
+def test_profile_from_docs_accepts_cloud_defaults() -> None:
     payload = profile_from_docs(
         [],
         stdin_text="""
@@ -1207,7 +1271,8 @@ Jira site: https://acme.atlassian.net
 """.strip(),
     )
 
-    assert any("Cloud" in item for item in payload["warnings"])
+    assert payload["defaults"]["jira_deployment"] == "cloud"
+    assert not any("Cloud" in item for item in payload["warnings"])
 
 
 @pytest.mark.parametrize(

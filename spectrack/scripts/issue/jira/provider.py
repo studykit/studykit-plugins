@@ -18,6 +18,7 @@ from issue.cache import (
     relationship_operations_from_intent,
     require_provider_freshness,
 )
+from issue.jira import adf
 from issue.jira.cache import JiraDataCenterIssueCache, jira_target_fingerprint
 from issue.jira.refs import JiraProviderError, normalize_jira_issue_key
 from issue.jira.relationships import (
@@ -944,12 +945,57 @@ def get_issue(
     *,
     runner: CommandRunner | None = None,
 ) -> Mapping[str, Any]:
-    """Read one Jira Data Center issue REST object."""
+    """Read one Jira issue REST object.
+
+    On Cloud the ADF description and comment bodies are replaced with their
+    Markdown rendering before anything downstream sees the issue, so the cache,
+    normalization, and write-back fingerprints all work on the same Markdown
+    text a Data Center site would hand back as a plain string.
+    """
 
     raw_issue = jira_get_json(site, jira_data_center_issue_path(site, issue_key), runner=runner)
     if not isinstance(raw_issue, Mapping):
-        raise JiraProviderError(f"Jira Data Center issue response was not an object: {issue_key}")
+        raise JiraProviderError(f"Jira issue response was not an object: {issue_key}")
+    if getattr(site, "is_cloud", False):
+        return _cloud_issue_with_markdown_bodies(site, raw_issue, runner=runner)
     return raw_issue
+
+
+def _cloud_issue_with_markdown_bodies(
+    site: Any,
+    raw_issue: Mapping[str, Any],
+    *,
+    runner: CommandRunner | None,
+) -> Mapping[str, Any]:
+    fields = raw_issue.get("fields")
+    if not isinstance(fields, Mapping):
+        return raw_issue
+    new_fields = dict(fields)
+    if adf.is_adf_document(fields.get("description")):
+        new_fields["description"] = adf.adf_to_markdown(site, fields["description"], runner=runner)
+    comment_block = fields.get("comment")
+    if isinstance(comment_block, Mapping) and isinstance(comment_block.get("comments"), list):
+        comments = []
+        for comment in comment_block["comments"]:
+            if isinstance(comment, Mapping) and adf.is_adf_document(comment.get("body")):
+                comment = {**comment, "body": adf.adf_to_markdown(site, comment["body"], runner=runner)}
+            comments.append(comment)
+        new_fields["comment"] = {**comment_block, "comments": comments}
+    return {**raw_issue, "fields": new_fields}
+
+
+def _cloud_body(site: Any, body: str, *, runner: CommandRunner | None) -> Any:
+    """Return a body value in the site's native format (ADF on Cloud)."""
+
+    if getattr(site, "is_cloud", False):
+        return adf.markdown_to_adf(body, runner=runner)
+    return body
+
+
+def _jira_user_ref(site: Any, user: str) -> dict[str, str]:
+    """Cloud identifies users by accountId; Data Center by username."""
+
+    return {"accountId": user} if getattr(site, "is_cloud", False) else {"name": user}
 
 
 def get_remote_links(
@@ -1033,7 +1079,7 @@ def create_issue(
         "fields": {
             "project": {"key": project_key},
             "summary": title,
-            "description": body,
+            "description": _cloud_body(site, body, runner=runner),
             "issuetype": {"name": issue_type},
         }
     }
@@ -1044,7 +1090,7 @@ def create_issue(
     if epic_name is not None and epic_name_field is not None:
         payload["fields"][epic_name_field] = epic_name
     if assignee:
-        payload["fields"]["assignee"] = {"name": assignee}
+        payload["fields"]["assignee"] = _jira_user_ref(site, assignee)
     result = jira_send_json(site, "POST", f"/rest/api/{site.api_version}/issue", payload, runner=runner)
     if not isinstance(result, Mapping):
         raise JiraProviderError("Jira create issue response was not an object")
@@ -1062,6 +1108,11 @@ def update_issue(
     payload: dict[str, Any] = {}
     if fields:
         payload["fields"] = dict(fields)
+        if isinstance(payload["fields"].get("description"), str):
+            payload["fields"]["description"] = _cloud_body(site, payload["fields"]["description"], runner=runner)
+        assignee = payload["fields"].get("assignee")
+        if isinstance(assignee, Mapping) and isinstance(assignee.get("name"), str):
+            payload["fields"]["assignee"] = _jira_user_ref(site, assignee["name"])
     if update:
         payload["update"] = dict(update)
     if not payload:
@@ -1083,15 +1134,19 @@ def get_jira_myself(
     *,
     runner: CommandRunner | None = None,
 ) -> str:
-    """Return the authenticated Jira user's name via ``/rest/api/<v>/myself``."""
+    """Return the authenticated Jira user's assignable id via ``/rest/api/<v>/myself``.
+
+    That is the username on Data Center and the accountId on Cloud, which has
+    no usernames.
+    """
 
     path = f"/rest/api/{site.api_version}/myself"
     result = jira_get_json(site, path, runner=runner)
     if isinstance(result, Mapping):
-        name = result.get("name")
+        name = result.get("accountId" if getattr(site, "is_cloud", False) else "name")
         if isinstance(name, str) and name.strip():
             return name.strip()
-    raise ProviderOperationError("could not resolve Jira authenticated user (missing 'name')")
+    raise ProviderOperationError("could not resolve Jira authenticated user (missing 'name' or 'accountId')")
 
 
 def create_issue_link(
@@ -1214,7 +1269,7 @@ def add_comment(
         site,
         "POST",
         jira_data_center_comments_path(site, issue_key),
-        {"body": body},
+        {"body": _cloud_body(site, body, runner=runner)},
         runner=runner,
     )
     if not isinstance(result, Mapping):
@@ -1234,7 +1289,7 @@ def update_comment(
         site,
         "PUT",
         jira_data_center_comment_path(site, issue_key, comment_id),
-        {"body": body},
+        {"body": _cloud_body(site, body, runner=runner)},
         runner=runner,
     )
     if not isinstance(result, Mapping):

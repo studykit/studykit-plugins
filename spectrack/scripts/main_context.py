@@ -31,6 +31,7 @@ injection so runtimes without a ``spectrack`` PATH export can use literal paths.
 from __future__ import annotations
 
 import re
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
@@ -111,8 +112,9 @@ def build_session_policy_context(
     })
     if not _mustread_enabled(config):
         rendered = _strip_authoring_resolver(rendered)
-    if issue_provider != "jira":
+    if issue_provider != "jira" or not _jira_uses_wiki_markup(config):
         rendered = _strip_jira_format(rendered)
+        rendered = _drop_jira_markup_check(rendered)
     rendered = _strip_unconfigured_jira_review_blocks(rendered, config)
     return _wrap_policy(rendered)
 
@@ -141,8 +143,9 @@ def build_subagent_policy_context(
     })
     if not _mustread_enabled(config):
         rendered = _strip_authoring_resolver(rendered)
-    if issue_provider != "jira":
+    if issue_provider != "jira" or not _jira_uses_wiki_markup(config):
         rendered = _strip_jira_format(rendered)
+        rendered = _drop_jira_markup_check(rendered)
     rendered = _strip_unconfigured_jira_review_blocks(rendered, config)
     agent_block = _build_agent_context_block(agent_type, issue_provider)
     # An agent whose own block carries <jira-format> owns the markup rules in
@@ -214,6 +217,33 @@ def _strip_authoring_resolver(text: str) -> str:
 
     stripped = _AUTHORING_RESOLVER_BLOCK_RE.sub("\n\n", text, count=1)
     return re.sub(r"\n{3,}", "\n\n", stripped).strip()
+
+
+def _jira_uses_wiki_markup(config: Any) -> bool:
+    """Whether Jira bodies are authored as wiki markup.
+
+    On Jira Cloud they are Markdown, so the wiki-markup rules and the markup
+    check would only corrupt them.
+    """
+
+    from issue.jira.client import jira_bodies_use_wiki_markup
+
+    issues = getattr(config, "issues", None)
+    settings = getattr(issues, "settings", None)
+    if not isinstance(settings, Mapping):
+        return True
+    return jira_bodies_use_wiki_markup(settings)
+
+
+_JIRA_MARKUP_CHECK_STEP_RE = re.compile(r"then\s+run\s+the\s+Jira\s+markup\s+check\s+and\s+present")
+_JIRA_MARKUP_CHECK_GATE_RE = re.compile(r"the\s+review,\s+markup\s+check,\s+and\s+user")
+
+
+def _drop_jira_markup_check(text: str) -> str:
+    """Remove the markup-check step from the Jira review gates."""
+
+    text = _JIRA_MARKUP_CHECK_STEP_RE.sub("then present", text)
+    return _JIRA_MARKUP_CHECK_GATE_RE.sub("the review and user", text)
 
 
 def _strip_jira_format(text: str) -> str:

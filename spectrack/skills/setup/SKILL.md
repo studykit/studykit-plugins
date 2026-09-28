@@ -145,8 +145,12 @@ spectrack config.py --project <project-root> --require
   inside the knowledge folder. The value must be relative to
   `--github-wiki-path` and must not contain `..`. When omitted, PRD
   pages sit at the knowledge folder root.
-- Jira setup targets Data Center or Server only. Reject or report Cloud,
-  including `*.atlassian.net` sites.
+- Jira setup supports Data Center / Server and Cloud. An `*.atlassian.net`
+  site is detected as Cloud on REST v3; omit `--jira-deployment` and
+  `--jira-api-version` unless the user names them. Cloud calls need the
+  account email (see Jira Site Profiling) and an API token
+  (`JIRA_API_TOKEN`, or the macOS Keychain); if inspection fails with a
+  credential error, ask the user to provide them rather than retrying.
 - Jira issue setup requires explicit `providers.issues.relationship_mappings`
   before final config generation. Collect sample issue keys, inspect the Jira
   site, and ask the user to confirm exact mappings. If site data or confirmed
@@ -206,7 +210,11 @@ confirmed workflow config: inspect the site, show the evidence, ask for
 confirmation, then use only the exact confirmed values in setup.
 
 1. Resolve the Jira site, deployment, API version, and project key from the
-   user, provider profile, or `.spectrack/config.yml`.
+   user, provider profile, or `.spectrack/config.yml`. When the site is Jira
+   Cloud, ask the user for their Atlassian account email and pass it as
+   `--jira-email` to every inspect command and to `build-config`, which
+   records it as `providers.issues.email`. Mention that `JIRA_EMAIL`
+   overrides it, so teammates sharing a committed config can use their own.
 2. Collect sample issue keys for each relationship surface the user cares about:
    an issue with dependencies or related links, a parent issue with sub-tasks, a
    sub-task, and any site-specific hierarchy example.

@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
-"""Jira Data Center site config and REST client helpers."""
+"""Jira site config and REST client helpers (Data Center/Server and Cloud)."""
 
 from __future__ import annotations
 
+import functools
 import json
 import os
+import subprocess
+import sys
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
@@ -16,11 +19,16 @@ from config import ProviderConfig, WorkflowConfigError, load_workflow_config
 from issue.jira.refs import JiraProviderError, normalize_jira_issue_key
 
 DEPLOYMENT_DATA_CENTER = "data_center"
+DEPLOYMENT_CLOUD = "cloud"
+# Cloud issue bodies are ADF, which only REST v3 speaks; v2 would hand back wiki
+# markup converted server-side, so Cloud is pinned to v3.
+CLOUD_API_VERSION = "3"
+DEFAULT_KEYCHAIN_SERVICE = "jira-api-token"
 
 
 @dataclass(frozen=True)
 class JiraDataCenterSite:
-    """Resolved Jira Data Center or Server site configuration."""
+    """Resolved Jira site configuration (Data Center/Server or Cloud)."""
 
     base_url: str
     authority: str
@@ -28,10 +36,12 @@ class JiraDataCenterSite:
     project: str | None = None
     issue_type: str | None = None
     cache_site: str | None = None
+    deployment: str = DEPLOYMENT_DATA_CENTER
+    email: str | None = None
 
     @property
-    def deployment(self) -> str:
-        return DEPLOYMENT_DATA_CENTER
+    def is_cloud(self) -> bool:
+        return self.deployment == DEPLOYMENT_CLOUD
 
     @property
     def cache_site_segment(self) -> str:
@@ -52,7 +62,7 @@ class JiraDataCenterSite:
 
 
 def resolve_jira_data_center_site(project: Path) -> JiraDataCenterSite:
-    """Resolve Jira Data Center issue provider settings from ``.spectrack/config.yml``."""
+    """Resolve Jira issue provider settings from ``.spectrack/config.yml``."""
 
     try:
         config = load_workflow_config(project, require=True)
@@ -64,24 +74,30 @@ def resolve_jira_data_center_site(project: Path) -> JiraDataCenterSite:
 
 
 def jira_data_center_site_from_provider_config(provider: ProviderConfig) -> JiraDataCenterSite:
-    """Resolve normalized Jira Data Center settings from an issue provider config."""
+    """Resolve normalized Jira settings from an issue provider config."""
 
     if provider.kind != "jira":
         raise JiraProviderError(f"provider config is not Jira: {provider.kind}")
 
     settings = dict(provider.settings)
-    deployment = _string_setting(settings, "deployment", "type", "edition")
-    if deployment is not None and _normalize_deployment(deployment) != DEPLOYMENT_DATA_CENTER:
-        raise JiraProviderError("Jira Cloud is out of scope for this provider; use a Data Center/on-premise site")
-
     raw_site = _string_setting(settings, "site", "base_url", "url", "host", "hostname")
     if raw_site is None:
         raise JiraProviderError("Jira issue provider requires a site, base_url, url, host, or hostname setting")
     base_url, authority, cache_site = _normalize_base_url(raw_site)
+    deployment = jira_deployment_from_settings(settings)
 
-    api_version = _string_setting(settings, "api_version", "apiVersion", "rest_api_version") or "2"
+    raw_api_version = _string_setting(settings, "api_version", "apiVersion", "rest_api_version")
+    if deployment == DEPLOYMENT_CLOUD:
+        if raw_api_version is not None and raw_api_version.strip().strip("/") != CLOUD_API_VERSION:
+            raise JiraProviderError(
+                f"Jira Cloud requires REST API version {CLOUD_API_VERSION}; got {raw_api_version}"
+            )
+        api_version = CLOUD_API_VERSION
+    else:
+        api_version = raw_api_version or "2"
     project = _string_setting(settings, "project", "project_key", "projectKey")
     issue_type = _string_setting(settings, "issue_type", "issueType", "issuetype", "issue_type_name")
+    email = _string_setting(settings, "email", "account_email", "accountEmail")
     return JiraDataCenterSite(
         base_url=base_url,
         authority=authority,
@@ -89,7 +105,37 @@ def jira_data_center_site_from_provider_config(provider: ProviderConfig) -> Jira
         project=project.upper() if project else None,
         issue_type=issue_type,
         cache_site=cache_site,
+        deployment=deployment,
+        email=email,
     )
+
+
+def jira_bodies_use_wiki_markup(settings: Mapping[str, Any]) -> bool:
+    """Whether issue and comment bodies are authored as Jira wiki markup.
+
+    Data Center takes wiki markup verbatim. Cloud bodies are authored as
+    Markdown and converted to ADF by the provider.
+    """
+
+    return jira_deployment_from_settings(settings) != DEPLOYMENT_CLOUD
+
+
+def jira_deployment_from_settings(settings: Mapping[str, Any]) -> str:
+    """Return the Jira deployment for provider settings.
+
+    An explicit ``deployment`` wins; otherwise an ``*.atlassian.net`` host is
+    Cloud and anything else is Data Center/Server.
+    """
+
+    deployment = _string_setting(settings, "deployment", "type", "edition")
+    if deployment is not None:
+        normalized = _normalize_deployment(deployment)
+        if normalized != "auto":
+            return normalized
+    raw_site = _string_setting(settings, "site", "base_url", "url", "host", "hostname")
+    if raw_site is not None and _is_atlassian_cloud_host(raw_site):
+        return DEPLOYMENT_CLOUD
+    return DEPLOYMENT_DATA_CENTER
 
 
 def jira_data_center_issue_path(site: JiraDataCenterSite, issue_key: str) -> str:
@@ -127,7 +173,9 @@ def jira_data_center_search_path(
     field_list = [field for field in fields if field]
     if field_list:
         params.append(f"fields={quote(','.join(field_list), safe='')}")
-    return f"/rest/api/{site.api_version}/search?{'&'.join(params)}"
+    # Cloud removed the offset-paged /search in favor of /search/jql.
+    endpoint = "search/jql" if site.is_cloud else "search"
+    return f"/rest/api/{site.api_version}/{endpoint}?{'&'.join(params)}"
 
 
 def jira_data_center_issue_links_path(site: JiraDataCenterSite) -> str:
@@ -182,7 +230,7 @@ def jira_get_json(
     url = f"{site.base_url}{path}"
     result = run_command(
         ("curl", "--silent", "--show-error", "--fail", "--request", "GET", "--config", "-", url),
-        input_text=_curl_config(),
+        input_text=_curl_config(site),
         runner=runner,
     )
     try:
@@ -204,7 +252,7 @@ def jira_send_json(
     url = f"{site.base_url}{path}"
     result = run_command(
         ("curl", "--silent", "--show-error", "--fail", "--config", "-"),
-        input_text=_curl_json_config(method=method, url=url, payload=payload),
+        input_text=_curl_json_config(site, method=method, url=url, payload=payload),
         runner=runner,
     )
     stdout = result.stdout.strip()
@@ -236,7 +284,7 @@ def jira_upload_attachments(
     url = f"{site.base_url}{jira_data_center_attachments_path(site, issue_key)}"
     result = run_command(
         ("curl", "--silent", "--show-error", "--fail", "--config", "-"),
-        input_text=_curl_multipart_config(url=url, file_paths=paths),
+        input_text=_curl_multipart_config(site, url=url, file_paths=paths),
         runner=runner,
     )
     stdout = result.stdout.strip()
@@ -264,10 +312,9 @@ def jira_download_attachment(
     the binary body is not negotiated away.
     """
 
-    _ = site  # auth comes from the environment; the URL is absolute
     run_command(
         ("curl", "--silent", "--show-error", "--fail", "--location", "--config", "-"),
-        input_text=_curl_download_config(url=content_url, out_path=out_path),
+        input_text=_curl_download_config(site, url=content_url, out_path=out_path),
         runner=runner,
     )
 
@@ -283,7 +330,7 @@ def jira_delete(
     url = f"{site.base_url}{path}"
     result = run_command(
         ("curl", "--silent", "--show-error", "--fail", "--config", "-"),
-        input_text=_curl_method_config(method="DELETE", url=url),
+        input_text=_curl_method_config(site, method="DELETE", url=url),
         runner=runner,
     )
     stdout = result.stdout.strip()
@@ -311,12 +358,22 @@ def _normalize_base_url(value: str) -> tuple[str, str, str]:
     return base_url, authority, cache_site
 
 
+def _is_atlassian_cloud_host(value: str) -> bool:
+    raw = value.strip()
+    if "://" not in raw:
+        raw = f"https://{raw}"
+    hostname = urlparse(raw).hostname
+    return bool(hostname and hostname.lower().endswith(".atlassian.net"))
+
+
 def _normalize_deployment(value: str) -> str:
     normalized = value.strip().lower().replace("-", "_").replace(" ", "_")
-    if normalized in {"", "auto", "on_premise", "on_prem", "onprem", "premise", "server", "datacenter", "data_center", "dc"}:
+    if normalized in {"", "auto"}:
+        return "auto"
+    if normalized in {"on_premise", "on_prem", "onprem", "premise", "server", "datacenter", "data_center", "dc"}:
         return DEPLOYMENT_DATA_CENTER
-    if normalized in {"cloud", "jira_cloud"}:
-        return "cloud"
+    if normalized in {"cloud", "jira_cloud", "atlassian_cloud"}:
+        return DEPLOYMENT_CLOUD
     raise JiraProviderError(f"unsupported Jira deployment: {value}")
 
 
@@ -328,13 +385,13 @@ def _string_setting(settings: Mapping[str, Any], *names: str) -> str | None:
     return None
 
 
-def _curl_config() -> str:
-    lines = _curl_base_config_lines()
+def _curl_config(site: JiraDataCenterSite) -> str:
+    lines = _curl_base_config_lines(site)
     return "\n".join(lines) + "\n"
 
 
-def _curl_json_config(*, method: str, url: str, payload: Mapping[str, Any]) -> str:
-    lines = _curl_method_config(method=method, url=url).rstrip("\n").splitlines()
+def _curl_json_config(site: JiraDataCenterSite, *, method: str, url: str, payload: Mapping[str, Any]) -> str:
+    lines = _curl_method_config(site, method=method, url=url).rstrip("\n").splitlines()
     lines.extend(
         [
             'header = "Content-Type: application/json"',
@@ -344,8 +401,8 @@ def _curl_json_config(*, method: str, url: str, payload: Mapping[str, Any]) -> s
     return "\n".join(lines) + "\n"
 
 
-def _curl_multipart_config(*, url: str, file_paths: Iterable[str]) -> str:
-    lines = _curl_base_config_lines()
+def _curl_multipart_config(site: JiraDataCenterSite, *, url: str, file_paths: Iterable[str]) -> str:
+    lines = _curl_base_config_lines(site)
     lines.extend(
         [
             'header = "X-Atlassian-Token: no-check"',
@@ -357,8 +414,8 @@ def _curl_multipart_config(*, url: str, file_paths: Iterable[str]) -> str:
     return "\n".join(lines) + "\n"
 
 
-def _curl_download_config(*, url: str, out_path: str) -> str:
-    lines = _curl_auth_lines()
+def _curl_download_config(site: JiraDataCenterSite, *, url: str, out_path: str) -> str:
+    lines = _curl_auth_lines(site)
     lines.extend(
         [
             f'output = "{_curl_quote(out_path)}"',
@@ -368,8 +425,8 @@ def _curl_download_config(*, url: str, out_path: str) -> str:
     return "\n".join(lines) + "\n"
 
 
-def _curl_method_config(*, method: str, url: str) -> str:
-    lines = _curl_base_config_lines()
+def _curl_method_config(site: JiraDataCenterSite, *, method: str, url: str) -> str:
+    lines = _curl_base_config_lines(site)
     lines.extend(
         [
             f'request = "{_curl_quote(method.upper())}"',
@@ -379,11 +436,14 @@ def _curl_method_config(*, method: str, url: str) -> str:
     return "\n".join(lines) + "\n"
 
 
-def _curl_base_config_lines() -> list[str]:
-    return ['header = "Accept: application/json"', *_curl_auth_lines()]
+def _curl_base_config_lines(site: JiraDataCenterSite) -> list[str]:
+    return ['header = "Accept: application/json"', *_curl_auth_lines(site)]
 
 
-def _curl_auth_lines() -> list[str]:
+def _curl_auth_lines(site: JiraDataCenterSite) -> list[str]:
+    if site.is_cloud:
+        email, token = _cloud_credentials(site.email)
+        return [f'user = "{_curl_quote(email)}:{_curl_quote(token)}"']
     lines: list[str] = []
     personal_token = _first_env("JIRA_PERSONAL_TOKEN", "JIRA_PAT")
     username = _first_env("JIRA_USERNAME", "JIRA_USER")
@@ -393,6 +453,51 @@ def _curl_auth_lines() -> list[str]:
     elif username and password:
         lines.append(f'user = "{_curl_quote(username)}:{_curl_quote(password)}"')
     return lines
+
+
+def _cloud_credentials(config_email: str | None = None) -> tuple[str, str]:
+    """Resolve Jira Cloud basic-auth credentials (account email + API token).
+
+    ``JIRA_EMAIL`` wins over the config ``email`` setting: the config is usually
+    committed and shared, so each user must be able to override it. The token
+    comes from ``JIRA_API_TOKEN`` or, on macOS, from the login
+    Keychain entry for service ``JIRA_KEYCHAIN_SERVICE`` (default
+    ``jira-api-token``) and the email as account, so it never has to sit in a
+    shell profile.
+    """
+
+    email = _first_env("JIRA_EMAIL", "JIRA_USERNAME", "JIRA_USER") or config_email
+    if not email:
+        raise JiraProviderError(
+            "Jira Cloud requires the Atlassian account email: set providers.issues.email or JIRA_EMAIL"
+        )
+    token = _first_env("JIRA_API_TOKEN") or _keychain_token(
+        _first_env("JIRA_KEYCHAIN_SERVICE") or DEFAULT_KEYCHAIN_SERVICE, email
+    )
+    if not token:
+        raise JiraProviderError(
+            "Jira Cloud requires an API token: set JIRA_API_TOKEN, or on macOS store it with "
+            f"`security add-generic-password -s {DEFAULT_KEYCHAIN_SERVICE} -a <email> -w`"
+        )
+    return email, token
+
+
+@functools.cache
+def _keychain_token(service: str, account: str) -> str | None:
+    if sys.platform != "darwin":
+        return None
+    try:
+        completed = subprocess.run(
+            ("security", "find-generic-password", "-s", service, "-a", account, "-w"),
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except OSError:
+        return None
+    if completed.returncode != 0:
+        return None
+    return completed.stdout.strip() or None
 
 
 def _first_env(*names: str) -> str | None:

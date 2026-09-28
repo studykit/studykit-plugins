@@ -300,9 +300,10 @@ def _resolve_authoring_jira_issue(
 ) -> tuple[list[str], list[str]]:
     # Jira wiki-markup rendering is not an authoring file: the
     # `jira-format-corrector` agent owns those rules and is dispatched from the
-    # always-injected `<jira-format>` context block. Keeping them out of the
-    # resolver is deliberate — mustread can be disabled per project, and a
-    # Markdown body published to Jira renders as literal punctuation either way.
+    # `<jira-format>` context block, injected on every wiki-markup (non-Cloud)
+    # site. Keeping them out of the resolver is deliberate — mustread can be
+    # disabled per project, and a Markdown body published to Jira renders as
+    # literal punctuation either way.
     if scope == "comment" or target is not None:
         return [], []
     notes = [RETROACTIVE_PUBLISH_STATE_JIRA] if mode == "retroactive" else []
