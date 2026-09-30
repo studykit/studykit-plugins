@@ -11,7 +11,8 @@ fragments live under ``hooks/context/main/``; subagent fragments live under
 ``SessionStart`` and ``SubagentStart``) and
 ``hooks/context/snippets/launcher/<runtime>.md`` (runtime-keyed), and
 ``hooks/context/snippets/prd-path.md`` (single file, used at both
-``SessionStart`` and ``SubagentStart``).
+``SessionStart`` and ``SubagentStart``), and
+``hooks/context/snippets/confluence.md`` (Jira Cloud only).
 
 Per-verb CLI usage is not injected at all: the ``<commands>`` block points
 the agent at ``spectrack issue --help`` (backend-aware verb list) and
@@ -20,8 +21,9 @@ source of truth for issue-CLI usage.
 
 Template placeholders use ``{{NAME}}`` (double braces) so they stay visually
 distinct from real ``$NAME`` shell variables in the same text.
-``{{SNIPPET_AUTHORING}}``, ``{{SNIPPET_LAUNCHER}}``, and
-``{{SNIPPET_PRD_PATH}}`` substitute the three inlined snippet files;
+``{{SNIPPET_AUTHORING}}``, ``{{SNIPPET_LAUNCHER}}``,
+``{{SNIPPET_PRD_PATH}}``, and ``{{SNIPPET_CONFLUENCE}}`` substitute the
+inlined snippet files;
 ``{{SPECTRACK_ISSUE_PROVIDER}}`` resolves to the active issue provider
 (``github``/``jira``/``filesystem``). Launcher snippets may use
 ``{{SPECTRACK_PLUGIN_ROOT}}``, which resolves to the absolute plugin root before
@@ -106,6 +108,7 @@ def build_session_policy_context(
         "SNIPPET_LAUNCHER": _build_launcher_block(runtime, resolved_plugin_root),
         "SNIPPET_AUTHORING": _read_fragment("snippets/authoring.md").strip(),
         "SNIPPET_PRD_PATH": _read_fragment("snippets/prd-path.md").strip(),
+        "SNIPPET_CONFLUENCE": _build_confluence_block(config, issue_provider),
         "SPECTRACK_ISSUE_PROVIDER": issue_provider,
         "SPECTRACK_JIRA_TASK_REVIEW_AGENT": _jira_review_agent(config, "task"),
         "SPECTRACK_JIRA_COMMENT_REVIEW_AGENT": _jira_review_agent(config, "comment"),
@@ -137,6 +140,7 @@ def build_subagent_policy_context(
         "SNIPPET_LAUNCHER": _build_launcher_block(runtime, resolved_plugin_root),
         "SNIPPET_AUTHORING": _read_fragment("snippets/authoring.md").strip(),
         "SNIPPET_PRD_PATH": _read_fragment("snippets/prd-path.md").strip(),
+        "SNIPPET_CONFLUENCE": _build_confluence_block(config, issue_provider),
         "SPECTRACK_ISSUE_PROVIDER": issue_provider,
         "SPECTRACK_JIRA_TASK_REVIEW_AGENT": _jira_review_agent(config, "task"),
         "SPECTRACK_JIRA_COMMENT_REVIEW_AGENT": _jira_review_agent(config, "comment"),
@@ -233,6 +237,22 @@ def _jira_uses_wiki_markup(config: Any) -> bool:
     if not isinstance(settings, Mapping):
         return True
     return jira_bodies_use_wiki_markup(settings)
+
+
+def _build_confluence_block(config: Any, issue_provider: str) -> str:
+    """Expose Confluence commands only when the Jira Cloud site is configured."""
+
+    if issue_provider != "jira":
+        return ""
+    from issue.jira.client import DEPLOYMENT_CLOUD, jira_deployment_from_settings
+
+    issues = getattr(config, "issues", None)
+    settings = getattr(issues, "settings", None)
+    if not isinstance(settings, Mapping):
+        return ""
+    if jira_deployment_from_settings(settings) != DEPLOYMENT_CLOUD:
+        return ""
+    return _read_fragment("snippets/confluence.md").strip()
 
 
 _JIRA_MARKUP_CHECK_STEP_RE = re.compile(r"then\s+run\s+the\s+Jira\s+markup\s+check\s+and\s+present")

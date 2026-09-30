@@ -25,6 +25,8 @@ Run `spectrack --help` to discover top-level commands, then
 `spectrack issue <verb> --help` for a verb's flags and usage.
 </commands>
 
+{{SNIPPET_CONFLUENCE}}
+
 <authoring-issues>
 An issue body is settled with the user, not drafted unilaterally. Before
 publishing one, discuss what it should say, present the draft, and

@@ -24,8 +24,10 @@ from main_context import (  # noqa: E402
     _merge_commands_blocks,
     _strip_unconfigured_jira_review_blocks,
     _strip_jira_format,
+    build_subagent_policy_context,
     render as render_template,
 )
+from config import load_workflow_config  # noqa: E402
 from command import CommandRequest, CommandResult  # noqa: E402
 from issue.github.cache import GitHubIssueCache  # noqa: E402
 from issue.github.gh import DEFAULT_ISSUE_FIELDS, GitHubRepository  # noqa: E402
@@ -127,6 +129,7 @@ def expected_session_start_context(
         "SNIPPET_LAUNCHER": launcher_block,
         "SNIPPET_AUTHORING": main_context_fragment("snippets/authoring.md"),
         "SNIPPET_PRD_PATH": main_context_fragment("snippets/prd-path.md"),
+        "SNIPPET_CONFLUENCE": "",
         "SPECTRACK_ISSUE_PROVIDER": issue_kind,
         "SPECTRACK_JIRA_TASK_REVIEW_AGENT": jira_task_review_agent,
         "SPECTRACK_JIRA_COMMENT_REVIEW_AGENT": jira_comment_review_agent,
@@ -160,6 +163,7 @@ def expected_subagent_start_context(
         "SNIPPET_LAUNCHER": launcher_block,
         "SNIPPET_AUTHORING": main_context_fragment("snippets/authoring.md"),
         "SNIPPET_PRD_PATH": main_context_fragment("snippets/prd-path.md"),
+        "SNIPPET_CONFLUENCE": "",
         "SPECTRACK_ISSUE_PROVIDER": issue_kind,
         "SPECTRACK_JIRA_TASK_REVIEW_AGENT": jira_task_review_agent,
         "SPECTRACK_JIRA_COMMENT_REVIEW_AGENT": jira_comment_review_agent,
@@ -327,6 +331,7 @@ def _write_jira_config(
     *,
     task_review_agent: str | None = None,
     comment_review_agent: str | None = None,
+    deployment: str = "data-center",
 ) -> None:
     config_path = project / ".spectrack" / "config.yml"
     config_path.parent.mkdir(parents=True, exist_ok=True)
@@ -336,14 +341,15 @@ def _write_jira_config(
             f"    comment_review_agent: {comment_review_agent}\n" if comment_review_agent else "",
         )
     )
-    config_path.write_text(
+    site = "https://example.atlassian.net" if deployment == "cloud" else "https://jira.example.test"
+    config_text = (
         """
 version: 1
 providers:
   issues:
     kind: jira
-    site: https://jira.example.test
-    deployment: data-center
+    site: SITE_PLACEHOLDER
+    deployment: DEPLOYMENT_PLACEHOLDER
     api_version: 2
     project: TEST
     issue_type: Task
@@ -353,7 +359,10 @@ issue_id_format: jira
 commit_refs:
   enabled: true
   style: provider-native
-""",
+"""
+    )
+    config_path.write_text(
+        config_text.replace("SITE_PLACEHOLDER", site).replace("DEPLOYMENT_PLACEHOLDER", deployment),
         encoding="utf-8",
     )
 
@@ -1198,6 +1207,29 @@ def test_session_start_emits_commands_pointer_for_jira_config(
     assert "spectrack issue --help" in context
     assert "spectrack issue <verb> --help" in context
     assert "authoring/runbook" not in context
+    assert "<confluence>" not in context
+
+
+@pytest.mark.parametrize("runtime", ["claude", "codex"])
+def test_jira_cloud_context_advertises_confluence(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    runtime: str,
+) -> None:
+    _write_jira_config(tmp_path, deployment="cloud")
+
+    payload = json.loads(_run_session_start(tmp_path, monkeypatch, runtime=runtime))
+    context = payload["hookSpecificOutput"]["additionalContext"]
+    assert "<confluence>" in context
+    assert "spectrack confluence --help" in context
+
+    config = load_workflow_config(tmp_path)
+    assert config is not None
+    subagent_context = build_subagent_policy_context(
+        config, plugin_root=_PLUGIN_ROOT, runtime=runtime
+    )
+    assert "<confluence>" in subagent_context
+    assert "spectrack confluence --help" in subagent_context
 
 
 def test_session_start_skips_claude_subagent_payload(

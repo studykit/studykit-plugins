@@ -1,7 +1,7 @@
 {
   "name": "spectrack",
   "displayName": "SpecTrack",
-  "version": "0.31.0",
+  "version": "0.31.1",
   "description": "Provider-backed workflow over GitHub Issues, Jira, and a GitHub repository wiki directory, with Confluence Cloud page commands and issue and knowledge authoring contracts",
   "author": {
     "name": "studykit"
