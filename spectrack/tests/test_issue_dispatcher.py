@@ -473,6 +473,18 @@ def test_top_usage_hides_labels_under_jira(tmp_path: Path) -> None:
         assert not line.strip().startswith("labels")
 
 
+@pytest.mark.parametrize(("config", "has_epic"), [(_JIRA_CONFIG, True), (_GITHUB_CONFIG, False)])
+def test_top_usage_link_row_follows_provider_relationships(
+    tmp_path: Path, config: str, has_epic: bool
+) -> None:
+    _write_config(tmp_path, config)
+    code, stdout, _ = _capture_help(issue_main, ["--help", "--project", str(tmp_path)])
+    assert code == 0
+    (link_row,) = [line for line in stdout.splitlines() if line.strip().startswith("link ")]
+    assert "parent" in link_row
+    assert ("epic" in link_row) is has_epic
+
+
 @pytest.mark.parametrize(
     ("config", "verb"),
     [

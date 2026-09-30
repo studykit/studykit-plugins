@@ -201,8 +201,10 @@ def run_intent(
 
 # (verb, one-line description, only). ``only`` scopes the verb to a single
 # provider in `issue --help`: None lists it for every provider, "jira" or
-# "github" list it only when the configured provider matches.
-_VERB_HELP: tuple[tuple[str, str, str | None], ...] = (
+# "github" list it only when the configured provider matches. A description
+# may instead map a provider to its wording; the ``None`` key is the fallback
+# used when the provider is unknown or has no entry of its own.
+_VERB_HELP: tuple[tuple[str, str | dict[str | None, str], str | None], ...] = (
     ("new", "create a new issue", None),
     ("update", "update title / body / labels / state", None),
     ("fetch", "fetch one or more issues into the cache", None),
@@ -211,7 +213,17 @@ _VERB_HELP: tuple[tuple[str, str, str | None], ...] = (
     ("resume", "find the current Resume comment for an issue", None),
     ("history", "show issue body or comment edit history", "github"),
     ("attach", "add/get issue file attachments", "jira"),
-    ("link", "add / remove / replace relationships", None),
+    (
+        "link",
+        {
+            None: "add / remove / replace relationships (parent, child, dependencies, ...)",
+            "jira": "add / remove / replace relationships: parent / child / epic, "
+            "blocked-by / blocking, related",
+            "github": "add / remove / replace relationships: parent / child, "
+            "blocked-by / blocking",
+        },
+        None,
+    ),
     ("labels", "list configured issue-type labels", "github"),
     ("state", "change lifecycle state (e.g. `state <ref> close`)", None),
     ("assign", "assign an issue to a user (e.g. `assign <ref> me`)", None),
@@ -224,7 +236,7 @@ _VERBS = tuple(name for name, _desc, _only in _VERB_HELP)
 
 def _build_usage(provider: str | None) -> str:
     rows = [
-        (name, desc)
+        (name, desc if isinstance(desc, str) else desc.get(provider, desc[None]))
         for name, desc, only in _VERB_HELP
         if only is None or provider == only
     ]
