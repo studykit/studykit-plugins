@@ -263,6 +263,9 @@ first parent. The history view is restored with Lens's saved view.
   includes headings, lists, tables, code blocks and footnotes. If rendering fails,
   you see the source.
 - **Plain text** and unknown file types show with line numbers.
+- **Symbolic links** have a `↗` marker in the tree. Open one to see its target
+  in the preview title. Links to files use the target's preview type; links to
+  directories show their immediate entries. Broken links show an error.
 - **Binary files** are not previewed.
 
 Files are only displayed, never run. Colors follow your Herdr theme, including

@@ -30,8 +30,7 @@ def breadth_first_walk(root, onerror):
                     if entry.name in VCS_DIRS:
                         continue
                     if entry.is_dir():
-                        if not entry.is_symlink():
-                            dirs.append(entry.name)
+                        (names if entry.is_symlink() else dirs).append(entry.name)
                     else:
                         names.append(entry.name)
         except OSError as error:
@@ -131,6 +130,7 @@ def scan(root: Path, include_ignored: bool = False, *, include_status: bool = Tr
         walk = breadth_first_walk(root, walk_error) if include_ignored else os.walk(root, followlinks=False, onerror=walk_error)
         for directory, dirs, names in walk:
             if not include_ignored:
+                names.extend(d for d in dirs if os.path.islink(os.path.join(directory, d)))
                 dirs[:] = sorted(d for d in dirs if d not in excluded and not os.path.islink(os.path.join(directory, d)))
             # Walkers already constrain entries to this root. Compute the prefix
             # once per directory, not a pathlib ancestry search for every entry.
@@ -261,6 +261,31 @@ def read_text(root: Path, name: str) -> tuple[str, bool]:
 def preview(index: Index, name: str) -> str:
     text, truncated = read_text(index.root, name)
     return text + ("\n[Preview truncated at 256 KiB]" if truncated else "")
+
+
+def link_target(root: Path, name: str) -> str | None:
+    """Return a link's literal destination, including for broken links."""
+    try:
+        return os.readlink(root / name)
+    except (OSError, ValueError):
+        return None
+
+
+def directory_preview(root: Path, name: str) -> str:
+    path = checked_path(root, name)
+    if not path.is_dir():
+        raise ValueError("Symlink target is not a directory")
+    with os.scandir(path) as entries:
+        children = sorted(((entry.name, entry.is_symlink(), entry.is_dir(follow_symlinks=False))
+                           for entry in entries), key=lambda item: (item[0].casefold(), item[0]))
+    lines = [f"Directory: {path.resolve()}", ""]
+    lines.extend(f"{child}{'@' if link else '/' if directory else ''}"
+                 for child, link, directory in children[:200])
+    if len(children) > 200:
+        lines.append(f"… {len(children) - 200} more entries")
+    if not children:
+        lines.append("(Empty directory)")
+    return "\n".join(lines)
 
 
 def editor_command(configured: str, path: Path, line: int | None = 1) -> list[str]:

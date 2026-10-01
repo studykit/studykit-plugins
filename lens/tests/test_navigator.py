@@ -113,7 +113,7 @@ class ProjectTests(unittest.TestCase):
         (self.root / "loop").symlink_to(self.root, target_is_directory=True)
         (self.root / "outside").symlink_to(self.root.parent, target_is_directory=True)
         index = core.scan(self.root)
-        self.assertEqual(index.files, ["src/file.txt"])
+        self.assertEqual(index.files, ["loop", "outside", "src/file.txt"])
         self.assertEqual(core.preview(index, "src/file.txt"), "hello\n")
         with self.assertRaisesRegex(ValueError, "unavailable"):
             snapshots(index, "src/file.txt")
@@ -121,6 +121,33 @@ class ProjectTests(unittest.TestCase):
             core.checked_path(self.root, "../escape")
         with self.assertRaises(ValueError):
             core.checked_path(self.root, "outside/escape")
+
+    def test_symlink_targets_in_tree_and_preview(self):
+        self.write("notes/topic.md", "# Topic\n")
+        (self.root / "file-alias").symlink_to("notes/topic.md")
+        (self.root / "folder-alias").symlink_to("notes", target_is_directory=True)
+        (self.root / "missing-alias").symlink_to("gone.md")
+        (self.root / "outside-alias").symlink_to(self.root.parent, target_is_directory=True)
+        for ignored in (False, True):
+            index = core.scan(self.root, include_ignored=ignored)
+            self.assertTrue({"file-alias", "folder-alias", "missing-alias", "outside-alias"} <= set(index.files))
+            self.assertNotIn("folder-alias/topic.md", index.files)
+        nav = Navigator(self.root, "pane", False, "")
+        for alias, target in (("file-alias", "notes/topic.md"), ("folder-alias", "notes"),
+                              ("missing-alias", "gone.md")):
+            self.assertEqual(core.link_target(self.root, alias), target)
+        nav.load("file-alias")
+        self.assertEqual(nav.source_text, "# Topic\n")
+        self.assertTrue(nav.markdown)
+        self.assertEqual(nav.preview_name, "topic.md")
+        nav.load("folder-alias")
+        self.assertEqual(nav.link_kind, "directory")
+        self.assertIn("topic.md", nav.content)
+        self.assertFalse(nav.source_view())
+        nav.load("missing-alias")
+        self.assertEqual(nav.content, ["Broken symbolic link"])
+        nav.load("outside-alias")
+        self.assertIn("outside the project", nav.content[0])
 
     def test_large_binary_and_special_files(self):
         self.write("large.txt", "a" * (core.PREVIEW_BYTES + 1))

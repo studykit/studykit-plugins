@@ -10,7 +10,7 @@ import subprocess
 from threading import Thread
 import unicodedata
 
-from core import Row, apply_status, application_command, checked_path, editor_command, highlights, opener_command, preview, read_status, rows, scan
+from core import Row, apply_status, application_command, checked_path, directory_preview, editor_command, highlights, link_target, opener_command, preview, read_status, rows, scan
 from diff_tool import comparison
 import git_history
 from popup_size import PopupSize, PRESETS
@@ -246,6 +246,7 @@ class Navigator:
         self.active = ""
         self.content = ["Select a file and press Enter, or click it, to open it here."]
         self.source_text = ""
+        self.preview_name = self.link_kind = ""
         self.previewable = False
         self.markdown = False
         self.vault = None  # Where a Markdown preview resolves Obsidian embeds and links.
@@ -458,7 +459,7 @@ class Navigator:
         return True
 
     def clear_preview(self):
-        self.active = self.source_text = self.language = ""
+        self.active = self.source_text = self.language = self.preview_name = self.link_kind = ""
         self.content = ["Select a file and press Enter, or click it, to open it here."]
         self.previewable = self.markdown = self.preview_focus = False
         self.rendered = self.syntax = self.render_width = None
@@ -769,21 +770,37 @@ class Navigator:
         self.syntax = None
         self.language = ""
         self.source_text = ""
+        self.preview_name = name
+        self.link_kind = ""
         self.previewable = False
         self.markdown = False
         try:
-            self.source_text = preview(self.index, name)
+            path = self.index.root / name
+            if path.is_symlink():
+                self.link_kind = "link"
+                self.preview_name = path.resolve().name
+                if not path.exists():
+                    self.link_kind = "broken"
+                    raise ValueError("Broken symbolic link")
+                if path.is_dir():
+                    self.link_kind = "directory"
+                    self.source_text = directory_preview(self.index.root, name)
+                else:
+                    self.link_kind = "file"
+                    self.source_text = preview(self.index, name)
+            else:
+                self.source_text = preview(self.index, name)
             self.content = self.source_text.splitlines() or ["(Empty file)"]
             self.previewable = True
-            self.markdown = Path(name).suffix.lower() in (".md", ".markdown")
+            self.markdown = self.link_kind != "directory" and Path(self.preview_name).suffix.lower() in (".md", ".markdown")
         except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as error:
             self.content = [str(error)]
         self.vault = None
         if self.markdown:
-            path = self.index.root / name
+            path = (self.index.root / name).resolve()
             self.vault = obsidian_embeds.Vault(obsidian_embeds.vault_root(path, self.index.root), path)
         try:
-            self.active_size = (self.index.root / name).stat().st_size
+            self.active_size = None if self.link_kind == "directory" else (self.index.root / name).stat().st_size
         except (OSError, AttributeError):
             self.active_size = None
         self.start_diagrams()
@@ -795,7 +812,7 @@ class Navigator:
     def diagram_sources(self):
         if not self.previewable or not self.diagram_languages:
             return []
-        language = diagram_preview.file_language(self.active)
+        language = diagram_preview.file_language(self.preview_name)
         if language:
             return [(language, self.source_text)] if language in self.diagram_languages else []
         if self.markdown:
@@ -1057,7 +1074,7 @@ class Navigator:
                 # Code, and Markdown shown as source: the file's own lines, which comments point at.
                 self.rendered = None
                 self.content = self.source_text.splitlines() or ["(Empty file)"]
-                highlighted = syntax_preview.render(self.source_text, self.active, self.palette)
+                highlighted = None if self.link_kind == "directory" else syntax_preview.render(self.source_text, self.preview_name, self.palette)
                 if highlighted is not None:
                     self.language, self.syntax = highlighted
                     self.content = ["".join(span.text for span in line) for line in self.syntax]
@@ -2499,8 +2516,9 @@ class Navigator:
             if selected:
                 style = self.style("inactive" if self.preview_focus else "selected")
             opened = row.path in self.expanded and row.path not in (".", "..")
-            # The open or closed folder says enough; files line up after the glyph's width.
-            marker = ("\uf07c " if opened else "\uf07b ") if row.directory else "  "
+            # Symlinks occupy the same two columns as the folder glyph or file indent.
+            target = link_target(self.root, row.path) if row.path not in (".", "..") else None
+            marker = ("\uf07c " if opened else "\uf07b ") if row.directory else "↗ " if target is not None else "  "
             label = row.path if self.query else row.path.rsplit("/", 1)[-1]
             # Inside Git the status column is always there, so rows do not shift when status arrives.
             status = self.index.status.get(row.path, "  ") + " " if self.index.repository else ""
@@ -2574,7 +2592,10 @@ class Navigator:
                 note = "diagram source"
             elif current in keys:
                 note = f"diagram {keys.index(current) + 1}/{len(keys)} · {round(self.zoom_of(current) * 100)}%"
-        self.panel(screen, x, width, bottom, self.preview_focus, self.active or "No file selected", note)
+        title = self.active or "No file selected"
+        if self.active and self.link_kind:
+            title += f" → {link_target(self.root, self.active) or '?'}"
+        self.panel(screen, x, width, bottom, self.preview_focus, title, note)
         if self.finding or (self.find_query and self.active):
             total = len(self.matches()) if self.find_query else 0
             found = (f"{self.find_index + 1}/{total}" if total and self.find_index >= 0
@@ -3395,7 +3416,7 @@ class Navigator:
 
     def source_view(self):
         """Whether preview lines are the file's own lines, the only ones a comment can name."""
-        return self.cursor_view() and not (self.markdown and not self.diagram_source)
+        return self.cursor_view() and self.link_kind != "directory" and not (self.markdown and not self.diagram_source)
 
     def clamp_cursor(self):
         """Keep the cursor on a line inside the visible rows, after a scroll moved them."""

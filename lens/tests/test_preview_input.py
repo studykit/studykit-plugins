@@ -518,6 +518,23 @@ class PreviewTests(unittest.TestCase):
                 self.assertTrue(file_labels)
                 self.assertTrue(all("\uf07b" not in label and "\uf07c" not in label for label in file_labels))
 
+    def test_tree_marks_symlinks_and_shows_target_only_in_preview(self):
+        (self.root / "shortcut").symlink_to("README.md")
+        self.nav.refresh()
+        for query in ("", "shortcut"):
+            self.nav.query = query
+            self.nav.rebuild()
+            with patch("ui.put") as put, patch.object(self.nav, "panel"):
+                self.nav.draw_tree(Mock(), 0, 60, 20)
+            self.assertTrue(any("↗ shortcut" in call.args[3] for call in put.call_args_list))
+            self.assertFalse(any("→ README.md" in call.args[3] for call in put.call_args_list))
+        self.nav.load("shortcut")
+        screen = Mock()
+        screen.getmaxyx.return_value = (30, 80)
+        with patch.object(self.nav, "panel") as panel:
+            self.nav.draw_content(screen, 0, 60, 20)
+        self.assertIn("shortcut → README.md", panel.call_args.args[5])
+
     def test_search_results_do_not_show_folder_icons_for_parent_path(self):
         (self.root / "folder").mkdir()
         (self.root / "folder" / "child.txt").write_text("content")
