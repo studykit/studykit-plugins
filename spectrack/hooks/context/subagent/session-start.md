@@ -65,4 +65,4 @@ Run `spectrack --help` to discover top-level commands, then
 `spectrack issue <verb> --help` for a verb's flags and usage.
 </commands>
 
-{{SNIPPET_CONFLUENCE}}
+{{SNIPPET_JIRA_CLOUD}}

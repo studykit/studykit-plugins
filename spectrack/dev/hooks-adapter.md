@@ -22,7 +22,7 @@ records the invariants that must not regress.
 - **Stdout is JSON or empty.** Empty stdout = no-op. Never emit plain text.
 - **Subagents inherit env, not policy.** SubagentStart injection stays narrow
   (launcher + authoring resolver + PRD-path resolver + the same `<commands>` `--help`
-  pointer as the main session, the Jira Cloud Confluence capability hint, plus
+  pointer as the main session, the Jira Cloud agile and Confluence capability hint, plus
   per-agent flow blocks). Per-verb CLI usage lives in
   `spectrack issue <verb> --help` for both main session and subagents.
 - **Codex cannot persist env directly from hooks.** `hook_codex.py` records main and

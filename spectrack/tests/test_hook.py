@@ -129,7 +129,7 @@ def expected_session_start_context(
         "SNIPPET_LAUNCHER": launcher_block,
         "SNIPPET_AUTHORING": main_context_fragment("snippets/authoring.md"),
         "SNIPPET_PRD_PATH": main_context_fragment("snippets/prd-path.md"),
-        "SNIPPET_CONFLUENCE": "",
+        "SNIPPET_JIRA_CLOUD": "",
         "SPECTRACK_ISSUE_PROVIDER": issue_kind,
         "SPECTRACK_JIRA_TASK_REVIEW_AGENT": jira_task_review_agent,
         "SPECTRACK_JIRA_COMMENT_REVIEW_AGENT": jira_comment_review_agent,
@@ -163,7 +163,7 @@ def expected_subagent_start_context(
         "SNIPPET_LAUNCHER": launcher_block,
         "SNIPPET_AUTHORING": main_context_fragment("snippets/authoring.md"),
         "SNIPPET_PRD_PATH": main_context_fragment("snippets/prd-path.md"),
-        "SNIPPET_CONFLUENCE": "",
+        "SNIPPET_JIRA_CLOUD": "",
         "SPECTRACK_ISSUE_PROVIDER": issue_kind,
         "SPECTRACK_JIRA_TASK_REVIEW_AGENT": jira_task_review_agent,
         "SPECTRACK_JIRA_COMMENT_REVIEW_AGENT": jira_comment_review_agent,
@@ -1207,11 +1207,11 @@ def test_session_start_emits_commands_pointer_for_jira_config(
     assert "spectrack issue --help" in context
     assert "spectrack issue <verb> --help" in context
     assert "authoring/runbook" not in context
-    assert "<confluence>" not in context
+    assert "<jira-cloud>" not in context
 
 
 @pytest.mark.parametrize("runtime", ["claude", "codex"])
-def test_jira_cloud_context_advertises_confluence(
+def test_jira_cloud_context_advertises_agile_and_confluence(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     runtime: str,
@@ -1220,7 +1220,8 @@ def test_jira_cloud_context_advertises_confluence(
 
     payload = json.loads(_run_session_start(tmp_path, monkeypatch, runtime=runtime))
     context = payload["hookSpecificOutput"]["additionalContext"]
-    assert "<confluence>" in context
+    assert "<jira-cloud>" in context
+    assert "spectrack agile --help" in context
     assert "spectrack confluence --help" in context
 
     config = load_workflow_config(tmp_path)
@@ -1228,7 +1229,8 @@ def test_jira_cloud_context_advertises_confluence(
     subagent_context = build_subagent_policy_context(
         config, plugin_root=_PLUGIN_ROOT, runtime=runtime
     )
-    assert "<confluence>" in subagent_context
+    assert "<jira-cloud>" in subagent_context
+    assert "spectrack agile --help" in subagent_context
     assert "spectrack confluence --help" in subagent_context
 
 

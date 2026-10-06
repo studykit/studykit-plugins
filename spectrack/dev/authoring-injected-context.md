@@ -46,7 +46,7 @@ every per-agent SubagentStart block.
 - **Inline snippets** — `hooks/context/snippets/authoring.md` (authoring
   resolver), `hooks/context/snippets/launcher/<runtime>.md` (launcher
   invocation), `hooks/context/snippets/prd-path.md` (PRD-path
-  resolver), and `hooks/context/snippets/confluence.md` (Jira Cloud
+  resolver), and `hooks/context/snippets/jira-cloud.md` (Jira Cloud
   capability hint) are the only fragments inlined into the templates above.
   Everything else is referenced on demand.
 - **Per-verb CLI usage** is *not* injected and has no on-demand doc tree.
@@ -55,8 +55,9 @@ every per-agent SubagentStart block.
   for top-level discovery, `spectrack issue --help` for the backend-aware
   issue verb list, and `spectrack issue <verb> --help` for per-verb flags.
   The agent runs `--help` when it needs a command's options.
-  Jira Cloud context also names Confluence access explicitly so the agent
-  knows to run `spectrack confluence --help` when page work comes up.
+  Jira Cloud context also names the agile and Confluence commands explicitly
+  so the agent knows to run `spectrack agile --help` for board or sprint work
+  and `spectrack confluence --help` when page work comes up.
 
 The runtime manifests (`hooks/hooks.json` for Claude and
 `hooks/hooks.codex.json` for Codex) and their adapters
