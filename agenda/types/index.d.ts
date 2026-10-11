@@ -5,8 +5,10 @@ export type Item = {
   isDecision: boolean
 }
 
+export type Place = 'pane' | 'band'
+
 declare module 'claude-code' {
   interface PluginState {
-    agenda: { items: Item[]; start: number; focus: string }
+    agenda: { items: Item[]; start: number; focus: string; place: Place; isHidden: boolean }
   }
 }
