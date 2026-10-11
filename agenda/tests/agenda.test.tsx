@@ -28,7 +28,7 @@ test('shows the current topic on top', async ($, on) => {
   world(on)
   await $.tool.call({ tool: 'mcp__agenda__agenda_focus', tool_use_id: 'f', topic: 'Jira 쓰기 테스트' } as never)
   const ui = await $.ui.mount({ plugin: 'agenda', surface: 'terminal', component: 'Pane', props, requestId: 'agenda' })
-  expect(await ui.find({ text: /지금: Jira 쓰기 테스트/ })).toBeDefined()
+  expect(await ui.find({ text: /🎯 Jira 쓰기 테스트/ })).toBeDefined()
   await ui.unmount()
 })
 
@@ -71,7 +71,7 @@ test('pressing an item asks first, then makes it the current topic and tells the
   expect(rows.appended()).toHaveLength(0)
   await ui.press({ key: 'pick-ci' })
   await ui.press({ key: 'confirm' })
-  expect(await ui.find({ text: /지금: CI 캐시/ })).toBeDefined()
+  expect(await ui.find({ text: /🎯 CI 캐시/ })).toBeDefined()
   expect(JSON.stringify(rows.appended().at(-1))).toContain('CI 캐시')
   // The topic itself pressed again asks nothing and tells the model nothing more.
   await ui.press({ key: 'pick-ci' })
@@ -90,6 +90,6 @@ test('/agenda <number|id> picks an item without asking', async ($, on) => {
   expect(JSON.stringify(await $.command.run({ command: 'agenda', args: '9' } as never))).toContain('없습니다')
   expect(rows.appended()).toHaveLength(2)
   const ui = await $.ui.mount({ plugin: 'agenda', surface: 'terminal', component: 'Pane', props, requestId: 'agenda' })
-  expect(await ui.find({ text: /지금: 로그 회전 한도/ })).toBeDefined()
+  expect(await ui.find({ text: /🎯 로그 회전 한도/ })).toBeDefined()
   await ui.unmount()
 })

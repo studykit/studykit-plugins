@@ -242,7 +242,13 @@ async function body($: EngineInterface, e: Parameters<EngineInterface['ui']['res
   const open = await read($, items)
   const asking = await read($, pending)
   const asked = open.find(d => d.id === asking)
-  const head = now ? <Text color="cyan" bold>{`▶ 지금: ${now}`}</Text> : null
+  // A blank row under the topic sets it apart from the items to pick from.
+  const head = now ? (
+    <Box flexDirection="column">
+      <Text color="cyan" bold>{`🎯 ${now}`}</Text>
+      <Text> </Text>
+    </Box>
+  ) : null
   if (open.length === 0)
     return (
       <Box flexDirection="column">
@@ -250,7 +256,7 @@ async function body($: EngineInterface, e: Parameters<EngineInterface['ui']['res
         <Text dimColor>남은 안건이 없습니다.</Text>
       </Box>
     )
-  const rows = Math.max(1, room - 1 - (now ? 1 : 0) - (asked ? 2 : 0))
+  const rows = Math.max(1, room - 1 - (now ? 2 : 0) - (asked ? 2 : 0))
   const height = (d: Item) => (d.detail ? 2 : 1)
   const first = Math.min(await read($, start), open.length - 1)
   let last = first
