@@ -57,5 +57,6 @@ For compatibility and versioning rules, see `AGENTS.md`.
 - `handover` — create a self-contained session handover and load a recorded handover after a clear
 - `lens` — Herdr file tree with popup and overlay views, saved navigation state, filename search, Markdown and source previews, diagram rendering (PlantUML, Mermaid, D2, Graphviz and more), and Git diffs
 - `shellbox` — resumable Herdr shell popup for each pane
+- `agenda` — a pane of the session's current topic and open items, so a long conversation keeps its thread
 
-`handover` is Claude Code only. `lens` and `shellbox` install through Herdr and work alongside any agent. The remaining plugins run in both Claude Code and Codex.
+`handover` and `agenda` are Claude Code only. `lens` and `shellbox` install through Herdr and work alongside any agent. The remaining plugins run in both Claude Code and Codex.

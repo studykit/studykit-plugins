@@ -89,6 +89,16 @@
       "license": "MIT",
       "category": "productivity",
       "keywords": ["handover", "session", "continuity", "claude-code"]
+    },
+    {
+      "name": "agenda",
+      "source": "./agenda",
+      "description": "A pane of what the session is discussing: the current topic and the open items, decisions marked. A hooks-module mod for Claude Code.",
+      "author": {"name": "studykit"},
+      "repository": "https://github.com/studykit/studykit-plugins",
+      "license": "MIT",
+      "category": "productivity",
+      "keywords": ["agenda", "session", "pane", "decisions", "claude-code"]
     }
   ]
 }
