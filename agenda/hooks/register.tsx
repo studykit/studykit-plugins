@@ -65,7 +65,7 @@ const str = (v: unknown): string | undefined => (typeof v === 'string' && v.trim
 async function showStatus($: EngineInterface): Promise<void> {
   const list = await read($, items)
   const decisions = list.filter(d => d.isDecision).length
-  $.ui.status(list.length > 0 ? `안건 ${list.length}${decisions > 0 ? ` · 결정 ${decisions}` : ''}` : undefined)
+  $.ui.status(list.length > 0 ? `📋${list.length}${decisions > 0 ? ` · 🚦${decisions}` : ''}` : undefined)
 }
 
 async function show($: EngineInterface): Promise<void> {
@@ -193,16 +193,27 @@ export const register: Register = on => {
     if (e.props.hasSurvey || (await read($, place)) !== 'band' || (await read($, isHidden))) return next(e)
     if ((await read($, items)).length === 0 && (await read($, focus)) === '') return next(e)
     // At most half the band's room, so the transcript keeps the rest.
-    return body($, e, Math.max(3, Math.floor(e.props.maxRows / 2)))
+    return body($, e, Math.max(3, Math.floor(e.props.maxRows / 2)), false)
   })
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) =>
-    body($, e, e.props.scroll?.bodyRows ?? e.viewport?.rows ?? 24),
+    body($, e, e.props.scroll?.bodyRows ?? e.viewport?.rows ?? 24, true),
   )
 }
 
-// The focus line and a page of whole items that fits `room` rows, one row kept for the paging buttons.
-async function body($: EngineInterface, e: Parameters<EngineInterface['ui']['resolve']>[0], room: number) {
+// The person makes an item the current topic by pressing it: a click, or Enter on it once the site has the
+// keyboard (ctrl+x tab), or in the pane its digit. The model is told in a row it reads with the next request.
+async function choose($: EngineInterface, d: Item): Promise<void> {
+  await update($, focus, () => d.title)
+  await save($)
+  await $.session.append({
+    message: { type: 'user', content: [{ type: 'text', text: `[안건] 사용자가 "${d.title}" (${d.id})를 지금 다룰 주제로 골랐습니다.` }] },
+  })
+}
+
+// The focus line and a page of whole items that fits `room` rows, one row kept for the paging buttons. Digit
+// hotkeys only in the pane: in the band a bare digit in an empty prompt would press them instead of typing.
+async function body($: EngineInterface, e: Parameters<EngineInterface['ui']['resolve']>[0], room: number, hasDigits: boolean) {
   const { Box, Button, Text } = $.ui.resolve(e)
   const now = await read($, focus)
   const open = await read($, items)
@@ -231,15 +242,20 @@ async function body($: EngineInterface, e: Parameters<EngineInterface['ui']['res
   return (
     <Box flexDirection="column">
       {head}
-      {open.slice(first, last).map((d, i) => (
-        <Box flexDirection="column" key={`o-${d.id}`}>
-          <Text bold>
-            {first + i + 1}. {d.isDecision ? '[결정] ' : ''}
-            {d.title}
-          </Text>
-          {d.detail ? <Text dimColor>{`   ${d.id} · ${d.detail}`}</Text> : null}
-        </Box>
-      ))}
+      {open.slice(first, last).map((d, i) => {
+        // A plain Button draws its hotkey before the label (`1: `), which then stands in for the item's number.
+        const hotkey = hasDigits && i < 9 ? String(i + 1) : undefined
+        return (
+          <Box flexDirection="column" key={`o-${d.id}`}>
+            <Button key={`pick-${d.id}`} plain hotkey={hotkey} onPress={() => choose($, d)}>
+              <Text bold color={d.title === now ? 'cyan' : undefined}>
+                {`${hotkey ? '' : `${first + i + 1}. `}${d.isDecision ? '🚦 ' : ''}${d.title}${d.title === now ? ' ◀' : ''}`}
+              </Text>
+            </Button>
+            {d.detail ? <Text dimColor>{`   ${d.id} · ${d.detail}`}</Text> : null}
+          </Box>
+        )
+      })}
       {isPaged && (
         <Box>
           <Text dimColor>
