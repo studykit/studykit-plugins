@@ -11,6 +11,8 @@ const items = atom({ plugin: 'agenda', key: 'items' } as const, [])
 const isHidden = atom({ plugin: 'agenda', key: 'isHidden' } as const, false)
 const start = atom({ plugin: 'agenda', key: 'start' } as const, 0)
 const focus = atom({ plugin: 'agenda', key: 'focus' } as const, '')
+// The item pressed and awaiting the person's yes before it becomes the topic; '' when none.
+const pending = atom({ plugin: 'agenda', key: 'pending' } as const, '')
 // Where the list shows: its own pane (the surface seats it, docked beside the transcript in fullscreen, else
 // inline above the prompt) or the band right above the prompt. Kept across sessions in the store.
 const place = atom({ plugin: 'agenda', key: 'place' } as const, 'pane')
@@ -48,6 +50,7 @@ async function sync($: EngineInterface): Promise<void> {
     await update($, focus, () => '')
   } else await save($)
   await update($, start, () => 0)
+  await update($, pending, () => '')
   await showStatus($)
 }
 
@@ -81,7 +84,7 @@ async function moveTo($: EngineInterface, where: Place): Promise<void> {
 
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
-    await $.command.register({ name: 'agenda', description: '이 세션의 안건(지금 주제와 남은 항목)을 보여줍니다 (band: prompt 위로, pane: pane으로, close: 닫기)', argumentHint: '[band|pane|close]' })
+    await $.command.register({ name: 'agenda', description: '이 세션의 안건(지금 주제와 남은 항목)을 보여줍니다 (번호나 id: 지금 주제로 고르기, band: prompt 위로, pane: pane으로, close: 닫기)', argumentHint: '[번호|id|band|pane|close]' })
     const kept = await $.store.get(PLACE_KEY)
     if (kept === 'band' || kept === 'pane') await update($, place, () => kept)
     await $.tool.register({
@@ -149,6 +152,15 @@ export const register: Register = on => {
       await moveTo($, arg)
       return { text: arg === 'band' ? '안건을 prompt 위 band로 옮겼습니다. /agenda pane 으로 되돌립니다.' : '안건을 pane으로 옮겼습니다. /agenda band 로 prompt 위에 둡니다.' }
     }
+    if (arg !== '') {
+      // Typed out, the pick is deliberate: no yes to ask for, unlike a press.
+      const open = await read($, items)
+      const d = /^\d+$/.test(arg) ? open[Number(arg) - 1] : open.find(x => x.id === arg)
+      if (!d) return { text: `"${arg}"에 해당하는 안건이 없습니다. 번호(1–${open.length})나 id로 고릅니다.` }
+      if (d.title !== (await read($, focus))) await choose($, d)
+      await show($)
+      return { text: `지금 주제: ${d.title}` }
+    }
     if ((await read($, place)) === 'band') return { text: '안건은 prompt 위 band에 있습니다.' }
     await $.ui.open({ id: PANE, title: TITLE, columns: COLUMNS })
     return { text: '안건 pane을 열었습니다.' }
@@ -175,6 +187,7 @@ export const register: Register = on => {
     if (!id || !answer) return { deny: 'id and answer are required.' }
     if (!(await read($, items)).some(d => d.id === id)) return { deny: `No item "${id}".` }
     await update($, items, list => list.filter(d => d.id !== id))
+    await update($, pending, p => (p === id ? '' : p))
     await save($)
     await showStatus($)
     return { result: `Resolved "${id}".` }
@@ -193,17 +206,27 @@ export const register: Register = on => {
     if (e.props.hasSurvey || (await read($, place)) !== 'band' || (await read($, isHidden))) return next(e)
     if ((await read($, items)).length === 0 && (await read($, focus)) === '') return next(e)
     // At most half the band's room, so the transcript keeps the rest.
-    return body($, e, Math.max(3, Math.floor(e.props.maxRows / 2)), false)
+    return body($, e, Math.max(3, Math.floor(e.props.maxRows / 2)), false, e.requestId)
   })
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) =>
-    body($, e, e.props.scroll?.bodyRows ?? e.viewport?.rows ?? 24, true),
+    body($, e, e.props.scroll?.bodyRows ?? e.viewport?.rows ?? 24, true, PANE),
   )
 }
 
-// The person makes an item the current topic by pressing it: a click, or Enter on it once the site has the
-// keyboard (ctrl+x tab), or in the pane its digit. The model is told in a row it reads with the next request.
+// The person makes an item the current topic by pressing it (a click, or Enter on it once the site has the
+// keyboard (ctrl+x tab), or in the pane its digit) and then saying yes: a stray press must not tell the model
+// the topic moved. Pressing the topic itself does nothing.
+async function ask($: EngineInterface, d: Item, site: string): Promise<void> {
+  if (d.title === (await read($, focus))) return
+  await update($, pending, () => d.id)
+  // Moves the ring onto the yes so Enter answers; a site not holding the keys refuses, and a click still works.
+  await $.ui.focus({ requestId: site, key: 'confirm' }).catch(() => undefined)
+}
+
+// The model is told in a row it reads with the next request.
 async function choose($: EngineInterface, d: Item): Promise<void> {
+  await update($, pending, () => '')
   await update($, focus, () => d.title)
   await save($)
   await $.session.append({
@@ -213,10 +236,12 @@ async function choose($: EngineInterface, d: Item): Promise<void> {
 
 // The focus line and a page of whole items that fits `room` rows, one row kept for the paging buttons. Digit
 // hotkeys only in the pane: in the band a bare digit in an empty prompt would press them instead of typing.
-async function body($: EngineInterface, e: Parameters<EngineInterface['ui']['resolve']>[0], room: number, hasDigits: boolean) {
+async function body($: EngineInterface, e: Parameters<EngineInterface['ui']['resolve']>[0], room: number, hasDigits: boolean, site: string) {
   const { Box, Button, Text } = $.ui.resolve(e)
   const now = await read($, focus)
   const open = await read($, items)
+  const asking = await read($, pending)
+  const asked = open.find(d => d.id === asking)
   const head = now ? <Text color="cyan" bold>{`▶ 지금: ${now}`}</Text> : null
   if (open.length === 0)
     return (
@@ -225,7 +250,7 @@ async function body($: EngineInterface, e: Parameters<EngineInterface['ui']['res
         <Text dimColor>남은 안건이 없습니다.</Text>
       </Box>
     )
-  const rows = Math.max(1, room - 1 - (now ? 1 : 0))
+  const rows = Math.max(1, room - 1 - (now ? 1 : 0) - (asked ? 2 : 0))
   const height = (d: Item) => (d.detail ? 2 : 1)
   const first = Math.min(await read($, start), open.length - 1)
   let last = first
@@ -242,12 +267,22 @@ async function body($: EngineInterface, e: Parameters<EngineInterface['ui']['res
   return (
     <Box flexDirection="column">
       {head}
+      {asked && (
+        <Box flexDirection="column">
+          <Text color="yellow">{`"${asked.title}"을(를) 지금 주제로 할까요?`}</Text>
+          <Box>
+            <Button key="confirm" label="선택 (y)" hotkey="y" variant="primary" onPress={() => choose($, asked)} />
+            <Text> </Text>
+            <Button key="cancel" label="취소 (n)" hotkey="n" onPress={() => update($, pending, () => '')} />
+          </Box>
+        </Box>
+      )}
       {open.slice(first, last).map((d, i) => {
         // A plain Button draws its hotkey before the label (`1: `), which then stands in for the item's number.
         const hotkey = hasDigits && i < 9 ? String(i + 1) : undefined
         return (
           <Box flexDirection="column" key={`o-${d.id}`}>
-            <Button key={`pick-${d.id}`} plain hotkey={hotkey} onPress={() => choose($, d)}>
+            <Button key={`pick-${d.id}`} plain hotkey={hotkey} onPress={() => ask($, d, site)}>
               <Text bold color={d.title === now ? 'cyan' : undefined}>
                 {`${hotkey ? '' : `${first + i + 1}. `}${d.isDecision ? '🚦 ' : ''}${d.title}${d.title === now ? ' ◀' : ''}`}
               </Text>

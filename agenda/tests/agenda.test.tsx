@@ -57,16 +57,39 @@ test('/agenda close closes the pane', async ($, on) => {
   expect(JSON.stringify(r)).toContain('닫았습니다')
 })
 
-test('pressing an item makes it the current topic and tells the model', async ($, on) => {
+test('pressing an item asks first, then makes it the current topic and tells the model', async ($, on) => {
+  world(on)
+  on('ui.focus', async () => ({}) as never)
+  const rows = mock.session(on)
+  await $.tool.call({ tool: 'mcp__agenda__agenda_add', tool_use_id: 'a', id: 'log', title: '로그 회전 한도' } as never)
+  await $.tool.call({ tool: 'mcp__agenda__agenda_add', tool_use_id: 'b', id: 'ci', title: 'CI 캐시' } as never)
+  const ui = await $.ui.mount({ plugin: 'agenda', surface: 'terminal', component: 'Pane', props, requestId: 'agenda' })
+  await ui.press({ key: 'pick-ci' })
+  expect(await ui.find({ text: /CI 캐시"을\(를\) 지금 주제로/ })).toBeDefined()
+  await ui.press({ key: 'cancel' })
+  expect(await ui.find({ text: /지금 주제로/ })).toBeUndefined()
+  expect(rows.appended()).toHaveLength(0)
+  await ui.press({ key: 'pick-ci' })
+  await ui.press({ key: 'confirm' })
+  expect(await ui.find({ text: /지금: CI 캐시/ })).toBeDefined()
+  expect(JSON.stringify(rows.appended().at(-1))).toContain('CI 캐시')
+  // The topic itself pressed again asks nothing and tells the model nothing more.
+  await ui.press({ key: 'pick-ci' })
+  expect(await ui.find({ text: /지금 주제로/ })).toBeUndefined()
+  expect(rows.appended()).toHaveLength(1)
+  await ui.unmount()
+})
+
+test('/agenda <number|id> picks an item without asking', async ($, on) => {
   world(on)
   const rows = mock.session(on)
   await $.tool.call({ tool: 'mcp__agenda__agenda_add', tool_use_id: 'a', id: 'log', title: '로그 회전 한도' } as never)
   await $.tool.call({ tool: 'mcp__agenda__agenda_add', tool_use_id: 'b', id: 'ci', title: 'CI 캐시' } as never)
-  for (const surface of ['terminal', 'desktop'] as const) {
-    const ui = await $.ui.mount({ plugin: 'agenda', surface, component: 'Pane', props, requestId: 'agenda' })
-    await ui.press({ key: 'pick-ci' })
-    expect(await ui.find({ text: /지금: CI 캐시/ })).toBeDefined()
-    await ui.unmount()
-  }
-  expect(JSON.stringify(rows.appended().at(-1))).toContain('CI 캐시')
+  expect(JSON.stringify(await $.command.run({ command: 'agenda', args: '2' } as never))).toContain('CI 캐시')
+  expect(JSON.stringify(await $.command.run({ command: 'agenda', args: 'log' } as never))).toContain('로그 회전 한도')
+  expect(JSON.stringify(await $.command.run({ command: 'agenda', args: '9' } as never))).toContain('없습니다')
+  expect(rows.appended()).toHaveLength(2)
+  const ui = await $.ui.mount({ plugin: 'agenda', surface: 'terminal', component: 'Pane', props, requestId: 'agenda' })
+  expect(await ui.find({ text: /지금: 로그 회전 한도/ })).toBeDefined()
+  await ui.unmount()
 })

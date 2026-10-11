@@ -9,6 +9,6 @@ export type Place = 'pane' | 'band'
 
 declare module 'claude-code' {
   interface PluginState {
-    agenda: { items: Item[]; start: number; focus: string; place: Place; isHidden: boolean }
+    agenda: { items: Item[]; start: number; focus: string; pending: string; place: Place; isHidden: boolean }
   }
 }
