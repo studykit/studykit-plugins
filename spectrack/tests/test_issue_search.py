@@ -14,6 +14,8 @@ import json
 import sys
 from pathlib import Path
 
+import pytest
+
 _PLUGIN_ROOT = Path(__file__).resolve().parent.parent
 _SCRIPTS_DIR = _PLUGIN_ROOT / "scripts"
 if str(_SCRIPTS_DIR) not in sys.path:
@@ -26,12 +28,15 @@ from config import load_workflow_config  # noqa: E402
 from issue.dispatch import SEARCH, run_intent  # noqa: E402
 from issue.github.gh import SEARCH_ISSUE_FIELDS  # noqa: E402
 from issue.jira.client import (  # noqa: E402
-    jira_data_center_search_path,
-    jira_data_center_site_from_provider_config,
+    jira_search_path,
+    jira_site_from_provider_config,
 )
 from issue.jira.provider import JIRA_SEARCH_FIELDS  # noqa: E402
 
 issue_search_main = partial(run_intent, SEARCH)
+
+
+pytestmark = pytest.mark.usefixtures("jira_cloud")
 
 
 class FakeRunner:
@@ -78,9 +83,7 @@ version: 1
 providers:
   issues:
     kind: jira
-    site: https://jira.example.test
-    deployment: data-center
-    api_version: 2
+    site: https://example.atlassian.net
     project: TEST
     issue_type: Task
   knowledge:
@@ -112,8 +115,8 @@ def gh_search_args(query: str, *, limit: int = 30) -> tuple[str, ...]:
 def jira_search_args(project: Path, jql: str, *, max_results: int = 30) -> tuple[str, ...]:
     config = load_workflow_config(project)
     assert config is not None
-    site = jira_data_center_site_from_provider_config(config.issues)
-    path = jira_data_center_search_path(
+    site = jira_site_from_provider_config(config.issues)
+    path = jira_search_path(
         site, jql=jql, max_results=max_results, fields=JIRA_SEARCH_FIELDS
     )
     url = f"{site.base_url}{path}"
@@ -251,7 +254,7 @@ def test_jira_search_returns_lightweight_ref_list(tmp_path: Path) -> None:
         "title": "Do the thing",
         "state": "IN PROGRESS",
         "assignees": ["bob"],
-        "url": "https://jira.example.test/browse/TEST-1",
+        "url": "https://example.atlassian.net/browse/TEST-1",
     }
     assert [request.args for request in runner.requests] == [args]
 

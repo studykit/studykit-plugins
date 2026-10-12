@@ -23,7 +23,7 @@ import frontmatter as frontmatter_lib
 from command import CommandRunner
 from config import WorkflowConfig, WorkflowConfigError
 from issue.cache import _read_frontmatter_markdown
-from issue.jira.client import resolve_jira_data_center_site
+from issue.jira.client import resolve_jira_site
 from issue.backend import IssueBackendError
 from issue.cli_output import (
     IssueFetchContext,
@@ -33,10 +33,10 @@ from issue.cli_output import (
     format_issue_cache_json,
     format_issue_search_json,
 )
-from issue.jira.cache import JiraDataCenterIssueCache
+from issue.jira.cache import JiraIssueCache
 from issue.jira.provider import (
     JIRA_ARTIFACT_ISSUE_TYPES,
-    JiraDataCenterIssueNativeProvider,
+    JiraIssueNativeProvider,
     _jira_configured_artifact_issue_types,
     _jira_issue_provider_settings,
     get_jira_myself,
@@ -110,7 +110,7 @@ class JiraIssueBackend:
         stderr: TextIO,
     ) -> int:
         try:
-            site = resolve_jira_data_center_site(config.root)
+            site = resolve_jira_site(config.root)
         except (WorkflowConfigError, JiraProviderError) as exc:
             print(f"Jira issue fetch error: {exc}", file=stderr)
             return 2
@@ -127,8 +127,8 @@ class JiraIssueBackend:
             )
             return 2
 
-        provider = JiraDataCenterIssueNativeProvider(runner=runner)
-        cache = JiraDataCenterIssueCache.for_project(config.root)
+        provider = JiraIssueNativeProvider(runner=runner)
+        cache = JiraIssueCache.for_project(config.root)
         contexts: list[IssueFetchContext] = []
         try:
             for issue in issue_keys:
@@ -226,7 +226,7 @@ class JiraIssueBackend:
         stdout: TextIO,
         stderr: TextIO,
     ) -> int:
-        provider = JiraDataCenterIssueNativeProvider(runner=runner)
+        provider = JiraIssueNativeProvider(runner=runner)
         try:
             response = provider.call(
                 ProviderRequest(
@@ -272,9 +272,9 @@ class JiraIssueBackend:
         stderr: TextIO,
     ) -> int:
         try:
-            site = resolve_jira_data_center_site(config.root)
+            site = resolve_jira_site(config.root)
             issue_key = normalize_jira_issue_key(args.issue)
-            provider = JiraDataCenterIssueNativeProvider(runner=runner)
+            provider = JiraIssueNativeProvider(runner=runner)
             response = provider.call(
                 ProviderRequest(
                     role="issue",
@@ -293,7 +293,7 @@ class JiraIssueBackend:
                     },
                 )
             )
-            cache = JiraDataCenterIssueCache.for_project(config.root)
+            cache = JiraIssueCache.for_project(config.root)
             payload = _find_resume_comment_payload(
                 comment_files=cache.comment_files(site, issue_key),
                 issue=issue_key,
@@ -371,7 +371,7 @@ class JiraIssueBackend:
             "--body-file",
             type=Path,
             required=True,
-            help="path to the Resume body content file (must start with 'h2. Resume'; leading YAML frontmatter is stripped)",
+            help="path to the Resume body content file (must start with '## Resume'; leading YAML frontmatter is stripped)",
         )
         resume.add_argument(
             "--overwrite",
@@ -465,7 +465,7 @@ class JiraIssueBackend:
         if state_reason:
             payload["state_reason"] = state_reason.strip()
 
-        provider = JiraDataCenterIssueNativeProvider(runner=runner)
+        provider = JiraIssueNativeProvider(runner=runner)
         response = provider.call(
             ProviderRequest(
                 role="issue",
@@ -544,7 +544,7 @@ class JiraIssueBackend:
         if overwrite:
             payload["overwrite"] = True
 
-        provider = JiraDataCenterIssueNativeProvider(runner=runner)
+        provider = JiraIssueNativeProvider(runner=runner)
         response = provider.call(
             ProviderRequest(
                 role="issue",
@@ -602,7 +602,7 @@ class JiraIssueBackend:
     ) -> dict[str, object]:
         artifact_type = _required_text(artifact_type, "artifact type")
         try:
-            site = resolve_jira_data_center_site(config.root)
+            site = resolve_jira_site(config.root)
             issue_key = normalize_jira_issue_key(issue)
         except JiraProviderError as exc:
             raise IssueBackendError(str(exc)) from exc
@@ -613,13 +613,13 @@ class JiraIssueBackend:
         body = _strip_body_frontmatter(body_path.read_text(encoding="utf-8"))
         if not _is_resume_comment_body(body):
             raise IssueBackendError(
-                "comment resume requires a Resume body that starts with 'h2. Resume'"
+                "comment resume requires a Resume body that starts with '## Resume'"
             )
 
         # Refresh the comment projection first: discovery must see a Resume comment
         # created remotely since the last fetch, otherwise the upsert would append
         # a second one — the very duplicate this verb exists to prevent.
-        provider = JiraDataCenterIssueNativeProvider(runner=runner)
+        provider = JiraIssueNativeProvider(runner=runner)
         provider.call(
             ProviderRequest(
                 role="issue",
@@ -638,7 +638,7 @@ class JiraIssueBackend:
                 },
             )
         )
-        cache = JiraDataCenterIssueCache.for_project(config.root)
+        cache = JiraIssueCache.for_project(config.root)
         resume_ids = _find_resume_comment_ids(cache.comment_files(site, issue_key))
 
         if len(resume_ids) > 1:
@@ -788,7 +788,7 @@ class JiraIssueBackend:
         if not resolved:
             raise IssueBackendError("at least one attachment file is required")
 
-        provider = JiraDataCenterIssueNativeProvider(runner=runner)
+        provider = JiraIssueNativeProvider(runner=runner)
         response = provider.call(
             ProviderRequest(
                 role="issue",
@@ -837,7 +837,7 @@ class JiraIssueBackend:
         except JiraProviderError as exc:
             raise IssueBackendError(str(exc)) from exc
 
-        provider = JiraDataCenterIssueNativeProvider(runner=runner)
+        provider = JiraIssueNativeProvider(runner=runner)
         response = provider.call(
             ProviderRequest(
                 role="issue",
@@ -890,7 +890,7 @@ class JiraIssueBackend:
                 "create the new issue as a native Jira Sub-task under this parent key. "
                 "Sets the create-time parent field and forces issuetype=Sub-task; no "
                 "post-create relationship step. Pick this when siblings under the parent "
-                "are Sub-tasks. Use --parent instead for a post-create issue-link "
+                "are Sub-tasks. Use --parent instead for a post-create parent "
                 "relationship that leaves issuetype unchanged."
             ),
         )
@@ -905,25 +905,20 @@ class JiraIssueBackend:
             help="path to the opaque body content file (leading YAML frontmatter is stripped)",
         )
         publish.add_argument(
-            "--epic-name",
-            help="Epic Name customfield value (epic only; defaults to --title)",
-        )
-        publish.add_argument(
             "--assignee",
-            help='Jira username (Data Center) or accountId (Cloud), or the literal "me" to resolve via /rest/api/<v>/myself',
+            help='Jira accountId, or the literal "me" to resolve via /rest/api/3/myself',
         )
         publish.add_argument(
             "--parent",
             help=(
-                "add a post-create issue-link parent relationship to this key. "
+                "set the new issue's native parent field to this key after publish. "
                 "Does not change the new issue's issuetype (use --subtask-parent for a "
-                "native Sub-task). Requires providers.issues.relationship_mappings.parent "
-                "to be configured; the post-create step fails otherwise."
+                "native Sub-task)."
             ),
         )
         publish.add_argument(
             "--epic",
-            help="add Epic Link after publish (rejected when --type epic)",
+            help="alias of --parent for an Epic key (rejected when --type epic or with --parent)",
         )
         publish.add_argument(
             "--blocked-by",
@@ -970,7 +965,6 @@ class JiraIssueBackend:
                     issue_type=args.issue_type,
                     subtask_parent=args.subtask_parent,
                     project_key=args.project_key,
-                    epic_name=args.epic_name,
                     assignee=args.assignee,
                     relationship_intent=self._publish_relationship_intent(args),
                     runner=runner,
@@ -1019,7 +1013,6 @@ class JiraIssueBackend:
         issue_type: str | None,
         subtask_parent: str | None,
         project_key: str | None,
-        epic_name: str | None,
         assignee: str | None,
         relationship_intent: dict[str, object],
         runner: CommandRunner | None,
@@ -1029,7 +1022,6 @@ class JiraIssueBackend:
         normalized_labels = tuple(label.strip() for label in labels if label.strip())
         normalized_subtask_parent = _jira_issue_key(subtask_parent, "subtask parent")
         normalized_issue_type = _optional_text(issue_type)
-        normalized_epic_name = _optional_text(epic_name)
 
         # Jira represents the workflow type as a native issuetype, not a label,
         # so a type it cannot map has nowhere to live and would silently
@@ -1072,13 +1064,11 @@ class JiraIssueBackend:
         normalized_project_key = _optional_text(project_key)
         if normalized_project_key:
             payload["project_key"] = normalized_project_key
-        if normalized_epic_name is not None:
-            payload["epic_name"] = normalized_epic_name
         normalized_assignee = _optional_text(assignee)
         if normalized_assignee:
             payload["assignee"] = normalized_assignee
 
-        provider = JiraDataCenterIssueNativeProvider(runner=runner)
+        provider = JiraIssueNativeProvider(runner=runner)
         response = provider.call(
             ProviderRequest(
                 role="issue",
@@ -1307,7 +1297,7 @@ class JiraIssueBackend:
         if state_reason:
             payload["state_reason"] = state_reason.strip()
 
-        provider = JiraDataCenterIssueNativeProvider(runner=runner)
+        provider = JiraIssueNativeProvider(runner=runner)
         response = provider.call(
             ProviderRequest(
                 role="issue",
@@ -1376,18 +1366,18 @@ class JiraIssueBackend:
         epic_group = parser.add_mutually_exclusive_group()
         epic_group.add_argument(
             "--epic",
-            help="add Epic Link (errors if an Epic Link already exists)",
+            help="alias of --parent for an Epic key (errors if a parent already exists)",
         )
         epic_group.add_argument(
             "--replace-epic",
             dest="replace_epic",
-            help="set Epic Link, replacing any existing Epic Link",
+            help="alias of --replace-parent for an Epic key",
         )
         epic_group.add_argument(
             "--remove-epic",
             dest="remove_epic",
             action="store_true",
-            help="remove the current Epic Link (no-op when no Epic Link exists)",
+            help="alias of --remove-parent",
         )
         parser.add_argument(
             "--child", action="append", default=[], help="add a child (repeatable)"
@@ -1505,7 +1495,7 @@ class JiraIssueBackend:
         runner: CommandRunner | None,
     ) -> dict[str, object]:
         try:
-            site = resolve_jira_data_center_site(config.root)
+            site = resolve_jira_site(config.root)
         except (WorkflowConfigError, JiraProviderError) as exc:
             raise IssueBackendError(str(exc)) from exc
         issue_keys: list[str] = []
@@ -1522,7 +1512,7 @@ class JiraIssueBackend:
             )
         issue_key = issue_keys[0]
 
-        provider = JiraDataCenterIssueNativeProvider(runner=runner)
+        provider = JiraIssueNativeProvider(runner=runner)
         response = provider.call(
             ProviderRequest(
                 role="issue",
@@ -1532,7 +1522,7 @@ class JiraIssueBackend:
                 payload={"issue": issue_key, "relationship_intent": intent},
             )
         )
-        cache = JiraDataCenterIssueCache.for_project(config.root)
+        cache = JiraIssueCache.for_project(config.root)
         return flatten_provider_envelope(
             response.payload,
             project=config.root,
@@ -1571,7 +1561,7 @@ class JiraIssueBackend:
 
         p_assign = subparsers.add_parser("assign", help="assign an issue to a user")
         p_assign.add_argument("issue", help="Jira issue key")
-        p_assign.add_argument("user", help='Jira username (Data Center) or accountId (Cloud), or the literal "me"')
+        p_assign.add_argument("user", help='Jira accountId, or the literal "me"')
 
         p_unassign = subparsers.add_parser("unassign", help="clear the assignee")
         p_unassign.add_argument("issue", help="Jira issue key")
@@ -1693,12 +1683,12 @@ class JiraIssueBackend:
         runner: CommandRunner | None,
     ) -> dict[str, Any]:
         try:
-            site = resolve_jira_data_center_site(config.root)
+            site = resolve_jira_site(config.root)
             issue_key = normalize_jira_issue_key(issue)
         except (WorkflowConfigError, JiraProviderError) as exc:
             raise IssueBackendError(str(exc)) from exc
 
-        provider = JiraDataCenterIssueNativeProvider(runner=runner)
+        provider = JiraIssueNativeProvider(runner=runner)
         context = ProviderContext(project=config.root, artifact_type=artifact_type)
 
         if verb not in _RESERVED_FIELDS_VERBS:
@@ -1862,7 +1852,7 @@ def _find_resume_comment_ids(comment_files: list[Path]) -> list[str]:
 
 
 def _is_resume_comment_body(body: str) -> bool:
-    return body.lstrip().startswith("h2. Resume")
+    return body.lstrip().startswith("## Resume")
 
 
 def _optional_text(value: str | None) -> str | None:
@@ -1927,7 +1917,7 @@ def fetch_cache_payload(
 
     config = _load_jira_config(project)
     try:
-        site = resolve_jira_data_center_site(config.root)
+        site = resolve_jira_site(config.root)
     except (WorkflowConfigError, JiraProviderError) as exc:
         raise IssueBackendError(str(exc)) from exc
 
@@ -1935,8 +1925,8 @@ def fetch_cache_payload(
     if not issue_keys:
         raise IssueBackendError("no Jira issue references were found")
 
-    provider = JiraDataCenterIssueNativeProvider(runner=runner)
-    cache = JiraDataCenterIssueCache.for_project(config.root)
+    provider = JiraIssueNativeProvider(runner=runner)
+    cache = JiraIssueCache.for_project(config.root)
     contexts: list[IssueFetchContext] = []
     for issue in issue_keys:
         try:
@@ -2028,7 +2018,6 @@ def publish_issue(
     issue_type: str | None = None,
     subtask_parent: str | None = None,
     project_key: str | None = None,
-    epic_name: str | None = None,
     assignee: str | None = None,
     relationship_intent: dict[str, object] | None = None,
     runner: CommandRunner | None = None,
@@ -2045,7 +2034,6 @@ def publish_issue(
         issue_type=issue_type,
         subtask_parent=subtask_parent,
         project_key=project_key,
-        epic_name=epic_name,
         assignee=assignee,
         relationship_intent=relationship_intent or {},
         runner=runner,

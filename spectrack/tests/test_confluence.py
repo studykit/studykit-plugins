@@ -69,12 +69,18 @@ def page(version: int = 3, body: dict | None = None) -> dict:
     return result
 
 
-@pytest.mark.parametrize("kind,site", [("github", SITE), ("jira", "https://jira.example.test")])
-def test_refuses_non_cloud_before_request(tmp_path: Path, kind: str, site: str) -> None:
+@pytest.mark.parametrize(
+    "kind,site,message",
+    [
+        ("github", SITE, "requires a Jira Cloud issue provider"),
+        ("jira", "https://jira.example.test", "spectrack supports Jira Cloud only"),
+    ],
+)
+def test_refuses_non_cloud_before_request(tmp_path: Path, kind: str, site: str, message: str) -> None:
     config(tmp_path, kind, site)
     runner = Runner([])
     status, _, error = invoke(tmp_path, runner, "page", "get", "42")
-    assert status == 1 and ("Cloud" in error or "Jira" in error)
+    assert status == 1 and message in error
     assert not runner.requests
 
 

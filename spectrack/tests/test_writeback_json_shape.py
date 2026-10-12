@@ -23,6 +23,8 @@ import json
 import sys
 from pathlib import Path
 
+import pytest
+
 _SCRIPTS_DIR = Path(__file__).resolve().parent.parent / "scripts"
 if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
@@ -109,6 +111,9 @@ _JIRA_UPDATE_EXPECTED_KEYS = frozenset(
 )
 
 
+pytestmark = pytest.mark.usefixtures("jira_cloud")
+
+
 def _assert_no_wrapper_keys(payload: dict[str, object]) -> None:
     assert "operation" not in payload, payload
     assert "verified" not in payload, payload
@@ -182,8 +187,8 @@ def test_github_update_writeback_json_omits_operation_and_verified(tmp_path: Pat
 def test_jira_publish_writeback_json_omits_operation_and_verified(tmp_path: Path) -> None:
     _write_jira_config(tmp_path)
     body_file = _write_body_file(tmp_path, "Body.\n")
-    issue_url = "https://jira.example.test/rest/api/2/issue/TEST-1234"
-    remote_links_url = "https://jira.example.test/rest/api/2/issue/TEST-1234/remotelink"
+    issue_url = "https://example.atlassian.net/rest/api/3/issue/TEST-1234"
+    remote_links_url = "https://example.atlassian.net/rest/api/3/issue/TEST-1234/remotelink"
 
     runner = JiraFakeRunner(
         {

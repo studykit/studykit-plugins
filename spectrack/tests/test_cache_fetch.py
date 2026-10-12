@@ -7,6 +7,8 @@ import json
 import sys
 from pathlib import Path
 
+import pytest
+
 _PLUGIN_ROOT = Path(__file__).resolve().parent.parent
 _SCRIPTS_DIR = _PLUGIN_ROOT / "scripts"
 if str(_SCRIPTS_DIR) not in sys.path:
@@ -23,9 +25,12 @@ from config import load_workflow_config  # noqa: E402
 from issue.github.cache import GitHubIssueCache  # noqa: E402
 from issue.github.gh import DEFAULT_ISSUE_FIELDS, GitHubRepository  # noqa: E402
 from issue.github.refs import issue_numbers_from_references  # noqa: E402
-from issue.jira.cache import JiraDataCenterIssueCache  # noqa: E402
-from issue.jira.client import jira_data_center_site_from_provider_config  # noqa: E402
+from issue.jira.cache import JiraIssueCache  # noqa: E402
+from issue.jira.client import jira_site_from_provider_config  # noqa: E402
 from issue.jira.refs import jira_issue_keys_from_references  # noqa: E402
+
+
+pytestmark = pytest.mark.usefixtures("jira_cloud")
 
 
 class FakeRunner:
@@ -143,9 +148,7 @@ version: 1
 providers:
   issues:
     kind: jira
-    site: https://jira.example.test
-    deployment: data-center
-    api_version: 2
+    site: https://example.atlassian.net
     project: TEST
     issue_type: Task
   knowledge:
@@ -159,15 +162,15 @@ issue_id_format: jira
 def jira_site(project: Path):
     config = load_workflow_config(project)
     assert config is not None
-    return jira_data_center_site_from_provider_config(config.issues)
+    return jira_site_from_provider_config(config.issues)
 
 
-def jira_issue_payload(*, body: str = "Data Center description.") -> dict[str, object]:
+def jira_issue_payload(*, body: str = "Cloud description.") -> dict[str, object]:
     return {
         "id": "10001",
         "key": "TEST-1234",
         "fields": {
-            "summary": "Support Jira Data Center",
+            "summary": "Support Jira Cloud",
             "description": body,
             "labels": ["workflow", "jira"],
             "created": "2026-05-15T09:00:00.000+0900",
@@ -230,11 +233,11 @@ def curl_args(url: str) -> tuple[str, ...]:
 
 
 def jira_issue_url(issue: str = "TEST-1234") -> str:
-    return f"https://jira.example.test/rest/api/2/issue/{issue}"
+    return f"https://example.atlassian.net/rest/api/3/issue/{issue}"
 
 
 def jira_remote_links_url(issue: str = "TEST-1234") -> str:
-    return f"https://jira.example.test/rest/api/2/issue/{issue}/remotelink"
+    return f"https://example.atlassian.net/rest/api/3/issue/{issue}/remotelink"
 
 
 def test_issue_numbers_from_references_accepts_agent_shell_inputs() -> None:
@@ -392,7 +395,7 @@ def test_cache_fetch_refresh_reads_remote_and_updates_cache(tmp_path: Path) -> N
 def test_cache_fetch_uses_jira_cache_hit_without_remote_read(tmp_path: Path) -> None:
     write_jira_config(tmp_path)
     site = jira_site(tmp_path)
-    cache = JiraDataCenterIssueCache.for_project(tmp_path)
+    cache = JiraIssueCache.for_project(tmp_path)
     cache.write_issue_bundle(
         site,
         jira_issue_payload(body="Cached Jira body."),
@@ -449,5 +452,5 @@ def test_cache_fetch_refresh_reads_remote_jira_and_updates_cache(tmp_path: Path)
         curl_args(jira_issue_url()),
         curl_args(jira_remote_links_url()),
     ]
-    cached = JiraDataCenterIssueCache.for_project(tmp_path).read_issue(jira_site(tmp_path), "TEST-1234")
+    cached = JiraIssueCache.for_project(tmp_path).read_issue(jira_site(tmp_path), "TEST-1234")
     assert cached["body"] == "Fresh Jira body."

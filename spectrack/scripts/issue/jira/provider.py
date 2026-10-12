@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Jira Data Center native issue provider."""
+"""Jira Cloud native issue provider."""
 
 from __future__ import annotations
 
@@ -19,32 +19,33 @@ from issue.cache import (
     require_provider_freshness,
 )
 from issue.jira import adf
-from issue.jira.cache import JiraDataCenterIssueCache, jira_target_fingerprint
+from issue.jira.cache import JiraIssueCache, jira_target_fingerprint
 from issue.jira.refs import JiraProviderError, normalize_jira_issue_key
 from issue.jira.relationships import (
     filter_jira_payload,
-    normalize_jira_data_center_issue,
+    normalize_jira_issue,
     normalize_jira_remote_links,
 )
 from command import CommandRunner
 from config import WorkflowConfigError, load_workflow_config
 from issue.jira.client import (
+    CLOUD_ONLY_MESSAGE,
     jira_download_attachment,
     jira_upload_attachments,
-    jira_data_center_comment_path,
-    jira_data_center_comments_path,
-    jira_data_center_issue_path,
-    jira_data_center_issue_link_path,
-    jira_data_center_issue_links_path,
-    jira_data_center_remote_link_global_id_path,
-    jira_data_center_remote_link_path,
-    jira_data_center_remote_links_path,
-    jira_data_center_search_path,
-    jira_data_center_transitions_path,
+    jira_comment_path,
+    jira_comments_path,
+    jira_issue_path,
+    jira_issue_link_path,
+    jira_issue_links_path,
+    jira_remote_link_global_id_path,
+    jira_remote_link_path,
+    jira_remote_links_path,
+    jira_search_path,
+    jira_transitions_path,
     jira_delete,
     jira_get_json,
     jira_send_json,
-    resolve_jira_data_center_site,
+    resolve_jira_site,
 )
 from issue.providers import (
     CACHE_POLICY_BYPASS,
@@ -63,6 +64,12 @@ JIRA_REVIEW_TITLE_PREFIX = "[Review] "
 JIRA_RESEARCH_TITLE_PREFIX = "[Research] "
 JIRA_SPIKE_ISSUE_TYPE = "Task"
 JIRA_SPIKE_TITLE_PREFIX = "[Spike] "
+# Jira Cloud models the whole issue hierarchy (Epic > Story/Task > Sub-task)
+# with the native ``parent`` field, so these relationships need no config.
+# ``epic`` is an alias of ``parent``; ``child`` writes the target's parent.
+_PARENT_RELATIONSHIPS = frozenset({"parent", "epic"})
+_CHILD_RELATIONSHIPS = frozenset({"child", "children", "subtask", "subtasks"})
+_BUILTIN_HIERARCHY_RELATIONSHIPS = _PARENT_RELATIONSHIPS | _CHILD_RELATIONSHIPS
 JIRA_ARTIFACT_ISSUE_TYPES = {
     "bug": "Bug",
     "epic": "Epic",
@@ -142,8 +149,8 @@ class _ResolvedJiraRelationshipOperation:
         return result
 
 
-class JiraDataCenterIssueNativeProvider(IssueProvider):
-    """Native Jira Data Center issue provider backed by REST API v2 by default."""
+class JiraIssueNativeProvider(IssueProvider):
+    """Native Jira Cloud issue provider backed by REST API v3."""
 
     def __init__(self, *, runner: CommandRunner | None = None):
         super().__init__(kind="jira", transport=TRANSPORT_NATIVE)
@@ -157,8 +164,8 @@ class JiraDataCenterIssueNativeProvider(IssueProvider):
         include_remote_links = bool(request.payload.get("include_remote_links", True))
 
         try:
-            site = resolve_jira_data_center_site(request.context.project)
-            cache = JiraDataCenterIssueCache.for_project(request.context.project)
+            site = resolve_jira_site(request.context.project)
+            cache = JiraIssueCache.for_project(request.context.project)
             settings = _jira_issue_provider_settings(request.context.project)
             mappings = _relationship_mappings(settings)
             if request.context.cache_policy == CACHE_POLICY_DEFAULT:
@@ -176,7 +183,7 @@ class JiraDataCenterIssueNativeProvider(IssueProvider):
 
             raw_issue = get_issue(site, issue_key, runner=self.runner)
             remote_links = get_remote_links(site, issue_key, runner=self.runner) if include_remote_links else []
-            payload = normalize_jira_data_center_issue(
+            payload = normalize_jira_issue(
                 raw_issue,
                 site=site,
                 remote_links=remote_links,
@@ -209,7 +216,7 @@ class JiraDataCenterIssueNativeProvider(IssueProvider):
         query = str(_required_payload_value(request, "query"))
         max_results = _search_limit(request.payload.get("limit"))
         try:
-            site = resolve_jira_data_center_site(request.context.project)
+            site = resolve_jira_site(request.context.project)
             raw_issues = search_issues(
                 site, jql=query, max_results=max_results, runner=self.runner
             )
@@ -219,8 +226,8 @@ class JiraDataCenterIssueNativeProvider(IssueProvider):
         return {"query": query, "issues": issues}
 
     def create(self, request: ProviderRequest) -> Mapping[str, Any]:
-        site = resolve_jira_data_center_site(request.context.project)
-        cache = JiraDataCenterIssueCache.for_project(request.context.project)
+        site = resolve_jira_site(request.context.project)
+        cache = JiraIssueCache.for_project(request.context.project)
 
         title = str(_required_payload_value(request, "title"))
         body = str(_required_payload_value(request, "body"))
@@ -248,12 +255,6 @@ class JiraDataCenterIssueNativeProvider(IssueProvider):
         subtask_parent_key = _jira_create_subtask_parent_key(request)
         if subtask_parent_key and not _is_jira_subtask_issue_type(issue_type):
             raise ProviderOperationError("Jira subtask_parent can only be used when issue_type is Sub-task")
-        epic_name, epic_name_field = _jira_create_epic_name(
-            request,
-            settings=settings,
-            issue_type=issue_type,
-            title=title,
-        )
         assignee = _optional_string(request.payload.get("assignee"))
         if assignee is not None and assignee.lower() == "me":
             assignee = get_jira_myself(site, runner=self.runner)
@@ -266,8 +267,6 @@ class JiraDataCenterIssueNativeProvider(IssueProvider):
             body=body,
             labels=labels,
             subtask_parent_key=subtask_parent_key,
-            epic_name=epic_name,
-            epic_name_field=epic_name_field,
             assignee=assignee,
             runner=self.runner,
         )
@@ -323,7 +322,7 @@ class JiraDataCenterIssueNativeProvider(IssueProvider):
         if label_set is not None:
             fields["labels"] = _string_list(label_set)
         if assignee is not None:
-            fields["assignee"] = {"name": assignee}
+            fields["assignee"] = _jira_user_ref(assignee)
         elif unassign:
             fields["assignee"] = None
         if issuetype is not None:
@@ -347,8 +346,8 @@ class JiraDataCenterIssueNativeProvider(IssueProvider):
                 "assignee, issuetype, state"
             )
 
-        site = resolve_jira_data_center_site(request.context.project)
-        cache = JiraDataCenterIssueCache.for_project(request.context.project)
+        site = resolve_jira_site(request.context.project)
+        cache = JiraIssueCache.for_project(request.context.project)
         try:
             self._require_write_freshness(request, site, cache, issue_key, target="issue")
         except ProviderFreshnessError as exc:
@@ -400,8 +399,8 @@ class JiraDataCenterIssueNativeProvider(IssueProvider):
             raise ProviderOperationError("update_comment requires a non-empty 'comment_id' payload")
         body = str(_required_payload_value(request, "body"))
 
-        site = resolve_jira_data_center_site(request.context.project)
-        cache = JiraDataCenterIssueCache.for_project(request.context.project)
+        site = resolve_jira_site(request.context.project)
+        cache = JiraIssueCache.for_project(request.context.project)
         for target in ("issue", "comments"):
             try:
                 self._require_write_freshness(request, site, cache, issue_key, target=target)
@@ -434,8 +433,8 @@ class JiraDataCenterIssueNativeProvider(IssueProvider):
             raise ProviderOperationError("add_attachment requires a non-empty 'files' payload")
         files = [str(path) for path in raw_files]
 
-        site = resolve_jira_data_center_site(request.context.project)
-        cache = JiraDataCenterIssueCache.for_project(request.context.project)
+        site = resolve_jira_site(request.context.project)
+        cache = JiraIssueCache.for_project(request.context.project)
         uploaded = upload_attachments(site, issue_key, files, runner=self.runner)
         # Attachments are additive — they never conflict with a stale body
         # edit — so no freshness gate. Refresh the cache so the projection and
@@ -457,7 +456,7 @@ class JiraDataCenterIssueNativeProvider(IssueProvider):
         want_all = bool(request.payload.get("all"))
         out_override = _optional_string(request.payload.get("out"))
 
-        site = resolve_jira_data_center_site(request.context.project)
+        site = resolve_jira_site(request.context.project)
         raw_issue = get_issue(site, issue_key, runner=self.runner)
         fields = raw_issue.get("fields") if isinstance(raw_issue.get("fields"), Mapping) else {}
         attachments = [item for item in (fields.get("attachment") or []) if isinstance(item, Mapping)]
@@ -470,7 +469,7 @@ class JiraDataCenterIssueNativeProvider(IssueProvider):
         if out_override:
             out_dir = Path(out_override).expanduser()
         else:
-            cache = JiraDataCenterIssueCache.for_project(request.context.project)
+            cache = JiraIssueCache.for_project(request.context.project)
             out_dir = cache.issue_dir(site, issue_key) / "attachments"
         out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -511,6 +510,7 @@ class JiraDataCenterIssueNativeProvider(IssueProvider):
             target_id=issue_key,
         )
         operations = self._resolve_parent_remove_target(request, issue_key, operations)
+        self._require_parent_vacancy(request, issue_key, operations)
 
         if not operations:
             return {
@@ -524,8 +524,8 @@ class JiraDataCenterIssueNativeProvider(IssueProvider):
                 "no_changes": True,
             }
 
-        site = resolve_jira_data_center_site(request.context.project)
-        cache = JiraDataCenterIssueCache.for_project(request.context.project)
+        site = resolve_jira_site(request.context.project)
+        cache = JiraIssueCache.for_project(request.context.project)
         return self._apply_relationship_operations(request, site, cache, issue_key, operations)
 
     def _resolve_parent_remove_target(
@@ -535,35 +535,66 @@ class JiraDataCenterIssueNativeProvider(IssueProvider):
         operations: list[PendingIssueRelationshipOperation],
     ) -> list[PendingIssueRelationshipOperation]:
         if not any(
-            op.action == "remove" and op.relationship == "parent" and not op.target_ref
+            op.action == "remove" and _is_parent_relationship(op.relationship) and not op.target_ref
             for op in operations
         ):
             return operations
-        cache = JiraDataCenterIssueCache.for_project(request.context.project)
-        site = resolve_jira_data_center_site(request.context.project)
-        current_parent = ""
-        try:
-            cached = cache.read_issue(site, issue_key, include_body=False, include_comments=False)
-        except WorkflowCacheError:
-            cached = {}
-        parent_value = (
-            cached.get("parent")
-            or cached.get("parentKey")
-            or cached.get("parent_key")
-        )
-        if isinstance(parent_value, Mapping):
-            parent_value = parent_value.get("key") or parent_value.get("ref") or parent_value.get("id")
-        if parent_value not in (None, "", 0):
-            current_parent = str(parent_value)
+        current_parent = self._cached_parent_key(request, issue_key)
         resolved: list[PendingIssueRelationshipOperation] = []
         for op in operations:
-            if op.action == "remove" and op.relationship == "parent" and not op.target_ref:
+            if op.action == "remove" and _is_parent_relationship(op.relationship) and not op.target_ref:
                 if not current_parent:
                     continue
                 resolved.append(replace(op, target_ref=current_parent))
             else:
                 resolved.append(op)
         return resolved
+
+    def _cached_parent_key(self, request: ProviderRequest, issue_key: str) -> str:
+        """Return the parent key recorded in the local projection, or ``""``."""
+
+        cache = JiraIssueCache.for_project(request.context.project)
+        site = resolve_jira_site(request.context.project)
+        try:
+            cached = cache.read_issue(site, issue_key, include_body=False, include_comments=False)
+        except WorkflowCacheError:
+            return ""
+        relationships = cached.get("relationships")
+        if not isinstance(relationships, Mapping):
+            return ""
+        parent_value = relationships.get("parent")
+        if parent_value is None and isinstance(relationships.get("workflow"), Mapping):
+            parent_value = relationships["workflow"].get("parent")
+        if isinstance(parent_value, Mapping):
+            parent_value = parent_value.get("key") or parent_value.get("ref") or parent_value.get("id")
+        if parent_value in (None, "", 0):
+            return ""
+        return str(parent_value)
+
+    def _require_parent_vacancy(
+        self,
+        request: ProviderRequest,
+        issue_key: str,
+        operations: list[PendingIssueRelationshipOperation],
+    ) -> None:
+        """Refuse a plain parent add when the issue already has a parent.
+
+        Only ``--replace-parent`` (``replace_parent``) may overwrite an
+        existing parent, so an add cannot silently move an issue.
+        """
+
+        adds = [
+            op
+            for op in operations
+            if op.action == "add" and _is_parent_relationship(op.relationship) and not op.replace_parent
+        ]
+        if not adds:
+            return
+        current_parent = self._cached_parent_key(request, issue_key)
+        if current_parent:
+            raise ProviderOperationError(
+                f"Jira issue {issue_key} parent already exists ({current_parent}); use --replace-parent"
+            )
 
     def _append_comment(
         self,
@@ -573,8 +604,8 @@ class JiraDataCenterIssueNativeProvider(IssueProvider):
         *,
         state: str | None = None,
     ) -> Mapping[str, Any]:
-        site = resolve_jira_data_center_site(request.context.project)
-        cache = JiraDataCenterIssueCache.for_project(request.context.project)
+        site = resolve_jira_site(request.context.project)
+        cache = JiraIssueCache.for_project(request.context.project)
         for target in ("issue", "comments"):
             try:
                 self._require_write_freshness(request, site, cache, issue_key, target=target)
@@ -641,7 +672,7 @@ class JiraDataCenterIssueNativeProvider(IssueProvider):
         self,
         request: ProviderRequest,
         site: Any,
-        cache: JiraDataCenterIssueCache,
+        cache: JiraIssueCache,
         issue_key: str,
         operations: list[PendingIssueRelationshipOperation],
     ) -> Mapping[str, Any]:
@@ -684,14 +715,14 @@ class JiraDataCenterIssueNativeProvider(IssueProvider):
         self,
         project: Any,
         site: Any,
-        cache: JiraDataCenterIssueCache,
+        cache: JiraIssueCache,
         source_key: str,
         operations: list[_ResolvedJiraRelationshipOperation],
     ) -> tuple[list[str], list[dict[str, str]]]:
         """Re-project ``relation.md`` for the far endpoint of each relationship.
 
         A Jira relationship write mutates both endpoints: an issue link is a
-        single object surfaced from both issues, and a parent/epic field change
+        single object surfaced from both issues, and a parent field change
         flips the child list on the other key. Refreshing only ``source_key``
         leaves every target's cached ``relation.md`` stale. Re-project each
         Jira-issue target that is already tracked locally; never materialize a
@@ -808,7 +839,7 @@ class JiraDataCenterIssueNativeProvider(IssueProvider):
         self,
         request: ProviderRequest,
         site: Any,
-        cache: JiraDataCenterIssueCache,
+        cache: JiraIssueCache,
         issue_key: str,
         *,
         target: str,
@@ -857,7 +888,7 @@ class JiraDataCenterIssueNativeProvider(IssueProvider):
         """
 
         settings = _jira_issue_provider_settings(request.context.project)
-        normalized = normalize_jira_data_center_issue(
+        normalized = normalize_jira_issue(
             provider_current,
             site=site,
             remote_links=[],
@@ -873,7 +904,7 @@ class JiraDataCenterIssueNativeProvider(IssueProvider):
         self,
         project: Any,
         site: Any,
-        cache: JiraDataCenterIssueCache,
+        cache: JiraIssueCache,
         issue_key: str,
     ) -> Mapping[str, str]:
         raw_issue = get_issue(site, issue_key, runner=self.runner)
@@ -891,7 +922,7 @@ class JiraDataCenterIssueNativeProvider(IssueProvider):
         self,
         *,
         site: Any,
-        cache: JiraDataCenterIssueCache,
+        cache: JiraIssueCache,
         project: Any,
         issue_key: str,
         operation: str,
@@ -930,7 +961,7 @@ class JiraDataCenterIssueNativeProvider(IssueProvider):
 
     def _reread_paths(
         self,
-        cache: JiraDataCenterIssueCache,
+        cache: JiraIssueCache,
         site: Any,
         issue_key: str,
     ) -> list[str]:
@@ -947,18 +978,15 @@ def get_issue(
 ) -> Mapping[str, Any]:
     """Read one Jira issue REST object.
 
-    On Cloud the ADF description and comment bodies are replaced with their
-    Markdown rendering before anything downstream sees the issue, so the cache,
-    normalization, and write-back fingerprints all work on the same Markdown
-    text a Data Center site would hand back as a plain string.
+    The ADF description and comment bodies are replaced with their Markdown
+    rendering before anything downstream sees the issue, so the cache,
+    normalization, and write-back fingerprints all work on Markdown text.
     """
 
-    raw_issue = jira_get_json(site, jira_data_center_issue_path(site, issue_key), runner=runner)
+    raw_issue = jira_get_json(site, jira_issue_path(site, issue_key), runner=runner)
     if not isinstance(raw_issue, Mapping):
         raise JiraProviderError(f"Jira issue response was not an object: {issue_key}")
-    if getattr(site, "is_cloud", False):
-        return _cloud_issue_with_markdown_bodies(site, raw_issue, runner=runner)
-    return raw_issue
+    return _cloud_issue_with_markdown_bodies(site, raw_issue, runner=runner)
 
 
 def _cloud_issue_with_markdown_bodies(
@@ -984,18 +1012,16 @@ def _cloud_issue_with_markdown_bodies(
     return {**raw_issue, "fields": new_fields}
 
 
-def _cloud_body(site: Any, body: str, *, runner: CommandRunner | None) -> Any:
-    """Return a body value in the site's native format (ADF on Cloud)."""
+def _cloud_body(body: str, *, runner: CommandRunner | None) -> Any:
+    """Return a Markdown body as the ADF document Jira Cloud stores."""
 
-    if getattr(site, "is_cloud", False):
-        return adf.markdown_to_adf(body, runner=runner)
-    return body
+    return adf.markdown_to_adf(body, runner=runner)
 
 
-def _jira_user_ref(site: Any, user: str) -> dict[str, str]:
-    """Cloud identifies users by accountId; Data Center by username."""
+def _jira_user_ref(user: str) -> dict[str, str]:
+    """Jira Cloud identifies users by accountId."""
 
-    return {"accountId": user} if getattr(site, "is_cloud", False) else {"name": user}
+    return {"accountId": user}
 
 
 def get_remote_links(
@@ -1004,9 +1030,9 @@ def get_remote_links(
     *,
     runner: CommandRunner | None = None,
 ) -> list[dict[str, Any]]:
-    """Read Jira Data Center remote links for one issue."""
+    """Read Jira remote links for one issue."""
 
-    raw_links = jira_get_json(site, jira_data_center_remote_links_path(site, issue_key), runner=runner)
+    raw_links = jira_get_json(site, jira_remote_links_path(site, issue_key), runner=runner)
     return normalize_jira_remote_links(raw_links)
 
 
@@ -1020,13 +1046,13 @@ def search_issues(
     max_results: int = 30,
     runner: CommandRunner | None = None,
 ) -> list[Mapping[str, Any]]:
-    """Search Jira Data Center issues through the JQL search endpoint.
+    """Search Jira issues through the JQL search endpoint.
 
-    ``jql`` is passed verbatim to ``/rest/api/<v>/search`` (the site's native
+    ``jql`` is passed verbatim to ``/rest/api/3/search/jql`` (the site's native
     JQL). Only the lightweight fields needed for the ref list are requested.
     """
 
-    path = jira_data_center_search_path(
+    path = jira_search_path(
         site, jql=jql, max_results=max_results, fields=JIRA_SEARCH_FIELDS
     )
     raw = jira_get_json(site, path, runner=runner)
@@ -1070,8 +1096,6 @@ def create_issue(
     body: str,
     labels: tuple[str, ...] = (),
     subtask_parent_key: str | None = None,
-    epic_name: str | None = None,
-    epic_name_field: str | None = None,
     assignee: str | None = None,
     runner: CommandRunner | None = None,
 ) -> Mapping[str, Any]:
@@ -1079,7 +1103,7 @@ def create_issue(
         "fields": {
             "project": {"key": project_key},
             "summary": title,
-            "description": _cloud_body(site, body, runner=runner),
+            "description": _cloud_body(body, runner=runner),
             "issuetype": {"name": issue_type},
         }
     }
@@ -1087,10 +1111,8 @@ def create_issue(
         payload["fields"]["labels"] = list(labels)
     if subtask_parent_key:
         payload["fields"]["parent"] = {"key": subtask_parent_key}
-    if epic_name is not None and epic_name_field is not None:
-        payload["fields"][epic_name_field] = epic_name
     if assignee:
-        payload["fields"]["assignee"] = _jira_user_ref(site, assignee)
+        payload["fields"]["assignee"] = _jira_user_ref(assignee)
     result = jira_send_json(site, "POST", f"/rest/api/{site.api_version}/issue", payload, runner=runner)
     if not isinstance(result, Mapping):
         raise JiraProviderError("Jira create issue response was not an object")
@@ -1109,10 +1131,7 @@ def update_issue(
     if fields:
         payload["fields"] = dict(fields)
         if isinstance(payload["fields"].get("description"), str):
-            payload["fields"]["description"] = _cloud_body(site, payload["fields"]["description"], runner=runner)
-        assignee = payload["fields"].get("assignee")
-        if isinstance(assignee, Mapping) and isinstance(assignee.get("name"), str):
-            payload["fields"]["assignee"] = _jira_user_ref(site, assignee["name"])
+            payload["fields"]["description"] = _cloud_body(payload["fields"]["description"], runner=runner)
     if update:
         payload["update"] = dict(update)
     if not payload:
@@ -1120,7 +1139,7 @@ def update_issue(
     result = jira_send_json(
         site,
         "PUT",
-        jira_data_center_issue_path(site, issue_key),
+        jira_issue_path(site, issue_key),
         payload,
         runner=runner,
     )
@@ -1134,19 +1153,15 @@ def get_jira_myself(
     *,
     runner: CommandRunner | None = None,
 ) -> str:
-    """Return the authenticated Jira user's assignable id via ``/rest/api/<v>/myself``.
-
-    That is the username on Data Center and the accountId on Cloud, which has
-    no usernames.
-    """
+    """Return the authenticated Jira user's accountId via ``/rest/api/3/myself``."""
 
     path = f"/rest/api/{site.api_version}/myself"
     result = jira_get_json(site, path, runner=runner)
     if isinstance(result, Mapping):
-        name = result.get("accountId" if getattr(site, "is_cloud", False) else "name")
+        name = result.get("accountId")
         if isinstance(name, str) and name.strip():
             return name.strip()
-    raise ProviderOperationError("could not resolve Jira authenticated user (missing 'name' or 'accountId')")
+    raise ProviderOperationError("could not resolve Jira authenticated user (missing 'accountId')")
 
 
 def create_issue_link(
@@ -1179,7 +1194,7 @@ def create_issue_link(
     result = jira_send_json(
         site,
         "POST",
-        jira_data_center_issue_links_path(site),
+        jira_issue_links_path(site),
         {
             "type": {"name": link_type},
             "inwardIssue": {"key": inward_issue},
@@ -1198,7 +1213,7 @@ def delete_issue_link(
     *,
     runner: CommandRunner | None = None,
 ) -> Mapping[str, Any]:
-    result = jira_delete(site, jira_data_center_issue_link_path(site, link_id), runner=runner)
+    result = jira_delete(site, jira_issue_link_path(site, link_id), runner=runner)
     if not isinstance(result, Mapping):
         return {}
     return result
@@ -1226,7 +1241,7 @@ def create_remote_link(
             "type": application_type or "studykit.spectrack",
             "name": application_name or "Workflow",
         }
-    result = jira_send_json(site, "POST", jira_data_center_remote_links_path(site, issue_key), payload, runner=runner)
+    result = jira_send_json(site, "POST", jira_remote_links_path(site, issue_key), payload, runner=runner)
     if not isinstance(result, Mapping):
         return {}
     return result
@@ -1239,7 +1254,7 @@ def delete_remote_link_by_global_id(
     global_id: str,
     runner: CommandRunner | None = None,
 ) -> Mapping[str, Any]:
-    result = jira_delete(site, jira_data_center_remote_link_global_id_path(site, issue_key, global_id), runner=runner)
+    result = jira_delete(site, jira_remote_link_global_id_path(site, issue_key, global_id), runner=runner)
     if not isinstance(result, Mapping):
         return {}
     return result
@@ -1252,7 +1267,7 @@ def delete_remote_link(
     link_id: str,
     runner: CommandRunner | None = None,
 ) -> Mapping[str, Any]:
-    result = jira_delete(site, jira_data_center_remote_link_path(site, issue_key, link_id), runner=runner)
+    result = jira_delete(site, jira_remote_link_path(site, issue_key, link_id), runner=runner)
     if not isinstance(result, Mapping):
         return {}
     return result
@@ -1268,8 +1283,8 @@ def add_comment(
     result = jira_send_json(
         site,
         "POST",
-        jira_data_center_comments_path(site, issue_key),
-        {"body": _cloud_body(site, body, runner=runner)},
+        jira_comments_path(site, issue_key),
+        {"body": _cloud_body(body, runner=runner)},
         runner=runner,
     )
     if not isinstance(result, Mapping):
@@ -1288,8 +1303,8 @@ def update_comment(
     result = jira_send_json(
         site,
         "PUT",
-        jira_data_center_comment_path(site, issue_key, comment_id),
-        {"body": _cloud_body(site, body, runner=runner)},
+        jira_comment_path(site, issue_key, comment_id),
+        {"body": _cloud_body(body, runner=runner)},
         runner=runner,
     )
     if not isinstance(result, Mapping):
@@ -1355,7 +1370,7 @@ def get_transitions(
 ) -> list[Mapping[str, Any]]:
     """Read available transitions for one Jira issue."""
 
-    raw = jira_get_json(site, jira_data_center_transitions_path(site, issue_key), runner=runner)
+    raw = jira_get_json(site, jira_transitions_path(site, issue_key), runner=runner)
     if isinstance(raw, Mapping):
         value = raw.get("transitions")
     else:
@@ -1377,7 +1392,7 @@ def transition_issue(
     result = jira_send_json(
         site,
         "POST",
-        jira_data_center_transitions_path(site, issue_key),
+        jira_transitions_path(site, issue_key),
         {"transition": {"id": str(transition_id)}},
         runner=runner,
     )
@@ -1452,63 +1467,6 @@ def _jira_configured_artifact_issue_types(settings: Mapping[str, Any]) -> Mappin
         if artifact and issue_type:
             result[artifact] = issue_type
     return result
-
-
-def _jira_create_epic_name(
-    request: ProviderRequest,
-    *,
-    settings: Mapping[str, Any],
-    issue_type: str,
-    title: str,
-) -> tuple[str | None, str | None]:
-    """Resolve Epic Name payload for create requests.
-
-    Returns ``(epic_name, epic_name_field)`` when the request targets the
-    configured Epic issue type; ``(None, None)`` otherwise. Raises when
-    ``epic_name`` is set for a non-Epic create (typo guard) or when the
-    Epic issue type is selected without ``epic_fields.name`` configured.
-    """
-
-    raw_epic_name = _optional_string(
-        request.payload.get("epic_name") or request.payload.get("epicName")
-    )
-    epic_type_name = _jira_epic_issue_type_name(settings)
-    if not _is_jira_epic_issue_type(issue_type, epic_type_name=epic_type_name):
-        if raw_epic_name is not None:
-            raise ProviderOperationError(
-                "Jira epic_name is only valid when issue_type matches the configured Epic"
-            )
-        return None, None
-    epic_name_field = _jira_epic_field_id(settings, "name")
-    if not epic_name_field:
-        raise ProviderOperationError(
-            "Jira Epic create requires providers.issues.epic_fields.name; "
-            f"got mapped issue_type={issue_type} but the field is unconfigured"
-        )
-    return raw_epic_name or title, epic_name_field
-
-
-def _jira_epic_issue_type_name(settings: Mapping[str, Any]) -> str:
-    configured = _jira_configured_artifact_issue_types(settings).get("epic")
-    return configured or JIRA_ARTIFACT_ISSUE_TYPES["epic"]
-
-
-def _is_jira_epic_issue_type(issue_type: str, *, epic_type_name: str) -> bool:
-    return issue_type.strip().lower() == epic_type_name.strip().lower()
-
-
-def _jira_epic_fields(settings: Mapping[str, Any]) -> Mapping[str, Any]:
-    raw = settings.get("epic_fields") or settings.get("epicFields")
-    if raw is None:
-        return {}
-    if not isinstance(raw, Mapping):
-        raise ProviderOperationError("providers.issues.epic_fields must be a mapping")
-    return raw
-
-
-def _jira_epic_field_id(settings: Mapping[str, Any], kind: str) -> str | None:
-    raw = _jira_epic_fields(settings).get(kind)
-    return _optional_string(raw)
 
 
 def _jira_create_subtask_parent_key(request: ProviderRequest) -> str | None:
@@ -1630,7 +1588,9 @@ def _resolve_jira_relationship_operation(
     *,
     settings: Mapping[str, Any],
 ) -> _ResolvedJiraRelationshipOperation:
-    mapping = _relationship_mapping(settings, operation.relationship)
+    mapping = _builtin_hierarchy_mapping(settings, operation.relationship) or _relationship_mapping(
+        settings, operation.relationship
+    )
     action = operation.action
     if action not in {"add", "remove"}:
         raise ProviderOperationError(f"unsupported Jira relationship action: {action}")
@@ -1684,8 +1644,9 @@ def validate_relationship_intent_mappings(
     project: Any, intent: Mapping[str, Any]
 ) -> None:
     """Raise ``ProviderOperationError`` if any relationship in ``intent`` lacks a
-    configured ``providers.issues.relationship_mappings`` entry. Lets callers
-    fail fast before issuing a remote write that would later be rejected by
+    configured ``providers.issues.relationship_mappings`` entry. The built-in
+    parent / epic / child relationships need none. Lets callers fail fast
+    before issuing a remote write that would later be rejected by
     ``apply_relationships``.
     """
 
@@ -1701,7 +1662,34 @@ def validate_relationship_intent_mappings(
         if name in seen:
             continue
         seen.add(name)
-        _relationship_mapping(settings, name)
+        if _builtin_hierarchy_mapping(settings, name) is None:
+            _relationship_mapping(settings, name)
+
+
+def _is_parent_relationship(relationship: str) -> bool:
+    return _normalize_relationship_name(relationship) in _PARENT_RELATIONSHIPS
+
+
+def _normalize_relationship_name(relationship: str) -> str:
+    return relationship.strip().lower().replace("-", "_")
+
+
+def _builtin_hierarchy_mapping(
+    settings: Mapping[str, Any], relationship: str
+) -> _JiraRelationshipMapping | None:
+    """Return the native-``parent`` field mapping for a hierarchy relationship."""
+
+    name = _normalize_relationship_name(relationship)
+    if name not in _BUILTIN_HIERARCHY_RELATIONSHIPS:
+        return None
+    _relationship_mappings(settings)  # rejects a stale mapping that would shadow the built-in
+    return _JiraRelationshipMapping(
+        relationship=relationship,
+        surface="field",
+        field="parent",
+        write_to="source" if name in _PARENT_RELATIONSHIPS else "target",
+        value="key",
+    )
 
 
 def _relationship_mapping(settings: Mapping[str, Any], relationship: str) -> _JiraRelationshipMapping:
@@ -1786,14 +1774,18 @@ def _relationship_mappings(settings: Mapping[str, Any]) -> Mapping[str, Any]:
         return {}
     if not isinstance(raw, Mapping):
         raise ProviderOperationError("providers.issues.relationship_mappings must be a mapping")
+    for name in raw:
+        if isinstance(name, str) and _normalize_relationship_name(name) in _BUILTIN_HIERARCHY_RELATIONSHIPS:
+            raise ProviderOperationError(
+                f"{CLOUD_ONLY_MESSAGE}: remove providers.issues.relationship_mappings.{name}; "
+                "parent, epic, and child use the native parent field"
+            )
     return raw
 
 
 def _relationship_aliases(relationship: str) -> tuple[str, ...]:
     normalized = relationship.strip().lower().replace("-", "_")
     aliases = {
-        "parent": ("parent",),
-        "child": ("child", "children", "subtask", "subtasks"),
         "blocked_by": ("blocked_by", "blockedBy", "depends_on", "dependency"),
         "blocking": ("blocking", "blocks"),
         "related": ("related", "relates_to"),

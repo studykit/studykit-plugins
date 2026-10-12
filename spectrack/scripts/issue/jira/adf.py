@@ -23,7 +23,7 @@ from pathlib import Path
 from typing import Any
 
 from command import CommandRunner, WorkflowCommandError, run_command
-from issue.jira.client import JiraDataCenterSite, jira_send_json
+from issue.jira.client import JiraSite, jira_send_json
 from issue.jira.refs import JiraProviderError
 
 _PACKAGE_DIR = Path(__file__).resolve().parent / "md_to_adf"
@@ -36,7 +36,7 @@ def is_adf_document(value: Any) -> bool:
 
 
 def adf_to_markdown(
-    site: JiraDataCenterSite,
+    site: JiraSite,
     document: Mapping[str, Any],
     *,
     runner: CommandRunner | None = None,

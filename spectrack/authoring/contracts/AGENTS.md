@@ -29,10 +29,9 @@ The literal markup for headings, paragraphs, lists, inline emphasis, links, code
 
 - `../providers/knowledge/github/convention.md`
 
-Jira issue bodies have no convention file. Their wiki-markup rules live in the
-`jira-format-corrector` agent, which validates and fixes a draft file before it is
-shown or published — see `../../agents/jira-format-corrector.md`.
+Jira issue bodies have no convention file. They are authored as Markdown, and the
+Jira provider converts them to ADF on publish.
 
-When a common file references a section, refer to it by its canonical Title Case name without a literal heading prefix. For example, write `Description section` or `the Description section`, not `## Description`. The provider convention turns the canonical name into the correct heading form (`## Description`, `h2. Description`, `<h2>Description</h2>`, etc.).
+When a common file references a section, refer to it by its canonical Title Case name without a literal heading prefix. For example, write `Description section` or `the Description section`, not `## Description`. The provider convention turns the canonical name into the correct heading form (`## Description`, `<h2>Description</h2>`, etc.).
 
 When a common file shows a body shape, prefer a list of section names and their required/optional status. If a literal example is genuinely needed for clarity, isolate it into a provider-specific file rather than embedding markup into common.

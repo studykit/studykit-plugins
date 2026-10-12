@@ -298,12 +298,8 @@ def _resolve_authoring_github_knowledge(
 def _resolve_authoring_jira_issue(
     artifact_type: str, target: str | None, scope: str, mode: str | None
 ) -> tuple[list[str], list[str]]:
-    # Jira wiki-markup rendering is not an authoring file: the
-    # `jira-format-corrector` agent owns those rules and is dispatched from the
-    # `<jira-format>` context block, injected on every wiki-markup (non-Cloud)
-    # site. Keeping them out of the resolver is deliberate — mustread can be
-    # disabled per project, and a Markdown body published to Jira renders as
-    # literal punctuation either way.
+    # Jira has no convention file: bodies are authored as Markdown and the
+    # provider converts them to ADF on publish.
     if scope == "comment" or target is not None:
         return [], []
     notes = [RETROACTIVE_PUBLISH_STATE_JIRA] if mode == "retroactive" else []

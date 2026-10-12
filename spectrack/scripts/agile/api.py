@@ -10,7 +10,7 @@ from typing import Any
 from urllib.parse import quote, urlencode
 
 from command import CommandRunner
-from issue.jira.client import JiraDataCenterSite, jira_delete, jira_get_json, jira_send_json
+from issue.jira.client import JiraSite, jira_delete, jira_get_json, jira_send_json
 
 AGILE = "/rest/agile/1.0"
 SOFTWARE = "/rest/software/1.0"
@@ -30,19 +30,19 @@ def with_query(path: str, **params: object) -> str:
     return f"{path}{'&' if '?' in path else '?'}{urlencode(values, doseq=True)}" if values else path
 
 
-def get(site: JiraDataCenterSite, path: str, runner: CommandRunner | None = None) -> Any:
+def get(site: JiraSite, path: str, runner: CommandRunner | None = None) -> Any:
     return jira_get_json(site, path, runner=runner)
 
 
-def send(site: JiraDataCenterSite, method: str, path: str, body: Mapping[str, Any], runner: CommandRunner | None = None) -> Any:
+def send(site: JiraSite, method: str, path: str, body: Mapping[str, Any], runner: CommandRunner | None = None) -> Any:
     return jira_send_json(site, method, path, body, runner=runner)
 
 
-def delete(site: JiraDataCenterSite, path: str, runner: CommandRunner | None = None) -> Any:
+def delete(site: JiraSite, path: str, runner: CommandRunner | None = None) -> Any:
     return jira_delete(site, path, runner=runner)
 
 
-def pages(site: JiraDataCenterSite, path: str, *, runner: CommandRunner | None = None,
+def pages(site: JiraSite, path: str, *, runner: CommandRunner | None = None,
           max_results: int = 50, page_token: str | None = None, start_at: int | None = None,
           all_pages: bool = False, token_paged: bool = False) -> Any:
     if max_results < 1:
@@ -98,7 +98,7 @@ def sprint_name(name: str) -> str:
     return name
 
 
-def board_create(site: JiraDataCenterSite, *, name: str, board_type: str, jql: str | None,
+def board_create(site: JiraSite, *, name: str, board_type: str, jql: str | None,
                  filter_id: int | None, project: str | None, user_location: bool,
                  runner: CommandRunner | None = None) -> Any:
     if bool(jql) == (filter_id is not None):
@@ -127,7 +127,7 @@ def board_create(site: JiraDataCenterSite, *, name: str, board_type: str, jql: s
         raise
 
 
-def board_delete(site: JiraDataCenterSite, board_id: str, *, delete_filter: bool,
+def board_delete(site: JiraSite, board_id: str, *, delete_filter: bool,
                  runner: CommandRunner | None = None) -> Any:
     filter_id = None
     if delete_filter:
@@ -139,7 +139,7 @@ def board_delete(site: JiraDataCenterSite, board_id: str, *, delete_filter: bool
     return result
 
 
-def board_add(site: JiraDataCenterSite, board_id: str, issues: list[str], *, before: str | None,
+def board_add(site: JiraSite, board_id: str, issues: list[str], *, before: str | None,
               after: str | None, runner: CommandRunner | None = None) -> Any:
     body = issue_batch(issues, before=before, after=after)
     board = get(site, f"{AGILE}/board/{segment(board_id)}", runner)
@@ -148,7 +148,7 @@ def board_add(site: JiraDataCenterSite, board_id: str, issues: list[str], *, bef
     return send(site, "POST", f"{AGILE}/board/{segment(board_id)}/issue", body, runner)
 
 
-def property_op(site: JiraDataCenterSite, kind: str, object_id: str, action: str,
+def property_op(site: JiraSite, kind: str, object_id: str, action: str,
                 key: str | None = None, value: Any = None, runner: CommandRunner | None = None) -> Any:
     base = f"{AGILE}/{kind}/{segment(object_id)}/properties"
     if action == "list":

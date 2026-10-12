@@ -7,6 +7,8 @@ import json
 import sys
 from pathlib import Path
 
+import pytest
+
 _SCRIPTS_DIR = Path(__file__).resolve().parent.parent / "scripts"
 if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
@@ -24,8 +26,12 @@ from command import CommandRequest, CommandResult  # noqa: E402
 from issue.github.cache import GitHubIssueCache  # noqa: E402
 from issue.github.gh import DEFAULT_ISSUE_FIELDS  # noqa: E402
 from issue.github.gh import GitHubRepository  # noqa: E402
-from issue.jira.client import resolve_jira_data_center_site  # noqa: E402
-from issue.jira.cache import JiraDataCenterIssueCache  # noqa: E402
+from issue.jira.client import resolve_jira_site  # noqa: E402
+from issue.jira.cache import JiraIssueCache  # noqa: E402
+from jira_cloud_support import sent_json  # noqa: E402
+
+
+pytestmark = pytest.mark.usefixtures("jira_cloud")
 
 
 class GitHubFakeRunner:
@@ -126,9 +132,7 @@ version: 1
 providers:
   issues:
     kind: jira
-    site: https://jira.example.test
-    deployment: data-center
-    api_version: 2
+    site: https://example.atlassian.net
     project: TEST
     issue_type: Task
 """.lstrip()
@@ -1181,9 +1185,9 @@ def _jira_issue_payload(key: str = "TEST-1234") -> dict[str, object]:
 def test_jira_publish_creates_issue_inline_and_deletes_body_file(tmp_path: Path) -> None:
     _write_jira_config(tmp_path)
     body_file = _write_body_file(tmp_path, "Body.\n")
-    site = resolve_jira_data_center_site(tmp_path)
-    issue_url = "https://jira.example.test/rest/api/2/issue/TEST-1234"
-    remote_links_url = "https://jira.example.test/rest/api/2/issue/TEST-1234/remotelink"
+    site = resolve_jira_site(tmp_path)
+    issue_url = "https://example.atlassian.net/rest/api/3/issue/TEST-1234"
+    remote_links_url = "https://example.atlassian.net/rest/api/3/issue/TEST-1234/remotelink"
 
     runner = JiraFakeRunner(
         {
@@ -1232,7 +1236,7 @@ def test_jira_publish_creates_issue_inline_and_deletes_body_file(tmp_path: Path)
     assert payload["body_file_removed"] is True
     assert payload["issue_file"].endswith("issues/TEST-1234/issue.md")
     assert "cache" not in payload
-    cache = JiraDataCenterIssueCache.for_project(tmp_path)
+    cache = JiraIssueCache.for_project(tmp_path)
     assert cache.issue_json_file(site, "TEST-1234").is_file()
     assert not body_file.exists()
     assert runner.requests[0].args == _jira_write_args()
@@ -1278,8 +1282,8 @@ def test_jira_publish_allows_custom_type_with_explicit_issue_type(tmp_path: Path
     # is allowed through that deliberate escape hatch.
     _write_jira_config(tmp_path)
     body_file = _write_body_file(tmp_path, "Body.\n")
-    issue_url = "https://jira.example.test/rest/api/2/issue/TEST-1234"
-    remote_links_url = "https://jira.example.test/rest/api/2/issue/TEST-1234/remotelink"
+    issue_url = "https://example.atlassian.net/rest/api/3/issue/TEST-1234"
+    remote_links_url = "https://example.atlassian.net/rest/api/3/issue/TEST-1234/remotelink"
 
     runner = JiraFakeRunner(
         {
@@ -1387,8 +1391,8 @@ def test_jira_publish_preserves_body_on_relationship_failure(tmp_path: Path) -> 
         relationship_mappings={"related": {"link_type": "Relates", "direction": "outward"}},
     )
     body_file = _write_body_file(tmp_path, "Body.\n")
-    issue_url = "https://jira.example.test/rest/api/2/issue/TEST-1234"
-    remote_links_url = "https://jira.example.test/rest/api/2/issue/TEST-1234/remotelink"
+    issue_url = "https://example.atlassian.net/rest/api/3/issue/TEST-1234"
+    remote_links_url = "https://example.atlassian.net/rest/api/3/issue/TEST-1234/remotelink"
 
     runner = JiraPublishRelationshipFailureRunner(
         {
@@ -1484,8 +1488,8 @@ def test_jira_publish_epic_with_post_create_epic_link_is_rejected(tmp_path: Path
 def test_jira_publish_accepts_assignee_user_and_sets_field_on_post(tmp_path: Path) -> None:
     _write_jira_config(tmp_path)
     body_file = _write_body_file(tmp_path, "Body.\n")
-    issue_url = "https://jira.example.test/rest/api/2/issue/TEST-1234"
-    remote_links_url = "https://jira.example.test/rest/api/2/issue/TEST-1234/remotelink"
+    issue_url = "https://example.atlassian.net/rest/api/3/issue/TEST-1234"
+    remote_links_url = "https://example.atlassian.net/rest/api/3/issue/TEST-1234/remotelink"
 
     runner = JiraFakeRunner(
         {
@@ -1529,22 +1533,22 @@ def test_jira_publish_accepts_assignee_user_and_sets_field_on_post(tmp_path: Pat
     assert code == 0
     write_request = runner.requests[0]
     assert write_request.args == _jira_write_args()
-    assert '\\"assignee\\":{\\"name\\":\\"alice\\"}' in str(write_request.input_text)
+    assert '\\"assignee\\":{\\"accountId\\":\\"alice\\"}' in str(write_request.input_text)
 
 
 def test_jira_publish_accepts_assignee_me_and_resolves_current_user(tmp_path: Path) -> None:
     _write_jira_config(tmp_path)
     body_file = _write_body_file(tmp_path, "Body.\n")
-    myself_url = "https://jira.example.test/rest/api/2/myself"
-    issue_url = "https://jira.example.test/rest/api/2/issue/TEST-1234"
-    remote_links_url = "https://jira.example.test/rest/api/2/issue/TEST-1234/remotelink"
+    myself_url = "https://example.atlassian.net/rest/api/3/myself"
+    issue_url = "https://example.atlassian.net/rest/api/3/issue/TEST-1234"
+    remote_links_url = "https://example.atlassian.net/rest/api/3/issue/TEST-1234/remotelink"
 
     runner = JiraFakeRunner(
         {
             _jira_curl_get_args(myself_url): CommandResult(
                 request=CommandRequest(args=()),
                 returncode=0,
-                stdout=json.dumps({"name": "studykit-svc", "displayName": "Studykit Service"}),
+                stdout=json.dumps({"accountId": "studykit-svc", "displayName": "Studykit Service"}),
             ),
             _jira_write_args(): CommandResult(
                 request=CommandRequest(args=()),
@@ -1588,7 +1592,7 @@ def test_jira_publish_accepts_assignee_me_and_resolves_current_user(tmp_path: Pa
     assert len(myself_calls) == 1
     write_requests = [r for r in runner.requests if r.args == _jira_write_args()]
     assert any(
-        '\\"assignee\\":{\\"name\\":\\"studykit-svc\\"}' in str(r.input_text)
+        '\\"assignee\\":{\\"accountId\\":\\"studykit-svc\\"}' in str(r.input_text)
         for r in write_requests
     )
 
@@ -1895,4 +1899,95 @@ def test_github_comment_resume_reports_duplicate_resumes(tmp_path: Path) -> None
     # Refuses to guess — no comment written.
     assert runner.posted_bodies == []
     assert runner.updated_bodies == []
+    assert body_file.exists()
+
+
+@pytest.mark.parametrize("flag", ["--parent", "--epic"])
+def test_jira_publish_parent_or_epic_writes_the_native_parent_without_mappings(
+    tmp_path: Path, flag: str
+) -> None:
+    _write_jira_config(tmp_path)
+    body_file = _write_body_file(tmp_path, "Body.\n")
+    issue_url = "https://example.atlassian.net/rest/api/3/issue/TEST-1234"
+    remote_links_url = "https://example.atlassian.net/rest/api/3/issue/TEST-1234/remotelink"
+    runner = JiraFakeRunner(
+        {
+            _jira_write_args(): CommandResult(
+                request=CommandRequest(args=()),
+                returncode=0,
+                stdout=json.dumps({"id": "10001", "key": "TEST-1234"}),
+            ),
+            _jira_curl_get_args(issue_url): CommandResult(
+                request=CommandRequest(args=()),
+                returncode=0,
+                stdout=json.dumps(_jira_issue_payload()),
+            ),
+            _jira_curl_get_args(remote_links_url): CommandResult(
+                request=CommandRequest(args=()),
+                returncode=0,
+                stdout=json.dumps([]),
+            ),
+        }
+    )
+    stdout = io.StringIO()
+
+    code = jira_issue_drafts_main(
+        [
+            "--project",
+            str(tmp_path),
+            "publish",
+            "--type",
+            "task",
+            "--title",
+            "Published Jira issue",
+            "--body-file",
+            str(body_file),
+            flag,
+            "TEST-10",
+        ],
+        stdout=stdout,
+        runner=runner,
+    )
+
+    assert code == 0, stdout.getvalue()
+    parent_writes = [
+        request
+        for request in runner.requests
+        if request.args == _jira_write_args() and 'request = "PUT"' in (request.input_text or "")
+    ]
+    assert len(parent_writes) == 1
+    assert f'url = "{issue_url}"' in str(parent_writes[0].input_text)
+    assert sent_json(str(parent_writes[0].input_text)) == {"fields": {"parent": {"key": "TEST-10"}}}
+
+
+def test_jira_publish_rejects_parent_and_epic_together(tmp_path: Path) -> None:
+    _write_jira_config(tmp_path)
+    body_file = _write_body_file(tmp_path, "Body.\n")
+    runner = JiraFakeRunner({})
+    stderr = io.StringIO()
+
+    code = jira_issue_drafts_main(
+        [
+            "--project",
+            str(tmp_path),
+            "publish",
+            "--type",
+            "task",
+            "--title",
+            "Published Jira issue",
+            "--body-file",
+            str(body_file),
+            "--parent",
+            "TEST-10",
+            "--epic",
+            "TEST-11",
+        ],
+        stdout=io.StringIO(),
+        stderr=stderr,
+        runner=runner,
+    )
+
+    assert code == 2
+    assert "conflicting parent relationship flags: parent_add, epic_add" in stderr.getvalue()
+    assert runner.requests == []
     assert body_file.exists()

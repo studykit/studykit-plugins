@@ -7,16 +7,16 @@ from collections.abc import Mapping
 from typing import Any
 
 from issue.jira.refs import normalize_jira_issue_key
-from issue.jira.client import JiraDataCenterSite
+from issue.jira.client import JiraSite
 
-def normalize_jira_data_center_issue(
+def normalize_jira_issue(
     issue: Mapping[str, Any],
     *,
-    site: JiraDataCenterSite,
+    site: JiraSite,
     remote_links: list[Mapping[str, Any]] | None = None,
     relationship_mappings: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Normalize Jira Data Center REST JSON into the workflow provider payload shape."""
+    """Normalize Jira REST JSON into the workflow provider payload shape."""
 
     key = normalize_jira_issue_key(issue.get("key") or "")
     fields = issue.get("fields") if isinstance(issue.get("fields"), Mapping) else {}
@@ -33,7 +33,7 @@ def normalize_jira_data_center_issue(
 
     raw_comments = fields.get("comment") if isinstance(fields.get("comment"), Mapping) else {}
     assert isinstance(raw_comments, Mapping)
-    comments = [_normalize_data_center_comment(comment) for comment in _mapping_list(raw_comments.get("comments"))]
+    comments = [_normalize_comment(comment) for comment in _mapping_list(raw_comments.get("comments"))]
 
     relationships = _provider_relationships(
         fields,
@@ -368,7 +368,7 @@ def _issue_stub(issue: Mapping[str, Any]) -> dict[str, Any]:
     return {key: value for key, value in result.items() if value is not None}
 
 
-def _normalize_data_center_comment(comment: Mapping[str, Any]) -> dict[str, Any]:
+def _normalize_comment(comment: Mapping[str, Any]) -> dict[str, Any]:
     author = comment.get("author") if isinstance(comment.get("author"), Mapping) else {}
     assert isinstance(author, Mapping)
     return {

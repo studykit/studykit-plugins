@@ -27,6 +27,9 @@ from issue.jira.provider import (  # noqa: E402
 )
 
 
+pytestmark = pytest.mark.usefixtures("jira_cloud")
+
+
 def _operation(direction: str, *, target_issue: str = "TEST-200") -> _ResolvedJiraRelationshipOperation:
     mapping = _JiraRelationshipMapping(
         relationship="related",

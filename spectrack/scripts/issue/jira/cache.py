@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Jira Data Center issue cache carrier for workflow provider projections."""
+"""Jira issue cache carrier for workflow provider projections."""
 
 from __future__ import annotations
 
@@ -30,7 +30,7 @@ from issue.cache import (
 from issue.jira.refs import normalize_jira_issue_key
 from issue.jira.relationships import (
     filter_jira_payload,
-    normalize_jira_data_center_issue,
+    normalize_jira_issue,
 )
 from issue.jira.snapshot import (
     _jira_person_display_name,
@@ -39,7 +39,7 @@ from issue.jira.snapshot import (
     render_jira_relationships_markdown,
     render_jira_state_markdown,
 )
-from issue.jira.client import JiraDataCenterSite
+from issue.jira.client import JiraSite
 
 
 _COMMENT_FILENAME_RE = re.compile(r"^comment-.*\.md$")
@@ -86,44 +86,44 @@ def _jira_issue_cache_dir_match(path: Path, project: Path) -> bool:
     return len(parts) == 3 and parts[0] == "issues"
 
 
-class JiraDataCenterIssueCache:
-    """Repo-local Jira Data Center cache with native JSON plus an LLM snapshot."""
+class JiraIssueCache:
+    """Repo-local Jira cache with native JSON plus an LLM snapshot."""
 
     def __init__(self, root: Path):
         self.root = root
 
     @classmethod
-    def for_project(cls, project: Path) -> JiraDataCenterIssueCache:
+    def for_project(cls, project: Path) -> JiraIssueCache:
         return cls(project.expanduser().resolve(strict=False) / CACHE_ROOT_NAME)
 
-    def issue_dir(self, site: JiraDataCenterSite, issue_key: str) -> Path:
+    def issue_dir(self, site: JiraSite, issue_key: str) -> Path:
         return self.root / "issues" / _safe_path_segment(normalize_jira_issue_key(issue_key))
 
-    def issue_file(self, site: JiraDataCenterSite, issue_key: str) -> Path:
+    def issue_file(self, site: JiraSite, issue_key: str) -> Path:
         return self.issue_dir(site, issue_key) / "issue.md"
 
-    def state_file(self, site: JiraDataCenterSite, issue_key: str) -> Path:
+    def state_file(self, site: JiraSite, issue_key: str) -> Path:
         return self.issue_dir(site, issue_key) / "state.md"
 
-    def meta_file(self, site: JiraDataCenterSite, issue_key: str) -> Path:
+    def meta_file(self, site: JiraSite, issue_key: str) -> Path:
         return self.issue_dir(site, issue_key) / ".meta.json"
 
-    def issue_json_file(self, site: JiraDataCenterSite, issue_key: str) -> Path:
+    def issue_json_file(self, site: JiraSite, issue_key: str) -> Path:
         return self.issue_dir(site, issue_key) / ".issue.json"
 
-    def remote_links_json_file(self, site: JiraDataCenterSite, issue_key: str) -> Path:
+    def remote_links_json_file(self, site: JiraSite, issue_key: str) -> Path:
         return self.issue_dir(site, issue_key) / ".remote-links.json"
 
-    def relationships_file(self, site: JiraDataCenterSite, issue_key: str) -> Path:
+    def relationships_file(self, site: JiraSite, issue_key: str) -> Path:
         return self.issue_dir(site, issue_key) / "relation.md"
 
-    def attachments_file(self, site: JiraDataCenterSite, issue_key: str) -> Path:
+    def attachments_file(self, site: JiraSite, issue_key: str) -> Path:
         return self.issue_dir(site, issue_key) / "attachment.md"
 
-    def has_issue_projection(self, site: JiraDataCenterSite, issue_key: str) -> bool:
+    def has_issue_projection(self, site: JiraSite, issue_key: str) -> bool:
         return self.issue_json_file(site, issue_key).is_file()
 
-    def comment_files(self, site: JiraDataCenterSite, issue_key: str) -> list[Path]:
+    def comment_files(self, site: JiraSite, issue_key: str) -> list[Path]:
         """Return cached comment files sorted by filename (chronological)."""
 
         issue_dir = self.issue_dir(site, issue_key)
@@ -133,7 +133,7 @@ class JiraDataCenterIssueCache:
 
     def read_freshness_metadata(
         self,
-        site: JiraDataCenterSite,
+        site: JiraSite,
         issue_key: str,
         *,
         target: str = "issue",
@@ -155,7 +155,7 @@ class JiraDataCenterIssueCache:
 
     def read_issue(
         self,
-        site: JiraDataCenterSite,
+        site: JiraSite,
         issue_key: str,
         *,
         include_body: bool = True,
@@ -163,7 +163,7 @@ class JiraDataCenterIssueCache:
         include_relationships: bool = True,
         relationship_mappings: Mapping[str, Any] | None = None,
     ) -> dict[str, Any]:
-        """Read a cached Jira Data Center issue projection."""
+        """Read a cached Jira issue projection."""
 
         key = normalize_jira_issue_key(issue_key)
         issue_json_path = self.issue_json_file(site, key)
@@ -180,7 +180,7 @@ class JiraDataCenterIssueCache:
             _require_schema(_read_json_mapping(meta_path), meta_path)
             issue = _read_json_mapping(issue_json_path)
             remote_links = _read_json_list_if_exists(self.remote_links_json_file(site, key))
-            payload = normalize_jira_data_center_issue(
+            payload = normalize_jira_issue(
                 issue,
                 site=site,
                 remote_links=remote_links,
@@ -204,7 +204,7 @@ class JiraDataCenterIssueCache:
         except Exception as exc:
             raise WorkflowCacheCorrupt(f"could not read Jira issue cache {issue_json_path}: {exc}") from exc
 
-    def read_issue_json(self, site: JiraDataCenterSite, issue_key: str) -> Mapping[str, Any]:
+    def read_issue_json(self, site: JiraSite, issue_key: str) -> Mapping[str, Any]:
         key = normalize_jira_issue_key(issue_key)
         issue_json_path = self.issue_json_file(site, key)
         if not issue_json_path.is_file():
@@ -213,7 +213,7 @@ class JiraDataCenterIssueCache:
 
     def write_issue_bundle(
         self,
-        site: JiraDataCenterSite,
+        site: JiraSite,
         issue: Mapping[str, Any],
         *,
         remote_links: list[Mapping[str, Any]] | None = None,
@@ -225,7 +225,7 @@ class JiraDataCenterIssueCache:
 
         key = normalize_jira_issue_key(issue.get("key") or "")
         links = [dict(item) for item in (remote_links or [])]
-        normalized = normalize_jira_data_center_issue(
+        normalized = normalize_jira_issue(
             issue,
             site=site,
             remote_links=links,
@@ -289,7 +289,7 @@ class JiraDataCenterIssueCache:
 
     def _write_comment_files(
         self,
-        site: JiraDataCenterSite,
+        site: JiraSite,
         issue_key: str,
         normalized: Mapping[str, Any],
         *,

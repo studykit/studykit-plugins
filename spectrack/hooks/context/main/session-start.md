@@ -39,28 +39,14 @@ was never agreed costs more to unwind than a question costs to ask.
 Publish without that exchange only when the user explicitly asked you to.
 </authoring-issues>
 
-<jira-format>
-Jira renders issue descriptions and comments as Jira wiki markup, not
-Markdown. A Markdown draft does not fail — it publishes and renders as
-literal punctuation. So before you present an issue or comment draft to
-the user, and before you publish one, write the draft to a file and
-dispatch the `jira-format-corrector` agent on that absolute path. It
-validates the markup, rewrites Markdown-only forms in place, and reports
-what it changed. Present the corrected draft — and anything the agent
-flagged as needing your decision — to the user; publish only after they
-confirm. This applies to every issue and comment body, whichever way you
-came to draft it.
-</jira-format>
-
 <jira-task-review>
 Before presenting or publishing an LLM-authored Jira `task` issue draft, write
 the complete candidate body to a draft file and dispatch the configured review
 agent `{{SPECTRACK_JIRA_TASK_REVIEW_AGENT}}` with that absolute path. Ask it
 to review scope, context, acceptance criteria, and internal consistency only;
 it must not publish or otherwise mutate the tracker. Address its actionable
-findings in the draft, then run the Jira markup check and present the reviewed
-draft to the user for confirmation. Do not publish until the review, markup
-check, and user confirmation are complete.
+findings in the draft, then present the reviewed
+draft to the user for confirmation. Do not publish until the review and user confirmation are complete.
 </jira-task-review>
 
 <jira-comment-review>
@@ -69,8 +55,8 @@ complete candidate text to a draft file and dispatch the configured review
 agent `{{SPECTRACK_JIRA_COMMENT_REVIEW_AGENT}}` with that absolute path. Ask
 it to review accuracy, relevance, and internal consistency only; it must not
 publish or otherwise mutate the tracker. Address its actionable findings in
-the draft, then run the Jira markup check and present the reviewed draft to the
-user for confirmation. Do not publish until the review, markup check, and user
+the draft, then present the reviewed draft to the
+user for confirmation. Do not publish until the review and user
 confirmation are complete.
 </jira-comment-review>
 

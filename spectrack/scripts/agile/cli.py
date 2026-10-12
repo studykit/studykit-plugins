@@ -11,7 +11,7 @@ from agile import api
 from command import CommandRunner, WorkflowCommandError
 from config import WorkflowConfigError, load_workflow_config
 from env import workflow_project_dir_from_env
-from issue.jira.client import jira_data_center_site_from_provider_config
+from issue.jira.client import jira_site_from_provider_config
 from issue.jira.refs import JiraProviderError
 
 
@@ -342,9 +342,7 @@ def main(argv: list[str] | None = None, *, stdout: TextIO | None = None, stderr:
         config = load_workflow_config(args.project_dir, require=True)
         if config is None or config.issues.kind != "jira":
             raise api.AgileError("agile requires a Jira Cloud issue provider")
-        site = jira_data_center_site_from_provider_config(config.issues)
-        if not site.is_cloud:
-            raise api.AgileError("agile supports Jira Cloud only")
+        site = jira_site_from_provider_config(config.issues)
         result = dispatch(site, args, runner)
         print(json.dumps(result, indent=2, ensure_ascii=False), file=out)
         return 0

@@ -8,6 +8,8 @@ import sys
 from functools import partial
 from pathlib import Path
 
+import pytest
+
 _PLUGIN_ROOT = Path(__file__).resolve().parent.parent
 _SCRIPTS_DIR = _PLUGIN_ROOT / "scripts"
 if str(_SCRIPTS_DIR) not in sys.path:
@@ -18,6 +20,9 @@ from issue.dispatch import HISTORY, run_intent  # noqa: E402
 from issue.github.backend import _history_payload  # noqa: E402
 
 github_issue_history_main = partial(run_intent, HISTORY)
+
+
+pytestmark = pytest.mark.usefixtures("jira_cloud")
 
 
 def write_config(project: Path) -> None:
@@ -47,9 +52,7 @@ version: 1
 providers:
   issues:
     kind: jira
-    site: https://jira.example.test
-    deployment: data-center
-    api_version: 2
+    site: https://example.atlassian.net
     project: TEST
     issue_type: Task
   knowledge:

@@ -12,18 +12,17 @@ from pathlib import Path
 
 from config import WorkflowConfigError, load_workflow_config
 from env import workflow_project_dir_from_env
-from issue.jira.client import DEPLOYMENT_CLOUD, jira_deployment_from_settings
+from issue.jira.client import jira_site_from_provider_config
 from issue.jira.refs import JiraProviderError
 
 
 def jira_cloud_available(project: Path) -> bool:
     try:
         config = load_workflow_config(project)
-        return bool(
-            config
-            and config.issues.kind == "jira"
-            and jira_deployment_from_settings(config.issues.settings) == DEPLOYMENT_CLOUD
-        )
+        if config is None or config.issues.kind != "jira":
+            return False
+        jira_site_from_provider_config(config.issues)
+        return True
     except (WorkflowConfigError, JiraProviderError):
         return False
 

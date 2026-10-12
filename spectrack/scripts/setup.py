@@ -7,8 +7,8 @@
 
 The setup CLI builds and writes the repository-root ``.spectrack/config.yml``
 used by the workflow plugin. It keeps provider choices explicit so setup does
-not infer organization-specific Jira link types, custom fields, or cloud
-deployment details from prose.
+not infer organization-specific Jira link types, custom fields, or site
+details from prose.
 """
 
 from __future__ import annotations
@@ -56,12 +56,11 @@ from issue.github.gh import (  # noqa: E402
 from mustread import GITHUB_TYPE_LABEL_SPECS  # noqa: E402
 from prd_path import PrdPathError, normalize_prd_path  # noqa: E402
 from issue.jira.client import (  # noqa: E402
-    jira_data_center_createmeta_path,
-    jira_data_center_issue_path,
-    jira_data_center_site_from_provider_config,
-    jira_data_center_transitions_path,
-    jira_bodies_use_wiki_markup,
-    jira_deployment_from_settings,
+    CLOUD_ONLY_MESSAGE,
+    is_atlassian_cloud_host,
+    jira_issue_path,
+    jira_site_from_provider_config,
+    jira_transitions_path,
     jira_get_json,
 )
 from issue.jira.refs import JiraProviderError, normalize_jira_issue_key  # noqa: E402
@@ -77,17 +76,9 @@ FIELD_WRITE_TARGETS = {"source", "target"}
 FIELD_VALUE_KINDS = {"key", "key_object", "string"}
 DEFAULT_JIRA_RELATIONSHIP_FIELD_QUERIES = ("parent",)
 
-EPIC_FIELD_SCHEMA_CUSTOM_IDS: Mapping[str, str] = {
-    "name": "com.pyxis.greenhopper.jira:gh-epic-label",
-    "link": "com.pyxis.greenhopper.jira:gh-epic-link",
-    "status": "com.pyxis.greenhopper.jira:gh-epic-status",
-}
-EPIC_FIELD_NAME_HINTS: Mapping[str, tuple[str, ...]] = {
-    "name": ("epic name",),
-    "link": ("epic link",),
-    "status": ("epic status",),
-}
-EPIC_ISSUE_TYPE_NAME = "epic"
+# Jira Cloud writes these through the native parent field; a mapping for one
+# would be rejected by the provider, so setup refuses to write it.
+BUILTIN_HIERARCHY_RELATIONSHIPS = frozenset({"parent", "epic", "child", "children", "subtask", "subtasks"})
 
 
 def probe_git_remote(
@@ -324,8 +315,6 @@ def build_jira_relationship_mappings(
 def inspect_jira_relationships(
     *,
     jira_site: str,
-    jira_deployment: str | None = None,
-    jira_api_version: str | None = None,
     jira_email: str | None = None,
     jira_project: str | None = None,
     issues: Sequence[str] = (),
@@ -334,9 +323,9 @@ def inspect_jira_relationships(
 ) -> dict[str, Any]:
     """Inspect Jira relationship surfaces without inferring config mappings."""
 
-    settings = _jira_site_settings(jira_site, jira_deployment, jira_api_version, jira_email)
+    settings = _jira_site_settings(jira_site, jira_email)
     _set_if_text(settings, "project", jira_project.upper() if jira_project else None)
-    site = jira_data_center_site_from_provider_config(
+    site = jira_site_from_provider_config(
         ProviderConfig(role="issue", kind="jira", settings=settings)
     )
 
@@ -357,19 +346,12 @@ def inspect_jira_relationships(
         _inspect_jira_issue(site, issue, field_ids=field_ids, runner=runner)
         for issue in issues
     ]
-    epic = _discover_jira_epic_metadata(
-        site,
-        raw_fields=raw_fields,
-        project_key=site.project,
-        runner=runner,
-    )
 
     return {
         "operation": "jira_relationship_inspect",
         "site": site.to_json(),
         "link_types": link_types,
         "fields": fields,
-        "epic": epic,
         "sample_issues": sample_issues,
         "warnings": [
             "Inspection reports observed Jira data only; choose relationship mappings explicitly before writing config"
@@ -380,8 +362,6 @@ def inspect_jira_relationships(
 def inspect_jira_state_transitions(
     *,
     jira_site: str,
-    jira_deployment: str | None = None,
-    jira_api_version: str | None = None,
     jira_email: str | None = None,
     issues: Sequence[str],
     runner: CommandRunner | None = None,
@@ -391,8 +371,8 @@ def inspect_jira_state_transitions(
     if not issues:
         raise WorkflowSetupError("jira-state-transition-inspect requires at least one --issue")
 
-    settings = _jira_site_settings(jira_site, jira_deployment, jira_api_version, jira_email)
-    site = jira_data_center_site_from_provider_config(
+    settings = _jira_site_settings(jira_site, jira_email)
+    site = jira_site_from_provider_config(
         ProviderConfig(role="issue", kind="jira", settings=settings)
     )
 
@@ -406,7 +386,7 @@ def inspect_jira_state_transitions(
         normalized_key = normalize_jira_issue_key(issue_key)
         raw = jira_get_json(
             site,
-            jira_data_center_transitions_path(site, normalized_key),
+            jira_transitions_path(site, normalized_key),
             runner=runner,
         )
         if isinstance(raw, Mapping):
@@ -482,12 +462,9 @@ def build_config(
     github_wiki_prd_path: str | None = None,
     github_labels: Sequence[Mapping[str, str]] | None = None,
     jira_site: str | None = None,
-    jira_deployment: str | None = None,
-    jira_api_version: str | None = None,
     jira_email: str | None = None,
     jira_project: str | None = None,
     jira_issue_type: str | None = None,
-    jira_epic_fields: Mapping[str, str] | None = None,
     jira_epic_issue_type: str | None = None,
     jira_relationship_mappings: Mapping[str, Any] | None = None,
     jira_state_transitions: Mapping[str, str] | None = None,
@@ -524,26 +501,18 @@ def build_config(
     issue_github_host = github_issue_host or github_host or probed_non_default_host
     knowledge_github_host = github_wiki_host or github_host or probed_non_default_host
 
-    normalized_epic_fields = _normalize_epic_fields(jira_epic_fields)
     normalized_epic_issue_type = _text(jira_epic_issue_type)
-    effective_relationship_mappings = _augment_jira_relationship_mappings_with_epic(
-        jira_relationship_mappings,
-        epic_fields=normalized_epic_fields,
-    )
     issues = _issue_provider_config(
         issue_provider,
         github_repo=github_repo or probed_repo,
         github_host=issue_github_host,
         github_labels=github_labels,
         jira_site=jira_site,
-        jira_deployment=jira_deployment,
-        jira_api_version=jira_api_version,
         jira_email=jira_email,
         jira_project=jira_project,
         jira_issue_type=jira_issue_type,
-        jira_epic_fields=normalized_epic_fields,
         jira_epic_issue_type=normalized_epic_issue_type,
-        jira_relationship_mappings=effective_relationship_mappings,
+        jira_relationship_mappings=jira_relationship_mappings,
         jira_state_transitions=jira_state_transitions,
         jira_snapshot_hidden_comment_markers=jira_snapshot_hidden_comment_markers,
         jira_task_review_agent=jira_task_review_agent,
@@ -621,17 +590,14 @@ CODEX_HOOKS_RELATIVE_PATH = f"{CODEX_DIRNAME}/hooks.json"
 CODEX_AGENT_INSTALL_MARKER_BEGIN = "# BEGIN spectrack custom agents"
 CODEX_AGENT_INSTALL_MARKER_END = "# END spectrack custom agents"
 SPECTRACK_CODEX_AGENT_ROLES: Mapping[str, str] = {
-    "jira-format-corrector": "SpecTrack corrector that rewrites a Jira issue or comment draft file into valid Jira wiki markup, correcting Markdown-only syntax in place.",
     "mock-html-generator": "SpecTrack mock generator for throwaway HTML/CSS screen mockups grounded in selected usecase issues.",
     "usecase-explorer": "SpecTrack explorer that finds candidate use cases missed by an existing set of workflow usecase issues.",
     "usecase-reviewer": "SpecTrack reviewer that publishes review issues for quality findings in workflow usecase issues.",
 }
-# Roles that only serve Jira wiki-markup projects; every other project gets
-# them removed instead, since nothing there would ever dispatch them.
-JIRA_WIKI_MARKUP_CODEX_AGENT_ROLES = frozenset({"jira-format-corrector"})
 RETIRED_CODEX_AGENT_ROLES = frozenset({
     "implementation-auditor",
     "issue-implementer",
+    "jira-format-corrector",
     "resolution-auditor",
     "task-size-auditor",
 })
@@ -696,24 +662,17 @@ def ensure_agents_knowledge_root(
     }
 
 
-def install_codex_agents(project: Path, config: WorkflowConfig | None = None) -> dict[str, Any]:
-    """Install SpecTrack Codex roles and project-local hook adapters.
-
-    ``config`` (loaded from the project when omitted) decides which roles the
-    project needs; without any config every role is installed.
-    """
+def install_codex_agents(project: Path) -> dict[str, Any]:
+    """Install SpecTrack Codex roles and project-local hook adapters."""
 
     project = project.expanduser().resolve()
-    if config is None:
-        config = load_workflow_config(project)
-    wanted_roles = _codex_agent_roles_for(config)
     codex_dir = project / CODEX_DIRNAME
     role_dir = project / CODEX_SPECTRACK_AGENT_DIR
     codex_dir.mkdir(parents=True, exist_ok=True)
     role_dir.mkdir(parents=True, exist_ok=True)
 
     installed_roles: list[dict[str, str]] = []
-    for agent_name in sorted(wanted_roles):
+    for agent_name in sorted(SPECTRACK_CODEX_AGENT_ROLES):
         source_path = Path(__file__).resolve().parent.parent / "agents" / f"{agent_name}.md"
         body = _load_agent_instruction_body(source_path)
         role_path = role_dir / f"spectrack-{agent_name}.toml"
@@ -729,11 +688,6 @@ def install_codex_agents(project: Path, config: WorkflowConfig | None = None) ->
         )
 
     removed_roles: list[str] = []
-    for agent_name in sorted(set(SPECTRACK_CODEX_AGENT_ROLES) - wanted_roles):
-        role_path = role_dir / f"spectrack-{agent_name}.toml"
-        if role_path.exists():
-            role_path.unlink()
-            removed_roles.append(str(role_path))
     for agent_name in sorted(RETIRED_CODEX_AGENT_ROLES):
         for filename in (f"spectrack-{agent_name}.toml", f"{agent_name}.toml"):
             role_path = role_dir / filename
@@ -772,16 +726,6 @@ def install_codex_agents(project: Path, config: WorkflowConfig | None = None) ->
         "hooks": hooks,
         "restart_required": True,
     }
-
-
-def _codex_agent_roles_for(config: WorkflowConfig | None) -> set[str]:
-    roles = set(SPECTRACK_CODEX_AGENT_ROLES)
-    if config is None:
-        return roles
-    issues = config.issues
-    if issues.kind != "jira" or not jira_bodies_use_wiki_markup(issues.settings):
-        roles -= JIRA_WIKI_MARKUP_CODEX_AGENT_ROLES
-    return roles
 
 
 def install_codex_hooks(project: Path) -> dict[str, Any]:
@@ -972,7 +916,7 @@ def write_config(
     agents_update = ensure_agents_knowledge_root(project, verified)
     if agents_update is not None:
         result["agents_md"] = agents_update
-    result["codex_agents"] = install_codex_agents(project, verified)
+    result["codex_agents"] = install_codex_agents(project)
     return result
 
 
@@ -1078,9 +1022,7 @@ def build_parser() -> argparse.ArgumentParser:
         "jira-relationship-inspect",
         help="inspect Jira link types, relationship fields, and sample issue relationship data",
     )
-    jira_inspect.add_argument("--jira-site", required=True, help="Jira base URL (Data Center, Server, or Cloud)")
-    jira_inspect.add_argument("--jira-deployment", help="Jira deployment: data_center or cloud (default: cloud for *.atlassian.net sites, else data_center)")
-    jira_inspect.add_argument("--jira-api-version", help="Jira REST API version (default: 3 on Cloud, 2 on Data Center)")
+    jira_inspect.add_argument("--jira-site", required=True, help="Jira Cloud base URL (*.atlassian.net)")
     jira_inspect.add_argument("--jira-email", help="Atlassian account email for Jira Cloud basic auth; stored as providers.issues.email")
     jira_inspect.add_argument("--jira-project", help="Jira project key")
     jira_inspect.add_argument("--issue", action="append", default=[], help="sample Jira issue key to inspect")
@@ -1095,9 +1037,7 @@ def build_parser() -> argparse.ArgumentParser:
         "jira-state-transition-inspect",
         help="inspect Jira workflow transitions reachable from sample issues",
     )
-    jira_state_inspect.add_argument("--jira-site", required=True, help="Jira base URL (Data Center, Server, or Cloud)")
-    jira_state_inspect.add_argument("--jira-deployment", help="Jira deployment: data_center or cloud (default: cloud for *.atlassian.net sites, else data_center)")
-    jira_state_inspect.add_argument("--jira-api-version", help="Jira REST API version (default: 3 on Cloud, 2 on Data Center)")
+    jira_state_inspect.add_argument("--jira-site", required=True, help="Jira Cloud base URL (*.atlassian.net)")
     jira_state_inspect.add_argument("--jira-email", help="Atlassian account email for Jira Cloud basic auth; stored as providers.issues.email")
     jira_state_inspect.add_argument(
         "--issue",
@@ -1121,7 +1061,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--field",
         action="append",
         default=[],
-        help="relationship=field:write_to:value, e.g. custom_relation=customfield_12345:source:string or child=parent:target:key",
+        help="relationship=field:write_to:value, e.g. custom_relation=customfield_12345:source:string",
     )
     jira_mappings.add_argument(
         "--remote-link",
@@ -1187,8 +1127,6 @@ def _dispatch(args: argparse.Namespace) -> dict[str, Any]:
     if args.command == "jira-relationship-inspect":
         return inspect_jira_relationships(
             jira_site=args.jira_site,
-            jira_deployment=args.jira_deployment,
-            jira_api_version=args.jira_api_version,
             jira_email=args.jira_email,
             jira_project=args.jira_project,
             issues=args.issue,
@@ -1197,8 +1135,6 @@ def _dispatch(args: argparse.Namespace) -> dict[str, Any]:
     if args.command == "jira-state-transition-inspect":
         return inspect_jira_state_transitions(
             jira_site=args.jira_site,
-            jira_deployment=args.jira_deployment,
-            jira_api_version=args.jira_api_version,
             jira_email=args.jira_email,
             issues=args.issue,
         )
@@ -1253,9 +1189,7 @@ def _add_config_build_args(parser: argparse.ArgumentParser) -> None:
         "--github-labels-json",
         help="JSON array of GitHub label objects {name,color,description}; or a file path when it names one",
     )
-    parser.add_argument("--jira-site", help="Jira base URL (Data Center, Server, or Cloud)")
-    parser.add_argument("--jira-deployment", help="Jira deployment: data_center or cloud (default: cloud for *.atlassian.net sites, else data_center)")
-    parser.add_argument("--jira-api-version", help="Jira REST API version (default: 3 on Cloud, 2 on Data Center)")
+    parser.add_argument("--jira-site", help="Jira Cloud base URL (*.atlassian.net)")
     parser.add_argument("--jira-email", help="Atlassian account email for Jira Cloud basic auth; stored as providers.issues.email")
     parser.add_argument("--jira-project", help="Jira project key")
     parser.add_argument("--jira-issue-type", help="Jira issue type")
@@ -1270,18 +1204,6 @@ def _add_config_build_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--jira-epic-issue-type",
         help="Jira Epic issue type name when it differs from the built-in default 'Epic'",
-    )
-    parser.add_argument(
-        "--jira-epic-field-name",
-        help="Jira Epic Name customfield id (writes providers.issues.epic_fields.name)",
-    )
-    parser.add_argument(
-        "--jira-epic-field-link",
-        help="Jira Epic Link customfield id (writes providers.issues.epic_fields.link)",
-    )
-    parser.add_argument(
-        "--jira-epic-field-status",
-        help="Jira Epic Status customfield id (writes providers.issues.epic_fields.status)",
     )
     parser.add_argument(
         "--jira-state-transition",
@@ -1329,13 +1251,10 @@ def _config_from_args(args: argparse.Namespace) -> dict[str, Any]:
         github_wiki_prd_path=args.github_wiki_prd_path,
         github_labels=_github_labels_from_args(args),
         jira_site=args.jira_site,
-        jira_deployment=args.jira_deployment,
-        jira_api_version=args.jira_api_version,
         jira_email=args.jira_email,
         jira_project=args.jira_project,
         jira_issue_type=args.jira_issue_type,
         jira_epic_issue_type=args.jira_epic_issue_type,
-        jira_epic_fields=_jira_epic_fields_from_args(args),
         jira_relationship_mappings=_relationship_mappings_from_args(args),
         jira_state_transitions=_jira_state_transitions_from_args(args),
         jira_snapshot_hidden_comment_markers=_jira_snapshot_hidden_comment_markers_from_args(args),
@@ -1384,12 +1303,9 @@ def _issue_provider_config(
     github_host: str | None,
     github_labels: Sequence[Mapping[str, str]] | None = None,
     jira_site: str | None,
-    jira_deployment: str | None,
-    jira_api_version: str | None,
     jira_email: str | None,
     jira_project: str | None,
     jira_issue_type: str | None,
-    jira_epic_fields: Mapping[str, str] | None,
     jira_epic_issue_type: str | None,
     jira_relationship_mappings: Mapping[str, Any] | None,
     jira_state_transitions: Mapping[str, str] | None,
@@ -1407,15 +1323,13 @@ def _issue_provider_config(
             settings["labels"] = normalized_labels
     elif provider == "jira":
         if jira_site:
-            settings.update(_jira_site_settings(jira_site, jira_deployment, jira_api_version, jira_email))
+            settings.update(_jira_site_settings(jira_site, jira_email))
         _set_if_text(settings, "project", jira_project.upper() if jira_project else None)
         _set_if_text(settings, "issue_type", jira_issue_type)
         _set_if_text(settings, "task_review_agent", jira_task_review_agent)
         _set_if_text(settings, "comment_review_agent", jira_comment_review_agent)
         if jira_epic_issue_type and jira_epic_issue_type != "Epic":
             settings["artifact_issue_types"] = {"epic": jira_epic_issue_type}
-        if jira_epic_fields:
-            settings["epic_fields"] = dict(jira_epic_fields)
         hidden_markers = _normalized_string_tuple(jira_snapshot_hidden_comment_markers)
         if hidden_markers:
             settings["snapshot"] = {"hidden_comment_markers": list(hidden_markers)}
@@ -1460,10 +1374,10 @@ def _issue_capabilities(provider: str, has_jira_mappings: bool) -> dict[str, Any
         }
     if provider == "jira":
         limitations = [
-            "Jira Cloud is unsupported; use Data Center or Server",
+            "Jira Cloud only (*.atlassian.net); Data Center and Server are unsupported",
             "metadata writes require explicit workflow metadata mappings",
         ]
-        warnings = ["Jira setup targets Data Center or Server only"]
+        warnings = []
         if not has_jira_mappings:
             warnings.append(
                 "Jira issue provider setup is incomplete until providers.issues.relationship_mappings is filled from inspected site data; run jira-relationship-inspect, confirm exact mappings, and pass them to build-config"
@@ -1595,174 +1509,6 @@ def _normalize_jira_link_types(raw_link_types: Any) -> list[dict[str, str]]:
     return result
 
 
-def _discover_jira_epic_metadata(
-    site: Any,
-    *,
-    raw_fields: Any,
-    project_key: str | None,
-    runner: CommandRunner | None,
-) -> dict[str, Any]:
-    """Discover Jira Software Epic field ids and issue-type Epic Link support."""
-
-    fields = _discover_epic_field_ids(raw_fields)
-    field_warnings: list[str] = []
-    for kind in EPIC_FIELD_SCHEMA_CUSTOM_IDS:
-        if fields.get(kind) is None:
-            field_warnings.append(
-                f"Epic {kind} customfield was not discovered; the site may not have Jira Software installed or uses non-default field schema"
-            )
-
-    issue_types: list[dict[str, str]] = []
-    issue_type_epic_link_support: list[dict[str, Any]] = []
-    createmeta_warnings: list[str] = []
-    if not project_key:
-        createmeta_warnings.append(
-            "Epic issue-type discovery skipped; supply --jira-project to fetch createmeta"
-        )
-    else:
-        try:
-            raw_createmeta = jira_get_json(
-                site,
-                jira_data_center_createmeta_path(
-                    site, project_key=project_key, expand_fields=True
-                ),
-                runner=runner,
-            )
-        except (JiraProviderError, WorkflowCommandError) as exc:
-            createmeta_warnings.append(f"createmeta fetch failed: {exc}")
-        else:
-            link_field_id = fields["link"]["id"] if fields.get("link") else None
-            issue_types, issue_type_epic_link_support = _parse_jira_createmeta_epic_support(
-                raw_createmeta,
-                project_key=project_key,
-                epic_link_field_id=link_field_id,
-            )
-            if not issue_types:
-                createmeta_warnings.append(
-                    "No candidate Epic issue type found in createmeta; pass --jira-epic-issue-type to override"
-                )
-
-    return {
-        "fields": fields,
-        "issue_types": issue_types,
-        "issue_type_epic_link_support": issue_type_epic_link_support,
-        "warnings": [*field_warnings, *createmeta_warnings],
-    }
-
-
-def _discover_epic_field_ids(raw_fields: Any) -> dict[str, dict[str, str] | None]:
-    """Locate Epic Name / Link / Status field ids by Greenhopper schema or name."""
-
-    items = raw_fields if isinstance(raw_fields, list) else []
-    schema_matches: dict[str, dict[str, str]] = {}
-    name_matches: dict[str, dict[str, str]] = {}
-    for item in items:
-        if not isinstance(item, Mapping):
-            continue
-        field_id = _text(item.get("id"))
-        name = _text(item.get("name"))
-        if not field_id:
-            continue
-        schema_custom = _text(_dig_text_path(item, ("schema", "custom")))
-        for kind, schema_id in EPIC_FIELD_SCHEMA_CUSTOM_IDS.items():
-            if schema_custom and schema_custom == schema_id and kind not in schema_matches:
-                schema_matches[kind] = {
-                    "id": field_id,
-                    "name": name or "",
-                    "matched_by": "schema",
-                }
-        if name:
-            normalized_name = name.strip().lower()
-            for kind, hints in EPIC_FIELD_NAME_HINTS.items():
-                if kind in schema_matches or kind in name_matches:
-                    continue
-                if normalized_name in hints:
-                    name_matches[kind] = {
-                        "id": field_id,
-                        "name": name,
-                        "matched_by": "name",
-                    }
-
-    discovered: dict[str, dict[str, str] | None] = {}
-    for kind in EPIC_FIELD_SCHEMA_CUSTOM_IDS:
-        match = schema_matches.get(kind) or name_matches.get(kind)
-        discovered[kind] = {key: value for key, value in match.items() if value} if match else None
-    return discovered
-
-
-def _parse_jira_createmeta_epic_support(
-    raw_createmeta: Any,
-    *,
-    project_key: str,
-    epic_link_field_id: str | None,
-) -> tuple[list[dict[str, str]], list[dict[str, Any]]]:
-    if not isinstance(raw_createmeta, Mapping):
-        return [], []
-    projects = raw_createmeta.get("projects")
-    if not isinstance(projects, list):
-        return [], []
-    normalized_key = project_key.strip().upper()
-    selected: Mapping[str, Any] | None = None
-    for entry in projects:
-        if not isinstance(entry, Mapping):
-            continue
-        key = _text(entry.get("key"))
-        if key and key.upper() == normalized_key:
-            selected = entry
-            break
-    if selected is None and projects:
-        first = projects[0]
-        if isinstance(first, Mapping):
-            selected = first
-    if selected is None:
-        return [], []
-
-    issue_types_raw = selected.get("issuetypes")
-    if not isinstance(issue_types_raw, list):
-        return [], []
-
-    epic_issue_types: list[dict[str, str]] = []
-    epic_link_support: list[dict[str, Any]] = []
-    for entry in issue_types_raw:
-        if not isinstance(entry, Mapping):
-            continue
-        type_id = _text(entry.get("id"))
-        type_name = _text(entry.get("name"))
-        if not type_name:
-            continue
-        normalized = type_name.lower()
-        record: dict[str, str] = {"name": type_name}
-        if type_id:
-            record["id"] = type_id
-        if normalized == EPIC_ISSUE_TYPE_NAME:
-            epic_issue_types.append(record)
-        supports = _issue_type_supports_epic_link(entry, epic_link_field_id)
-        if supports is not None:
-            epic_link_support.append({**record, "supports_epic_link": supports})
-    return epic_issue_types, epic_link_support
-
-
-def _issue_type_supports_epic_link(
-    issue_type_entry: Mapping[str, Any],
-    epic_link_field_id: str | None,
-) -> bool | None:
-    fields = issue_type_entry.get("fields")
-    if not isinstance(fields, Mapping):
-        return None
-    if not epic_link_field_id:
-        return None
-    return epic_link_field_id in fields
-
-
-def _dig_text_path(mapping: Mapping[str, Any], path: Sequence[str]) -> Any:
-    current: Any = mapping
-    for key in path:
-        if not isinstance(current, Mapping):
-            return None
-        current = current.get(key)
-    return current
-
-
 def _matching_jira_fields(raw_fields: Any, queries: Sequence[str]) -> list[dict[str, str]]:
     if not isinstance(raw_fields, list):
         return []
@@ -1796,7 +1542,7 @@ def _inspect_jira_issue(
     unique_fields = ",".join(dict.fromkeys(fields))
     raw_issue = jira_get_json(
         site,
-        f"{jira_data_center_issue_path(site, issue_key)}?fields={unique_fields}",
+        f"{jira_issue_path(site, issue_key)}?fields={unique_fields}",
         runner=runner,
     )
     return _summarize_jira_issue_relationships(raw_issue, field_ids=field_ids)
@@ -2017,19 +1763,6 @@ def _parse_github_label_spec(value: str) -> dict[str, str]:
     return label
 
 
-def _jira_epic_fields_from_args(args: argparse.Namespace) -> dict[str, str] | None:
-    fields: dict[str, str] = {}
-    for kind, attr in (
-        ("name", "jira_epic_field_name"),
-        ("link", "jira_epic_field_link"),
-        ("status", "jira_epic_field_status"),
-    ):
-        text = _text(getattr(args, attr, None))
-        if text:
-            fields[kind] = text
-    return fields or None
-
-
 def _jira_snapshot_hidden_comment_markers_from_args(args: argparse.Namespace) -> tuple[str, ...]:
     return _normalized_string_tuple(getattr(args, "jira_snapshot_hidden_comment_marker", None))
 
@@ -2094,6 +1827,11 @@ def _validate_relationship_mappings(mappings: Mapping[str, Any] | None) -> None:
     if not isinstance(mappings, Mapping):
         raise WorkflowSetupError("providers.issues.relationship_mappings must be a mapping")
     for name, raw_mapping in mappings.items():
+        if str(name).strip().lower().replace("-", "_") in BUILTIN_HIERARCHY_RELATIONSHIPS:
+            raise WorkflowSetupError(
+                f"{CLOUD_ONLY_MESSAGE}: drop the '{name}' relationship mapping; "
+                "parent, epic, and child use the native parent field"
+            )
         if not isinstance(raw_mapping, Mapping):
             raise WorkflowSetupError(f"Jira relationship mapping for '{name}' must be a mapping")
         surface = _normalize_surface(raw_mapping.get("surface"))
@@ -2120,48 +1858,6 @@ def _validate_relationship_mappings(mappings: Mapping[str, Any] | None) -> None:
                 raise WorkflowSetupError(f"Jira field relationship mapping for '{name}' requires value key, key_object, or string")
 
 
-def _normalize_epic_fields(value: Mapping[str, Any] | None) -> dict[str, str] | None:
-    """Coerce epic_fields input into the canonical {name/link/status: id} shape."""
-
-    if value is None:
-        return None
-    if not isinstance(value, Mapping):
-        raise WorkflowSetupError("Jira epic_fields must be a mapping of {name, link, status} to field ids")
-    allowed = set(EPIC_FIELD_SCHEMA_CUSTOM_IDS)
-    normalized: dict[str, str] = {}
-    for raw_kind, raw_id in value.items():
-        kind = str(raw_kind).strip().lower()
-        if kind not in allowed:
-            raise WorkflowSetupError(
-                f"unknown Jira epic_fields entry '{raw_kind}'; expected one of: {sorted(allowed)}"
-            )
-        text = _text(raw_id)
-        if text:
-            normalized[kind] = text
-    return normalized or None
-
-
-def _augment_jira_relationship_mappings_with_epic(
-    mappings: Mapping[str, Any] | None,
-    *,
-    epic_fields: Mapping[str, str] | None,
-) -> Mapping[str, Any] | None:
-    """Auto-add the standard ``epic`` field mapping when the Epic Link id is known."""
-
-    if not epic_fields or "link" not in epic_fields:
-        return mappings
-    if mappings and "epic" in mappings:
-        return mappings
-    augmented = dict(mappings or {})
-    augmented["epic"] = {
-        "surface": "field",
-        "field": epic_fields["link"],
-        "write_to": "source",
-        "value": "string",
-    }
-    return augmented
-
-
 def _require_jira_relationship_mappings(mappings: Mapping[str, Any] | None) -> None:
     if mappings:
         return
@@ -2172,23 +1868,12 @@ def _require_jira_relationship_mappings(mappings: Mapping[str, Any] | None) -> N
     )
 
 
-def _jira_site_settings(
-    site: str,
-    deployment: str | None,
-    api_version: str | None,
-    email: str | None = None,
-) -> dict[str, Any]:
-    """Build Jira site settings, detecting Cloud from an ``*.atlassian.net`` host.
+def _jira_site_settings(site: str, email: str | None = None) -> dict[str, Any]:
+    """Build Jira site settings for an ``*.atlassian.net`` Cloud site."""
 
-    Cloud only speaks REST v3 for ADF bodies, so its api_version defaults to 3;
-    Data Center keeps the v2 default.
-    """
-
+    if not is_atlassian_cloud_host(site):
+        raise WorkflowSetupError(f"{CLOUD_ONLY_MESSAGE}: site must be an *.atlassian.net host; got {site}")
     settings: dict[str, Any] = {"site": site}
-    _set_if_text(settings, "deployment", deployment)
-    resolved = jira_deployment_from_settings(settings)
-    settings["deployment"] = resolved
-    settings["api_version"] = api_version or ("3" if resolved == "cloud" else "2")
     _set_if_text(settings, "email", email)
     return settings
 
@@ -2250,7 +1935,6 @@ def _merge_profile_mapping(defaults: dict[str, Any], mapping: Mapping[str, Any])
         _set_default(defaults, "github_repo", _text(issues.get("repo") or issues.get("repository") or issues.get("slug")))
         _set_default(defaults, "github_issue_host", _text(issues.get("host") or issues.get("hostname")))
         _set_default(defaults, "jira_site", _text(issues.get("site") or issues.get("base_url") or issues.get("url")))
-        _set_default(defaults, "jira_deployment", _text(issues.get("deployment") or issues.get("type") or issues.get("edition")))
         _set_default(defaults, "jira_project", _text(issues.get("project") or issues.get("project_key")))
         _set_default(defaults, "jira_issue_type", _text(issues.get("issue_type") or issues.get("issueType")))
         if isinstance(issues.get("relationship_mappings"), Mapping):
@@ -2287,10 +1971,6 @@ def _extract_profile_regex_defaults(text: str) -> dict[str, Any]:
         match = re.search(pattern, text)
         if match:
             defaults[key] = match.group("value").strip()
-    if re.search(r"(?i)\bdata\s*center\b|\bdatacenter\b|\bserver\b", text):
-        defaults.setdefault("jira_deployment", "data_center")
-    if re.search(r"(?i)\bcloud\b|atlassian\.net", text):
-        defaults.setdefault("jira_deployment", "cloud")
     return defaults
 
 

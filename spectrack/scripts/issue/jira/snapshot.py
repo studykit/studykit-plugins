@@ -269,8 +269,8 @@ def _jira_person_display_name(value: Any) -> str | None:
     """Resolve the best Jira person display name from a user mapping.
 
     Mirrors the fallback chain Jira's REST API documents for user objects:
-    ``displayName`` is preferred, then ``name`` (Data Center username),
-    then ``key``, then ``accountId`` (Cloud). Returns ``None`` when the
+    ``displayName`` is preferred, then ``name``, then ``key``, then
+    ``accountId``. Returns ``None`` when the
     input is not a mapping or carries none of these keys with a truthy
     value.
     """

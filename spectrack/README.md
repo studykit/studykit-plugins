@@ -7,37 +7,28 @@ draft, publish, refresh, and link work items without leaving the session.
 
 ## Supported Providers
 
-- **Issues** — GitHub Issues, Jira (Data Center / Server or Cloud), or a local
-  filesystem provider.
+- **Issues** — GitHub Issues, Jira Cloud, or a local filesystem provider. Jira
+  Data Center and Server are not supported.
 - **Knowledge** — GitHub repository `wiki/`.
 
 Issue tracking and knowledge documentation are configured independently, so
 mixed setups (e.g., Jira issues + GitHub repository `wiki/`) are supported.
 
-On Jira Data Center / Server projects, issue and comment bodies must be Jira
-wiki markup rather than Markdown. The assistant checks each draft against that
-markup and fixes wrong syntax before showing you the draft for confirmation.
-
-On Jira Cloud, drafts stay Markdown: SpecTrack converts them to Jira's document
+On Jira, drafts stay Markdown: SpecTrack converts them to Jira's document
 format when publishing, and fetched issues and comments come back as Markdown.
 
 ### Jira Cloud
 
-A site on `*.atlassian.net` is treated as Jira Cloud automatically (set
-`deployment: cloud` for any other Cloud host). Cloud needs:
+The Jira site must be on `*.atlassian.net`. A config left over from Jira Data
+Center (a `deployment` other than `cloud`, an `api_version` other than `3`, a
+non-Cloud host, or `epic_fields`) is refused with an error rather than ignored.
 
-`spectrack agile` manages Jira Software boards, sprints, backlogs, epics,
-ranking, and estimates on Jira Cloud. Run `spectrack agile --help` to see
-commands and options. Jira Data Center and Server are not supported.
+Parent, epic, and child relationships use Jira's native parent field and need
+no configuration; an epic is simply the issue's parent. `relationship_mappings`
+covers the other relationships, such as issue links (blocked by, blocking,
+related) and custom fields.
 
-`spectrack confluence` reads, searches (CQL), creates, updates, and moves
-Confluence Cloud pages on the same site with the same credentials. Page bodies
-are exchanged as Markdown by default; Markdown cannot carry macros, layouts, or
-panels, so use `--format adf` to edit such pages without losing them. Updates
-accept `--expected-version` to refuse overwriting a concurrent edit. Run
-`spectrack confluence --help` for commands and options. Confluence Data Center
-and Server are not supported, and Confluence is not a knowledge provider — the
-GitHub repository `wiki/` remains the knowledge store.
+Jira Cloud needs:
 
 - Your Atlassian account email, as `email:` under `providers.issues` in
   `.spectrack/config.yml` or in `JIRA_EMAIL` (which wins, so teammates sharing
@@ -56,6 +47,19 @@ GitHub repository `wiki/` remains the knowledge store.
   through it.
 
 Assign issues by Atlassian accountId, or use `me`.
+
+`spectrack agile` manages Jira Software boards, sprints, backlogs, epics,
+ranking, and estimates. Run `spectrack agile --help` to see commands and
+options.
+
+`spectrack confluence` reads, searches (CQL), creates, updates, and moves
+Confluence Cloud pages on the same site with the same credentials. Page bodies
+are exchanged as Markdown by default; Markdown cannot carry macros, layouts, or
+panels, so use `--format adf` to edit such pages without losing them. Updates
+accept `--expected-version` to refuse overwriting a concurrent edit. Run
+`spectrack confluence --help` for commands and options. Confluence Data Center
+and Server are not supported, and Confluence is not a knowledge provider — the
+GitHub repository `wiki/` remains the knowledge store.
 
 ## Installation
 
@@ -91,9 +95,7 @@ root. The fastest way to create it is the bundled setup skill:
 
 The skill walks through provider selection, fills in the required fields,
 and writes `.spectrack/config.yml`. It also installs the Codex roles used for
-use-case exploration, review, screen mocks, and — on Jira Data Center / Server —
-Jira markup correction; restart
-Codex after setup so the new `spectrack:*` roles are available.
+use-case exploration, review, and screen mocks; restart Codex after setup so the new `spectrack:*` roles are available.
 
 A minimal hand-written configuration looks like:
 

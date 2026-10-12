@@ -217,8 +217,8 @@ _VERB_HELP: tuple[tuple[str, str | dict[str | None, str], str | None], ...] = (
         "link",
         {
             None: "add / remove / replace relationships (parent, child, dependencies, ...)",
-            "jira": "add / remove / replace relationships: parent / child / epic, "
-            "blocked-by / blocking, related",
+            "jira": "add / remove / replace relationships: parent / child / epic "
+            "(epic = native parent), blocked-by / blocking, related",
             "github": "add / remove / replace relationships: parent / child, "
             "blocked-by / blocking",
         },

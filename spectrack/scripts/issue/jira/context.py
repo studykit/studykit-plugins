@@ -8,9 +8,9 @@ from collections.abc import Sequence
 from command import CommandRunner
 from config import WorkflowConfig
 from issue.cli_output import IssueFetchContext, cache_refreshed_from_payload, display_project_path
-from issue.jira.cache import JiraDataCenterIssueCache
+from issue.jira.cache import JiraIssueCache
 from issue.jira.refs import normalize_jira_issue_key
-from issue.jira.client import resolve_jira_data_center_site
+from issue.jira.client import resolve_jira_site
 from issue.providers import CACHE_POLICY_DEFAULT, ProviderContext, ProviderRequest
 
 
@@ -24,11 +24,11 @@ def cache_jira_issue_references(
 ) -> list[IssueFetchContext]:
     """Read Jira issues through the provider cache path and return hook context."""
 
-    from issue.jira.provider import JiraDataCenterIssueNativeProvider
+    from issue.jira.provider import JiraIssueNativeProvider
 
-    provider = JiraDataCenterIssueNativeProvider(runner=runner)
-    site = resolve_jira_data_center_site(config.root)
-    cache = JiraDataCenterIssueCache.for_project(config.root)
+    provider = JiraIssueNativeProvider(runner=runner)
+    site = resolve_jira_site(config.root)
+    cache = JiraIssueCache.for_project(config.root)
     contexts: list[IssueFetchContext] = []
 
     for key in issue_keys:

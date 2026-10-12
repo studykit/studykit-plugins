@@ -51,6 +51,9 @@ from setup import (  # noqa: E402
 from mustread import GITHUB_TYPE_LABEL_SPECS  # noqa: E402
 
 
+pytestmark = pytest.mark.usefixtures("jira_cloud")
+
+
 def _fixture(name: str) -> dict[str, Any]:
     return yaml.safe_load((_FIXTURES / name).read_text(encoding="utf-8"))
 
@@ -184,7 +187,7 @@ def test_build_config_defaults_issue_id_format_to_provider_native(tmp_path: Path
         project=tmp_path,
         issue_provider="jira",
         knowledge_provider="github",
-        jira_site="https://jira.example.test",
+        jira_site="https://example.atlassian.net",
         jira_relationship_mappings=_jira_relationship_mappings(),
     )
 
@@ -196,7 +199,7 @@ def test_build_config_records_jira_snapshot_hidden_comment_markers(tmp_path: Pat
         project=tmp_path,
         issue_provider="jira",
         knowledge_provider="github",
-        jira_site="https://jira.example.test",
+        jira_site="https://example.atlassian.net",
         jira_relationship_mappings=_jira_relationship_mappings(),
         jira_snapshot_hidden_comment_markers=("!git-event",),
     )
@@ -210,7 +213,7 @@ def test_build_config_requires_jira_relationship_mappings(tmp_path: Path) -> Non
             project=tmp_path,
             issue_provider="jira",
             knowledge_provider="github",
-            jira_site="https://jira.example.test",
+            jira_site="https://example.atlassian.net",
             )
 
 
@@ -223,7 +226,7 @@ def test_build_config_rejects_invalid_provider_for_role(tmp_path: Path) -> None:
         )
 
 
-def test_build_config_detects_jira_cloud_from_atlassian_net_site(tmp_path: Path) -> None:
+def test_build_config_writes_only_the_jira_cloud_site(tmp_path: Path) -> None:
     payload = build_config(
         project=tmp_path,
         issue_provider="jira",
@@ -233,8 +236,35 @@ def test_build_config_detects_jira_cloud_from_atlassian_net_site(tmp_path: Path)
     )
 
     issues = payload["providers"]["issues"]
-    assert issues["deployment"] == "cloud"
-    assert issues["api_version"] == "3"
+    assert issues["site"] == "https://acme.atlassian.net"
+    assert "deployment" not in issues
+    assert "api_version" not in issues
+
+
+def test_build_config_rejects_a_non_cloud_jira_site(tmp_path: Path) -> None:
+    with pytest.raises(WorkflowSetupError, match="spectrack supports Jira Cloud only"):
+        build_config(
+            project=tmp_path,
+            issue_provider="jira",
+            knowledge_provider="github",
+            jira_site="https://jira.example.test",
+            jira_relationship_mappings=_jira_relationship_mappings(),
+        )
+
+
+@pytest.mark.parametrize("relationship", ["parent", "epic", "child"])
+def test_build_config_rejects_a_builtin_hierarchy_mapping(tmp_path: Path, relationship: str) -> None:
+    mappings = _jira_relationship_mappings()
+    mappings[relationship] = {"surface": "field", "field": "parent", "write_to": "source", "value": "key"}
+
+    with pytest.raises(WorkflowSetupError, match="spectrack supports Jira Cloud only"):
+        build_config(
+            project=tmp_path,
+            issue_provider="jira",
+            knowledge_provider="github",
+            jira_site="https://acme.atlassian.net",
+            jira_relationship_mappings=mappings,
+        )
 
 
 def test_build_config_records_the_jira_cloud_account_email(tmp_path: Path) -> None:
@@ -248,20 +278,6 @@ def test_build_config_records_the_jira_cloud_account_email(tmp_path: Path) -> No
     )
 
     assert payload["providers"]["issues"]["email"] == "user@example.test"
-
-
-def test_build_config_keeps_data_center_defaults_for_other_sites(tmp_path: Path) -> None:
-    payload = build_config(
-        project=tmp_path,
-        issue_provider="jira",
-        knowledge_provider="github",
-        jira_site="https://jira.example.test",
-        jira_relationship_mappings=_jira_relationship_mappings(),
-    )
-
-    issues = payload["providers"]["issues"]
-    assert issues["deployment"] == "data_center"
-    assert issues["api_version"] == "2"
 
 
 def test_capabilities_mark_jira_setup_incomplete_when_relationship_mappings_are_missing() -> None:
@@ -280,7 +296,7 @@ def test_build_config_accepts_explicit_jira_relationship_mappings(tmp_path: Path
         project=tmp_path,
         issue_provider="jira",
         knowledge_provider="github",
-        jira_site="https://jira.example.test",
+        jira_site="https://example.atlassian.net",
         jira_relationship_mappings=mappings,
     )
     payload = build_config_payload(raw, project=tmp_path)
@@ -296,10 +312,7 @@ def test_jira_relationship_mapping_helper_builds_explicit_mapping_yaml() -> None
             "blocking=Blocks:outward",
             "related=Relate:outward",
         ),
-        fields=(
-            "custom_relation=customfield_12345:source:string",
-            "child=parent:target:key",
-        ),
+        fields=("custom_relation=customfield_12345:source:string",),
     )
 
     mappings = payload["relationship_mappings"]
@@ -314,12 +327,6 @@ def test_jira_relationship_mapping_helper_builds_explicit_mapping_yaml() -> None
         "write_to": "source",
         "value": "string",
     }
-    assert mappings["child"] == {
-        "surface": "field",
-        "field": "parent",
-        "write_to": "target",
-        "value": "key",
-    }
     assert yaml.safe_load(payload["yaml"]) == mappings
 
 
@@ -331,19 +338,19 @@ def test_jira_relationship_mapping_helper_rejects_incomplete_specs() -> None:
 def test_jira_relationship_inspect_reports_observed_surfaces() -> None:
     def runner(request: CommandRequest) -> CommandResult:
         responses = {
-            _curl_get_args("https://jira.example.test/rest/api/2/issueLinkType"): {
+            _curl_get_args("https://example.atlassian.net/rest/api/3/issueLinkType"): {
                 "issueLinkTypes": [
                     {"name": "Blocks", "inward": "is blocked by", "outward": "blocks"},
                     {"name": "Relate", "inward": "is related by", "outward": "relates to"},
                 ]
             },
-            _curl_get_args("https://jira.example.test/rest/api/2/field"): [
+            _curl_get_args("https://example.atlassian.net/rest/api/3/field"): [
                 {"id": "customfield_12345", "name": "Custom Relationship"},
                 {"id": "customfield_12287", "name": "Parent Link"},
                 {"id": "summary", "name": "Summary"},
             ],
             _curl_get_args(
-                "https://jira.example.test/rest/api/2/issue/PROJ-9911"
+                "https://example.atlassian.net/rest/api/3/issue/PROJ-9911"
                 "?fields=summary,issuetype,parent,subtasks,issuelinks,customfield_12345,customfield_12287"
             ): {
                 "key": "PROJ-9911",
@@ -375,7 +382,7 @@ def test_jira_relationship_inspect_reports_observed_surfaces() -> None:
         return CommandResult(request=request, returncode=0, stdout=json.dumps(payload))
 
     payload = inspect_jira_relationships(
-        jira_site="https://jira.example.test",
+        jira_site="https://example.atlassian.net",
         issues=("PROJ-9911",),
         field_queries=("customfield_12345", "Parent Link"),
         runner=runner,
@@ -392,235 +399,12 @@ def test_jira_relationship_inspect_reports_observed_surfaces() -> None:
     assert any("observed Jira data only" in warning for warning in payload["warnings"])
 
 
-def _epic_field_response() -> list[dict[str, Any]]:
-    return [
-        {
-            "id": "customfield_12345",
-            "name": "Epic Name",
-            "schema": {"custom": "com.pyxis.greenhopper.jira:gh-epic-label"},
-        },
-        {
-            "id": "customfield_12346",
-            "name": "Epic Link",
-            "schema": {"custom": "com.pyxis.greenhopper.jira:gh-epic-link"},
-        },
-        {
-            "id": "customfield_12347",
-            "name": "Epic Status",
-            "schema": {"custom": "com.pyxis.greenhopper.jira:gh-epic-status"},
-        },
-        {"id": "summary", "name": "Summary"},
-    ]
-
-
-def _epic_createmeta_response() -> dict[str, Any]:
-    return {
-        "projects": [
-            {
-                "key": "TEST",
-                "issuetypes": [
-                    {
-                        "id": "10000",
-                        "name": "Task",
-                        "fields": {"summary": {}, "customfield_12346": {}},
-                    },
-                    {
-                        "id": "10001",
-                        "name": "Story",
-                        "fields": {"summary": {}, "customfield_12346": {}},
-                    },
-                    {
-                        "id": "10100",
-                        "name": "Epic",
-                        "fields": {
-                            "summary": {},
-                            "customfield_12345": {},
-                            "customfield_12347": {},
-                        },
-                    },
-                    {
-                        "id": "10200",
-                        "name": "Sub-task",
-                        "fields": {"summary": {}, "customfield_12346": {}},
-                    },
-                ],
-            }
-        ]
-    }
-
-
-def _jira_inspect_runner(
-    *,
-    fields: list[dict[str, Any]] | None = None,
-    createmeta: dict[str, Any] | None = None,
-    project: str | None = "TEST",
-):
-    raw_fields = fields if fields is not None else _epic_field_response()
-    raw_createmeta = createmeta if createmeta is not None else _epic_createmeta_response()
-    createmeta_url = (
-        f"https://jira.example.test/rest/api/2/issue/createmeta?projectKeys={project}"
-        "&expand=projects.issuetypes.fields"
-    ) if project else None
-
-    def runner(request: CommandRequest) -> CommandResult:
-        responses: dict[tuple[str, ...], Any] = {
-            _curl_get_args("https://jira.example.test/rest/api/2/issueLinkType"): {"issueLinkTypes": []},
-            _curl_get_args("https://jira.example.test/rest/api/2/field"): raw_fields,
-        }
-        if createmeta_url is not None:
-            responses[_curl_get_args(createmeta_url)] = raw_createmeta
-        payload = responses.get(request.args)
-        if payload is None:
-            return CommandResult(request=request, returncode=127, stderr=f"unexpected command: {request.args}")
-        return CommandResult(request=request, returncode=0, stdout=json.dumps(payload))
-
-    return runner
-
-
-def test_jira_relationship_inspect_discovers_epic_fields_by_schema() -> None:
-    payload = inspect_jira_relationships(
-        jira_site="https://jira.example.test",
-        jira_project="TEST",
-        runner=_jira_inspect_runner(),
-    )
-
-    epic = payload["epic"]
-    assert epic["fields"]["name"]["id"] == "customfield_12345"
-    assert epic["fields"]["name"]["matched_by"] == "schema"
-    assert epic["fields"]["link"]["id"] == "customfield_12346"
-    assert epic["fields"]["status"]["id"] == "customfield_12347"
-
-
-def test_jira_relationship_inspect_falls_back_to_name_match_for_epic_fields() -> None:
-    fields = [
-        {"id": "customfield_22001", "name": "Epic Name"},
-        {"id": "customfield_22002", "name": "Epic Link"},
-        {"id": "customfield_22003", "name": "Epic Status"},
-    ]
-    payload = inspect_jira_relationships(
-        jira_site="https://jira.example.test",
-        jira_project="TEST",
-        runner=_jira_inspect_runner(fields=fields),
-    )
-
-    epic = payload["epic"]
-    assert epic["fields"]["name"] == {
-        "id": "customfield_22001",
-        "name": "Epic Name",
-        "matched_by": "name",
-    }
-    assert epic["fields"]["link"]["matched_by"] == "name"
-
-
-def test_jira_relationship_inspect_warns_when_epic_fields_missing() -> None:
-    payload = inspect_jira_relationships(
-        jira_site="https://jira.example.test",
-        jira_project="TEST",
-        runner=_jira_inspect_runner(fields=[{"id": "summary", "name": "Summary"}]),
-    )
-
-    epic = payload["epic"]
-    assert epic["fields"]["name"] is None
-    assert epic["fields"]["link"] is None
-    assert any("Epic name customfield" in warning for warning in epic["warnings"])
-
-
-def test_jira_relationship_inspect_surfaces_epic_issue_type_candidates() -> None:
-    payload = inspect_jira_relationships(
-        jira_site="https://jira.example.test",
-        jira_project="TEST",
-        runner=_jira_inspect_runner(),
-    )
-
-    epic = payload["epic"]
-    assert epic["issue_types"] == [{"id": "10100", "name": "Epic"}]
-
-
-def test_jira_relationship_inspect_reports_per_issue_type_epic_link_support() -> None:
-    payload = inspect_jira_relationships(
-        jira_site="https://jira.example.test",
-        jira_project="TEST",
-        runner=_jira_inspect_runner(),
-    )
-
-    support = {
-        entry["name"]: entry["supports_epic_link"]
-        for entry in payload["epic"]["issue_type_epic_link_support"]
-    }
-    assert support == {
-        "Task": True,
-        "Story": True,
-        "Epic": False,
-        "Sub-task": True,
-    }
-
-
-def test_jira_relationship_inspect_warns_when_project_missing_for_createmeta() -> None:
-    payload = inspect_jira_relationships(
-        jira_site="https://jira.example.test",
-        runner=_jira_inspect_runner(project=None),
-    )
-
-    epic = payload["epic"]
-    assert epic["issue_types"] == []
-    assert epic["issue_type_epic_link_support"] == []
-    assert any("supply --jira-project" in warning for warning in epic["warnings"])
-
-
-def test_build_config_writes_epic_fields_when_provided(tmp_path: Path) -> None:
-    raw = build_config(
-        project=tmp_path,
-        issue_provider="jira",
-        knowledge_provider="github",
-        jira_site="https://jira.example.test",
-        jira_relationship_mappings=_jira_relationship_mappings(),
-        jira_epic_fields={
-            "name": "customfield_12345",
-            "link": "customfield_12346",
-            "status": "customfield_12347",
-        },
-    )
-
-    issues = raw["providers"]["issues"]
-    assert issues["epic_fields"] == {
-        "name": "customfield_12345",
-        "link": "customfield_12346",
-        "status": "customfield_12347",
-    }
-    assert issues["relationship_mappings"]["epic"] == {
-        "surface": "field",
-        "field": "customfield_12346",
-        "write_to": "source",
-        "value": "string",
-    }
-
-
-def test_build_config_keeps_explicit_epic_mapping_when_provided(tmp_path: Path) -> None:
-    mappings = dict(_jira_relationship_mappings())
-    mappings["epic"] = {
-        "surface": "field",
-        "field": "customfield_99999",
-        "write_to": "source",
-        "value": "string",
-    }
-    raw = build_config(
-        project=tmp_path,
-        issue_provider="jira",
-        knowledge_provider="github",
-        jira_site="https://jira.example.test",
-        jira_relationship_mappings=mappings,
-        jira_epic_fields={"link": "customfield_12346"},
-    )
-
-    assert raw["providers"]["issues"]["relationship_mappings"]["epic"]["field"] == "customfield_99999"
-
-
 def test_build_config_writes_epic_issue_type_only_when_non_default(tmp_path: Path) -> None:
     raw_default = build_config(
         project=tmp_path,
         issue_provider="jira",
         knowledge_provider="github",
-        jira_site="https://jira.example.test",
+        jira_site="https://example.atlassian.net",
         jira_relationship_mappings=_jira_relationship_mappings(),
         jira_epic_issue_type="Epic",
     )
@@ -628,7 +412,7 @@ def test_build_config_writes_epic_issue_type_only_when_non_default(tmp_path: Pat
         project=tmp_path,
         issue_provider="jira",
         knowledge_provider="github",
-        jira_site="https://jira.example.test",
+        jira_site="https://example.atlassian.net",
         jira_relationship_mappings=_jira_relationship_mappings(),
         jira_epic_issue_type="Initiative",
     )
@@ -637,24 +421,12 @@ def test_build_config_writes_epic_issue_type_only_when_non_default(tmp_path: Pat
     assert raw_override["providers"]["issues"]["artifact_issue_types"] == {"epic": "Initiative"}
 
 
-def test_build_config_rejects_unknown_epic_fields_key(tmp_path: Path) -> None:
-    with pytest.raises(WorkflowSetupError, match="unknown Jira epic_fields entry"):
-        build_config(
-            project=tmp_path,
-            issue_provider="jira",
-            knowledge_provider="github",
-            jira_site="https://jira.example.test",
-            jira_relationship_mappings=_jira_relationship_mappings(),
-            jira_epic_fields={"unknown": "customfield_12345"},
-            )
-
-
 def _jira_state_transition_runner(
     transitions_by_issue: dict[str, list[dict[str, Any]]],
 ):
     def runner(request: CommandRequest) -> CommandResult:
         for key, transitions in transitions_by_issue.items():
-            url = f"https://jira.example.test/rest/api/2/issue/{key}/transitions"
+            url = f"https://example.atlassian.net/rest/api/3/issue/{key}/transitions"
             if request.args == _curl_get_args(url):
                 return CommandResult(
                     request=request,
@@ -682,7 +454,7 @@ def test_jira_state_transition_inspect_reports_per_issue_transitions() -> None:
         }
     )
     payload = inspect_jira_state_transitions(
-        jira_site="https://jira.example.test",
+        jira_site="https://example.atlassian.net",
         issues=("PROJ-1", "PROJ-2"),
         runner=runner,
     )
@@ -713,7 +485,7 @@ def test_jira_state_transition_inspect_silent_when_all_samples_match() -> None:
     runner = _jira_state_transition_runner({"PROJ-1": transitions, "PROJ-2": transitions})
 
     payload = inspect_jira_state_transitions(
-        jira_site="https://jira.example.test",
+        jira_site="https://example.atlassian.net",
         issues=("PROJ-1", "PROJ-2"),
         runner=runner,
     )
@@ -752,7 +524,7 @@ def test_jira_state_transition_inspect_skips_reserved_auto_verb() -> None:
     )
 
     payload = inspect_jira_state_transitions(
-        jira_site="https://jira.example.test",
+        jira_site="https://example.atlassian.net",
         issues=("PROJ-1",),
         runner=runner,
     )
@@ -773,7 +545,7 @@ def test_jira_state_transition_inspect_skips_colliding_auto_verbs() -> None:
     )
 
     payload = inspect_jira_state_transitions(
-        jira_site="https://jira.example.test",
+        jira_site="https://example.atlassian.net",
         issues=("PROJ-1",),
         runner=runner,
     )
@@ -785,7 +557,7 @@ def test_jira_state_transition_inspect_skips_colliding_auto_verbs() -> None:
 def test_jira_state_transition_inspect_requires_at_least_one_issue() -> None:
     with pytest.raises(WorkflowSetupError, match="requires at least one --issue"):
         inspect_jira_state_transitions(
-            jira_site="https://jira.example.test",
+            jira_site="https://example.atlassian.net",
             issues=(),
         )
 
@@ -795,7 +567,7 @@ def test_build_config_writes_state_transitions_when_provided(tmp_path: Path) -> 
         project=tmp_path,
         issue_provider="jira",
         knowledge_provider="github",
-        jira_site="https://jira.example.test",
+        jira_site="https://example.atlassian.net",
         jira_relationship_mappings=_jira_relationship_mappings(),
         jira_state_transitions={"close": "Closed", "reopen": "Reopened"},
     )
@@ -811,7 +583,7 @@ def test_build_config_omits_state_transitions_when_not_provided(tmp_path: Path) 
         project=tmp_path,
         issue_provider="jira",
         knowledge_provider="github",
-        jira_site="https://jira.example.test",
+        jira_site="https://example.atlassian.net",
         jira_relationship_mappings=_jira_relationship_mappings(),
     )
 
@@ -844,7 +616,7 @@ def test_build_config_state_transition_flag_rejects_malformed_input(
         "--knowledge-provider",
         "github",
         "--jira-site",
-        "https://jira.example.test",
+        "https://example.atlassian.net",
         "--jira-relationship-mapping",
         "blocked_by:surface=issue_link,link_type=Blocks,direction=inward",
         "--jira-state-transition",
@@ -867,7 +639,7 @@ def test_build_config_state_transition_flag_rejects_duplicate_verb(tmp_path: Pat
         "--knowledge-provider",
         "github",
         "--jira-site",
-        "https://jira.example.test",
+        "https://example.atlassian.net",
         "--jira-relationship-mapping",
         "blocked_by:surface=issue_link,link_type=Blocks,direction=inward",
         "--jira-state-transition",
@@ -888,7 +660,7 @@ def test_jira_relationship_mappings_require_explicit_surface(tmp_path: Path) -> 
             project=tmp_path,
             issue_provider="jira",
             knowledge_provider="github",
-            jira_site="https://jira.example.test",
+            jira_site="https://example.atlassian.net",
             jira_relationship_mappings={"blocked_by": {"link_type": "Blocks", "direction": "inward"}},
         )
 
@@ -919,9 +691,7 @@ def test_write_rejects_jira_config_without_relationship_mappings(tmp_path: Path)
         "providers": {
             "issues": {
                 "kind": "jira",
-                "site": "https://jira.example.test",
-                "deployment": "data_center",
-                "api_version": "2",
+                "site": "https://example.atlassian.net",
             },
             "knowledge": {
                 "kind": "github",
@@ -1118,7 +888,7 @@ def _write_issue_provider_config(project: Path, issues_yaml: str) -> None:
     )
 
 
-def test_install_codex_agents_skips_jira_format_corrector_on_jira_cloud(tmp_path: Path) -> None:
+def test_install_codex_agents_removes_the_retired_jira_format_corrector(tmp_path: Path) -> None:
     role_path = tmp_path / CODEX_SPECTRACK_AGENT_DIR / "spectrack-jira-format-corrector.toml"
     role_path.parent.mkdir(parents=True)
     role_path.write_text("stale role\n", encoding="utf-8")
@@ -1131,15 +901,6 @@ def test_install_codex_agents_skips_jira_format_corrector_on_jira_cloud(tmp_path
     assert "spectrack:usecase-explorer" in names
     assert not role_path.exists()
     assert str(role_path) in result["removed_agents"]
-
-
-def test_install_codex_agents_keeps_jira_format_corrector_on_data_center(tmp_path: Path) -> None:
-    _write_issue_provider_config(tmp_path, "    kind: jira\n    site: https://jira.example.test\n")
-
-    result = install_codex_agents(tmp_path)
-
-    assert "spectrack:jira-format-corrector" in {item["name"] for item in result["agents"]}
-    assert (tmp_path / CODEX_SPECTRACK_AGENT_DIR / "spectrack-jira-format-corrector.toml").exists()
 
 
 def test_install_codex_agents_is_idempotent(tmp_path: Path) -> None:
@@ -1271,7 +1032,7 @@ Jira site: https://acme.atlassian.net
 """.strip(),
     )
 
-    assert payload["defaults"]["jira_deployment"] == "cloud"
+    assert "jira_deployment" not in payload["defaults"]
     assert not any("Cloud" in item for item in payload["warnings"])
 
 

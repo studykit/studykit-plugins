@@ -521,16 +521,16 @@ def relationship_operations_from_intent(
     - ``parent_remove``: True — detach the current parent. The provider
       resolves the current parent from cache; if no parent exists, the
       operation is dropped (idempotent no-op).
-    - ``epic_add`` / ``epic_replace`` / ``epic_remove``: parallel scalar
-      semantics for the Epic Link customfield (Jira only).
+    - ``epic_add`` / ``epic_replace`` / ``epic_remove``: the parent keys under
+      the ``epic`` name (Jira Cloud links an issue to its Epic through the
+      native parent field), so they share the parent conflict check.
     - ``blocked_by_add`` / ``blocked_by_remove``: list of refs.
     - ``blocking_add`` / ``blocking_remove``: list of refs.
     - ``child_add`` / ``child_remove``: list of refs.
     - ``related_add`` / ``related_remove``: list of refs.
 
-    Parent and epic intents are each mutually exclusive within their own
-    group, but a parent_* flag may coexist with an epic_* flag. For list
-    relationships, the same ref cannot appear in both add and remove.
+    Parent and epic intents together form one mutually exclusive group. For
+    list relationships, the same ref cannot appear in both add and remove.
     Returns an empty list when the intent has no actionable entries.
     """
 
@@ -540,16 +540,7 @@ def relationship_operations_from_intent(
     operations.extend(
         _scalar_relationship_operations(
             intent,
-            relationship="parent",
-            target_kind=target_kind,
-            target_id=target_id,
-            path=path,
-        )
-    )
-    operations.extend(
-        _scalar_relationship_operations(
-            intent,
-            relationship="epic",
+            relationships=("parent", "epic"),
             target_kind=target_kind,
             target_id=target_id,
             path=path,
@@ -595,26 +586,42 @@ def relationship_operations_from_intent(
 def _scalar_relationship_operations(
     intent: Mapping[str, Any],
     *,
-    relationship: str,
+    relationships: tuple[str, ...],
     target_kind: str,
     target_id: str,
     path: Path,
 ) -> list[PendingIssueRelationshipOperation]:
-    add = _intent_scalar(intent.get(f"{relationship}_add"))
-    replace = _intent_scalar(intent.get(f"{relationship}_replace"))
-    remove = bool(intent.get(f"{relationship}_remove"))
-    flags = [
-        name
-        for name, present in (
-            (f"{relationship}_add", bool(add)),
-            (f"{relationship}_replace", bool(replace)),
-            (f"{relationship}_remove", remove),
+    """Build the single scalar operation one mutually exclusive group allows.
+
+    ``relationships`` names every key prefix in the group; the operation keeps
+    the name of the prefix that supplied it.
+    """
+
+    relationship = relationships[0]
+    add = replace = ""
+    remove = False
+    flags: list[str] = []
+    for name in relationships:
+        name_add = _intent_scalar(intent.get(f"{name}_add"))
+        name_replace = _intent_scalar(intent.get(f"{name}_replace"))
+        name_remove = bool(intent.get(f"{name}_remove"))
+        if name_add or name_replace or name_remove:
+            relationship = name
+        add = add or name_add
+        replace = replace or name_replace
+        remove = remove or name_remove
+        flags.extend(
+            flag
+            for flag, present in (
+                (f"{name}_add", bool(name_add)),
+                (f"{name}_replace", bool(name_replace)),
+                (f"{name}_remove", name_remove),
+            )
+            if present
         )
-        if present
-    ]
     if len(flags) > 1:
         raise WorkflowCacheError(
-            f"conflicting {relationship} relationship flags: {', '.join(flags)}"
+            f"conflicting {relationships[0]} relationship flags: {', '.join(flags)}"
         )
     operations: list[PendingIssueRelationshipOperation] = []
     if add:
@@ -638,7 +645,7 @@ def _scalar_relationship_operations(
                 action="add",
                 relationship=relationship,
                 target_ref=replace,
-                replace_parent=relationship == "parent",
+                replace_parent=True,
             )
         )
     elif remove:

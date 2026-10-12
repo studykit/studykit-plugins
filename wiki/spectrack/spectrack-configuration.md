@@ -65,9 +65,20 @@ Supported issue provider kinds:
 - `jira`
 - `filesystem`
 
-Jira Data Center relationship writes require explicit mappings under
+The `jira` provider supports Jira Cloud only: `site` must be an
+`*.atlassian.net` host. Settings left over from Jira Data Center — a
+`deployment` other than `cloud`, an `api_version` other than `3`, or
+`epic_fields` — fail with a "spectrack supports Jira Cloud only" error.
+
+The `parent`, `epic`, and `child` relationships are built in: they write the
+native `parent` field (an epic is the issue's parent; `child` sets the target's
+parent) and take no mapping. Naming any of them under `relationship_mappings`
+is rejected with the same error, so a stale custom-field mapping cannot shadow
+the built-in.
+
+Every other relationship write requires an explicit mapping under
 `providers.issues.relationship_mappings`. The wrapper does not infer Jira link
-types, directions, remote-link behavior, or parent fields from prose.
+types, directions, or remote-link behavior from prose.
 
 Example:
 
@@ -75,8 +86,8 @@ Example:
 providers:
   issues:
     kind: jira
-    site: https://jira.example.com
-    deployment: data-center
+    site: https://example.atlassian.net
+    email: you@example.com
     relationship_mappings:
       blocked_by:
         surface: issue_link
@@ -89,11 +100,6 @@ providers:
       related:
         surface: remote_link
         relationship_label: relates to
-      parent:
-        surface: field
-        field: parent
-        write_to: source
-        value: key
 ```
 
 Supported Jira relationship surfaces:
@@ -101,7 +107,7 @@ Supported Jira relationship surfaces:
 - `issue_link`: requires `link_type` and `direction` (`inward` or `outward`).
 - `remote_link`: requires an absolute `http` or `https` target reference.
 - `field`: requires `field`, `write_to` (`source` or `target`), and `value`
-  (`key`, `key_object`, or `string`).
+  (`key`, `key_object`, or `string`), for a custom-field relationship.
 
 ### Jira Task and Comment Draft Review Agents
 
@@ -124,8 +130,7 @@ internal consistency, or a comment's accuracy, relevance, and internal
 consistency. The two settings are independent: omit either one to leave that
 draft type on the normal publication flow. Each reviewer is advisory: it must
 not publish or modify the issue tracker. After actionable findings are
-addressed, the normal Jira markup check and user confirmation still happen
-before publication.
+addressed, user confirmation still happens before publication.
 
 These fields are Jira-only. Omit both to preserve the existing publication flow.
 
@@ -238,5 +243,6 @@ It validates:
 
 ## Change Log
 
+- 2026-10-12 — The Jira provider supports Jira Cloud only; `parent`, `epic`, and `child` are built-in native-parent relationships.
 - 2026-05-15 — [#58](https://github.com/studykit/studykit-plugins/issues/58) — Added explicit Jira Data Center relationship write mappings.
 - 2026-05-13 — [#29](https://github.com/studykit/studykit-plugins/issues/29) — Published the version 1 workflow configuration schema.

@@ -7,6 +7,8 @@ import json
 import sys
 from pathlib import Path
 
+import pytest
+
 _PLUGIN_ROOT = Path(__file__).resolve().parent.parent
 _SCRIPTS_DIR = _PLUGIN_ROOT / "scripts"
 if str(_SCRIPTS_DIR) not in sys.path:
@@ -21,6 +23,9 @@ from issue.dispatch import RELATIONSHIPS, run_intent  # noqa: E402
 github_issue_relationships_main = partial(run_intent, RELATIONSHIPS)
 from command import CommandRequest, CommandResult  # noqa: E402
 from issue.github.gh import GitHubRepository  # noqa: E402
+
+
+pytestmark = pytest.mark.usefixtures("jira_cloud")
 
 
 def repo() -> GitHubRepository:
@@ -148,7 +153,7 @@ def test_relationship_intent_helper_supports_epic_scalar_handlers() -> None:
     )
     assert replace_ops[0].relationship == "epic"
     assert replace_ops[0].action == "add"
-    assert replace_ops[0].replace_parent is False
+    assert replace_ops[0].replace_parent is True
 
     remove_ops = relationship_operations_from_intent(
         {"epic_remove": True}, target_kind="issue", target_id="TEST-5",
@@ -161,7 +166,7 @@ def test_relationship_intent_helper_supports_epic_scalar_handlers() -> None:
 def test_relationship_intent_helper_rejects_conflicting_epic_flags() -> None:
     import pytest
 
-    with pytest.raises(Exception, match="conflicting epic"):
+    with pytest.raises(Exception, match="conflicting parent"):
         relationship_operations_from_intent(
             {"epic_add": "TEST-10", "epic_replace": "TEST-11"},
             target_kind="issue",
@@ -169,15 +174,16 @@ def test_relationship_intent_helper_rejects_conflicting_epic_flags() -> None:
         )
 
 
-def test_relationship_intent_helper_combines_parent_and_epic_independently() -> None:
-    operations = relationship_operations_from_intent(
-        {"parent_add": "TEST-50", "epic_add": "TEST-10"},
-        target_kind="issue",
-        target_id="TEST-5",
-    )
-    by_relationship = {op.relationship: op for op in operations}
-    assert by_relationship["parent"].target_ref == "TEST-50"
-    assert by_relationship["epic"].target_ref == "TEST-10"
+def test_relationship_intent_helper_rejects_parent_and_epic_together() -> None:
+    import pytest
+
+    # An Epic is the parent on Jira Cloud, so the two flags name one field.
+    with pytest.raises(Exception, match="conflicting parent relationship flags: parent_add, epic_add"):
+        relationship_operations_from_intent(
+            {"parent_add": "TEST-50", "epic_add": "TEST-10"},
+            target_kind="issue",
+            target_id="TEST-5",
+        )
 
 
 def test_github_provider_rejects_epic_relationship_operation(tmp_path: Path) -> None:
@@ -320,9 +326,7 @@ version: 1
 providers:
   issues:
     kind: jira
-    site: https://jira.example.test
-    deployment: data-center
-    api_version: 2
+    site: https://example.atlassian.net
     project: TEST
     issue_type: Task
   knowledge:

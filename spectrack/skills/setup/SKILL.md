@@ -1,6 +1,6 @@
 ---
 name: setup
-description: Initialize the spectrack plugin in a repository by generating and writing .spectrack/config.yml, including GitHub, Jira Data Center or Server, filesystem issues, GitHub repository wiki, and Jira site profiling for relationship mappings, fields, Epic configuration, and labels.
+description: Initialize the spectrack plugin in a repository by generating and writing .spectrack/config.yml, including GitHub, Jira Cloud, filesystem issues, GitHub repository wiki, and Jira site profiling for relationship mappings, fields, the Epic issue type, and labels.
 disable-model-invocation: true
 ---
 
@@ -27,10 +27,10 @@ spectrack setup.py jira-relationship-inspect --jira-site <url> --issue <KEY>
 spectrack setup.py jira-relationship-inspect --jira-site <url> --jira-project <PROJECT> --issue <ISSUE-123>
 spectrack setup.py jira-relationship-inspect --jira-site <url> --field-query <field-name-or-id>
 spectrack setup.py jira-state-transition-inspect --jira-site <url> --issue <KEY-A> --issue <KEY-B>
-spectrack setup.py jira-relationship-mappings --issue-link blocked_by=Blocks:inward --field child=parent:target:key
+spectrack setup.py jira-relationship-mappings --issue-link blocked_by=Blocks:inward --issue-link blocking=Blocks:outward
 spectrack setup.py build-config --project <project-root> --issue-provider <provider> --knowledge-provider <provider> <options...>
 spectrack setup.py build-config --issue-provider jira --knowledge-provider <provider> --jira-snapshot-hidden-comment-marker '!git-event' <options...>
-spectrack setup.py build-config --issue-provider jira --knowledge-provider <provider> --jira-epic-field-name <id> --jira-epic-field-link <id> --jira-epic-field-status <id> [--jira-epic-issue-type <NAME>] <options...>
+spectrack setup.py build-config --issue-provider jira --knowledge-provider <provider> --jira-epic-issue-type <NAME> <options...>
 spectrack setup.py build-config --issue-provider jira --knowledge-provider <provider> --jira-state-transition <verb>=<transition> [--jira-state-transition <verb>=<transition> ...] <options...>
 spectrack setup.py build-config --project <project-root> --issue-provider <provider> --knowledge-provider <provider> --disable-mustread <options...>
 spectrack setup.py write --project <project-root> --config <reviewed-yaml-file>
@@ -145,19 +145,23 @@ spectrack config.py --project <project-root> --require
   inside the knowledge folder. The value must be relative to
   `--github-wiki-path` and must not contain `..`. When omitted, PRD
   pages sit at the knowledge folder root.
-- Jira setup supports Data Center / Server and Cloud. An `*.atlassian.net`
-  site is detected as Cloud on REST v3; omit `--jira-deployment` and
-  `--jira-api-version` unless the user names them. Cloud calls need the
-  account email (see Jira Site Profiling) and an API token
-  (`JIRA_API_TOKEN`, or the macOS Keychain); if inspection fails with a
-  credential error, ask the user to provide them rather than retrying.
+- Jira setup supports Jira Cloud only: the site must be an `*.atlassian.net`
+  host, and setup refuses any other. Jira Data Center and Server are not
+  supported. Calls need the account email (see Jira Site Profiling) and an
+  API token (`JIRA_API_TOKEN`, or the macOS Keychain); if inspection fails
+  with a credential error, ask the user to provide them rather than retrying.
 - Jira issue setup requires explicit `providers.issues.relationship_mappings`
   before final config generation. Collect sample issue keys, inspect the Jira
   site, and ask the user to confirm exact mappings. If site data or confirmed
   mappings are unavailable, pause setup as incomplete; do not build or write a
   Jira issue config and do not suggest configuring relationships later. Do not
-  infer Jira link type, direction, remote-link surface, parent field,
+  infer Jira link type, direction, remote-link surface, custom field,
   `write_to`, or value semantics from prose.
+- `parent`, `epic`, and `child` are built in: they write Jira's native
+  `parent` field, an epic being the issue's parent. Never put them in
+  `relationship_mappings`; setup and the provider both reject such an entry.
+  The mappings cover issue links (for example `blocked_by`, `blocking`,
+  `related`), remote links, and custom-field relationships only.
 - For Jira relationship setup, use `jira-relationship-inspect` only to show
   observed link types, fields, and sample issue relationship data. Then ask the
   user to confirm the exact mappings and generate the mapping YAML with
@@ -173,14 +177,11 @@ spectrack config.py --project <project-root> --require
   comments from local snapshots; they do not delete provider comments.
 - Jira labels are opt-in. Do not copy local labels into Jira unless the user or
   provider profile explicitly asks for label writes.
-- Jira Epic configuration (`providers.issues.epic_fields.{name,link,status}`
-  and `artifact_issue_types.epic`) is opt-in and site-dependent. When the user
-  plans Epic creation or Epic Link writes, source the values from
-  `jira-relationship-inspect` (run with `--jira-project` so createmeta is
-  available) and pass confirmed ids to `build-config` via
-  `--jira-epic-field-name|link|status` and `--jira-epic-issue-type`. Do not
-  assume values; if the site lacks Jira Software or returns non-default field
-  schema, ask the user for explicit ids.
+- The Epic issue type (`artifact_issue_types.epic`) is opt-in and
+  site-dependent. When the user plans Epic creation and the site's Epic issue
+  type is not named `Epic`, ask for the exact name and pass it to
+  `build-config` via `--jira-epic-issue-type`. Linking an issue to an Epic
+  needs no configuration.
 - Jira state transitions (`providers.issues.state_transitions.<verb>`) are
   opt-in and workflow-dependent, and the verb space is free-form except
   for the reserved CLI verbs (`assign` / `unassign` / `set-type`). When
@@ -209,28 +210,19 @@ behavior. Keep a hard boundary between observed Jira data and
 confirmed workflow config: inspect the site, show the evidence, ask for
 confirmation, then use only the exact confirmed values in setup.
 
-1. Resolve the Jira site, deployment, API version, and project key from the
-   user, provider profile, or `.spectrack/config.yml`. When the site is Jira
-   Cloud, ask the user for their Atlassian account email and pass it as
-   `--jira-email` to every inspect command and to `build-config`, which
-   records it as `providers.issues.email`. Mention that `JIRA_EMAIL`
+1. Resolve the Jira site and project key from the user, provider profile, or
+   `.spectrack/config.yml`. Ask the user for their Atlassian account email
+   and pass it as `--jira-email` to every inspect command and to
+   `build-config`, which records it as `providers.issues.email`. Mention that `JIRA_EMAIL`
    overrides it, so teammates sharing a committed config can use their own.
 2. Collect sample issue keys for each relationship surface the user cares about:
    an issue with dependencies or related links, a parent issue with sub-tasks, a
    sub-task, and any site-specific hierarchy example.
 3. Run `jira-relationship-inspect` for link types, native `parent/subtasks`,
-   and requested field queries. When `--jira-project` is supplied, the same
-   call returns an `epic` block: Epic Name / Link / Status customfield ids
-   discovered by Greenhopper schema or name heuristic, candidate Epic issue
-   types from createmeta, per-issue-type Epic Link availability, and warnings.
-4. When the user plans Epic creation or Epic Link writes on the site, extract
-   `epic.fields.{name,link,status}.id`, `epic.issue_types`, and any
-   `epic.warnings` from the inspect output and confirm with the user. When
-   `epic.issue_types` returns zero or two-or-more candidates, ask the user for
-   the exact Epic issue-type name. If `epic.fields` are missing or
-   `epic.warnings` indicate a non-default schema, ask for explicit field ids
-   before continuing. Skip this step when the site lacks Jira Software or the
-   user has no Epic intent.
+   and requested field queries.
+4. When the user plans Epic creation and the site's Epic issue type is not
+   named `Epic`, confirm the exact Epic issue-type name with the user. Skip
+   this step when the user has no Epic intent.
 5. When the user plans to drive workflow state transitions, collect sample
    issue keys reachable on each side of the workflow (typical: one issue
    in an early state and one in a terminal state) and run
@@ -255,7 +247,7 @@ confirmation, then use only the exact confirmed values in setup.
 8. Determine whether automation comments should be hidden from generated Jira
    snapshots, and record only exact user-confirmed markers.
 9. Summarize observed link types, hierarchy surfaces, custom fields, confirmed
-   Epic field ids and Epic issue-type, confirmed state-transition mapping,
+   Epic issue-type, confirmed state-transition mapping,
    label policy, snapshot-hidden comment markers, confirmed relationship
    mapping YAML, and open questions before
    generating the final config.
@@ -269,16 +261,11 @@ Rules:
   the relationship name and direction.
 - Keep portfolio, team, parent-link, or other hierarchy fields site-specific.
   Report what Jira returned; do not assign global semantics.
-- Treat `parent` and `child` as Jira native parent/subtask or explicitly
-  confirmed hierarchy mappings only.
-- Do not assume Epic field ids or Epic issue-type names. Use only values
-  confirmed against the `epic` block in `jira-relationship-inspect` output and
-  explicit user confirmation. Pass confirmed ids to `build-config` via
-  `--jira-epic-field-name|link|status` (and `--jira-epic-issue-type` when the
-  Epic issue-type name differs from the default `Epic`).
-  `relationship_mappings.epic` is auto-injected by `build-config` when
-  `epic_fields.link` is supplied; do not write it manually in
-  `--jira-relationship-mappings-file` or `--jira-relationship-mappings-json`.
+- `parent`, `epic`, and `child` always mean Jira's native parent field; never
+  map them.
+- Do not assume the Epic issue-type name. Pass `--jira-epic-issue-type` only
+  with a name the user confirmed, and only when it differs from the default
+  `Epic`.
 - Do not create, update, delete, or link Jira issues without explicit user
   approval for that mutation.
 
@@ -296,8 +283,7 @@ spectrack setup.py jira-relationship-mappings \
   --issue-link blocking=Blocks:outward \
   --remote-link "related=relates to" \
   --remote-application-type studykit.spectrack \
-  --remote-application-name Workflow \
-  --field child=parent:target:key \
+  --remote-application-name Workflow
 ```
 
 ```yaml

@@ -23,7 +23,6 @@ import hook  # noqa: E402
 from main_context import (  # noqa: E402
     _merge_commands_blocks,
     _strip_unconfigured_jira_review_blocks,
-    _strip_jira_format,
     build_subagent_policy_context,
     render as render_template,
 )
@@ -62,6 +61,9 @@ from session_state import (  # noqa: E402
     session_policy_state_path,
     session_state_path,
 )
+
+
+pytestmark = pytest.mark.usefixtures("jira_cloud")
 
 
 class FakeRunner:
@@ -129,13 +131,13 @@ def expected_session_start_context(
         "SNIPPET_LAUNCHER": launcher_block,
         "SNIPPET_AUTHORING": main_context_fragment("snippets/authoring.md"),
         "SNIPPET_PRD_PATH": main_context_fragment("snippets/prd-path.md"),
-        "SNIPPET_JIRA_CLOUD": "",
+        "SNIPPET_JIRA_CLOUD": (
+            main_context_fragment("snippets/jira-cloud.md") if issue_kind == "jira" else ""
+        ),
         "SPECTRACK_ISSUE_PROVIDER": issue_kind,
         "SPECTRACK_JIRA_TASK_REVIEW_AGENT": jira_task_review_agent,
         "SPECTRACK_JIRA_COMMENT_REVIEW_AGENT": jira_comment_review_agent,
     })
-    if issue_kind != "jira":
-        rendered = _strip_jira_format(rendered)
     rendered = _strip_unconfigured_jira_review_blocks(
         rendered,
         type("Config", (), {
@@ -163,13 +165,13 @@ def expected_subagent_start_context(
         "SNIPPET_LAUNCHER": launcher_block,
         "SNIPPET_AUTHORING": main_context_fragment("snippets/authoring.md"),
         "SNIPPET_PRD_PATH": main_context_fragment("snippets/prd-path.md"),
-        "SNIPPET_JIRA_CLOUD": "",
+        "SNIPPET_JIRA_CLOUD": (
+            main_context_fragment("snippets/jira-cloud.md") if issue_kind == "jira" else ""
+        ),
         "SPECTRACK_ISSUE_PROVIDER": issue_kind,
         "SPECTRACK_JIRA_TASK_REVIEW_AGENT": jira_task_review_agent,
         "SPECTRACK_JIRA_COMMENT_REVIEW_AGENT": jira_comment_review_agent,
     })
-    if issue_kind != "jira":
-        rendered = _strip_jira_format(rendered)
     rendered = _strip_unconfigured_jira_review_blocks(
         rendered,
         type("Config", (), {
@@ -331,7 +333,6 @@ def _write_jira_config(
     *,
     task_review_agent: str | None = None,
     comment_review_agent: str | None = None,
-    deployment: str = "data-center",
 ) -> None:
     config_path = project / ".spectrack" / "config.yml"
     config_path.parent.mkdir(parents=True, exist_ok=True)
@@ -341,16 +342,14 @@ def _write_jira_config(
             f"    comment_review_agent: {comment_review_agent}\n" if comment_review_agent else "",
         )
     )
-    site = "https://example.atlassian.net" if deployment == "cloud" else "https://jira.example.test"
     config_text = (
         """
 version: 1
 providers:
   issues:
     kind: jira
-    site: SITE_PLACEHOLDER
-    deployment: DEPLOYMENT_PLACEHOLDER
-    api_version: 2
+    site: https://example.atlassian.net
+    email: dev@example.com
     project: TEST
     issue_type: Task
 """.lstrip() + reviewer_lines + """  knowledge:
@@ -361,13 +360,10 @@ commit_refs:
   style: provider-native
 """
     )
-    config_path.write_text(
-        config_text.replace("SITE_PLACEHOLDER", site).replace("DEPLOYMENT_PLACEHOLDER", deployment),
-        encoding="utf-8",
-    )
+    config_path.write_text(config_text, encoding="utf-8")
 
 
-def jira_issue_payload(*, title: str = "Support Jira Data Center hooks") -> dict[str, Any]:
+def jira_issue_payload(*, title: str = "Support Jira hooks") -> dict[str, Any]:
     return {
         "id": "10001",
         "key": "TEST-1234",
@@ -389,11 +385,11 @@ def curl_args(url: str) -> tuple[str, ...]:
 
 
 def jira_issue_url(issue: str = "TEST-1234") -> str:
-    return f"https://jira.example.test/rest/api/2/issue/{issue}"
+    return f"https://example.atlassian.net/rest/api/3/issue/{issue}"
 
 
 def jira_remote_links_url(issue: str = "TEST-1234") -> str:
-    return f"https://jira.example.test/rest/api/2/issue/{issue}/remotelink"
+    return f"https://example.atlassian.net/rest/api/3/issue/{issue}/remotelink"
 
 
 def _run_session_start(
@@ -1005,27 +1001,6 @@ def test_codex_session_start_migrates_legacy_split_state(
 
 
 @pytest.mark.parametrize("runtime", ["claude", "codex"])
-def test_session_start_injects_jira_format_directive_for_jira_projects(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-    runtime: str,
-) -> None:
-    """A Jira project must receive the wiki-markup directive end to end."""
-
-    _write_jira_config(tmp_path)
-
-    out = _run_session_start(tmp_path, monkeypatch, runtime=runtime)
-
-    payload = json.loads(out)
-    context = payload["hookSpecificOutput"]["additionalContext"]
-    assert context == expected_session_start_context(
-        runtime=runtime, issue_kind="jira"
-    )
-    assert "<jira-format>" in context
-    assert "jira-format-corrector" in context
-
-
-@pytest.mark.parametrize("runtime", ["claude", "codex"])
 def test_session_start_uses_filesystem_issue_policy_for_local_artifacts(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -1207,7 +1182,6 @@ def test_session_start_emits_commands_pointer_for_jira_config(
     assert "spectrack issue --help" in context
     assert "spectrack issue <verb> --help" in context
     assert "authoring/runbook" not in context
-    assert "<jira-cloud>" not in context
 
 
 @pytest.mark.parametrize("runtime", ["claude", "codex"])
@@ -1216,7 +1190,7 @@ def test_jira_cloud_context_advertises_agile_and_confluence(
     monkeypatch: pytest.MonkeyPatch,
     runtime: str,
 ) -> None:
-    _write_jira_config(tmp_path, deployment="cloud")
+    _write_jira_config(tmp_path)
 
     payload = json.loads(_run_session_start(tmp_path, monkeypatch, runtime=runtime))
     context = payload["hookSpecificOutput"]["additionalContext"]

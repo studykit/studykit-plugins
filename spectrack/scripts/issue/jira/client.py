@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Jira site config and REST client helpers (Data Center/Server and Cloud)."""
+"""Jira Cloud site config and REST client helpers."""
 
 from __future__ import annotations
 
@@ -18,30 +18,24 @@ from command import CommandRunner, run_command
 from config import ProviderConfig, WorkflowConfigError, load_workflow_config
 from issue.jira.refs import JiraProviderError, normalize_jira_issue_key
 
-DEPLOYMENT_DATA_CENTER = "data_center"
-DEPLOYMENT_CLOUD = "cloud"
-# Cloud issue bodies are ADF, which only REST v3 speaks; v2 would hand back wiki
-# markup converted server-side, so Cloud is pinned to v3.
-CLOUD_API_VERSION = "3"
+# Issue bodies are ADF, which only REST v3 speaks.
+API_VERSION = "3"
 DEFAULT_KEYCHAIN_SERVICE = "jira-api-token"
+CLOUD_ONLY_MESSAGE = "spectrack supports Jira Cloud only"
+_CLOUD_DEPLOYMENT_ALIASES = frozenset({"cloud", "jira_cloud", "atlassian_cloud"})
 
 
 @dataclass(frozen=True)
-class JiraDataCenterSite:
-    """Resolved Jira site configuration (Data Center/Server or Cloud)."""
+class JiraSite:
+    """Resolved Jira Cloud site configuration."""
 
     base_url: str
     authority: str
-    api_version: str = "2"
+    api_version: str = API_VERSION
     project: str | None = None
     issue_type: str | None = None
     cache_site: str | None = None
-    deployment: str = DEPLOYMENT_DATA_CENTER
     email: str | None = None
-
-    @property
-    def is_cloud(self) -> bool:
-        return self.deployment == DEPLOYMENT_CLOUD
 
     @property
     def cache_site_segment(self) -> str:
@@ -51,8 +45,6 @@ class JiraDataCenterSite:
         result = {
             "base_url": self.base_url,
             "authority": self.authority,
-            "deployment": self.deployment,
-            "api_version": self.api_version,
         }
         if self.project:
             result["project"] = self.project
@@ -61,7 +53,7 @@ class JiraDataCenterSite:
         return result
 
 
-def resolve_jira_data_center_site(project: Path) -> JiraDataCenterSite:
+def resolve_jira_site(project: Path) -> JiraSite:
     """Resolve Jira issue provider settings from ``.spectrack/config.yml``."""
 
     try:
@@ -70,11 +62,15 @@ def resolve_jira_data_center_site(project: Path) -> JiraDataCenterSite:
         raise JiraProviderError(str(exc)) from exc
     if config is None or config.issues.kind != "jira":
         raise JiraProviderError("workflow issue provider is not configured as Jira")
-    return jira_data_center_site_from_provider_config(config.issues)
+    return jira_site_from_provider_config(config.issues)
 
 
-def jira_data_center_site_from_provider_config(provider: ProviderConfig) -> JiraDataCenterSite:
-    """Resolve normalized Jira settings from an issue provider config."""
+def jira_site_from_provider_config(provider: ProviderConfig) -> JiraSite:
+    """Resolve normalized Jira settings from an issue provider config.
+
+    Settings left over from a Jira Data Center config fail here rather than
+    being ignored, so a stale config cannot silently reach a Cloud site.
+    """
 
     if provider.kind != "jira":
         raise JiraProviderError(f"provider config is not Jira: {provider.kind}")
@@ -83,84 +79,74 @@ def jira_data_center_site_from_provider_config(provider: ProviderConfig) -> Jira
     raw_site = _string_setting(settings, "site", "base_url", "url", "host", "hostname")
     if raw_site is None:
         raise JiraProviderError("Jira issue provider requires a site, base_url, url, host, or hostname setting")
+    reject_non_cloud_settings(settings)
     base_url, authority, cache_site = _normalize_base_url(raw_site)
-    deployment = jira_deployment_from_settings(settings)
-
-    raw_api_version = _string_setting(settings, "api_version", "apiVersion", "rest_api_version")
-    if deployment == DEPLOYMENT_CLOUD:
-        if raw_api_version is not None and raw_api_version.strip().strip("/") != CLOUD_API_VERSION:
-            raise JiraProviderError(
-                f"Jira Cloud requires REST API version {CLOUD_API_VERSION}; got {raw_api_version}"
-            )
-        api_version = CLOUD_API_VERSION
-    else:
-        api_version = raw_api_version or "2"
     project = _string_setting(settings, "project", "project_key", "projectKey")
     issue_type = _string_setting(settings, "issue_type", "issueType", "issuetype", "issue_type_name")
     email = _string_setting(settings, "email", "account_email", "accountEmail")
-    return JiraDataCenterSite(
+    return JiraSite(
         base_url=base_url,
         authority=authority,
-        api_version=api_version.strip().strip("/") or "2",
         project=project.upper() if project else None,
         issue_type=issue_type,
         cache_site=cache_site,
-        deployment=deployment,
         email=email,
     )
 
 
-def jira_bodies_use_wiki_markup(settings: Mapping[str, Any]) -> bool:
-    """Whether issue and comment bodies are authored as Jira wiki markup.
-
-    Data Center takes wiki markup verbatim. Cloud bodies are authored as
-    Markdown and converted to ADF by the provider.
-    """
-
-    return jira_deployment_from_settings(settings) != DEPLOYMENT_CLOUD
-
-
-def jira_deployment_from_settings(settings: Mapping[str, Any]) -> str:
-    """Return the Jira deployment for provider settings.
-
-    An explicit ``deployment`` wins; otherwise an ``*.atlassian.net`` host is
-    Cloud and anything else is Data Center/Server.
-    """
+def reject_non_cloud_settings(settings: Mapping[str, Any]) -> None:
+    """Raise when provider settings describe anything but a Jira Cloud site."""
 
     deployment = _string_setting(settings, "deployment", "type", "edition")
     if deployment is not None:
-        normalized = _normalize_deployment(deployment)
-        if normalized != "auto":
-            return normalized
+        normalized = deployment.strip().lower().replace("-", "_").replace(" ", "_")
+        if normalized not in _CLOUD_DEPLOYMENT_ALIASES:
+            raise JiraProviderError(f"{CLOUD_ONLY_MESSAGE}: unsupported deployment {deployment!r}")
+    raw_api_version = _string_setting(settings, "api_version", "apiVersion", "rest_api_version")
+    if raw_api_version is not None and raw_api_version.strip().strip("/") != API_VERSION:
+        raise JiraProviderError(
+            f"{CLOUD_ONLY_MESSAGE}: REST API version must be {API_VERSION}; got {raw_api_version}"
+        )
     raw_site = _string_setting(settings, "site", "base_url", "url", "host", "hostname")
-    if raw_site is not None and _is_atlassian_cloud_host(raw_site):
-        return DEPLOYMENT_CLOUD
-    return DEPLOYMENT_DATA_CENTER
+    if raw_site is not None and not is_atlassian_cloud_host(raw_site):
+        raise JiraProviderError(f"{CLOUD_ONLY_MESSAGE}: site must be an *.atlassian.net host; got {raw_site}")
+    if settings.get("epic_fields") is not None or settings.get("epicFields") is not None:
+        raise JiraProviderError(
+            f"{CLOUD_ONLY_MESSAGE}: remove providers.issues.epic_fields; epics link through the native parent field"
+        )
 
 
-def jira_data_center_issue_path(site: JiraDataCenterSite, issue_key: str) -> str:
+def is_atlassian_cloud_host(value: str) -> bool:
+    raw = value.strip()
+    if "://" not in raw:
+        raw = f"https://{raw}"
+    hostname = urlparse(raw).hostname
+    return bool(hostname and hostname.lower().endswith(".atlassian.net"))
+
+
+def jira_issue_path(site: JiraSite, issue_key: str) -> str:
     escaped_key = quote(normalize_jira_issue_key(issue_key), safe="")
     return f"/rest/api/{site.api_version}/issue/{escaped_key}"
 
 
-def jira_data_center_remote_links_path(site: JiraDataCenterSite, issue_key: str) -> str:
+def jira_remote_links_path(site: JiraSite, issue_key: str) -> str:
     escaped_key = quote(normalize_jira_issue_key(issue_key), safe="")
     return f"/rest/api/{site.api_version}/issue/{escaped_key}/remotelink"
 
 
-def jira_data_center_remote_link_global_id_path(site: JiraDataCenterSite, issue_key: str, global_id: str) -> str:
+def jira_remote_link_global_id_path(site: JiraSite, issue_key: str, global_id: str) -> str:
     escaped_key = quote(normalize_jira_issue_key(issue_key), safe="")
     return f"/rest/api/{site.api_version}/issue/{escaped_key}/remotelink?globalId={quote(global_id, safe='')}"
 
 
-def jira_data_center_remote_link_path(site: JiraDataCenterSite, issue_key: str, link_id: str) -> str:
+def jira_remote_link_path(site: JiraSite, issue_key: str, link_id: str) -> str:
     escaped_key = quote(normalize_jira_issue_key(issue_key), safe="")
     escaped_link_id = quote(str(link_id).strip(), safe="")
     return f"/rest/api/{site.api_version}/issue/{escaped_key}/remotelink/{escaped_link_id}"
 
 
-def jira_data_center_search_path(
-    site: JiraDataCenterSite,
+def jira_search_path(
+    site: JiraSite,
     *,
     jql: str,
     max_results: int,
@@ -173,54 +159,41 @@ def jira_data_center_search_path(
     field_list = [field for field in fields if field]
     if field_list:
         params.append(f"fields={quote(','.join(field_list), safe='')}")
-    # Cloud removed the offset-paged /search in favor of /search/jql.
-    endpoint = "search/jql" if site.is_cloud else "search"
-    return f"/rest/api/{site.api_version}/{endpoint}?{'&'.join(params)}"
+    return f"/rest/api/{site.api_version}/search/jql?{'&'.join(params)}"
 
 
-def jira_data_center_issue_links_path(site: JiraDataCenterSite) -> str:
+def jira_issue_links_path(site: JiraSite) -> str:
     return f"/rest/api/{site.api_version}/issueLink"
 
 
-def jira_data_center_issue_link_path(site: JiraDataCenterSite, link_id: str) -> str:
+def jira_issue_link_path(site: JiraSite, link_id: str) -> str:
     escaped_link_id = quote(str(link_id).strip(), safe="")
     return f"/rest/api/{site.api_version}/issueLink/{escaped_link_id}"
 
 
-def jira_data_center_comments_path(site: JiraDataCenterSite, issue_key: str) -> str:
+def jira_comments_path(site: JiraSite, issue_key: str) -> str:
     escaped_key = quote(normalize_jira_issue_key(issue_key), safe="")
     return f"/rest/api/{site.api_version}/issue/{escaped_key}/comment"
 
 
-def jira_data_center_comment_path(site: JiraDataCenterSite, issue_key: str, comment_id: str) -> str:
+def jira_comment_path(site: JiraSite, issue_key: str, comment_id: str) -> str:
     escaped_key = quote(normalize_jira_issue_key(issue_key), safe="")
     escaped_comment = quote(str(comment_id).strip(), safe="")
     return f"/rest/api/{site.api_version}/issue/{escaped_key}/comment/{escaped_comment}"
 
 
-def jira_data_center_attachments_path(site: JiraDataCenterSite, issue_key: str) -> str:
+def jira_attachments_path(site: JiraSite, issue_key: str) -> str:
     escaped_key = quote(normalize_jira_issue_key(issue_key), safe="")
     return f"/rest/api/{site.api_version}/issue/{escaped_key}/attachments"
 
 
-def jira_data_center_transitions_path(site: JiraDataCenterSite, issue_key: str) -> str:
+def jira_transitions_path(site: JiraSite, issue_key: str) -> str:
     escaped_key = quote(normalize_jira_issue_key(issue_key), safe="")
     return f"/rest/api/{site.api_version}/issue/{escaped_key}/transitions"
 
 
-def jira_data_center_createmeta_path(
-    site: JiraDataCenterSite,
-    *,
-    project_key: str,
-    expand_fields: bool = False,
-) -> str:
-    escaped_project = quote(project_key.strip().upper(), safe="")
-    suffix = "&expand=projects.issuetypes.fields" if expand_fields else ""
-    return f"/rest/api/{site.api_version}/issue/createmeta?projectKeys={escaped_project}{suffix}"
-
-
 def jira_get_json(
-    site: JiraDataCenterSite,
+    site: JiraSite,
     path: str,
     *,
     runner: CommandRunner | None = None,
@@ -240,7 +213,7 @@ def jira_get_json(
 
 
 def jira_send_json(
-    site: JiraDataCenterSite,
+    site: JiraSite,
     method: str,
     path: str,
     payload: Mapping[str, Any],
@@ -265,7 +238,7 @@ def jira_send_json(
 
 
 def jira_upload_attachments(
-    site: JiraDataCenterSite,
+    site: JiraSite,
     issue_key: str,
     file_paths: Iterable[str],
     *,
@@ -281,7 +254,7 @@ def jira_upload_attachments(
     paths = [str(path) for path in file_paths]
     if not paths:
         raise JiraProviderError("at least one attachment file is required")
-    url = f"{site.base_url}{jira_data_center_attachments_path(site, issue_key)}"
+    url = f"{site.base_url}{jira_attachments_path(site, issue_key)}"
     result = run_command(
         ("curl", "--silent", "--show-error", "--fail", "--config", "-"),
         input_text=_curl_multipart_config(site, url=url, file_paths=paths),
@@ -297,7 +270,7 @@ def jira_upload_attachments(
 
 
 def jira_download_attachment(
-    site: JiraDataCenterSite,
+    site: JiraSite,
     content_url: str,
     out_path: str,
     *,
@@ -307,7 +280,7 @@ def jira_download_attachment(
 
     The attachment ``content`` URL is an absolute Jira link (often a redirect
     to a streaming endpoint), so this follows redirects (``--location``) and
-    writes the raw bytes out (``--output``). Auth reuses the same token / basic
+    writes the raw bytes out (``--output``). Auth reuses the same basic
     credentials as the JSON helpers; the JSON ``Accept`` header is dropped so
     the binary body is not negotiated away.
     """
@@ -320,7 +293,7 @@ def jira_download_attachment(
 
 
 def jira_delete(
-    site: JiraDataCenterSite,
+    site: JiraSite,
     path: str,
     *,
     runner: CommandRunner | None = None,
@@ -358,25 +331,6 @@ def _normalize_base_url(value: str) -> tuple[str, str, str]:
     return base_url, authority, cache_site
 
 
-def _is_atlassian_cloud_host(value: str) -> bool:
-    raw = value.strip()
-    if "://" not in raw:
-        raw = f"https://{raw}"
-    hostname = urlparse(raw).hostname
-    return bool(hostname and hostname.lower().endswith(".atlassian.net"))
-
-
-def _normalize_deployment(value: str) -> str:
-    normalized = value.strip().lower().replace("-", "_").replace(" ", "_")
-    if normalized in {"", "auto"}:
-        return "auto"
-    if normalized in {"on_premise", "on_prem", "onprem", "premise", "server", "datacenter", "data_center", "dc"}:
-        return DEPLOYMENT_DATA_CENTER
-    if normalized in {"cloud", "jira_cloud", "atlassian_cloud"}:
-        return DEPLOYMENT_CLOUD
-    raise JiraProviderError(f"unsupported Jira deployment: {value}")
-
-
 def _string_setting(settings: Mapping[str, Any], *names: str) -> str | None:
     for name in names:
         value = settings.get(name)
@@ -385,12 +339,12 @@ def _string_setting(settings: Mapping[str, Any], *names: str) -> str | None:
     return None
 
 
-def _curl_config(site: JiraDataCenterSite) -> str:
+def _curl_config(site: JiraSite) -> str:
     lines = _curl_base_config_lines(site)
     return "\n".join(lines) + "\n"
 
 
-def _curl_json_config(site: JiraDataCenterSite, *, method: str, url: str, payload: Mapping[str, Any]) -> str:
+def _curl_json_config(site: JiraSite, *, method: str, url: str, payload: Mapping[str, Any]) -> str:
     lines = _curl_method_config(site, method=method, url=url).rstrip("\n").splitlines()
     lines.extend(
         [
@@ -401,7 +355,7 @@ def _curl_json_config(site: JiraDataCenterSite, *, method: str, url: str, payloa
     return "\n".join(lines) + "\n"
 
 
-def _curl_multipart_config(site: JiraDataCenterSite, *, url: str, file_paths: Iterable[str]) -> str:
+def _curl_multipart_config(site: JiraSite, *, url: str, file_paths: Iterable[str]) -> str:
     lines = _curl_base_config_lines(site)
     lines.extend(
         [
@@ -414,7 +368,7 @@ def _curl_multipart_config(site: JiraDataCenterSite, *, url: str, file_paths: It
     return "\n".join(lines) + "\n"
 
 
-def _curl_download_config(site: JiraDataCenterSite, *, url: str, out_path: str) -> str:
+def _curl_download_config(site: JiraSite, *, url: str, out_path: str) -> str:
     lines = _curl_auth_lines(site)
     lines.extend(
         [
@@ -425,7 +379,7 @@ def _curl_download_config(site: JiraDataCenterSite, *, url: str, out_path: str) 
     return "\n".join(lines) + "\n"
 
 
-def _curl_method_config(site: JiraDataCenterSite, *, method: str, url: str) -> str:
+def _curl_method_config(site: JiraSite, *, method: str, url: str) -> str:
     lines = _curl_base_config_lines(site)
     lines.extend(
         [
@@ -436,23 +390,13 @@ def _curl_method_config(site: JiraDataCenterSite, *, method: str, url: str) -> s
     return "\n".join(lines) + "\n"
 
 
-def _curl_base_config_lines(site: JiraDataCenterSite) -> list[str]:
+def _curl_base_config_lines(site: JiraSite) -> list[str]:
     return ['header = "Accept: application/json"', *_curl_auth_lines(site)]
 
 
-def _curl_auth_lines(site: JiraDataCenterSite) -> list[str]:
-    if site.is_cloud:
-        email, token = _cloud_credentials(site.email)
-        return [f'user = "{_curl_quote(email)}:{_curl_quote(token)}"']
-    lines: list[str] = []
-    personal_token = _first_env("JIRA_PERSONAL_TOKEN", "JIRA_PAT")
-    username = _first_env("JIRA_USERNAME", "JIRA_USER")
-    password = _first_env("JIRA_PASSWORD")
-    if personal_token:
-        lines.append(f'header = "Authorization: Bearer {_curl_quote(personal_token)}"')
-    elif username and password:
-        lines.append(f'user = "{_curl_quote(username)}:{_curl_quote(password)}"')
-    return lines
+def _curl_auth_lines(site: JiraSite) -> list[str]:
+    email, token = _cloud_credentials(site.email)
+    return [f'user = "{_curl_quote(email)}:{_curl_quote(token)}"']
 
 
 def _cloud_credentials(config_email: str | None = None) -> tuple[str, str]:

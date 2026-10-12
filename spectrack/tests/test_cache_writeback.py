@@ -7,6 +7,8 @@ import json
 import sys
 from pathlib import Path
 
+import pytest
+
 _PLUGIN_ROOT = Path(__file__).resolve().parent.parent
 _SCRIPTS_DIR = _PLUGIN_ROOT / "scripts"
 if str(_SCRIPTS_DIR) not in sys.path:
@@ -19,8 +21,12 @@ from issue.dispatch import WRITEBACK, run_intent  # noqa: E402
 jira_issue_writeback_main = partial(run_intent, WRITEBACK)
 from command import CommandRequest, CommandResult  # noqa: E402
 from config import load_workflow_config  # noqa: E402
-from issue.jira.cache import JiraDataCenterIssueCache  # noqa: E402
-from issue.jira.client import jira_data_center_site_from_provider_config  # noqa: E402
+from issue.jira.cache import JiraIssueCache  # noqa: E402
+from issue.jira.client import jira_site_from_provider_config  # noqa: E402
+from jira_cloud_support import adf_doc, sent_json  # noqa: E402
+
+
+pytestmark = pytest.mark.usefixtures("jira_cloud")
 
 
 class FakeRunner:
@@ -54,9 +60,7 @@ version: 1
 providers:
   issues:
     kind: jira
-    site: https://jira.example.test
-    deployment: data-center
-    api_version: 2
+    site: https://example.atlassian.net
     project: TEST
     issue_type: Task
 """
@@ -74,7 +78,7 @@ issue_id_format: jira
 def jira_site(project: Path):
     config = load_workflow_config(project)
     assert config is not None
-    return jira_data_center_site_from_provider_config(config.issues)
+    return jira_site_from_provider_config(config.issues)
 
 
 def jira_issue_payload(*, body: str = "Cached body.") -> dict[str, object]:
@@ -82,7 +86,7 @@ def jira_issue_payload(*, body: str = "Cached body.") -> dict[str, object]:
         "id": "10001",
         "key": "TEST-1234",
         "fields": {
-            "summary": "Support Jira Data Center",
+            "summary": "Support Jira Cloud",
             "description": body,
             "labels": ["workflow", "jira"],
             "created": "2026-05-15T09:00:00.000+0900",
@@ -113,20 +117,20 @@ def curl_write_args() -> tuple[str, ...]:
 
 
 def jira_issue_url(issue: str = "TEST-1234") -> str:
-    return f"https://jira.example.test/rest/api/2/issue/{issue}"
+    return f"https://example.atlassian.net/rest/api/3/issue/{issue}"
 
 
 def jira_remote_links_url(issue: str = "TEST-1234") -> str:
-    return f"https://jira.example.test/rest/api/2/issue/{issue}/remotelink"
+    return f"https://example.atlassian.net/rest/api/3/issue/{issue}/remotelink"
 
 
 def jira_transitions_url(issue: str = "TEST-1234") -> str:
-    return f"https://jira.example.test/rest/api/2/issue/{issue}/transitions"
+    return f"https://example.atlassian.net/rest/api/3/issue/{issue}/transitions"
 
 
 def _seed_cached_issue(project: Path) -> None:
     site = jira_site(project)
-    cache = JiraDataCenterIssueCache.for_project(project)
+    cache = JiraIssueCache.for_project(project)
     cache.write_issue_bundle(
         site,
         jira_issue_payload(),
@@ -187,7 +191,7 @@ def test_jira_update_writes_body_and_deletes_body_file(tmp_path: Path) -> None:
     assert not body_file.exists()
     write_request = next(request for request in runner.requests if request.args == curl_write_args())
     assert 'request = "PUT"' in str(write_request.input_text)
-    assert '\\"description\\":\\"Updated body.\\\\n\\"' in str(write_request.input_text)
+    assert sent_json(str(write_request.input_text))["fields"]["description"] == adf_doc("Updated body.\n")
 
 
 def test_jira_update_strips_body_file_frontmatter(tmp_path: Path) -> None:
@@ -228,7 +232,7 @@ def test_jira_update_strips_body_file_frontmatter(tmp_path: Path) -> None:
     assert payload["body_file_removed"] is True
     assert not body_file.exists()
     write_request = next(request for request in runner.requests if request.args == curl_write_args())
-    assert '\\"description\\":\\"Updated body.\\\\n\\"' in str(write_request.input_text)
+    assert sent_json(str(write_request.input_text))["fields"]["description"] == adf_doc("Updated body.\n")
 
 
 def test_jira_update_missing_body_file_fails(tmp_path: Path) -> None:

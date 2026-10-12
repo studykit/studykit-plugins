@@ -26,6 +26,9 @@ from issue.jira.backend import (  # noqa: E402
 )
 
 
+pytestmark = pytest.mark.usefixtures("jira_cloud")
+
+
 def result(args: tuple[str, ...], stdout: str = "", stderr: str = "", returncode: int = 0) -> CommandResult:
     return CommandResult(request=CommandRequest(args=args), returncode=returncode, stdout=stdout, stderr=stderr)
 
@@ -78,9 +81,7 @@ version: 1
 providers:
   issues:
     kind: jira
-    site: https://jira.example.test
-    deployment: data-center
-    api_version: 2
+    site: https://example.atlassian.net
     project: TEST
     issue_type: Task
   knowledge:

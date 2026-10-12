@@ -6,8 +6,7 @@ This document is intentionally scoped to workflow provider setup.
 providers:
   issues:
     kind: jira
-    site: https://jira.example.test
-    deployment: data_center
+    site: https://example.atlassian.net
     project: PROJ
     issue_type: Task
     relationship_mappings:

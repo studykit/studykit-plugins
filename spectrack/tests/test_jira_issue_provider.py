@@ -1,4 +1,4 @@
-"""Tests for Jira Data Center workflow provider reads and cache."""
+"""Tests for Jira Cloud workflow provider reads and cache."""
 
 from __future__ import annotations
 
@@ -15,15 +15,15 @@ if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
 from command import CommandRequest, CommandResult  # noqa: E402
-from issue.jira.cache import JiraDataCenterIssueCache  # noqa: E402
+from issue.jira.cache import JiraIssueCache  # noqa: E402
 from issue.jira.provider import (  # noqa: E402
     _jira_issue_provider_settings,
     _relationship_mapping,
     _relationship_mappings,
     create_issue_link,
 )
-from issue.jira.relationships import normalize_jira_data_center_issue  # noqa: E402
-from issue.jira.client import jira_data_center_site_from_provider_config  # noqa: E402
+from issue.jira.relationships import normalize_jira_issue  # noqa: E402
+from issue.jira.client import jira_site_from_provider_config  # noqa: E402
 from issue.providers import (  # noqa: E402
     CACHE_POLICY_BYPASS,
     CACHE_POLICY_REFRESH,
@@ -34,6 +34,10 @@ from issue.providers import (  # noqa: E402
     default_provider_registry,
 )
 from config import load_workflow_config  # noqa: E402
+from jira_cloud_support import adf_doc, markdown_bodies, sent_json  # noqa: E402
+
+
+pytestmark = pytest.mark.usefixtures("jira_cloud")
 
 
 class FakeRunner:
@@ -68,7 +72,6 @@ def curl_write_args() -> tuple[str, ...]:
 def write_jira_config(
     project: Path,
     *,
-    deployment: str = "data-center",
     snapshot_settings: str = "",
     relationship_mappings: str = "",
 ) -> None:
@@ -76,14 +79,12 @@ def write_jira_config(
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
         (
-            f"""
+            """
 version: 1
 providers:
   issues:
     kind: jira
-    site: https://jira.example.test
-    deployment: {deployment}
-    api_version: 2
+    site: https://example.atlassian.net
     project: TEST
     issue_type: Task
 """
@@ -99,13 +100,13 @@ issue_id_format: jira
     )
 
 
-def jira_issue_payload(*, body: str = "Data Center description.") -> dict[str, object]:
+def jira_issue_payload(*, body: str = "Cloud description.") -> dict[str, object]:
     return {
         "id": "10001",
         "key": "TEST-1234",
         "fields": {
-            "summary": "Support Jira Data Center",
-            "description": body,
+            "summary": "Support Jira Cloud",
+            "description": adf_doc(body),
             "labels": ["workflow", "jira"],
             "created": "2026-05-15T09:00:00.000+0900",
             "updated": "2026-05-15T10:00:00.000+0900",
@@ -118,7 +119,7 @@ def jira_issue_payload(*, body: str = "Data Center description.") -> dict[str, o
                     {
                         "id": "20001",
                         "author": {"displayName": "Example User", "name": "example"},
-                        "body": "Please keep Data Center first.",
+                        "body": adf_doc("Please keep Cloud first."),
                         "created": "2026-05-15T09:30:00.000+0900",
                         "updated": "2026-05-15T09:30:00.000+0900",
                     }
@@ -276,7 +277,7 @@ def remote_link_relationship_mappings() -> str:
 """
 
 
-def issue_link_and_field_epic_relationship_mappings(*, value_kind: str = "string") -> str:
+def issue_link_and_custom_field_relationship_mappings(*, value_kind: str = "string") -> str:
     return f"""
     relationship_mappings:
       blocked_by:
@@ -291,7 +292,7 @@ def issue_link_and_field_epic_relationship_mappings(*, value_kind: str = "string
         surface: issue_link
         link_type: Relates
         direction: outward
-      epic:
+      initiative:
         surface: field
         field: customfield_10350
         write_to: source
@@ -300,15 +301,15 @@ def issue_link_and_field_epic_relationship_mappings(*, value_kind: str = "string
 
 
 def issue_url(issue: str = "TEST-1234") -> str:
-    return f"https://jira.example.test/rest/api/2/issue/{issue}"
+    return f"https://example.atlassian.net/rest/api/3/issue/{issue}"
 
 
 def remote_links_url(issue: str = "TEST-1234") -> str:
-    return f"https://jira.example.test/rest/api/2/issue/{issue}/remotelink"
+    return f"https://example.atlassian.net/rest/api/3/issue/{issue}/remotelink"
 
 
 def issue_link_url() -> str:
-    return "https://jira.example.test/rest/api/2/issueLink"
+    return "https://example.atlassian.net/rest/api/3/issueLink"
 
 
 def dispatch_get(
@@ -353,7 +354,7 @@ def dispatch_write(
 def jira_site(project: Path):
     config = load_workflow_config(project)
     assert config is not None
-    return jira_data_center_site_from_provider_config(config.issues)
+    return jira_site_from_provider_config(config.issues)
 
 
 def _split_issue_md(text: str) -> tuple[str, str]:
@@ -363,15 +364,11 @@ def _split_issue_md(text: str) -> tuple[str, str]:
     return frontmatter, body
 
 
-def test_data_center_provider_fetches_issue_remote_links_and_writes_llm_snapshot(
+def test_jira_provider_fetches_issue_remote_links_and_writes_llm_snapshot(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     write_jira_config(tmp_path, relationship_mappings=issue_link_relationship_mappings())
-    monkeypatch.delenv("JIRA_PERSONAL_TOKEN", raising=False)
-    monkeypatch.delenv("JIRA_PAT", raising=False)
-    monkeypatch.delenv("JIRA_USERNAME", raising=False)
-    monkeypatch.delenv("JIRA_PASSWORD", raising=False)
     runner = FakeRunner(
         {
             curl_args(issue_url()): result(curl_args(issue_url()), stdout=json.dumps(jira_issue_payload())),
@@ -382,9 +379,15 @@ def test_data_center_provider_fetches_issue_remote_links_and_writes_llm_snapshot
     response = dispatch_get(tmp_path, runner)
 
     assert response.payload["key"] == "TEST-1234"
-    assert response.payload["title"] == "Support Jira Data Center"
-    assert response.payload["body"] == "Data Center description."
-    assert response.payload["jira"]["deployment"] == "data_center"
+    assert response.payload["title"] == "Support Jira Cloud"
+    assert response.payload["body"] == "Cloud description."
+    assert response.payload["jira"] == {
+        "base_url": "https://example.atlassian.net",
+        "authority": "example.atlassian.net",
+        "project": "TEST",
+        "issue_type": "Task",
+        "key": "TEST-1234",
+    }
     assert response.payload["relationships"]["remote_links"][0]["url"] == "https://example.com/design"
     workflow = response.payload["relationships"]["workflow"]
     assert workflow["parent"]["key"] == "TEST-1200"
@@ -396,9 +399,12 @@ def test_data_center_provider_fetches_issue_remote_links_and_writes_llm_snapshot
     assert "issue_links" not in workflow
     assert workflow["external_links"][0]["url"] == "https://example.com/design"
     assert [request.args for request in runner.requests] == [curl_args(issue_url()), curl_args(remote_links_url())]
-    assert all(request.input_text == 'header = "Accept: application/json"\n' for request in runner.requests)
+    assert all(
+        request.input_text == 'header = "Accept: application/json"\nuser = "user@example.test:test-token"\n'
+        for request in runner.requests
+    )
 
-    cache = JiraDataCenterIssueCache.for_project(tmp_path)
+    cache = JiraIssueCache.for_project(tmp_path)
     site = jira_site(tmp_path)
     issue_dir = cache.issue_dir(site, "TEST-1234")
     assert issue_dir == tmp_path / ".spectrack-cache" / "issues" / "TEST-1234"
@@ -409,8 +415,8 @@ def test_data_center_provider_fetches_issue_remote_links_and_writes_llm_snapshot
     # issue.md is the pure authored body; title / state / labels / relationships
     # are served from the native .issue.json + .remote-links.json projections and
     # are already asserted via the GET response above.
-    assert issue_md_text == "Data Center description."
-    assert "Please keep Data Center first." not in issue_md_text
+    assert issue_md_text == "Cloud description."
+    assert "Please keep Cloud first." not in issue_md_text
     assert not (issue_dir / "metadata.yml").exists()
 
     comment_files = cache.comment_files(site, "TEST-1234")
@@ -418,7 +424,7 @@ def test_data_center_provider_fetches_issue_remote_links_and_writes_llm_snapshot
         "comment-2026-05-15T093000Z-20001.md",
     ]
     comment_text = comment_files[0].read_text(encoding="utf-8")
-    assert "Please keep Data Center first." in comment_text
+    assert "Please keep Cloud first." in comment_text
     assert "provider_comment_id: '20001'" in comment_text
     assert "author: Example User" in comment_text
 
@@ -432,7 +438,7 @@ def _assert_existing_workflow_buckets_unchanged(workflow: dict) -> None:
 
 
 @pytest.mark.parametrize("relationship", ["blocked_by", "blocking", "related"])
-def test_data_center_issue_link_write_read_round_trips(
+def test_jira_issue_link_write_read_round_trips(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     relationship: str,
@@ -503,7 +509,7 @@ def test_data_center_issue_link_write_read_round_trips(
         },
     }
 
-    normalized = normalize_jira_data_center_issue(
+    normalized = normalize_jira_issue(
         issue,
         site=site,
         relationship_mappings=mappings,
@@ -517,18 +523,14 @@ def test_data_center_issue_link_write_read_round_trips(
     assert "issue_links" not in workflow
 
 
-def test_data_center_field_surface_string_relationship_surfaces_in_workflow(
+def test_jira_field_surface_string_relationship_surfaces_in_workflow(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     write_jira_config(
         tmp_path,
-        relationship_mappings=issue_link_and_field_epic_relationship_mappings(value_kind="string"),
+        relationship_mappings=issue_link_and_custom_field_relationship_mappings(value_kind="string"),
     )
-    monkeypatch.delenv("JIRA_PERSONAL_TOKEN", raising=False)
-    monkeypatch.delenv("JIRA_PAT", raising=False)
-    monkeypatch.delenv("JIRA_USERNAME", raising=False)
-    monkeypatch.delenv("JIRA_PASSWORD", raising=False)
     payload = jira_issue_payload()
     fields = payload["fields"]
     assert isinstance(fields, dict)
@@ -543,22 +545,18 @@ def test_data_center_field_surface_string_relationship_surfaces_in_workflow(
     response = dispatch_get(tmp_path, runner)
 
     workflow = response.payload["relationships"]["workflow"]
-    assert workflow["epic"] == [{"provider": "jira", "key": "TEST-EPIC-1", "issue": "TEST-EPIC-1"}]
+    assert workflow["initiative"] == [{"provider": "jira", "key": "TEST-EPIC-1", "issue": "TEST-EPIC-1"}]
     _assert_existing_workflow_buckets_unchanged(workflow)
 
 
-def test_data_center_field_surface_key_object_relationship_surfaces_in_workflow(
+def test_jira_field_surface_key_object_relationship_surfaces_in_workflow(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     write_jira_config(
         tmp_path,
-        relationship_mappings=issue_link_and_field_epic_relationship_mappings(value_kind="key_object"),
+        relationship_mappings=issue_link_and_custom_field_relationship_mappings(value_kind="key_object"),
     )
-    monkeypatch.delenv("JIRA_PERSONAL_TOKEN", raising=False)
-    monkeypatch.delenv("JIRA_PAT", raising=False)
-    monkeypatch.delenv("JIRA_USERNAME", raising=False)
-    monkeypatch.delenv("JIRA_PASSWORD", raising=False)
     payload = jira_issue_payload()
     fields = payload["fields"]
     assert isinstance(fields, dict)
@@ -573,22 +571,18 @@ def test_data_center_field_surface_key_object_relationship_surfaces_in_workflow(
     response = dispatch_get(tmp_path, runner)
 
     workflow = response.payload["relationships"]["workflow"]
-    assert workflow["epic"] == [{"provider": "jira", "key": "TEST-EPIC-1", "issue": "TEST-EPIC-1"}]
+    assert workflow["initiative"] == [{"provider": "jira", "key": "TEST-EPIC-1", "issue": "TEST-EPIC-1"}]
     _assert_existing_workflow_buckets_unchanged(workflow)
 
 
-def test_data_center_field_surface_absent_field_is_omitted(
+def test_jira_field_surface_absent_field_is_omitted(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     write_jira_config(
         tmp_path,
-        relationship_mappings=issue_link_and_field_epic_relationship_mappings(value_kind="string"),
+        relationship_mappings=issue_link_and_custom_field_relationship_mappings(value_kind="string"),
     )
-    monkeypatch.delenv("JIRA_PERSONAL_TOKEN", raising=False)
-    monkeypatch.delenv("JIRA_PAT", raising=False)
-    monkeypatch.delenv("JIRA_USERNAME", raising=False)
-    monkeypatch.delenv("JIRA_PASSWORD", raising=False)
     runner = FakeRunner(
         {
             curl_args(issue_url()): result(curl_args(issue_url()), stdout=json.dumps(jira_issue_payload())),
@@ -599,11 +593,11 @@ def test_data_center_field_surface_absent_field_is_omitted(
     response = dispatch_get(tmp_path, runner)
 
     workflow = response.payload["relationships"]["workflow"]
-    assert "epic" not in workflow
+    assert "initiative" not in workflow
     _assert_existing_workflow_buckets_unchanged(workflow)
 
 
-def test_data_center_snapshot_hides_comments_with_configured_markers(
+def test_jira_snapshot_hides_comments_with_configured_markers(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -615,10 +609,6 @@ def test_data_center_snapshot_hides_comments_with_configured_markers(
         - "!git-event"
 """,
     )
-    monkeypatch.delenv("JIRA_PERSONAL_TOKEN", raising=False)
-    monkeypatch.delenv("JIRA_PAT", raising=False)
-    monkeypatch.delenv("JIRA_USERNAME", raising=False)
-    monkeypatch.delenv("JIRA_PASSWORD", raising=False)
     payload = jira_issue_payload()
     comments = payload["fields"]["comment"]["comments"]  # type: ignore[index]
     comments.append(  # type: ignore[attr-defined]
@@ -649,7 +639,7 @@ def test_data_center_snapshot_hides_comments_with_configured_markers(
     response = dispatch_get(tmp_path, runner)
 
     assert any("!git-event" in comment["body"] for comment in response.payload["comments"])
-    cache = JiraDataCenterIssueCache.for_project(tmp_path)
+    cache = JiraIssueCache.for_project(tmp_path)
     site = jira_site(tmp_path)
     issue_dir = cache.issue_dir(site, "TEST-1234")
     assert "!git-event" in (issue_dir / ".issue.json").read_text(encoding="utf-8")
@@ -662,19 +652,19 @@ def test_data_center_snapshot_hides_comments_with_configured_markers(
     visible_bodies = "\n".join(
         path.read_text(encoding="utf-8") for path in cache.comment_files(site, "TEST-1234")
     )
-    assert "Please keep Data Center first." in visible_bodies
+    assert "Please keep Cloud first." in visible_bodies
     assert "Human follow-up remains visible." in visible_bodies
     assert "!git-event" not in visible_bodies
     assert "pushed commit abc123" not in visible_bodies
 
 
-def test_default_cache_policy_uses_data_center_cache_hit_without_curl(tmp_path: Path) -> None:
+def test_default_cache_policy_uses_cache_hit_without_curl(tmp_path: Path) -> None:
     write_jira_config(tmp_path)
     site = jira_site(tmp_path)
-    cache = JiraDataCenterIssueCache.for_project(tmp_path)
+    cache = JiraIssueCache.for_project(tmp_path)
     cache.write_issue_bundle(
         site,
-        jira_issue_payload(body="Cached Jira body."),
+        markdown_bodies(jira_issue_payload(body="Cached Jira body.")),
         remote_links=remote_links_payload(),
         fetched_at="2026-05-15T01:00:00Z",
     )
@@ -690,11 +680,11 @@ def test_default_cache_policy_uses_data_center_cache_hit_without_curl(tmp_path: 
     assert runner.requests == []
 
 
-def test_refresh_policy_overwrites_data_center_cache(tmp_path: Path) -> None:
+def test_refresh_policy_overwrites_cache(tmp_path: Path) -> None:
     write_jira_config(tmp_path)
     site = jira_site(tmp_path)
-    cache = JiraDataCenterIssueCache.for_project(tmp_path)
-    cache.write_issue_bundle(site, jira_issue_payload(body="Stale body."), fetched_at="2026-05-15T01:00:00Z")
+    cache = JiraIssueCache.for_project(tmp_path)
+    cache.write_issue_bundle(site, markdown_bodies(jira_issue_payload(body="Stale body.")), fetched_at="2026-05-15T01:00:00Z")
     runner = FakeRunner(
         {
             curl_args(issue_url()): result(
@@ -712,7 +702,7 @@ def test_refresh_policy_overwrites_data_center_cache(tmp_path: Path) -> None:
     assert cached["body"] == "Fresh body."
 
 
-def test_bypass_policy_reads_data_center_without_writing_cache(tmp_path: Path) -> None:
+def test_bypass_policy_reads_without_writing_cache(tmp_path: Path) -> None:
     write_jira_config(tmp_path)
     runner = FakeRunner(
         {
@@ -723,15 +713,15 @@ def test_bypass_policy_reads_data_center_without_writing_cache(tmp_path: Path) -
 
     response = dispatch_get(tmp_path, runner, cache_policy=CACHE_POLICY_BYPASS)
 
-    assert response.payload["body"] == "Data Center description."
-    cache = JiraDataCenterIssueCache.for_project(tmp_path)
+    assert response.payload["body"] == "Cloud description."
+    cache = JiraIssueCache.for_project(tmp_path)
     assert not cache.issue_json_file(jira_site(tmp_path), "TEST-1234").exists()
 
 
-def test_data_center_create_inline_refreshes_cache(tmp_path: Path) -> None:
+def test_jira_create_inline_refreshes_cache(tmp_path: Path) -> None:
     write_jira_config(tmp_path)
     site = jira_site(tmp_path)
-    cache = JiraDataCenterIssueCache.for_project(tmp_path)
+    cache = JiraIssueCache.for_project(tmp_path)
     runner = FakeRunner(
         {
             curl_write_args(): result(curl_write_args(), stdout=json.dumps({"id": "10001", "key": "TEST-1234"})),
@@ -754,14 +744,14 @@ def test_data_center_create_inline_refreshes_cache(tmp_path: Path) -> None:
     write_request = runner.requests[0]
     assert write_request.args == curl_write_args()
     assert 'request = "POST"' in str(write_request.input_text)
-    assert 'url = "https://jira.example.test/rest/api/2/issue"' in str(write_request.input_text)
+    assert 'url = "https://example.atlassian.net/rest/api/3/issue"' in str(write_request.input_text)
     assert '\\"summary\\":\\"Pending Jira issue\\"' in str(write_request.input_text)
     assert '\\"issuetype\\":{\\"name\\":\\"Task\\"}' in str(write_request.input_text)
     assert '\\"parent\\"' not in str(write_request.input_text)
     assert cache.issue_json_file(site, "TEST-1234").is_file()
 
 
-def test_data_center_create_with_assignee_carries_assignee_field(tmp_path: Path) -> None:
+def test_jira_create_with_assignee_carries_assignee_field(tmp_path: Path) -> None:
     write_jira_config(tmp_path)
     runner = FakeRunner(
         {
@@ -783,17 +773,17 @@ def test_data_center_create_with_assignee_carries_assignee_field(tmp_path: Path)
     assert response.payload["operation"] == "create_issue"
     write_request = runner.requests[0]
     assert write_request.args == curl_write_args()
-    assert '\\"assignee\\":{\\"name\\":\\"alice\\"}' in str(write_request.input_text)
+    assert '\\"assignee\\":{\\"accountId\\":\\"alice\\"}' in str(write_request.input_text)
 
 
-def test_data_center_create_with_assignee_me_resolves_via_myself_once(tmp_path: Path) -> None:
+def test_jira_create_with_assignee_me_resolves_via_myself_once(tmp_path: Path) -> None:
     write_jira_config(tmp_path)
-    myself_url = "https://jira.example.test/rest/api/2/myself"
+    myself_url = "https://example.atlassian.net/rest/api/3/myself"
     runner = FakeRunner(
         {
             curl_args(myself_url): result(
                 curl_args(myself_url),
-                stdout=json.dumps({"name": "studykit-svc", "displayName": "Studykit Service"}),
+                stdout=json.dumps({"accountId": "studykit-svc", "displayName": "Studykit Service"}),
             ),
             curl_write_args(): result(curl_write_args(), stdout=json.dumps({"id": "10001", "key": "TEST-1234"})),
             curl_args(issue_url()): result(curl_args(issue_url()), stdout=json.dumps(jira_issue_payload())),
@@ -815,15 +805,15 @@ def test_data_center_create_with_assignee_me_resolves_via_myself_once(tmp_path: 
     assert len(myself_calls) == 1
     write_requests = [request for request in runner.requests if request.args == curl_write_args()]
     assert any(
-        '\\"assignee\\":{\\"name\\":\\"studykit-svc\\"}' in str(request.input_text)
+        '\\"assignee\\":{\\"accountId\\":\\"studykit-svc\\"}' in str(request.input_text)
         for request in write_requests
     )
 
 
-def test_data_center_subtask_create_inline_refreshes_parent_cache(tmp_path: Path) -> None:
+def test_jira_subtask_create_inline_refreshes_parent_cache(tmp_path: Path) -> None:
     write_jira_config(tmp_path)
     site = jira_site(tmp_path)
-    cache = JiraDataCenterIssueCache.for_project(tmp_path)
+    cache = JiraIssueCache.for_project(tmp_path)
     runner = FakeRunner(
         {
             curl_write_args(): result(curl_write_args(), stdout=json.dumps({"id": "10005", "key": "TEST-1237"})),
@@ -881,7 +871,7 @@ def test_data_center_subtask_create_inline_refreshes_parent_cache(tmp_path: Path
     assert parent_fields["subtasks"][0]["key"] == "TEST-1237"
 
 
-def test_data_center_review_create_uses_task_type_and_review_summary_prefix(tmp_path: Path) -> None:
+def test_jira_review_create_uses_task_type_and_review_summary_prefix(tmp_path: Path) -> None:
     write_jira_config(tmp_path)
     runner = FakeRunner(
         {
@@ -909,7 +899,7 @@ def test_data_center_review_create_uses_task_type_and_review_summary_prefix(tmp_
     assert '\\"issuetype\\":{\\"name\\":\\"Task\\"}' in payload_text
 
 
-def test_data_center_spike_create_uses_task_type_and_spike_summary_prefix(tmp_path: Path) -> None:
+def test_jira_spike_create_uses_task_type_and_spike_summary_prefix(tmp_path: Path) -> None:
     write_jira_config(tmp_path)
     runner = FakeRunner(
         {
@@ -937,7 +927,7 @@ def test_data_center_spike_create_uses_task_type_and_spike_summary_prefix(tmp_pa
     assert '\\"issuetype\\":{\\"name\\":\\"Task\\"}' in payload_text
 
 
-def test_data_center_research_create_uses_task_type_and_research_summary_prefix(tmp_path: Path) -> None:
+def test_jira_research_create_uses_task_type_and_research_summary_prefix(tmp_path: Path) -> None:
     write_jira_config(tmp_path)
     runner = FakeRunner(
         {
@@ -964,7 +954,7 @@ def test_data_center_research_create_uses_task_type_and_research_summary_prefix(
     assert '\\"issuetype\\":{\\"name\\":\\"Task\\"}' in payload_text
 
 
-def test_data_center_usecase_create_uses_story_type(tmp_path: Path) -> None:
+def test_jira_usecase_create_uses_story_type(tmp_path: Path) -> None:
     write_jira_config(tmp_path)
     runner = FakeRunner(
         {
@@ -1001,20 +991,12 @@ def test_data_center_usecase_create_uses_story_type(tmp_path: Path) -> None:
         ("usecase", "Story"),
     ],
 )
-def test_data_center_create_uses_artifact_issue_type(
+def test_jira_create_uses_artifact_issue_type(
     tmp_path: Path,
     artifact_type: str,
     expected_issue_type: str,
 ) -> None:
-    extra = (
-        """
-    epic_fields:
-      name: customfield_12345
-"""
-        if artifact_type == "epic"
-        else ""
-    )
-    write_jira_config(tmp_path, relationship_mappings=extra)
+    write_jira_config(tmp_path)
     runner = FakeRunner(
         {
             curl_write_args(): result(curl_write_args(), stdout=json.dumps({"id": "10001", "key": "TEST-1234"})),
@@ -1038,14 +1020,12 @@ def test_data_center_create_uses_artifact_issue_type(
     assert f'\\"issuetype\\":{{\\"name\\":\\"{expected_issue_type}\\"}}' in payload_text
 
 
-def test_data_center_create_uses_configured_epic_issue_type(tmp_path: Path) -> None:
+def test_jira_create_uses_configured_epic_issue_type(tmp_path: Path) -> None:
     write_jira_config(
         tmp_path,
         relationship_mappings="""
     artifact_issue_types:
       epic: Initiative
-    epic_fields:
-      name: customfield_12345
 """,
     )
     runner = FakeRunner(
@@ -1070,162 +1050,13 @@ def test_data_center_create_uses_configured_epic_issue_type(tmp_path: Path) -> N
     assert '\\"issuetype\\":{\\"name\\":\\"Initiative\\"}' in payload_text
 
 
-def test_data_center_epic_create_injects_epic_name_default_from_title(tmp_path: Path) -> None:
-    write_jira_config(
-        tmp_path,
-        relationship_mappings="""
-    epic_fields:
-      name: customfield_12345
-""",
-    )
-    runner = FakeRunner(
-        {
-            curl_write_args(): result(curl_write_args(), stdout=json.dumps({"id": "10001", "key": "TEST-1234"})),
-            curl_args(issue_url()): result(curl_args(issue_url()), stdout=json.dumps(jira_issue_payload())),
-            curl_args(remote_links_url()): result(curl_args(remote_links_url()), stdout=json.dumps(remote_links_payload())),
-        }
-    )
-
-    response = dispatch_write(
-        tmp_path,
-        runner,
-        "create",
-        artifact_type="epic",
-        title="Coordinate a larger batch",
-        body="## Description\n\nCoordinate the batch.",
-    )
-
-    assert response.payload["operation"] == "create_issue"
-    payload_text = str(runner.requests[0].input_text)
-    assert '\\"customfield_12345\\":\\"Coordinate a larger batch\\"' in payload_text
-
-
-def test_data_center_epic_create_overrides_epic_name_when_provided(tmp_path: Path) -> None:
-    write_jira_config(
-        tmp_path,
-        relationship_mappings="""
-    epic_fields:
-      name: customfield_12345
-""",
-    )
-    runner = FakeRunner(
-        {
-            curl_write_args(): result(curl_write_args(), stdout=json.dumps({"id": "10001", "key": "TEST-1234"})),
-            curl_args(issue_url()): result(curl_args(issue_url()), stdout=json.dumps(jira_issue_payload())),
-            curl_args(remote_links_url()): result(curl_args(remote_links_url()), stdout=json.dumps(remote_links_payload())),
-        }
-    )
-
-    response = dispatch_write(
-        tmp_path,
-        runner,
-        "create",
-        artifact_type="epic",
-        title="Coordinate a larger batch",
-        body="## Description\n\nCoordinate the batch.",
-        epic_name="Initiative codename",
-    )
-
-    assert response.payload["operation"] == "create_issue"
-    payload_text = str(runner.requests[0].input_text)
-    assert '\\"customfield_12345\\":\\"Initiative codename\\"' in payload_text
-
-
-def test_data_center_epic_create_without_epic_name_field_raises(tmp_path: Path) -> None:
-    write_jira_config(tmp_path)
-    runner = FakeRunner({})
-
-    with pytest.raises(ProviderOperationError, match="epic_fields.name"):
-        dispatch_write(
-            tmp_path,
-            runner,
-            "create",
-            artifact_type="epic",
-            title="Coordinate",
-            body="Body.",
-        )
-
-
-def test_data_center_epic_name_rejected_for_non_epic_artifact(tmp_path: Path) -> None:
-    write_jira_config(
-        tmp_path,
-        relationship_mappings="""
-    epic_fields:
-      name: customfield_12345
-""",
-    )
-    runner = FakeRunner({})
-
-    with pytest.raises(ProviderOperationError, match="epic_name is only valid"):
-        dispatch_write(
-            tmp_path,
-            runner,
-            "create",
-            artifact_type="task",
-            title="Task title",
-            body="Body.",
-            epic_name="Stray epic name",
-        )
-
-
-def test_data_center_non_epic_create_payload_is_byte_identical_with_epic_fields(tmp_path: Path) -> None:
-    """Regression: configured epic_fields must not leak into non-Epic create payload."""
-
-    write_jira_config(tmp_path)
-    runner_a = FakeRunner(
-        {
-            curl_write_args(): result(curl_write_args(), stdout=json.dumps({"id": "10001", "key": "TEST-1234"})),
-            curl_args(issue_url()): result(curl_args(issue_url()), stdout=json.dumps(jira_issue_payload())),
-            curl_args(remote_links_url()): result(curl_args(remote_links_url()), stdout=json.dumps(remote_links_payload())),
-        }
-    )
-    dispatch_write(
-        tmp_path,
-        runner_a,
-        "create",
-        artifact_type="task",
-        title="Plain task",
-        body="Plain body.\n",
-        labels=["workflow"],
-    )
-    plain_payload = runner_a.requests[0].input_text
-
-    write_jira_config(
-        tmp_path,
-        relationship_mappings="""
-    epic_fields:
-      name: customfield_12345
-      link: customfield_12346
-      status: customfield_12347
-""",
-    )
-    runner_b = FakeRunner(
-        {
-            curl_write_args(): result(curl_write_args(), stdout=json.dumps({"id": "10001", "key": "TEST-1234"})),
-            curl_args(issue_url()): result(curl_args(issue_url()), stdout=json.dumps(jira_issue_payload())),
-            curl_args(remote_links_url()): result(curl_args(remote_links_url()), stdout=json.dumps(remote_links_payload())),
-        }
-    )
-    dispatch_write(
-        tmp_path,
-        runner_b,
-        "create",
-        artifact_type="task",
-        title="Plain task",
-        body="Plain body.\n",
-        labels=["workflow"],
-    )
-
-    assert runner_b.requests[0].input_text == plain_payload
-
-
-def test_data_center_update_writes_body_and_refreshes_cache(tmp_path: Path) -> None:
+def test_jira_update_writes_body_and_refreshes_cache(tmp_path: Path) -> None:
     write_jira_config(tmp_path)
     site = jira_site(tmp_path)
-    cache = JiraDataCenterIssueCache.for_project(tmp_path)
+    cache = JiraIssueCache.for_project(tmp_path)
     cache.write_issue_bundle(
         site,
-        jira_issue_payload(body="Cached body."),
+        markdown_bodies(jira_issue_payload(body="Cached body.")),
         remote_links=remote_links_payload(),
         fetched_at="2026-05-15T10:00:00.000+0900",
     )
@@ -1254,12 +1085,12 @@ def test_data_center_update_writes_body_and_refreshes_cache(tmp_path: Path) -> N
     write_request = runner.requests[1]
     assert write_request.args == curl_write_args()
     assert 'request = "PUT"' in str(write_request.input_text)
-    assert 'url = "https://jira.example.test/rest/api/2/issue/TEST-1234"' in str(write_request.input_text)
-    assert '\\"description\\":\\"Updated body.\\"' in str(write_request.input_text)
+    assert 'url = "https://example.atlassian.net/rest/api/3/issue/TEST-1234"' in str(write_request.input_text)
+    assert sent_json(str(write_request.input_text))["fields"]["description"] == adf_doc("Updated body.")
 
 
 def attachments_url(issue: str = "TEST-1234") -> str:
-    return f"https://jira.example.test/rest/api/2/issue/{issue}/attachments"
+    return f"https://example.atlassian.net/rest/api/3/issue/{issue}/attachments"
 
 
 def attachments_payload() -> list[dict[str, object]]:
@@ -1269,18 +1100,18 @@ def attachments_payload() -> list[dict[str, object]]:
             "filename": "report.pdf",
             "size": 2048,
             "mimeType": "application/pdf",
-            "content": "https://jira.example.test/secure/attachment/40001/report.pdf",
+            "content": "https://example.atlassian.net/secure/attachment/40001/report.pdf",
             "created": "2026-06-02T10:00:00.000+0900",
         }
     ]
 
 
 def test_curl_multipart_config_sets_token_and_repeated_form_lines() -> None:
-    from issue.jira.client import JiraDataCenterSite, _curl_multipart_config
+    from issue.jira.client import JiraSite, _curl_multipart_config
 
     config = _curl_multipart_config(
-        JiraDataCenterSite(base_url="https://jira.example.test", authority="jira.example.test"),
-        url="https://jira.example.test/rest/api/2/issue/TEST-1234/attachments",
+        JiraSite(base_url="https://example.atlassian.net", authority="example.atlassian.net"),
+        url="https://example.atlassian.net/rest/api/3/issue/TEST-1234/attachments",
         file_paths=["/tmp/a.png", "/tmp/b.pdf"],
     )
     assert 'header = "X-Atlassian-Token: no-check"' in config
@@ -1291,10 +1122,10 @@ def test_curl_multipart_config_sets_token_and_repeated_form_lines() -> None:
     assert "Content-Type" not in config
 
 
-def test_data_center_add_attachment_uploads_and_refreshes_cache(tmp_path: Path) -> None:
+def test_jira_add_attachment_uploads_and_refreshes_cache(tmp_path: Path) -> None:
     write_jira_config(tmp_path)
     site = jira_site(tmp_path)
-    cache = JiraDataCenterIssueCache.for_project(tmp_path)
+    cache = JiraIssueCache.for_project(tmp_path)
     runner = FakeRunner(
         {
                 ("curl", "--silent", "--show-error", "--fail", "--config", "-"): result(curl_write_args(), stdout=json.dumps(attachments_payload())),
@@ -1327,7 +1158,7 @@ def test_data_center_add_attachment_uploads_and_refreshes_cache(tmp_path: Path) 
     assert cache.issue_json_file(site, "TEST-1234").is_file()
 
 
-def test_data_center_add_attachment_requires_files(tmp_path: Path) -> None:
+def test_jira_add_attachment_requires_files(tmp_path: Path) -> None:
     write_jira_config(tmp_path)
     runner = FakeRunner({})
 
@@ -1350,13 +1181,13 @@ def _issue_payload_with_attachments() -> dict[str, object]:
                     "id": "40001",
                     "filename": "report.pdf",
                     "size": 2048,
-                    "content": "https://jira.example.test/secure/attachment/40001/report.pdf",
+                    "content": "https://example.atlassian.net/secure/attachment/40001/report.pdf",
                 },
                 {
                     "id": "40002",
                     "filename": "notes.txt",
                     "size": 12,
-                    "content": "https://jira.example.test/secure/attachment/40002/notes.txt",
+                    "content": "https://example.atlassian.net/secure/attachment/40002/notes.txt",
                 },
             ],
         },
@@ -1366,7 +1197,7 @@ def _issue_payload_with_attachments() -> dict[str, object]:
 _DOWNLOAD_ARGS = ("curl", "--silent", "--show-error", "--fail", "--location", "--config", "-")
 
 
-def test_data_center_get_attachment_resolves_id_and_downloads(tmp_path: Path) -> None:
+def test_jira_get_attachment_resolves_id_and_downloads(tmp_path: Path) -> None:
     write_jira_config(tmp_path)
     runner = FakeRunner(
         {
@@ -1399,7 +1230,7 @@ def test_data_center_get_attachment_resolves_id_and_downloads(tmp_path: Path) ->
     assert "40002" not in text
 
 
-def test_data_center_get_attachment_all_downloads_every_file(tmp_path: Path) -> None:
+def test_jira_get_attachment_all_downloads_every_file(tmp_path: Path) -> None:
     write_jira_config(tmp_path)
     runner = FakeRunner(
         {
@@ -1423,7 +1254,7 @@ def test_data_center_get_attachment_all_downloads_every_file(tmp_path: Path) -> 
     assert sum(1 for req in runner.requests if req.args == _DOWNLOAD_ARGS) == 2
 
 
-def test_data_center_get_attachment_no_match_raises(tmp_path: Path) -> None:
+def test_jira_get_attachment_no_match_raises(tmp_path: Path) -> None:
     write_jira_config(tmp_path)
     runner = FakeRunner(
         {
@@ -1444,13 +1275,13 @@ def test_data_center_get_attachment_no_match_raises(tmp_path: Path) -> None:
         )
 
 
-def test_data_center_update_rejects_empty_payload(tmp_path: Path) -> None:
+def test_jira_update_rejects_empty_payload(tmp_path: Path) -> None:
     write_jira_config(tmp_path)
     site = jira_site(tmp_path)
-    cache = JiraDataCenterIssueCache.for_project(tmp_path)
+    cache = JiraIssueCache.for_project(tmp_path)
     cache.write_issue_bundle(
         site,
-        jira_issue_payload(),
+        markdown_bodies(jira_issue_payload()),
         remote_links=remote_links_payload(),
         fetched_at="2026-05-15T10:00:00.000+0900",
     )
@@ -1462,7 +1293,7 @@ def test_data_center_update_rejects_empty_payload(tmp_path: Path) -> None:
     assert runner.requests == []
 
 
-def test_data_center_update_applies_state_transition(tmp_path: Path) -> None:
+def test_jira_update_applies_state_transition(tmp_path: Path) -> None:
     write_jira_config(
         tmp_path,
         relationship_mappings="""
@@ -1472,14 +1303,14 @@ def test_data_center_update_applies_state_transition(tmp_path: Path) -> None:
 """,
     )
     site = jira_site(tmp_path)
-    cache = JiraDataCenterIssueCache.for_project(tmp_path)
+    cache = JiraIssueCache.for_project(tmp_path)
     cache.write_issue_bundle(
         site,
-        jira_issue_payload(body="Cached body."),
+        markdown_bodies(jira_issue_payload(body="Cached body.")),
         remote_links=remote_links_payload(),
         fetched_at="2026-05-15T10:00:00.000+0900",
     )
-    transitions_url = f"https://jira.example.test/rest/api/2/issue/TEST-1234/transitions"
+    transitions_url = f"https://example.atlassian.net/rest/api/3/issue/TEST-1234/transitions"
     runner = FakeRunner(
         {
             curl_args(issue_url()): [
@@ -1520,13 +1351,13 @@ def test_data_center_update_applies_state_transition(tmp_path: Path) -> None:
     assert any('\\"transition\\":{\\"id\\":\\"31\\"}' in str(request.input_text) for request in write_requests)
 
 
-def test_data_center_update_state_without_configured_transition_errors(tmp_path: Path) -> None:
+def test_jira_update_state_without_configured_transition_errors(tmp_path: Path) -> None:
     write_jira_config(tmp_path)
     site = jira_site(tmp_path)
-    cache = JiraDataCenterIssueCache.for_project(tmp_path)
+    cache = JiraIssueCache.for_project(tmp_path)
     cache.write_issue_bundle(
         site,
-        jira_issue_payload(),
+        markdown_bodies(jira_issue_payload()),
         remote_links=remote_links_payload(),
         fetched_at="2026-05-15T10:00:00.000+0900",
     )
@@ -1558,13 +1389,13 @@ def test_data_center_update_state_without_configured_transition_errors(tmp_path:
     assert "setup skill" in message
 
 
-def test_data_center_add_comment_posts_body_and_refreshes_cache(tmp_path: Path) -> None:
+def test_jira_add_comment_posts_body_and_refreshes_cache(tmp_path: Path) -> None:
     write_jira_config(tmp_path)
     site = jira_site(tmp_path)
-    cache = JiraDataCenterIssueCache.for_project(tmp_path)
+    cache = JiraIssueCache.for_project(tmp_path)
     cache.write_issue_bundle(
         site,
-        jira_issue_payload(),
+        markdown_bodies(jira_issue_payload()),
         remote_links=remote_links_payload(),
         fetched_at="2026-05-15T10:00:00.000+0900",
     )
@@ -1599,19 +1430,19 @@ def test_data_center_add_comment_posts_body_and_refreshes_cache(tmp_path: Path) 
     assert response.payload["state_changed"] is False
     write_request = next(request for request in runner.requests if request.args == curl_write_args())
     assert 'request = "POST"' in str(write_request.input_text)
-    assert 'url = "https://jira.example.test/rest/api/2/issue/TEST-1234/comment"' in str(write_request.input_text)
-    assert '\\"body\\":\\"Inline comment body.\\\\n\\"' in str(write_request.input_text)
+    assert 'url = "https://example.atlassian.net/rest/api/3/issue/TEST-1234/comment"' in str(write_request.input_text)
+    assert sent_json(str(write_request.input_text)) == {"body": adf_doc("Inline comment body.\n")}
 
 
-def test_data_center_issue_link_relationships_are_applied_from_inline_intent(tmp_path: Path) -> None:
+def test_jira_issue_link_relationships_are_applied_from_inline_intent(tmp_path: Path) -> None:
     write_jira_config(tmp_path, relationship_mappings=issue_link_relationship_mappings())
     site = jira_site(tmp_path)
-    cache = JiraDataCenterIssueCache.for_project(tmp_path)
+    cache = JiraIssueCache.for_project(tmp_path)
     # Seed with the configured relationship mappings so the cached relationships
     # fingerprint matches the provider's freshness re-compute (which uses them).
     cache.write_issue_bundle(
         site,
-        jira_issue_payload(),
+        markdown_bodies(jira_issue_payload()),
         remote_links=remote_links_payload(),
         fetched_at="2026-05-15T10:00:00.000+0900",
         relationship_mappings=_relationship_mappings(_jira_issue_provider_settings(tmp_path)),
@@ -1690,7 +1521,7 @@ def _jira_target_payload(key: str, *, blocks_key: str) -> dict[str, object]:
     }
 
 
-def test_data_center_relationship_apply_refreshes_cached_target_relation_md(tmp_path: Path) -> None:
+def test_jira_relationship_apply_refreshes_cached_target_relation_md(tmp_path: Path) -> None:
     """Linking refreshes relation.md for every *already-cached* far endpoint.
 
     A Jira issue link is one object surfaced from both issues, so the target's
@@ -1700,11 +1531,11 @@ def test_data_center_relationship_apply_refreshes_cached_target_relation_md(tmp_
 
     write_jira_config(tmp_path, relationship_mappings=issue_link_relationship_mappings())
     site = jira_site(tmp_path)
-    cache = JiraDataCenterIssueCache.for_project(tmp_path)
+    cache = JiraIssueCache.for_project(tmp_path)
     mappings = _relationship_mappings(_jira_issue_provider_settings(tmp_path))
     cache.write_issue_bundle(
         site,
-        jira_issue_payload(),
+        markdown_bodies(jira_issue_payload()),
         remote_links=remote_links_payload(),
         fetched_at="2026-05-15T10:00:00.000+0900",
         relationship_mappings=mappings,
@@ -1712,7 +1543,7 @@ def test_data_center_relationship_apply_refreshes_cached_target_relation_md(tmp_
     # TEST-1233 (the blocker) is already tracked locally; TEST-1235 is not.
     cache.write_issue_bundle(
         site,
-        _jira_target_payload("TEST-1233", blocks_key="TEST-1234"),
+        markdown_bodies(_jira_target_payload("TEST-1233", blocks_key="TEST-1234")),
         remote_links=[],
         fetched_at="2026-05-15T10:00:00.000+0900",
         relationship_mappings=mappings,
@@ -1761,130 +1592,13 @@ def test_data_center_relationship_apply_refreshes_cached_target_relation_md(tmp_
     assert "TEST-1234" in target_relation.read_text(encoding="utf-8")
 
 
-def test_data_center_epic_link_relationship_writes_bare_key_string(tmp_path: Path) -> None:
-    write_jira_config(
-        tmp_path,
-        relationship_mappings="""
-    epic_fields:
-      name: customfield_12345
-      link: customfield_12346
-    relationship_mappings:
-      epic:
-        surface: field
-        field: customfield_12346
-        write_to: source
-        value: string
-""",
-    )
-    site = jira_site(tmp_path)
-    cache = JiraDataCenterIssueCache.for_project(tmp_path)
-    cache.write_issue_bundle(
-        site,
-        jira_issue_payload(),
-        remote_links=remote_links_payload(),
-        fetched_at="2026-05-15T10:00:00.000+0900",
-    )
-    runner = FakeRunner(
-        {
-            curl_args(issue_url()): [
-                result(curl_args(issue_url()), stdout=json.dumps(jira_issue_payload())),
-                result(curl_args(issue_url()), stdout=json.dumps(jira_issue_payload())),
-            ],
-            curl_write_args(): result(curl_write_args(), stdout=""),
-            curl_args(remote_links_url()): result(curl_args(remote_links_url()), stdout=json.dumps(remote_links_payload())),
-        }
-    )
-
-    response = dispatch_write(
-        tmp_path,
-        runner,
-        "apply_relationships",
-        issue="TEST-1234",
-        relationship_intent={"epic_add": "TEST-10"},
-    )
-
-    assert response.payload["applied"] == 1
-    write_request = next(request for request in runner.requests if request.args == curl_write_args())
-    body = str(write_request.input_text)
-    assert 'request = "PUT"' in body
-    assert 'url = "https://jira.example.test/rest/api/2/issue/TEST-1234"' in body
-    assert '\\"customfield_12346\\":\\"TEST-10\\"' in body
-    assert '\\"key\\":\\"TEST-10\\"' not in body
-
-
-def test_data_center_combined_parent_and_epic_relationships_write_independently(tmp_path: Path) -> None:
-    write_jira_config(
-        tmp_path,
-        relationship_mappings="""
-    epic_fields:
-      link: customfield_12346
-    relationship_mappings:
-      child:
-        surface: field
-        field: parent
-        write_to: target
-        value: key
-      epic:
-        surface: field
-        field: customfield_12346
-        write_to: source
-        value: string
-""",
-    )
-    site = jira_site(tmp_path)
-    cache = JiraDataCenterIssueCache.for_project(tmp_path)
-    cache.write_issue_bundle(
-        site,
-        jira_subtask_payload(),
-        remote_links=[],
-        fetched_at="2026-05-15T10:00:00.000+0900",
-    )
-    runner = FakeRunner(
-        {
-            curl_args(issue_url("TEST-1237")): [
-                result(curl_args(issue_url("TEST-1237")), stdout=json.dumps(jira_subtask_payload())),
-                result(curl_args(issue_url("TEST-1237")), stdout=json.dumps(jira_subtask_payload())),
-            ],
-            curl_args(issue_url("TEST-50")): result(
-                curl_args(issue_url("TEST-50")),
-                stdout=json.dumps({"key": "TEST-50", "fields": {"summary": "Story", "issuetype": {"name": "Story"}}}),
-            ),
-            curl_write_args(): [
-                result(curl_write_args(), stdout=""),
-                result(curl_write_args(), stdout=""),
-            ],
-            curl_args(remote_links_url("TEST-1237")): result(curl_args(remote_links_url("TEST-1237")), stdout=json.dumps([])),
-        }
-    )
-
-    response = dispatch_write(
-        tmp_path,
-        runner,
-        "apply_relationships",
-        issue="TEST-1237",
-        relationship_intent={
-            "child_add": ["TEST-50"],
-            "epic_add": "TEST-10",
-        },
-    )
-
-    assert response.payload["applied"] == 2
-    write_requests = [request for request in runner.requests if request.args == curl_write_args()]
-    assert len(write_requests) == 2
-    bodies = [str(req.input_text) for req in write_requests]
-    epic_body = next(body for body in bodies if "customfield_12346" in body)
-    child_body = next(body for body in bodies if 'url = "https://jira.example.test/rest/api/2/issue/TEST-50"' in body)
-    assert '\\"customfield_12346\\":\\"TEST-10\\"' in epic_body
-    assert '\\"parent\\":{\\"key\\":\\"TEST-1237\\"}' in child_body
-
-
-def test_data_center_remote_link_relationships_are_applied_with_stable_global_id(tmp_path: Path) -> None:
+def test_jira_remote_link_relationships_are_applied_with_stable_global_id(tmp_path: Path) -> None:
     write_jira_config(tmp_path, relationship_mappings=remote_link_relationship_mappings())
     site = jira_site(tmp_path)
-    cache = JiraDataCenterIssueCache.for_project(tmp_path)
+    cache = JiraIssueCache.for_project(tmp_path)
     cache.write_issue_bundle(
         site,
-        jira_issue_payload(),
+        markdown_bodies(jira_issue_payload()),
         remote_links=remote_links_payload(),
         fetched_at="2026-05-15T10:00:00.000+0900",
     )
@@ -1913,20 +1627,20 @@ def test_data_center_remote_link_relationships_are_applied_with_stable_global_id
     write_request = next(request for request in runner.requests if request.args == curl_write_args())
     body = str(write_request.input_text)
     assert 'request = "POST"' in body
-    assert 'url = "https://jira.example.test/rest/api/2/issue/TEST-1234/remotelink"' in body
+    assert 'url = "https://example.atlassian.net/rest/api/3/issue/TEST-1234/remotelink"' in body
     assert '\\"globalId\\":\\"system=studykit-workflow&id=' in body
     assert '\\"relationship\\":\\"relates to\\"' in body
     assert '\\"url\\":\\"https://github.com/studykit/studykit-plugins/issues/57\\"' in body
     assert '\\"title\\":\\"57\\"' in body
 
 
-def test_data_center_missing_relationship_mapping_fails_before_mutation(tmp_path: Path) -> None:
+def test_jira_missing_relationship_mapping_fails_before_mutation(tmp_path: Path) -> None:
     write_jira_config(tmp_path)
     site = jira_site(tmp_path)
-    cache = JiraDataCenterIssueCache.for_project(tmp_path)
+    cache = JiraIssueCache.for_project(tmp_path)
     cache.write_issue_bundle(
         site,
-        jira_issue_payload(),
+        markdown_bodies(jira_issue_payload()),
         remote_links=remote_links_payload(),
         fetched_at="2026-05-15T10:00:00.000+0900",
     )
@@ -1944,7 +1658,7 @@ def test_data_center_missing_relationship_mapping_fails_before_mutation(tmp_path
     assert runner.requests == []
 
 
-def test_data_center_bad_relationship_direction_fails_before_mutation(tmp_path: Path) -> None:
+def test_jira_bad_relationship_direction_fails_before_mutation(tmp_path: Path) -> None:
     write_jira_config(
         tmp_path,
         relationship_mappings="""
@@ -1956,10 +1670,10 @@ def test_data_center_bad_relationship_direction_fails_before_mutation(tmp_path: 
 """,
     )
     site = jira_site(tmp_path)
-    cache = JiraDataCenterIssueCache.for_project(tmp_path)
+    cache = JiraIssueCache.for_project(tmp_path)
     cache.write_issue_bundle(
         site,
-        jira_issue_payload(),
+        markdown_bodies(jira_issue_payload()),
         remote_links=remote_links_payload(),
         fetched_at="2026-05-15T10:00:00.000+0900",
     )
@@ -1977,13 +1691,13 @@ def test_data_center_bad_relationship_direction_fails_before_mutation(tmp_path: 
     assert runner.requests == []
 
 
-def test_data_center_stale_cache_blocks_write_before_put(tmp_path: Path) -> None:
+def test_jira_stale_cache_blocks_write_before_put(tmp_path: Path) -> None:
     write_jira_config(tmp_path)
     site = jira_site(tmp_path)
-    cache = JiraDataCenterIssueCache.for_project(tmp_path)
+    cache = JiraIssueCache.for_project(tmp_path)
     cache.write_issue_bundle(
         site,
-        jira_issue_payload(body="Cached body."),
+        markdown_bodies(jira_issue_payload(body="Cached body.")),
         remote_links=remote_links_payload(),
         fetched_at="2026-05-15T10:00:00.000+0900",
     )
@@ -2019,13 +1733,13 @@ def test_data_center_stale_cache_blocks_write_before_put(tmp_path: Path) -> None
     assert all(request.args != curl_write_args() for request in runner.requests)
 
 
-def test_data_center_comment_stale_cache_blocks_and_refreshes_before_post(tmp_path: Path) -> None:
+def test_jira_comment_stale_cache_blocks_and_refreshes_before_post(tmp_path: Path) -> None:
     write_jira_config(tmp_path)
     site = jira_site(tmp_path)
-    cache = JiraDataCenterIssueCache.for_project(tmp_path)
+    cache = JiraIssueCache.for_project(tmp_path)
     cache.write_issue_bundle(
         site,
-        jira_issue_payload(),
+        markdown_bodies(jira_issue_payload()),
         remote_links=remote_links_payload(),
         fetched_at="2026-05-15T10:00:00.000+0900",
     )
@@ -2055,3 +1769,194 @@ def test_data_center_comment_stale_cache_blocks_and_refreshes_before_post(tmp_pa
     assert response.payload["reason"] == "provider_changed"
     assert response.payload["reread_required"] is True
     assert all(request.args != curl_write_args() for request in runner.requests)
+
+
+# ---------------------------------------------------------------------------
+# Built-in hierarchy relationships: parent / epic / child use the native
+# ``parent`` field and need no relationship_mappings entry.
+# ---------------------------------------------------------------------------
+
+
+def _issue_without_parent() -> dict[str, object]:
+    payload = jira_issue_payload()
+    fields = payload["fields"]
+    assert isinstance(fields, dict)
+    fields.pop("parent")
+    return payload
+
+
+def _seed_hierarchy_cache(project: Path, payload: dict[str, object]) -> None:
+    JiraIssueCache.for_project(project).write_issue_bundle(
+        jira_site(project),
+        markdown_bodies(payload),
+        remote_links=remote_links_payload(),
+        fetched_at="2026-05-15T10:00:00.000+0900",
+    )
+
+
+def _hierarchy_runner(current: dict[str, object]) -> FakeRunner:
+    return FakeRunner(
+        {
+            curl_args(issue_url()): [
+                result(curl_args(issue_url()), stdout=json.dumps(current)),
+                result(curl_args(issue_url()), stdout=json.dumps(current)),
+            ],
+            curl_write_args(): result(curl_write_args(), stdout=""),
+            curl_args(remote_links_url()): result(curl_args(remote_links_url()), stdout=json.dumps(remote_links_payload())),
+        }
+    )
+
+
+def _field_writes(runner: FakeRunner) -> list[tuple[str, object]]:
+    writes = []
+    for request in runner.requests:
+        if request.args != curl_write_args():
+            continue
+        text = str(request.input_text)
+        url = next(line for line in text.splitlines() if line.startswith("url = "))
+        writes.append((url, sent_json(text)))
+    return writes
+
+
+@pytest.mark.parametrize("intent_key", ["parent_add", "epic_add"])
+def test_parent_and_epic_add_write_the_native_parent_field(tmp_path: Path, intent_key: str) -> None:
+    write_jira_config(tmp_path)
+    _seed_hierarchy_cache(tmp_path, _issue_without_parent())
+    runner = _hierarchy_runner(_issue_without_parent())
+
+    response = dispatch_write(
+        tmp_path,
+        runner,
+        "apply_relationships",
+        issue="TEST-1234",
+        relationship_intent={intent_key: "TEST-10"},
+    )
+
+    assert response.payload["applied"] == 1
+    assert _field_writes(runner) == [
+        (f'url = "{issue_url()}"', {"fields": {"parent": {"key": "TEST-10"}}}),
+    ]
+
+
+def test_child_add_writes_the_target_parent_field(tmp_path: Path) -> None:
+    write_jira_config(tmp_path)
+    _seed_hierarchy_cache(tmp_path, jira_issue_payload())
+    runner = _hierarchy_runner(jira_issue_payload())
+
+    dispatch_write(
+        tmp_path,
+        runner,
+        "apply_relationships",
+        issue="TEST-1234",
+        relationship_intent={"child_add": ["TEST-2001"]},
+    )
+
+    assert _field_writes(runner) == [
+        (f'url = "{issue_url("TEST-2001")}"', {"fields": {"parent": {"key": "TEST-1234"}}}),
+    ]
+
+
+@pytest.mark.parametrize("intent_key", ["parent_remove", "epic_remove"])
+def test_parent_and_epic_remove_clear_the_native_parent(tmp_path: Path, intent_key: str) -> None:
+    write_jira_config(tmp_path)
+    _seed_hierarchy_cache(tmp_path, jira_issue_payload())
+    runner = _hierarchy_runner(jira_issue_payload())
+
+    response = dispatch_write(
+        tmp_path,
+        runner,
+        "apply_relationships",
+        issue="TEST-1234",
+        relationship_intent={intent_key: True},
+    )
+
+    assert response.payload["operations"][0]["target_ref"] == "TEST-1200"
+    assert _field_writes(runner) == [
+        (f'url = "{issue_url()}"', {"fields": {"parent": None}}),
+    ]
+
+
+def test_parent_add_on_an_issue_with_a_parent_fails_before_any_request(tmp_path: Path) -> None:
+    write_jira_config(tmp_path)
+    _seed_hierarchy_cache(tmp_path, jira_issue_payload())
+    runner = FakeRunner({})
+
+    with pytest.raises(ProviderOperationError, match="parent already exists.*--replace-parent"):
+        dispatch_write(
+            tmp_path,
+            runner,
+            "apply_relationships",
+            issue="TEST-1234",
+            relationship_intent={"parent_add": "TEST-1300"},
+        )
+
+    assert runner.requests == []
+
+
+def test_replace_parent_overwrites_an_existing_parent(tmp_path: Path) -> None:
+    write_jira_config(tmp_path)
+    _seed_hierarchy_cache(tmp_path, jira_issue_payload())
+    runner = _hierarchy_runner(jira_issue_payload())
+
+    dispatch_write(
+        tmp_path,
+        runner,
+        "apply_relationships",
+        issue="TEST-1234",
+        relationship_intent={"parent_replace": "TEST-1300"},
+    )
+
+    assert _field_writes(runner) == [
+        (f'url = "{issue_url()}"', {"fields": {"parent": {"key": "TEST-1300"}}}),
+    ]
+
+
+@pytest.mark.parametrize("relationship", ["parent", "epic", "child"])
+def test_hierarchy_relationship_mapping_raises_cloud_only_error(tmp_path: Path, relationship: str) -> None:
+    write_jira_config(
+        tmp_path,
+        relationship_mappings=f"""
+    relationship_mappings:
+      {relationship}:
+        surface: field
+        field: parent
+        write_to: source
+        value: key
+""",
+    )
+    runner = FakeRunner({})
+
+    with pytest.raises(ProviderOperationError, match="spectrack supports Jira Cloud only"):
+        dispatch_write(
+            tmp_path,
+            runner,
+            "apply_relationships",
+            issue="TEST-1234",
+            relationship_intent={"blocked_by_add": ["TEST-1233"]},
+        )
+
+    assert runner.requests == []
+
+
+def test_epic_create_sends_no_epic_name(tmp_path: Path) -> None:
+    write_jira_config(tmp_path)
+    runner = FakeRunner(
+        {
+            curl_write_args(): result(curl_write_args(), stdout=json.dumps({"id": "10001", "key": "TEST-1234"})),
+            curl_args(issue_url()): result(curl_args(issue_url()), stdout=json.dumps(jira_issue_payload())),
+            curl_args(remote_links_url()): result(curl_args(remote_links_url()), stdout=json.dumps(remote_links_payload())),
+        }
+    )
+
+    dispatch_write(
+        tmp_path,
+        runner,
+        "create",
+        artifact_type="epic",
+        title="Coordinate a larger batch",
+        body="Coordinate the batch.",
+    )
+
+    fields = sent_json(str(runner.requests[0].input_text))["fields"]
+    assert set(fields) == {"project", "summary", "description", "issuetype"}
+    assert fields["issuetype"] == {"name": "Epic"}

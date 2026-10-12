@@ -48,7 +48,6 @@ opening ten files.
 | `claude-code-subagent-frontmatter.md` | Subagent frontmatter fields; `tools` omitted inherits all, no way to express none | code.claude.com/docs/en/sub-agents |
 | `claude-code-subagent-memory.md` | The `memory` frontmatter field: `user`/`project`/`local` scopes and their directories, MEMORY.md auto-injection limits, and the fact that it silently enables Write/Edit | code.claude.com/docs/en/sub-agents |
 | `iterm2-profiles-text-unicode.md` | Profiles › Text Unicode and font settings: what the Normalization popup does to text on input (and that the page publishes no value-to-form mapping), what the non-ASCII font setting draws, ambiguous-width cells, and the Unicode 9 emoji note | iterm2.com/documentation-preferences-profiles-text.html |
-| `jira-wiki-markup-notation.md` | Jira wiki markup notation (headings, effects, lists, links, tables, code) | Jira `WikiRendererHelpAction.jspa` |
 | `markdown-footnotes.md` | Markdown footnote syntax (extended) | markdownguide.org/extended-syntax |
 | `obsidian-block-links.md` | Obsidian block identifiers and block links | obsidian.md/help/links |
 | `openai-codex-hooks-2026-08-14.md` | Codex plugin hook env vars and payloads | learn.chatgpt.com/docs/hooks |

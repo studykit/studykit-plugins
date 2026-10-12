@@ -16,10 +16,10 @@ if str(_SCRIPTS_DIR) not in sys.path:
 from command import CommandRequest, CommandResult  # noqa: E402
 from config import ProviderConfig, load_workflow_config  # noqa: E402
 from issue.jira import adf, client  # noqa: E402
-from issue.jira.cache import JiraDataCenterIssueCache  # noqa: E402
+from issue.jira.cache import JiraIssueCache  # noqa: E402
 from issue.jira.client import (  # noqa: E402
-    jira_data_center_search_path,
-    jira_data_center_site_from_provider_config,
+    jira_search_path,
+    jira_site_from_provider_config,
 )
 from issue.jira.refs import JiraProviderError  # noqa: E402
 from issue.providers import (  # noqa: E402
@@ -124,37 +124,46 @@ def dispatch(project: Path, runner: FakeRunner, operation: str, **payload: objec
 
 
 def cloud_site():
-    return jira_data_center_site_from_provider_config(
+    return jira_site_from_provider_config(
         ProviderConfig(role="issue", kind="jira", settings={"site": SITE})
     )
 
 
-def test_atlassian_net_site_resolves_to_cloud_on_rest_v3() -> None:
+def test_atlassian_net_site_resolves_on_rest_v3() -> None:
     site = cloud_site()
 
-    assert site.is_cloud
     assert site.api_version == "3"
-    assert site.to_json()["deployment"] == "cloud"
+    assert site.to_json() == {"base_url": SITE, "authority": "acme.atlassian.net"}
 
 
-def test_other_sites_stay_data_center_on_rest_v2() -> None:
-    site = jira_data_center_site_from_provider_config(
-        ProviderConfig(role="issue", kind="jira", settings={"site": "https://jira.example.test"})
+def test_explicit_cloud_settings_are_accepted() -> None:
+    site = jira_site_from_provider_config(
+        ProviderConfig(
+            role="issue",
+            kind="jira",
+            settings={"site": SITE, "deployment": "cloud", "api_version": "3"},
+        )
     )
 
-    assert not site.is_cloud
-    assert site.api_version == "2"
+    assert site.api_version == "3"
 
 
-def test_cloud_rejects_rest_v2() -> None:
-    with pytest.raises(JiraProviderError, match="REST API version 3"):
-        jira_data_center_site_from_provider_config(
-            ProviderConfig(role="issue", kind="jira", settings={"site": SITE, "api_version": "2"})
-        )
+@pytest.mark.parametrize(
+    "settings",
+    [
+        pytest.param({"site": SITE, "deployment": "data_center"}, id="deployment"),
+        pytest.param({"site": SITE, "api_version": "2"}, id="api-version"),
+        pytest.param({"site": "https://jira.example.test"}, id="non-atlassian-host"),
+        pytest.param({"site": SITE, "epic_fields": {"name": "customfield_10011"}}, id="epic-fields"),
+    ],
+)
+def test_data_center_leftover_settings_raise_cloud_only_error(settings: dict[str, object]) -> None:
+    with pytest.raises(JiraProviderError, match="spectrack supports Jira Cloud only"):
+        jira_site_from_provider_config(ProviderConfig(role="issue", kind="jira", settings=settings))
 
 
 def test_cloud_search_uses_the_jql_endpoint() -> None:
-    path = jira_data_center_search_path(cloud_site(), jql="project = TEST", max_results=5)
+    path = jira_search_path(cloud_site(), jql="project = TEST", max_results=5)
 
     assert path.startswith("/rest/api/3/search/jql?")
 
@@ -173,7 +182,7 @@ def test_cloud_auth_requires_an_email(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_cloud_auth_reads_the_email_from_config(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("JIRA_EMAIL")
-    site = jira_data_center_site_from_provider_config(
+    site = jira_site_from_provider_config(
         ProviderConfig(role="issue", kind="jira", settings={"site": SITE, "email": "config@example.test"})
     )
 
@@ -181,7 +190,7 @@ def test_cloud_auth_reads_the_email_from_config(monkeypatch: pytest.MonkeyPatch)
 
 
 def test_cloud_auth_env_email_overrides_config() -> None:
-    site = jira_data_center_site_from_provider_config(
+    site = jira_site_from_provider_config(
         ProviderConfig(role="issue", kind="jira", settings={"site": SITE, "email": "config@example.test"})
     )
 
@@ -231,10 +240,10 @@ def test_cloud_fetch_caches_adf_bodies_as_markdown(tmp_path: Path) -> None:
     convert_calls = [json.loads(_data_binary(text)) for text in runner.write_inputs()]
     assert all(call["representation"] == "atlas_doc_format" for call in convert_calls)
     assert all("contentbody/convert/markdown" in text for text in runner.write_inputs())
-    cache = JiraDataCenterIssueCache.for_project(tmp_path)
+    cache = JiraIssueCache.for_project(tmp_path)
     config = load_workflow_config(tmp_path)
     assert config is not None
-    site = jira_data_center_site_from_provider_config(config.issues)
+    site = jira_site_from_provider_config(config.issues)
     assert cache.issue_file(site, "TEST-1").read_text(encoding="utf-8") == "**Description.**\n"
 
 
@@ -278,7 +287,7 @@ def test_cloud_comment_is_sent_as_adf(tmp_path: Path, monkeypatch: pytest.Monkey
     assert {"body": adf_doc("Looks *good*.")} in sent
 
 
-def test_cloud_context_drops_wiki_markup_rules(tmp_path: Path) -> None:
+def test_jira_context_has_no_markup_check(tmp_path: Path) -> None:
     write_cloud_config(tmp_path, extra="    task_review_agent: project:task-reviewer\n")
     config = load_workflow_config(tmp_path)
 

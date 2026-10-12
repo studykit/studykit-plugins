@@ -12,7 +12,7 @@ fragments live under ``hooks/context/main/``; subagent fragments live under
 ``hooks/context/snippets/launcher/<runtime>.md`` (runtime-keyed), and
 ``hooks/context/snippets/prd-path.md`` (single file, used at both
 ``SessionStart`` and ``SubagentStart``), and
-``hooks/context/snippets/jira-cloud.md`` (Jira Cloud only).
+``hooks/context/snippets/jira-cloud.md`` (Jira projects only).
 
 Per-verb CLI usage is not injected at all: the ``<commands>`` block points
 the agent at ``spectrack issue --help`` (backend-aware verb list) and
@@ -33,7 +33,6 @@ injection so runtimes without a ``spectrack`` PATH export can use literal paths.
 from __future__ import annotations
 
 import re
-from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
@@ -49,14 +48,6 @@ _AUTHORING_RESOLVER_BLOCK_RE = re.compile(
     re.DOTALL,
 )
 
-# The Jira wiki-markup directive is provider-specific, so it is stripped for
-# every non-Jira issue provider. It is deliberately independent of the mustread
-# gate: mustread can be disabled per project, and a Markdown body published to
-# Jira renders as literal punctuation either way.
-_JIRA_FORMAT_BLOCK_RE = re.compile(
-    r"\n?<jira-format>\s*\n?.*?\n?\s*</jira-format>\n?",
-    re.DOTALL,
-)
 
 _JIRA_TASK_REVIEW_BLOCK_RE = re.compile(
     r"\n?<jira-task-review>\s*\n?.*?\n?\s*</jira-task-review>\n?",
@@ -108,16 +99,13 @@ def build_session_policy_context(
         "SNIPPET_LAUNCHER": _build_launcher_block(runtime, resolved_plugin_root),
         "SNIPPET_AUTHORING": _read_fragment("snippets/authoring.md").strip(),
         "SNIPPET_PRD_PATH": _read_fragment("snippets/prd-path.md").strip(),
-        "SNIPPET_JIRA_CLOUD": _build_jira_cloud_block(config, issue_provider),
+        "SNIPPET_JIRA_CLOUD": _build_jira_cloud_block(issue_provider),
         "SPECTRACK_ISSUE_PROVIDER": issue_provider,
         "SPECTRACK_JIRA_TASK_REVIEW_AGENT": _jira_review_agent(config, "task"),
         "SPECTRACK_JIRA_COMMENT_REVIEW_AGENT": _jira_review_agent(config, "comment"),
     })
     if not _mustread_enabled(config):
         rendered = _strip_authoring_resolver(rendered)
-    if issue_provider != "jira" or not _jira_uses_wiki_markup(config):
-        rendered = _strip_jira_format(rendered)
-        rendered = _drop_jira_markup_check(rendered)
     rendered = _strip_unconfigured_jira_review_blocks(rendered, config)
     return _wrap_policy(rendered)
 
@@ -140,22 +128,15 @@ def build_subagent_policy_context(
         "SNIPPET_LAUNCHER": _build_launcher_block(runtime, resolved_plugin_root),
         "SNIPPET_AUTHORING": _read_fragment("snippets/authoring.md").strip(),
         "SNIPPET_PRD_PATH": _read_fragment("snippets/prd-path.md").strip(),
-        "SNIPPET_JIRA_CLOUD": _build_jira_cloud_block(config, issue_provider),
+        "SNIPPET_JIRA_CLOUD": _build_jira_cloud_block(issue_provider),
         "SPECTRACK_ISSUE_PROVIDER": issue_provider,
         "SPECTRACK_JIRA_TASK_REVIEW_AGENT": _jira_review_agent(config, "task"),
         "SPECTRACK_JIRA_COMMENT_REVIEW_AGENT": _jira_review_agent(config, "comment"),
     })
     if not _mustread_enabled(config):
         rendered = _strip_authoring_resolver(rendered)
-    if issue_provider != "jira" or not _jira_uses_wiki_markup(config):
-        rendered = _strip_jira_format(rendered)
-        rendered = _drop_jira_markup_check(rendered)
     rendered = _strip_unconfigured_jira_review_blocks(rendered, config)
     agent_block = _build_agent_context_block(agent_type, issue_provider)
-    # An agent whose own block carries <jira-format> owns the markup rules in
-    # full (the format corrector does), so the generic block would only repeat it.
-    if agent_block and _JIRA_FORMAT_BLOCK_RE.search(agent_block):
-        rendered = _strip_jira_format(rendered)
     merged = _merge_commands_blocks(rendered, agent_block)
     return _wrap_policy(merged)
 
@@ -223,54 +204,12 @@ def _strip_authoring_resolver(text: str) -> str:
     return re.sub(r"\n{3,}", "\n\n", stripped).strip()
 
 
-def _jira_uses_wiki_markup(config: Any) -> bool:
-    """Whether Jira bodies are authored as wiki markup.
-
-    On Jira Cloud they are Markdown, so the wiki-markup rules and the markup
-    check would only corrupt them.
-    """
-
-    from issue.jira.client import jira_bodies_use_wiki_markup
-
-    issues = getattr(config, "issues", None)
-    settings = getattr(issues, "settings", None)
-    if not isinstance(settings, Mapping):
-        return True
-    return jira_bodies_use_wiki_markup(settings)
-
-
-def _build_jira_cloud_block(config: Any, issue_provider: str) -> str:
-    """Expose the agile and Confluence commands only on a Jira Cloud site."""
+def _build_jira_cloud_block(issue_provider: str) -> str:
+    """Expose the agile and Confluence commands to every Jira project."""
 
     if issue_provider != "jira":
         return ""
-    from issue.jira.client import DEPLOYMENT_CLOUD, jira_deployment_from_settings
-
-    issues = getattr(config, "issues", None)
-    settings = getattr(issues, "settings", None)
-    if not isinstance(settings, Mapping):
-        return ""
-    if jira_deployment_from_settings(settings) != DEPLOYMENT_CLOUD:
-        return ""
     return _read_fragment("snippets/jira-cloud.md").strip()
-
-
-_JIRA_MARKUP_CHECK_STEP_RE = re.compile(r"then\s+run\s+the\s+Jira\s+markup\s+check\s+and\s+present")
-_JIRA_MARKUP_CHECK_GATE_RE = re.compile(r"the\s+review,\s+markup\s+check,\s+and\s+user")
-
-
-def _drop_jira_markup_check(text: str) -> str:
-    """Remove the markup-check step from the Jira review gates."""
-
-    text = _JIRA_MARKUP_CHECK_STEP_RE.sub("then present", text)
-    return _JIRA_MARKUP_CHECK_GATE_RE.sub("the review and user", text)
-
-
-def _strip_jira_format(text: str) -> str:
-    """Remove the <jira-format> block for non-Jira issue providers."""
-
-    stripped = _JIRA_FORMAT_BLOCK_RE.sub("\n\n", text, count=1)
-    return re.sub(r"\n{3,}", "\n\n", stripped).strip()
 
 
 def _strip_unconfigured_jira_review_blocks(text: str, config: Any) -> str:

@@ -381,11 +381,11 @@ def default_provider_registry(*, runner: CommandRunner | None = None) -> Provide
     """
 
     from issue.github.provider import GitHubIssueNativeProvider
-    from issue.jira.provider import JiraDataCenterIssueNativeProvider
+    from issue.jira.provider import JiraIssueNativeProvider
 
     registry = ProviderRegistry()
     registry.register(GitHubIssueNativeProvider(runner=runner))
-    registry.register(JiraDataCenterIssueNativeProvider(runner=runner))
+    registry.register(JiraIssueNativeProvider(runner=runner))
     return registry
 
 

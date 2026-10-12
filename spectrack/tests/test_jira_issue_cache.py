@@ -12,17 +12,20 @@ _SCRIPTS_DIR = _PLUGIN_ROOT / "scripts"
 if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
-from issue.jira.client import JiraDataCenterSite  # noqa: E402
+from issue.jira.client import JiraSite  # noqa: E402
 from issue.jira.cache import (  # noqa: E402
-    JiraDataCenterIssueCache,
+    JiraIssueCache,
     _comment_author_name,
     is_jira_issue_cache_body_path,
 )
 from issue.jira.snapshot import _jira_person_display_name  # noqa: E402
 
 
-def jira_site() -> JiraDataCenterSite:
-    return JiraDataCenterSite(base_url="https://jira.example.test", authority="jira.example.test")
+pytestmark = pytest.mark.usefixtures("jira_cloud")
+
+
+def jira_site() -> JiraSite:
+    return JiraSite(base_url="https://example.atlassian.net", authority="example.atlassian.net")
 
 
 def _jira_issue_payload(status_name: str) -> dict[str, object]:
@@ -63,7 +66,7 @@ def test_jira_issue_cache_body_path_recognizer_matches_issue_md_and_comments(tmp
 
 
 def test_jira_issue_cache_paths_are_provider_specific(tmp_path: Path) -> None:
-    cache = JiraDataCenterIssueCache.for_project(tmp_path)
+    cache = JiraIssueCache.for_project(tmp_path)
     site = jira_site()
 
     assert cache.issue_dir(site, "test-1234") == (
@@ -75,7 +78,7 @@ def test_jira_issue_cache_paths_are_provider_specific(tmp_path: Path) -> None:
 
 
 def test_jira_read_issue_records_native_state(tmp_path: Path) -> None:
-    cache = JiraDataCenterIssueCache.for_project(tmp_path)
+    cache = JiraIssueCache.for_project(tmp_path)
     site = jira_site()
 
     cache.write_issue_bundle(
@@ -88,7 +91,7 @@ def test_jira_read_issue_records_native_state(tmp_path: Path) -> None:
 
 
 def test_jira_read_issue_state_round_trips_closed(tmp_path: Path) -> None:
-    cache = JiraDataCenterIssueCache.for_project(tmp_path)
+    cache = JiraIssueCache.for_project(tmp_path)
     site = jira_site()
 
     cache.write_issue_bundle(
@@ -101,7 +104,7 @@ def test_jira_read_issue_state_round_trips_closed(tmp_path: Path) -> None:
 
 
 def test_jira_write_issue_bundle_renders_state_markdown(tmp_path: Path) -> None:
-    cache = JiraDataCenterIssueCache.for_project(tmp_path)
+    cache = JiraIssueCache.for_project(tmp_path)
     site = jira_site()
 
     payload = _jira_issue_payload("Resolved")
@@ -123,7 +126,7 @@ def test_jira_write_issue_bundle_renders_state_markdown(tmp_path: Path) -> None:
 
 
 def test_jira_state_markdown_marks_unresolved_and_unassigned(tmp_path: Path) -> None:
-    cache = JiraDataCenterIssueCache.for_project(tmp_path)
+    cache = JiraIssueCache.for_project(tmp_path)
     site = jira_site()
 
     cache.write_issue_bundle(
@@ -136,7 +139,7 @@ def test_jira_state_markdown_marks_unresolved_and_unassigned(tmp_path: Path) -> 
 
 
 def test_jira_write_issue_bundle_does_not_emit_metadata_file(tmp_path: Path) -> None:
-    cache = JiraDataCenterIssueCache.for_project(tmp_path)
+    cache = JiraIssueCache.for_project(tmp_path)
     site = jira_site()
 
     cache.write_issue_bundle(
@@ -150,7 +153,7 @@ def test_jira_write_issue_bundle_does_not_emit_metadata_file(tmp_path: Path) -> 
 
 
 def test_jira_write_issue_bundle_response_omits_internal_json_paths(tmp_path: Path) -> None:
-    cache = JiraDataCenterIssueCache.for_project(tmp_path)
+    cache = JiraIssueCache.for_project(tmp_path)
     site = jira_site()
 
     written = cache.write_issue_bundle(
@@ -180,7 +183,7 @@ def test_jira_write_issue_bundle_renders_relationships_markdown(tmp_path: Path) 
     # relation.md is the LLM-readable view; its sections follow Jira's
     # relationship model (parent / unmapped issue links / external links) and
     # need not match GitHub's projection.
-    cache = JiraDataCenterIssueCache.for_project(tmp_path)
+    cache = JiraIssueCache.for_project(tmp_path)
     site = jira_site()
 
     payload = _jira_issue_payload("Open")
@@ -230,7 +233,7 @@ def test_jira_write_issue_bundle_renders_relationships_markdown(tmp_path: Path) 
 
 
 def test_jira_write_issue_bundle_omits_relation_md_when_no_links(tmp_path: Path) -> None:
-    cache = JiraDataCenterIssueCache.for_project(tmp_path)
+    cache = JiraIssueCache.for_project(tmp_path)
     site = jira_site()
 
     cache.write_issue_bundle(
@@ -246,7 +249,7 @@ def test_jira_write_issue_bundle_omits_relation_md_when_no_links(tmp_path: Path)
 def test_jira_write_issue_bundle_renders_attachments_markdown(tmp_path: Path) -> None:
     # attachment.md is the LLM-readable list; one line per attachment with the
     # stable id the download verb consumes. Kept out of issue.md / frontmatter.
-    cache = JiraDataCenterIssueCache.for_project(tmp_path)
+    cache = JiraIssueCache.for_project(tmp_path)
     site = jira_site()
 
     payload = _jira_issue_payload("Open")
@@ -258,7 +261,7 @@ def test_jira_write_issue_bundle_renders_attachments_markdown(tmp_path: Path) ->
             "filename": "report.pdf",
             "size": 2048,
             "mimeType": "application/pdf",
-            "content": "https://jira.example.test/secure/attachment/40001/report.pdf",
+            "content": "https://example.atlassian.net/secure/attachment/40001/report.pdf",
             "created": "2026-06-02T10:00:00.000+0900",
             "author": {"displayName": "Example User", "name": "example"},
         }
@@ -278,7 +281,7 @@ def test_jira_write_issue_bundle_renders_attachments_markdown(tmp_path: Path) ->
 
 
 def test_jira_write_issue_bundle_omits_attachment_md_when_none(tmp_path: Path) -> None:
-    cache = JiraDataCenterIssueCache.for_project(tmp_path)
+    cache = JiraIssueCache.for_project(tmp_path)
     site = jira_site()
 
     cache.write_issue_bundle(
@@ -302,7 +305,7 @@ def _payload_with_assignee(assignee: object) -> dict[str, object]:
 def test_read_issue_preserves_native_assignee(tmp_path: Path) -> None:
     # issue.md is now the pure body; the native assignee object round-trips
     # through issue.json and surfaces verbatim on read (no snapshot frontmatter).
-    cache = JiraDataCenterIssueCache.for_project(tmp_path)
+    cache = JiraIssueCache.for_project(tmp_path)
     site = jira_site()
 
     cache.write_issue_bundle(
@@ -335,7 +338,7 @@ def test_jira_person_display_name_falls_back_through_keys(
 
 
 def test_read_issue_assignee_is_null_when_unassigned(tmp_path: Path) -> None:
-    cache = JiraDataCenterIssueCache.for_project(tmp_path)
+    cache = JiraIssueCache.for_project(tmp_path)
     site = jira_site()
 
     cache.write_issue_bundle(
@@ -350,7 +353,7 @@ def test_read_issue_assignee_is_null_when_unassigned(tmp_path: Path) -> None:
 
 
 def test_read_issue_assignee_is_null_when_field_absent(tmp_path: Path) -> None:
-    cache = JiraDataCenterIssueCache.for_project(tmp_path)
+    cache = JiraIssueCache.for_project(tmp_path)
     site = jira_site()
 
     payload = _jira_issue_payload("Open")

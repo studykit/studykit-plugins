@@ -16,8 +16,8 @@ if str(_SCRIPTS_DIR) not in sys.path:
 
 from command import CommandRequest, CommandResult  # noqa: E402
 from config import load_workflow_config  # noqa: E402
-from issue.jira.client import jira_data_center_site_from_provider_config  # noqa: E402
-from issue.jira.cache import JiraDataCenterIssueCache  # noqa: E402
+from issue.jira.client import jira_site_from_provider_config  # noqa: E402
+from issue.jira.cache import JiraIssueCache  # noqa: E402
 from issue.providers import ProviderOperationError  # noqa: E402
 from issue.jira.backend import JiraIssueFieldsError, fields_payload  # noqa: E402
 from functools import partial  # noqa: E402
@@ -28,6 +28,9 @@ main = partial(run_intent, FIELDS)
 
 
 _DROPPED_FIELD_KEYS = ("provider", "cache", "site", "operation", "role", "kind", "verified", "key")
+
+
+pytestmark = pytest.mark.usefixtures("jira_cloud")
 
 
 def _assert_flat_field_envelope(payload: dict, *, issue_basename: str = "TEST-1234/issue.md") -> None:
@@ -69,9 +72,7 @@ version: 1
 providers:
   issues:
     kind: jira
-    site: https://jira.example.test
-    deployment: data-center
-    api_version: 2
+    site: https://example.atlassian.net
     project: TEST
     issue_type: Task
 """
@@ -89,7 +90,7 @@ issue_id_format: jira
 def jira_site(project: Path):
     config = load_workflow_config(project)
     assert config is not None
-    return jira_data_center_site_from_provider_config(config.issues)
+    return jira_site_from_provider_config(config.issues)
 
 
 def jira_issue_payload(*, assignee: str | None = None, issuetype: str = "Task") -> dict[str, object]:
@@ -97,7 +98,7 @@ def jira_issue_payload(*, assignee: str | None = None, issuetype: str = "Task") 
         "id": "10001",
         "key": "TEST-1234",
         "fields": {
-            "summary": "Support Jira Data Center",
+            "summary": "Support Jira Cloud",
             "description": "Cached body.",
             "labels": ["workflow", "jira"],
             "issuetype": {"name": issuetype},
@@ -124,24 +125,24 @@ def curl_write_args() -> tuple[str, ...]:
 
 
 def jira_issue_url(issue: str = "TEST-1234") -> str:
-    return f"https://jira.example.test/rest/api/2/issue/{issue}"
+    return f"https://example.atlassian.net/rest/api/3/issue/{issue}"
 
 
 def jira_remote_links_url(issue: str = "TEST-1234") -> str:
-    return f"https://jira.example.test/rest/api/2/issue/{issue}/remotelink"
+    return f"https://example.atlassian.net/rest/api/3/issue/{issue}/remotelink"
 
 
 def jira_transitions_url(issue: str = "TEST-1234") -> str:
-    return f"https://jira.example.test/rest/api/2/issue/{issue}/transitions"
+    return f"https://example.atlassian.net/rest/api/3/issue/{issue}/transitions"
 
 
 def jira_myself_url() -> str:
-    return "https://jira.example.test/rest/api/2/myself"
+    return "https://example.atlassian.net/rest/api/3/myself"
 
 
 def _seed_cache(project: Path, *, payload: dict[str, object] | None = None) -> None:
     site = jira_site(project)
-    cache = JiraDataCenterIssueCache.for_project(project)
+    cache = JiraIssueCache.for_project(project)
     cache.write_issue_bundle(
         site,
         payload if payload is not None else jira_issue_payload(),
@@ -250,7 +251,7 @@ def test_assign_me_resolves_via_myself_once(tmp_path: Path) -> None:
     responses = _baseline_responses()
     responses[curl_args(jira_myself_url())] = result(
         curl_args(jira_myself_url()),
-        stdout=json.dumps({"name": "studykit-svc", "displayName": "Studykit Service"}),
+        stdout=json.dumps({"accountId": "studykit-svc", "displayName": "Studykit Service"}),
     )
     runner = FakeRunner(responses)
 
@@ -266,7 +267,7 @@ def test_assign_me_resolves_via_myself_once(tmp_path: Path) -> None:
     myself_calls = [request for request in runner.requests if request.args == curl_args(jira_myself_url())]
     assert len(myself_calls) == 1
     write_requests = [request for request in runner.requests if request.args == curl_write_args()]
-    assert any('\\"assignee\\":{\\"name\\":\\"studykit-svc\\"}' in str(request.input_text) for request in write_requests)
+    assert any('\\"assignee\\":{\\"accountId\\":\\"studykit-svc\\"}' in str(request.input_text) for request in write_requests)
 
 
 def test_unassign_sets_fields_assignee_null(tmp_path: Path) -> None:
@@ -319,7 +320,7 @@ def test_assign_refreshes_cache_with_new_assignee(tmp_path: Path) -> None:
         runner=runner,
     )
 
-    cache = JiraDataCenterIssueCache.for_project(tmp_path)
+    cache = JiraIssueCache.for_project(tmp_path)
     payload = cache.read_issue(jira_site(tmp_path), "TEST-1234")
     assert payload["assignee"] == {"name": "alice", "displayName": "Alice Anderson"}
 

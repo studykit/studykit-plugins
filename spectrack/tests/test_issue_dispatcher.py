@@ -73,15 +73,16 @@ version: 1
 providers:
   issues:
     kind: jira
-    site: https://jira.example.test
-    deployment: data-center
-    api_version: 2
+    site: https://example.atlassian.net
     project: TEST
     issue_type: Task
   knowledge:
     kind: github
 issue_id_format: jira
 """
+
+
+pytestmark = pytest.mark.usefixtures("jira_cloud")
 
 
 def _write_config(project: Path, body: str) -> None:
@@ -176,7 +177,7 @@ def test_drafts_help_under_jira_includes_jira_only_flags(tmp_path: Path) -> None
     )
     assert code == 0
     assert "--epic" in stdout
-    assert "--epic-name" in stdout
+    assert "--epic-name" not in stdout
     assert "--subtask-parent" in stdout
     assert "--issue-type" in stdout
     assert "--project-key" in stdout
