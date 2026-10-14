@@ -10,6 +10,8 @@ const COLUMNS = 44
 const items = atom({ plugin: 'agenda', key: 'items' } as const, [])
 const isHidden = atom({ plugin: 'agenda', key: 'isHidden' } as const, false)
 const start = atom({ plugin: 'agenda', key: 'start' } as const, 0)
+// The id of the listed item being discussed now; '' when none. Only a listed item can be the topic, and
+// resolving it clears the topic.
 const focus = atom({ plugin: 'agenda', key: 'focus' } as const, '')
 // The item pressed and awaiting the person's yes before it becomes the topic; '' when none.
 const pending = atom({ plugin: 'agenda', key: 'pending' } as const, '')
@@ -48,7 +50,11 @@ async function sync($: EngineInterface): Promise<void> {
   } else if (isSwitch) {
     await update($, items, () => [])
     await update($, focus, () => '')
-  } else await save($)
+  }
+  // Up to 0.3 the topic was free text, not an id: a title of a listed item becomes its id, any other is dropped.
+  const list = await read($, items)
+  await update($, focus, f => (list.some(d => d.id === f) ? f : (list.find(d => d.title === f)?.id ?? '')))
+  if (!kept && !isSwitch) await save($)
   await update($, start, () => 0)
   await update($, pending, () => '')
   await showStatus($)
@@ -65,26 +71,45 @@ async function prune($: EngineInterface): Promise<void> {
 
 const str = (v: unknown): string | undefined => (typeof v === 'string' && v.trim() !== '' ? v.trim() : undefined)
 
+// The item being discussed now, if any.
+async function topic($: EngineInterface): Promise<Item | undefined> {
+  const now = await read($, focus)
+  return (await read($, items)).find(d => d.id === now)
+}
+
 async function showStatus($: EngineInterface): Promise<void> {
   const list = await read($, items)
   const decisions = list.filter(d => d.isDecision).length
   $.ui.status(list.length > 0 ? `📋${list.length}${decisions > 0 ? ` · 🚦${decisions}` : ''}` : undefined)
 }
 
-async function show($: EngineInterface): Promise<void> {
-  if ((await read($, place)) === 'pane') $.ui.open({ id: PANE, title: TITLE, columns: COLUMNS }).catch(() => undefined)
+// Opens the pane unasked. Below the engine's width floor, or on a surface that places no panes, it waits
+// undrawn; the answer is then a note for the model to pass on, since the person sees nothing.
+async function show($: EngineInterface): Promise<string> {
+  if ((await read($, place)) !== 'pane') return ''
+  const opened = await $.ui.open({ id: PANE, title: TITLE, columns: COLUMNS }).catch(() => undefined)
+  if (!opened || opened.isPlaced) return ''
+  return ` The "${TITLE}" pane is not drawn (${opened.reason}); the user can open it with /agenda, or put the list above the prompt with /agenda band.`
 }
 
-async function moveTo($: EngineInterface, where: Place): Promise<void> {
+// The person's own open: placed at any width, unless no attached surface places panes. Answers '' when drawn,
+// else why not.
+async function openAsked($: EngineInterface): Promise<string> {
+  const opened = await $.ui.open({ id: PANE, title: TITLE, columns: COLUMNS })
+  return opened.isPlaced ? '' : ` 다만 화면에 그려지지 않았습니다: ${opened.reason}`
+}
+
+async function moveTo($: EngineInterface, where: Place): Promise<string> {
   await update($, place, () => where)
   await $.store.set(PLACE_KEY, where)
-  if (where === 'band') await $.ui.close({ id: PANE })
-  else await $.ui.open({ id: PANE, title: TITLE, columns: COLUMNS })
+  if (where === 'pane') return openAsked($)
+  await $.ui.close({ id: PANE })
+  return ''
 }
 
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
-    await $.command.register({ name: 'agenda', description: '이 세션의 안건(지금 주제와 남은 항목)을 보여줍니다 (번호나 id: 지금 주제로 고르기, band: prompt 위로, pane: pane으로, close: 닫기)', argumentHint: '[번호|id|band|pane|close]' })
+    await $.command.register({ name: 'agenda', description: '이 세션의 안건(지금 주제와 남은 항목)을 보여줍니다 (번호나 id: 지금 주제로 고르기, unfocus: 지금 주제 해제, band: prompt 위로, pane: pane으로, close: 닫기)', argumentHint: '[번호|id|unfocus|band|pane|close]' })
     const kept = await $.store.get(PLACE_KEY)
     if (kept === 'band' || kept === 'pane') await update($, place, () => kept)
     await $.tool.register({
@@ -117,13 +142,21 @@ export const register: Register = on => {
     await $.tool.register({
       name: 'agenda_focus',
       description:
-        'Set the topic being discussed now, shown at the top of the "안건" pane, so the user can see what the conversation is about. ' +
-        'Call it when the topic changes; an empty topic clears it.',
+        'Mark the listed item the conversation is on right now, by its number in the "안건" pane; it shows at the top so the user ' +
+        'can see what is being discussed. Focus an item only while it is being discussed: when the conversation moves to another ' +
+        'listed item, focus that one; when it moves off the list, call agenda_unfocus (or agenda_add the new topic, then focus it). ' +
+        'Resolving the focused item clears the focus.',
       inputSchema: {
         type: 'object',
-        properties: { topic: { type: 'string', description: 'One line, in the user\'s language' } },
-        required: ['topic'],
+        properties: { number: { type: 'integer', minimum: 1, description: 'The item\'s number in the list, from 1' } },
+        required: ['number'],
       },
+      isDeferred: false,
+    })
+    await $.tool.register({
+      name: 'agenda_unfocus',
+      description: 'Clear the focused item of the "안건" pane once the conversation is no longer on it.',
+      inputSchema: { type: 'object', properties: {} },
       isDeferred: false,
     })
     await sync($)
@@ -147,23 +180,31 @@ export const register: Register = on => {
       await $.ui.close({ id: PANE })
       return { text: '안건을 닫았습니다. /agenda 로 다시 엽니다.' }
     }
+    if (arg === 'unfocus') {
+      const was = await topic($)
+      if (!was) return { text: '지금 주제가 없습니다.' }
+      await unfocus($)
+      await $.session.append({
+        message: { type: 'user', content: [{ type: 'text', text: `[안건] 사용자가 지금 주제 "${was.title}" (${was.id})를 해제했습니다.` }] },
+      })
+      return { text: `지금 주제를 해제했습니다: ${was.title}` }
+    }
     await update($, isHidden, () => false)
     if (arg === 'band' || arg === 'pane') {
-      await moveTo($, arg)
-      return { text: arg === 'band' ? '안건을 prompt 위 band로 옮겼습니다. /agenda pane 으로 되돌립니다.' : '안건을 pane으로 옮겼습니다. /agenda band 로 prompt 위에 둡니다.' }
+      const unplaced = await moveTo($, arg)
+      return { text: arg === 'band' ? '안건을 prompt 위 band로 옮겼습니다. /agenda pane 으로 되돌립니다.' : `안건을 pane으로 옮겼습니다. /agenda band 로 prompt 위에 둡니다.${unplaced}` }
     }
     if (arg !== '') {
       // Typed out, the pick is deliberate: no yes to ask for, unlike a press.
       const open = await read($, items)
       const d = /^\d+$/.test(arg) ? open[Number(arg) - 1] : open.find(x => x.id === arg)
       if (!d) return { text: `"${arg}"에 해당하는 안건이 없습니다. 번호(1–${open.length})나 id로 고릅니다.` }
-      if (d.title !== (await read($, focus))) await choose($, d)
+      if (d.id !== (await read($, focus))) await choose($, d)
       await show($)
       return { text: `지금 주제: ${d.title}` }
     }
     if ((await read($, place)) === 'band') return { text: '안건은 prompt 위 band에 있습니다.' }
-    await $.ui.open({ id: PANE, title: TITLE, columns: COLUMNS })
-    return { text: '안건 pane을 열었습니다.' }
+    return { text: `안건 pane을 열었습니다.${await openAsked($)}` }
   })
 
   on('tool.call', { tool: 'mcp__agenda__agenda_add' }, async ($, e) => {
@@ -176,8 +217,8 @@ export const register: Register = on => {
     await save($)
     await showStatus($)
     await update($, isHidden, () => false)
-    await show($)
-    return { result: `Listed "${id}".` }
+    const number = (await read($, items)).findIndex(d => d.id === id) + 1
+    return { result: `Listed "${id}" as number ${number}.${await show($)}` }
   })
 
   on('tool.call', { tool: 'mcp__agenda__agenda_resolve' }, async ($, e) => {
@@ -185,21 +226,42 @@ export const register: Register = on => {
     const id = str(e.id)
     const answer = str(e.answer)
     if (!id || !answer) return { deny: 'id and answer are required.' }
-    if (!(await read($, items)).some(d => d.id === id)) return { deny: `No item "${id}".` }
-    await update($, items, list => list.filter(d => d.id !== id))
+    const list = await read($, items)
+    const at = list.findIndex(d => d.id === id)
+    if (at < 0) return { deny: `No item "${id}".` }
+    const wasFocus = (await read($, focus)) === id
+    await update($, items, l => l.filter(d => d.id !== id))
     await update($, pending, p => (p === id ? '' : p))
+    if (wasFocus) await update($, focus, () => '')
     await save($)
     await showStatus($)
-    return { result: `Resolved "${id}".` }
+    const moved = at < list.length - 1 ? ` Items after number ${at + 1} moved up one number.` : ''
+    return { result: `Resolved "${id}".${wasFocus ? ' It was the focus; the focus is cleared.' : ''}${moved}` }
   })
 
   on('tool.call', { tool: 'mcp__agenda__agenda_focus' }, async ($, e) => {
     await sync($)
-    const topic = str(e.topic) ?? ''
-    await update($, focus, () => topic)
+    const list = await read($, items)
+    // Typed a number, but a model may still send "2".
+    const raw: unknown = e.number
+    const n = typeof raw === 'number' ? raw : typeof raw === 'string' && /^\d+$/.test(raw.trim()) ? Number(raw) : NaN
+    const d = Number.isInteger(n) ? list[n - 1] : undefined
+    if (!d) {
+      const listed = list.map((x, i) => `${i + 1}. ${x.title} (${x.id})`).join('; ')
+      return { deny: list.length === 0 ? 'The list is empty: add the item with agenda_add first.' : `No item number ${String(e.number)}. Listed: ${listed}` }
+    }
+    await update($, focus, () => d.id)
+    await update($, pending, () => '')
     await save($)
-    if (topic) await show($)
-    return { result: topic ? `Focus: ${topic}` : 'Focus cleared.' }
+    return { result: `Focus: ${n}. ${d.title} (${d.id}).${await show($)}` }
+  })
+
+  on('tool.call', { tool: 'mcp__agenda__agenda_unfocus' }, async $ => {
+    await sync($)
+    const was = await topic($)
+    if (!was) return { result: 'Nothing was focused.' }
+    await unfocus($)
+    return { result: `Focus cleared (was "${was.title}").` }
   })
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
@@ -218,7 +280,7 @@ export const register: Register = on => {
 // keyboard (ctrl+x tab), or in the pane its digit) and then saying yes: a stray press must not tell the model
 // the topic moved. Pressing the topic itself does nothing.
 async function ask($: EngineInterface, d: Item, site: string): Promise<void> {
-  if (d.title === (await read($, focus))) return
+  if (d.id === (await read($, focus))) return
   await update($, pending, () => d.id)
   // Moves the ring onto the yes so Enter answers; a site not holding the keys refuses, and a click still works.
   await $.ui.focus({ requestId: site, key: 'confirm' }).catch(() => undefined)
@@ -227,19 +289,26 @@ async function ask($: EngineInterface, d: Item, site: string): Promise<void> {
 // The model is told in a row it reads with the next request.
 async function choose($: EngineInterface, d: Item): Promise<void> {
   await update($, pending, () => '')
-  await update($, focus, () => d.title)
+  await update($, focus, () => d.id)
   await save($)
   await $.session.append({
     message: { type: 'user', content: [{ type: 'text', text: `[안건] 사용자가 "${d.title}" (${d.id})를 지금 다룰 주제로 골랐습니다.` }] },
   })
 }
 
+async function unfocus($: EngineInterface): Promise<void> {
+  await update($, focus, () => '')
+  await update($, pending, () => '')
+  await save($)
+}
+
 // The focus line and a page of whole items that fits `room` rows, one row kept for the paging buttons. Digit
 // hotkeys only in the pane: in the band a bare digit in an empty prompt would press them instead of typing.
 async function body($: EngineInterface, e: Parameters<EngineInterface['ui']['resolve']>[0], room: number, hasDigits: boolean, site: string) {
   const { Box, Button, Text } = $.ui.resolve(e)
-  const now = await read($, focus)
   const open = await read($, items)
+  const focused = await read($, focus)
+  const now = open.find(d => d.id === focused)?.title
   const asking = await read($, pending)
   const asked = open.find(d => d.id === asking)
   // A blank row under the topic sets it apart from the items to pick from.
@@ -289,8 +358,8 @@ async function body($: EngineInterface, e: Parameters<EngineInterface['ui']['res
         return (
           <Box flexDirection="column" key={`o-${d.id}`}>
             <Button key={`pick-${d.id}`} plain hotkey={hotkey} onPress={() => ask($, d, site)}>
-              <Text bold color={d.title === now ? 'cyan' : undefined}>
-                {`${hotkey ? '' : `${first + i + 1}. `}${d.isDecision ? '🚦 ' : ''}${d.title}${d.title === now ? ' ◀' : ''}`}
+              <Text bold color={d.id === focused ? 'cyan' : undefined}>
+                {`${hotkey ? '' : `${first + i + 1}. `}${d.isDecision ? '🚦 ' : ''}${d.title}${d.id === focused ? ' ◀' : ''}`}
               </Text>
             </Button>
             {d.detail ? <Text dimColor>{`   ${d.id} · ${d.detail}`}</Text> : null}

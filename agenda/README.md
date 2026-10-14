@@ -3,11 +3,12 @@
 A Claude Code mod (hooks module) that keeps a pane of what the session is discussing, so the topic
 is not lost in a long conversation.
 
-- **🎯** — the topic being discussed now, set by the model with `agenda_focus`.
+- **🎯** — the listed item being discussed now. The model sets it with `agenda_focus` by the item's number and clears it with `agenda_unfocus` once the conversation moves off it; only a listed item can be the topic, and resolving it clears the topic.
 - **안건** — the open items, added with `agenda_add` (`decision: true` marks one the user must
   decide) and removed with `agenda_resolve`.
 - Pressing an item asks whether to make it the 🎯 topic; on yes (`y`, or Enter) it becomes the topic and the model is told so. Press it with a click, or give the list the keyboard (ctrl+x tab) and press Enter on it; in the pane its digit (`1`–`9`) also presses it.
 - `/agenda <number|id>` picks an item without asking, e.g. `/agenda 2`.
+- `/agenda unfocus` clears the 🎯 topic, and the model is told so.
 - `/agenda` opens the pane, `/agenda close` closes it; the status line shows `📋N · 🚦M` (📋 the open items, 🚦 the decisions among them).
 - `/agenda band` moves the list to the band right above the prompt, `/agenda pane` back to its own pane; the choice is kept across sessions.
 - Each session's items and topic are saved in the plugin's store under the session id, so `claude --resume` brings them back; `/clear` starts an empty agenda. Entries untouched for 30 days are dropped.
