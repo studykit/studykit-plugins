@@ -6,6 +6,7 @@ is not lost in a long conversation.
 - **🎯** — the listed item being discussed now. The model sets it with `agenda_focus` by the item's number and clears it with `agenda_unfocus` once the conversation moves off it; only a listed item can be the topic, and resolving it clears the topic.
 - **안건** — the open items, added with `agenda_add` (`decision: true` marks one the user must
   decide) and removed with `agenda_resolve`.
+- The model reads the list as it stands (each item's number and id, and the 🎯 topic) with `agenda_list`, which changes nothing.
 - Pressing an item asks whether to make it the 🎯 topic; on yes (`y`, or Enter) it becomes the topic and the model is told so. Press it with a click, or give the list the keyboard (ctrl+x tab) and press Enter on it; in the pane its digit (`1`–`9`) also presses it.
 - `/agenda <number|id>` picks an item without asking, e.g. `/agenda 2`.
 - `/agenda unfocus` clears the 🎯 topic, and the model is told so.

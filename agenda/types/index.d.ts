@@ -18,5 +18,6 @@ declare module 'claude-code' {
     mcp__agenda__agenda_resolve: { id: string; answer: string }
     mcp__agenda__agenda_focus: { number: number }
     mcp__agenda__agenda_unfocus: {}
+    mcp__agenda__agenda_list: {}
   }
 }

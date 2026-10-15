@@ -159,6 +159,15 @@ export const register: Register = on => {
       inputSchema: { type: 'object', properties: {} },
       isDeferred: false,
     })
+    await $.tool.register({
+      name: 'agenda_list',
+      description:
+        'Read the "안건" pane as it stands: each open item\'s number, id, title and detail (🚦 marks a decision), and which ' +
+        'one is focused. It changes nothing. Read it whenever you need an item\'s number or id; never focus an item to find out ' +
+        'what it is.',
+      inputSchema: { type: 'object', properties: {} },
+      isDeferred: false,
+    })
     await sync($)
     await prune($)
     await showStatus($)
@@ -262,6 +271,17 @@ export const register: Register = on => {
     if (!was) return { result: 'Nothing was focused.' }
     await unfocus($)
     return { result: `Focus cleared (was "${was.title}").` }
+  })
+
+  // A read for the model: it neither opens the pane nor touches the topic.
+  on('tool.call', { tool: 'mcp__agenda__agenda_list' }, async $ => {
+    await sync($)
+    const list = await read($, items)
+    if (list.length === 0) return { result: 'The list is empty.' }
+    const focused = await read($, focus)
+    const rows = list.map((d, i) => `${i + 1}. ${d.isDecision ? '🚦 ' : ''}${d.title} (${d.id})${d.detail ? ` — ${d.detail}` : ''}`)
+    const now = list.findIndex(d => d.id === focused) + 1
+    return { result: `${rows.join('\n')}\n${now > 0 ? `Focus: number ${now}.` : 'Nothing is focused.'}` }
   })
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {

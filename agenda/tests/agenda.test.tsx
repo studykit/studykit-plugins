@@ -77,6 +77,24 @@ test('/agenda unfocus clears the topic and tells the model', async ($, on) => {
   await ui.unmount()
 })
 
+test('agenda_list reads the numbers, ids and focus without changing them', async ($, on) => {
+  // A pane that waits undrawn: a call that opens it says so in its answer.
+  world(on, { isPlaced: false, reason: 'unasked below 144 columns (80 now)' })
+  expect(JSON.stringify(await $.tool.call({ tool: 'mcp__agenda__agenda_list', tool_use_id: 'l0' } as never))).toContain('The list is empty')
+  await $.tool.call({ tool: 'mcp__agenda__agenda_add', tool_use_id: 'a', id: 'log', title: '로그 회전 한도', detail: '10MB / 50MB', decision: true } as never)
+  await $.tool.call({ tool: 'mcp__agenda__agenda_add', tool_use_id: 'b', id: 'ci', title: 'CI 캐시' } as never)
+  await $.tool.call({ tool: 'mcp__agenda__agenda_focus', tool_use_id: 'f', number: 2 } as never)
+  const r = JSON.stringify(await $.tool.call({ tool: 'mcp__agenda__agenda_list', tool_use_id: 'l1' } as never))
+  expect(r).toContain('1. 🚦 로그 회전 한도 (log) — 10MB / 50MB')
+  expect(r).toContain('2. CI 캐시 (ci)\\nFocus: number 2.')
+  expect(r).not.toContain('not drawn')
+  await $.tool.call({ tool: 'mcp__agenda__agenda_unfocus', tool_use_id: 'u' } as never)
+  expect(JSON.stringify(await $.tool.call({ tool: 'mcp__agenda__agenda_list', tool_use_id: 'l2' } as never))).toContain('Nothing is focused.')
+  const ui = await $.ui.mount({ plugin: 'agenda', surface: 'terminal', component: 'Pane', props, requestId: 'agenda' })
+  expect(await ui.find({ text: /🎯/ })).toBeUndefined()
+  await ui.unmount()
+})
+
 test('refuses to resolve an unknown id', async ($, on) => {
   world(on)
   const r = await $.tool.call({ tool: 'mcp__agenda__agenda_resolve', tool_use_id: 'x', id: 'nope', answer: 'y' } as never)
