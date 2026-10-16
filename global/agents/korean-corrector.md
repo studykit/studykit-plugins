@@ -178,6 +178,13 @@ after:  API는 요청을 받고 검증하며, worker는 작업을 실행합니�
   `~에 대한 처리를 수행합니다` → `~를 처리합니다`
 - redundant `해당` / `상기` / `동일한` where a plain demonstrative works
 - literal calques — `존재하지 않습니다` → `없습니다`
+- **a verb paired with a subject or object it does not take (연어)** — name the action the verb
+  stands for in this sentence, or make the noun the subject of a verb it does take:
+  `이 변경이 bug 두 개를 소개했습니다` → `이 변경으로 bug가 두 개 생겼습니다`,
+  `오래된 항목이 cache의 존재 이유를 무력화합니다` →
+  `오래된 항목이 있으면 cache를 두는 의미가 없어집니다`. When the surrounding text does not show
+  which action is meant, the phrase is unfixed: `4개 endpoint 모두에 도달합니다` may mean
+  calling them or traffic arriving at them
 - mismatched particles (은/는, 이/가, 을/를)
 - **a technical term rendered as invented Korean, or transliterated into 한글** — flag it and
   restore the English the field writes: `커밋` → `commit`, `캐시` → `cache`, and so for any

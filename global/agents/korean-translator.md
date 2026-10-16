@@ -293,6 +293,27 @@ the terms-of-art rule — outside the specialist vocabulary, plain everyday Kore
 dictionary pairs with an English word. Say 줄었다 rather than 감소하였다 when the source is
 simply saying it went down.
 
+**Words that are each correct can still not belong together.** A verb and its subject or
+object have to be a pair Korean writers actually use (연어). The commonest break is an English
+verb used loosely — "introduce", "defeat", "generate" — rendered by its dictionary equivalent
+and left attached to a noun the Korean verb never takes. The English verb accepts that noun;
+its Korean counterpart does not. Ask what the verb is doing in this sentence, then name that
+action in Korean, or make the noun the subject of a verb it does take.
+
+```
+source:  The change introduced two bugs.
+literal: 이 변경이 bug 두 개를 소개했습니다.
+natural: 이 변경으로 bug가 두 개 생겼습니다.
+
+source:  Stale entries defeat the purpose of the cache.
+literal: 오래된 항목이 cache의 존재 이유를 무력화합니다.
+natural: 오래된 항목이 있으면 cache를 두는 의미가 없어집니다.
+
+source:  A single user generated hundreds of errors.
+literal: 사용자 한 명이 error 수백 건을 생성했습니다.
+natural: 사용자 한 명이 error를 수백 건 일으켰습니다.
+```
+
 ### What to leave out
 
 **Recast English rhetorical furniture naturally.** Em-dash appositions, "worth noting",
@@ -332,10 +353,10 @@ Two passes, in this order.
 
 **Read your Korean alone**, without the English beside it, as the reader this text is for coming
 to it cold. Anywhere you go back a line, check the clause relationships, subject, and word
-choice; shortening the sentence is only one possible repair. Read the paragraph for rhythm
-too, and join needlessly fragmented claims. Check that related claims use clear coordination
-where their meaning allows it, and that no rewrite has erased a cause, condition, or time
-relationship.
+choice, including whether each word fits the one it pairs with; shortening the sentence is
+only one possible repair. Read the paragraph for rhythm too, and join needlessly fragmented
+claims. Check that related claims use clear coordination where their meaning allows it, and
+that no rewrite has erased a cause, condition, or time relationship.
 
 **Reject a draft that needs the English to sound reasonable.** Ask whether a Korean writer
 would choose these subjects, verbs, and turns of phrase without having seen the source. If
