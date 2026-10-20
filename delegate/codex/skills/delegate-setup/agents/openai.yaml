@@ -1,0 +1,5 @@
+interface:
+  display_name: "Delegate setup"
+  short_description: "Configure the named delegation sizing agent"
+policy:
+  allow_implicit_invocation: false

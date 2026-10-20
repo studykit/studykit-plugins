@@ -1,0 +1,16 @@
+{
+  "name": "delegate",
+  "version": "0.1.0",
+  "description": "Delegate work through a dedicated sizing agent, verify worker results, and learn from recorded verdicts.",
+  "author": {
+    "name": "studykit"
+  },
+  "repository": "https://github.com/studykit/studykit-plugins",
+  "license": "MIT",
+  "keywords": [
+    "delegation",
+    "subagents",
+    "model-selection",
+    "verification"
+  ]
+}

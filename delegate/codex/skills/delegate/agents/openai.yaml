@@ -1,0 +1,5 @@
+interface:
+  display_name: "Delegate"
+  short_description: "Delegate, verify, and learn from subagent results"
+policy:
+  allow_implicit_invocation: false

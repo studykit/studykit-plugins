@@ -54,6 +54,7 @@ For compatibility and versioning rules, see `AGENTS.md`.
 - `spectrack` — provider-backed workflow over GitHub Issues, Jira, GitHub repository wiki directory, and Confluence with issue and knowledge authoring contracts
 - `diagram` — PlantUML, D2, and Structurizr DSL diagram creation, syntax reference, validation, and rendering
 - `guard` — user-configured answer, turn, and plan reviews, plus rule-based checkpoints for changed files
+- `delegate` — delegation through a named sizing agent, with verified worker results and persistent verdicts
 - `handover` — create a self-contained session handover and load a recorded handover after a clear
 - `lens` — Herdr file tree with popup and overlay views, saved navigation state, filename search, Markdown and source previews, diagram rendering (PlantUML, Mermaid, D2, Graphviz and more), and Git diffs
 - `shellbox` — resumable Herdr shell popup for each pane

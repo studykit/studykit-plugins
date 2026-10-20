@@ -99,6 +99,16 @@
       "license": "MIT",
       "category": "productivity",
       "keywords": ["agenda", "session", "pane", "decisions", "claude-code"]
+    },
+    {
+      "name": "delegate",
+      "source": "./delegate",
+      "description": "Delegate work through a dedicated sizing agent, verify worker results, and learn from recorded verdicts.",
+      "author": {"name": "studykit"},
+      "repository": "https://github.com/studykit/studykit-plugins",
+      "license": "MIT",
+      "category": "development",
+      "keywords": ["delegation", "subagents", "model-selection", "verification", "claude-code", "codex"]
     }
   ]
 }

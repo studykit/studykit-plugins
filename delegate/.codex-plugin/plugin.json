@@ -1,0 +1,33 @@
+{
+  "name": "delegate",
+  "version": "0.1.0",
+  "description": "Delegate work through a dedicated sizing agent, verify worker results, and learn from recorded verdicts.",
+  "author": {
+    "name": "studykit"
+  },
+  "repository": "https://github.com/studykit/studykit-plugins",
+  "license": "MIT",
+  "keywords": [
+    "delegation",
+    "subagents",
+    "model-selection",
+    "verification"
+  ],
+  "interface": {
+    "displayName": "Delegate",
+    "shortDescription": "Sized, verified delegation",
+    "developerName": "studykit",
+    "category": "Coding",
+    "capabilities": [
+      "Interactive",
+      "Write"
+    ]
+  },
+  "skills": "./codex/skills/",
+  "extensions": {
+    "com.openai": {
+      "onboardingSkill": "./codex/skills/delegate-setup/SKILL.md"
+    }
+  },
+  "hooks": "./hooks/hooks.codex.json"
+}
