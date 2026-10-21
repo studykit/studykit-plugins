@@ -86,6 +86,14 @@ class DelegateTests(unittest.TestCase):
         self.assertEqual(agent.read_bytes(), (PLUGIN / "agents/delegate-sizer.toml").read_bytes())
         self.assertEqual(tomllib.loads(config.read_text())["agents"]["delegate-sizer"]["config_file"], str(agent))
         self.assertFalse(str(agent).startswith(str(PLUGIN)))
+        verifier = Path(result["agents"]["delegate-verifier"]["agent"])
+        self.assertEqual(verifier.read_bytes(), (PLUGIN / "agents/delegate-verifier.toml").read_bytes())
+        definition = tomllib.loads(verifier.read_text())
+        self.assertEqual(definition["model"], "gpt-6.1-sol")
+        self.assertEqual(definition["model_reasoning_effort"], "high")
+        self.assertEqual(result["agents"]["delegate-verifier"]["model"], "gpt-6.1-sol")
+        self.assertEqual(result["agents"]["delegate-verifier"]["effort"], "high")
+        self.assertFalse(definition["features"]["memories"])
         snapshot = config.read_bytes()
         self.run_script("setup.py")
         self.assertEqual(snapshot, config.read_bytes())
@@ -97,6 +105,7 @@ class DelegateTests(unittest.TestCase):
         self.run_script("setup.py", "remove")
         self.assertEqual(config.read_bytes(), original)
         self.assertFalse(agent.exists())
+        self.assertFalse(verifier.exists())
         self.assertEqual((self.data / "ledger.jsonl").read_bytes(), history)
         self.assertTrue((self.data / "sizer-lessons.md").exists())
 
@@ -108,6 +117,89 @@ class DelegateTests(unittest.TestCase):
         self.run_script("setup.py", ok=False)
         self.assertEqual(config.read_text(), original)
         self.assertFalse(self.data.exists())
+
+    def test_verifier_role_conflict_preflights_both_agents(self):
+        self.home.mkdir()
+        config = self.home / "config.toml"
+        original = '[agents.delegate-verifier]\ndescription="Mine"\nconfig_file="mine.toml"\n'
+        config.write_text(original)
+        self.run_script("setup.py", ok=False)
+        self.assertEqual(config.read_text(), original)
+        self.assertFalse(self.data.exists())
+
+    def test_upgrade_from_sizer_only_state_and_remove_preserve_history(self):
+        import hashlib
+        sys.path.insert(0, str(PLUGIN / "scripts"))
+        self.addCleanup(sys.path.remove, str(PLUGIN / "scripts"))
+        from role_registration import block
+        agent = self.data / "agents/delegate-sizer.toml"
+        agent.parent.mkdir(parents=True)
+        old_bytes = (PLUGIN / "agents/delegate-sizer.toml").read_bytes() + b"\n# Old managed release\n"
+        agent.write_bytes(old_bytes)
+        self.home.mkdir()
+        original = '# Preserved\nmodel="gpt-6-luna"\n'
+        config = self.home / "config.toml"
+        config.write_text(original + block(str(agent)))
+        state = self.data / "setup.json"
+        state.write_text(json.dumps({"agent_sha256": hashlib.sha256(old_bytes).hexdigest(),
+                                     "plugin_version": "0.2.0"}))
+        self.add()
+        history = (self.data / "ledger.jsonl").read_bytes()
+        status = json.loads(self.run_script("setup.py", "status"))
+        self.assertFalse(status["configured"])
+        self.assertFalse((self.data / "agents/delegate-verifier.toml").exists())
+        self.run_script("setup.py")
+        self.assertEqual(agent.read_bytes(), (PLUGIN / "agents/delegate-sizer.toml").read_bytes())
+        self.assertEqual(set(json.loads(state.read_text())["agents"]),
+                         {"delegate-sizer", "delegate-verifier"})
+        self.assertTrue(json.loads(self.run_script("setup.py", "status"))["configured"])
+        self.run_script("setup.py", "remove")
+        self.assertEqual(config.read_text(), original)
+        self.assertEqual((self.data / "ledger.jsonl").read_bytes(), history)
+
+    def test_edited_verifier_blocks_update_and_remove_without_partial_changes(self):
+        result = json.loads(self.run_script("setup.py"))
+        verifier = Path(result["agents"]["delegate-verifier"]["agent"])
+        verifier.write_bytes(verifier.read_bytes() + b"\n# User verifier\n")
+        before = {p: p.read_bytes() for p in self.data.rglob("*") if p.is_file()}
+        config = (self.home / "config.toml").read_bytes()
+        self.assertFalse(json.loads(self.run_script("setup.py", "status"))["configured"])
+        self.run_script("setup.py", ok=False)
+        self.run_script("setup.py", "remove", ok=False)
+        self.assertEqual(before, {p: p.read_bytes() for p in self.data.rglob("*") if p.is_file()})
+        self.assertEqual((self.home / "config.toml").read_bytes(), config)
+
+    def test_edited_verifier_registration_status_and_remove(self):
+        result = json.loads(self.run_script("setup.py"))
+        config = self.home / "config.toml"
+        text = config.read_text().replace('[agents.delegate-verifier]\n',
+                                          '[agents.delegate-verifier]\nmodel="gpt-6-luna"\n')
+        config.write_text(text)
+        self.assertFalse(json.loads(self.run_script("setup.py", "status"))["configured"])
+        self.run_script("setup.py", ok=False)
+        self.run_script("setup.py", "remove", ok=False)
+        self.assertEqual(config.read_text(), text)
+        for item in result["agents"].values():
+            self.assertTrue(Path(item["agent"]).is_file())
+
+    def test_unowned_verifier_destination_blocks_sizer_install(self):
+        verifier = self.data / "agents/delegate-verifier.toml"
+        verifier.parent.mkdir(parents=True)
+        verifier.write_text("# Mine\n")
+        self.run_script("setup.py", ok=False)
+        self.assertEqual(verifier.read_text(), "# Mine\n")
+        self.assertFalse((self.data / "agents/delegate-sizer.toml").exists())
+        self.assertFalse((self.home / "config.toml").exists())
+
+    def test_incomplete_managed_block_is_preserved(self):
+        result = json.loads(self.run_script("setup.py"))
+        config = self.home / "config.toml"
+        text = config.read_text().replace('[agents.delegate-verifier]', '[agents.my-verifier]')
+        config.write_text(text)
+        self.run_script("setup.py", ok=False)
+        self.run_script("setup.py", "remove", ok=False)
+        self.assertEqual(config.read_text(), text)
+        self.assertTrue(Path(result["agent"]).exists())
 
     def test_edited_agent_is_preserved_on_update_and_remove(self):
         result = json.loads(self.run_script("setup.py"))
@@ -139,8 +231,11 @@ class DelegateTests(unittest.TestCase):
         shutil.copytree(PLUGIN, copied, ignore=shutil.ignore_patterns("__pycache__"))
         source = copied / "agents/delegate-sizer.toml"
         source.write_text(source.read_text() + "\n# Updated bundled definition\n")
+        verifier = copied / "agents/delegate-verifier.toml"
+        verifier.write_text(verifier.read_text() + "\n# Updated verifier\n")
         self.run_script("setup.py", plugin=copied)
         self.assertEqual(agent.read_bytes(), source.read_bytes())
+        self.assertEqual(Path(result["agents"]["delegate-verifier"]["agent"]).read_bytes(), verifier.read_bytes())
         self.add(plugin=copied)
 
     def test_config_symlink_preserved(self):

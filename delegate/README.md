@@ -27,7 +27,7 @@ the same time where the work allows, and gives each a time budget. Workers are s
 ladder from `haiku` / `low` to `opus` / `high`, limited to the models the session offers.
 
 `delegate-verifier` checks each result — reads the diff, runs the project's tests, opens cited
-sources — on the worker's model, never below `sonnet` / `medium`, and proposes the verdict. The
+sources — on `opus` with high effort, and proposes the verdict. The
 main session can overturn it with a reason; both stay in the history.
 
 Each piece gets two attempts. A worker that misses or runs past its budget is retried once —
@@ -47,17 +47,24 @@ after installing or updating:
 $delegate:delegate-setup
 ```
 
-This registers the named `delegate-sizer` in your Codex user configuration and installs its
-definition in durable user state. Existing settings and user-edited definitions are preserved.
-Start a new Codex session after setup so the custom agent becomes available.
+This registers `delegate-sizer` and `delegate-verifier` in your Codex user configuration and
+installs their definitions in durable user state. Existing settings and user-edited definitions are preserved.
+Start a new Codex session after setup so both custom agents become available.
 
 ```text
 $delegate:delegate Find which code owns settings validation and report its rules.
 ```
 
 `delegate-sizer` runs on `gpt-6.1-sol` / `high`. The worker ladder uses `gpt-6-luna`,
-`gpt-6.1-sol`, and `gpt-6-astra`, subject to the models and efforts the current session
-supports.
+`gpt-6.1-sol`, and `gpt-6-astra`, ending at `gpt-6-astra` / `high`, subject to the pairs
+the current session supports. The sizer gives each piece a scope, dependencies, and a time
+budget; independent ready pieces run together.
+
+`delegate-verifier` checks every result on `gpt-6.1-sol` / `high`, regardless of the worker tier.
+The main session records its verdict and can amend it with a reason; both judgments remain
+in history. A worker stopped at its budget goes back to the sizer for a higher tier and longer
+budget. Each piece gets at most two attempts. A piece that cannot be retried or misses again
+is given up, along with work depending on it; the main session reports its remaining changes.
 
 To inspect or remove the Codex configuration:
 
@@ -66,8 +73,8 @@ $delegate:delegate-setup status
 $delegate:delegate-setup remove
 ```
 
-Run `remove` before uninstalling the plugin. It removes only the unchanged managed agent and
-registration, preserving verdict history and sizing lessons. If setup detects a user-edited
+Run `remove` before uninstalling the plugin. It removes only unchanged managed agents and
+registrations, preserving verdict history and sizing lessons. If setup detects a user-edited
 definition or role, it reports the conflict and leaves it intact.
 
 ## History and lessons

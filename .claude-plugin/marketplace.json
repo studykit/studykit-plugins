@@ -103,7 +103,7 @@
     {
       "name": "delegate",
       "source": "./delegate",
-      "description": "Delegate work through a dedicated sizing agent, verify worker results, and learn from recorded verdicts.",
+      "description": "Split and size delegated work, independently verify worker results, and learn from recorded verdicts.",
       "author": {"name": "studykit"},
       "repository": "https://github.com/studykit/studykit-plugins",
       "license": "MIT",

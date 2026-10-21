@@ -2,8 +2,8 @@
 name: delegate-verifier
 description: Used only by the `delegate` skill. Do not invoke otherwise.
 tools: Read, Grep, Glob, Bash
-model: sonnet
-effort: medium
+model: opus
+effort: high
 color: cyan
 ---
 

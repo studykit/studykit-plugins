@@ -77,8 +77,8 @@ When a worker goes out, start its timer: a background shell command that sleeps 
 
 ## 3. Verify
 
-Dispatch `delegate:delegate-verifier` for each finished or stopped worker, on the worker's model
-and effort but never below `sonnet` / `medium`. Give it:
+Dispatch `delegate:delegate-verifier` for each finished or stopped worker, with `model: opus`
+and `effort: high` whatever tier the worker ran on. Give it:
 
 - the worker's prompt, verbatim;
 - the "done" criteria;

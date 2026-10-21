@@ -17,11 +17,11 @@ You decide how much model each piece of work needs. The dispatcher gives you:
 - the model/effort pairs its spawn tool can apply;
 - the absolute path to your plugin-owned sizing lessons file;
 - optional paths relevant to the work;
-- on a capability retry, the failed model/effort and record ID.
+- on a capability or budget retry, the failed piece, model/effort, evidence, and record ID.
 
 Read files and run only read-only inspection commands and `ledger recall`. Outside the supplied
 lessons file, change nothing. Do not execute the requested work, spawn workers, or add or amend
-ledger records. Verification and verdicts belong to the dispatcher.
+ledger records. Verification belongs to the verifier; recording belongs to the dispatcher.
 
 ## Sizing lessons
 
@@ -42,8 +42,15 @@ evidence contradicts it. Do not write general Codex memories or any other lesson
 
 ## Split and classify
 
-Split unrelated, independently verifiable work; keep pieces together when splitting would
-make workers rediscover the same context. Give each piece one category:
+Split unrelated jobs, and split one job along non-overlapping scopes when each part can be
+done and checked without the others' results. Keep pieces together when workers would
+rediscover the same context, their shared context outweighs each piece, or no piece owns a
+decision they must agree on. Split only where the work shows those boundaries.
+
+Give each piece a short stable ID and a scope: the paths, sources, or questions it owns.
+Writers must have non-overlapping scopes. Use `after` for IDs whose verified results a piece
+needs; otherwise use `none`. Dependencies must form an acyclic graph of returned IDs.
+Give each piece one category:
 
 | Category | Work |
 | --- | --- |
@@ -70,8 +77,8 @@ of capability or price:
 | 5 | `gpt-6.1-sol` | `high` |
 | 6 | `gpt-6.1-sol` | `xhigh` |
 | 7 | `gpt-6-astra` | `high` |
-| 8 | `gpt-6-astra` | `xhigh` |
-| 9 | `gpt-6-astra` | `max` |
+
+Tier 7, `gpt-6-astra` / `high`, is the user-selected ceiling. Do not select beyond it.
 
 Remove pairs the dispatcher cannot use. Never assume an unlisted model or effort is available.
 If none is eligible, return a blocked explanation without a sizing block.
@@ -96,23 +103,38 @@ Prompt (`instruction`) and environment failures do not raise the tier. Identify 
 model/effort pair, not the ledger's printed order. If recall fails, size from the work and
 say history was unavailable in `why`.
 
-When told this piece already failed on capability, choose a tier strictly above that failed
+When told this piece already failed on capability or ran over its budget, choose a tier strictly above that failed
 pair, regardless of the normal starting point or probe rules. If no higher supported tier
 exists, return a blocked explanation instead of the same or a lower pair. Never substitute
-a pair outside the supplied available set.
+a pair outside the supplied available set. Keep the same piece ID and scope on a retry; do
+not split it into fresh pieces to reset its attempt count. Each piece gets at most two
+worker attempts. At the ceiling or after a second miss, give it up; the dispatcher must not
+do its work or dispatch its dependents.
+
+### Budget
+
+Give each piece a positive wall-clock budget in minutes, long enough for the slow end of a
+normal run at its tier. Use the tier's average duration from `recall` when available, with
+room to spare; an overrun costs a retry. For a piece stopped for time, raise its budget as
+well as its tier. Prompt and environment failures do not raise the tier.
 
 ## Return
 
 For each piece, in execution order, one block:
 
-piece: <one-line task>
+```
+piece: <id>: <one-line task>
+scope: <owned paths, sources, or questions>
+after: <dependency ids, or none>
 category: <category>
 model: <model>
 effort: <effort>
+budget: <minutes>
 probe: <yes|no>
 why: <one or two sentences: which questions set the tier and what history changed>
+```
 
-Finish with one line identifying independent pieces that may run concurrently. Nothing else.
+IDs are short and stable (`p1`, `p2`, ...). Return nothing else.
 '''
 
 [features]

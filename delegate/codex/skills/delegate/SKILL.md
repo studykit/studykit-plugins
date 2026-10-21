@@ -1,122 +1,169 @@
 ---
 name: delegate
-description: Have delegate-sizer choose a Codex worker's model and effort, dispatch the work, verify the result, and record its verdict. Use when explicitly invoked as $delegate:delegate.
+description: Have delegate-sizer split and size Codex workers, dispatch ready pieces together, have delegate-verifier check results, and record verdicts. Use when explicitly invoked as $delegate:delegate.
 ---
 
 # Delegate
 
-Delegate the instruction accompanying the user's `$delegate:delegate` invocation. Read it from the
-user's message; there is no argument substitution. If the instruction is missing, ask for it.
-`delegate-sizer` splits and sizes the work. You prepare worker prompts, verify results, and
-record verdicts; you never choose a worker's model or effort yourself. Delegation does not
-expand the user's permission to edit, publish, or send messages.
+Delegate the instruction accompanying the user's `$delegate:delegate` invocation. Read it from
+the user's message; there is no argument substitution. If it is missing, ask for it.
+The sizer owns splitting, model/effort choices, and budgets; the verifier owns checking results
+and proposing verdicts. You prepare prompts, dispatch, and record. Delegation does not expand
+the user's permission to edit, publish, or send messages.
 
-Resolve the plugin root three directories above this loaded `SKILL.md`'s directory, then find
-its `scripts/ledger.py`. Run it with its concrete
-absolute path using `uv run --script <ledger-path> <command> ...`. Below, `ledger` means that
-command. Use the native plugin-data path supplied by the Delegate SessionStart hook as
-`--data-dir <absolute-path>` in every ledger command. Below, that option is part of `ledger`.
-Use `<command> --help` for other flags. History lives in that directory's `ledger.jsonl`;
-`DELEGATE_LEDGER` overrides the history file only. Qualitative sizing lessons live in
-`sizer-lessons.md` beside it. Do not guess a data directory or assume hook variables are set
-in skill shell commands. If the storage context is missing, tell the user to enable/trust the
-Delegate hook and start a new session. If the named sizer is unavailable, tell the user to run
-this plugin's `$delegate:delegate-setup` and start a new session; do not run setup implicitly.
+Resolve the plugin root three directories above this loaded `SKILL.md`'s directory. Below,
+`ledger` means `uv run --script <absolute-plugin-root>/scripts/ledger.py --data-dir
+<absolute-native-data-path>`. Take the native plugin-data path from the Delegate SessionStart
+context; do not guess it or assume hook variables are exported in skill shell commands.
+History is `ledger.jsonl` there (`DELEGATE_LEDGER` overrides only the history file); sizing
+lessons are `sizer-lessons.md` beside it. Use `<command> --help` for ledger flags.
+If storage context is absent, tell the user to enable/trust the hook and start a new session.
+If either named agent is unavailable, tell the user to run `$delegate:delegate-setup` and
+start a new session. Never run setup implicitly or imitate a missing role with a default agent.
 
-## Size
+## 1. Size
 
 Call the available `spawn_agent` tool with `agent_type: "delegate-sizer"`. A summarized tool
-description may omit registered custom roles; do not infer absence from that omission.
-The named custom agent's configuration fixes `gpt-6.1-sol` / `high`; pass those same settings
-explicitly if the schema permits overrides, and use a fresh context (`fork_turns: "none"`
-when supported). If the host rejects the named type, cannot run it, or reports a different
-effective configuration, stop and tell the user. Never imitate it with a default agent,
-read its ladder to size the work yourself, or install or reconfigure agents during this
-invocation. If the tool schema cannot select custom agent types, report that limitation.
+listing may omit registered roles; try the named type if the schema permits custom roles.
+It fixes `gpt-6.1-sol` / `high`; pass the same overrides when supported. Use fresh context
+(`fork_turns: "none"` when exposed) so inheritance does not defeat explicit settings.
+Give it:
 
-Give the sizer:
+- The original instruction verbatim, including constraints, and known relevant paths.
+- The fully resolved ledger command and absolute sizing-lessons path; it may maintain only
+  that lessons file, never a general memory store.
+- The model/effort pairs the current spawn tool can apply and any override restrictions.
+  Report uncertainty rather than guessing availability. The ceiling is `gpt-6-astra` / `high`.
 
-- The user's instruction verbatim, including constraints.
-- The ledger command with the script path fully resolved to an absolute path.
-- The absolute `sizer-lessons.md` path in the native plugin-data directory; the sizer may read
-  and maintain only that lessons file, never a general Codex memory store.
-- The model/effort pairs the current spawn tool can actually apply; report uncertainty rather
-  than guessing availability, and respect the host's override restrictions.
-- Any known relevant input paths.
+Wait for one block per piece: `piece: <id>: <task>`, `scope`, `after`, `category`, `model`,
+`effort`, `budget` in positive minutes, `probe`, and `why`. Confirm IDs are unique, dependency
+IDs exist without cycles, writers' scopes do not overlap, and choices are supported within
+the ceiling. If incomplete or invalid, return it to the sizer for correction; do not fill in
+choices yourself. A blocked piece is given up, with its dependents held back. Sizing creates
+no worker attempt or ledger verdict.
 
-Wait for its answer: one block per piece with `piece`, `category`, `model`, `effort`, `probe`,
-and `why`, plus which pieces are independent. Use its decisions as given. If the answer is
-incomplete, blocked, or chooses an unsupported pair, report the problem instead of filling in
-or substituting a choice. Sizing produces no worker verdict or ledger run of its own.
+If the named role is rejected, its effective settings differ, or the schema cannot select
+custom roles or apply explicit model/effort overrides, stop and report the limitation. Do not
+reconfigure the host or start another CLI to work around it. Apply this to verifiers too.
 
-## Dispatch
+## 2. Dispatch and budget
 
-Use Codex's available `spawn_agent` tool with each piece's sizer-selected `model` and
-`reasoning_effort` explicitly. Never silently fall back to inheritance or another pair.
-When its schema exposes `fork_turns`, set it to `"none"` so a full-history fork does not
-override the selection. Use `default`, or an available `worker` or `explorer` suited to the
-task. A custom agent can override spawn settings: use it only if its effective model and
-effort match your choice. Follow the actual tool schema instead of copying Claude's
-`Agent`, `effort`, `general-purpose`, or `fork` arguments.
+Keep a table of each piece's dependencies, current scope state, attempt count, worker ID,
+start/deadline, and ledger IDs. A piece is ready only when all its `after` pieces have verified
+usable results, including any verified small fix. Send all ready pieces in one batch of spawn
+calls, up to the host's concurrency limit; queue the rest. Writers own disjoint scopes.
+Keep the attempt label `<piece-id>-<attempt>` alongside the returned identifier. For a
+`task_name` restricted to lowercase letters, digits, and underscores, use `<piece-id>_<attempt>`
+(for example, `p1_1`); validate it against the actual schema before spawning. Attempt numbers
+are 1 and 2; each piece gets at most two attempts.
 
-Give the subagent a prompt it can act on without this conversation:
+Use the sizer's exact `model` and `reasoning_effort` in `spawn_agent`. Set `fork_turns: "none"`
+where supported. Use `default`, or an available `worker`/`explorer` suited to the task. A
+custom role may override spawn settings; use one only if its effective pair matches. Never
+silently inherit another tier. Give each worker a self-contained prompt containing:
 
-- Goal, relevant context, and concrete acceptance criteria.
-- Absolute input paths, where to look, and what it must not touch.
-- Requested result and the locations or evidence needed to verify it.
+- The goal, relevant context, original constraints, and concrete acceptance criteria.
+- Absolute input paths, its owned scope, forbidden edits, and the scope's starting state
+  (baseline commit and any pre-existing changes). Capture that baseline before it starts.
+- Its budget, requested report, and evidence/locations needed for verification.
 
-Dispatch only jobs the sizer marked independent concurrently, within the host's limit. Give
-writers disjoint scopes. If the host cannot apply the selected settings, stop and explain;
-do not change user configuration or start a separate CLI process as a workaround.
-Wait for completion with the available subagent wait tool (such as `wait_agent` or `wait`);
-an accepted spawn is not a finished result. Use the returned agent identifier when inspecting
-or continuing that agent. Record the effective model and effort if the host reports them;
-if they differ from the request, disclose it and do not attribute the result to the requested
-tier. Never estimate token usage or duration from an agent's prose.
+Record the local clock at dispatch and compute its deadline as start plus budget. Before
+launching workers, confirm the host exposes a native way to interrupt/stop an active agent.
+If it does not, report that budgets cannot be enforced and do not dispatch.
 
-## Verify and record
+Wait with the available native agent wait tool (`wait_agent` or `wait`, following its schema).
+Use bounded waits no longer than the nearest active deadline and the tool's maximum; keep
+user updates timely. If the nearest deadline is shorter than the tool's minimum wait, use a
+short clock wait and then inspect status. Check the actual clock and all worker statuses
+after each return: one mailbox update can concern a different worker. A wait timeout ends
+only the wait; it does not stop a worker or prove a budget overrun. Completion/acceptance
+notifications must be distinguished. Do not use the wait call's elapsed duration as the
+worker's runtime.
 
-Check the acceptance criteria yourself: read diffs, run the project's relevant tests or build,
-and open cited code or sources. Find validation instructions in the target project's README,
-CONTRIBUTING, documentation, Makefile, CI workflows, or test directories. The subagent's
-own report is evidence to inspect, not proof.
+At the deadline, inspect status once more. If still active, stop the specific worker with the
+host's native stop tool: `interrupt_agent` when exposed, or `close_agent` when that schema
+supports stopping active agents. Follow the actual argument names and returned status. Do not
+send a "please stop" prompt and assume it stopped. Confirm it is no longer running before
+verification, a retry, or any dependent write; if confirmation fails, hold that scope and its
+dependents and report the blocker. Also account for any still-running shell command it
+started; interruption is not proof that subprocesses stopped. Preserve partial changes and
+its report. A stopped worker is still an attempt and must be verified and recorded.
 
-Assign one verdict per attempted worker dispatch:
+Record effective settings if the host supplies them. Disclose mismatches and do not credit
+the requested tier. Never infer token counts or runtime from the worker's prose.
 
-- `pass`: usable as delivered and meets the criteria.
-- `partial`: needs a small fix you made or misses a part.
-- `fail`: wrong, unverifiable, or requires redoing.
+## 3. Verify
 
-For a miss, choose one cause: `capability` (a clear, complete prompt exceeded the model),
-`instruction` (your prompt was missing, ambiguous, or wrong), or `environment` (tools,
-availability, permissions, or network blocked the work). A rejected spawn is an environment
-failure, not evidence of weak reasoning. Be honest about instruction failures.
+Dispatch the named `delegate-verifier` for each completed or confirmed-stopped attempt, using
+fresh context and explicit `model: "gpt-6.1-sol"` / `reasoning_effort: "high"`, regardless of
+the worker's tier. The named role fixes the same pair so every tier has the same judge.
+If that pair is unavailable or the effective settings differ, report verification blocked;
+do not downgrade or take over checking.
+Independent verifiers may run concurrently within host limits. Give each:
+
+- The worker prompt verbatim and the acceptance criteria.
+- Its scope and captured starting state, including pre-existing or concurrent changes.
+- The report, or notice of the budget stop and what it left behind; include rejection or
+  environment evidence if the worker could not start.
+
+Require each criterion's met/not-met status and evidence, verdict, cause, and reason. An
+unsupported claim is not evidence. Ask for missing verification evidence without restarting
+the worker. Overturn a verdict only where evidence contradicts it or you know a constraint
+or user intent the verifier did not receive. Explain the correction; keep both judgments.
+If verification cannot complete, report that blocker and hold dependents; never invent a
+verifier verdict or rerun the worker just to obtain a record.
+
+## 4. Record
+
+Record every worker attempt, including rejected spawns and retries, with the sizer's category
+and the verifier's verdict and reason as given:
 
 ```sh
 ledger add --category <category> --task "<one-line task>" \
   --agent-type <type> --model <model> --effort <effort> \
-  --verdict <pass|partial|fail> [--cause <cause>] --reason "<why>" \
+  --verdict <pass|partial|fail> [--cause <cause>] --reason "<verifier reason>" \
   [--tokens <reported-count>] [--duration-ms <reported-duration>] [--retry-of <id>]
 ```
 
-Record every worker attempt, including retries. Omit usage fields the host does not provide. If
-recording fails, preserve and report the result and the logging error; do not rerun the task
-to recreate a record.
-
-Retry at most once per piece. For a capability failure, dispatch `delegate-sizer` again with
-the original instruction and constraints, the failed piece, model/effort, failure evidence,
-record ID, available pairs, absolute ledger command, and the same lessons-file path. Require
-it to select a higher tier; you do not decide the increase. If it cannot, report the blocker. For an instruction failure,
-repair the prompt at the same model/effort. For an environment failure, retry only after
-resolving the blocker. Link the retry to the first record using `--retry-of`. Report a second
-failure with both record IDs.
-
-Return the result, selected model/effort and the sizer's reason (including any probe), subagent
-identifier, verified verdict and reason, and record ID for each piece. If the user disputes a
-verdict, append their correction:
+Omit usage fields the host does not supply. If you overturned the verdict, immediately append:
 
 ```sh
-ledger amend <id> --verdict <verdict> [--cause <cause>] --reason "<user's reason>"
+ledger amend <id> --by dispatcher --verdict <verdict> [--cause <cause>] --reason "<correction reason>"
 ```
 
-Amendments replace the verdict in later recall without deleting its history.
+If recording fails, preserve the result and report the error; never rerun work to recreate
+its record. A rejected spawn is an environment failure, not evidence of weak reasoning.
+
+## 5. After a miss
+
+Each piece gets two worker attempts in total: the first and at most one retry.
+
+- For a usable `partial` needing a small, in-scope fix, you may make that fix and have the
+  verifier check it. Keep the original verdict, and record the verified correction with
+  `amend --by dispatcher`; do not turn a redo into a small fix.
+- For `capability`, or any worker stopped at its budget, dispatch the sizer again with the
+  original handoff, same piece ID and scope, failed model/effort, failure/stop evidence, and
+  record ID. Require a strictly higher supported tier; for an overrun also require a longer
+  budget. If none exists below the ceiling, give the piece up. Never raise the tier yourself
+  or accept a longer budget alone as the escalation.
+- For `instruction`, repair the prompt and retry at the same tier and budget.
+- For `environment`, resolve the blocker and retry at the same tier and budget, or give up.
+
+Update the retry prompt with the scope's current state; partial work remains on disk. Link
+its record with `--retry-of <first-id>`. Never split a retry to reset the attempt limit.
+After a second miss, give up. Do not do an abandoned piece's work yourself, dispatch its
+transitive dependents, or quietly accept partial leftovers as complete. Let unrelated pieces
+finish. Report what remains in every abandoned scope.
+
+## 6. Report
+
+Per piece, return the result, selected pair and sizing reason (including any probe), worker
+identifier, verified verdict/reason, and ledger IDs. Lead with abandoned or blocked pieces,
+what they left behind, and the pieces that could not run because of them.
+If the user disputes a verdict, record their correction:
+
+```sh
+ledger amend <id> --verdict <verdict> [--cause <cause>] --reason "<user reason>"
+```
+
+Amendments replace the verdict in later recall without deleting history.

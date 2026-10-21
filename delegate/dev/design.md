@@ -20,7 +20,7 @@ exists here:
   Codex reads only the path its own manifest names. Each host's skills thus sit under a
   directory named for it. Claude's agents are `agents/delegate-sizer.md` and
   `agents/delegate-verifier.md`; Claude reads only `.md` agents, so the Codex
-  `agents/delegate-sizer.toml` beside them is invisible to it.
+  `agents/*.toml` definitions beside them are invisible to it.
 
 A test pins this: no `skills/`, no `hooks/hooks.json`, and every manifest path resolves.
 
@@ -53,9 +53,14 @@ the ceiling is given up rather than retried.
 replaced verification by the main session for two reasons: diffs and test output stayed in the
 main session's context, and the main session was grading its own prompt — every miss it put
 on `capability` instead of `instruction` pushed later runs up the ladder. The verifier sees the
-worker's prompt verbatim, which is what judging `instruction` needs. It runs on the worker's
-tier, floored at `sonnet` / `medium`: a weaker checker cannot see an error that took depth to
-make, the same reason the sizer runs on `opus`. A lenient verifier inflates passes and lets
+worker's prompt verbatim, which is what judging `instruction` needs. It runs on `opus` /
+`high` whatever the worker's tier, on the user's call. A verifier that followed the worker's
+tier would judge cheap tiers more leniently, so their pass rates would look better than the
+expensive tiers' and probes would walk down on that bias; one fixed judge keeps the record
+comparable across tiers. Nothing checks the verifier's judgment, and the `capability` /
+`instruction` call is the same kind of depth the sizer runs on `opus` for. The cost stays
+modest because short pieces verify quickly. If it grows, lower the effort before the model.
+A lenient verifier inflates passes and lets
 probes walk tiers down, so the main session rejects a criterion marked met without evidence,
 may overturn a verdict with a reason, and records the overturn as an `amend --by dispatcher`
 so both judgments stay in the history.
@@ -77,9 +82,11 @@ Its ledger lived at `~/.claude/delegate/ledger.jsonl` with the same schema; poin
 
 ## Shared policy
 
-Only `capability` failures move the tier, and a piece gets at most two attempts. Without a cause, a vague prompt reads as a weak
-model and every later run of that category climbs to a tier it does not need. The verdict is
-the main session's, amendable by the user; `amend` appends rather than rewrites, so the
+Capability failures and budget stops require a strictly higher tier; prompt and environment
+failures alone do not. A piece gets at most two attempts. Without a cause, a vague prompt
+reads as a weak model and every later run of that category climbs to a tier it does not need.
+The verifier proposes the verdict; the main session records it and can amend it with a reason.
+The user may also amend it; `amend` appends rather than rewrites, so the
 original judgment stays visible. The tier ladders are judgments, not measurements; the ledger
 is what should correct them.
 
@@ -87,10 +94,40 @@ is what should correct them.
 
 The custom `delegate-sizer` agent owns decomposition, categories, the provisional worker
 ladder, ambiguity/depth/breadth/undetected-cost questions, recall adjustments, and capability
-retry sizing. Its fixed configuration is `gpt-6.1-sol` / `high`, selected directly by the user.
+and budget retry sizing. Its fixed configuration is `gpt-6.1-sol` / `high`, selected directly by the user.
 The main skill passes through the original instruction, known paths, an absolute ledger
-command, and available worker pairs. It follows the answer, writes worker prompts, verifies
-results, and records verdicts. A missing sizer or unavailable pair stops the workflow.
+command, and available worker pairs. It follows the answer, writes worker prompts, dispatches
+verification, and records verdicts. A missing named role or unavailable pair stops the workflow.
+
+The Codex worker ladder ends at `gpt-6-astra/high`, selected by the user. Historical ledger
+records above that ceiling remain readable; the ceiling governs new dispatches. Each piece
+has a stable ID, non-overlapping writer scope, dependency IDs, and a positive minute budget.
+Only verified usable prerequisites release dependent pieces. Attempt labels may contain a
+hyphen, but native `task_name` values use underscores (`p1_1`), as required by the tested
+Codex schema. A retry preserves identity and
+scope; it cannot create fresh pieces to reset the two-attempt limit. An abandoned piece is
+never taken over by the dispatcher, and its transitive dependents do not run.
+
+`delegate-verifier` fixes `gpt-6.1-sol/high`, on the user's call, and the skill supplies that
+same pair explicitly. A fixed judge keeps ledger verdicts comparable across worker tiers
+and avoids making cheaper workers look better because a weaker judge missed their errors.
+The verifier gets the prompt verbatim,
+acceptance criteria, scope baseline, and worker report or stop evidence. Local tests and build
+scratch output are permitted, but source edits and ledger writes are not. This is an
+instruction boundary, not a separate read-only sandbox; native agents inherit parent
+permissions. A dispatcher correction is an append-only `amend --by dispatcher`, preserving
+the verifier's original verdict.
+
+Budget enforcement uses measured dispatch/deadline clocks and bounded native agent waits.
+A wait timeout does not stop a worker. At a deadline the dispatcher checks status and calls
+the actual host's native interrupt/stop tool, then confirms the worker and any running shell
+command cannot still write before checking or retrying the scope. The public subagent docs
+confirm stop/close orchestration but do not specify these tools' exact argument schemas;
+the skill follows the tools exposed in the current session (`interrupt_agent`, or
+`close_agent` when it supports stopping). Missing stop capability blocks dispatch rather than
+pretending a deadline can be enforced. Budget stops require the sizer to choose both a
+higher tier and a longer budget; the verifier still distinguishes capability from a tool or
+permission blocker. At the ceiling or after the second miss, abandon the piece.
 
 The agent's short description reserves it for the skill. This is instructional routing;
 Codex documents no custom-agent equivalent of the skill's explicit-only policy. Native
@@ -101,21 +138,25 @@ copies or unrelated project content belong there; contrary ledger evidence remov
 
 ## Packaging and setup
 
-The supported Codex compatibility manifest describes version 0.1.0.
+Both runtime manifests carry the same plugin version.
 The Codex marketplace registers the plugin. No unsupported `agents` manifest field is used. The tested CLI 0.163.0 ignored plugin hooks
 when a portable root manifest was also present; with the Codex manifest alone, `hooks/list`
 discovered the plugin SessionStart hook. Keep this package in the verified compatibility
 format until that host limitation is resolved.
-The package contains both Codex skills, its agent definition, a storage hook, all scripts, and a host-neutral
+The package contains both Codex skills, its agent definitions, a storage hook, all scripts, and a host-neutral
 ledger core; no file depends on `global/` or another installed package.
 
-`delegate-setup` installs a regular agent snapshot under native plugin data and registers
-it through a marked `[agents.delegate-sizer]` block. It never registers a versioned plugin
+`delegate-setup` installs regular snapshots for both agents under native plugin data and
+registers them through separate marked `[agents.delegate-sizer]` and
+`[agents.delegate-verifier]` blocks. It never registers a versioned plugin
 cache path. An agent-file symlink in the discovery directory was unavailable in the tested
 CLI; a regular file referenced by explicit configuration worked. The snapshot is therefore
 kept in a dedicated data directory outside standalone-agent discovery, preventing duplicate
 role names. Setup after an update refreshes it only when its prior content hash still matches
-managed state. It preserves user edits instead of overwriting them.
+managed state. It preserves user edits instead of overwriting them. Both roles are preflighted
+before any write, so a verifier conflict cannot partially update or remove the sizer. The
+original single-sizer `agent_sha256` state upgrades to a per-role hash map without taking
+ownership of a user verifier. Status validates complete managed blocks and all agent hashes.
 
 Role updates retain unrelated TOML bytes and config-file symlinks. Writes use atomic
 replacement. Cleanup removes only managed, unchanged artifacts and always preserves history.
@@ -138,12 +179,14 @@ older history can point `DELEGATE_LEDGER` at that file. No unrequested history m
 
 ## Official references
 
-Checked on 2026-10-20:
+Codex subagent and configuration behavior rechecked on 2026-10-21 (other references below
+were checked on 2026-10-20):
 
 - https://developers.openai.com/plugins/build/plugins
 - https://learn.chatgpt.com/docs/build-skills
 - https://learn.chatgpt.com/docs/agent-configuration/subagents
 - https://learn.chatgpt.com/docs/config-file/config-reference
+- https://learn.chatgpt.com/docs/config-file/config-sample
 - https://learn.chatgpt.com/docs/customization/memories
 - https://learn.chatgpt.com/docs/hooks
 
@@ -156,21 +199,44 @@ relocated packages, and managed-agent upgrades. Validate both skill frontmatters
 the JSON/YAML/TOML metadata. Install the working-tree marketplace into an isolated Codex
 profile, confirm plugin-owned skills are discovered, run setup, then start a fresh session
 in a throwaway project. Inspect raw subagent events for the sizer and selected worker and
-confirm the main session alone writes a verified verdict.
+confirm the named verifier supplies evidence and the main session alone records its verdict.
+Also inspect deadline interruption and dependent scheduling; a successful setup or ordinary
+lookup does not establish those branches.
 
-On 2026-10-20, Codex CLI 0.163.0 passed all 12 behavioral tests and both skill validators.
-That run predates the move of the Codex skills to `codex/skills/` and of the hook manifest to
-`hooks/hooks.codex.json`; the installed-plugin checks below have not been repeated since.
-An isolated profile installed the plugin from this working-tree marketplace. With native
-plugin variables absent in the launching shell, the trusted-for-one-invocation SessionStart
-hook supplied the host's data directory. The setup skill installed the named agent there;
-a fresh session dispatched the sizer on `gpt-6.1-sol` / `high` and its selected lookup worker
-on `gpt-6-luna` / `low`. Persisted child turn contexts confirmed those effective settings.
-The parent verified the fixture and wrote one pass record in native plugin data. No empty
-lessons file was created. These checks exercised the installed cache, not direct working-tree
-scripts with manually supplied native variables.
+On 2026-10-21, Codex CLI 0.163.0 passed the isolated-profile setup and delegation probes
+against version 0.3.0 installed from the working-tree marketplace, including the per-host
+skill and hook layout. The launching environments had neither `PLUGIN_ROOT` nor `PLUGIN_DATA`;
+the reviewed SessionStart hook supplied native storage context using the one-invocation
+hook-trust flag. Setup installed and reported both named agents as configured and current.
 
-The app-server accepted the root hook-trust bypass flag but did not execute the untrusted
-plugin hook in this probe; the supported `codex exec` invocation did. The skill correctly
-stopped when native storage context was absent. Do not count app-server hook discovery or
-unit-test environment injection as evidence that the host executed a hook.
+The parallel lookup probe used `gpt-6-luna/low` for the root; persisted child turn contexts
+confirmed the sizer on `gpt-6.1-sol/high` and two independent lookup workers on
+`gpt-6-luna/low`. The fixture was a separate project with a clean baseline commit. Both
+workers were launched before either was awaited; named verifiers read the fixture and
+compared it with its starting state. Both results were recorded as passes, with no project
+files changed.
+
+After pinning the verifier, a fresh installed profile repeated setup and a verification
+handoff. Setup reported both roles on `gpt-6.1-sol/high`, and the verifier's persisted turn
+context confirmed that exact pair despite the root using `gpt-6-luna/low`.
+
+An earlier probe exposed an invalid hyphenated task name. The verifier classified the rejected
+spawn as an environment failure; the dispatcher recorded it and linked the successful retry.
+The skill now specifies valid underscore names. A separate native control probe recorded
+`running` before interruption, `previous_status: running` from `interrupt_agent`, and
+`interrupted` from the following `list_agents`. That probe used no shell subprocess; it does
+not establish cancellation of an in-flight shell command. Full budget-overrun escalation,
+capability retry at the ceiling, dependent abandonment, and dispatcher corrections have not
+been exercised end to end.
+
+All 21 behavioral tests pass, including sizer-only upgrades, verifier conflicts, user-edited
+files and blocks, incomplete managed blocks, relocated package upgrades, byte-preserving
+config updates, and history retention. Both Codex skill frontmatters pass the skill validator;
+JSON, YAML, and agent TOML parse. `claude plugin validate ./delegate` passes with a directory
+listing warning about the missing icon and advice about the install line. These notices do
+not affect manifest validation.
+
+The earlier app-server probe accepted the root hook-trust flag but did not execute the
+untrusted plugin hook; hook discovery alone did not prove execution. The current `codex exec`
+probes establish actual hook delivery. Do not count unit-test environment injection as
+proof that a host executed a hook.
