@@ -5,8 +5,8 @@ verdicts so later model choices improve. Runs in Claude Code and Codex.
 
 The main session never picks a worker's model or effort: `delegate-sizer` splits and classifies
 the instruction, reads past verdicts, and selects each worker's model and effort. The main
-session follows those choices, verifies each result itself, and records pass, partial, or
-fail. Capability failures go back to the sizer for at most one higher-tier retry; prompt and
+session follows those choices, has each result verified, and records pass, partial, or fail.
+Capability failures go back to the sizer for at most one higher-tier retry; prompt and
 environment failures do not raise the tier. If a verdict is wrong, ask for it to be amended.
 A missing sizer or an unavailable choice stops the workflow rather than substituting one.
 Delegation runs only when you invoke it.
@@ -22,8 +22,17 @@ sizer ships with the plugin.
 /delegate:delegate Find which code owns settings validation and report its rules.
 ```
 
-`delegate-sizer` runs on `opus` with high effort. Workers are sized on a ladder from
-`haiku` / `low` to `fable` / `max`, limited to the models the session offers.
+`delegate-sizer` runs on `opus` with high effort. It splits work into pieces that can run at
+the same time where the work allows, and gives each a time budget. Workers are sized on a
+ladder from `haiku` / `low` to `opus` / `high`, limited to the models the session offers.
+
+`delegate-verifier` checks each result — reads the diff, runs the project's tests, opens cited
+sources — on the worker's model, never below `sonnet` / `medium`, and proposes the verdict. The
+main session can overturn it with a reason; both stay in the history.
+
+Each piece gets two attempts. A worker that misses or runs past its budget is retried once —
+on a higher tier when the model was the cause — and a piece that misses again, or fails at
+`opus` / `high`, is given up and reported rather than done by the main session.
 
 ## Codex
 

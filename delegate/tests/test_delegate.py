@@ -49,6 +49,18 @@ class DelegateTests(unittest.TestCase):
         output = self.run_script("ledger.py", "recall", "--category", "lookup")
         self.assertIn("1 pass, 0 partial, 0 fail", output)
 
+    def test_recall_reports_average_duration_and_dispatcher_amendment(self):
+        record = self.add("pass")
+        self.add("pass")
+        self.run_script("ledger.py", "add", "--category", "lookup", "--task", "Find x",
+                        "--agent-type", "worker", "--model", "gpt-6-luna", "--effort", "low",
+                        "--verdict", "pass", "--reason", "Verified", "--duration-ms", "180000")
+        self.run_script("ledger.py", "amend", record, "--by", "dispatcher", "--verdict", "fail",
+                        "--cause", "capability", "--reason", "Evidence contradicted the pass")
+        output = self.run_script("ledger.py", "recall", "--category", "lookup")
+        self.assertIn("avg 3.0 min", output)
+        self.assertIn("(amended by dispatcher)", output)
+
     def test_ledger_override(self):
         path = self.root / "alternate/ledger.jsonl"
         self.env["DELEGATE_LEDGER"] = str(path)
@@ -187,8 +199,11 @@ class DelegateTests(unittest.TestCase):
         self.assertTrue((PLUGIN / codex["extensions"]["com.openai"]["onboardingSkill"]).is_file())
         claude = json.loads((PLUGIN / ".claude-plugin/plugin.json").read_text())
         self.assertEqual(claude["version"], codex["version"])
-        self.assertTrue((PLUGIN / "commands/delegate.md").is_file())
+        for path in claude["skills"]:
+            self.assertTrue((PLUGIN / path).is_dir(), path)
+        self.assertTrue((PLUGIN / "claude/skills/delegate/SKILL.md").is_file())
         self.assertTrue((PLUGIN / "agents/delegate-sizer.md").is_file())
+        self.assertTrue((PLUGIN / "agents/delegate-verifier.md").is_file())
 
 
 if __name__ == "__main__":

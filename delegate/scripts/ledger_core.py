@@ -154,6 +154,9 @@ def cmd_recall(args: argparse.Namespace) -> None:
                 streak += 1
             tokens = [r["tokens"] for r in tier_runs if r.get("tokens")]
             avg = f", avg {sum(tokens) // len(tokens)} tokens" if tokens else ""
+            durations = [r["duration_ms"] for r in tier_runs if r.get("duration_ms")]
+            if durations:
+                avg += f", avg {sum(durations) / len(durations) / 60000:.1f} min"
             print(
                 f"- {model}/{effort}: {len(tier_runs)} runs — "
                 f"{counts['pass']} pass, {counts['partial']} partial, {counts['fail']} fail; "

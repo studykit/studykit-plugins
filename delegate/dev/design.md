@@ -15,15 +15,18 @@ exists here:
   `onboardingSkill` there. This departs from the repository's usual `./skills/` because
   nothing in `skills/` can be kept out of Claude.
 - The Codex hook manifest is `hooks/hooks.codex.json`, the repository convention.
-- Claude's entry point is `commands/delegate.md`, a directory Codex does not read. Claude's
-  sizer is `agents/delegate-sizer.md`; Claude reads only `.md` agents, so the Codex
-  `agents/delegate-sizer.toml` beside it is invisible to it.
+- Claude's skill lives under `claude/skills/`, which `.claude-plugin/plugin.json` names in
+  `skills`; that field adds to Claude's default `skills/` scan rather than replacing it, and
+  Codex reads only the path its own manifest names. Each host's skills thus sit under a
+  directory named for it. Claude's agents are `agents/delegate-sizer.md` and
+  `agents/delegate-verifier.md`; Claude reads only `.md` agents, so the Codex
+  `agents/delegate-sizer.toml` beside them is invisible to it.
 
 A test pins this: no `skills/`, no `hooks/hooks.json`, and every manifest path resolves.
 
 ## Claude Code edition
 
-Claude loads plugin agents natively, so there is no setup skill and no hook. The command's
+Claude loads plugin agents natively, so there is no setup skill and no hook. The skill's
 content gets `${CLAUDE_PLUGIN_ROOT}` and `${CLAUDE_PLUGIN_DATA}` substituted, and it passes the
 data path to the ledger adapter as `--data-dir` and to the sizer as the lessons path: the
 Bash tool's environment does not carry `CLAUDE_PLUGIN_DATA`, and whether an agent body is
@@ -41,6 +44,30 @@ edition, and keeps lessons beside the ledger they cite rather than in a store th
 see. `Write` and `Edit` are granted for that file alone; the body is what holds the boundary.
 Plugin data is deleted on uninstall unless the user passes `--keep-data`.
 
+The worker ladder stops at `opus` / `high`, on the user's call: `fable` and `opus` / `xhigh`
+cost more tokens than the work they would rescue was judged worth. The ledger adapter still
+accepts `fable` so older records keep their tier order. A piece that fails on capability at
+the ceiling is given up rather than retried.
+
+`delegate-verifier` checks each worker's result and proposes its verdict and cause. It
+replaced verification by the main session for two reasons: diffs and test output stayed in the
+main session's context, and the main session was grading its own prompt — every miss it put
+on `capability` instead of `instruction` pushed later runs up the ladder. The verifier sees the
+worker's prompt verbatim, which is what judging `instruction` needs. It runs on the worker's
+tier, floored at `sonnet` / `medium`: a weaker checker cannot see an error that took depth to
+make, the same reason the sizer runs on `opus`. A lenient verifier inflates passes and lets
+probes walk tiers down, so the main session rejects a criterion marked met without evidence,
+may overturn a verdict with a reason, and records the overturn as an `amend --by dispatcher`
+so both judgments stay in the history.
+
+Each piece gets two attempts. The sizer gives a wall-clock budget per piece; the skill times
+it with a background `sleep` and stops an overrunning worker with `TaskStop`, which the
+subagent documentation names for stopping a background subagent. The Agent tool has no
+timeout of its own. `recall` prints average durations so budgets can follow the record.
+
+The sizer gives each piece a scope and the pieces it comes after, so the main session can send
+every ready piece at once and keep writers off each other's files without re-deriving either.
+
 The entry point never uses `fork`: a fork runs on the caller's model and effort and ignores the
 Agent tool's per-call `model` and `effort`, so the record would credit a tier that never ran.
 
@@ -50,7 +77,7 @@ Its ledger lived at `~/.claude/delegate/ledger.jsonl` with the same schema; poin
 
 ## Shared policy
 
-Only `capability` failures move the tier. Without a cause, a vague prompt reads as a weak
+Only `capability` failures move the tier, and a piece gets at most two attempts. Without a cause, a vague prompt reads as a weak
 model and every later run of that category climbs to a tier it does not need. The verdict is
 the main session's, amendable by the user; `amend` appends rather than rewrites, so the
 original judgment stays visible. The tier ladders are judgments, not measurements; the ledger

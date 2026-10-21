@@ -1,12 +1,15 @@
 {
   "name": "delegate",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Delegate work through a dedicated sizing agent, verify worker results, and learn from recorded verdicts.",
   "author": {
     "name": "studykit"
   },
   "repository": "https://github.com/studykit/studykit-plugins",
   "license": "MIT",
+  "skills": [
+    "./claude/skills/"
+  ],
   "keywords": [
     "delegation",
     "subagents",
