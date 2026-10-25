@@ -248,7 +248,7 @@ class Server:
             self.form_supported = isinstance(elicitation, dict) and isinstance(elicitation.get("form"), dict)
             protocol = params.get("protocolVersion")
             self.send({"id": request, "result": {"protocolVersion": protocol if isinstance(protocol, str) and protocol in SUPPORTED_PROTOCOLS else "2025-11-25",
-                       "capabilities": {"tools": {}}, "serverInfo": {"name": "guard-review-consent", "version": "0.165.0"},
+                       "capabilities": {"tools": {}}, "serverInfo": {"name": "guard-review-consent", "version": "0.165.1"},
                        "instructions": "Guard collects user consent for project-configured file reviews. Review criteria and reviewers belong to the project."}})
         elif method == "ping":
             self.send({"id": request, "result": {}})
@@ -262,7 +262,7 @@ class Server:
                     "required": ["cwd", "session_id"], "additionalProperties": False},
                 "annotations": {"readOnlyHint": False, "destructiveHint": False, "openWorldHint": False}},
                 *[{"name": name,
-                   "description": ("Read a Stop-approved checkpoint and its review workflow; never creates consent."
+                   "description": ("Read approved reviewer groups and concise execution instructions; never creates consent."
                        if name == "get_review_checkpoint" else
                        "Complete a Stop-approved checkpoint ONLY after every configured reviewer succeeded for every path. Clears matching revisions, not findings; never edits source files."),
                    "inputSchema": {"type": "object", "properties": {

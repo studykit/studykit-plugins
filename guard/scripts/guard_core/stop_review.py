@@ -16,7 +16,6 @@ import uuid
 
 from .cmd_checkpoint import _complete, _plan, _review_fingerprint, _show, _show_token, _snapshot, review_rule
 from .config import _HOST_IS_CODEX, _load_config
-from .dispatch import _plugin_root
 from .paths import _state_root
 from .state import _read_state, _write_state
 
@@ -124,7 +123,8 @@ def prepare(project_dir: Path, session_id: str, host: str, *,
         groups = [group for group in groups if group["paths"]]
         state["pending"] = {"request_id": request_id, "created_at": time.time(),
                             "files": selected, "fingerprints": fingerprints,
-                            "groups": groups, "host": host}
+                            "groups": groups, "host": host,
+                            "partial": any(isinstance(n, int) and n > 0 for n in eligible["truncated"].values())}
         _write(path, state)
     names = [Path(name).relative_to(project).as_posix() for name in selected]
     reviewers = sorted({group["kind"] + ":" + group["name"] for group in groups})
@@ -190,22 +190,35 @@ def checkpoint_authorized(project: Path, session: str, token: str) -> bool:
             and set(approved) == set(files) and isinstance(checkpoint.get("groups"), list))
 
 
-def approved_checkpoint(project: Path, session: str, token: str, *, complete: bool = False) -> dict[str, Any]:
+def approved_checkpoint(project: Path, session: str, token: str) -> dict[str, Any]:
     """Expose only an existing Stop-approved scope, never create approval from a tool call."""
     if not checkpoint_authorized(project, session, token):
         raise ValueError("No Stop-approved checkpoint for this project and session; use audit-files to retry.")
     output, errors = io.StringIO(), io.StringIO()
     with redirect_stdout(output), redirect_stderr(errors):
-        result = (_complete if complete else _show_token)(project, session, token)
+        result = _show_token(project, session, token)
     if result:
         raise ValueError(errors.getvalue().strip() or "Checkpoint operation failed; files remain pending.")
-    payload = json.loads(output.getvalue())
-    if not complete:
-        workflow = _plugin_root() / "skills" / "audit-files" / "SKILL.md"
-        payload["workflow"] = workflow.read_text(encoding="utf-8")
-    else:
-        payload["meaning"] = "Reviewed revisions were cleared. This is not a clean verdict or proof that findings were fixed."
-    return payload
+    return json.loads(output.getvalue())
+
+
+def _review_response(review_id: str, checkpoint: dict[str, Any], *, partial: bool = False) -> dict[str, Any]:
+    groups = [{key: group[key] for key in ("kind", "name", "paths")} |
+              ({"conditional": True} if group.get("conditional") else {})
+              for group in checkpoint["groups"]]
+    instructions = (
+        "Dispatch all groups concurrently using their exact kind/name; give each reviewer only its paths. "
+        "Do not add files or substitute reviewers. Wait for all reports. If any reviewer is unavailable, "
+        "fails or skips a path, report it and leave the review pending. Otherwise call "
+        "complete_review_checkpoint with this review_id. Review approval does not authorize fixes. "
+        "Report reviewed files, findings, fixes and remaining pending files; zero pending does not mean findings are fixed.")
+    if any(group.get("conditional") for group in groups):
+        instructions += (" For conditional groups, establish this session edited each path from its tool activity, "
+                         "not a shared diff. If any path lacks evidence, leave the entire review pending.")
+    if partial:
+        instructions += " The scope is capped; report this as a partial checkpoint."
+    return {"review_id": review_id, "status": "approved", "groups": groups,
+            **({"partial": True} if partial else {}), "instructions": instructions}
 
 
 def _review_path(data_dir: Path, review_id: str) -> Path:
@@ -273,8 +286,7 @@ def review_checkpoint(data_dir: Path, host: str, review_id: str, *, complete: bo
                     raise ValueError(errors.getvalue().strip() or "Review completion could not be saved")
                 return json.loads(output.getvalue())
             payload = approved_checkpoint(project, session, token)
-            payload.pop("token", None)
-            return {"review_id": review_id, "status": "approved", **payload}
+            return _review_response(review_id, payload, partial=record["checkpoint"].get("partial") is True)
 
 
 def unavailable(project: Path, session: str, host: str) -> dict[str, Any]:
@@ -338,6 +350,8 @@ def answer(project_dir: Path, session_id: str, host: str, request_id: str,
                     continue
                 checkpoint_state = saved["file_checkpoints"][checkpoint["token"]]
                 checkpoint_state["review_id"] = review_id
+                if request.get("partial"):
+                    checkpoint_state["partial"] = True
                 _write_state(project, session_id, saved)
                 if _read_state(project, session_id, _load_config(project))["file_checkpoints"].get(checkpoint["token"]) != checkpoint_state:
                     raise OSError("Could not persist review binding")

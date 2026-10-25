@@ -143,14 +143,39 @@ class StopMcpTests(unittest.TestCase):
                 token = self.approve()
                 result = self.output(self.checkpoint_tool("get_review_checkpoint", token))
                 self.assertNotIn("token", result)
-                self.assertEqual(set(result["files"]), {str(self.path)})
+                self.assertNotIn("files", result)
+                self.assertNotIn("workflow", result)
+                self.assertNotIn("truncated", result)
+                self.assertNotIn("partial", result)
+                self.assertNotIn("sha256", json.dumps(result))
+                self.assertNotIn("conditional", result["groups"][0])
+                self.assertEqual(result["groups"][0]["paths"], [str(self.path)])
+                # Keep fixed overhead small even if the manual skill grows in the future.
+                self.assertLess(len(json.dumps(result)) - len(str(self.path)), 900)
                 self.assertEqual(result["groups"][0]["name"], "project-reviewer")
-                self.assertIn("every named reviewer", result["workflow"])
+                self.assertIn("Wait for all reports", result["instructions"])
                 self.assertIn(str(self.path), self.state()["edited_files"])
                 done = self.output(self.checkpoint_tool("complete_review_checkpoint", token))
                 self.assertEqual((done["cleared"], done["remaining"]), (1, 0))
                 self.assertIn("not a clean verdict", done["meaning"])
                 self.assertEqual(self.output(self.checkpoint_tool("complete_review_checkpoint", token)), done)
+
+    def test_compact_response_preserves_conditional_and_partial_scope(self):
+        self.start()
+        state_path = self.project / ".claude/guard/state/session.json"
+        state = self.state()
+        state["edited_provenance"][str(self.path)]["source"] = "shell"
+        state["edited_truncated"] = {"edited_files": 3}
+        state_path.write_text(json.dumps(state))
+        review_id = self.approve()
+        before = state_path.read_text()
+        result = self.output(self.checkpoint_tool("get_review_checkpoint", review_id))
+        self.assertTrue(result["groups"][0]["conditional"])
+        self.assertTrue(result["partial"])
+        self.assertIn("tool activity", result["instructions"])
+        self.assertIn("leave the entire review pending", result["instructions"])
+        self.assertIn("partial checkpoint", result["instructions"])
+        self.assertEqual(state_path.read_text(), before, "compact lookup must remain read-only")
 
     def test_checkpoint_tools_reject_wrong_session_missing_and_manual_tokens(self):
         self.start()

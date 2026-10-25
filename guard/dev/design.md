@@ -1,5 +1,37 @@
 # guard — design detail
 
+## Compact checkpoint responses (v0.165.1)
+
+Approved lookups return only `review_id`, `status`, reviewer `groups` and concise
+`instructions`. Each path appears once in its group. Internal `files` snapshots (hashes and
+buckets), checkpoint tokens, empty truncation metadata and the complete manual skill are
+not sent to the model. Hash and reviewer checks still run before formatting the response.
+`conditional: true` and its ownership instructions appear only for groups that need them;
+Queue truncation at approval adds a frozen `partial: true` and a disclosure instruction,
+without changing the internal truncation counters used by completion. Missing/failed
+reviewers and skipped paths still prevent completion. Completed lookups return their
+original receipt, with no dispatch instructions.
+
+The explicit manual skill remains available for manual invocation. Response size is tested
+independently of that document so edits to manual instructions cannot inflate every MCP
+lookup. No runtime hook, MCP envelope or permission contract changed; the official Claude
+and Codex hooks references and MCP tools specification were rechecked on 2026-10-25.
+
+A single-file stdio fixture measured 5,037 UTF-8 JSON bytes before this change and 712
+afterwards (85.9% smaller), using identical IDs, paths, groups and serialization. These are
+payload bytes, not model tokens. The full regression suite passed 115 tests; scoped
+permission, restart/retry, changed-revision and reviewer-binding tests remain unchanged.
+The compact response test also checks ownership/partial instructions and read-only lookup.
+
+Fresh Herdr sessions verified the compact response without earlier full-workflow context:
+Claude Haiku session `e0050e2f-513a-4366-97d3-b28aaee57f4f` completed `dwcm8aqD`; Codex
+`gpt-6-luna` session `01a1735f-6205-7df0-ace1-9a9b5ba328fd` completed `xCPiOl4p`. Its
+configured native reviewer also recorded `gpt-6-luna`. Both ended with one cleared file,
+zero pending and no fixes. Claude completed despite reviewer findings and reused Stop
+consent for both MCP operations. Codex used the byte-verified 0.165.1 test cache; Claude
+used the working tree. Native evidence includes `/tmp/guard-compact-claude-debug.log` and
+`/private/tmp/guard-codex-luna-yiaf73ef/verified-compact-response-result.json`.
+
 ## Stop review interaction (v0.165.0)
 
 The form uses a required, titled single-select enum (`review` or `later`) without a default.
@@ -33,7 +65,7 @@ never touch later edits. Its `remaining` count is historical, not a fresh queue 
 Registry operations lock each ID and serialize consent/completion for its owning session; receipts live as long as the owning Guard session state.
 A cleared/reset session does not resurrect approval from the registry. State persistence
 failure is reported rather than claiming completion.
-The getter returns the frozen groups and the bundled audit workflow, avoiding a separate
+The getter returns the frozen groups and compact execution instructions, avoiding a separate
 file-read permission and shell calls. Completion retains the existing revision/rule checks
 and caller-reported completion contract; it is not independent proof of reviewer execution.
 Explicit manual and Herdr checkpoints retain their script path.
@@ -41,7 +73,7 @@ Explicit manual and Herdr checkpoints retain their script path.
 The Claude adapter uses Stop `hookSpecificOutput.additionalContext` for a normal feedback
 continuation. Codex keeps `decision: "block"` and `reason`, its documented continuation
 shape. The continuation contains only the approved tool arguments and a short direction;
-the full workflow is returned by the getter.
+the compact execution instructions are returned by the getter.
 
 Claude's PermissionRequest adapter reuses persisted Stop consent only for the exact two
 checkpoint tools. It requires host MCP provenance (`source: plugin`, `name: plugin:guard:review`),

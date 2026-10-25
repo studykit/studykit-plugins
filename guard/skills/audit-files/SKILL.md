@@ -14,11 +14,11 @@ Matching rules need no per-agent switch. Do not add reviewers for unmatched file
 ## Read the checkpoint
 
 For an accepted Stop confirmation, call Guard's `get_review_checkpoint` MCP tool with
-the exact `review_id` supplied by the continuation. Its result includes
-this workflow and the frozen checkpoint. Use that result directly; no shell command or
-separate workflow-file read is needed. If you are reading this workflow in that tool's
-result, proceed to Dispatch without calling the getter again. If it fails, report the error and leave the scope
-pending. Never replace an invalid approved token with a new snapshot.
+the exact `review_id` supplied by the continuation. Follow its compact `instructions` and
+reviewer `groups` directly; no shell command or separate workflow-file read is needed.
+The response omits internal revision hashes and duplicate file lists; the server still
+validates the approved revisions and reviewers. If lookup fails, report the error and
+leave the scope pending. Never replace an invalid approval with a new snapshot.
 
 For an explicit manual invocation, use the script path below.
 
