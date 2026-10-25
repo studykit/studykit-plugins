@@ -1,6 +1,19 @@
 {
   "description": "guard hooks. Logic lives in `scripts/guard_hook.py`; see `dev/design.md` for the design.",
   "hooks": {
+    "PermissionRequest": [
+      {
+        "matcher": "^mcp__plugin_guard_review__(get_review_checkpoint|complete_review_checkpoint)$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "uv run --script \"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/review_permission_claude.py\"",
+            "timeout": 5,
+            "description": "Reuse the user's Stop approval for Guard checkpoint lookup and completion in the same project and session. No source edits or general tool grants."
+          }
+        ]
+      }
+    ],
     "PreToolUse": [
       {
         "matcher": "Bash|Grep|Glob",

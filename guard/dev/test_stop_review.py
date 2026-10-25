@@ -34,8 +34,14 @@ try:
         result = stop_review.prepare(project, session, host,
             stop_hook_active=data.get('stop_hook_active', False))
     elif op == 'answer':
+        if 'id_candidates' in data:
+            characters = iter(''.join(data['id_candidates']))
+            stop_review.secrets.choice = lambda _: next(characters)
         result = stop_review.answer(project, session, host, data['request_id'],
-            data['action'], data.get('content'))
+            data['action'], data.get('content'), data_dir=project / 'plugin-data')
+    elif op == 'review_checkpoint':
+        result = stop_review.review_checkpoint(project / 'plugin-data', host, data['review_id'],
+            complete=data.get('complete', False))
     elif op == 'failure':
         result = stop_review.failure(project, session, data['request_id'])
     elif op == 'consent_path':
@@ -81,13 +87,29 @@ class StopReviewTests(unittest.TestCase):
 
     def approve(self, host, request_id, **extra):
         return self.invoke(host, "answer", request_id=request_id,
-                           action="accept", content={"run_review": True}, **extra)
+                           action="accept", content={"review_action": "review"}, **extra)
 
     def token(self, response):
         self.assertEqual(response.get("decision"), "block", response)
-        match = re.search(r"--token ([0-9a-f]{64})", response["reason"])
+        match = re.search(r'"review_id": "([A-Za-z0-9]{8})"', response["reason"])
         self.assertIsNotNone(match, response)
-        return match.group(1)
+        return json.loads((self.project / "plugin-data/reviews" / (match.group(1) + ".json")).read_text())["token"]
+
+    def test_short_id_collision_retries_without_overwriting_existing_approval(self):
+        self.configure("claude", [ask_rule("main.py", "reviewer")])
+        path = self.write("main.py")
+        self.record("claude", path)
+        question = self.invoke("claude", "prepare")
+        first = self.approve("claude", question["request_id"])
+        first_id = re.search(r'"review_id": "([A-Za-z0-9]{8})"', first["reason"]).group(1)
+        record_path = self.project / "plugin-data/reviews" / (first_id + ".json")
+        original = record_path.read_text()
+        self.write("main.py", "next revision")
+        question = self.invoke("claude", "prepare")
+        second = self.approve("claude", question["request_id"], id_candidates=[first_id, "Z9y8X7w6"])
+        self.assertIn('"review_id": "Z9y8X7w6"', second["reason"])
+        self.assertEqual(record_path.read_text(), original)
+        self.assertTrue((record_path.parent / "Z9y8X7w6.json").is_file())
 
     def test_default_manual_unmatched_and_excluded_do_not_ask(self):
         for host in ("claude", "codex"):
@@ -141,16 +163,17 @@ class StopReviewTests(unittest.TestCase):
             self.assertEqual(completed, {"cleared": 2, "remaining": 1})
             self.assertEqual(self.pending(host), {str(self.project / "manual.md")})
 
-    def test_decline_cancel_and_accept_false_keep_queue_and_suppress_revision(self):
+    def test_decline_cancel_and_later_keep_queue_and_suppress_revision(self):
         for host in ("claude", "codex"):
             for index, (action, content) in enumerate(
-                    (("decline", None), ("cancel", None), ("accept", {"run_review": False}))):
+                    (("decline", None), ("cancel", None), ("accept", {"review_action": "later"}))):
                 with self.subTest(host=host, action=action):
                     self.configure(host, [ask_rule("**/*.py", "project-review")])
                     self.record(host, self.write("main.py", f"revision {index}\n"))
                     question = self.invoke(host, "prepare")
-                    self.assertEqual(self.invoke(host, "answer", request_id=question["request_id"],
-                                                 action=action, content=content), {})
+                    response = self.invoke(host, "answer", request_id=question["request_id"],
+                                           action=action, content=content)
+                    self.assertIn("no review started", response["systemMessage"])
                     self.assertIn(str(self.project / "main.py"), self.pending(host))
                     self.assertEqual(self.invoke(host, "prepare"), {"status": "unchanged"})
 

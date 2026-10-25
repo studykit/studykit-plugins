@@ -169,8 +169,8 @@ def case(base: Path, home: Path, action: str, output: Path, env: dict[str, str],
                 (output / 'server-process.txt').write_text(server_processes(pid))
                 print(f'{action}: native Guard consent form visible', flush=True)
             if asked_at is not None and answered_at is None and time.monotonic() - asked_at > .5:
-                # Guard defaults to False; Down would wrap to True in Codex's form.
-                os.write(fd, {'accept': b'\x1b[A\r', 'decline': b'\r', 'cancel': b'\x1b'}[action])
+                # The required enum lists review first and keep-pending second.
+                os.write(fd, {'accept': b'\r', 'decline': b'\x1b[B\r', 'cancel': b'\x1b'}[action])
                 answered_at = time.monotonic()
             state = read_jsons(project / '.codex' / 'guard')
             states = [value for name, value in state.items() if name.startswith('state/') and isinstance(value, dict)]

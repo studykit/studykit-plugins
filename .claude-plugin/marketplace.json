@@ -71,7 +71,7 @@
     {
       "name": "guard",
       "source": "./guard",
-      "description": "Project-configured reviewers, pattern-based file checkpoints with optional Stop confirmation, and Git diffs in Herdr.",
+      "description": "Project-configured reviewers, explicit Stop review choices with single-ID checkpoint tools, and Git diffs in Herdr.",
       "author": {
         "name": "studykit"
       },

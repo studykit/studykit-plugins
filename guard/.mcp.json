@@ -7,7 +7,9 @@
         "--script",
         "${CLAUDE_PLUGIN_ROOT}/mcp/server.py",
         "--host",
-        "claude"
+        "claude",
+        "--data-dir",
+        "${CLAUDE_PLUGIN_DATA}"
       ]
     }
   }

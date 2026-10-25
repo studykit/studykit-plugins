@@ -90,8 +90,11 @@ file type or folder, including files without an extension. It has no UI-specific
 The question runs while the host is processing Stop, after the assistant's reply; it does
 not wait for the CLI process to exit.
 
-The question identifies the pending scope. Accepting it authorizes the named reviewers to
-check a frozen checkpoint of those changes. It does not approve a new design or authorize
+The question identifies the pending scope and offers **Run the configured reviewers** or
+**Keep pending for later**, with no preselected answer. Select the review option and accept
+to authorize the named reviewers to
+check a frozen checkpoint of those changes, including reading its review scope and marking
+the matching revisions reviewed afterwards. It does not approve a new design or authorize
 implementation of the findings. The assistant invokes each exact configured agent or skill
 and reports the results. If one is unavailable or fails, the affected files remain unreviewed;
 Guard never supplies a fallback reviewer.
@@ -105,6 +108,18 @@ do not recursively prompt for the same changes. You can always request another c
 explicitly.
 An unavailable or failed form leaves the files unreviewed as well; the same offered revision
 is not repeatedly prompted, and `audit-files` remains available for a retry.
+
+Confirmation expires after five minutes. Expiration, unsupported forms, and failures explain
+that no review started and point to `audit-files` for a manual retry. Approved Stop reviews
+use Guard's connected tools with a single approval ID for checkpoint handling. Interrupted
+connections can resume that approved scope, and repeating completion safely returns the
+original result without clearing later edits. In Claude Code 2.1.274 or later,
+Guard reuses that consent for its two internal checkpoint tools in the same project and
+session, so those steps do not ask again. This does not grant permission to edit source files
+or use other tools. Older hosts without MCP provenance keep their normal permission prompts;
+Codex also retains its normal tool-permission flow.
+The result separates reviewed files, findings, fixes, and files still pending. **Zero pending
+files means the review queue is clear; it does not mean every finding was fixed.**
 
 Run `/guard:audit-files` in Claude Code or `$guard:audit-files` in Codex to review the pending
 queue at any time. Manual and confirmed reviews use the same reviewer grouping and checkpoint

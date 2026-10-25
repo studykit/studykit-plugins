@@ -1,6 +1,6 @@
 {
   "name": "guard",
-  "version": "0.163.0",
+  "version": "0.165.0",
   "description": "User-configured reviews, consent-based Stop file checkpoints, and Git diffs in Herdr.",
   "author": {
     "name": "studykit"

@@ -23,6 +23,30 @@ def rule(pattern, name, kind="agent"):
 
 
 class FileReviewTests(unittest.TestCase):
+    def test_codex_stop_refreshes_sidebar_after_mcp_completion_without_herdr_env(self):
+        self.configure("codex", [rule("main.py", "reviewer")])
+        calls = self.project / "herdr-calls.jsonl"
+        binary = self.project / "herdr-probe"
+        binary.write_text(f"#!{sys.executable}\nimport json,sys\n"
+                          f"with open({str(calls)!r}, 'a') as stream:\n"
+                          "    stream.write(json.dumps(sys.argv[1:]) + '\\n')\n")
+        binary.chmod(0o755)
+        presentation = {"HERDR_ENV": "1", "HERDR_PANE_ID": "fixture:p1", "HERDR_BIN_PATH": str(binary)}
+        self.env.update(presentation)
+        self.record("codex", self.write("main.py"))
+        checkpoint = self.checkpoint("codex", "show")
+        self.assertIn("guard_pending=Guard · 1 pending", json.loads(calls.read_text().splitlines()[-1]))
+        for key in presentation:
+            self.env.pop(key)
+        before = calls.read_text()
+        self.assertEqual(self.checkpoint("codex", "complete", checkpoint["token"]),
+                         {"cleared": 1, "remaining": 0})
+        self.assertEqual(calls.read_text(), before)
+        self.env.update(presentation)
+        self.event("codex", "Stop")
+        self.assertEqual(json.loads(calls.read_text().splitlines()[-1])[-2:],
+                         ["--clear-token", "guard_pending"])
+
     def setUp(self):
         temporary = tempfile.TemporaryDirectory(prefix="guard-file-review-")
         self.addCleanup(temporary.cleanup)

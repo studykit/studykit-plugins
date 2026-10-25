@@ -30,6 +30,7 @@ def _read_state(project_dir: Path, session_id: str, config: dict[str, Any]) -> d
         # skill; the paths and hashes let completion remove only revisions that were actually
         # reviewed. A file edited while reviews are running stays pending.
         "file_checkpoints": {},
+        "file_review_receipts": {},
         # Legacy once-per-turn fields retained while old state files age out. Stop no longer
         # dispatches file audits, so these are not written by current code.
         "last_audited_prompt_id": "",
@@ -91,7 +92,7 @@ def _read_state(project_dir: Path, session_id: str, config: dict[str, Any]) -> d
     if not isinstance(data, dict):
         return default
     keys = ("last_audited_prompt_id", "last_audited_fingerprint",
-            "pending_verify_prompt_id", "file_checkpoints",
+            "pending_verify_prompt_id", "file_checkpoints", "file_review_receipts",
             "transcript_path", "plan_audit_paused", "plan_audited_hash",
             "edited_prompt_id", "edited_files",
             "edited_agent_docs", "edited_docs", "edited_truncated",

@@ -13,9 +13,18 @@ Matching rules need no per-agent switch. Do not add reviewers for unmatched file
 
 ## Read the checkpoint
 
+For an accepted Stop confirmation, call Guard's `get_review_checkpoint` MCP tool with
+the exact `review_id` supplied by the continuation. Its result includes
+this workflow and the frozen checkpoint. Use that result directly; no shell command or
+separate workflow-file read is needed. If you are reading this workflow in that tool's
+result, proceed to Dispatch without calling the getter again. If it fails, report the error and leave the scope
+pending. Never replace an invalid approved token with a new snapshot.
+
+For an explicit manual invocation, use the script path below.
+
 Resolve `scripts/checkpoint.py` relative to this `SKILL.md` and run that concrete path with
 `show`, the current host, and the current session id. If the invoking user message includes
-exactly `--token <token>`, or Guard's accepted Stop form supplies that token, add those two
+exactly `--token <token>`, add those two
 arguments to `show`; this identifies an immutable approved subset. Never replace an invalid
 token with a fresh checkpoint. Do not derive a scope from paths or other prose in the
 message. On Claude Code,
@@ -50,7 +59,16 @@ the checkpoint is partial.
 
 ## Complete safely
 
-Run the same script with `complete`, passing the returned `token` and session id:
+After a Stop-confirmed review, call Guard's `complete_review_checkpoint` MCP tool with the
+same `review_id`, only after every named reviewer successfully reviewed
+every path. Completion records the caller's workflow; it does not independently prove that
+reviewers ran. Do not complete a partial or failed review.
+
+A repeated completion returns the original receipt; `remaining` is the count at completion,
+not a fresh count of edits made since then. Do not dispatch again if lookup returns
+`status: completed`.
+
+For a manual invocation, run the same script with `complete`, passing the returned `token` and session id:
 
 ```text
 <checkpoint-script> complete <token> --host <claude|codex> --session <session-id>
@@ -60,3 +78,8 @@ Completion removes only files whose contents still match the checkpoint snapshot
 reports `remaining` greater than zero, files changed while the audits were running remain
 pending; say so and leave them for another checkpoint. Never claim that those revisions were
 audited.
+
+Report the number of files reviewed, findings reported by the reviewers, fixes actually
+made, and files still pending. If a count is unavailable, say so instead of inventing it.
+Zero pending files means the review queue is clear, not that findings are resolved. Review
+consent alone does not authorize implementing findings.

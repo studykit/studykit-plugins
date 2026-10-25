@@ -1,5 +1,139 @@
 # guard — design detail
 
+## Stop review interaction (v0.165.0)
+
+The form uses a required, titled single-select enum (`review` or `later`) without a default.
+Only `accept` plus `review_action: "review"` creates an approved checkpoint. Missing values,
+the old boolean field, decline and cancellation never authorize review. A single-file scope
+appears in the first line, before the host can collapse the rest of the message.
+
+Approved Stop continuations use `get_review_checkpoint` and `complete_review_checkpoint`
+on the review MCP server. Their only argument is `review_id` (eight case-sensitive ASCII letters/digits, without a prefix).
+The ID has about 47.6 random bits; a collision is retried under the ID lock without
+overwriting its existing record. Earlier long IDs are intentionally rejected. This is a
+local workflow handle, not a remote authentication credential.
+Each accepted form mints a distinct ID and persists its host, canonical project, session,
+internal checkpoint token and exact approved scope. No model-provided project/session,
+latest-approval inference or content-hash lookup is accepted. The bound checkpoint must still
+exist with `approved_stop` and the matching review ID; these tools cannot create consent.
+The ID is an opaque capability: MCP does not supply a trusted caller thread ID on each call.
+The server resolves the stored owner; it does not claim to authenticate a calling thread.
+
+The MCP adapter accepts `--data-dir`. Claude passes its native `${CLAUDE_PLUGIN_DATA}`;
+Codex uses native `PLUGIN_DATA` when supplied, otherwise the documented plugin-owned fallback
+`$CODEX_HOME/plugins/data/guard-review` when that variable reaches the process, otherwise
+`~/.codex/plugins/data/guard-review`. The compatibility MCP
+loader does not promise hook-only variables or argument interpolation. Registry files are
+private, atomic writes outside the versioned plugin cache. Test adapters pass an isolated
+path. Unknown IDs, lost state and reset/evicted checkpoints fail closed.
+
+Completion stores its receipt in the same session-state replacement that removes matching
+revisions. Reads and completion retries return that original receipt after restart; they
+never touch later edits. Its `remaining` count is historical, not a fresh queue count.
+Registry operations lock each ID and serialize consent/completion for its owning session; receipts live as long as the owning Guard session state.
+A cleared/reset session does not resurrect approval from the registry. State persistence
+failure is reported rather than claiming completion.
+The getter returns the frozen groups and the bundled audit workflow, avoiding a separate
+file-read permission and shell calls. Completion retains the existing revision/rule checks
+and caller-reported completion contract; it is not independent proof of reviewer execution.
+Explicit manual and Herdr checkpoints retain their script path.
+
+The Claude adapter uses Stop `hookSpecificOutput.additionalContext` for a normal feedback
+continuation. Codex keeps `decision: "block"` and `reason`, its documented continuation
+shape. The continuation contains only the approved tool arguments and a short direction;
+the full workflow is returned by the getter.
+
+Claude's PermissionRequest adapter reuses persisted Stop consent only for the exact two
+checkpoint tools. It requires host MCP provenance (`source: plugin`, `name: plugin:guard:review`),
+the hook's project, the calling session, an exact one-field argument object and a live
+Stop-approved binding or its completed receipt. Unknown provenance, manual tokens, other
+scopes/tools and malformed state leave the host permission flow unchanged. It writes no permission rules
+and never authorizes source edits. The server still validates revision/rule fingerprints.
+This adapter is Claude-specific because the repeated dialogs were verified there and its
+documented provenance field establishes the plugin origin. Codex keeps its ordinary permission
+flow; do not infer MCP origin from a tool-name prefix alone.
+
+Expiration and content/rule changes have different messages. An unsupported form capability
+produces one diagnostic per MCP connection and affected session, only when eligible files
+exist. Failure and cancellation preserve pending revisions and point to manual `audit-files`.
+Review summaries distinguish reviewed files, findings, actual fixes and remaining files;
+the pending count is deliberately still a queue count, not an unresolved-findings tracker.
+
+Official references checked on 2026-10-25:
+[Claude plugin data](https://code.claude.com/docs/en/plugins-reference#environment-variables),
+[Codex plugin packaging](https://developers.openai.com/plugins/build/plugins),
+[Claude Stop feedback](https://code.claude.com/docs/en/hooks#stop-decision-control),
+[Codex hooks](https://learn.chatgpt.com/docs/hooks),
+[Codex MCP](https://learn.chatgpt.com/docs/extend/mcp), and
+[MCP titled enum forms](https://modelcontextprotocol.io/specification/2025-11-25/client/elicitation).
+Run the Stop transport/core tests and the full regression suite using the commands below.
+
+Validation on 2026-10-25: 107 regression tests passed, as did `check-entries.py` and
+`claude plugin validate guard` (the existing missing-icon directory warning remains).
+Claude Code 2.1.310 / Haiku 5.5 ran this working tree in a fresh Herdr project at
+`/private/tmp/guard-stop-one-approval-3kmixicd`, with all checked Guard/session variables
+unset before startup and `acceptEdits` permissions. The native Stop form showed the filename,
+reviewer and required unset choice. After accepting review once, the two checkpoint MCP calls
+were allowed by the scoped PermissionRequest hook without another dialog. A native
+`demo-reviewer` subagent found the intentionally introduced empty-input failure; completion
+left zero pending files, and the response distinguished the finding from fixes (none).
+The debug log at `/tmp/guard-stop-one-approval-debug.log` records both native permission
+hook decisions and successful tool calls.
+
+Codex 0.164.0 was subsequently verified in Herdr with both the main agent and the native
+`demo_reviewer` using `gpt-6-luna` (confirmed in their turn records). An isolated Codex home
+installed a byte-verified working-tree snapshot of 0.164.0; its hooks were trusted through
+the normal UI. The required enum form appeared after a native edit, and one acceptance
+continued through both MCP tools and the named reviewer without further permission dialogs.
+Two approved revisions found the expected empty-input defect and completed with
+`cleared: 1, remaining: 0`.
+
+That run exposed stale Herdr metadata after Codex MCP completion. The Codex Stop adapter now
+refreshes the sidebar from persisted state, since the MCP process may lack the pane environment.
+After updating the isolated cache, Codex correctly required renewed hook trust; the untrusted
+attempt was not counted as verification. After trust renewal, a new native edit/review cleared
+both the queue and the sidebar token. The fixture and raw session records are under
+`/private/tmp/guard-codex-luna-yiaf73ef`. The full suite now passes 108 tests, including the
+missing-MCP-environment sidebar regression. The standalone Codex driver itself was not rerun.
+
+### Single-ID runtime verification
+
+The 0.165.0 single-ID flow was exercised on 2026-10-25 with Claude Code 2.1.310 / Haiku
+and Codex 0.164.0 / `gpt-6-luna` in Herdr. Claude used the working-tree `--plugin-dir`;
+Codex used 85 byte-verified files in the isolated marketplace cache. Both accepted forms
+continued through `get_review_checkpoint({review_id})`, their configured native reviewer,
+and `complete_review_checkpoint({review_id})`, ending with `cleared: 1, remaining: 0`.
+Claude's debug log confirms that both PermissionRequest decisions reused the original consent.
+Codex main session `01a1734e-7718-7c93-92d2-0656f7191325` and reviewer session
+`01a17350-51b7-7ad2-9675-05aa02512dca` both recorded `gpt-6-luna`.
+
+The Codex run also showed an unnecessary assistant invocation of the host-only confirmation
+tool before the actual Stop form; it returned no continuation. Its tool description now
+explicitly prohibits assistant calls and invented hook context. This instruction is not a
+protocol-level caller-authentication boundary. The actual host form, accepted review and
+single-ID calls were separately observed.
+
+The compatibility MCP process did not inherit the test launcher's `CODEX_HOME`, so its
+registry used the documented `~/.codex/plugins/data/guard-review` fallback. Project/session
+queue state remained in the throwaway project. Do not describe this as native plugin-data
+environment propagation or assume a launcher variable reaches an MCP process.
+Claude evidence is in `/tmp/guard-review-id-claude-debug.log`; the fixture path is recorded
+in `/tmp/guard-review-id-claude-current`. Codex evidence remains under
+`/private/tmp/guard-codex-luna-yiaf73ef/codex-home/sessions`.
+
+The final eight-character format was then exercised through fresh native Stop approvals:
+Codex used `IeBHf0Sz` and Claude used `tMSaMg7O`. Both ran the configured reviewer and
+completed with one cleared file and zero pending files; Claude reused consent for both
+MCP tools. The new Codex reviewer again recorded `gpt-6-luna`. Long-ID compatibility was
+removed at the user's request. The final suite passed 114 tests, including forced ID
+collision retry without overwriting the prior binding. `check-entries.py`, manifest
+validation and `git diff --check` passed (the existing missing-icon warning remains).
+
+Transport regressions cover restart before completion, restart after completion and later
+edits, equal-content approvals in different sessions, host separation, scope/rule changes,
+missing consent and injected persistence failures. Permission tests cover the original
+approval and receipt retries, wrong host-provided owner/provenance and corrupt receipts.
+
 ## Confirmed Stop file reviews
 
 File-review scope and criteria belong to the project. `file_review_rules` still chooses one

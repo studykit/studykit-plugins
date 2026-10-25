@@ -234,7 +234,7 @@ def _show_token(project_dir: Path, session_id: str, token: str) -> int:
     return 0
 
 
-def _complete(project_dir: Path, session_id: str, token: str) -> int:
+def _complete(project_dir: Path, session_id: str, token: str, *, review_id: str | None = None) -> int:
     config = _load_config(project_dir)
     state = _read_state(project_dir, session_id, config)
     checkpoints = state.get("file_checkpoints")
@@ -283,10 +283,21 @@ def _complete(project_dir: Path, session_id: str, token: str) -> int:
     state["file_checkpoints"] = {
         key: value for key, value in checkpoints.items() if key != token
     }
+    receipt = {"cleared": len(cleared), "remaining": len(_snapshot(state))}
+    if review_id is not None:
+        receipt.update(review_id=review_id, status="completed",
+                       meaning="Reviewed revisions were cleared. This is not a clean verdict or proof that findings were fixed.")
+        state.setdefault("file_review_receipts", {})[review_id] = receipt
+    # The receipt and queue removal share one atomic state replacement. A retry after a
+    # process crash must not reapply the old snapshot to edits recorded afterwards.
     _write_state(project_dir, session_id, state)
+    persisted = _read_state(project_dir, session_id, config)
+    if token in persisted.get("file_checkpoints", {}) or (review_id is not None and
+            persisted.get("file_review_receipts", {}).get(review_id) != receipt):
+        print("guard: checkpoint completion could not be persisted.", file=sys.stderr)
+        return 1
     report_pending(state)
-    print(json.dumps({"cleared": len(cleared),
-                      "remaining": len(_snapshot(state))}, ensure_ascii=False))
+    print(json.dumps(receipt, ensure_ascii=False))
     return 0
 
 

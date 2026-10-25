@@ -50,6 +50,7 @@ from guard_core import config as core_config  # noqa: E402
 from guard_core import payload as core_payload  # noqa: E402
 from guard_core import paths as core_paths  # noqa: E402
 from guard_core import state as core_state  # noqa: E402
+from guard_core.herdr import report_pending  # noqa: E402
 from guard_core.codex_turns import _load_turn, _save_turn  # noqa: E402
 from guard_core.transcript import _is_control_command_name, _turn_command_name  # noqa: E402
 
@@ -214,6 +215,8 @@ def main() -> int:
         _handle_post_tool(project_dir, payload, session_id, turn_id)
     elif event == "Stop":
         _handle_stop(project_dir, payload, session_id, turn_id)
+        # MCP completion may not inherit Herdr's pane environment; the host hook does.
+        report_pending(core_state._read_state(project_dir, session_id, core_config._load_config(project_dir)))
     return 0
 
 
