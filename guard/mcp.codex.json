@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "review": {
+      "command": "uv",
+      "args": [
+        "run",
+        "--script",
+        "mcp/server.py",
+        "--host",
+        "codex"
+      ],
+      "cwd": "."
+    }
+  }
+}

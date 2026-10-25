@@ -7,13 +7,15 @@ Keep host payloads, environment variables and output shapes at adapter boundarie
 
 ## Product boundaries
 
-- Turn, plan, and answer reviewers belong to the user. `audit-turn` dispatches only `turn_review`;
+- All reviewers and review criteria belong to the project or user; Guard ships no reviewer agents.
+  `audit-turn` dispatches only `turn_review`;
   `answer` uses only `answer_review`; `audit-plan` and Claude's post-approval gate use only
   `plan_review`. Unset means no
   review. Never introduce a fallback critic, built-in review criteria, or a generic agent
   impersonating the configured reviewer.
-- Reviews are explicit, except for Claude's configured post-approval plan gate. Stop never
-  launches an audit. It may retain evidence and recover interrupted shell writes.
+- Reviews require an explicit invocation or approval. A file rule with `on_stop: "ask"` may
+  request confirmation through the host; only an affirmative response authorizes its frozen
+  checkpoint. Claude's configured post-approval plan gate remains separate.
 - `audit-report`, `audit-report-*`, `audit-turn-*`, and the router are retired. `answer`
   requires a configured reviewer before drafting; never deliver an unaudited draft as a
   reviewed document.
@@ -43,6 +45,9 @@ Keep host payloads, environment variables and output shapes at adapter boundarie
   announcement; see the design notes before changing inheritance.
 - File checkpoints clear only reviewed revisions. Queue resets invalidate live checkpoints;
   an old review must not clear later edits. Keep edited-file buckets disjoint.
+- A declined or cancelled Stop question leaves files unreviewed. Suppress repeated questions
+  for the same contents, selected rule and reviewer in one session, and never treat review
+  consent as approval to adopt a design or implement findings.
 - The answer document stays outside swept session state so a user deliverable cannot expire.
 - Do not collect the full session history into every review. Supply the selected turn and
   source location so a reviewer can obtain further context when needed.
@@ -53,8 +58,9 @@ Keep host payloads, environment variables and output shapes at adapter boundarie
 
 ## Constraints on future changes
 
-Do not restore automatic Stop auditing, a model call inside a hook, lexical reviewer
-selection, or a child `claude -p` router. Do not restore the retired `audit_gate`, turn mute,
+Do not run Stop reviews without per-rule opt-in and the user's affirmative confirmation.
+Do not add a model call inside a hook, lexical reviewer selection, or a child `claude -p`
+router. Do not restore the retired `audit_gate`, turn mute,
 `reuse` mode, `reuse_agents`, or `exempt_skills`. The design notes retain the reasoning.
 File-review mode aliases are retired along with their switches.
 
@@ -71,4 +77,5 @@ Do not duplicate detailed mechanics here or in the end-user README.
 From the repository root, run `uv run guard/dev/check-entries.py` to validate shipped names and static agent references.
 Plan, turn, and answer regression commands and the working-tree real-session recipe are in
 [dev/design.md](dev/design.md), under "Explicit plan review", "Configured turn reviews", "Configured answer reviews" and
-"Manual testing". Script tests alone do not verify host hook delivery or native invocation.
+"Manual testing". The confirmed file-review contract is under "Confirmed Stop file reviews".
+Script tests alone do not verify host hook delivery or native invocation.

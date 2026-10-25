@@ -59,6 +59,24 @@
             "timeout": 15
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "mcp_tool",
+            "server": "review",
+            "tool": "confirm_file_review",
+            "input": {
+              "cwd": "${cwd}",
+              "session_id": "${session_id}",
+              "stop_hook_active": "${stop_hook_active}",
+              "transcript_path": "${transcript_path}",
+              "turn_id": "${turn_id}"
+            },
+            "timeout": 360,
+            "statusMessage": "Checking Guard file-review consent"
+          }
+        ]
       }
     ]
   }

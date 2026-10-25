@@ -19,11 +19,6 @@ from .state import _edit_source, _edited_files, _read_state, _write_state
 
 
 _BUCKETS = ("edited_files", "edited_agent_docs", "edited_docs")
-_CODEX_AGENTS = {
-    "guard:doc-auditor": "guard_doc_auditor",
-    "guard:agents-md-auditor": "guard_agents_md_auditor",
-    "guard:ext-docs-auditor": "guard_ext_docs_auditor",
-}
 
 
 def _content_hash(path: str) -> str | None:
@@ -35,6 +30,20 @@ def _content_hash(path: str) -> str | None:
         return digest.hexdigest()
     except OSError:
         return None
+
+
+def _review_fingerprint(revision: dict[str, str], rule: FileReviewRule) -> str:
+    return hashlib.sha256(json.dumps(
+        [revision["sha256"], rule.glob, rule.kind, rule.name],
+        ensure_ascii=False, separators=(",", ":")).encode()).hexdigest()
+
+
+def _approved_revision(project: Path, name: str, revision: dict[str, str],
+                       fingerprint: str, config: dict[str, Any]) -> bool:
+    rule = review_rule(project, Path(name), config)
+    return (rule is not None and rule.on_stop == "ask"
+            and _content_hash(name) == revision.get("sha256")
+            and _review_fingerprint(revision, rule) == fingerprint)
 
 
 def _session_arg() -> str:
@@ -133,10 +142,6 @@ def _plan(project_dir: Path, state: dict[str, Any], host: str,
         if rule is None:
             continue
         kind, name = rule.kind, rule.name
-        if (kind, name) == ("skill", "guard:audit-docs"):
-            kind, name = "agent", "guard:doc-auditor"
-        if host == "codex" and kind == "agent":
-            name = _CODEX_AGENTS.get(name, name)
         conditional = _edit_source(state, path) != "native"
         groups.setdefault((kind, name, conditional), []).append(path)
     return [
@@ -157,7 +162,8 @@ def reconcile_queue(project_dir: Path, state: dict[str, Any], host: str
 
 
 def _show(project_dir: Path, session_id: str, host: str,
-          selected: set[str] | None = None) -> int:
+          selected: set[str] | None = None, *,
+          approved_fingerprints: dict[str, str] | None = None) -> int:
     config = _load_config(project_dir)
     state = _read_state(project_dir, session_id, config)
     snapshot, groups = reconcile_queue(project_dir, state, host)
@@ -171,6 +177,8 @@ def _show(project_dir: Path, session_id: str, host: str,
     truncated = state.get("edited_truncated", {}) if selected is None else {}
     payload = {"files": snapshot, "groups": groups,
                "truncated": truncated}
+    if approved_fingerprints is not None:
+        payload["approved_stop"] = approved_fingerprints
     token = hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()
     payload["token"] = token
     checkpoints = state.get("file_checkpoints")
@@ -181,6 +189,8 @@ def _show(project_dir: Path, session_id: str, host: str,
         "groups": groups,
         "truncated": dict(truncated) if isinstance(truncated, dict) else {},
     }
+    if approved_fingerprints is not None:
+        checkpoints[token]["approved_stop"] = approved_fingerprints
     # Display refreshes also call `show`; keep several live tokens so a panel refresh cannot
     # invalidate an audit already in flight, but bound stale snapshot growth.
     state["file_checkpoints"] = dict(list(checkpoints.items())[-8:])
@@ -205,6 +215,14 @@ def _show_token(project_dir: Path, session_id: str, token: str) -> int:
     if not isinstance(files, dict) or not isinstance(groups, list):
         print("guard: checkpoint token cannot be resumed; request a new audit.",
               file=sys.stderr)
+        return 1
+    approved = checkpoint.get("approved_stop")
+    if approved is not None and (not isinstance(approved, dict)
+            or set(approved) != set(files)
+            or not all(_approved_revision(project_dir, name, revision, approved[name], config)
+                       for name, revision in files.items())):
+        print("guard: approved file revisions or reviewer rules changed; no review is "
+              "authorized by this token. Request fresh consent.", file=sys.stderr)
         return 1
     payload = {
         "files": files,
@@ -235,6 +253,10 @@ def _complete(project_dir: Path, session_id: str, token: str) -> int:
         if not isinstance(path, str) or not isinstance(item, dict):
             continue
         before = item.get("sha256")
+        approved = checkpoint.get("approved_stop")
+        if isinstance(approved, dict) and not _approved_revision(
+                project_dir, path, item, approved.get(path, ""), config):
+            continue
         now = _content_hash(path)
         if now is None or now == before:
             cleared.add(path)

@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from .config import (
-    AUDIT_PLAN_KEY, AUDIT_SWITCHES, RETIRED_KEYS, DEFAULT_CONFIG, _HOST_IS_CODEX,
+    AUDIT_PLAN_KEY, AUDIT_SWITCHES, RETIRED_KEYS, DEFAULT_CONFIG, CONFIG_REL, _HOST_IS_CODEX,
     _audit_on, _cli_write_allowed, _file_review_rules, _load_config, _load_raw_config,
     _parse_switch, _plan_review_action, _turn_review_action, _answer_review_action, _write_config
 )
@@ -166,7 +166,8 @@ def _config_show_lines(project_dir: Path, session_id: str | None) -> list[str]:
         if not isinstance(raw_rules, list) or len(rules) != len(raw_rules):
             return "file_review_rules: (invalid entries ignored)"
         return "file_review_rules: " + ", ".join(
-            f"{rule.glob} -> {rule.kind}:{rule.name}" for rule in rules)
+            f"{rule.glob} -> {rule.kind}:{rule.name} (on_stop: {rule.on_stop})"
+            for rule in rules)
 
     def reviewer_line(key: str) -> str:
         raw_action = raw.get(key)
@@ -182,12 +183,6 @@ def _config_show_lines(project_dir: Path, session_id: str | None) -> list[str]:
                     'Needs {"kind": "agent" | "skill", "name": "..."}')
         return f"{key}: {action.kind}:{action.name}"
 
-    def built_in_review_actions_line() -> str:
-        return ("file review actions (built in): "
-                "agent:guard:comment-corrector (Claude Code only), "
-                "agent:guard:doc-auditor, agent:guard:agents-md-auditor, "
-                "agent:guard:ext-docs-auditor")
-
     def checkpoint_line() -> str:
         """This session's pending file-checkpoint count."""
         if session_id is None or state is None:
@@ -196,8 +191,8 @@ def _config_show_lines(project_dir: Path, session_id: str | None) -> list[str]:
             path for bucket in ("edited_files", "edited_agent_docs", "edited_docs")
             for path in state.get(bucket, []) if isinstance(path, str) and path
         }
-        return (f"file checkpoint: {len(pending)} pending — run `/guard:audit-files`; "
-                "Stop does not launch file audits")
+        return (f"file checkpoint: {len(pending)} pending — invoke guard:audit-files; "
+                "rules with on_stop: ask also offer a review question at Stop")
 
     def retired_lines() -> list[str]:
         """One line per retired key still present in the file.
@@ -222,7 +217,6 @@ def _config_show_lines(project_dir: Path, session_id: str | None) -> list[str]:
         doc_line("doc_dir"),
         "files_exclude: " + json.dumps(cfg.get("files_exclude", [])),
         file_review_rules_line(),
-        built_in_review_actions_line(),
         *retired_lines(),
     ]
 
@@ -242,7 +236,7 @@ def _settings_unset(project_dir: Path, session_id: str | None,
     # a lowercased guess would miss the misspelled or foreign-cased key that is exactly
     # what someone reaches for this verb to clear.
     if key not in raw:
-        print(f"guard settings: no key {key!r} in .claude/guard.local.json — nothing to "
+        print(f"guard settings: no key {key!r} in {CONFIG_REL} — nothing to "
               f"remove. Keys present: " + (", ".join(raw) if raw else "(none)"))
         _trace(project_dir, session_id, "settings", "unset_absent", key=key)
         return 0
@@ -255,7 +249,7 @@ def _settings_unset(project_dir: Path, session_id: str | None,
     del raw[key]
 
     if not _write_config(project_dir, raw):
-        print("guard settings: failed to write .claude/guard.local.json", file=sys.stderr)
+        print(f"guard settings: failed to write {CONFIG_REL}", file=sys.stderr)
         return 0
 
     _reconcile_session_queue(project_dir, session_id)
@@ -311,7 +305,7 @@ def cmd_settings() -> int:
 
     if not _cli_write_allowed():
         print("guard settings: refusing to change settings outside a user-invoked Guard "
-              "configuration command. Ask the user to run `/guard:settings` "
+              "configuration command. Ask the user to invoke guard:settings "
               "— only the user changes guard's "
               "own configuration.", file=sys.stderr)
         _trace(project_dir, session_id, "settings", "refused_no_skill_marker")
@@ -360,7 +354,8 @@ def cmd_settings() -> int:
         candidate = {key: parsed}
         if not isinstance(parsed, list) or len(_file_review_rules(candidate)) != len(parsed):
             print(f"guard settings: {key} must be a JSON list of "
-                  '{"glob": "...", "action": {"kind": "agent|skill", "name": "..."}} '
+                  '{"glob": "...", "action": {"kind": "agent|skill", "name": "..."}, '
+                  '"on_stop": "manual|ask"} '
                   "entries; use files_exclude for exclusions; audit-files cannot review itself",
                   file=sys.stderr)
             return 0
@@ -399,7 +394,7 @@ def cmd_settings() -> int:
         return 0
 
     if not _write_config(project_dir, raw):
-        print("guard settings: failed to write .claude/guard.local.json", file=sys.stderr)
+        print(f"guard settings: failed to write {CONFIG_REL}", file=sys.stderr)
         return 0
 
     _reconcile_session_queue(project_dir, session_id)

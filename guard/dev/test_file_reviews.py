@@ -89,7 +89,7 @@ class FileReviewTests(unittest.TestCase):
             self.configure(host, [rule("**/*.py", "source-review"),
                                   rule("**/*.json", "config-review", "skill"),
                                   rule("Makefile", "build-review", "skill"),
-                                  rule("**/*.md", "guard:doc-auditor")],
+                                  rule("**/*.md", "project-doc-review")],
                            **{"comment-corrector": "off", "doc-auditor": "off"})
             for path in paths.values():
                 self.record(host, path)
@@ -101,7 +101,7 @@ class FileReviewTests(unittest.TestCase):
                 "src/deep/main.py": ("agent", "source-review"),
                 "config.json": ("skill", "config-review"),
                 "Makefile": ("skill", "build-review"),
-                "guide.md": ("agent", "guard_doc_auditor" if host == "codex" else "guard:doc-auditor")})
+                "guide.md": ("agent", "project-doc-review")})
             self.assertTrue(all(not g["conditional"] for g in result["groups"]))
 
     def test_specificity_and_exclusions_apply_before_dispatch(self):
@@ -234,6 +234,35 @@ class FileReviewTests(unittest.TestCase):
             self.assertEqual([g["name"] for g in groups], ["json-review"])
             self.assertTrue(groups[0]["conditional"])
             (self.project / "wiki/ref/page.md").unlink()
+
+    def test_codex_native_apply_patch_command_records_add_and_move_destinations(self):
+        self.configure("codex", [rule("**/*.py", "project-source-review")])
+        added = self.write("added.py")
+        moved = self.write("nested/moved.py")
+        patch = ("*** Begin Patch\n*** Add File: added.py\n+changed\n"
+                 "*** Update File: original.py\n*** Move to: nested/moved.py\n"
+                 "@@\n-before\n+after\n*** End Patch")
+        self.event("codex", "UserPromptSubmit")
+        self.event("codex", "PostToolUse", "apply_patch", {"command": patch})
+        groups = self.checkpoint("codex", "show")["groups"]
+        self.assertEqual(len(groups), 1)
+        self.assertEqual(set(groups[0]["paths"]), {str(added), str(moved)})
+        self.assertEqual(groups[0]["name"], "project-source-review")
+        self.assertFalse(groups[0]["conditional"])
+
+    def test_codex_shell_command_containing_patch_text_keeps_conditional_provenance(self):
+        subprocess.run(["git", "init", "-q", str(self.project)], check=True)
+        self.configure("codex", [rule("**/*.py", "project-source-review")])
+        target = self.write("shell.py", "before\n")
+        patch_text = "*** Begin Patch\n*** Update File: shell.py\n@@\n-before\n+after\n*** End Patch"
+        self.event("codex", "UserPromptSubmit")
+        self.event("codex", "PreToolUse", "Bash", {"command": patch_text})
+        target.write_text("after\n")
+        self.event("codex", "PostToolUse", "Bash", {"command": patch_text})
+        groups = self.checkpoint("codex", "show")["groups"]
+        self.assertEqual(len(groups), 1)
+        self.assertEqual(groups[0]["paths"], [str(target)])
+        self.assertTrue(groups[0]["conditional"])
 
 
 if __name__ == "__main__":

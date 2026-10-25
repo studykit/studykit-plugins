@@ -1,41 +1,45 @@
 {
   "audit-plan": "on",
+  "turn_review": {
+    "kind": "agent",
+    "name": "reviewer"
+  },
   "plan_review": {
     "kind": "agent",
-    "name": "project:plan-reviewer"
+    "name": "reviewer"
+  },
+  "answer_review": {
+    "kind": "skill",
+    "name": "review-answer"
   },
   "file_review_rules": [
     {
-      "glob": "**/*.py",
+      "glob": "src/**",
       "action": {
         "kind": "agent",
-        "name": "guard:comment-corrector"
-      }
-    },
-    {
-      "glob": "docs/references/**/*.md",
-      "action": {
-        "kind": "agent",
-        "name": "guard:ext-docs-auditor"
-      }
+        "name": "reviewer"
+      },
+      "on_stop": "ask"
     },
     {
       "glob": "docs/**/*.md",
       "action": {
-        "kind": "agent",
-        "name": "guard:doc-auditor"
-      }
+        "kind": "skill",
+        "name": "review-docs"
+      },
+      "on_stop": "manual"
     },
     {
-      "glob": "docs/api/**/*.md",
+      "glob": "config/**/*.json",
       "action": {
-        "kind": "skill",
-        "name": "project:review-api-docs"
-      }
+        "kind": "agent",
+        "name": "reviewer"
+      },
+      "on_stop": "ask"
     }
   ],
   "files_exclude": [
-    "docs/generated/**",
-    "!docs/generated/README.md"
+    "generated/**",
+    "vendor/**"
   ]
 }

@@ -144,12 +144,14 @@ def _edited_paths(payload: dict[str, Any]) -> list[str]:
         if isinstance(direct, str) and direct:
             return [direct]
         patch = tool_input.get("patch") or tool_input.get("input")
+        if not patch and payload.get("tool_name") == "apply_patch":
+            patch = tool_input.get("command")
     else:
         patch = tool_input
     if not isinstance(patch, str):
         return []
     out: list[str] = []
-    for match in re.finditer(r"^\*\*\* (?:Add|Update|Delete) File: (.+)$", patch, re.MULTILINE):
+    for match in re.finditer(r"^\*\*\* (?:(?:Add|Update|Delete) File:|Move to:) (.+)$", patch, re.MULTILINE):
         path = match.group(1).strip()
         if path and path not in out:
             out.append(path)

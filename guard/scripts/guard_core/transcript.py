@@ -56,12 +56,9 @@ from .turnrec import _short
 # real files and about edits made to them, so its turn stays auditable like any other work.
 # `statusline` is absent for the same reason: it reports what is in the user's settings files
 # and proposes an edit to them, which is checkable work, not a relay of guard's own state.
-# `reader-profile` is here for a different reason from the rest: its turn is an interview
-# about the user, so the "answer" is the user's own words read back to them, and auditing
-# that would have guard grading the user on how they described themselves.
 # Keep retired audit entry names: old review replies must remain control turns.
 _CONTROL_CMD_RE = re.compile(
-    r"^/(guard:)?(settings|reader-profile|answer|audit-plan"
+    r"^/(guard:)?(settings|answer|audit-plan"
     r"|audit-turn(-claims|-clarity|-deferrals)?"
     r"|audit-files|audit-report(-claims|-clarity|-deferrals)?)(?=\s|$)",
     re.IGNORECASE)
@@ -100,7 +97,7 @@ def _turn_command_name(user_text: str) -> str:
 
 def _is_control_command_name(name: str) -> bool:
     """True when a normalized command name is one of guard's own control commands
-    (``settings``, ``reader-profile``, ``answer``, ``audit-plan``, ``audit-turn`` and the
+    (``settings``, ``answer``, ``audit-plan``, ``audit-turn`` and the
     retired ``audit-turn-*`` / ``audit-report-*`` entries — with or without the
     ``guard:`` prefix)."""
     return bool(name) and bool(_CONTROL_CMD_RE.match("/" + name))

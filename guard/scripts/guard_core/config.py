@@ -97,7 +97,7 @@ RETIRED_KEYS: dict[str, str] = {
 
 
 DEFAULT_CONFIG: dict[str, Any] = {
-    # Only the Claude post-approval gate can start a review automatically.
+    # The plan gate is independent of per-file Stop questions.
     AUDIT_PLAN_KEY: "on",
     # WHO reviews a held plan, as one `{"kind": "agent"|"skill", "name": "..."}` action —
     # the same shape `file_review_rules` uses per glob, without the glob, because there is
@@ -108,7 +108,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "plan_review": {},
     "turn_review": {},
     "answer_review": {},
-    # A matching rule is the only opt-in for an explicit file checkpoint.
+    # Matching rules select file checkpoints; on_stop="ask" also offers a user prompt.
     "file_review_rules": [],
     "files_exclude": [],
     # Which directories hold those documents, relative to the project dir. Empty (the
@@ -140,6 +140,7 @@ class FileReviewRule(NamedTuple):
     glob: str
     kind: str
     name: str
+    on_stop: str = "manual"
 
 
 class ReviewAction(NamedTuple):
@@ -220,10 +221,11 @@ def _file_review_rules(cfg: dict[str, Any]) -> tuple[FileReviewRule, ...]:
             continue
         kind = action.get("kind")
         name = _review_action_name(action.get("name"))
-        if kind in ("agent", "skill") and name is not None:
+        on_stop = raw_rule.get("on_stop", "manual")
+        if kind in ("agent", "skill") and name is not None and on_stop in ("manual", "ask"):
             if kind == "skill" and name in {"guard:audit-files", "audit-files"}:
                 continue
-            rules.append(FileReviewRule(pattern, kind, name))
+            rules.append(FileReviewRule(pattern, kind, name, on_stop))
     return tuple(rules)
 
 

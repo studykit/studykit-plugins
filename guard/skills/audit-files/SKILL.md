@@ -6,7 +6,8 @@ disable-model-invocation: true
 
 # Audit pending edited files
 
-This is an explicit checkpoint. It replaces automatic file audits at every Stop event.
+Run this checkpoint when the user invokes it or explicitly accepts Guard's Stop-time
+file-review form. A Stop event alone never authorizes review.
 `file_review_rules` maps project-relative globs to agents or skills for any file type.
 Matching rules need no per-agent switch. Do not add reviewers for unmatched files.
 
@@ -14,8 +15,9 @@ Matching rules need no per-agent switch. Do not add reviewers for unmatched file
 
 Resolve `scripts/checkpoint.py` relative to this `SKILL.md` and run that concrete path with
 `show`, the current host, and the current session id. If the invoking user message includes
-exactly `--token <token>`, add those two arguments to `show`; this identifies an immutable
-subset prepared by Guard's selection UI. Do not derive a scope from paths or other prose in the
+exactly `--token <token>`, or Guard's accepted Stop form supplies that token, add those two
+arguments to `show`; this identifies an immutable approved subset. Never replace an invalid
+token with a fresh checkpoint. Do not derive a scope from paths or other prose in the
 message. On Claude Code,
 `${CLAUDE_SKILL_DIR}/scripts/checkpoint.py` is already the concrete script path. Use
 `CLAUDE_CODE_SESSION_ID` on Claude Code and `CODEX_THREAD_ID` on Codex:
@@ -38,6 +40,9 @@ session's tool activity; a shared worktree diff alone is not ownership evidence.
 
 If an action is unavailable or fails, report it and stop without completing the checkpoint.
 Do not substitute another reviewer or claim those paths were reviewed.
+If any path is skipped because this session's ownership cannot be established, report the
+partial review and leave the whole checkpoint pending. Completing its token would also
+clear those unreviewed paths.
 
 Wait for all reports, then apply only findings their own disposition permits. Every listed
 file has a matching audit rule. If `truncated` contains a positive count, say that

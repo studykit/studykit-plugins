@@ -14,7 +14,8 @@ PLUGIN_ROOT = Path(__file__).resolve().parent.parent
 def problems() -> list[str]:
     out = []
     definitions = list((PLUGIN_ROOT / "skills").glob("*/SKILL.md"))
-    definitions += list((PLUGIN_ROOT / "agents").glob("*.md"))
+    for path in (PLUGIN_ROOT / "agents").glob("*.md"):
+        out.append(f"{path}: Guard reviewers must be owned by the target project")
     for path in definitions:
         text = path.read_text()
         header = re.match(r"\A---\n(.*?)\n---", text, re.DOTALL)

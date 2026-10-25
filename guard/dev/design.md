@@ -1,5 +1,66 @@
 # guard — design detail
 
+## Confirmed Stop file reviews
+
+File-review scope and criteria belong to the project. `file_review_rules` still chooses one
+agent or skill per project-relative path, using existing specificity, exclusions, queue
+provenance and checkpoint hashes. An optional `on_stop` value controls when a rule is offered:
+`manual` is the default; `ask` enables a host-owned confirmation at Stop. There is no UI-only
+path list, built-in review checklist or fallback reviewer.
+The form is part of Stop processing after the assistant's response, before the host finishes
+the turn; it is not a prompt after the CLI process exits.
+
+The Stop path asks only about matching pending revisions not already offered in that host
+and session. Confirmation is scoped to the captured file contents and selected reviewers.
+An affirmative form response permits the caller to dispatch those exact reviewers through
+native host tools. Declining, choosing no, or cancelling dispatches nothing, leaves the files
+pending, and suppresses another question for those same revisions. Changes to file contents,
+matching rules or selected reviewers can make a new offer eligible. Review continuations must
+not prompt recursively; a manual `audit-files` request remains available independently.
+Failed form requests are also retained as offered revisions, so an unavailable service does
+not produce the same question repeatedly. The files remain pending for an explicit retry.
+
+Consent to review is not consent to implement findings or adopt a proposed design. Missing
+reviewers, failed dispatch and missing evidence remain unreviewed states. The existing
+checkpoint completion contract clears matching revisions only. It relies on the caller
+following the review workflow and is not proof of subagent execution or a clean verdict.
+Approved tokens also bind the selected rules and reviewers. Token reads refuse changed
+contents or routing, and completion cannot clear those changed revisions. If any selected
+path lacks sufficient ownership evidence, the workflow leaves the whole token pending.
+
+The shared workflow owns selection and consent state; adapters own host input normalization,
+MCP interaction and hook output. The MCP tool requests a form without calling a model. After
+acceptance, the hook asks the main agent to continue with the approved checkpoint; it does
+not start a child CLI or run a reviewer inside the hook. This keeps the user's configured
+reviewer, native host permissions and independent reviewer context intact.
+
+The command Stop hook's interrupted-shell recovery remains in place. Hook-source trust,
+MCP availability, timeouts and form support must be verified in each real host. Script tests
+cannot establish that the host delivered a hook or displayed a question. Compatibility
+probes target Claude Code 2.1.310 and Codex 0.164.0 with `haiku` and `gpt-6-luna` respectively.
+Use a throwaway project and the working-tree plugin; load any required authentication into
+the child environment without recording credential values.
+
+Run `uv run --python 3.11 python -m unittest discover -s guard/dev -p 'test_*.py'` and
+`uv run guard/dev/check-entries.py` for regression and definition checks. For native-host
+verification, exercise accept, decline, cancel, unchanged revisions and changed revisions in
+separate throwaway projects, and verify the exact configured reviewer actually ran.
+
+## Project-owned reviewers
+
+Guard ships no reviewer agent definitions or reviewer installer. The shared `settings` skill
+helps users select installed agents or skills, or create project-local definitions using
+criteria they supply, then save patterns and reviewer names through the validated settings
+interface. `setup` and the bundled clarity-specific `reader-profile` workflow are removed.
+Existing project files are user-owned and are not deleted or silently rewritten.
+
+Both hosts use their registered reviewer names exactly. There is no translation from former
+Guard auditor names to copied agent files. Users can point a file rule, `turn_review`,
+`plan_review` or `answer_review` at their own reviewer. No setting means no review.
+
+Versioned sections below retain the decisions and measurements for their named releases.
+They do not restore removed reviewer agents, setup workflows or unsolicited Stop routing.
+
 ## Keyboard mode reset after a popup child (v0.161.1)
 
 Doom Emacs's `kkp` pushes a kitty keyboard mode (`CSI > 5 u`) on an `emacsclient -nw` frame
@@ -36,8 +97,9 @@ comments went with it. It had no dedicated configuration
 key, hook dispatch, or Codex setup entry. Documentation lookup now belongs to the caller's
 tools or independently installed agents.
 
-`ext-docs-auditor` and knowledge-directory access remain in use by other reviews. References to `docs-finder` and its former name `ext-docs-fetcher` below are
-historical design notes and measurements, not instructions to invoke an available agent.
+At that release, `ext-docs-auditor` and knowledge-directory access remained in use.
+References below to removed Guard agents are historical measurements, not instructions to
+invoke a currently shipped reviewer.
 
 Claude, Codex, and Herdr manifests use 0.158.0. Marketplace registrations and descriptions
 already describe the remaining features and need no change.
@@ -197,7 +259,8 @@ Retired switch keys remain untouched in raw configuration until explicitly unset
 shows migration guidance and rejects new writes to them. Old session switch fields are
 ignored; file switches, pending files, plan completion, and turn evidence remain intact.
 The legacy `candidates` CLI and shell wrapper only print a retirement notice, with no roster.
-The standalone `audit-turn-*` skills were removed in v0.154.0; their agent definitions remain.
+The standalone `audit-turn-*` skills were removed in v0.154.0. All remaining bundled reviewer
+agent definitions are now removed as well.
 
 Run `uv run --script guard/dev/test_answer_review.py` from the repository root. These tests
 cover configuration, host isolation, read-only preparation, migration, and retained file
@@ -227,8 +290,8 @@ once-per-turn suppression; explicitly asking again requests another review.
 
 The former Claude `audit-turn-*` primitives were removed in v0.154.0. There is no
 fallback roster for `audit-turn`. The claims, deferrals, and clarity switches were retired
-in v0.153.0 and do not govern any configured reviewer. Codex setup now installs file-review agents only. Existing user agent
-files are not removed during upgrades.
+in v0.153.0 and do not govern any configured reviewer. Guard no longer installs reviewer
+agents. Existing project and user agent files remain user-owned.
 
 Run `uv run --script guard/dev/test_turn_review.py` from the repository root. The isolated
 CLI tests cover exact reviewer selection, evidence fidelity, missing/invalid configuration,
@@ -310,16 +373,16 @@ beyond the state root.
 | --- | --- | --- |
 | `PreToolUse` (`Bash\|Grep\|Glob`) | `pre-search` | Deny a search rooted at the filesystem root: `find /`, `grep -r /`, `rg /` (and `fd`/`ag`/`ack`/`locate`), a `/`-anchored glob like `/*`, or a `Grep`/`Glob` call whose `path` is `/`. Reads the tool ARGUMENT only — never the caller — which is why it survives where the removed `pre-write` hook could not. Ignores the agent switches and the mute. Silent for every other call, and fails open on a command `shlex` cannot parse. |
 | `PostToolUse` (`Bash\|Write\|Edit\|MultiEdit\|NotebookEdit`) and `PostToolUseFailure` (`Bash`) | `post-edit` | Add a source file, agent instruction file or ordinary document to the session's pending checkpoint queue. Emits nothing. Native targets are exact; Bash targets come from snapshot/hash differences and retain inferred provenance. |
-| (called via Bash, not a hook) | `settings` | `guard:settings` (a `context: fork` skill, so it runs in a forked `general-purpose` agent rather than in the main session) shows/sets/unsets guard.local.json settings; the agent modes also apply to the live session's `state/<sid>.json` (session id from `--session`/`CLAUDE_CODE_SESSION_ID`). `set` preserves every other key; `unset <key>` is the only way to delete one. |
-| `Stop` | `stop` | Recover writes from an interrupted Bash call and emit nothing. It records nothing about the turn, reads none of the response and launches no audit. |
+| (called via Bash, not a hook) | `settings` | The shared `guard:settings` skill configures exact user reviewer names, file patterns, exclusions and Stop confirmation. Settings writes preserve unrelated keys. |
+| `Stop` command hook | `stop` | Recover interrupted shell writes without requesting review. The separate MCP hook owns optional file-review confirmation. |
+| `Stop` MCP tool hook | Host adapter | Offer opted-in pending revisions and continue only after the user accepts their checkpoint. See "Confirmed Stop file reviews". |
 | `SessionEnd` (`clear`) | `session-end` | Carry a live plan-gate override into the session `/clear` is about to open. It writes nothing when the gate still matches the project's configured default. |
 | `SessionStart` | `session-start` | Sweep state and turn records past retention, export `GUARD_PROJECT_DIR` and `GUARD_TOGGLE_CLI`, and name the explicit audit commands when any agent is on. Also records this session's `transcript_path`, the host-owned field every turn audit needs. Claude emits one JSON object; Codex keeps the plain-text form. |
-| (called via Bash, not a hook) | `candidates` | The router's roster for explicit turn/report/answer audits: prints the eligible agents switched on for this session. It deliberately reads no retired file-audit mute. |
+| (called via Bash, not a hook) | `candidates` | Retirement notice only; no reviewer roster. |
 | (called via Bash, not a hook) | `transcript` | `index` / `turn` / `find` over the session transcript, for the audit agents. Writes an extract file and prints only its path plus a one-line summary; `--since` / `--until` / `--last` bound which turns are scanned. |
 | (called via Bash, not a hook) | `file-checkpoint` | Snapshot all or selected paths, resume an immutable selection by token, explicitly clear all or selected paths, and safely complete the pending queue. The shared `audit-files` skill is its caller on both hosts; completion removes only paths whose contents still match its token, while any clear invalidates every live token. |
-| (called via Bash, not a hook) | `toggle-cli` | Compatibility message for the retired `guard on\|off` command. File audits are explicit checkpoints and no longer have an automatic Stop path to mute. |
+| (called via Bash, not a hook) | `toggle-cli` | Retirement notice for the old global file-audit mute. Per-rule `on_stop` selects confirmation; there is no global unsolicited audit switch. |
 | (called via Bash, not a hook) | `status` | Status-line segment: pending file count plus the plan gate flag (`⚑` armed, `⚐` muted); nothing at all on failure. |
-| (called via Bash, not a hook) | `handover-written` | Record `<path>` as the handover this session wrote, for the `guard:handover` skill to run as its last step. Writes one key into `state/<sid>.json`; the file must exist, so a path that was never written is refused while someone can still act on it. Session id from `CLAUDE_CODE_SESSION_ID`. Fails open — the handover file is the deliverable, and the record only decides whether the next session is told about it. |
 
 ## The turn audit is invoked, not recommended (v0.118.0)
 
@@ -1716,7 +1779,7 @@ payloads, not memory.
   This does not make the handoff safe, and the closeout is the wrong place to try. The
   translator→corrector step is still held by prose, which v0.110.0 established is the form that
   fails silently; a real session had already been observed ignoring an explicit "ONE AT A TIME",
-  and `dev/handoff-audit-workflow.md` listed "a `.ko.md` opened when `korean-corrector` did not
+  and an earlier handoff listed "a `.ko.md` opened when `korean-corrector` did not
   run" as a failure to watch for. What changed here is only the *response* to that failure, and
   it shares the weakness of every rule in this file: it runs when the main agent notices. A
   mechanism — state that records the translation and a hook that checks the corrector against it

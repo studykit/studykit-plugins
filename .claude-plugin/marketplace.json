@@ -71,14 +71,14 @@
     {
       "name": "guard",
       "source": "./guard",
-      "description": "User-configured answer, turn, and plan reviews, glob-based file reviews, and Git diffs in Herdr.",
+      "description": "Project-configured reviewers, pattern-based file checkpoints with optional Stop confirmation, and Git diffs in Herdr.",
       "author": {
         "name": "studykit"
       },
       "repository": "https://github.com/studykit/studykit-plugins",
       "license": "MIT",
       "category": "development",
-      "keywords": ["evidence", "claims", "grounding", "hallucination-guard", "korean", "audit", "hooks", "plan-review", "claude-code", "codex"]
+      "keywords": ["evidence", "review", "audit", "hooks", "file-review", "confirmation", "plan-review", "claude-code", "codex"]
     },
     {
       "name": "handover",

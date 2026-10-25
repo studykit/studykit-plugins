@@ -1,19 +1,19 @@
 # Guard
 
-Guard lets you run reviews that you define yourself inside Claude Code and Codex:
+Guard runs reviews that you define inside Claude Code and Codex:
 
-- **Turn reviews**: check a finished assistant response.
-- **Plan reviews**: check a plan file before implementation starts.
-- **Answer documents**: write a document for a question, have it reviewed, and correct it.
-- **Edited-file checkpoints**: record the files the agent changes, then review them with an agent or
-  skill chosen by glob when you are ready.
+- **Turn reviews** check a finished assistant response.
+- **Plan reviews** check a plan file before implementation starts.
+- **Answer documents** write a document, have your reviewer check it, and deliver the corrected file.
+- **File reviews** collect changed files by pattern. Run a checkpoint yourself, or opt selected
+  patterns into a confirmation question when the assistant finishes a turn.
 
-Guard ships no review criteria of its own. Every reviewer is an agent or skill you install and
-name in the settings. With no reviewer set, Guard does not review. Reviews never run on their
-own, with one exception: Claude Code's plan gate, which runs when you approve a plan.
+Guard ships no reviewer agents or default review criteria. You choose an installed agent or
+skill by its exact host name. An absent reviewer means that review does not run; an unavailable
+reviewer is reported instead of being replaced.
 
-Guard also refuses file searches that start at the filesystem root (`/`). It adds a status
-line segment and an optional [Herdr](https://herdr.dev) popup for the pending-file queue.
+Guard also refuses file searches rooted at `/`, adds a Claude Code status-line segment, and
+provides an optional [Herdr](https://herdr.dev) popup for pending files and Git diffs.
 
 ## Install
 
@@ -25,149 +25,143 @@ line segment and an optional [Herdr](https://herdr.dev) popup for the pending-fi
 ```
 
 **Codex**: open the plugin directory, choose the **Studykit Plugins** marketplace, and install
-**guard**. If the marketplace was added while Codex was running, restart Codex first. To use
-Guard's bundled document reviewers in Codex, run `$guard:setup` once per project. It creates
-their agent files under `.codex/agents/`. Start a new Codex session afterwards.
+**guard**. If the marketplace was added while Codex was running, restart Codex first.
 
-Every feature needs `uv` and Python 3.11 or newer on `PATH`.
+Every feature needs `uv` and Python 3.11 or newer on `PATH`. Review and trust Guard's hooks in
+your host so change tracking and Stop questions can run. Stop questions also need an available
+MCP connection and a host that permits interactive form requests.
 
-## Settings
+## Configure project reviews
+
+Run `/guard:settings` in Claude Code or `$guard:settings` in Codex. The skill helps you:
+
+- Find an installed reviewer or create a project-local agent or skill using your review criteria.
+- Choose the exact files and folders it should review, plus any exclusions.
+- Select manual review or a Stop confirmation for each file pattern.
+- View and change turn, plan, and answer reviewers without replacing unrelated settings.
+
+Reviewer definitions belong to your project or user configuration; Guard does not install
+bundled critics. Creating a new agent may require a new host session before it is available.
+The settings skill distinguishes a saved rule from a reviewer that can actually be invoked.
 
 Each project's settings live in `.claude/guard.local.json` for Claude Code and in
-`.codex/guard.local.json` for Codex. A reviewer is always written as an object with a
-`kind` (`"agent"` or `"skill"`) and the exact `name` the host uses to invoke it:
+`.codex/guard.local.json` for Codex. A reviewer has a `kind` (`"agent"` or `"skill"`) and the
+exact `name` that host uses. This example assumes you have created the named reviewers:
 
 ```json
 {
-  "turn_review":   {"kind": "agent", "name": "my-turn-reviewer"},
-  "plan_review":   {"kind": "agent", "name": "my-plan-reviewer"},
-  "answer_review": {"kind": "skill", "name": "my-answer-reviewer"},
+  "turn_review":   {"kind": "agent", "name": "reviewer"},
+  "plan_review":   {"kind": "agent", "name": "reviewer"},
+  "answer_review": {"kind": "skill", "name": "review-answer"},
   "audit-plan": "on",
   "file_review_rules": [
-    {"glob": "**/*.md", "action": {"kind": "agent", "name": "guard:doc-auditor"}}
+    {
+      "glob": "src/**",
+      "action": {"kind": "agent", "name": "reviewer"},
+      "on_stop": "ask"
+    },
+    {
+      "glob": "docs/**/*.md",
+      "action": {"kind": "skill", "name": "review-docs"},
+      "on_stop": "manual"
+    }
   ],
-  "files_exclude": ["vendor/**"]
+  "files_exclude": ["generated/**", "vendor/**"]
 }
 ```
 
-An absent reviewer or `{}` means that review does not happen. A reviewer object that is set
-but invalid is reported as an error. In Claude Code, `/guard:settings` views and changes these
-settings through conversation and can suggest file-review rules.
+Names above are examples, not defaults. The two hosts may need different registered names.
+An absent reviewer or `{}` disables that review. Invalid non-empty reviewer settings report
+an error. With empty or absent `file_review_rules`, no files are queued.
 
-## Turn reviews
+## File reviews and Stop confirmation
 
-Run `/guard:audit-turn` in Claude Code or `$guard:audit-turn` in Codex to review the last
-completed response. To review an earlier response, append its turn id.
+`file_review_rules` maps project-relative globs to reviewers. Edits matching a rule enter the
+session's pending queue. Each rule has an optional `on_stop` value:
 
-Your `turn_review` reviewer receives a JSON file with these fields:
+| Value | Behavior |
+| --- | --- |
+| `"manual"` or omitted | Files wait until you invoke `audit-files`. |
+| `"ask"` | When the assistant finishes a turn, Guard asks whether to review eligible pending changes. |
 
-- `turn_id`
-- `user`: the request
-- `assistant`: the response
-- `tools`: recorded tool activity
-- `source_path`: where to find more context
+The same specificity rules select both the reviewer and `on_stop`; a more specific manual
+rule can keep a file out of a broader Stop question. The feature applies to any configured
+file type or folder, including files without an extension. It has no UI-specific criteria.
+The question runs while the host is processing Stop, after the assistant's reply; it does
+not wait for the CLI process to exit.
 
-The reviewer should read this evidence and return findings without changing the evidence or
-any project file. Findings are reported in the conversation.
+The question identifies the pending scope. Accepting it authorizes the named reviewers to
+check a frozen checkpoint of those changes. It does not approve a new design or authorize
+implementation of the findings. The assistant invokes each exact configured agent or skill
+and reports the results. If one is unavailable or fails, the affected files remain unreviewed;
+Guard never supplies a fallback reviewer.
+If file contents, selected reviewers or matching rules change after confirmation, the approved
+token cannot authorize the changed scope. Request fresh consent before starting that review.
 
-Each run starts a fresh review. The evidence comes from what Guard's hooks recorded during the
-session, so the hooks must be active. Missing evidence or an unavailable reviewer is reported
-as an error, never as a clean review. `audit-turn` cannot be registered as its own reviewer.
+Declining, selecting no, or cancelling starts no review and leaves the files pending. Guard
+does not ask again for the same file contents, selected rule and reviewer in that session.
+A changed file, matching rule or reviewer can produce a new question. Review continuations
+do not recursively prompt for the same changes. You can always request another checkpoint
+explicitly.
+An unavailable or failed form leaves the files unreviewed as well; the same offered revision
+is not repeatedly prompted, and `audit-files` remains available for a retry.
 
-## Plan reviews
-
-Run `/guard:audit-plan <path>` in Claude Code or `$guard:audit-plan <path>` in Codex to review a
-plan file with your `plan_review` reviewer. Every run requests a fresh review, even when the plan
-was already reviewed. The assistant applies the findings you agree with to the plan and records
-that the review is complete. Changes of approach are brought back to you first. Reviewing a plan
-never starts implementation. `audit-plan` cannot be registered as its own reviewer.
-
-In Claude Code, Guard also requests the review each time you approve a plan, before
-implementation begins. A plan that changed is reviewed again at its next approval.
-
-- The `audit-plan` setting (`"on"` / `"off"`) sets the project default for this gate.
-- The shell commands `guard-plan on`, `guard-plan off`, and `guard-plan status` switch it or
-  report its state for the current session.
-
-Codex supports only the explicit command.
-
-## Answer documents
-
-Run `/guard:answer <question>` in Claude Code or `$guard:answer <question>` in Codex. Guard runs
-these steps:
-
-1. Writes an English answer document.
-2. Has your `answer_review` reviewer read it and return findings.
-3. Applies the corrections that fall within the question's scope.
-
-Documents are saved under `.claude/answers/` or `.codex/answers/`. For Korean readers, a
-user-level `korean-translator` agent, if installed, translates the reviewed document. Without
-it, you receive the reviewed English file and a note that the translation was skipped.
-
-Without a configured reviewer, the workflow stops before anything is drafted. `answer` cannot
-review itself.
-
-## Edited-file checkpoints
-
-`file_review_rules` maps project-relative globs to reviewers. When the agent edits a file that
-matches a rule, Guard adds it to a pending queue. Nothing is reviewed until you run
-`/guard:audit-files` in Claude Code or `$guard:audit-files` in Codex. The checkpoint groups the
-queued files by reviewer. It clears only the revisions that were reviewed successfully, so a file
-edited again during the review stays queued.
-
-```json
-{
-  "file_review_rules": [
-    {"glob": "**/*.py",         "action": {"kind": "agent", "name": "guard:comment-corrector"}},
-    {"glob": "**/*.md",         "action": {"kind": "agent", "name": "guard:doc-auditor"}},
-    {"glob": "**/AGENTS.md",    "action": {"kind": "agent", "name": "guard:agents-md-auditor"}},
-    {"glob": "config/**/*.json", "action": {"kind": "skill", "name": "my-config-review"}}
-  ],
-  "files_exclude": ["generated/**", "!generated/handwritten.py", "vendor/**"]
-}
-```
-
-These are examples, not defaults. With an empty or absent `file_review_rules`, no file is
-queued. A matching rule is the only way to opt a file in.
+Run `/guard:audit-files` in Claude Code or `$guard:audit-files` in Codex to review the pending
+queue at any time. Manual and confirmed reviews use the same reviewer grouping and checkpoint
+completion rules. Only matching revisions are cleared; a file edited during review remains
+pending. If ownership cannot be established for any selected path, report the partial review
+and leave the checkpoint pending. Checkpoint completion records the caller's completed
+workflow, not an independent proof that a reviewer ran or a guarantee that every finding was
+resolved.
 
 **Matching**
 
 - `*` matches within one directory. `**` crosses directories, including zero levels.
 - Rules apply to every file type, including files without an extension.
-- When several rules match, the most specific one wins:
-  1. An exact filename beats a filename pattern.
-  2. Next, more literal directory depth and detail win.
-  3. On an exact tie, the first rule in the list wins.
+- When several rules match, the most specific one wins: an exact filename beats a filename
+  pattern, then more literal directory depth and detail win. An exact tie uses the first rule.
 
 **Exclusions**
 
-- `files_exclude` entries are applied in list order, and the last matching entry wins.
-- `!pattern` restores files that an earlier entry excluded. In the example above,
-  `generated/handwritten.py` is restored after `generated/**`. A restored file still needs a
-  matching rule to be queued.
-- To exclude a filename that starts with a literal `!`, write `\\!name.py` in the JSON.
+- `files_exclude` entries apply in list order; the last match wins.
+- `!pattern` restores files excluded earlier. A restored file still needs a matching rule.
+- To match a filename starting with a literal `!`, write `\\!name.py` in JSON.
 - `doc_dir` limits which directories count as ordinary Markdown documentation.
 
-These patterns are Guard's own globs with negation, not full `.gitignore` syntax. For example, a
-`!` entry can restore a single file inside an excluded directory.
+These are Guard's own project-relative globs, not full `.gitignore` syntax. An exception can
+restore a single file inside an excluded directory.
 
-### Bundled reviewers
+## Turn reviews
 
-| Agent | What it does | Hosts |
-| --- | --- | --- |
-| `guard:doc-auditor` | Audits a project's ordinary Markdown documentation | Claude Code, Codex (after `$guard:setup`) |
-| `guard:agents-md-auditor` | Audits agent instruction files (`AGENTS.md`, `CLAUDE.md`) | Claude Code, Codex (after `$guard:setup`) |
-| `guard:ext-docs-auditor` | Audits files saved as local copies of external references | Claude Code, Codex (after `$guard:setup`) |
-| `guard:comment-corrector` | Audits source comments and **edits them in place**; never changes code | Claude Code |
-| `guard:claims-auditor` | Audits a text for claims it does not support | Claude Code |
-| `guard:deferrals-auditor` | Audits a text for open questions its author could have resolved | Claude Code |
-| `guard:clarity-auditor` | Audits whether a specific reader can follow an answer | Claude Code |
+Run `/guard:audit-turn` in Claude Code or `$guard:audit-turn` in Codex to review the last
+completed response, or append a turn id to select an earlier response. Only your `turn_review`
+reviewer runs. It receives recorded request, response, tool activity, and source location.
 
-In Codex, keep the `guard:` names in your rules. Guard maps them to the agents that
-`$guard:setup` installed. For source-code review in Codex, choose your own agent or skill.
+Each invocation requests a fresh review. Missing evidence, invalid configuration, and an
+unavailable reviewer are errors, never a clean verdict. Reviewing a response does not authorize
+project changes. `audit-turn` cannot be its own reviewer.
 
-The clarity auditor judges against a profile of you as a reader. Run `/guard:reader-profile`
-in Claude Code to create or correct it.
+## Plan reviews
+
+Run `/guard:audit-plan <path>` in Claude Code or `$guard:audit-plan <path>` in Codex to request
+a fresh review by `plan_review`. Reviewing a plan does not start implementation; changes of
+approach come back to you first. `audit-plan` cannot be its own reviewer.
+
+Claude Code also requests this review when you approve a plan, before implementation begins.
+The `audit-plan` setting (`"on"` by default, or `"off"`) controls that gate. The shell commands
+`guard-plan on`, `guard-plan off`, and `guard-plan status` control it for the current session.
+Codex supports the explicit plan-review command only.
+
+## Answer documents
+
+Run `/guard:answer <question>` in Claude Code or `$guard:answer <question>` in Codex. Guard
+writes an English answer document, sends it to `answer_review`, and applies corrections within
+the requested scope. Without a configured reviewer, it stops before drafting. `answer` cannot
+be its own reviewer.
+
+Documents are saved under `.claude/answers/` or `.codex/answers/`. For Korean readers, the
+user-level `korean-translator` agent, if installed, translates the reviewed document. Otherwise
+the reviewed English file is delivered with a note that translation was skipped.
 
 ## Status line (Claude Code)
 
@@ -181,7 +175,7 @@ a shield icon in front of Guard's segment:
  2 pending · ⚑    myrepo › src    main*    62%    Opus · xhigh ✻    3:41 PM
 ```
 
-The number counts the files waiting for `/guard:audit-files`. The flag shows the plan gate:
+The number counts pending files. The flag shows the plan gate:
 filled (`⚑`) when it is on, outlined (`⚐`) when it is paused for the session.
 
 ## Herdr

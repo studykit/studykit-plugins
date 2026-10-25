@@ -1,0 +1,6 @@
+interface:
+  display_name: "Configure project reviews"
+  short_description: "Set project reviewers and Stop-time questions"
+  default_prompt: "Use $settings to configure this project's Guard reviewers and file patterns."
+policy:
+  allow_implicit_invocation: false
